@@ -7,114 +7,110 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BC33F150247B7B0400E9635F /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = BC33F14F247B7B0400E9635F /* SDWebImageSwiftUI */; };
-		BC58D614246BF82100C86F57 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC58D613246BF82100C86F57 /* OGSPauseControl.swift */; };
-		BC58D616246C018D00C86F57 /* GameDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC58D615246C018D00C86F57 /* GameDetail.swift */; };
-		BC709F682451903500313C77 /* OGSWebSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F672451903500313C77 /* OGSWebSocket.swift */; };
-		BC709F6B24519BB500313C77 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC709F6A24519BB500313C77 /* SocketIO */; };
-		BC709F6E24529FAE00313C77 /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F6D24529FAE00313C77 /* OGSUser.swift */; };
-		BC709F712452DE1400313C77 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC709F702452DE1400313C77 /* DictionaryCoding */; };
-		BC709F732452E05900313C77 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F722452E05900313C77 /* OGSUIConfig.swift */; };
-		BC709F752452E12300313C77 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F742452E12300313C77 /* UserDefaults+SurroundModels.swift */; };
-		BC709F782452E1F900313C77 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F772452E1F900313C77 /* LoginView.swift */; };
-		BC709F7A245306B000313C77 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F79245306B000313C77 /* OGSService.swift */; };
-		BC709F7D245337B800313C77 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC709F7C245337B800313C77 /* Alamofire */; };
-		BC709F7F24598FDC00313C77 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F7E24598FDB00313C77 /* MainView.swift */; };
-		BC709F81245AD33900313C77 /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F80245AD33900313C77 /* OGSGame.swift */; };
-		BC709F83245ADC6700313C77 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F82245ADC6700313C77 /* Game.swift */; };
-		BC709F85245C1CBD00313C77 /* PublicGamesList.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F84245C1CBD00313C77 /* PublicGamesList.swift */; };
-		BC709F87245C1D5800313C77 /* GameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC709F86245C1D5800313C77 /* GameCell.swift */; };
-		BC767B8124616847003BCBAA /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC767B8024616846003BCBAA /* TimeControl.swift */; };
-		BC767B85246403BE003BCBAA /* Clock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC767B84246403BE003BCBAA /* Clock.swift */; };
-		BC767B8724641B18003BCBAA /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC767B8624641B18003BCBAA /* TimeUtilities.swift */; };
-		BC767B8924641CDD003BCBAA /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC767B8824641CDD003BCBAA /* TimerView.swift */; };
-		BCA72AD3244ABAD9007CC46B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72AD2244ABAD9007CC46B /* AppDelegate.swift */; };
-		BCA72AD5244ABAD9007CC46B /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72AD4244ABAD9007CC46B /* SceneDelegate.swift */; };
-		BCA72AD7244ABAD9007CC46B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72AD6244ABAD9007CC46B /* ContentView.swift */; };
-		BCA72AD9244ABADC007CC46B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BCA72AD8244ABADC007CC46B /* Assets.xcassets */; };
-		BCA72ADC244ABADC007CC46B /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BCA72ADB244ABADC007CC46B /* Preview Assets.xcassets */; };
-		BCA72ADF244ABADC007CC46B /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BCA72ADD244ABADC007CC46B /* LaunchScreen.storyboard */; };
-		BCA72AEA244ABADC007CC46B /* SurroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72AE9244ABADC007CC46B /* SurroundTests.swift */; };
-		BCA72AF5244ABADD007CC46B /* SurroundUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72AF4244ABADD007CC46B /* SurroundUITests.swift */; };
-		BCA72B05244AC6FE007CC46B /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72B04244AC6FE007CC46B /* BoardPosition.swift */; };
-		BCA72B09244ACC04007CC46B /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA72B08244ACC04007CC46B /* BoardView.swift */; };
-		BCF654732476345F00C8D8BF /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF654722476345F00C8D8BF /* TestData.swift */; };
+		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
+		BC042AF524AB2CF50050B2D1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* ContentView.swift */; };
+		BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
+		BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */; };
+		BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */; };
+		BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */; };
+		BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2A24AB2DD00050B2D1 /* GameCell.swift */; };
+		BC042B4724AB2DD10050B2D1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2B24AB2DD00050B2D1 /* LoginView.swift */; };
+		BC042B4824AB2DD10050B2D1 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2C24AB2DD00050B2D1 /* TimerView.swift */; };
+		BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2D24AB2DD00050B2D1 /* MainView.swift */; };
+		BC042B4A24AB2DD10050B2D1 /* GameDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2E24AB2DD00050B2D1 /* GameDetail.swift */; };
+		BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */; };
+		BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
+		BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
+		BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
+		BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3724AB2DD00050B2D1 /* OGSUser.swift */; };
+		BC042B5124AB2DD10050B2D1 /* Clock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* Clock.swift */; };
+		BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
+		BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
+		BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
+		BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
+		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
+		BC042B5824AB2DD10050B2D1 /* OGSWebSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */; };
+		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
+		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
+		BC042B5F24AB2EC60050B2D1 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5E24AB2EC60050B2D1 /* SocketIO */; };
+		BC042B6224AB2F1D0050B2D1 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */; };
+		BC042B6524AB2F970050B2D1 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B6424AB2F970050B2D1 /* Alamofire */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		BCA72AE6244ABADC007CC46B /* PBXContainerItemProxy */ = {
+		BC042B0124AB2CFA0050B2D1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = BCA72AC7244ABAD9007CC46B /* Project object */;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = BCA72ACE244ABAD9007CC46B;
+			remoteGlobalIDString = BC042AEE24AB2CF40050B2D1;
 			remoteInfo = Surround;
 		};
-		BCA72AF1244ABADC007CC46B /* PBXContainerItemProxy */ = {
+		BC042B0C24AB2CFA0050B2D1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = BCA72AC7244ABAD9007CC46B /* Project object */;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = BCA72ACE244ABAD9007CC46B;
+			remoteGlobalIDString = BC042AEE24AB2CF40050B2D1;
 			remoteInfo = Surround;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		BC58D613246BF82100C86F57 /* OGSPauseControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPauseControl.swift; sourceTree = "<group>"; };
-		BC58D615246C018D00C86F57 /* GameDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetail.swift; sourceTree = "<group>"; };
-		BC709F672451903500313C77 /* OGSWebSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebSocket.swift; sourceTree = "<group>"; };
-		BC709F6D24529FAE00313C77 /* OGSUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSUser.swift; sourceTree = "<group>"; };
-		BC709F722452E05900313C77 /* OGSUIConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSUIConfig.swift; sourceTree = "<group>"; };
-		BC709F742452E12300313C77 /* UserDefaults+SurroundModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserDefaults+SurroundModels.swift"; sourceTree = "<group>"; };
-		BC709F772452E1F900313C77 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		BC709F79245306B000313C77 /* OGSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
-		BC709F7E24598FDB00313C77 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
-		BC709F80245AD33900313C77 /* OGSGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSGame.swift; sourceTree = "<group>"; };
-		BC709F82245ADC6700313C77 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
-		BC709F84245C1CBD00313C77 /* PublicGamesList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicGamesList.swift; sourceTree = "<group>"; };
-		BC709F86245C1D5800313C77 /* GameCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCell.swift; sourceTree = "<group>"; };
-		BC767B8024616846003BCBAA /* TimeControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeControl.swift; sourceTree = "<group>"; };
-		BC767B84246403BE003BCBAA /* Clock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clock.swift; sourceTree = "<group>"; };
-		BC767B8624641B18003BCBAA /* TimeUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
-		BC767B8824641CDD003BCBAA /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
-		BCA72ACF244ABAD9007CC46B /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		BCA72AD2244ABAD9007CC46B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BCA72AD4244ABAD9007CC46B /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		BCA72AD6244ABAD9007CC46B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		BCA72AD8244ABADC007CC46B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		BCA72ADB244ABADC007CC46B /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		BCA72ADE244ABADC007CC46B /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		BCA72AE0244ABADC007CC46B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		BCA72AE5244ABADC007CC46B /* SurroundTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		BCA72AE9244ABADC007CC46B /* SurroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundTests.swift; sourceTree = "<group>"; };
-		BCA72AEB244ABADC007CC46B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		BCA72AF0244ABADC007CC46B /* SurroundUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		BCA72AF4244ABADD007CC46B /* SurroundUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITests.swift; sourceTree = "<group>"; };
-		BCA72AF6244ABADD007CC46B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		BCA72B04244AC6FE007CC46B /* BoardPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardPosition.swift; sourceTree = "<group>"; };
-		BCA72B08244ACC04007CC46B /* BoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
-		BCF654722476345F00C8D8BF /* TestData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestData.swift; sourceTree = "<group>"; };
+		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundApp.swift; sourceTree = "<group>"; };
+		BC042AF424AB2CF50050B2D1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		BC042AFB24AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundTests.swift; sourceTree = "<group>"; };
+		BC042B0624AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITests.swift; sourceTree = "<group>"; };
+		BC042B1124AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BC042B2A24AB2DD00050B2D1 /* GameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameCell.swift; sourceTree = "<group>"; };
+		BC042B2B24AB2DD00050B2D1 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		BC042B2C24AB2DD00050B2D1 /* TimerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
+		BC042B2D24AB2DD00050B2D1 /* MainView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		BC042B2E24AB2DD00050B2D1 /* GameDetail.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameDetail.swift; sourceTree = "<group>"; };
+		BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PublicGamesList.swift; sourceTree = "<group>"; };
+		BC042B3124AB2DD00050B2D1 /* TestData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestData.swift; sourceTree = "<group>"; };
+		BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSUIConfig.swift; sourceTree = "<group>"; };
+		BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSPauseControl.swift; sourceTree = "<group>"; };
+		BC042B3624AB2DD00050B2D1 /* OGSGame.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSGame.swift; sourceTree = "<group>"; };
+		BC042B3724AB2DD00050B2D1 /* OGSUser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSUser.swift; sourceTree = "<group>"; };
+		BC042B3924AB2DD00050B2D1 /* Clock.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Clock.swift; sourceTree = "<group>"; };
+		BC042B3A24AB2DD00050B2D1 /* Game.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
+		BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeControl.swift; sourceTree = "<group>"; };
+		BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardPosition.swift; sourceTree = "<group>"; };
+		BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UserDefaults+SurroundModels.swift"; sourceTree = "<group>"; };
+		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
+		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
+		BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSWebSocket.swift; sourceTree = "<group>"; };
+		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		BCA72ACC244ABAD9007CC46B /* Frameworks */ = {
+		BC042AEC24AB2CF40050B2D1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BC33F150247B7B0400E9635F /* SDWebImageSwiftUI in Frameworks */,
-				BC709F7D245337B800313C77 /* Alamofire in Frameworks */,
-				BC709F712452DE1400313C77 /* DictionaryCoding in Frameworks */,
-				BC709F6B24519BB500313C77 /* SocketIO in Frameworks */,
+				BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */,
+				BC042B6524AB2F970050B2D1 /* Alamofire in Frameworks */,
+				BC042B6224AB2F1D0050B2D1 /* DictionaryCoding in Frameworks */,
+				BC042B5F24AB2EC60050B2D1 /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AE2244ABADC007CC46B /* Frameworks */ = {
+		BC042AFD24AB2CFA0050B2D1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AED244ABADC007CC46B /* Frameworks */ = {
+		BC042B0824AB2CFA0050B2D1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -124,168 +120,166 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		BC709F652451900600313C77 /* Services */ = {
+		BC042AE624AB2CF40050B2D1 = {
 			isa = PBXGroup;
 			children = (
-				BC709F662451900E00313C77 /* OGS */,
-				BC767B8624641B18003BCBAA /* TimeUtilities.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		BC709F662451900E00313C77 /* OGS */ = {
-			isa = PBXGroup;
-			children = (
-				BC709F672451903500313C77 /* OGSWebSocket.swift */,
-				BC709F79245306B000313C77 /* OGSService.swift */,
-			);
-			path = OGS;
-			sourceTree = "<group>";
-		};
-		BC709F6C24529F9600313C77 /* OGS */ = {
-			isa = PBXGroup;
-			children = (
-				BC709F6D24529FAE00313C77 /* OGSUser.swift */,
-				BC709F722452E05900313C77 /* OGSUIConfig.swift */,
-				BC709F80245AD33900313C77 /* OGSGame.swift */,
-				BC58D613246BF82100C86F57 /* OGSPauseControl.swift */,
-			);
-			path = OGS;
-			sourceTree = "<group>";
-		};
-		BC709F762452E1C000313C77 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				BC709F772452E1F900313C77 /* LoginView.swift */,
-				BC709F7E24598FDB00313C77 /* MainView.swift */,
-				BC709F84245C1CBD00313C77 /* PublicGamesList.swift */,
-				BC709F86245C1D5800313C77 /* GameCell.swift */,
-				BC767B8824641CDD003BCBAA /* TimerView.swift */,
-				BC58D615246C018D00C86F57 /* GameDetail.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		BCA72AC6244ABAD9007CC46B = {
-			isa = PBXGroup;
-			children = (
-				BCA72AD1244ABAD9007CC46B /* Surround */,
-				BCA72AE8244ABADC007CC46B /* SurroundTests */,
-				BCA72AF3244ABADD007CC46B /* SurroundUITests */,
-				BCA72AD0244ABAD9007CC46B /* Products */,
+				BC042AF124AB2CF50050B2D1 /* Surround */,
+				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
+				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
+				BC042AF024AB2CF50050B2D1 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		BCA72AD0244ABAD9007CC46B /* Products */ = {
+		BC042AF024AB2CF50050B2D1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72ACF244ABAD9007CC46B /* Surround.app */,
-				BCA72AE5244ABADC007CC46B /* SurroundTests.xctest */,
-				BCA72AF0244ABADC007CC46B /* SurroundUITests.xctest */,
+				BC042AEF24AB2CF50050B2D1 /* Surround.app */,
+				BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */,
+				BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		BCA72AD1244ABAD9007CC46B /* Surround */ = {
+		BC042AF124AB2CF50050B2D1 /* Surround */ = {
 			isa = PBXGroup;
 			children = (
-				BCF654712476343900C8D8BF /* Data */,
-				BCA72B02244AC6AD007CC46B /* Models */,
-				BCA72B06244ACAC4007CC46B /* Components */,
-				BC709F762452E1C000313C77 /* Views */,
-				BC709F652451900600313C77 /* Services */,
-				BCA72AD2244ABAD9007CC46B /* AppDelegate.swift */,
-				BCA72AD4244ABAD9007CC46B /* SceneDelegate.swift */,
-				BCA72AD6244ABAD9007CC46B /* ContentView.swift */,
-				BCA72AD8244ABADC007CC46B /* Assets.xcassets */,
-				BCA72ADD244ABADC007CC46B /* LaunchScreen.storyboard */,
-				BCA72AE0244ABADC007CC46B /* Info.plist */,
-				BCA72ADA244ABADC007CC46B /* Preview Content */,
+				BC042B3E24AB2DD10050B2D1 /* Components */,
+				BC042B3024AB2DD00050B2D1 /* Data */,
+				BC042B3224AB2DD00050B2D1 /* Models */,
+				BC042B4124AB2DD10050B2D1 /* Services */,
+				BC042B2924AB2DD00050B2D1 /* Views */,
+				BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */,
+				BC042AF424AB2CF50050B2D1 /* ContentView.swift */,
+				BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */,
+				BC042AFB24AB2CFA0050B2D1 /* Info.plist */,
+				BC042AF824AB2CFA0050B2D1 /* Preview Content */,
 			);
 			path = Surround;
 			sourceTree = "<group>";
 		};
-		BCA72ADA244ABADC007CC46B /* Preview Content */ = {
+		BC042AF824AB2CFA0050B2D1 /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72ADB244ABADC007CC46B /* Preview Assets.xcassets */,
+				BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		BCA72AE8244ABADC007CC46B /* SurroundTests */ = {
+		BC042B0324AB2CFA0050B2D1 /* SurroundTests */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72AE9244ABADC007CC46B /* SurroundTests.swift */,
-				BCA72AEB244ABADC007CC46B /* Info.plist */,
+				BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */,
+				BC042B0624AB2CFA0050B2D1 /* Info.plist */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
 		};
-		BCA72AF3244ABADD007CC46B /* SurroundUITests */ = {
+		BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72AF4244ABADD007CC46B /* SurroundUITests.swift */,
-				BCA72AF6244ABADD007CC46B /* Info.plist */,
+				BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */,
+				BC042B1124AB2CFA0050B2D1 /* Info.plist */,
 			);
 			path = SurroundUITests;
 			sourceTree = "<group>";
 		};
-		BCA72B02244AC6AD007CC46B /* Models */ = {
+		BC042B2924AB2DD00050B2D1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				BC709F6C24529F9600313C77 /* OGS */,
-				BCA72B03244AC6F0007CC46B /* Core */,
-				BC709F742452E12300313C77 /* UserDefaults+SurroundModels.swift */,
+				BC042B2A24AB2DD00050B2D1 /* GameCell.swift */,
+				BC042B2B24AB2DD00050B2D1 /* LoginView.swift */,
+				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
+				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
+				BC042B2E24AB2DD00050B2D1 /* GameDetail.swift */,
+				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		BC042B3024AB2DD00050B2D1 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				BC042B3124AB2DD00050B2D1 /* TestData.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		BC042B3224AB2DD00050B2D1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BC042B3324AB2DD00050B2D1 /* OGS */,
+				BC042B3824AB2DD00050B2D1 /* Core */,
+				BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
 		};
-		BCA72B03244AC6F0007CC46B /* Core */ = {
+		BC042B3324AB2DD00050B2D1 /* OGS */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72B04244AC6FE007CC46B /* BoardPosition.swift */,
-				BC767B8024616846003BCBAA /* TimeControl.swift */,
-				BC767B84246403BE003BCBAA /* Clock.swift */,
-				BC709F82245ADC6700313C77 /* Game.swift */,
+				BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */,
+				BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */,
+				BC042B3624AB2DD00050B2D1 /* OGSGame.swift */,
+				BC042B3724AB2DD00050B2D1 /* OGSUser.swift */,
+			);
+			path = OGS;
+			sourceTree = "<group>";
+		};
+		BC042B3824AB2DD00050B2D1 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				BC042B3924AB2DD00050B2D1 /* Clock.swift */,
+				BC042B3A24AB2DD00050B2D1 /* Game.swift */,
+				BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */,
+				BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
 		};
-		BCA72B06244ACAC4007CC46B /* Components */ = {
+		BC042B3E24AB2DD10050B2D1 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72B07244ACBED007CC46B /* Board */,
+				BC042B3F24AB2DD10050B2D1 /* Board */,
 			);
 			path = Components;
 			sourceTree = "<group>";
 		};
-		BCA72B07244ACBED007CC46B /* Board */ = {
+		BC042B3F24AB2DD10050B2D1 /* Board */ = {
 			isa = PBXGroup;
 			children = (
-				BCA72B08244ACC04007CC46B /* BoardView.swift */,
+				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
 			);
 			path = Board;
 			sourceTree = "<group>";
 		};
-		BCF654712476343900C8D8BF /* Data */ = {
+		BC042B4124AB2DD10050B2D1 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				BCF654722476345F00C8D8BF /* TestData.swift */,
+				BC042B4224AB2DD10050B2D1 /* OGS */,
+				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
 			);
-			path = Data;
+			path = Services;
+			sourceTree = "<group>";
+		};
+		BC042B4224AB2DD10050B2D1 /* OGS */ = {
+			isa = PBXGroup;
+			children = (
+				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
+				BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */,
+			);
+			path = OGS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		BCA72ACE244ABAD9007CC46B /* Surround */ = {
+		BC042AEE24AB2CF40050B2D1 /* Surround */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BCA72AF9244ABADD007CC46B /* Build configuration list for PBXNativeTarget "Surround" */;
+			buildConfigurationList = BC042B1424AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "Surround" */;
 			buildPhases = (
-				BCA72ACB244ABAD9007CC46B /* Sources */,
-				BCA72ACC244ABAD9007CC46B /* Frameworks */,
-				BCA72ACD244ABAD9007CC46B /* Resources */,
+				BC042AEB24AB2CF40050B2D1 /* Sources */,
+				BC042AEC24AB2CF40050B2D1 /* Frameworks */,
+				BC042AED24AB2CF40050B2D1 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -293,74 +287,74 @@
 			);
 			name = Surround;
 			packageProductDependencies = (
-				BC709F6A24519BB500313C77 /* SocketIO */,
-				BC709F702452DE1400313C77 /* DictionaryCoding */,
-				BC709F7C245337B800313C77 /* Alamofire */,
-				BC33F14F247B7B0400E9635F /* SDWebImageSwiftUI */,
+				BC042B5B24AB2E360050B2D1 /* URLImage */,
+				BC042B5E24AB2EC60050B2D1 /* SocketIO */,
+				BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */,
+				BC042B6424AB2F970050B2D1 /* Alamofire */,
 			);
 			productName = Surround;
-			productReference = BCA72ACF244ABAD9007CC46B /* Surround.app */;
+			productReference = BC042AEF24AB2CF50050B2D1 /* Surround.app */;
 			productType = "com.apple.product-type.application";
 		};
-		BCA72AE4244ABADC007CC46B /* SurroundTests */ = {
+		BC042AFF24AB2CFA0050B2D1 /* SurroundTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BCA72AFC244ABADD007CC46B /* Build configuration list for PBXNativeTarget "SurroundTests" */;
+			buildConfigurationList = BC042B1724AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "SurroundTests" */;
 			buildPhases = (
-				BCA72AE1244ABADC007CC46B /* Sources */,
-				BCA72AE2244ABADC007CC46B /* Frameworks */,
-				BCA72AE3244ABADC007CC46B /* Resources */,
+				BC042AFC24AB2CFA0050B2D1 /* Sources */,
+				BC042AFD24AB2CFA0050B2D1 /* Frameworks */,
+				BC042AFE24AB2CFA0050B2D1 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				BCA72AE7244ABADC007CC46B /* PBXTargetDependency */,
+				BC042B0224AB2CFA0050B2D1 /* PBXTargetDependency */,
 			);
 			name = SurroundTests;
 			productName = SurroundTests;
-			productReference = BCA72AE5244ABADC007CC46B /* SurroundTests.xctest */;
+			productReference = BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		BCA72AEF244ABADC007CC46B /* SurroundUITests */ = {
+		BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BCA72AFF244ABADD007CC46B /* Build configuration list for PBXNativeTarget "SurroundUITests" */;
+			buildConfigurationList = BC042B1A24AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "SurroundUITests" */;
 			buildPhases = (
-				BCA72AEC244ABADC007CC46B /* Sources */,
-				BCA72AED244ABADC007CC46B /* Frameworks */,
-				BCA72AEE244ABADC007CC46B /* Resources */,
+				BC042B0724AB2CFA0050B2D1 /* Sources */,
+				BC042B0824AB2CFA0050B2D1 /* Frameworks */,
+				BC042B0924AB2CFA0050B2D1 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				BCA72AF2244ABADC007CC46B /* PBXTargetDependency */,
+				BC042B0D24AB2CFA0050B2D1 /* PBXTargetDependency */,
 			);
 			name = SurroundUITests;
 			productName = SurroundUITests;
-			productReference = BCA72AF0244ABADC007CC46B /* SurroundUITests.xctest */;
+			productReference = BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		BCA72AC7244ABAD9007CC46B /* Project object */ = {
+		BC042AE724AB2CF40050B2D1 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 1140;
-				LastUpgradeCheck = 1140;
+				LastSwiftUpdateCheck = 1200;
+				LastUpgradeCheck = 1200;
 				TargetAttributes = {
-					BCA72ACE244ABAD9007CC46B = {
-						CreatedOnToolsVersion = 11.4.1;
+					BC042AEE24AB2CF40050B2D1 = {
+						CreatedOnToolsVersion = 12.0;
 					};
-					BCA72AE4244ABADC007CC46B = {
-						CreatedOnToolsVersion = 11.4.1;
-						TestTargetID = BCA72ACE244ABAD9007CC46B;
+					BC042AFF24AB2CFA0050B2D1 = {
+						CreatedOnToolsVersion = 12.0;
+						TestTargetID = BC042AEE24AB2CF40050B2D1;
 					};
-					BCA72AEF244ABADC007CC46B = {
-						CreatedOnToolsVersion = 11.4.1;
-						TestTargetID = BCA72ACE244ABAD9007CC46B;
+					BC042B0A24AB2CFA0050B2D1 = {
+						CreatedOnToolsVersion = 12.0;
+						TestTargetID = BC042AEE24AB2CF40050B2D1;
 					};
 				};
 			};
-			buildConfigurationList = BCA72ACA244ABAD9007CC46B /* Build configuration list for PBXProject "Surround" */;
+			buildConfigurationList = BC042AEA24AB2CF40050B2D1 /* Build configuration list for PBXProject "Surround" */;
 			compatibilityVersion = "Xcode 9.3";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -368,43 +362,42 @@
 				en,
 				Base,
 			);
-			mainGroup = BCA72AC6244ABAD9007CC46B;
+			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
-				BC709F6924519BB500313C77 /* XCRemoteSwiftPackageReference "socket" */,
-				BC709F6F2452DE1400313C77 /* XCRemoteSwiftPackageReference "DictionaryCoding" */,
-				BC709F7B245337B800313C77 /* XCRemoteSwiftPackageReference "Alamofire" */,
-				BC33F14E247B7B0400E9635F /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
+				BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */,
+				BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */,
+				BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */,
+				BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
-			productRefGroup = BCA72AD0244ABAD9007CC46B /* Products */;
+			productRefGroup = BC042AF024AB2CF50050B2D1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				BCA72ACE244ABAD9007CC46B /* Surround */,
-				BCA72AE4244ABADC007CC46B /* SurroundTests */,
-				BCA72AEF244ABADC007CC46B /* SurroundUITests */,
+				BC042AEE24AB2CF40050B2D1 /* Surround */,
+				BC042AFF24AB2CFA0050B2D1 /* SurroundTests */,
+				BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		BCA72ACD244ABAD9007CC46B /* Resources */ = {
+		BC042AED24AB2CF40050B2D1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BCA72ADF244ABADC007CC46B /* LaunchScreen.storyboard in Resources */,
-				BCA72ADC244ABADC007CC46B /* Preview Assets.xcassets in Resources */,
-				BCA72AD9244ABADC007CC46B /* Assets.xcassets in Resources */,
+				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
+				BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AE3244ABADC007CC46B /* Resources */ = {
+		BC042AFE24AB2CFA0050B2D1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AEE244ABADC007CC46B /* Resources */ = {
+		BC042B0924AB2CFA0050B2D1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -414,80 +407,68 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		BCA72ACB244ABAD9007CC46B /* Sources */ = {
+		BC042AEB24AB2CF40050B2D1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BC709F81245AD33900313C77 /* OGSGame.swift in Sources */,
-				BC58D614246BF82100C86F57 /* OGSPauseControl.swift in Sources */,
-				BCA72AD3244ABAD9007CC46B /* AppDelegate.swift in Sources */,
-				BC709F7F24598FDC00313C77 /* MainView.swift in Sources */,
-				BC709F87245C1D5800313C77 /* GameCell.swift in Sources */,
-				BC767B8724641B18003BCBAA /* TimeUtilities.swift in Sources */,
-				BC709F7A245306B000313C77 /* OGSService.swift in Sources */,
-				BC709F732452E05900313C77 /* OGSUIConfig.swift in Sources */,
-				BC709F682451903500313C77 /* OGSWebSocket.swift in Sources */,
-				BC709F85245C1CBD00313C77 /* PublicGamesList.swift in Sources */,
-				BCF654732476345F00C8D8BF /* TestData.swift in Sources */,
-				BCA72AD5244ABAD9007CC46B /* SceneDelegate.swift in Sources */,
-				BC767B8924641CDD003BCBAA /* TimerView.swift in Sources */,
-				BC709F752452E12300313C77 /* UserDefaults+SurroundModels.swift in Sources */,
-				BC709F6E24529FAE00313C77 /* OGSUser.swift in Sources */,
-				BC767B8124616847003BCBAA /* TimeControl.swift in Sources */,
-				BC767B85246403BE003BCBAA /* Clock.swift in Sources */,
-				BC709F83245ADC6700313C77 /* Game.swift in Sources */,
-				BCA72B09244ACC04007CC46B /* BoardView.swift in Sources */,
-				BCA72AD7244ABAD9007CC46B /* ContentView.swift in Sources */,
-				BC709F782452E1F900313C77 /* LoginView.swift in Sources */,
-				BC58D616246C018D00C86F57 /* GameDetail.swift in Sources */,
-				BCA72B05244AC6FE007CC46B /* BoardPosition.swift in Sources */,
+				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
+				BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */,
+				BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */,
+				BC042B4824AB2DD10050B2D1 /* TimerView.swift in Sources */,
+				BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */,
+				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
+				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
+				BC042AF524AB2CF50050B2D1 /* ContentView.swift in Sources */,
+				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
+				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
+				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
+				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
+				BC042B4A24AB2DD10050B2D1 /* GameDetail.swift in Sources */,
+				BC042B5824AB2DD10050B2D1 /* OGSWebSocket.swift in Sources */,
+				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
+				BC042B5124AB2DD10050B2D1 /* Clock.swift in Sources */,
+				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
+				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
+				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,
+				BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */,
+				BC042B4724AB2DD10050B2D1 /* LoginView.swift in Sources */,
+				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AE1244ABADC007CC46B /* Sources */ = {
+		BC042AFC24AB2CFA0050B2D1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BCA72AEA244ABADC007CC46B /* SurroundTests.swift in Sources */,
+				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BCA72AEC244ABADC007CC46B /* Sources */ = {
+		BC042B0724AB2CFA0050B2D1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BCA72AF5244ABADD007CC46B /* SurroundUITests.swift in Sources */,
+				BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		BCA72AE7244ABADC007CC46B /* PBXTargetDependency */ = {
+		BC042B0224AB2CFA0050B2D1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = BCA72ACE244ABAD9007CC46B /* Surround */;
-			targetProxy = BCA72AE6244ABADC007CC46B /* PBXContainerItemProxy */;
+			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
+			targetProxy = BC042B0124AB2CFA0050B2D1 /* PBXContainerItemProxy */;
 		};
-		BCA72AF2244ABADC007CC46B /* PBXTargetDependency */ = {
+		BC042B0D24AB2CFA0050B2D1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = BCA72ACE244ABAD9007CC46B /* Surround */;
-			targetProxy = BCA72AF1244ABADC007CC46B /* PBXContainerItemProxy */;
+			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
+			targetProxy = BC042B0C24AB2CFA0050B2D1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
-/* Begin PBXVariantGroup section */
-		BCA72ADD244ABADC007CC46B /* LaunchScreen.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				BCA72ADE244ABADC007CC46B /* Base */,
-			);
-			name = LaunchScreen.storyboard;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
-
 /* Begin XCBuildConfiguration section */
-		BCA72AF7244ABADD007CC46B /* Debug */ = {
+		BC042B1224AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -513,6 +494,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -537,7 +519,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -547,7 +529,7 @@
 			};
 			name = Debug;
 		};
-		BCA72AF8244ABADD007CC46B /* Release */ = {
+		BC042B1324AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -573,6 +555,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -591,7 +574,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -601,15 +584,17 @@
 			};
 			name = Release;
 		};
-		BCA72AFA244ABADD007CC46B /* Debug */ = {
+		BC042B1524AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Surround/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -621,15 +606,17 @@
 			};
 			name = Debug;
 		};
-		BCA72AFB244ABADD007CC46B /* Release */ = {
+		BC042B1624AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Surround/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -641,7 +628,7 @@
 			};
 			name = Release;
 		};
-		BCA72AFD244ABADD007CC46B /* Debug */ = {
+		BC042B1824AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
@@ -649,7 +636,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -663,7 +650,7 @@
 			};
 			name = Debug;
 		};
-		BCA72AFE244ABADD007CC46B /* Release */ = {
+		BC042B1924AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
@@ -671,7 +658,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -685,7 +672,7 @@
 			};
 			name = Release;
 		};
-		BCA72B00244ABADD007CC46B /* Debug */ = {
+		BC042B1B24AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
@@ -705,7 +692,7 @@
 			};
 			name = Debug;
 		};
-		BCA72B01244ABADD007CC46B /* Release */ = {
+		BC042B1C24AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
@@ -728,38 +715,38 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BCA72ACA244ABAD9007CC46B /* Build configuration list for PBXProject "Surround" */ = {
+		BC042AEA24AB2CF40050B2D1 /* Build configuration list for PBXProject "Surround" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BCA72AF7244ABADD007CC46B /* Debug */,
-				BCA72AF8244ABADD007CC46B /* Release */,
+				BC042B1224AB2CFA0050B2D1 /* Debug */,
+				BC042B1324AB2CFA0050B2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BCA72AF9244ABADD007CC46B /* Build configuration list for PBXNativeTarget "Surround" */ = {
+		BC042B1424AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "Surround" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BCA72AFA244ABADD007CC46B /* Debug */,
-				BCA72AFB244ABADD007CC46B /* Release */,
+				BC042B1524AB2CFA0050B2D1 /* Debug */,
+				BC042B1624AB2CFA0050B2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BCA72AFC244ABADD007CC46B /* Build configuration list for PBXNativeTarget "SurroundTests" */ = {
+		BC042B1724AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "SurroundTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BCA72AFD244ABADD007CC46B /* Debug */,
-				BCA72AFE244ABADD007CC46B /* Release */,
+				BC042B1824AB2CFA0050B2D1 /* Debug */,
+				BC042B1924AB2CFA0050B2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BCA72AFF244ABADD007CC46B /* Build configuration list for PBXNativeTarget "SurroundUITests" */ = {
+		BC042B1A24AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "SurroundUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BCA72B00244ABADD007CC46B /* Debug */,
-				BCA72B01244ABADD007CC46B /* Release */,
+				BC042B1B24AB2CFA0050B2D1 /* Debug */,
+				BC042B1C24AB2CFA0050B2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -767,15 +754,15 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		BC33F14E247B7B0400E9635F /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
+		BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
+			repositoryURL = "https://github.com/dmytro-anokhin/url-image";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.4.0;
+				minimumVersion = 0.9.18;
 			};
 		};
-		BC709F6924519BB500313C77 /* XCRemoteSwiftPackageReference "socket" */ = {
+		BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
 			requirement = {
@@ -783,7 +770,7 @@
 				minimumVersion = 15.2.0;
 			};
 		};
-		BC709F6F2452DE1400313C77 /* XCRemoteSwiftPackageReference "DictionaryCoding" */ = {
+		BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/elegantchaos/DictionaryCoding";
 			requirement = {
@@ -791,38 +778,38 @@
 				minimumVersion = 1.0.9;
 			};
 		};
-		BC709F7B245337B800313C77 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+		BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Alamofire/Alamofire";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.1.0;
+				minimumVersion = 5.2.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		BC33F14F247B7B0400E9635F /* SDWebImageSwiftUI */ = {
+		BC042B5B24AB2E360050B2D1 /* URLImage */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC33F14E247B7B0400E9635F /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
-			productName = SDWebImageSwiftUI;
+			package = BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */;
+			productName = URLImage;
 		};
-		BC709F6A24519BB500313C77 /* SocketIO */ = {
+		BC042B5E24AB2EC60050B2D1 /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC709F6924519BB500313C77 /* XCRemoteSwiftPackageReference "socket" */;
+			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
-		BC709F702452DE1400313C77 /* DictionaryCoding */ = {
+		BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC709F6F2452DE1400313C77 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
 		};
-		BC709F7C245337B800313C77 /* Alamofire */ = {
+		BC042B6424AB2F970050B2D1 /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC709F7B245337B800313C77 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = BCA72AC7244ABAD9007CC46B /* Project object */;
+	rootObject = BC042AE724AB2CF40050B2D1 /* Project object */;
 }

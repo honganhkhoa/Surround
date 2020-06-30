@@ -2,7 +2,7 @@
 //  SurroundUITests.swift
 //  SurroundUITests
 //
-//  Created by Anh Khoa Hong on 4/18/20.
+//  Created by Anh Khoa Hong on 6/30/20.
 //
 
 import XCTest
@@ -34,7 +34,7 @@ class SurroundUITests: XCTestCase {
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, *) {
             // This measures how long it takes to launch your application.
-            measure(metrics: [XCTOSSignpostMetric.applicationLaunch]) {
+            measure(metrics: [XCTApplicationLaunchMetric()]) {
                 XCUIApplication().launch()
             }
         }

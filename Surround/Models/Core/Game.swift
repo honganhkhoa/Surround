@@ -77,6 +77,19 @@ class Game: ObservableObject, Identifiable {
     var ogsRawData: [String: Any]?
     @Published var clock: Clock?
     
+    func playerIcon(for player: StoneColor, size: Int) -> String? {
+        guard let icon = ((self.ogsRawData ?? [:]) as NSDictionary).value(forKeyPath: player == .black ? "players.black.icon" : "players.white.icon") as? String else {
+            return nil
+        }
+        
+        let regex1 = try! NSRegularExpression(pattern: "-[0-9]+.png")
+        let regex2 = try! NSRegularExpression(pattern: "s=[0-9]+")
+        var result = icon
+        result = regex1.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "-\(size).png")
+        result = regex2.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "s=\(size)")
+        return result
+    }
+    
     init(boardSize: Int, blackName: String, whiteName: String, gameId: GameID) {
         self.boardSize = boardSize
         self.blackName = blackName

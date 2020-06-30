@@ -32,7 +32,7 @@ struct PublicGamesList: View {
 //                }
 //                self.games = games
 //            }
-            self.gameDetailCancellable = OGSService.shared.getGameDetail(gameID: 24129283)
+            self.gameDetailCancellable = OGSService.shared.getGameDetail(gameID: 24209287)
                 .sink(receiveCompletion: { completion in
                     
                 }, receiveValue: { game in

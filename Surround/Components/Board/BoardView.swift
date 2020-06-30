@@ -28,8 +28,9 @@ struct Goban: View {
                 path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(boardSize) - 0.5) * size))
             }
         }
-        .stroke(Color.black).frame(width: size * CGFloat(boardSize), height: size * CGFloat(boardSize), alignment: .center)
+        .stroke(Color.black)
         .background(Color(red: 0.86, green: 0.69, blue: 0.42, opacity: 1.00).shadow(radius: 2))
+        .frame(width: size * CGFloat(boardSize), height: size * CGFloat(boardSize))
     }
 }
 
@@ -97,7 +98,7 @@ struct BoardView: View {
     var body: some View {
 //        self.boardPosition.printPosition()
         return GeometryReader { geometry in
-            ZStack {
+            ZStack(alignment: .center) {
                 Goban(geometry: geometry, boardSize: self.boardPosition.boardSize)
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach((0..<self.boardPosition.boardSize), id: \.self) { row in
@@ -108,14 +109,14 @@ struct BoardView: View {
                         }
                     }
                 }
-            }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
 
 struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
-        let game = TestData.Resigned19x19HandicappedWithInitialState
+        let game = TestData.Resigned9x9Japanese
         let boardPosition = game.currentPosition
         return Group {
             BoardView(boardPosition: .constant(boardPosition))

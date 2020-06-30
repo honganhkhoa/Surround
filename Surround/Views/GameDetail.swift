@@ -6,20 +6,19 @@
 //
 
 import SwiftUI
-import SDWebImageSwiftUI
+import URLImage
 
 struct PlayerInfo: View {
     @ObservedObject var game: Game
     var player: StoneColor
     
     var body: some View {
-        let icon: String? = (game.ogsRawData! as NSDictionary).value(forKeyPath: player == .black ? "players.black.icon" : "players.white.icon") as? String ?? nil
+        let icon: String? = game.playerIcon(for: player, size: 64)
         return VStack(alignment: .leading) {
             HStack(alignment: .top) {
                 ZStack {
                     if icon != nil {
-                        WebImage(url: URL(string: icon!)!)
-                            .resizable()
+                        URLImage(URL(string: icon!)!)
                             .frame(width: 64, height: 64)
                     }
                 }
@@ -40,7 +39,7 @@ struct GameDetail: View {
     @ObservedObject var game: Game
     
     var body: some View {
-        return VStack {
+        return VStack(alignment: .center) {
             HStack {
                 PlayerInfo(game: game, player: .black)
                 Spacer()
@@ -61,5 +60,6 @@ struct GameDetail_Previews: PreviewProvider {
             GameDetail(game: game)
                 .navigationBarItems(trailing: Button(action: {}) {Text("Something...")})
         }
+        
     }    
 }
