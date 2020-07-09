@@ -11,36 +11,55 @@ import Combine
 struct PublicGamesList: View {
     @State var games: [Game] = []
     @State var gameDetailCancellable: AnyCancellable?
-    
-    @State var gameToShowDetail: Game?
-    @State var showGameDetail = false
+    @State var publicGamesCancellable: AnyCancellable?    
+    @State var selectedGameID: GameID? = nil
     
     var body: some View {
         Group {
             List(games) { game in
-                GameCell(game: game)
+                NavigationLink(destination: GameDetail(game: game), tag: game.ID, selection: $selectedGameID) {
+                    GameCell(game: game)
+                }
+                .onTapGesture {
+                    self.selectedGameID = game.ID
+                    self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                    }, receiveValue: { value in
+                    })
+                }
             }
             .listStyle(GroupedListStyle())
-            NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: self.$showGameDetail) {
-                EmptyView()
-            }
         }
         .onAppear {
-//            OGSWebSocket.shared.getPublicGames { games in
-//                for game in games {
-//                    OGSWebSocket.shared.connect(to: game)
-//                }
-//                self.games = games
-//            }
-            self.gameDetailCancellable = OGSService.shared.getGameDetail(gameID: 24209287)
-                .sink(receiveCompletion: { completion in
-                    
-                }, receiveValue: { game in
-                    OGSWebSocket.shared.connect(to: game)
-                    self.gameToShowDetail = game
-                    self.showGameDetail = true
-                })
+            print("Appeared \(self)")
+            if self.games.count == 0 && self.publicGamesCancellable == nil {
+                self.publicGamesCancellable = OGSWebSocket.shared.getPublicGamesAndConnect().sink(receiveCompletion: { completion in
+
+                }) { games in
+                    self.games = games
+                }
+            }
         }
+        .onDisappear {
+            print("Disappeared \(self) \(selectedGameID)")
+            for game in games {
+                if game.ID != selectedGameID {
+                    OGSWebSocket.shared.disconnect(from: game)
+                } else {
+                    print("Skipped")
+                }
+            }
+            DispatchQueue.main.async {
+                games = []
+                publicGamesCancellable = nil
+                selectedGameID = nil
+            }
+        }
+        .navigationBarTitle(Text("Public live games"))
+        .navigationBarItems(trailing: Button(action: {
+            OGSService.shared.logout()
+        }, label: {
+            Text("Logout")
+        }))
 
     }
 }

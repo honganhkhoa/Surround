@@ -9,8 +9,26 @@ import SwiftUI
 
 func cellSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
     return CGFloat(
-        floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize) / 2) * 2
-        )
+        floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize) / 2) * 2)
+}
+
+struct Stone: View {
+    var color: StoneColor
+    
+    var body: some View {
+        Group {
+            switch color {
+            case .black:
+                Circle().fill(Color.black)
+            case .white:
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().stroke(Color.gray)
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
 }
 
 struct Goban: View {
@@ -57,28 +75,24 @@ struct Cell: View {
         if case .placeStone(let lastRow, let lastColumn) = self.boardPosition.lastMove {
             isLastMove = lastRow == row && lastColumn == column
         }
-        if case .hasStone(let color) = self.boardPosition[row, column] {
-            return AnyView(
-                ZStack {
-                    Circle().fill(color == .black ? Color.black : Color.white).padding(1)
-                    Circle().stroke(Color.black).padding(1)
+        return ZStack {
+            switch self.boardPosition[row, column] {
+            case .hasStone(let color):
+                Group {
+                    Stone(color: color)
+                        .padding(1)
                     if isLastMove {
                         Circle().stroke(color == .black ? Color.white : Color.black, lineWidth: size > 20 ? 2 : 1).padding(size / 4)
                     }
-                    scoreIndicator
-                }
-                .frame(width: size, height: size, alignment: .center)
-                .contentShape(Rectangle())
-                .opacity(self.boardPosition.removedStones?.contains([row, column]) ?? false ? 0.5 : 1)
-            )
-        } else {
-            return AnyView(
-                ZStack {
-                    EmptyView()
-                    scoreIndicator
-                }.frame(width: size, height: size, alignment: .center)
-            )
+                }.opacity(self.boardPosition.removedStones?.contains([row, column]) ?? false ? 0.5 : 1)
+            case .empty:
+                EmptyView()
+            }
+            scoreIndicator
         }
+        .frame(width: size, height: size, alignment: .center)
+        .contentShape(Rectangle())
+        
     }
 }
 
@@ -109,14 +123,14 @@ struct BoardView: View {
                         }
                     }
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
         }
     }
 }
 
 struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
-        let game = TestData.Resigned9x9Japanese
+        let game = TestData.Ongoing19x19HandicappedWithNoInitialState
         let boardPosition = game.currentPosition
         return Group {
             BoardView(boardPosition: .constant(boardPosition))

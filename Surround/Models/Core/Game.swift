@@ -6,12 +6,13 @@
 //
 
 import Foundation
+import Combine
 
-enum GameID {
+enum GameID: Hashable {
     case OGS(Int)
 }
 
-class Game: ObservableObject, Identifiable {
+class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     @Published var gameData: OGSGame? {
         didSet {
             if let data = gameData {
@@ -30,6 +31,7 @@ class Game: ObservableObject, Identifiable {
                             position.putStone(row: point[0], column: point[1], color: .white)
                             initialPositionStones += 1
                         }
+                        position.nextToMove = data.initialPlayer
                     }
                     if data.handicap > 0 {
                         if data.moves.count >= data.handicap && initialPositionStones == 0 {
@@ -38,8 +40,8 @@ class Game: ObservableObject, Identifiable {
                             }
                             firstMoveIndex = data.handicap
                         }
+                        position.nextToMove = data.initialPlayer.opponentColor()
                     }
-                    position.nextToMove = data.initialPlayer
                     for move in data.moves[firstMoveIndex...] {
                         position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
                     }
@@ -76,6 +78,13 @@ class Game: ObservableObject, Identifiable {
     var ID: GameID
     var ogsRawData: [String: Any]?
     @Published var clock: Clock?
+    
+    var debugDescription: String {
+        if case .OGS(let id) = self.ID {
+            return "Game #\(id)"
+        }
+        return ""
+    }
     
     func playerIcon(for player: StoneColor, size: Int) -> String? {
         guard let icon = ((self.ogsRawData ?? [:]) as NSDictionary).value(forKeyPath: player == .black ? "players.black.icon" : "players.white.icon") as? String else {

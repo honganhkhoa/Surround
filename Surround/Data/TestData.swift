@@ -24,7 +24,8 @@ class TestData {
         return game
     }
     static var Resigned9x9Japanese: Game { sampleGame(id: 2) }
-    
+    static var Ongoing19x19HandicappedWithNoInitialState: Game { sampleGame(id: 3) }
+
     static func sampleGame(id: Int = 0) -> Game {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -2565,6 +2566,179 @@ class TestData {
           "winner": 778820,
           "outcome": "Resignation",
           "end_time": 1593517560
+        }
+        """],
+        // MARK: - Ongoing, 19x19, Handicapped with No Initial State
+        // MARK: - #25291907
+        ["""
+        {
+          "white_player_id": 686323,
+          "black_player_id": 798782,
+          "game_id": 25291907,
+          "game_name": "Friendly Match",
+          "private": false,
+          "pause_on_weekends": false,
+          "players": {
+            "black": {
+              "username": "Masamune fan",
+              "rank": 30.609698641461705,
+              "professional": false,
+              "id": 798782
+            },
+            "white": {
+              "username": "masamune_40b",
+              "rank": 38.844930118959546,
+              "professional": false,
+              "id": 686323
+            }
+          },
+          "ranked": true,
+          "disable_analysis": false,
+          "handicap": 2,
+          "komi": 0.5,
+          "width": 19,
+          "height": 19,
+          "rules": "chinese",
+          "time_control": {
+            "system": "byoyomi",
+            "time_control": "byoyomi",
+            "speed": "live",
+            "pause_on_weekends": false,
+            "main_time": 3600,
+            "period_time": 50,
+            "periods": 5
+          },
+          "phase": "play",
+          "initial_player": "black",
+          "moves": [
+            [
+              3,
+              2,
+              3882
+            ],
+            [
+              2,
+              15,
+              2547
+            ],
+            [
+              16,
+              15,
+              56531
+            ],
+            [
+              15,
+              3,
+              71342
+            ],
+            [
+              4,
+              16,
+              48702
+            ],
+            [
+              3,
+              14,
+              46167
+            ],
+            [
+              13,
+              15,
+              49756
+            ],
+            [
+              3,
+              4,
+              59933
+            ],
+            [
+              16,
+              5,
+              51256
+            ],
+            [
+              13,
+              2,
+              43790
+            ],
+            [
+              7,
+              15,
+              47142
+            ],
+            [
+              16,
+              8,
+              73139
+            ],
+            [
+              16,
+              10,
+              53341
+            ],
+            [
+              15,
+              16,
+              30522
+            ],
+            [
+              15,
+              15,
+              49781
+            ],
+            [
+              9,
+              3,
+              41780
+            ],
+            [
+              14,
+              5,
+              53857
+            ]
+          ],
+          "allow_self_capture": false,
+          "automatic_stone_removal": false,
+          "free_handicap_placement": true,
+          "aga_handicap_scoring": false,
+          "allow_ko": false,
+          "allow_superko": false,
+          "superko_algorithm": "ssk",
+          "score_territory": true,
+          "score_territory_in_seki": true,
+          "score_stones": true,
+          "score_handicap": true,
+          "score_prisoners": false,
+          "score_passes": true,
+          "white_must_pass_last": false,
+          "opponent_plays_first_after_resume": false,
+          "strict_seki_mode": false,
+          "initial_state": {
+            "black": "",
+            "white": ""
+          },
+          "start_time": 1594268000,
+          "original_disable_analysis": false,
+          "clock": {
+            "game_id": 25291907,
+            "current_player": 798782,
+            "black_player_id": 798782,
+            "white_player_id": 686323,
+            "title": "Friendly Match",
+            "last_move": 1594268783468,
+            "expiration": 1594272266794,
+            "black_time": {
+              "thinking_time": 3233.3259999999996,
+              "periods": 5,
+              "period_time": 50
+            },
+            "white_time": {
+              "thinking_time": 3189.635,
+              "periods": 5,
+              "period_time": 50
+            }
+          },
+          "auto_score": true
         }
         """]
     ]

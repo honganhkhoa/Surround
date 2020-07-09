@@ -11,11 +11,9 @@ struct ContentView: View {
     @State var isLoggedIn = OGSService.shared.isLoggedIn()
     
     var body: some View {
-        NavigationView {
-            !isLoggedIn ?
-                AnyView(LoginView(isLoggedIn: $isLoggedIn)) :
-                AnyView(MainView(isLoggedIn: $isLoggedIn))
-        }
+        !isLoggedIn ?
+            AnyView(LoginView(isLoggedIn: $isLoggedIn)) :
+            AnyView(MainView())
     }
 }
 

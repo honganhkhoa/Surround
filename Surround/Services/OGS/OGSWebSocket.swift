@@ -10,12 +10,21 @@ import Combine
 import SocketIO
 import DictionaryCoding
 
+enum OGSWebSocketError: Error {
+    case notConnected
+}
+
 class OGSWebSocket {
     static let shared = OGSWebSocket()
     let manager: SocketManager
     let socket: SocketIOClient
-    var connectedGames = [Int: Game]()
+    private(set) public var connectedGames = [Int: Game]()
     var timerCancellable: AnyCancellable?
+    var pingCancellale: AnyCancellable?
+    var drift = 0.0
+    var latency = 0.0
+    var activeGames = [Int:Game]()
+    var gameReferencesCount = [Int:Int]()
     
     init() {
         manager = SocketManager(socketURL: URL(string: "https://online-go.com")!, config: [
@@ -23,22 +32,78 @@ class OGSWebSocket {
         ])
         socket = manager.defaultSocket
         socket.onAny { event in
-            print(event.event)
-            print(event.items ?? [])
+            print(event)
+        }
+                
+        socket.on(clientEvent: .connect) { [self] _, _ in
+            pingCancellale = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
+                socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": drift, "latency": latency])
+            }
+            self.authenticateIfLoggedIn()
         }
         
-        timerCancellable = TimeUtilities.shared.timer.sink { _ in
-            for game in self.connectedGames.values {
+        socket.on("net/pong") { [self] data, ack in
+            if let data = data[0] as? [String:Double] {
+                let now = Date().timeIntervalSince1970 * 1000
+                latency = now - data["client"]!
+                drift = (now - latency / 2) - data["server"]!
+                print(drift, latency)
+            }
+        }
+        
+        socket.on("active_game") { gameData, ack in
+            if let gameData = gameData[0] as? [String: Any] {
+                if let gameId = gameData["id"] as? Int {
+                    if self.activeGames[gameId] == nil {
+                        if let game = self.createGame(fromShortGameData: gameData) {
+                            self.activeGames[gameId] = game
+                            self.connect(to: game)
+                        }
+                    }
+                }
+            }
+        }
+        
+        timerCancellable = TimeUtilities.shared.timer.sink { [self] _ in
+            for game in connectedGames.values {
                 if game.gameData?.outcome == nil && !(game.gameData?.pauseControl?.isPaused() ?? false) {
                     if let timeControlSystem = game.gameData?.timeControl.system {
-                        game.clock?.calculateTimeLeft(with: timeControlSystem)
+                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency)
                     }
                 }
             }
         }
     }
     
-    func connect() {
+    func authenticateIfLoggedIn() {
+        guard OGSService.shared.isLoggedIn(), let uiconfig = UserDefaults.standard[.ogsUIConfig] else {
+            return
+        }
+        
+        guard socket.status == .connected else {
+            socket.once(clientEvent: .connect) { _, _ in
+                self.authenticateIfLoggedIn()
+            }
+            return
+        }
+      
+        socket.emit("notification/connect", [
+            "player_id": uiconfig.user.id,
+            "auth": uiconfig.notificationAuth ?? ""
+        ])
+        socket.emit("authenticate", [
+            "auth": uiconfig.chatAuth ?? "",
+            "jwt": uiconfig.userJwt ?? "",
+            "player_id": uiconfig.user.id,
+            "username": uiconfig.user.username
+        ])
+    }
+    
+    func ensureConnect() {
+        guard socket.status != .connected && socket.status != .connecting else {
+            return
+        }
+        
         socket.connect()
     }
     
@@ -48,7 +113,14 @@ class OGSWebSocket {
         }
 
         self.socket.emit("game/disconnect", ["game_id": ogsID])
-        connectedGames[ogsID] = nil
+        self.socket.off("game/\(ogsID)/gamedata")
+        self.socket.off("game/\(ogsID)/move")
+        self.socket.off("game/\(ogsID)/clock")
+        
+        gameReferencesCount[ogsID] = (gameReferencesCount[ogsID] ?? 1) - 1
+        if gameReferencesCount[ogsID]! <= 0 {
+            connectedGames[ogsID] = nil
+        }
     }
     
     func connect(to game: Game, withChat: Bool = false) {
@@ -68,6 +140,7 @@ class OGSWebSocket {
         }
 
         connectedGames[ogsID] = game
+        gameReferencesCount[ogsID] = (gameReferencesCount[ogsID] ?? 0) + 1
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": UserDefaults.standard[.ogsUIConfig]?.user.id ?? 0, "chat": withChat ? true : 0])
         self.socket.on("game/\(ogsID)/gamedata") { gamedata, ack in
             if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
@@ -110,38 +183,55 @@ class OGSWebSocket {
         }
     }
     
-    func getPublicGames(callback: @escaping ([Game]) -> Void) {
-        guard self.socket.status == .connected else {
-            socket.once(clientEvent: .connect, callback: {_,_ in
-                self.getPublicGames(callback: callback)
-            })
-            return
+    func createGame(fromShortGameData gameData: [String: Any]) -> Game? {
+        if let black = gameData["black"] as? [String: Any],
+                let white = gameData["white"] as? [String: Any],
+                let boardSize = gameData["width"] as? Int,
+                let gameId = gameData["id"] as? Int {
+            let game = Game(
+                boardSize: boardSize,
+                blackName: black["username"] as? String ?? "",
+                whiteName: white["username"] as? String ?? "",
+                gameId: .OGS(gameId)
+            )
+            return game
         }
+        return nil
+    }
+    
+    func getPublicGamesAndConnect() -> AnyPublisher<[Game], Error> {
         
-        self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 9]).timingOut(after: 3) { data in
-//            print(data)
-            if data.count > 0 {
-                if let gamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {
-                    var results = [Game]()
-                    for gameData in gamesData {
-                        if let black = gameData["black"] as? [String: Any],
-                                let white = gameData["white"] as? [String: Any],
-                                let boardSize = gameData["width"] as? Int,
-                                let gameId = gameData["id"] as? Int {
-                            let game = Game(
-                                boardSize: boardSize,
-                                blackName: black["username"] as? String ?? "",
-                                whiteName: white["username"] as? String ?? "",
-                                gameId: .OGS(gameId)
-                            )
-                            results.append(game)
+        func queryPublicGames(promise: @escaping Future<[Game], Error>.Promise) {
+            self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 9]).timingOut(after: 3) { data in
+    //            print(data)
+                if data.count > 0 {
+                    if let gamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {
+                        var results = [Game]()
+                        for gameData in gamesData {
+                            if let game = self.createGame(fromShortGameData: gameData) {
+                                if let connectedGame = self.connectedGames[gameData["id"] as? Int ?? -1] {
+                                    results.append(connectedGame)
+                                } else {
+                                    self.connect(to: game)
+                                    results.append(game)
+                                }
+                            }
                         }
+                        promise(.success(results))
+                        return
                     }
-                    callback(results)
-                    return
                 }
             }
-            callback([])
         }
+        
+        return Future<[Game], Error> { promise in
+            if self.socket.status != .connected {
+                self.socket.once(clientEvent: .connect) { _, _ in
+                    queryPublicGames(promise: promise)
+                }
+            } else {
+                queryPublicGames(promise: promise)
+            }
+        }.eraseToAnyPublisher()
     }
 }

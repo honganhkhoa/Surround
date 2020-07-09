@@ -53,7 +53,7 @@ class OGSService {
         return cookiesCount > 0
     }
     
-    func getGameDetail(gameID: Int) -> AnyPublisher<Game, Error> {
+    func getGameDetailAndConnect(gameID: Int) -> AnyPublisher<Game, Error> {
         return Future<Game, Error> { promise in
             AF.request("\(self.ogsRoot)/api/v1/games/\(gameID)").responseJSON { response in
                 switch response.result {
@@ -64,9 +64,15 @@ class OGSService {
                             decoder.keyDecodingStrategy = .convertFromSnakeCase
                             do {
                                 let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
-                                let game = Game(ogsGame: ogsGame)
-                                game.ogsRawData = data
-                                promise(.success(game))
+                                if let game = OGSWebSocket.shared.connectedGames[ogsGame.gameId] {
+                                    game.ogsRawData = data
+                                    promise(.success(game))
+                                } else {
+                                    let game = Game(ogsGame: ogsGame)
+                                    game.ogsRawData = data
+                                    OGSWebSocket.shared.connect(to: game)
+                                    promise(.success(game))
+                                }
                                 return
                             } catch {
                                 promise(.failure(error))

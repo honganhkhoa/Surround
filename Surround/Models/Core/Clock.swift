@@ -69,11 +69,11 @@ extension Clock: Decodable {
         started = !container.contains(.startMode)
     }
     
-    mutating func calculateTimeLeft(with system: TimeControlSystem) {
+    mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0) {
         guard started else {
             return
         }
-        let secondsSinceLastMove = (Date().timeIntervalSince1970 * 1000 - lastMoveTime) / 1000
+        let secondsSinceLastMove = (Date().timeIntervalSince1970 * 1000 - (lastMoveTime + serverTimeOffset)) / 1000
         if secondsSinceLastMove > 0 {
             var thinkingTime = currentPlayer == .black ? blackTime : whiteTime
             switch system {

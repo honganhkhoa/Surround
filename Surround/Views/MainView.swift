@@ -8,21 +8,16 @@
 import SwiftUI
 
 struct MainView: View {
-    @Binding var isLoggedIn: Bool
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        VStack {
+        NavigationView {
             PublicGamesList()
         }
-        .navigationBarTitle(Text("Welcome"))
-        .navigationBarItems(trailing: Button(action: {
-            OGSService.shared.logout()
-            self.isLoggedIn = OGSService.shared.isLoggedIn()
-        }, label: {
-            Text("Logout")
-        }))
-        .onAppear() {
-            OGSWebSocket.shared.connect()
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                OGSWebSocket.shared.ensureConnect()
+            }
         }
     }
 }
@@ -30,7 +25,7 @@ struct MainView: View {
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            MainView(isLoggedIn: .constant(true))
+            MainView()
         }
     }
 }
