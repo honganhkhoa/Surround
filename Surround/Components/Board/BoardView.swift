@@ -14,15 +14,24 @@ func cellSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
 
 struct Stone: View {
     var color: StoneColor
+    var shadowRadius: CGFloat = 0.0
     
     var body: some View {
         Group {
             switch color {
             case .black:
-                Circle().fill(Color.black)
+                if shadowRadius > 0 {
+                    Circle().fill(Color.black).shadow(radius: shadowRadius)
+                } else {
+                    Circle().fill(Color.black)
+                }
             case .white:
                 ZStack {
-                    Circle().fill(Color.white)
+                    if shadowRadius > 0 {
+                        Circle().fill(Color.white).shadow(radius: shadowRadius)
+                    } else {
+                        Circle().fill(Color.white)
+                    }
                     Circle().stroke(Color.gray)
                 }
             }

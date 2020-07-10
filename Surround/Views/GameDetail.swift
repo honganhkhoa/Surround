@@ -22,8 +22,7 @@ struct PlayerInfo: View {
                         URLImage(URL(string: icon!)!)
                             .frame(width: 64, height: 64)
                     }
-                    Stone(color: player)
-                        .background(Color.white.cornerRadius(10).shadow(radius: 1))
+                    Stone(color: player, shadowRadius: 1)
                         .frame(width: 20, height: 20)
                         .position(x: 62, y: 62)
                 }

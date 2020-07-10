@@ -9,10 +9,25 @@ import SwiftUI
 
 struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var activeGames = OGSWebSocket.shared.activeGames
 
     var body: some View {
-        NavigationView {
-            PublicGamesList()
+        TabView {
+            NavigationView {
+                HomeView(games: activeGames.gameList)
+            }
+            .tabItem {
+                Image(systemName: "house")
+                Text("Home")
+            }
+
+            NavigationView {
+                PublicGamesList()
+            }
+            .tabItem {
+                Image(systemName: "person.3")
+                Text("Public games")
+            }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
@@ -24,8 +39,6 @@ struct MainView: View {
 
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
-            MainView()
-        }
+        MainView()
     }
 }

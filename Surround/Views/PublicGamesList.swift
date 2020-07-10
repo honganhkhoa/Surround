@@ -11,23 +11,30 @@ import Combine
 struct PublicGamesList: View {
     @State var games: [Game] = []
     @State var gameDetailCancellable: AnyCancellable?
-    @State var publicGamesCancellable: AnyCancellable?    
-    @State var selectedGameID: GameID? = nil
+    @State var publicGamesCancellable: AnyCancellable?
+    @State var gameToShowDetail: Game? = nil
+    @State var showDetail = false
     
     var body: some View {
         Group {
-            List(games) { game in
-                NavigationLink(destination: GameDetail(game: game), tag: game.ID, selection: $selectedGameID) {
-                    GameCell(game: game)
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
+                    ForEach(games) { game in
+                        GameCell(game: game)
+                            .onTapGesture {
+                                self.gameToShowDetail = game
+                                self.showDetail = true
+                                self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                                }, receiveValue: { value in
+                                })
+                            }
+                    }
                 }
-                .onTapGesture {
-                    self.selectedGameID = game.ID
-                    self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-                    }, receiveValue: { value in
-                    })
+                NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: $showDetail) {
+                    EmptyView()
                 }
             }
-            .listStyle(GroupedListStyle())
+            .padding()
         }
         .onAppear {
             print("Appeared \(self)")
@@ -40,9 +47,9 @@ struct PublicGamesList: View {
             }
         }
         .onDisappear {
-            print("Disappeared \(self) \(selectedGameID)")
+            print("Disappeared \(self) \(String(describing: gameToShowDetail))")
             for game in games {
-                if game.ID != selectedGameID {
+                if game.ID != gameToShowDetail?.ID {
                     OGSWebSocket.shared.disconnect(from: game)
                 } else {
                     print("Skipped")
@@ -51,7 +58,6 @@ struct PublicGamesList: View {
             DispatchQueue.main.async {
                 games = []
                 publicGamesCancellable = nil
-                selectedGameID = nil
             }
         }
         .navigationBarTitle(Text("Public live games"))

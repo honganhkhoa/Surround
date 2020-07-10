@@ -18,13 +18,13 @@ class OGSWebSocket {
     static let shared = OGSWebSocket()
     let manager: SocketManager
     let socket: SocketIOClient
-    private(set) public var connectedGames = [Int: Game]()
     var timerCancellable: AnyCancellable?
     var pingCancellale: AnyCancellable?
     var drift = 0.0
     var latency = 0.0
-    var activeGames = [Int:Game]()
-    var gameReferencesCount = [Int:Int]()
+    private(set) public var connectedGames = [Int: Game]()
+
+    private(set) public var activeGames = OGSActiveGames()
     
     init() {
         manager = SocketManager(socketURL: URL(string: "https://online-go.com")!, config: [
@@ -117,10 +117,7 @@ class OGSWebSocket {
         self.socket.off("game/\(ogsID)/move")
         self.socket.off("game/\(ogsID)/clock")
         
-        gameReferencesCount[ogsID] = (gameReferencesCount[ogsID] ?? 1) - 1
-        if gameReferencesCount[ogsID]! <= 0 {
-            connectedGames[ogsID] = nil
-        }
+        connectedGames[ogsID] = nil
     }
     
     func connect(to game: Game, withChat: Bool = false) {
@@ -140,7 +137,6 @@ class OGSWebSocket {
         }
 
         connectedGames[ogsID] = game
-        gameReferencesCount[ogsID] = (gameReferencesCount[ogsID] ?? 0) + 1
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": UserDefaults.standard[.ogsUIConfig]?.user.id ?? 0, "chat": withChat ? true : 0])
         self.socket.on("game/\(ogsID)/gamedata") { gamedata, ack in
             if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {

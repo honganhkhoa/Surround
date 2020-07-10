@@ -63,6 +63,7 @@ struct GameCell: View {
                     .cornerRadius(5)
                 }
             }
+            .frame(maxHeight: .infinity)
         }
     }
 }
