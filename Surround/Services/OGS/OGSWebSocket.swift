@@ -40,6 +40,17 @@ class OGSWebSocket {
                 socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": drift, "latency": latency])
             }
             self.authenticateIfLoggedIn()
+
+            let previouslyConnectedGames = Array(connectedGames.values)
+            connectedGames = [:]
+            for game in previouslyConnectedGames {
+                if case .OGS(let ogsID) = game.ID {
+                    self.socket.off("game/\(ogsID)/gamedata")
+                    self.socket.off("game/\(ogsID)/move")
+                    self.socket.off("game/\(ogsID)/clock")
+                    self.connect(to: game)
+                }
+            }
         }
         
         socket.on("net/pong") { [self] data, ack in
@@ -76,17 +87,14 @@ class OGSWebSocket {
     }
     
     func authenticateIfLoggedIn() {
+        guard socket.status == .connected else {
+            return
+        }
+      
         guard OGSService.shared.isLoggedIn(), let uiconfig = UserDefaults.standard[.ogsUIConfig] else {
             return
         }
         
-        guard socket.status == .connected else {
-            socket.once(clientEvent: .connect) { _, _ in
-                self.authenticateIfLoggedIn()
-            }
-            return
-        }
-      
         socket.emit("notification/connect", [
             "player_id": uiconfig.user.id,
             "auth": uiconfig.notificationAuth ?? ""

@@ -20,6 +20,7 @@ struct ThinkingTime: Codable {
     // Canadian
     var movesLeft: Int?
     var blockTime: Double?
+    var blockTimeLeft: Double?
 }
 
 struct Clock {
@@ -73,7 +74,7 @@ extension Clock: Decodable {
         guard started else {
             return
         }
-        let secondsSinceLastMove = (Date().timeIntervalSince1970 * 1000 - (lastMoveTime + serverTimeOffset)) / 1000
+        let secondsSinceLastMove = floor((Date().timeIntervalSince1970 * 1000 - (lastMoveTime + serverTimeOffset)) / 1000)
         if secondsSinceLastMove > 0 {
             var thinkingTime = currentPlayer == .black ? blackTime : whiteTime
             switch system {
@@ -95,6 +96,20 @@ extension Clock: Decodable {
                         thinkingTime.periodTimeLeft = Int(timeLeft)
                     }
                 }
+            case .Fischer(_, _, _):
+                thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+            case .Canadian(_, let periodTime, _):
+                var timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                if timeLeft > 0 {
+                    thinkingTime.thinkingTimeLeft = timeLeft
+                } else {
+                    timeLeft += Double(periodTime)
+                    thinkingTime.thinkingTimeLeft = 0
+                    thinkingTime.blockTimeLeft = thinkingTime.blockTime! - timeLeft
+                }
+            case .Simple, .Absolute:
+                let timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                thinkingTime.thinkingTimeLeft = timeLeft
             default:
                 break
             }

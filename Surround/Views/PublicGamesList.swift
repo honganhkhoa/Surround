@@ -28,15 +28,21 @@ struct PublicGamesList: View {
                                 }, receiveValue: { value in
                                 })
                             }
+                            .padding()
                     }
                 }
                 NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: $showDetail) {
                     EmptyView()
                 }
             }
-            .padding()
         }
         .onAppear {
+//            self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: 25547938).sink(receiveCompletion: { _ in
+//            }, receiveValue: { game in
+//                self.gameToShowDetail = game
+//                self.showDetail = true
+//            })
+
             print("Appeared \(self)")
             if self.games.count == 0 && self.publicGamesCancellable == nil {
                 self.publicGamesCancellable = OGSWebSocket.shared.getPublicGamesAndConnect().sink(receiveCompletion: { completion in

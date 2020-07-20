@@ -11,6 +11,10 @@ class TimeUtilities {
     static let shared = TimeUtilities()
     lazy var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
+    func formatTimeLeft(timeLeft: Int) -> String {
+        return formatTimeLeft(timeLeft: TimeInterval(timeLeft))
+    }
+    
     func formatTimeLeft(timeLeft: TimeInterval) -> String {
         var secondsLeft = Int(timeLeft)
         let daysLeft = secondsLeft / 86400
@@ -34,7 +38,7 @@ class TimeUtilities {
                 return "\(hoursLeft + 24)h"
             } else {
                 if hoursLeft >= 1 {
-                    return String(format: "%dh %02d", hoursLeft, minutesLeft)
+                    return String(format: "%dh %02dm", hoursLeft, minutesLeft)
                 } else {
                     return String(format: "%02d:%02d", minutesLeft, secondsLeft)
                 }
@@ -42,4 +46,12 @@ class TimeUtilities {
         }
     }
     
+}
+
+func timeString(timeLeft: TimeInterval) -> String {
+    return TimeUtilities.shared.formatTimeLeft(timeLeft: timeLeft)
+}
+
+func timeString(timeLeft: Int) -> String {
+    return TimeUtilities.shared.formatTimeLeft(timeLeft: timeLeft)
 }
