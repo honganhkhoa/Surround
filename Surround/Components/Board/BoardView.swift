@@ -61,47 +61,83 @@ struct Goban: View {
     }
 }
 
-struct Cell: View {
+struct Stones: View {
     var boardPosition: BoardPosition
-    var parentGeometry: GeometryProxy
-    var row: Int
-    var column: Int
-    
-    var scoreIndicator: some View {
-        let size = max(cellSize(geometry: self.parentGeometry, boardSize: self.boardPosition.boardSize) / 4, 5)
-        if boardPosition.gameScores?.black.scoringPositions.contains([row, column]) ?? false {
-            return AnyView(Rectangle().fill(Color.black).frame(width: size, height: size))
-        }
-        if boardPosition.gameScores?.white.scoringPositions.contains([row, column]) ?? false {
-            return AnyView(Rectangle().fill(Color.white).frame(width: size, height: size))
-        }
-        return AnyView(EmptyView())
-    }
-    
+    var geometry: GeometryProxy
+
     var body: some View {
-        let size = cellSize(geometry: self.parentGeometry, boardSize: self.boardPosition.boardSize)
-        var isLastMove = false
-        if case .placeStone(let lastRow, let lastColumn) = self.boardPosition.lastMove {
-            isLastMove = lastRow == row && lastColumn == column
-        }
-        return ZStack {
-            switch self.boardPosition[row, column] {
-            case .hasStone(let color):
-                Group {
-                    Stone(color: color)
-                        .padding(1)
-                    if isLastMove {
-                        Circle().stroke(color == .black ? Color.white : Color.black, lineWidth: size > 20 ? 2 : 1).padding(size / 4)
+        let boardSize = boardPosition.boardSize
+                
+        let size = cellSize(geometry: geometry, boardSize: boardSize)
+        let whiteLivingPath = CGMutablePath()
+        let blackLivingPath = CGMutablePath()
+        let whiteCapturedPath = CGMutablePath()
+        let blackCapturedPath = CGMutablePath()
+        let whiteScoreIndicator = CGMutablePath()
+        let blackScoreIndicator = CGMutablePath()
+        for row in 0..<boardSize {
+            for column in 0..<boardSize {
+                if case .hasStone(let stoneColor) = boardPosition[row, column] {
+                    let stoneRect = CGRect(x: CGFloat(column) * size + 1, y: CGFloat(row) * size + 1, width: size - 2, height: size - 2)
+                    if boardPosition.removedStones?.contains([row, column]) ?? false {
+                        if stoneColor == .white {
+                            whiteCapturedPath.addEllipse(in: stoneRect)
+                        } else {
+                            blackCapturedPath.addEllipse(in: stoneRect)
+                        }
+                    } else {
+                        if stoneColor == .white {
+                            whiteLivingPath.addEllipse(in: stoneRect)
+                        } else {
+                            blackLivingPath.addEllipse(in: stoneRect)
+                        }
                     }
-                }.opacity(self.boardPosition.removedStones?.contains([row, column]) ?? false ? 0.5 : 1)
-            case .empty:
-                EmptyView()
+                }
+                if let scores = boardPosition.gameScores {
+                    let scoringRectSize = max(size / 4, 5)
+                    let scoringRectPadding = (size - scoringRectSize) / 2
+                    let scoringRect = CGRect(
+                        x: CGFloat(column) * size + scoringRectPadding,
+                        y: CGFloat(row) * size + scoringRectPadding,
+                        width: scoringRectSize,
+                        height: scoringRectSize)
+                    if scores.black.scoringPositions.contains([row, column]) {
+                        blackScoreIndicator.addRect(scoringRect)
+                    } else if scores.white.scoringPositions.contains([row, column]) {
+                        whiteScoreIndicator.addRect(scoringRect)
+                    }
+                }
             }
-            scoreIndicator
         }
-        .frame(width: size, height: size, alignment: .center)
-        .contentShape(Rectangle())
         
+        return ZStack {
+            Path(whiteLivingPath).fill(Color.white)
+            Path(whiteLivingPath).stroke(Color.gray)
+            Path(blackLivingPath).fill(Color.black)
+            
+            if boardPosition.removedStones != nil {
+                Path(whiteCapturedPath).fill(Color.white).opacity(0.5)
+                Path(whiteCapturedPath).stroke(Color.gray)
+                Path(blackCapturedPath).fill(Color.black).opacity(0.5)
+            }
+
+            if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
+                Path { path in
+                    path.addEllipse(in: CGRect(
+                                        x: CGFloat(lastColumn) * size + size / 4,
+                                        y: CGFloat(lastRow) * size + size / 4,
+                                        width: size / 2,
+                                        height: size / 2))
+                }
+                .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
+            }
+            
+            if boardPosition.gameScores != nil {
+                Path(whiteScoreIndicator).fill(Color.white)
+                Path(blackScoreIndicator).fill(Color.black)
+            }
+        }
+        .frame(width: size * CGFloat(boardSize), height: size * CGFloat(boardSize))
     }
 }
 
@@ -123,23 +159,16 @@ struct BoardView: View {
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
                 Goban(geometry: geometry, boardSize: self.boardPosition.boardSize)
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach((0..<self.boardPosition.boardSize), id: \.self) { row in
-                        HStack(spacing: 0) {
-                            ForEach((0..<self.boardPosition.boardSize), id: \.self) { column in
-                                Cell(boardPosition: self.boardPosition, parentGeometry: geometry, row: row, column: column)
-                            }
-                        }
-                    }
-                }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
+                Stones(boardPosition: boardPosition, geometry: geometry)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
         }
     }
 }
 
 struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
-        let game = TestData.Ongoing19x19HandicappedWithNoInitialState
+        let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
         return Group {
             BoardView(boardPosition: .constant(boardPosition))

@@ -52,6 +52,7 @@ extension Clock: Decodable {
         blackTime.thinkingTimeLeft = blackTime.thinkingTime
         blackTime.periodsLeft = blackTime.periods
         blackTime.periodTimeLeft = blackTime.periodTime
+        blackTime.blockTimeLeft = blackTime.blockTime
 
         if let whiteThinkingTime = try? container.decode(Double.self, forKey: .whiteTime) {
             whiteTime = ThinkingTime(thinkingTime: whiteThinkingTime)
@@ -61,6 +62,7 @@ extension Clock: Decodable {
         whiteTime.thinkingTimeLeft = whiteTime.thinkingTime
         whiteTime.periodsLeft = whiteTime.periods
         whiteTime.periodTimeLeft = whiteTime.periodTime
+        whiteTime.blockTimeLeft = whiteTime.blockTime
         
         let blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
         let currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
@@ -105,7 +107,7 @@ extension Clock: Decodable {
                 } else {
                     timeLeft += Double(periodTime)
                     thinkingTime.thinkingTimeLeft = 0
-                    thinkingTime.blockTimeLeft = thinkingTime.blockTime! - timeLeft
+                    thinkingTime.blockTimeLeft = timeLeft
                 }
             case .Simple, .Absolute:
                 let timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove

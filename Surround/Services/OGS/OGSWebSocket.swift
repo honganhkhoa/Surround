@@ -206,7 +206,7 @@ class OGSWebSocket {
     func getPublicGamesAndConnect() -> AnyPublisher<[Game], Error> {
         
         func queryPublicGames(promise: @escaping Future<[Game], Error>.Promise) {
-            self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 9]).timingOut(after: 3) { data in
+            self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 18]).timingOut(after: 3) { data in
     //            print(data)
                 if data.count > 0 {
                     if let gamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {

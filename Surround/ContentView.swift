@@ -12,7 +12,11 @@ struct ContentView: View {
     
     var body: some View {
         !isLoggedIn ?
-            AnyView(LoginView(isLoggedIn: $isLoggedIn)) :
+            AnyView(
+                NavigationView {
+                    LoginView(isLoggedIn: $isLoggedIn)
+                })
+            :
             AnyView(MainView())
     }
 }
