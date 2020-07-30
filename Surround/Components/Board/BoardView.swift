@@ -42,22 +42,23 @@ struct Stone: View {
 
 struct Goban: View {
     var geometry: GeometryProxy
-    var boardSize: Int
+    var width: Int
+    var height: Int
     
     var body: some View {
-        let size = cellSize(geometry: geometry, boardSize: boardSize)
+        let size = cellSize(geometry: geometry, boardSize: max(width, height))
         return Path { path in
-            for i in 0..<boardSize {
+            for i in 0..<height {
                 path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
-                path.addLine(to: CGPoint(x: (CGFloat(boardSize) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
-                
+                path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
+            }
+            for i in 0..<width {
                 path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
-                path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(boardSize) - 0.5) * size))
+                path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
             }
         }
         .stroke(Color.black)
-        .background(Color(red: 0.86, green: 0.69, blue: 0.42, opacity: 1.00).shadow(radius: 2))
-        .frame(width: size * CGFloat(boardSize), height: size * CGFloat(boardSize))
+        .frame(width: size * CGFloat(width), height: size * CGFloat(height))
     }
 }
 
@@ -66,17 +67,21 @@ struct Stones: View {
     var geometry: GeometryProxy
 
     var body: some View {
-        let boardSize = boardPosition.boardSize
+        let width = boardPosition.width
+        let height = boardPosition.height
                 
-        let size = cellSize(geometry: geometry, boardSize: boardSize)
+        let size = cellSize(geometry: geometry, boardSize: max(width, height))
         let whiteLivingPath = CGMutablePath()
         let blackLivingPath = CGMutablePath()
         let whiteCapturedPath = CGMutablePath()
         let blackCapturedPath = CGMutablePath()
         let whiteScoreIndicator = CGMutablePath()
         let blackScoreIndicator = CGMutablePath()
-        for row in 0..<boardSize {
-            for column in 0..<boardSize {
+        let whiteEstimatedScore = CGMutablePath()
+        let blackEstimatedScore = CGMutablePath()
+        
+        for row in 0..<height {
+            for column in 0..<width {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
                     let stoneRect = CGRect(x: CGFloat(column) * size + 1, y: CGFloat(row) * size + 1, width: size - 2, height: size - 2)
                     if boardPosition.removedStones?.contains([row, column]) ?? false {
@@ -93,18 +98,27 @@ struct Stones: View {
                         }
                     }
                 }
+                let scoringRectSize = max(size / 4, 5)
+                let scoringRectPadding = (size - scoringRectSize) / 2
+                let scoringRect = CGRect(
+                    x: CGFloat(column) * size + scoringRectPadding,
+                    y: CGFloat(row) * size + scoringRectPadding,
+                    width: scoringRectSize,
+                    height: scoringRectSize)
                 if let scores = boardPosition.gameScores {
-                    let scoringRectSize = max(size / 4, 5)
-                    let scoringRectPadding = (size - scoringRectSize) / 2
-                    let scoringRect = CGRect(
-                        x: CGFloat(column) * size + scoringRectPadding,
-                        y: CGFloat(row) * size + scoringRectPadding,
-                        width: scoringRectSize,
-                        height: scoringRectSize)
                     if scores.black.scoringPositions.contains([row, column]) {
                         blackScoreIndicator.addRect(scoringRect)
                     } else if scores.white.scoringPositions.contains([row, column]) {
                         whiteScoreIndicator.addRect(scoringRect)
+                    }
+                }
+                if let estimatedScores = boardPosition.estimatedScores {
+                    if case .hasStone(let color) = estimatedScores[row][column] {
+                        if color == .black {
+                            blackEstimatedScore.addRect(scoringRect)
+                        } else {
+                            whiteEstimatedScore.addRect(scoringRect)
+                        }
                     }
                 }
             }
@@ -136,8 +150,13 @@ struct Stones: View {
                 Path(whiteScoreIndicator).fill(Color.white)
                 Path(blackScoreIndicator).fill(Color.black)
             }
+            
+            if boardPosition.estimatedScores != nil {
+                Path(whiteEstimatedScore).fill(Color.white)
+                Path(blackEstimatedScore).fill(Color.black)
+            }
         }
-        .frame(width: size * CGFloat(boardSize), height: size * CGFloat(boardSize))
+        .frame(width: size * CGFloat(width), height: size * CGFloat(height))
     }
 }
 
@@ -158,7 +177,8 @@ struct BoardView: View {
 //        self.boardPosition.printPosition()
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Goban(geometry: geometry, boardSize: self.boardPosition.boardSize)
+                Color(red: 0.86, green: 0.69, blue: 0.42, opacity: 1.00).shadow(radius: 2)
+                Goban(geometry: geometry, width: boardPosition.width, height: boardPosition.height)
                 Stones(boardPosition: boardPosition, geometry: geometry)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
@@ -170,8 +190,11 @@ struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
         let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
+        let game2 = TestData.Scored15x17
         return Group {
             BoardView(boardPosition: .constant(boardPosition))
+                .previewLayout(.fixed(width: 375, height: 500))
+            BoardView(boardPosition: .constant(game2.currentPosition))
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: .constant(boardPosition)).colorScheme(.dark)
                 .previewLayout(.fixed(width: 375, height: 500))

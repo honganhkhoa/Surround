@@ -39,6 +39,8 @@
 		BC042B6524AB2F970050B2D1 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B6424AB2F970050B2D1 /* Alamofire */; };
 		BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC55D2D524B81E90003E20E7 /* HomeView.swift */; };
 		BC55D2D824B8238A003E20E7 /* OGSActiveGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC55D2D724B8238A003E20E7 /* OGSActiveGames.swift */; };
+		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 /* End PBXBuildFile section */
 
@@ -92,8 +94,22 @@
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSWebSocket.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
+		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC55D2D524B81E90003E20E7 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		BC55D2D724B8238A003E20E7 /* OGSActiveGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSActiveGames.swift; sourceTree = "<group>"; };
+		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
+		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
+		BCAE412F24D1213100B5DB74 /* Vec.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Vec.h; sourceTree = "<group>"; };
+		BCAE413024D1213100B5DB74 /* rang.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = rang.hpp; sourceTree = "<group>"; };
+		BCAE413124D1213100B5DB74 /* Color.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Color.h; sourceTree = "<group>"; };
+		BCAE413224D1213100B5DB74 /* estimator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = estimator.h; sourceTree = "<group>"; };
+		BCAE413324D1213100B5DB74 /* Grid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Grid.h; sourceTree = "<group>"; };
+		BCAE413424D1213100B5DB74 /* constants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = constants.h; sourceTree = "<group>"; };
+		BCAE413524D1213100B5DB74 /* log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
+		BCAE413624D1213100B5DB74 /* Goban.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Goban.cc; sourceTree = "<group>"; };
+		BCAE413724D1213100B5DB74 /* Goban.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Goban.h; sourceTree = "<group>"; };
+		BCAE413924D1234500B5DB74 /* se_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = se_wrapper.cpp; sourceTree = "<group>"; };
+		BCAE413C24D1299C00B5DB74 /* Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Bridging-Header.h"; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -149,6 +165,7 @@
 		BC042AF124AB2CF50050B2D1 /* Surround */ = {
 			isa = PBXGroup;
 			children = (
+				BCAE412C24D1213100B5DB74 /* ScoreEstimator */,
 				BC042B3E24AB2DD10050B2D1 /* Components */,
 				BC042B3024AB2DD00050B2D1 /* Data */,
 				BC042B3224AB2DD00050B2D1 /* Models */,
@@ -277,6 +294,27 @@
 				BC55D2D724B8238A003E20E7 /* OGSActiveGames.swift */,
 			);
 			path = OGS;
+			sourceTree = "<group>";
+		};
+		BCAE412C24D1213100B5DB74 /* ScoreEstimator */ = {
+			isa = PBXGroup;
+			children = (
+				BC3C7E9624D2840700D39AEB /* LICENSE */,
+				BCAE412D24D1213100B5DB74 /* ThreadPool.h */,
+				BCAE412E24D1213100B5DB74 /* Point.h */,
+				BCAE412F24D1213100B5DB74 /* Vec.h */,
+				BCAE413024D1213100B5DB74 /* rang.hpp */,
+				BCAE413124D1213100B5DB74 /* Color.h */,
+				BCAE413224D1213100B5DB74 /* estimator.h */,
+				BCAE413324D1213100B5DB74 /* Grid.h */,
+				BCAE413424D1213100B5DB74 /* constants.h */,
+				BCAE413524D1213100B5DB74 /* log.h */,
+				BCAE413624D1213100B5DB74 /* Goban.cc */,
+				BCAE413724D1213100B5DB74 /* Goban.h */,
+				BCAE413924D1234500B5DB74 /* se_wrapper.cpp */,
+				BCAE413C24D1299C00B5DB74 /* Bridging-Header.h */,
+			);
+			path = ScoreEstimator;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -433,6 +471,7 @@
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
+				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC042B4A24AB2DD10050B2D1 /* GameDetail.swift in Sources */,
 				BC042B5824AB2DD10050B2D1 /* OGSWebSocket.swift in Sources */,
@@ -444,6 +483,7 @@
 				BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */,
 				BC042B4724AB2DD10050B2D1 /* LoginView.swift in Sources */,
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
+				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -605,6 +645,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -613,6 +654,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -627,6 +669,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -635,6 +678,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

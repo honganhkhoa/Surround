@@ -7,7 +7,25 @@
 		<key>Surround.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>1</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>BC042AEE24AB2CF40050B2D1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>BC042AFF24AB2CFA0050B2D1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>BC042B0A24AB2CFA0050B2D1</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>

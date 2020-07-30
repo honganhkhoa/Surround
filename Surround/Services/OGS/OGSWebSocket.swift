@@ -190,10 +190,12 @@ class OGSWebSocket {
     func createGame(fromShortGameData gameData: [String: Any]) -> Game? {
         if let black = gameData["black"] as? [String: Any],
                 let white = gameData["white"] as? [String: Any],
-                let boardSize = gameData["width"] as? Int,
+                let width = gameData["width"] as? Int,
+                let height = gameData["height"] as? Int,
                 let gameId = gameData["id"] as? Int {
             let game = Game(
-                boardSize: boardSize,
+                width: width,
+                height: height,
                 blackName: black["username"] as? String ?? "",
                 whiteName: white["username"] as? String ?? "",
                 gameId: .OGS(gameId)

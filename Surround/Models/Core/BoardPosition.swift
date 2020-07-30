@@ -5,6 +5,8 @@
 //  Created by Anh Khoa Hong on 4/18/20.
 //
 
+import Dispatch
+
 enum PointState {
     case empty
     case hasStone(StoneColor)
@@ -34,7 +36,8 @@ enum MoveError: Error {
 }
 
 class BoardPosition {
-    var boardSize: Int
+    var width: Int
+    var height: Int
     var board: [[PointState]]
     var nextToMove: StoneColor
     var previousPosition: BoardPosition?
@@ -42,15 +45,18 @@ class BoardPosition {
     var captures: [StoneColor: Int] = [.black: 0, .white: 0]
     var removedStones: Set<[Int]>?
     var gameScores: GameScores?
+    var estimatedScores: [[PointState]]?
     
-    init(boardSize: Int) {
-        self.boardSize = boardSize
-        self.board = Array(repeating: Array(repeating: .empty, count: self.boardSize), count: self.boardSize)
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+        self.board = Array(repeating: Array(repeating: .empty, count: self.width), count: self.height)
         self.nextToMove = .black
     }
     
     init(fromPreviousPosition previousPosition: BoardPosition, lastMove: Move) {
-        self.boardSize = previousPosition.boardSize
+        self.width = previousPosition.width
+        self.height = previousPosition.height
         self.lastMove = lastMove
         self.previousPosition = previousPosition
         self.nextToMove = previousPosition.nextToMove.opponentColor()
@@ -76,12 +82,12 @@ class BoardPosition {
     }
     
     func hasTheSamePosition(with otherPosition: BoardPosition) -> Bool {
-        if self.boardSize != otherPosition.boardSize {
+        if self.width != otherPosition.width || self.height != otherPosition.height {
             return false
         }
         
-        for row in 0..<self.boardSize {
-            for column in 0..<self.boardSize {
+        for row in 0..<self.height {
+            for column in 0..<self.width {
                 switch (self[row, column], otherPosition[row, column]) {
                 case (.hasStone(let color), .hasStone(let otherColor)):
                     if color != otherColor {
@@ -107,7 +113,7 @@ class BoardPosition {
         }
         
         return Set(neighbors.filter { neighbor in
-            return neighbor[0] >= 0 && neighbor[0] < self.boardSize && neighbor[1] >= 0 && neighbor[1] < self.boardSize
+            return neighbor[0] >= 0 && neighbor[0] < self.height && neighbor[1] >= 0 && neighbor[1] < self.width
         })
     }
     
@@ -211,8 +217,8 @@ class BoardPosition {
     }
     
     func printPosition() {
-        for i in 0..<self.boardSize {
-            print((0..<self.boardSize).map({
+        for i in 0..<self.height {
+            print((0..<self.width).map({
                 switch self[i, $0] {
                 case .empty:
                     return " "
@@ -231,5 +237,37 @@ class BoardPosition {
             result.insert([Int(row), Int(column)])
         }
         return result
+    }
+    
+    func estimateScore() {
+        DispatchQueue.global().async { [self] in
+            var data = board.joined().map({ state -> CInt in
+                switch state {
+                case .empty:
+                    return 0
+                case .hasStone(let color):
+                    return color == .white ? -1 : 1
+                }
+            })
+            
+            print(data)
+            se_estimate(CInt(width), CInt(height), &data, nextToMove == .white ? -1 : 1, 1000, Float(0.3))
+            print(data)
+
+            DispatchQueue.main.async { [self] in
+                estimatedScores = Array(repeating: Array(repeating: .empty, count: width), count: height)
+                for i in 0..<height * width {
+                    let row = i / width
+                    let column = i % width
+                    if data[i] == 0 {
+                        estimatedScores![row][column] = .empty
+                    } else if data[i] == -1 {
+                        estimatedScores![row][column] = .hasStone(.white)
+                    } else {
+                        estimatedScores![row][column] = .hasStone(.black)
+                    }
+                }
+            }
+        }
     }
 }

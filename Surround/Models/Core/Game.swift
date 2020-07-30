@@ -61,7 +61,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
             }
         }
     }
-    var boardSize: Int
+    var width: Int
+    var height: Int
     var blackName: String
     var whiteName: String
     @Published var blackRank: Double?
@@ -99,21 +100,23 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
         return result
     }
     
-    init(boardSize: Int, blackName: String, whiteName: String, gameId: GameID) {
-        self.boardSize = boardSize
+    init(width: Int, height: Int, blackName: String, whiteName: String, gameId: GameID) {
+        self.width = width
+        self.height = height
         self.blackName = blackName
         self.whiteName = whiteName
         self.ID = gameId
-        self.initialPosition = BoardPosition(boardSize: boardSize)
+        self.initialPosition = BoardPosition(width: width, height: height)
         self.currentPosition = self.initialPosition
     }
     
     init(ogsGame: OGSGame) {
-        self.boardSize = ogsGame.width
+        self.width = ogsGame.width
+        self.height = ogsGame.height
         self.blackName = ogsGame.players.black.username
         self.whiteName = ogsGame.players.white.username
         self.ID = .OGS(ogsGame.gameId)
-        self.initialPosition = BoardPosition(boardSize: boardSize)
+        self.initialPosition = BoardPosition(width: width, height: height)
         self.currentPosition = self.initialPosition
         self.gameData = ogsGame
     }
