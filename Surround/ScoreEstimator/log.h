@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <iostream>
-#include <iostream>
 #include <fstream>
 
 using namespace rang;

@@ -1,7 +1,6 @@
 #pragma once
 
 #define EMSCRIPTEN 1
-#define USE_THREADS 1
 
 #include "Color.h"
 #include "Point.h"
@@ -28,6 +27,16 @@ class Goban {
         Grid      global_visited;
         int       last_visited_counter;
 
+        Vec       has_liberties_queue;
+        Vec       place_and_remove_queue;
+        Vec       is_eye_queue;
+        Vec       is_territory_tocheck;
+        Vec       is_territory_neighbors;
+        Vec       remove_group_tocheck;
+        Vec       remove_group_neighbors;
+        Vec       fill_territory_tocheck;
+        Vec       fill_territory_neighbors;
+
 #if USE_THREADS
         std::mt19937 rand;
 #endif
@@ -35,7 +44,7 @@ class Goban {
         Goban(int width, int height);
         Goban(const Goban &other);
         void setBoardSize(int width, int height); 
-        Grid estimate(Color player_to_move, int trials, float tolerance, bool debug) const;
+        Grid estimate(Color player_to_move, int trials, float tolerance, bool debug);
         Point generateMove(Color player, int trials, float tolerance);
         inline int at(const Point &p) const { return board[p]; }
         inline int& at(const Point &p) { return board[p]; }
@@ -47,10 +56,10 @@ class Goban {
         Result place_and_remove(Point move, Color player, Vec &possible_moves);
 
         /* Looks for probable seki situations and returns them as a binary grid */
-        Grid scanForSeki(int num_iterations, float tolerance, const Grid &rollout_pass) const;
+        Grid scanForSeki(int num_iterations, float tolerance, const Grid &rollout_pass);
 
         /** Returns a list of false eyes detected */
-        Vec getFalseEyes() const;
+        Vec getFalseEyes();
 
         /** Fills false eyes, removing stones if appropriate */
         void fillFalseEyes(const Vec &false_eyes);
@@ -64,7 +73,7 @@ class Goban {
          * horrible for a bot, but we're just trying to mark the board up how
          * the players, who may be weak or strong, view the board. 
          */
-        Grid rollout(int num_iterations, Color player_to_move, bool pullup_life_based_on_neigboring_territory = true, const Grid &life_map = Grid(), const Grid &bias = Grid(), const Grid &seki = Grid()) const;
+        Grid rollout(int num_iterations, Color player_to_move, bool pullup_life_based_on_neigboring_territory = true, const Grid &life_map = Grid(), const Grid &bias = Grid(), const Grid &seki = Grid());
 
         /** 
          * We bias positions on the board based on who they currently belong
@@ -78,9 +87,9 @@ class Goban {
          * Bias against some probably very dead stone groups, namely groups with
          * no eyes that are surrounded by area that is almost definitely the opponents
          */
-        Grid biasLikelyDead(int num_iterations, float tolerance, const Grid &liberty_map) const;
+        Grid biasLikelyDead(int num_iterations, float tolerance, const Grid &liberty_map);
 
-        Grid biasLibertyMap(int num_iterations, float tolerance, const Grid &liberty_map) const;
+        Grid biasLibertyMap(int num_iterations, float tolerance, const Grid &liberty_map);
 
         /** 
          * Marks each location with the positive or negative size of the
@@ -89,36 +98,36 @@ class Goban {
         Grid computeTerritory();
 
         /** Uniquely labels strings of groups on the board. */
-        Grid computeGroupMap() const;
+        Grid computeGroupMap();
 
         /**
          * Computes the liberties for any groups on the boards. For empty
          * spaces, computes the number of blank minus number of white stones
          * touching the group. The value is always negative for white and positive for black. 
          */
-        Grid computeLiberties(const Grid &group_map) const;
+        Grid computeLiberties(const Grid &group_map);
 
         /** 
          * Flags spaces that are part of a string of like colored stone strings
          * and territory * so long as the stone strings have a combined two or
          * more territory 
          */ 
-        Grid computeStrongLife(const Grid &groups, const Grid &territory, const Grid &liberties) const;
+        Grid computeStrongLife(const Grid &groups, const Grid &territory, const Grid &liberties);
 
         /**
          * Returns a list of stones that are probably dead as determined by
          * looking at the results of a rollout pass compared to our initial
          * board state 
          */ 
-        Vec getDead(int num_iterations, float tolerance, const Grid &rollout_pass) const;
+        Vec getDead(int num_iterations, float tolerance, const Grid &rollout_pass);
 
     private:
         Grid _estimate(Color player_to_move, int trials, float tolerance, bool debug);
         bool has_liberties(const Point &pt);
         int  remove_group(Point move, Vec &possible_moves);
-        bool is_eye(Point move, Color player) const;
-        bool would_self_atari(Point move, Color player) const;
-        bool is_safe_horseshoe(Point move, Color player) const; // u shape but not eye, without opponents in enough corners to be dangerous
+        bool is_eye(Point move, Color player);
+        bool would_self_atari(Point move, Color player);
+        bool is_safe_horseshoe(Point move, Color player); // u shape but not eye, without opponents in enough corners to be dangerous
         bool is_territory(Point pt, Color player) ;
         void fill_territory(Point pt, Color player);
 

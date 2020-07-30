@@ -111,34 +111,37 @@ class TGrid {
 
         /* Flood matches all similar values starting at starting_point, writing all points
          * within the flood match to group, and all neighboring points to neighbors */
-        void groupAndNeighbors(const Point &starting_point, Vec &group, Vec &out_neighbors) const {
+        void groupAndNeighbors(const Point &starting_point, Vec &group, Vec &out_neighbors) {
             Vec starting_points;
             starting_points.push(starting_point);
             groupAndNeighbors(starting_points, group, out_neighbors);
         }
-        void groupAndNeighbors(const Vec &starting_points, Vec &group, Vec &out_neighbors) const {
-            Vec         tocheck;
-            Vec         neighbors;
+
+        Vec groupAndNeighborsToCheck;
+        Vec groupAndNeighborsNeighbors;
+        void groupAndNeighbors(const Vec &starting_points, Vec &group, Vec &out_neighbors) {
+            this->groupAndNeighborsToCheck.size = 0;
+            this->groupAndNeighborsNeighbors.size = 0;
             TGrid<int>  visited(width, height);
             T           matching_value = (*this)[starting_points[0]];
 
             for (int i=0; i < starting_points.size; ++i) {
-                tocheck.push(starting_points[i]);
+                this->groupAndNeighborsToCheck.push(starting_points[i]);
                 visited[starting_points[i]] = 1;
             }
 
-            while (tocheck.size) {
-                Point p = tocheck.remove(0);
+            while (this->groupAndNeighborsToCheck.size) {
+                Point p = this->groupAndNeighborsToCheck.remove(0);
                 if ((*this)[p] == matching_value) {
                     group.push(p);
-                    getNeighbors(p, neighbors);
-                    for (int i=0; i < neighbors.size; ++i) {
-                        const Point &neighbor = neighbors[i];
+                    getNeighbors(p, this->groupAndNeighborsNeighbors);
+                    for (int i=0; i < this->groupAndNeighborsNeighbors.size; ++i) {
+                        const Point &neighbor = this->groupAndNeighborsNeighbors[i];
                         if (visited[neighbor]) {
                             continue;
                         }
                         visited[neighbor] = 1;
-                        tocheck.push(neighbor);
+                        this->groupAndNeighborsToCheck.push(neighbor);
                     }
                 } else {
                     out_neighbors.push(p);
@@ -435,7 +438,7 @@ class TGrid {
         }
 
         /* Counts the liberties of all neighboring groups, returns the minimum liberty count */
-        int getMinLibertiesOfSurroundingGroups(const Point &pt) const {
+        int getMinLibertiesOfSurroundingGroups(const Point &pt) {
             Vec neighbors;
             getNeighbors(pt, neighbors);
 
