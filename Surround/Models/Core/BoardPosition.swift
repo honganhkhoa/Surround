@@ -25,8 +25,19 @@ enum StoneColor: String, Codable {
 }
 
 enum Move {
-    case pass
     case placeStone(Int, Int)
+    case pass
+    
+    static private let coordinateLabels = "abcdefghijklmnopqrstuvwxyz".map { $0 }
+    
+    func toOGSString() -> String {
+        switch self {
+        case .placeStone(let row, let column):
+            return "\(Move.coordinateLabels[column])\(Move.coordinateLabels[row])"
+        case .pass:
+            return ".."
+        }
+    }
 }
 
 enum MoveError: Error {
@@ -46,6 +57,7 @@ class BoardPosition {
     var removedStones: Set<[Int]>?
     var gameScores: GameScores?
     var estimatedScores: [[PointState]]?
+    var lastMoveNumber = 0
     
     init(width: Int, height: Int) {
         self.width = width
@@ -61,6 +73,7 @@ class BoardPosition {
         self.previousPosition = previousPosition
         self.nextToMove = previousPosition.nextToMove.opponentColor()
         self.board = previousPosition.board
+        self.lastMoveNumber = previousPosition.lastMoveNumber + 1
     }
     
     subscript(row: Int, column: Int) -> PointState {

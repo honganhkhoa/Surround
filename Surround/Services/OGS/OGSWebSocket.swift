@@ -12,6 +12,7 @@ import DictionaryCoding
 
 enum OGSWebSocketError: Error {
     case notConnected
+    case notLoggedIn
 }
 
 class OGSWebSocket {
@@ -32,7 +33,9 @@ class OGSWebSocket {
         ])
         socket = manager.defaultSocket
         socket.onAny { event in
-            print(event)
+            if event.event != "active-bots" {
+                print(event)
+            }
         }
                 
         socket.on(clientEvent: .connect) { [self] _, _ in
@@ -63,15 +66,8 @@ class OGSWebSocket {
         }
         
         socket.on("active_game") { gameData, ack in
-            if let gameData = gameData[0] as? [String: Any] {
-                if let gameId = gameData["id"] as? Int {
-                    if self.activeGames[gameId] == nil {
-                        if let game = self.createGame(fromShortGameData: gameData) {
-                            self.activeGames[gameId] = game
-                            self.connect(to: game)
-                        }
-                    }
-                }
+            if let activeGameData = gameData[0] as? [String: Any] {
+                self.updateActiveGames(withShortGameData: activeGameData)
             }
         }
         
@@ -81,6 +77,17 @@ class OGSWebSocket {
                     if let timeControlSystem = game.gameData?.timeControl.system {
                         game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency)
                     }
+                }
+            }
+        }
+    }
+    
+    func updateActiveGames(withShortGameData gameData: [String: Any]) {
+        if let gameId = gameData["id"] as? Int {
+            if self.activeGames[gameId] == nil {
+                if let game = self.createGame(fromShortGameData: gameData) {
+                    self.activeGames[gameId] = game
+                    self.connect(to: game)
                 }
             }
         }
@@ -124,6 +131,8 @@ class OGSWebSocket {
         self.socket.off("game/\(ogsID)/gamedata")
         self.socket.off("game/\(ogsID)/move")
         self.socket.off("game/\(ogsID)/clock")
+        self.socket.off("game/\(ogsID)/undo_accepted")
+        self.socket.off("game/\(ogsID)/undo_requested")
         
         connectedGames[ogsID] = nil
     }
@@ -185,6 +194,20 @@ class OGSWebSocket {
                 }
             }
         }
+        self.socket.on("game/\(ogsID)/undo_accepted") { undoData, ack in
+            if let moveNumber = undoData[0] as? Int {
+                if let connectedGame = self.connectedGames[ogsID] {
+                    connectedGame.undoMove(numbered: moveNumber)
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/undo_requested") { undoData, ack in
+            if let moveNumber = undoData[0] as? Int {
+                if let connectedGame = self.connectedGames[ogsID] {
+                    connectedGame.undoRequested = moveNumber
+                }
+            }
+        }
     }
     
     func createGame(fromShortGameData gameData: [String: Any]) -> Game? {
@@ -203,6 +226,39 @@ class OGSWebSocket {
             return game
         }
         return nil
+    }
+    
+    func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
+        guard let ogsUIConfig = UserDefaults.standard[.ogsUIConfig] else {
+            return Fail(error: OGSWebSocketError.notLoggedIn).eraseToAnyPublisher()
+        }
+        
+        return Future<Void, Error> { promise in
+            if let gameId = game.gameData?.gameId {
+                let userId = ogsUIConfig.user.id
+                self.socket.emitWithAck("game/move", ["game_id": gameId, "player_id": userId, "move": move.toOGSString()]).timingOut(after: 3) { _ in
+                    promise(.success(()))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func requestUndo(game: Game) {
+        if let ogsID = game.ogsID, let ogsUIConfig = OGSService.shared.ogsUIConfig {
+            self.socket.emit("game/undo/request", ["game_id": ogsID, "player_id": ogsUIConfig.user.id, "move_number": game.currentPosition.lastMoveNumber])
+        }
+    }
+    
+    func acceptUndo(game: Game, moveNumber: Int) {
+        if let ogsID = game.ogsID, let ogsUIConfig = OGSService.shared.ogsUIConfig {
+            self.socket.emit("game/undo/accept", ["game_id": ogsID, "player_id": ogsUIConfig.user.id, "move_number": moveNumber])
+        }
+    }
+    
+    func resign(game: Game) {
+        if let ogsID = game.ogsID, let ogsUIConfig = OGSService.shared.ogsUIConfig {
+            self.socket.emit("game/resign", ["game_id": ogsID, "player_id": ogsUIConfig.user.id])
+        }
     }
     
     func getPublicGamesAndConnect() -> AnyPublisher<[Game], Error> {

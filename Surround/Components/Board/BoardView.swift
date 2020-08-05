@@ -44,27 +44,70 @@ struct Goban: View {
     var geometry: GeometryProxy
     var width: Int
     var height: Int
-    
+    var editable = false
+    @State var currentRow = -1
+    @State var currentColumn = -1
+    var hoveredPoint: Binding<[Int]?> = .constant(nil)
+    var isHoveredPointValid: Bool? = nil
+    var selectedPoint: Binding<[Int]?> = .constant(nil)
+
     var body: some View {
         let size = cellSize(geometry: geometry, boardSize: max(width, height))
-        return Path { path in
-            for i in 0..<height {
-                path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
-                path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
-            }
-            for i in 0..<width {
-                path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
-                path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+        return Group {
+            ZStack {
+                Path { path in
+                    for i in 0..<height {
+                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
+                    }
+                    for i in 0..<width {
+                        path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                    }
+                }
+                .stroke(Color.black)
+                if hoveredPoint.wrappedValue != nil {
+                    Path { path in
+                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(currentRow) + 0.5) * size))
+
+                        path.move(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                    }
+                    .stroke(isHoveredPointValid ?? false ? Color.green : Color.red, lineWidth: 2)
+                }
             }
         }
-        .stroke(Color.black)
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged({ value in
+                    selectedPoint.wrappedValue = nil
+                    currentRow = Int((value.location.y / size - 0.5).rounded())
+                    currentColumn = Int((value.location.x / size - 0.5).rounded())
+                    if currentColumn >= 0 && currentColumn < width && currentRow >= 0 && currentRow < height {
+                        hoveredPoint.wrappedValue = [currentRow, currentColumn]
+                    } else {
+                        hoveredPoint.wrappedValue = nil
+                    }
+                })
+                .onEnded { _ in
+                    if isHoveredPointValid ?? false {
+                        if let hoveredPoint = hoveredPoint.wrappedValue {
+                            selectedPoint.wrappedValue = hoveredPoint
+                        }
+                    }
+                    hoveredPoint.wrappedValue = nil
+                }
+        )
     }
 }
 
 struct Stones: View {
     var boardPosition: BoardPosition
     var geometry: GeometryProxy
+    var isLastMovePending = false
 
     var body: some View {
         let width = boardPosition.width
@@ -136,14 +179,26 @@ struct Stones: View {
             }
 
             if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
-                Path { path in
-                    path.addEllipse(in: CGRect(
-                                        x: CGFloat(lastColumn) * size + size / 4,
-                                        y: CGFloat(lastRow) * size + size / 4,
-                                        width: size / 2,
-                                        height: size / 2))
+                if isLastMovePending {
+                    Path { path in
+                        let centerX = CGFloat(lastColumn) * size + size / 2
+                        let centerY = CGFloat(lastRow) * size + size / 2
+                        path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
+                        path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
+                        path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
+                        path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
+                    }
+                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
+                } else {
+                    Path { path in
+                        path.addEllipse(in: CGRect(
+                                            x: CGFloat(lastColumn) * size + size / 4,
+                                            y: CGFloat(lastRow) * size + size / 4,
+                                            width: size / 2,
+                                            height: size / 2))
+                    }
+                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
                 }
-                .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
             }
             
             if boardPosition.gameScores != nil {
@@ -161,7 +216,13 @@ struct Stones: View {
 }
 
 struct BoardView: View {
-    @Binding var boardPosition: BoardPosition
+    var boardPosition: BoardPosition
+    var editable = false
+    var newMove: Binding<Move?> = .constant(nil)
+    var newPosition: Binding<BoardPosition?> = .constant(nil)
+    @State var hoveredPoint: [Int]? = nil
+    @State var isHoveredPointValid: Bool? = nil
+    @State var selectedPoint: [Int]? = nil
     
 //        .onTapGesture {
 //            do {
@@ -172,14 +233,42 @@ struct BoardView: View {
 //                print("Move error")
 //            }
 //        }
-
+    
     var body: some View {
 //        self.boardPosition.printPosition()
+        let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
+            newPosition.wrappedValue! : boardPosition
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
                 Color(red: 0.86, green: 0.69, blue: 0.42, opacity: 1.00).shadow(radius: 2)
-                Goban(geometry: geometry, width: boardPosition.width, height: boardPosition.height)
-                Stones(boardPosition: boardPosition, geometry: geometry)
+                Goban(
+                    geometry: geometry,
+                    width: boardPosition.width,
+                    height: boardPosition.height,
+                    editable: editable,
+                    hoveredPoint: $hoveredPoint,
+                    isHoveredPointValid: isHoveredPointValid,
+                    selectedPoint: $selectedPoint
+                )
+                .allowsHitTesting(editable)
+                .onChange(of: hoveredPoint) { value in
+                    if let hoveredPoint = hoveredPoint {
+                        do {
+                            newPosition.wrappedValue = try boardPosition.makeMove(move: .placeStone(hoveredPoint[0], hoveredPoint[1]))
+                            isHoveredPointValid = true
+                        } catch {
+                            isHoveredPointValid = false
+                        }
+                    }
+                }
+                .onChange(of: selectedPoint) { value in
+                    if let selectedPoint = value {
+                        newMove.wrappedValue = .placeStone(selectedPoint[0], selectedPoint[1])
+                    } else {
+                        newMove.wrappedValue = nil
+                    }
+                }
+                Stones(boardPosition: displayedPosition, geometry: geometry, isLastMovePending: newMove.wrappedValue != nil)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
         }
@@ -192,11 +281,11 @@ struct BoardView_Previews: PreviewProvider {
         let boardPosition = game.currentPosition
         let game2 = TestData.Scored15x17
         return Group {
-            BoardView(boardPosition: .constant(boardPosition))
+            BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
-            BoardView(boardPosition: .constant(game2.currentPosition))
+            BoardView(boardPosition: game2.currentPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
-            BoardView(boardPosition: .constant(boardPosition)).colorScheme(.dark)
+            BoardView(boardPosition: boardPosition).colorScheme(.dark)
                 .previewLayout(.fixed(width: 375, height: 500))
         }
     }

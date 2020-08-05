@@ -63,6 +63,7 @@ struct MainView: View {
         }.onChange(of: scenePhase) { phase in
             if phase == .active {
                 OGSWebSocket.shared.ensureConnect()
+                OGSService.shared.loadOverview()
             }
         }
     }

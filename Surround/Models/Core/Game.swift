@@ -58,6 +58,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
                 if data.outcome != nil {
                     OGSWebSocket.shared.disconnect(from: self)
                 }
+                
+                undoRequested = data.undoRequested
             }
         }
     }
@@ -69,6 +71,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     @Published var whiteRank: Double?
     @Published var gameName: String?
     @Published var currentPosition: BoardPosition
+    @Published var undoRequested: Int?
     var blackFormattedRank: String {
         return formattedRank(rank: blackRank, professional: gameData?.players.black.professional ?? false)
     }
@@ -85,6 +88,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
             return "Game #\(id)"
         }
         return ""
+    }
+    var ogsID: Int? {
+        if case .OGS(let id) = self.ID {
+            return id
+        }
+        return nil
     }
     
     func playerIcon(for player: StoneColor, size: Int) -> String? {
@@ -123,6 +132,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     
     func makeMove(move: Move) throws {
         self.currentPosition = try currentPosition.makeMove(move: move)
+        self.undoRequested = nil
     }
     
     private func formattedRank(rank: Double?, professional: Bool = false) -> String {
@@ -139,5 +149,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
                 return "\(30 - displayedRank)k"
             }
         }
+    }
+    
+    func undoMove(numbered moveNumber: Int) {
+        var position = currentPosition
+        while position.previousPosition != nil && position.lastMoveNumber >= moveNumber {
+            position = position.previousPosition!
+        }
+        currentPosition = position
     }
 }

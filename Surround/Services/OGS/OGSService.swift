@@ -12,11 +12,20 @@ import DictionaryCoding
 
 enum ServiceError: Error {
     case invalidJSON
+    case notLoggedIn
 }
 
 class OGSService {
     static let shared = OGSService()
-    let ogsRoot = "https://online-go.com"
+    private let ogsRoot = "https://online-go.com"
+    var ogsUIConfig: OGSUIConfig? {
+        get {
+            return UserDefaults.standard[.ogsUIConfig]
+        }
+        set {
+            UserDefaults.standard[.ogsUIConfig] = newValue
+        }
+    }
     
     func login(username: String, password: String) -> AnyPublisher<OGSUIConfig, Error> {
         let jsonDecoder = JSONDecoder()
@@ -49,8 +58,24 @@ class OGSService {
         if UserDefaults.standard[.ogsUIConfig] == nil {
             return false
         }
-        let cookiesCount = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: ogsRoot)!)?.count ?? 0
-        return cookiesCount > 0
+        return true
+    }
+    
+    func loadOverview() {
+        AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseJSON { response in
+            switch response.result {
+            case .success:
+                if let data = response.value as? [String: Any] {
+                    if let activeGames = data["active_games"] as? [[String: Any]] {
+                        for game in activeGames {
+                            OGSWebSocket.shared.updateActiveGames(withShortGameData: game)
+                        }
+                    }
+                }
+            case .failure(let error):
+                print(error)
+            }
+        }
     }
     
     func getGameDetailAndConnect(gameID: Int) -> AnyPublisher<Game, Error> {

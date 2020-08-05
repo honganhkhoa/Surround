@@ -80,4 +80,6 @@ struct OGSGame: Decodable {
     
     var removed: String?
     var score: GameScores?
+    
+    var undoRequested: Int?
 }

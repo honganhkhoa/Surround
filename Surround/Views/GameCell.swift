@@ -47,7 +47,7 @@ struct GameCell: View {
         VStack {
             PlayerInfoLine(game: game, color: .black)
             ZStack {
-                BoardView(boardPosition: $game.currentPosition)
+                BoardView(boardPosition: game.currentPosition)
                     .scaledToFit()
                 if game.gameData?.outcome != nil {
                     gameOutCome
