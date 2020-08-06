@@ -8,16 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State var isLoggedIn = OGSService.shared.isLoggedIn()
+    @SceneStorage("sceneID") var sceneID = UUID().uuidString
+    @State var isLoggedIn = false
     
     var body: some View {
-        !isLoggedIn ?
-            AnyView(
-                NavigationView {
-                    LoginView(isLoggedIn: $isLoggedIn)
-                })
-            :
-            AnyView(MainView())
+        let ogs = OGSService.instance(forSceneWithID: sceneID)
+        return MainView()
+            .environmentObject(ogs)
     }
 }
 

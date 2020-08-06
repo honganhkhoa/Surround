@@ -12,17 +12,24 @@ struct MainView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @Environment(\.scenePhase) private var scenePhase
-    @ObservedObject private var activeGames = OGSWebSocket.shared.activeGames
+    @EnvironmentObject var ogs: OGSService
+    @SceneStorage("currentView") var currentView: SubView = .home
+    @State var navigationCurrentView: SubView? = .home
 
+    enum SubView: String {
+        case home
+        case publicGames
+    }
+    
     var tabView: some View {
-        TabView {
+        TabView(selection: $currentView) {
             NavigationView {
-                HomeView(games: activeGames.gameList)
+                HomeView()
             }
             .tabItem {
                 Image(systemName: "house")
                 Text("Home")
-            }
+            }.tag(SubView.home)
 
             NavigationView {
                 PublicGamesList()
@@ -30,14 +37,14 @@ struct MainView: View {
             .tabItem {
                 Image(systemName: "person.3")
                 Text("Public games")
-            }
+            }.tag(SubView.publicGames)
         }
     }
     
     var sideBarView: some View {
         NavigationView {
             List {
-                NavigationLink(destination: HomeView(games: activeGames.gameList)) {
+                NavigationLink(destination: HomeView(), tag: SubView.home, selection: $navigationCurrentView) {
                     Label("Home", systemImage: "house")
                 }
                 NavigationLink(destination: PublicGamesList()) {
@@ -47,10 +54,18 @@ struct MainView: View {
             .listStyle(SidebarListStyle())
             Text("Detail")
         }
+        .onChange(of: currentView) { newView in
+            navigationCurrentView = newView
+        }
+        .onChange(of: navigationCurrentView) { newView in
+            if let navigationCurrentView = newView {
+                currentView = navigationCurrentView
+            }
+        }
     }
     
     var body: some View {
-        Group {
+        return Group {
             #if os(iOS)
             if horizontalSizeClass == .compact {
                 tabView
@@ -62,8 +77,8 @@ struct MainView: View {
             #endif
         }.onChange(of: scenePhase) { phase in
             if phase == .active {
-                OGSWebSocket.shared.ensureConnect()
-                OGSService.shared.loadOverview()
+                ogs.ensureConnect()
+                ogs.loadOverview()
             }
         }
     }

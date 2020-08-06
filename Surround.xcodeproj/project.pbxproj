@@ -31,7 +31,6 @@
 		BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
-		BC042B5824AB2DD10050B2D1 /* OGSWebSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */; };
 		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
 		BC042B5F24AB2EC60050B2D1 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5E24AB2EC60050B2D1 /* SocketIO */; };
@@ -92,7 +91,6 @@
 		BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UserDefaults+SurroundModels.swift"; sourceTree = "<group>"; };
 		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
-		BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSWebSocket.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC55D2D524B81E90003E20E7 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -290,7 +288,6 @@
 			isa = PBXGroup;
 			children = (
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
-				BC042B4424AB2DD10050B2D1 /* OGSWebSocket.swift */,
 				BC55D2D724B8238A003E20E7 /* OGSActiveGames.swift */,
 			);
 			path = OGS;
@@ -474,7 +471,6 @@
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC042B4A24AB2DD10050B2D1 /* GameDetail.swift in Sources */,
-				BC042B5824AB2DD10050B2D1 /* OGSWebSocket.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* Clock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,

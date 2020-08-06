@@ -55,10 +55,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
                 currentPosition.gameScores = gameData?.score
                 clock = data.clock
                 
-                if data.outcome != nil {
-                    OGSWebSocket.shared.disconnect(from: self)
-                }
-                
                 undoRequested = data.undoRequested
             }
         }

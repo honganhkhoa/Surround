@@ -41,6 +41,7 @@ struct PlayerInfo: View {
 }
 
 struct GameDetail: View {
+    @EnvironmentObject var ogs: OGSService
     @ObservedObject var game: Game
     @State var gameDetailCancellable: AnyCancellable?
     @State var pendingMove: Move? = nil
@@ -49,7 +50,7 @@ struct GameDetail: View {
     @State var showingPassAlert = false
     
     func submitMove(move: Move) {
-        self.submitMoveCancellable = OGSWebSocket.shared.submitMove(move: move, forGame: game)
+        self.submitMoveCancellable = ogs.submitMove(move: move, forGame: game)
             .zip(game.$currentPosition.setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
                 self.submitMoveCancellable = nil
@@ -63,7 +64,7 @@ struct GameDetail: View {
     var body: some View {
         var status = ""
         var isUserTurn = false
-        var undoable = game.undoRequested == nil
+        var undoable = game.undoRequested == nil && game.currentPosition.lastMoveNumber > 0
         var undoacceptable = game.undoRequested != nil
         if let outcome = game.gameData?.outcome {
             if game.gameData?.winner == game.gameData?.blackPlayerId {
@@ -75,7 +76,7 @@ struct GameDetail: View {
             if let currentPlayer = game.clock?.currentPlayer {
                 let currentPlayerId = currentPlayer == .black ? game.gameData?.blackPlayerId : game.gameData?.whitePlayerId
                 status = "\(currentPlayer == .black ? "Black" : "White") to move"
-                if let ogsUIConfig = OGSService.shared.ogsUIConfig {
+                if let ogsUIConfig = ogs.ogsUIConfig {
                     let userId = ogsUIConfig.user.id
                     if let currentPlayerId = currentPlayerId {
                         if currentPlayerId == userId {
@@ -129,12 +130,12 @@ struct GameDetail: View {
                 newPosition: $pendingPosition
             ).layoutPriority(1)
             if undoable {
-                Button(action: { OGSWebSocket.shared.requestUndo(game: game) }) {
+                Button(action: { ogs.requestUndo(game: game) }) {
                     Text("Request undo")
                 }
             }
             if undoacceptable {
-                Button(action: { OGSWebSocket.shared.acceptUndo(game: game, moveNumber: game.undoRequested!) }) {
+                Button(action: { ogs.acceptUndo(game: game, moveNumber: game.undoRequested!) }) {
                     Text("Accept undo")
                 }
             }

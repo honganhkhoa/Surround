@@ -9,7 +9,9 @@ import SwiftUI
 import Combine
 
 struct HomeView: View {
-    var games: [Game]
+    var games: [Game] = []
+    @EnvironmentObject var ogs: OGSService
+    
     @State var gameDetailCancellable: AnyCancellable?
     @State var showGameDetail = false
     @State var gameToShowDetail: Game? = nil
@@ -18,12 +20,12 @@ struct HomeView: View {
         Group {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
-                    ForEach(games) { game in
+                    ForEach(ogs.activeGames.count > 0 ? Array(ogs.activeGames.values) : games) { game in
                         GameCell(game: game)
                         .onTapGesture {
                             self.gameToShowDetail = game
                             self.showGameDetail = true
-                            self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                            self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
                             }, receiveValue: { game in
                             })
                         }

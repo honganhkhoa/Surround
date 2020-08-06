@@ -14,16 +14,17 @@ struct LoginView: View {
     @Binding var isLoggedIn: Bool
     
     @State var loggingIn: AnyCancellable?
+    @EnvironmentObject var ogs: OGSService
     
     func loginToOGS() {
-        loggingIn = OGSService.shared.login(username: username, password: password)
+        loggingIn = ogs.login(username: username, password: password)
             .sink(receiveCompletion: {completion in
                 if case .failure(let error) = completion {
                     print(error)
                 }
             }, receiveValue: { config in
                 print(config)
-                self.isLoggedIn = OGSService.shared.isLoggedIn()
+                self.isLoggedIn = ogs.isLoggedIn()
             })
     }
     

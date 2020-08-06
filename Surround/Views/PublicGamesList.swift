@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 
 struct PublicGamesList: View {
+    @EnvironmentObject var ogs: OGSService
     @State var games: [Game] = []
     @State var gameDetailCancellable: AnyCancellable?
     @State var publicGamesCancellable: AnyCancellable?
@@ -24,7 +25,7 @@ struct PublicGamesList: View {
                             .onTapGesture {
                                 self.gameToShowDetail = game
                                 self.showDetail = true
-                                self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
                                 }, receiveValue: { value in
                                 })
                             }
@@ -45,7 +46,7 @@ struct PublicGamesList: View {
 
             print("Appeared \(self)")
             if self.games.count == 0 && self.publicGamesCancellable == nil {
-                self.publicGamesCancellable = OGSWebSocket.shared.getPublicGamesAndConnect().sink(receiveCompletion: { completion in
+                self.publicGamesCancellable = ogs.getPublicGamesAndConnect().sink(receiveCompletion: { completion in
 
                 }) { games in
                     self.games = games
@@ -56,7 +57,7 @@ struct PublicGamesList: View {
             print("Disappeared \(self) \(String(describing: gameToShowDetail))")
             for game in games {
                 if game.ID != gameToShowDetail?.ID {
-                    OGSWebSocket.shared.disconnect(from: game)
+                    ogs.disconnect(from: game)
                 } else {
                     print("Skipped")
                 }
@@ -68,7 +69,7 @@ struct PublicGamesList: View {
         }
         .navigationBarTitle(Text("Public live games"))
         .navigationBarItems(trailing: Button(action: {
-            OGSService.shared.logout()
+            ogs.logout()
         }, label: {
             Text("Logout")
         }))
