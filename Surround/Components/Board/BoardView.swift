@@ -280,10 +280,16 @@ struct BoardView_Previews: PreviewProvider {
         let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
         let game2 = TestData.Scored15x17
+        let game3 = TestData.Resigned19x19HandicappedWithInitialState
+        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         return Group {
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: game2.currentPosition)
+                .previewLayout(.fixed(width: 375, height: 500))
+            BoardView(boardPosition: game3.currentPosition)
+                .previewLayout(.fixed(width: 375, height: 500))
+            BoardView(boardPosition: game4.currentPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: boardPosition).colorScheme(.dark)
                 .previewLayout(.fixed(width: 375, height: 500))

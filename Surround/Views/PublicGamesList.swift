@@ -46,7 +46,7 @@ struct PublicGamesList: View {
 
             print("Appeared \(self)")
             if self.games.count == 0 && self.publicGamesCancellable == nil {
-                self.publicGamesCancellable = ogs.getPublicGamesAndConnect().sink(receiveCompletion: { completion in
+                self.publicGamesCancellable = ogs.fetchAndConnectToPublicGames().sink(receiveCompletion: { completion in
 
                 }) { games in
                     self.games = games

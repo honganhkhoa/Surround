@@ -10,6 +10,7 @@ import Combine
 import Alamofire
 import DictionaryCoding
 import SocketIO
+import WebKit
 
 enum ServiceError: Error {
     case invalidJSON
@@ -28,6 +29,12 @@ class OGSService: ObservableObject {
             return result
         }
     }
+    static func previewInstance(user: OGSUser? = nil) -> OGSService {
+        let ogs = OGSService(forPreview: true)
+        ogs.user = user
+        ogs.isLoggedIn = user != nil
+        return ogs
+    }
 
     private let ogsRoot = "https://online-go.com"
 
@@ -38,13 +45,21 @@ class OGSService: ObservableObject {
     var drift = 0.0
     var latency = 0.0
     private(set) public var connectedGames = [Int: Game]()
-    @Published private(set) public var activeGames = [Int: Game]()
 
-    private init() {
+    @Published private(set) public var activeGames = [Int: Game]()
+    @Published var isLoggedIn: Bool = false
+    @Published var user: OGSUser? = nil
+    
+    private init(forPreview: Bool = false) {
         socketManager = SocketManager(socketURL: URL(string: ogsRoot)!, config: [
             .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(750), .reconnectWaitMax(10000)
         ])
         socket = socketManager.defaultSocket
+        
+        if forPreview {
+            return
+        }
+        
         socket.onAny { event in
             if event.event != "active-bots" {
                 print(event)
@@ -55,7 +70,7 @@ class OGSService: ObservableObject {
             pingCancellale = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
                 socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": drift, "latency": latency])
             }
-            self.authenticateIfLoggedIn()
+            self.authenticateSocketIfLoggedIn()
 
             let previouslyConnectedGames = Array(connectedGames.values)
             connectedGames = [:]
@@ -94,8 +109,12 @@ class OGSService: ObservableObject {
             }
         }
         
+        self.checkLoginStatus()
         self.ensureConnect()
-        self.loadOverview()
+        if isLoggedIn {
+            self.updateUIConfig()
+            self.loadOverview()
+        }
     }
     
     var ogsUIConfig: OGSUIConfig? {
@@ -104,6 +123,26 @@ class OGSService: ObservableObject {
         }
         set {
             UserDefaults.standard[.ogsUIConfig] = newValue
+            if newValue == nil {
+                Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
+                for game in activeGames.values {
+                    self.disconnect(from: game)
+                }
+                activeGames.removeAll()
+            }
+            checkLoginStatus()
+        }
+    }
+    
+    var uiConfigCancellable: AnyCancellable?
+    func updateUIConfig() {
+        if uiConfigCancellable == nil {
+            uiConfigCancellable = self.fetchUIConfig().sink(
+                receiveCompletion: { _ in },
+                receiveValue: { uiConfig in
+                    self.ogsUIConfig = uiConfig
+                    self.uiConfigCancellable = nil
+                })
         }
     }
     
@@ -125,29 +164,79 @@ class OGSService: ObservableObject {
                 }
             }
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
-            UserDefaults.standard[.ogsUIConfig] = config
+            self.ogsUIConfig = config
+            self.loadOverview()
+            self.authenticateSocketIfLoggedIn()
             return config
         }).eraseToAnyPublisher()
     }
     
     func logout() {
-        UserDefaults.standard[.ogsUIConfig] = nil
-        Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
+        self.ogsUIConfig = nil
     }
     
-    func isLoggedIn() -> Bool {
-        if UserDefaults.standard[.ogsUIConfig] == nil {
-            return false
+    func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
+        let jsonDecoder = JSONDecoder()
+        jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        return Future<Data, Error> { promise in
+            AF.request("\(self.ogsRoot)/api/v1/ui/config").responseData { response in
+                switch response.result {
+                case .success:
+                    promise(.success(response.value!))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
+            self.ogsUIConfig = config
+            return config
+        }).eraseToAnyPublisher()
+    }
+    
+    private func checkLoginStatus() {
+        isLoggedIn = {
+            if let ogsUIConfig = self.ogsUIConfig {
+                if let csrfToken = ogsUIConfig.csrfToken {
+                    if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: ogsRoot)!) {
+                        for cookie in cookies {
+                            if cookie.name == "csrftoken" {
+                                return true
+                            }
+                        }
+                    }
+                    
+                    if let domain = URL(string: ogsRoot)?.host {
+                        if let cookie = HTTPCookie(properties: [
+                            .name: "csrftoken",
+                            .value: csrfToken,
+                            .domain: domain,
+                            .path: "/"
+                        ]) {
+                            Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                            return true
+                        }
+                    }
+                    return false
+                } else {
+                    return false
+                }
+            } else {
+                return false
+            }
+        }()
+        if isLoggedIn {
+            user = self.ogsUIConfig?.user
+        } else {
+            user = nil
         }
-        return true
     }
     
-    func authenticateIfLoggedIn() {
+    func authenticateSocketIfLoggedIn() {
         guard socket.status == .connected else {
             return
         }
       
-        guard self.isLoggedIn(), let uiconfig = UserDefaults.standard[.ogsUIConfig] else {
+        guard self.isLoggedIn, let uiconfig = self.ogsUIConfig else {
             return
         }
         
@@ -165,6 +254,10 @@ class OGSService: ObservableObject {
 
     
     func loadOverview() {
+        guard isLoggedIn else {
+            return
+        }
+        
         AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseJSON { response in
             switch response.result {
             case .success:
@@ -266,7 +359,7 @@ class OGSService: ObservableObject {
         }
 
         connectedGames[ogsID] = game
-        self.socket.emit("game/connect", ["game_id": ogsID, "player_id": UserDefaults.standard[.ogsUIConfig]?.user.id ?? 0, "chat": withChat ? true : 0])
+        self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])
 
         self.socket.on("game/\(ogsID)/gamedata") { gamedata, ack in
             if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
@@ -345,7 +438,7 @@ class OGSService: ObservableObject {
     }
     
     func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
-        guard let ogsUIConfig = UserDefaults.standard[.ogsUIConfig] else {
+        guard let ogsUIConfig = self.ogsUIConfig else {
             return Fail(error: ServiceError.notLoggedIn).eraseToAnyPublisher()
         }
         
@@ -360,24 +453,24 @@ class OGSService: ObservableObject {
     }
     
     func requestUndo(game: Game) {
-        if let ogsID = game.ogsID, let ogsUIConfig = self.ogsUIConfig {
-            self.socket.emit("game/undo/request", ["game_id": ogsID, "player_id": ogsUIConfig.user.id, "move_number": game.currentPosition.lastMoveNumber])
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/undo/request", ["game_id": ogsID, "player_id": user.id, "move_number": game.currentPosition.lastMoveNumber])
         }
     }
     
     func acceptUndo(game: Game, moveNumber: Int) {
-        if let ogsID = game.ogsID, let ogsUIConfig = self.ogsUIConfig {
-            self.socket.emit("game/undo/accept", ["game_id": ogsID, "player_id": ogsUIConfig.user.id, "move_number": moveNumber])
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/undo/accept", ["game_id": ogsID, "player_id": user.id, "move_number": moveNumber])
         }
     }
     
     func resign(game: Game) {
-        if let ogsID = game.ogsID, let ogsUIConfig = self.ogsUIConfig {
-            self.socket.emit("game/resign", ["game_id": ogsID, "player_id": ogsUIConfig.user.id])
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/resign", ["game_id": ogsID, "player_id": user.id])
         }
     }
     
-    func getPublicGamesAndConnect() -> AnyPublisher<[Game], Error> {
+    func fetchAndConnectToPublicGames() -> AnyPublisher<[Game], Error> {
         
         func queryPublicGames(promise: @escaping Future<[Game], Error>.Promise) {
             self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 18]).timingOut(after: 3) { data in
@@ -411,5 +504,36 @@ class OGSService: ObservableObject {
                 queryPublicGames(promise: promise)
             }
         }.eraseToAnyPublisher()
+    }
+    
+    func isOGSDomain(url: URL) -> Bool {
+        return url.absoluteString.lowercased().starts(with: ogsRoot)
+    }
+    
+    func isOGSDomain(cookie: HTTPCookie) -> Bool {
+        return cookie.domain == URL(string: ogsRoot)!.host
+    }
+    
+    func thirdPartyLogin(cookieStore: WKHTTPCookieStore) -> AnyPublisher<OGSUIConfig, Error> {
+        return Future<[HTTPCookie], Error> { promise in
+            cookieStore.getAllCookies { cookies in
+                promise(.success(cookies))
+            }
+        }.map { cookies -> AnyPublisher<OGSUIConfig, Error> in
+            let host = URL(string: self.ogsRoot)!.host
+            for cookie in cookies {
+                if cookie.domain == host {
+                    Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                }
+            }
+            return self.fetchUIConfig()
+        }
+        .switchToLatest()
+        .map { config in
+            self.loadOverview()
+            self.authenticateSocketIfLoggedIn()
+            return config
+        }
+        .eraseToAnyPublisher()
     }
 }

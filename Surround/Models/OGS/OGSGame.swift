@@ -82,4 +82,5 @@ struct OGSGame: Decodable {
     var score: GameScores?
     
     var undoRequested: Int?
+    var phase: String
 }

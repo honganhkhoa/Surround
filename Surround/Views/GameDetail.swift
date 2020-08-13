@@ -61,41 +61,81 @@ struct GameDetail: View {
             })
     }
     
-    var body: some View {
-        var status = ""
-        var isUserTurn = false
-        var undoable = game.undoRequested == nil && game.currentPosition.lastMoveNumber > 0
-        var undoacceptable = game.undoRequested != nil
+    var isUserPlaying: Bool {
+        guard let user = ogs.user else {
+            return false
+        }
+        return user.id == game.gameData?.blackPlayerId || user.id == game.gameData?.whitePlayerId
+    }
+    
+    var isUserTurn: Bool {
+        guard isUserPlaying else {
+            return false
+        }
+
+        guard game.gameData?.phase == "play" else {
+            return false
+        }
+        
+        return (game.clock?.currentPlayer == .black && ogs.user?.id == game.gameData?.blackPlayerId)
+            || (game.clock?.currentPlayer == .white && ogs.user?.id == game.gameData?.whitePlayerId)
+    }
+    
+    var undoable: Bool {
+        guard isUserPlaying else {
+            return false
+        }
+        
+        guard game.gameData?.phase == "play" && game.gameData?.outcome == nil else {
+            return false
+        }
+        
+        return !isUserTurn && game.undoRequested == nil && game.currentPosition.lastMoveNumber > 0
+    }
+    
+    var undoacceptable: Bool {
+        guard let undoRequested = game.undoRequested else {
+            return false
+        }
+        return isUserTurn && undoRequested == game.currentPosition.lastMoveNumber
+    }
+    
+    var defaultStatus: String {
+        if let currentPlayer = game.clock?.currentPlayer {
+            return "\(currentPlayer == .black ? "Black" : "White") to move"
+        } else {
+            return ""
+        }
+    }
+    
+    var status: String {
         if let outcome = game.gameData?.outcome {
             if game.gameData?.winner == game.gameData?.blackPlayerId {
-                status = "Black wins by \(outcome)"
+                return "Black wins by \(outcome)"
             } else {
-                status = "White wins by \(outcome)"
+                return "White wins by \(outcome)"
             }
         } else {
-            if let currentPlayer = game.clock?.currentPlayer {
-                let currentPlayerId = currentPlayer == .black ? game.gameData?.blackPlayerId : game.gameData?.whitePlayerId
-                status = "\(currentPlayer == .black ? "Black" : "White") to move"
-                if let ogsUIConfig = ogs.ogsUIConfig {
-                    let userId = ogsUIConfig.user.id
-                    if let currentPlayerId = currentPlayerId {
-                        if currentPlayerId == userId {
-                            if case .pass = game.currentPosition.lastMove {
-                                status = "Your move - opponent passed"
-                            } else {
-                                status = "Your move"
-                            }
-                            isUserTurn = true
-                        }
+            if game.undoRequested != nil {
+                return "Undo requested"
+            }
+            if isUserPlaying {
+                if isUserTurn {
+                    if case .pass = game.currentPosition.lastMove {
+                        return "Your move - opponent passed"
+                    } else {
+                        return "Your move"
                     }
-                    undoable = undoable && !isUserTurn && (userId == game.gameData?.blackPlayerId || userId == game.gameData?.whitePlayerId)
+                } else {
+                    return defaultStatus
                 }
+            } else {
+                return defaultStatus
             }
         }
-        if let undoRequested = game.undoRequested {
-            status = "Undo requested"
-            undoacceptable = (undoRequested == game.currentPosition.lastMoveNumber) && isUserTurn
-        }
+    }
+    
+    var body: some View {
         return VStack(alignment: .center) {
             HStack {
                 PlayerInfo(game: game, player: .black)
@@ -163,6 +203,6 @@ struct GameDetail_Previews: PreviewProvider {
         return Group {
             GameDetail(game: game)
             GameDetail(game: ongoingGame, pendingMove: pendingMove, pendingPosition: pendingPosition)
-        }
+        }.environmentObject(OGSService.previewInstance(user: OGSUser(username: ongoingGame.blackName, id: ongoingGame.blackId!)))
     }    
 }

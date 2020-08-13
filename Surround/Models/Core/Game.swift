@@ -18,9 +18,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
             if let data = gameData {
                 self.blackRank = data.players.black.rank
                 self.whiteRank = data.players.white.rank
+                self.blackId = data.players.black.id
+                self.whiteId = data.players.white.id
                 var position = initialPosition
                 do {
-                    var firstMoveIndex = 0
+                    var firstNonHandicapMoveIndex = 0
                     var initialPositionStones = 0
                     if data.initialState.white.count > 0 || data.initialState.black.count > 0 {
                         for point in BoardPosition.points(fromPositionString: data.initialState.black) {
@@ -33,16 +35,14 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
                         }
                         position.nextToMove = data.initialPlayer
                     }
-                    if data.handicap > 0 {
-                        if data.moves.count >= data.handicap && initialPositionStones == 0 {
-                            for handicapMove in data.moves[..<data.handicap] {
-                                position.putStone(row: handicapMove[1], column: handicapMove[0], color: .black)
-                            }
-                            firstMoveIndex = data.handicap
+                    if data.handicap > 0 && data.freeHandicapPlacement {
+                        firstNonHandicapMoveIndex = min(data.handicap, data.moves.count)
+                        for handicapMove in data.moves[..<firstNonHandicapMoveIndex] {
+                            position.putStone(row: handicapMove[1], column: handicapMove[0], color: .black)
                         }
-                        position.nextToMove = data.initialPlayer.opponentColor()
+                        position.nextToMove = firstNonHandicapMoveIndex == data.handicap ? data.initialPlayer.opponentColor() : data.initialPlayer
                     }
-                    for move in data.moves[firstMoveIndex...] {
+                    for move in data.moves[firstNonHandicapMoveIndex...] {
                         position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
                     }
                 } catch {
@@ -65,6 +65,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     var whiteName: String
     @Published var blackRank: Double?
     @Published var whiteRank: Double?
+    @Published var blackId: Int?
+    @Published var whiteId: Int?
     @Published var gameName: String?
     @Published var currentPosition: BoardPosition
     @Published var undoRequested: Int?
@@ -120,6 +122,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
         self.height = ogsGame.height
         self.blackName = ogsGame.players.black.username
         self.whiteName = ogsGame.players.white.username
+        self.blackId = ogsGame.players.black.id
+        self.whiteId = ogsGame.players.white.id
         self.ID = .OGS(ogsGame.gameId)
         self.initialPosition = BoardPosition(width: width, height: height)
         self.currentPosition = self.initialPosition
@@ -153,5 +157,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
             position = position.previousPosition!
         }
         currentPosition = position
+        self.undoRequested = nil
     }
 }

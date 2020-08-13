@@ -11,11 +11,10 @@ import Combine
 struct LoginView: View {
     @State var username = ""
     @State var password = ""
-    @Binding var isLoggedIn: Bool
     
     @State var loggingIn: AnyCancellable?
     @EnvironmentObject var ogs: OGSService
-    
+
     func loginToOGS() {
         loggingIn = ogs.login(username: username, password: password)
             .sink(receiveCompletion: {completion in
@@ -24,7 +23,6 @@ struct LoginView: View {
                 }
             }, receiveValue: { config in
                 print(config)
-                self.isLoggedIn = ogs.isLoggedIn()
             })
     }
     
@@ -45,7 +43,7 @@ struct LoginView: View {
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            LoginView(isLoggedIn: .constant(false))
+            LoginView()
         }
     }
 }

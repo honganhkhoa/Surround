@@ -24,7 +24,20 @@ class TestData {
         return game
     }
     static var Resigned9x9Japanese: Game { sampleGame(id: 2) }
-    static var Ongoing19x19HandicappedWithNoInitialState: Game { sampleGame(id: 3) }
+    static var Ongoing19x19HandicappedWithNoInitialState: Game {
+        let game = sampleGame(id: 3)
+        game.ogsRawData = [
+            "players": [
+                "black": [
+                    "icon": "https://secure.gravatar.com/avatar/7e8d12fdf00911f6b573b6644b518f4d?s=32&d=retro"
+                ],
+                "white": [
+                    "icon": "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/bb1794c4b0538ce0068287464079d02e-32.png"
+                ]
+            ]
+        ]
+        return game
+    }
     static var Scored15x17: Game { sampleGame(id: 4) }
 
     static func sampleGame(id: Int = 0) -> Game {

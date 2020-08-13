@@ -78,7 +78,10 @@ struct MainView: View {
         }.onChange(of: scenePhase) { phase in
             if phase == .active {
                 ogs.ensureConnect()
-                ogs.loadOverview()
+                if ogs.isLoggedIn {
+                    ogs.updateUIConfig()
+                    ogs.loadOverview()
+                }
             }
         }
     }
