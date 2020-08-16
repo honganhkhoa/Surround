@@ -19,6 +19,7 @@ struct HomeView: View {
     @State var username = ""
     @State var password = ""
     @State var loginCancellable: AnyCancellable?
+    @State var isShowingThirdPartyLogin = false
 
     var body: some View {
         Group {
@@ -64,7 +65,7 @@ struct HomeView: View {
                         }.disabled(username.count == 0 || password.count == 0)
                     }.padding(.horizontal)
                     GroupBox {
-                        NavigationLink(destination: SocialLoginView(type: .facebook)) {
+                        NavigationLink(destination: ThirdPartyLoginView(type: .facebook), isActive: $isShowingThirdPartyLogin) {
                             Text("Sign in with Facebook")
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -82,6 +83,11 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
+        .onChange(of: ogs.isLoggedIn) { isLoggedIn in
+            if isLoggedIn {
+                isShowingThirdPartyLogin = false
+            }
+        }
     }
 }
 

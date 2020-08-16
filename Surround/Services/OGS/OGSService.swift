@@ -36,7 +36,8 @@ class OGSService: ObservableObject {
         return ogs
     }
 
-    private let ogsRoot = "https://online-go.com"
+    private static let ogsRoot = "https://online-go.com"
+    var ogsRoot = OGSService.ogsRoot
 
     let socketManager: SocketManager
     let socket: SocketIOClient
@@ -535,5 +536,16 @@ class OGSService: ObservableObject {
             return config
         }
         .eraseToAnyPublisher()
+    }
+    
+    static func thirdPartyLoginURL(type: ThirdPartyLoginWebView.ThirdParty) -> URL {
+        switch type {
+        case .facebook:
+            return URL(string: "\(OGSService.ogsRoot)/login/facebook/")!
+        case .google:
+            return URL(string: "\(OGSService.ogsRoot)/login/google-oauth2/")!
+        case .twitter:
+            return URL(string: "\(OGSService.ogsRoot)/login/twitter/")!
+        }
     }
 }

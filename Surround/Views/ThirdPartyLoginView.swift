@@ -12,27 +12,27 @@ import WebKit
 import Alamofire
 import Combine
 
-struct SocialLoginView: View {
-    var type: SocialLoginWebView.SocialType
+struct ThirdPartyLoginView: View {
+    var type: ThirdPartyLoginWebView.ThirdParty
     @State var isLoading = true
     
     var body: some View {
         ZStack {
-            SocialLoginWebView(type: type, isLoading: $isLoading)
+            ThirdPartyLoginWebView(type: type, isLoading: $isLoading)
             if isLoading {
                 ProgressView()
             }
-        }
+        }.navigationBarTitleDisplayMode(.inline)
     }
 }
 
-struct SocialLoginWebView: UIViewRepresentable {
+struct ThirdPartyLoginWebView: UIViewRepresentable {
     typealias UIViewType = WKWebView
-    var type: SocialType
+    var type: ThirdParty
     @EnvironmentObject var ogs: OGSService
     @Binding var isLoading: Bool
     
-    enum SocialType {
+    enum ThirdParty {
         case facebook
         case google
         case twitter
@@ -53,16 +53,7 @@ struct SocialLoginWebView: UIViewRepresentable {
                 }
             }
         }
-        
-        switch type {
-        case .facebook:
-            webview.load(URLRequest(url: URL(string: "https://online-go.com/login/facebook/")!))
-            break
-        case .google:
-            break
-        case .twitter:
-            break
-        }
+        webview.load(URLRequest(url: OGSService.thirdPartyLoginURL(type: type)))
         return webview
     }
 
@@ -75,11 +66,11 @@ struct SocialLoginWebView: UIViewRepresentable {
     }
     
     class Coordinator: NSObject, WKNavigationDelegate {
-        var parent: SocialLoginWebView
+        var parent: ThirdPartyLoginWebView
         var isLoadingObservation: NSKeyValueObservation?
         var loginCancellable: AnyCancellable?
         
-        init(_ parent: SocialLoginWebView) {
+        init(_ parent: ThirdPartyLoginWebView) {
             self.parent = parent
         }
         

@@ -78,7 +78,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     }
     var initialPosition: BoardPosition
     var ID: GameID
-    var ogsRawData: [String: Any]?
+    @Published var ogsRawData: [String: Any]?
     @Published var clock: Clock?
     
     var debugDescription: String {
