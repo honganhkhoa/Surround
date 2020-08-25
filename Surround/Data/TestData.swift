@@ -24,21 +24,11 @@ class TestData {
         return game
     }
     static var Resigned9x9Japanese: Game { sampleGame(id: 2) }
-    static var Ongoing19x19HandicappedWithNoInitialState: Game {
-        let game = sampleGame(id: 3)
-        game.ogsRawData = [
-            "players": [
-                "black": [
-                    "icon": "https://secure.gravatar.com/avatar/7e8d12fdf00911f6b573b6644b518f4d?s=32&d=retro"
-                ],
-                "white": [
-                    "icon": "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/bb1794c4b0538ce0068287464079d02e-32.png"
-                ]
-            ]
-        ]
-        return game
-    }
+    static var Ongoing19x19HandicappedWithNoInitialState: Game { sampleGame(id: 3) }
     static var Scored15x17: Game { sampleGame(id: 4) }
+    static var Ongoing19x19wBot1: Game { sampleGame(id: 5) }
+    static var Ongoing19x19wBot2: Game { sampleGame(id: 6) }
+    static var Ongoing19x19wBot3: Game { sampleGame(id: 7) }
 
     static func sampleGame(id: Int = 0) -> Game {
         let decoder = JSONDecoder()
@@ -3880,6 +3870,1886 @@ class TestData {
           "winner": 796361,
           "outcome": "9.5 points",
           "end_time": 1596011614
+        }
+        """],
+        // MARK: - Ongoing, 19x19 w/ bot, player turn
+        // MARK: - #26268396
+        ["""
+        {
+          "white_player_id": 592684,
+          "black_player_id": 736006,
+          "group_ids": [],
+          "game_id": 26268396,
+          "game_name": "Friendly Match",
+          "private": false,
+          "pause_on_weekends": false,
+          "players": {
+            "black": {
+              "username": "鍾宛彤",
+              "rank": 30.833597219282126,
+              "professional": false,
+              "id": 736006
+            },
+            "white": {
+              "username": "kata-bot",
+              "rank": 37.11563134150345,
+              "professional": false,
+              "id": 592684
+            }
+          },
+          "ranked": false,
+          "disable_analysis": false,
+          "handicap": 8,
+          "komi": 0.5,
+          "width": 19,
+          "height": 19,
+          "rules": "chinese",
+          "time_control": {
+            "system": "byoyomi",
+            "time_control": "byoyomi",
+            "speed": "live",
+            "pause_on_weekends": false,
+            "main_time": 7200,
+            "period_time": 30,
+            "periods": 5
+          },
+          "phase": "play",
+          "initial_player": "black",
+          "moves": [
+            [
+              15,
+              3,
+              1932
+            ],
+            [
+              15,
+              9,
+              1196
+            ],
+            [
+              15,
+              15,
+              908
+            ],
+            [
+              9,
+              15,
+              733
+            ],
+            [
+              3,
+              15,
+              733
+            ],
+            [
+              3,
+              9,
+              877
+            ],
+            [
+              3,
+              3,
+              760
+            ],
+            [
+              9,
+              3,
+              733
+            ],
+            [
+              16,
+              16,
+              12416
+            ],
+            [
+              6,
+              2,
+              12462
+            ],
+            [
+              15,
+              16,
+              4420
+            ],
+            [
+              12,
+              2,
+              2209
+            ],
+            [
+              14,
+              15,
+              8866
+            ],
+            [
+              9,
+              9,
+              30166
+            ],
+            [
+              6,
+              3,
+              10048
+            ],
+            [
+              5,
+              3,
+              2497
+            ],
+            [
+              16,
+              5,
+              10097
+            ],
+            [
+              16,
+              4,
+              17396
+            ],
+            [
+              15,
+              5,
+              10056
+            ],
+            [
+              13,
+              3,
+              8531
+            ],
+            [
+              16,
+              7,
+              10051
+            ],
+            [
+              6,
+              4,
+              4696
+            ],
+            [
+              17,
+              9,
+              10094
+            ],
+            [
+              7,
+              3,
+              17082
+            ],
+            [
+              1,
+              4,
+              10064
+            ],
+            [
+              1,
+              3,
+              15027
+            ],
+            [
+              1,
+              9,
+              5176
+            ],
+            [
+              2,
+              4,
+              2132
+            ],
+            [
+              2,
+              11,
+              10083
+            ],
+            [
+              3,
+              11,
+              2589
+            ],
+            [
+              3,
+              12,
+              10076
+            ],
+            [
+              4,
+              11,
+              56037
+            ],
+            [
+              2,
+              13,
+              9687
+            ],
+            [
+              13,
+              5,
+              2910
+            ],
+            [
+              7,
+              16,
+              9486
+            ],
+            [
+              14,
+              7,
+              6761
+            ],
+            [
+              8,
+              14,
+              10085
+            ],
+            [
+              15,
+              11,
+              48223
+            ],
+            [
+              4,
+              12,
+              10070
+            ],
+            [
+              5,
+              11,
+              2923
+            ],
+            [
+              6,
+              13,
+              10089
+            ],
+            [
+              7,
+              12,
+              30657
+            ],
+            [
+              2,
+              16,
+              10084
+            ],
+            [
+              2,
+              8,
+              70147
+            ],
+            [
+              13,
+              12,
+              10039
+            ],
+            [
+              12,
+              11,
+              3326
+            ],
+            [
+              13,
+              11,
+              9388
+            ],
+            [
+              13,
+              10,
+              9878
+            ],
+            [
+              14,
+              10,
+              8230
+            ],
+            [
+              13,
+              9,
+              36874
+            ],
+            [
+              12,
+              12,
+              10052
+            ],
+            [
+              11,
+              11,
+              2532
+            ],
+            [
+              11,
+              12,
+              8258
+            ],
+            [
+              10,
+              11,
+              108511
+            ],
+            [
+              9,
+              13,
+              4157
+            ],
+            [
+              14,
+              9,
+              25682
+            ],
+            [
+              16,
+              10,
+              4171
+            ],
+            [
+              15,
+              10,
+              7273
+            ],
+            [
+              16,
+              12,
+              6568
+            ],
+            [
+              16,
+              11,
+              181607
+            ],
+            [
+              17,
+              11,
+              10093
+            ],
+            [
+              15,
+              12,
+              2374
+            ],
+            [
+              1,
+              8,
+              8653
+            ],
+            [
+              1,
+              7,
+              3312
+            ],
+            [
+              16,
+              13,
+              10090
+            ],
+            [
+              15,
+              13,
+              6120
+            ],
+            [
+              14,
+              14,
+              10130
+            ],
+            [
+              17,
+              4,
+              3200
+            ],
+            [
+              6,
+              12,
+              10081
+            ],
+            [
+              6,
+              11,
+              36847
+            ],
+            [
+              15,
+              14,
+              5716
+            ],
+            [
+              10,
+              12,
+              21218
+            ],
+            [
+              10,
+              13,
+              10084
+            ],
+            [
+              7,
+              13,
+              1950
+            ],
+            [
+              7,
+              14,
+              10065
+            ],
+            [
+              5,
+              12,
+              2186
+            ],
+            [
+              5,
+              13,
+              10110
+            ],
+            [
+              14,
+              13,
+              7915
+            ],
+            [
+              2,
+              10,
+              10048
+            ],
+            [
+              2,
+              7,
+              925289
+            ],
+            [
+              13,
+              13,
+              3348
+            ]
+          ],
+          "allow_self_capture": false,
+          "automatic_stone_removal": false,
+          "free_handicap_placement": true,
+          "aga_handicap_scoring": false,
+          "allow_ko": false,
+          "allow_superko": false,
+          "superko_algorithm": "csk",
+          "score_territory": true,
+          "score_territory_in_seki": true,
+          "score_stones": true,
+          "score_handicap": true,
+          "score_prisoners": false,
+          "score_passes": true,
+          "white_must_pass_last": false,
+          "opponent_plays_first_after_resume": false,
+          "strict_seki_mode": false,
+          "initial_state": {
+            "black": "",
+            "white": ""
+          },
+          "start_time": 1597825582,
+          "original_disable_analysis": false,
+          "clock": {
+            "game_id": 26268396,
+            "current_player": 736006,
+            "black_player_id": 736006,
+            "white_player_id": 592684,
+            "title": "Friendly Match",
+            "last_move": 1597827638640,
+            "expiration": 1597833270102,
+            "black_time": {
+              "thinking_time": 5481.462000000001,
+              "periods": 5,
+              "period_time": 30
+            },
+            "white_time": {
+              "thinking_time": 6869.770000000001,
+              "periods": 5,
+              "period_time": 30
+            }
+          },
+          "auto_score": true
+        }
+        """],
+        // MARK: - Ongoing, 19x19 w/ bot, bot turn
+        // MARK: - #26268404
+        ["""
+        {
+          "white_player_id": 592684,
+          "black_player_id": 797416,
+          "group_ids": [],
+          "game_id": 26268404,
+          "game_name": "Friendly Match",
+          "private": false,
+          "pause_on_weekends": false,
+          "players": {
+            "black": {
+              "username": "Skywalker0116",
+              "rank": 26.651698818655287,
+              "professional": false,
+              "id": 797416
+            },
+            "white": {
+              "username": "kata-bot",
+              "rank": 37.11563134150345,
+              "professional": false,
+              "id": 592684
+            }
+          },
+          "ranked": false,
+          "disable_analysis": false,
+          "handicap": 5,
+          "komi": 0.5,
+          "width": 19,
+          "height": 19,
+          "rules": "chinese",
+          "time_control": {
+            "system": "fischer",
+            "time_control": "fischer",
+            "speed": "live",
+            "pause_on_weekends": false,
+            "time_increment": 30,
+            "initial_time": 1800,
+            "max_time": 1800
+          },
+          "phase": "play",
+          "initial_player": "black",
+          "moves": [
+            [
+              15,
+              4,
+              3090
+            ],
+            [
+              15,
+              2,
+              733
+            ],
+            [
+              3,
+              3,
+              1376
+            ],
+            [
+              2,
+              15,
+              824
+            ],
+            [
+              4,
+              15,
+              610
+            ],
+            [
+              15,
+              15,
+              12412
+            ],
+            [
+              2,
+              5,
+              12864
+            ],
+            [
+              6,
+              16,
+              8041
+            ],
+            [
+              16,
+              13,
+              8510
+            ],
+            [
+              16,
+              11,
+              10046
+            ],
+            [
+              15,
+              11,
+              13823
+            ],
+            [
+              15,
+              10,
+              6929
+            ],
+            [
+              15,
+              12,
+              1601
+            ],
+            [
+              14,
+              10,
+              7686
+            ],
+            [
+              16,
+              10,
+              3802
+            ],
+            [
+              16,
+              9,
+              8376
+            ],
+            [
+              17,
+              10,
+              1468
+            ],
+            [
+              17,
+              9,
+              1398
+            ],
+            [
+              17,
+              11,
+              2431
+            ],
+            [
+              17,
+              14,
+              7757
+            ],
+            [
+              17,
+              13,
+              9825
+            ],
+            [
+              16,
+              6,
+              10097
+            ],
+            [
+              16,
+              5,
+              13292
+            ],
+            [
+              15,
+              6,
+              10054
+            ],
+            [
+              11,
+              3,
+              24423
+            ],
+            [
+              16,
+              3,
+              10052
+            ],
+            [
+              15,
+              3,
+              8975
+            ],
+            [
+              2,
+              14,
+              9426
+            ],
+            [
+              3,
+              14,
+              24624
+            ],
+            [
+              2,
+              13,
+              7619
+            ],
+            [
+              1,
+              15,
+              2134
+            ],
+            [
+              3,
+              13,
+              10091
+            ],
+            [
+              4,
+              13,
+              3710
+            ],
+            [
+              4,
+              12,
+              8973
+            ],
+            [
+              5,
+              12,
+              9848
+            ],
+            [
+              5,
+              13,
+              8199
+            ],
+            [
+              4,
+              14,
+              1770
+            ],
+            [
+              4,
+              11,
+              4771
+            ],
+            [
+              6,
+              13,
+              1907
+            ],
+            [
+              9,
+              16,
+              8117
+            ],
+            [
+              5,
+              11,
+              39986
+            ],
+            [
+              2,
+              11,
+              6535
+            ],
+            [
+              13,
+              16,
+              42239
+            ],
+            [
+              14,
+              16,
+              10077
+            ],
+            [
+              13,
+              15,
+              16832
+            ],
+            [
+              17,
+              5,
+              6999
+            ],
+            [
+              16,
+              16,
+              13769
+            ],
+            [
+              14,
+              17,
+              7370
+            ],
+            [
+              16,
+              15,
+              14060
+            ],
+            [
+              14,
+              14,
+              2225
+            ],
+            [
+              15,
+              14,
+              9740
+            ],
+            [
+              11,
+              16,
+              1755
+            ],
+            [
+              14,
+              15,
+              73830
+            ],
+            [
+              13,
+              17,
+              10054
+            ],
+            [
+              15,
+              16,
+              32165
+            ],
+            [
+              4,
+              1,
+              5072
+            ],
+            [
+              3,
+              1,
+              39837
+            ],
+            [
+              3,
+              2,
+              3492
+            ],
+            [
+              4,
+              2,
+              3276
+            ],
+            [
+              2,
+              2,
+              496
+            ],
+            [
+              2,
+              1,
+              1630
+            ],
+            [
+              2,
+              3,
+              1175
+            ],
+            [
+              3,
+              4,
+              50673
+            ],
+            [
+              5,
+              1,
+              6491
+            ],
+            [
+              1,
+              1,
+              17660
+            ],
+            [
+              10,
+              2,
+              4889
+            ],
+            [
+              5,
+              2,
+              8812
+            ],
+            [
+              6,
+              2,
+              6228
+            ],
+            [
+              6,
+              3,
+              10141
+            ],
+            [
+              7,
+              2,
+              6701
+            ],
+            [
+              7,
+              3,
+              3159
+            ],
+            [
+              8,
+              3,
+              8712
+            ],
+            [
+              8,
+              4,
+              14607
+            ],
+            [
+              9,
+              3,
+              4003
+            ],
+            [
+              7,
+              5,
+              3588
+            ],
+            [
+              12,
+              1,
+              4877
+            ],
+            [
+              16,
+              4,
+              15048
+            ],
+            [
+              17,
+              4,
+              5742
+            ],
+            [
+              17,
+              3,
+              2661
+            ],
+            [
+              1,
+              7,
+              694
+            ],
+            [
+              1,
+              5,
+              26165
+            ],
+            [
+              4,
+              17,
+              8892
+            ],
+            [
+              3,
+              16,
+              29640
+            ],
+            [
+              3,
+              8,
+              10045
+            ],
+            [
+              18,
+              4,
+              47667
+            ],
+            [
+              18,
+              5,
+              10068
+            ],
+            [
+              17,
+              6,
+              34382
+            ],
+            [
+              18,
+              3,
+              10066
+            ],
+            [
+              17,
+              2,
+              2046
+            ],
+            [
+              17,
+              7,
+              1146
+            ],
+            [
+              14,
+              1,
+              4671
+            ],
+            [
+              16,
+              1,
+              5792
+            ],
+            [
+              16,
+              2,
+              6255
+            ],
+            [
+              5,
+              10,
+              10095
+            ],
+            [
+              5,
+              16,
+              17094
+            ],
+            [
+              5,
+              17,
+              10071
+            ],
+            [
+              6,
+              15,
+              2940
+            ],
+            [
+              7,
+              16,
+              10201
+            ],
+            [
+              3,
+              17,
+              31391
+            ],
+            [
+              9,
+              4,
+              10053
+            ],
+            [
+              9,
+              5,
+              123305
+            ],
+            [
+              15,
+              17,
+              10080
+            ],
+            [
+              16,
+              17,
+              46002
+            ],
+            [
+              5,
+              6,
+              10050
+            ],
+            [
+              6,
+              5,
+              53383
+            ],
+            [
+              13,
+              1,
+              10052
+            ],
+            [
+              13,
+              2,
+              11730
+            ],
+            [
+              12,
+              2,
+              10063
+            ],
+            [
+              12,
+              3,
+              7362
+            ],
+            [
+              10,
+              5,
+              3950
+            ],
+            [
+              11,
+              2,
+              15134
+            ],
+            [
+              11,
+              1,
+              5545
+            ],
+            [
+              12,
+              5,
+              34974
+            ],
+            [
+              9,
+              6,
+              9837
+            ],
+            [
+              8,
+              5,
+              2445
+            ],
+            [
+              7,
+              7,
+              7471
+            ],
+            [
+              11,
+              15,
+              57525
+            ],
+            [
+              12,
+              16,
+              10052
+            ],
+            [
+              10,
+              15,
+              13615
+            ],
+            [
+              10,
+              16,
+              10050
+            ],
+            [
+              7,
+              11,
+              14839
+            ],
+            [
+              12,
+              15,
+              3268
+            ],
+            [
+              12,
+              14,
+              5780
+            ],
+            [
+              13,
+              14,
+              9790
+            ],
+            [
+              15,
+              15,
+              2430
+            ],
+            [
+              12,
+              13,
+              7967
+            ],
+            [
+              11,
+              14,
+              4894
+            ],
+            [
+              13,
+              12,
+              5744
+            ],
+            [
+              11,
+              13,
+              9230
+            ],
+            [
+              11,
+              12,
+              8464
+            ],
+            [
+              10,
+              12,
+              13884
+            ],
+            [
+              11,
+              11,
+              1994
+            ],
+            [
+              9,
+              13,
+              29101
+            ],
+            [
+              10,
+              11,
+              5646
+            ],
+            [
+              9,
+              11,
+              5668
+            ],
+            [
+              13,
+              3,
+              798
+            ],
+            [
+              14,
+              2,
+              2936
+            ],
+            [
+              12,
+              6,
+              6628
+            ],
+            [
+              13,
+              6,
+              45834
+            ],
+            [
+              4,
+              5,
+              3295
+            ],
+            [
+              4,
+              4,
+              7928
+            ],
+            [
+              14,
+              5,
+              1135
+            ],
+            [
+              13,
+              4,
+              13815
+            ],
+            [
+              9,
+              10,
+              8143
+            ],
+            [
+              8,
+              10,
+              9195
+            ],
+            [
+              13,
+              5,
+              69
+            ],
+            [
+              11,
+              6,
+              15440
+            ],
+            [
+              8,
+              12,
+              135
+            ],
+            [
+              9,
+              12,
+              12379
+            ],
+            [
+              12,
+              7,
+              509
+            ],
+            [
+              11,
+              5,
+              10860
+            ],
+            [
+              11,
+              7,
+              208
+            ],
+            [
+              0,
+              12,
+              86633
+            ],
+            [
+              8,
+              11,
+              4276
+            ],
+            [
+              9,
+              9,
+              37853
+            ],
+            [
+              10,
+              10,
+              3889
+            ],
+            [
+              8,
+              13,
+              22824
+            ],
+            [
+              8,
+              9,
+              4125
+            ],
+            [
+              7,
+              10,
+              27000
+            ],
+            [
+              7,
+              9,
+              4426
+            ],
+            [
+              0,
+              10,
+              49763
+            ],
+            [
+              6,
+              11,
+              2864
+            ],
+            [
+              6,
+              12,
+              3390
+            ],
+            [
+              6,
+              10,
+              3600
+            ],
+            [
+              7,
+              12,
+              1914
+            ],
+            [
+              1,
+              12,
+              4090
+            ],
+            [
+              0,
+              13,
+              24316
+            ],
+            [
+              10,
+              6,
+              3886
+            ],
+            [
+              1,
+              9,
+              67188
+            ],
+            [
+              1,
+              11,
+              3793
+            ],
+            [
+              0,
+              11,
+              5520
+            ],
+            [
+              2,
+              9,
+              4010
+            ],
+            [
+              2,
+              7,
+              20332
+            ],
+            [
+              2,
+              6,
+              3686
+            ],
+            [
+              1,
+              6,
+              6394
+            ],
+            [
+              3,
+              6,
+              3503
+            ],
+            [
+              1,
+              8,
+              5157
+            ],
+            [
+              2,
+              8,
+              3365
+            ],
+            [
+              0,
+              7,
+              1964
+            ],
+            [
+              6,
+              6,
+              3757
+            ],
+            [
+              4,
+              0,
+              11296
+            ],
+            [
+              6,
+              1,
+              3048
+            ],
+            [
+              14,
+              11,
+              29699
+            ],
+            [
+              13,
+              11,
+              7466
+            ],
+            [
+              8,
+              6,
+              21264
+            ]
+          ],
+          "allow_self_capture": false,
+          "automatic_stone_removal": false,
+          "free_handicap_placement": true,
+          "aga_handicap_scoring": false,
+          "allow_ko": false,
+          "allow_superko": false,
+          "superko_algorithm": "csk",
+          "score_territory": true,
+          "score_territory_in_seki": true,
+          "score_stones": true,
+          "score_handicap": true,
+          "score_prisoners": false,
+          "score_passes": true,
+          "white_must_pass_last": false,
+          "opponent_plays_first_after_resume": false,
+          "strict_seki_mode": false,
+          "initial_state": {
+            "black": "",
+            "white": ""
+          },
+          "start_time": 1597825617,
+          "original_disable_analysis": false,
+          "clock": {
+            "game_id": 26268404,
+            "current_player": 592684,
+            "black_player_id": 797416,
+            "white_player_id": 592684,
+            "title": "Friendly Match",
+            "last_move": 1597827931586,
+            "expiration": 1597829731586,
+            "black_time": {
+              "thinking_time": 1800,
+              "skip_bonus": false
+            },
+            "white_time": {
+              "thinking_time": 1800,
+              "skip_bonus": false
+            }
+          },
+          "auto_score": true
+        }
+        """],
+        // MARK: - Ongoing, 19x19 w/ bot, bot turn
+        // MARK: - #26269354
+        ["""
+        {
+          "white_player_id": 592684,
+          "black_player_id": 761457,
+          "group_ids": [],
+          "game_id": 26269354,
+          "game_name": "친선 대국",
+          "private": false,
+          "pause_on_weekends": false,
+          "players": {
+            "black": {
+              "username": "신세계",
+              "rank": 30.581741021128902,
+              "professional": false,
+              "id": 761457
+            },
+            "white": {
+              "username": "kata-bot",
+              "rank": 37.11563134150345,
+              "professional": false,
+              "id": 592684
+            }
+          },
+          "ranked": false,
+          "disable_analysis": false,
+          "handicap": 5,
+          "komi": 0.5,
+          "width": 19,
+          "height": 19,
+          "rules": "chinese",
+          "time_control": {
+            "system": "byoyomi",
+            "time_control": "byoyomi",
+            "speed": "live",
+            "pause_on_weekends": false,
+            "main_time": 300,
+            "period_time": 60,
+            "periods": 3
+          },
+          "phase": "play",
+          "initial_player": "black",
+          "moves": [
+            [
+              15,
+              3,
+              3112
+            ],
+            [
+              3,
+              3,
+              1812
+            ],
+            [
+              3,
+              15,
+              1149
+            ],
+            [
+              9,
+              9,
+              1133
+            ],
+            [
+              15,
+              15,
+              1374
+            ],
+            [
+              2,
+              5,
+              9588
+            ],
+            [
+              3,
+              7,
+              2144
+            ],
+            [
+              4,
+              5,
+              4077
+            ],
+            [
+              5,
+              3,
+              2862
+            ],
+            [
+              5,
+              6,
+              2971
+            ],
+            [
+              8,
+              2,
+              15758
+            ],
+            [
+              2,
+              13,
+              4026
+            ],
+            [
+              3,
+              11,
+              2987
+            ],
+            [
+              4,
+              12,
+              3979
+            ],
+            [
+              4,
+              14,
+              4831
+            ],
+            [
+              3,
+              12,
+              8857
+            ],
+            [
+              5,
+              8,
+              8149
+            ],
+            [
+              2,
+              11,
+              4097
+            ],
+            [
+              2,
+              10,
+              2719
+            ],
+            [
+              3,
+              10,
+              6689
+            ],
+            [
+              3,
+              9,
+              7379
+            ],
+            [
+              4,
+              11,
+              3444
+            ],
+            [
+              2,
+              8,
+              9875
+            ],
+            [
+              1,
+              3,
+              4181
+            ],
+            [
+              2,
+              2,
+              2305
+            ],
+            [
+              6,
+              16,
+              2827
+            ],
+            [
+              2,
+              16,
+              28644
+            ],
+            [
+              4,
+              16,
+              4378
+            ],
+            [
+              6,
+              14,
+              10726
+            ],
+            [
+              9,
+              16,
+              3785
+            ],
+            [
+              7,
+              8,
+              59433
+            ],
+            [
+              7,
+              5,
+              4314
+            ],
+            [
+              5,
+              4,
+              68492
+            ],
+            [
+              1,
+              2,
+              4768
+            ],
+            [
+              3,
+              4,
+              14260
+            ],
+            [
+              2,
+              6,
+              5482
+            ],
+            [
+              1,
+              1,
+              2638
+            ],
+            [
+              4,
+              9,
+              3646
+            ],
+            [
+              4,
+              8,
+              2482
+            ],
+            [
+              5,
+              5,
+              9128
+            ],
+            [
+              1,
+              10,
+              36058
+            ],
+            [
+              1,
+              15,
+              3131
+            ],
+            [
+              7,
+              13,
+              49923
+            ],
+            [
+              7,
+              3,
+              5036
+            ],
+            [
+              7,
+              2,
+              3737
+            ],
+            [
+              9,
+              5,
+              3928
+            ],
+            [
+              11,
+              16,
+              33634
+            ],
+            [
+              13,
+              16,
+              5354
+            ],
+            [
+              16,
+              13,
+              20883
+            ],
+            [
+              13,
+              14,
+              4094
+            ],
+            [
+              11,
+              14,
+              3435
+            ],
+            [
+              8,
+              14,
+              3860
+            ],
+            [
+              8,
+              13,
+              25131
+            ],
+            [
+              9,
+              13,
+              3587
+            ],
+            [
+              9,
+              12,
+              2886
+            ],
+            [
+              10,
+              13,
+              5526
+            ],
+            [
+              9,
+              15,
+              105730
+            ]
+          ],
+          "allow_self_capture": false,
+          "automatic_stone_removal": false,
+          "free_handicap_placement": true,
+          "aga_handicap_scoring": false,
+          "allow_ko": false,
+          "allow_superko": false,
+          "superko_algorithm": "csk",
+          "score_territory": true,
+          "score_territory_in_seki": true,
+          "score_stones": true,
+          "score_handicap": true,
+          "score_prisoners": false,
+          "score_passes": true,
+          "white_must_pass_last": false,
+          "opponent_plays_first_after_resume": false,
+          "strict_seki_mode": false,
+          "initial_state": {
+            "black": "",
+            "white": ""
+          },
+          "start_time": 1597829699,
+          "original_disable_analysis": false,
+          "clock": {
+            "game_id": 26269354,
+            "current_player": 592684,
+            "black_player_id": 761457,
+            "white_player_id": 592684,
+            "title": "친선 대국",
+            "last_move": 1597830359434,
+            "expiration": 1597830714683,
+            "black_time": {
+              "thinking_time": 0,
+              "periods": 2,
+              "period_time": 60
+            },
+            "white_time": {
+              "thinking_time": 175.24900000000008,
+              "periods": 3,
+              "period_time": 60
+            }
+          },
+          "auto_score": true
         }
         """]
     ]

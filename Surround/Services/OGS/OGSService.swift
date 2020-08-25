@@ -29,27 +29,62 @@ class OGSService: ObservableObject {
             return result
         }
     }
-    static func previewInstance(user: OGSUser? = nil) -> OGSService {
+    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = []) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
         ogs.isLoggedIn = user != nil
+        
+        for game in activeGames {
+            ogs.activeGames[game.ogsID!] = game
+        }
+        ogs.sortActiveGames(activeGames: ogs.activeGames.values)
+
         return ogs
     }
 
     private static let ogsRoot = "https://online-go.com"
-    var ogsRoot = OGSService.ogsRoot
+    private var ogsRoot = OGSService.ogsRoot
 
-    let socketManager: SocketManager
-    let socket: SocketIOClient
-    var timerCancellable: AnyCancellable?
-    var pingCancellale: AnyCancellable?
-    var drift = 0.0
-    var latency = 0.0
+    private let socketManager: SocketManager
+    private let socket: SocketIOClient
+    private var timerCancellable: AnyCancellable?
+    private var pingCancellale: AnyCancellable?
+    private var drift = 0.0
+    private var latency = 0.0
     private(set) public var connectedGames = [Int: Game]()
 
     @Published private(set) public var activeGames = [Int: Game]()
+    @Published private(set) public var unsortedActiveGames: [Game] = []
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
+    @Published private(set) public var sortedActiveGamesOnUserTurn: [Game] = []
+    @Published private(set) public var sortedActiveGamesNotOnUserTurn: [Game] = []
+    
+    private var activeGamesSortingCancellable: AnyCancellable?
+    
+    private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
+        var gamesOnUserTurn: [Game] = []
+        var gamesOnOppornentTurn: [Game] = []
+        for game in activeGames {
+            if let clock = game.clock {
+                if clock.currentPlayerId == self.user?.id {
+                    gamesOnUserTurn.append(game)
+                } else {
+                    gamesOnOppornentTurn.append(game)
+                }
+            }
+        }
+        let thinkingTimeLeftIncreasing: (Game, Game) -> Bool =  { game1, game2 in
+            if let clock1 = game1.clock, let clock2 = game2.clock {
+                let time1 = game1.blackId == self.user?.id ? clock1.blackTime : clock1.whiteTime
+                let time2 = game2.blackId == self.user?.id ? clock2.blackTime : clock2.whiteTime
+                return time1.thinkingTimeLeft! <= time2.thinkingTimeLeft!
+            }
+            return false
+        }
+        self.sortedActiveGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
+        self.sortedActiveGamesNotOnUserTurn = gamesOnOppornentTurn.sorted(by: thinkingTimeLeftIncreasing)
+    }
     
     private init(forPreview: Bool = false) {
         socketManager = SocketManager(socketURL: URL(string: ogsRoot)!, config: [
@@ -61,6 +96,34 @@ class OGSService: ObservableObject {
             return
         }
         
+        self.setUpSocketEventListeners()
+        
+        timerCancellable = TimeUtilities.shared.timer.sink { [self] _ in
+            for game in connectedGames.values {
+                if game.gameData?.outcome == nil && !(game.gameData?.pauseControl?.isPaused() ?? false) {
+                    if let timeControlSystem = game.gameData?.timeControl.system {
+                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency)
+                    }
+                }
+            }
+        }
+        
+        activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).sink(receiveValue: { activeGamesValues in
+            if let activeGames = activeGamesValues.last {
+                print("xxxxxxx \(activeGames) \(activeGames.count)")
+                self.sortActiveGames(activeGames: activeGames.values)
+            }
+        })
+        
+        self.checkLoginStatus()
+        self.ensureConnect()
+        if isLoggedIn {
+            self.updateUIConfig()
+            self.loadOverview()
+        }
+    }
+    
+    private func setUpSocketEventListeners() {
         socket.onAny { event in
             if event.event != "active-bots" {
                 print(event)
@@ -98,23 +161,6 @@ class OGSService: ObservableObject {
             if let activeGameData = gameData[0] as? [String: Any] {
                 self.updateActiveGames(withShortGameData: activeGameData)
             }
-        }
-        
-        timerCancellable = TimeUtilities.shared.timer.sink { [self] _ in
-            for game in connectedGames.values {
-                if game.gameData?.outcome == nil && !(game.gameData?.pauseControl?.isPaused() ?? false) {
-                    if let timeControlSystem = game.gameData?.timeControl.system {
-                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency)
-                    }
-                }
-            }
-        }
-        
-        self.checkLoginStatus()
-        self.ensureConnect()
-        if isLoggedIn {
-            self.updateUIConfig()
-            self.loadOverview()
         }
     }
     
@@ -264,9 +310,24 @@ class OGSService: ObservableObject {
             case .success:
                 if let data = response.value as? [String: Any] {
                     if let activeGames = data["active_games"] as? [[String: Any]] {
-                        for game in activeGames {
-                            self.updateActiveGames(withShortGameData: game)
+                        var newActiveGames = [Int:Game]()
+                        var unsortedActiveGames = [Game]()
+                        for gameData in activeGames {
+                            if let gameId = gameData["id"] as? Int {
+                                if let game = self.activeGames[gameId] {
+                                    newActiveGames[gameId] = game
+                                    unsortedActiveGames.append(game)
+                                } else {
+                                    if let newGame = self.createGame(fromShortGameData: gameData) {
+                                        newActiveGames[gameId] = newGame
+                                        unsortedActiveGames.append(newGame)
+                                        self.connect(to: newGame)
+                                    }
+                                }
+                            }
                         }
+                        self.unsortedActiveGames = unsortedActiveGames
+                        self.activeGames = newActiveGames
                     }
                 }
             case .failure(let error):
@@ -311,7 +372,10 @@ class OGSService: ObservableObject {
     
     func updateActiveGames(withShortGameData gameData: [String: Any]) {
         if let gameId = gameData["id"] as? Int {
-            if self.activeGames[gameId] == nil {
+            if let game = self.activeGames[gameId] {
+                // Trigger $activeGames publisher
+                self.activeGames[gameId] = game
+            } else {
                 if let game = self.createGame(fromShortGameData: gameData) {
                     self.activeGames[gameId] = game
                     self.connect(to: game)
@@ -397,6 +461,10 @@ class OGSService: ObservableObject {
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     do {
                         connectedGame.clock = try decoder.decode(Clock.self, from: clockdata)
+                        if let _ = self.activeGames[gameId] {
+                            // Trigger active games publisher
+                            self.activeGames[gameId] = connectedGame
+                        }
                     } catch {
                         print(gameId, error)
                         print(clockdata)

@@ -29,6 +29,7 @@ struct Clock {
     var currentPlayer: StoneColor
     var lastMoveTime: Double
     var started: Bool = false
+    var currentPlayerId: Int?
 }
 
 extension Clock: Decodable {
@@ -65,7 +66,7 @@ extension Clock: Decodable {
         whiteTime.blockTimeLeft = whiteTime.blockTime
         
         let blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
-        let currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
+        currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
         currentPlayer = currentPlayerId == blackPlayerId ? .black : .white
         
         lastMoveTime = try container.decode(Double.self, forKey: .lastMove)

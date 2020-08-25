@@ -65,7 +65,7 @@ struct Goban: View {
                         path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
                 }
-                .stroke(Color.black)
+                .stroke(Color.black, lineWidth: size < 10 ? 0.5 : 1)
                 if hoveredPoint.wrappedValue != nil {
                     Path { path in
                         path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
@@ -126,7 +126,8 @@ struct Stones: View {
         for row in 0..<height {
             for column in 0..<width {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
-                    let stoneRect = CGRect(x: CGFloat(column) * size + 1, y: CGFloat(row) * size + 1, width: size - 2, height: size - 2)
+                    let padding = size < 10 ? CGFloat(0.0) : CGFloat(1.0)
+                    let stoneRect = CGRect(x: CGFloat(column) * size + padding, y: CGFloat(row) * size + padding, width: size - padding * 2, height: size - padding * 2)
                     if boardPosition.removedStones?.contains([row, column]) ?? false {
                         if stoneColor == .white {
                             whiteCapturedPath.addEllipse(in: stoneRect)
@@ -141,7 +142,7 @@ struct Stones: View {
                         }
                     }
                 }
-                let scoringRectSize = max(size / 4, 5)
+                let scoringRectSize = max(size / 4, 2)
                 let scoringRectPadding = (size - scoringRectSize) / 2
                 let scoringRect = CGRect(
                     x: CGFloat(column) * size + scoringRectPadding,
@@ -167,6 +168,8 @@ struct Stones: View {
             }
         }
         
+        let lastMoveIndicatorWidth: CGFloat = size > 20 ? 2 : (size > 10 ? 1 : 0.5)
+        
         return ZStack {
             Path(whiteLivingPath).fill(Color.white)
             Path(whiteLivingPath).stroke(Color.gray)
@@ -188,7 +191,7 @@ struct Stones: View {
                         path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
                         path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
                     }
-                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
+                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                 } else {
                     Path { path in
                         path.addEllipse(in: CGRect(
@@ -197,7 +200,7 @@ struct Stones: View {
                                             width: size / 2,
                                             height: size / 2))
                     }
-                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: size > 20 ? 2 : 1)
+                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                 }
             }
             
@@ -285,6 +288,8 @@ struct BoardView_Previews: PreviewProvider {
         return Group {
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
+            BoardView(boardPosition: boardPosition)
+                .previewLayout(.fixed(width: 120, height: 120))
             BoardView(boardPosition: game2.currentPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: game3.currentPosition)
