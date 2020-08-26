@@ -83,50 +83,75 @@ struct HomeView: View {
         }
     }
 
-    func gameCell(game: Game, displayMode: GameCell.CellDisplayMode) -> some View {
-        GameCell(game: game, displayMode: displayMode)
-        .onTapGesture {
-            self.gameToShowDetail = game
-            self.showGameDetail = true
-            self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-            }, receiveValue: { game in
-            })
-        }
-            .padding(.vertical, displayMode == .full ? nil : 0)
-            .padding(.horizontal)
-    }
-    
     func sectionHeader(title: String) -> some View {
-        Text(title)
-            .font(Font.title3.bold())
-            .padding([.vertical], 5)
-            .frame(maxWidth: .infinity)
-            .background(Color(UIColor.systemGray3).shadow(radius: 2))
+        HStack {
+            Text(title)
+                .font(Font.title3.bold())
+            Spacer()
+        }
+        .padding([.vertical], 5)
+        .padding([.horizontal])
+        .frame(maxWidth: .infinity)
+        .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
     
     var activeGamesView: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))], pinnedViews: [.sectionHeaders]) {
-                if ogs.sortedActiveGamesOnUserTurn.count + ogs.sortedActiveGamesNotOnUserTurn.count == 0 {
-                    ProgressView()
-                } else {
-                    Section(header: sectionHeader(title: "Your move")) {
-                        ForEach(ogs.sortedActiveGamesOnUserTurn) { game in
-                            gameCell(game: game, displayMode: displayMode)
+        Group {
+            if ogs.sortedActiveGamesOnUserTurn.count + ogs.sortedActiveGamesNotOnUserTurn.count == 0 {
+                ProgressView()
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))], pinnedViews: [.sectionHeaders]) {
+                        Section(header: sectionHeader(title: "Your move")) {
+                            ForEach(ogs.sortedActiveGamesOnUserTurn) { game in
+                                GameCell(game: game, displayMode: displayMode)
+                                .onTapGesture {
+                                    self.gameToShowDetail = game
+                                    self.showGameDetail = true
+                                    self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                                    }, receiveValue: { game in
+                                    })
+                                }
+                                    .padding(.vertical, displayMode == .full ? nil : 0)
+                                    .padding(.horizontal)
+                                    .environmentObject(ogs)
+                            }
                         }
-                    }
-                    Section(header: sectionHeader(title: "Opponents' move")) {
-                        ForEach(ogs.sortedActiveGamesNotOnUserTurn) { game in
-                            gameCell(game: game, displayMode: displayMode)
+                        Section(header: sectionHeader(title: "Opponents' move")) {
+                            ForEach(ogs.sortedActiveGamesNotOnUserTurn) { game in
+                                GameCell(game: game, displayMode: displayMode)
+                                .onTapGesture {
+                                    self.gameToShowDetail = game
+                                    self.showGameDetail = true
+                                    self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+                                    }, receiveValue: { game in
+                                    })
+                                }
+                                    .padding(.vertical, displayMode == .full ? nil : 0)
+                                    .padding(.horizontal)
+                                    .environmentObject(ogs)
+                            }
                         }
+                        Spacer()
                     }
+                    .background(Color(UIColor.systemGray4))
                 }
+            }
+        }
+    }
+        
+    var body: some View {
+        VStack {
+            if ogs.isLoggedIn {
+                activeGamesView
+            } else {
+                loginView
             }
             NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: $showGameDetail) {
                 EmptyView()
             }
         }
-        .background(Color(UIColor.systemGray4))
+        .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
@@ -134,19 +159,11 @@ struct HomeView: View {
                     Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
                 }
                 .pickerStyle(SegmentedPickerStyle())
+                .disabled(!ogs.isLoggedIn)
+                .opacity(ogs.isLoggedIn ? 1 : 0)
             }
         }
-    }
-        
-    var body: some View {
-        Group {
-            if ogs.isLoggedIn {
-                activeGamesView
-            } else {
-                loginView
-            }
-        }
-        .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")
+        .modifier(RootViewSwitchingMenu())
     }
 }
 

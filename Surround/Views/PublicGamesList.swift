@@ -38,7 +38,7 @@ struct PublicGamesList: View {
             }
         }
         .onAppear {
-//            self.gameDetailCancellable = OGSService.shared.getGameDetailAndConnect(gameID: 25547938).sink(receiveCompletion: { _ in
+//            self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: 25547938).sink(receiveCompletion: { _ in
 //            }, receiveValue: { game in
 //                self.gameToShowDetail = game
 //                self.showDetail = true
@@ -73,7 +73,7 @@ struct PublicGamesList: View {
         }, label: {
             Text("Logout")
         }))
-
+        .modifier(RootViewSwitchingMenu())
     }
 }
 

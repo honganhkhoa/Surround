@@ -78,18 +78,23 @@ struct InlineTimerView: View {
         
         let thinkingTime = player == .black ? clock.blackTime : clock.whiteTime
         
-        switch timeControl.system {
-        case .ByoYomi:
-            return AnyView(InlineByoYomiTimerView(thinkingTime: thinkingTime))
-        case .Fischer:
-            return AnyView(InlineFischerTimerView(thinkingTime: thinkingTime))
-        case .Canadian:
-            return AnyView(InlineCanadianTimerView(thinkingTime: thinkingTime))
-        case .Simple, .Absolute:
-            return AnyView(InlineSimpleTimerView(thinkingTime: thinkingTime))
-        default:
-            return AnyView(Text("").font(.subheadline))
-        }
+        return AnyView(HStack {
+            if clock.currentPlayer == player {
+                Image(systemName: "hourglass")
+            }
+            switch timeControl.system {
+            case .ByoYomi:
+                InlineByoYomiTimerView(thinkingTime: thinkingTime)
+            case .Fischer:
+                InlineFischerTimerView(thinkingTime: thinkingTime)
+            case .Canadian:
+                InlineCanadianTimerView(thinkingTime: thinkingTime)
+            case .Simple, .Absolute:
+                InlineSimpleTimerView(thinkingTime: thinkingTime)
+            default:
+                Text("").font(.subheadline)
+            }
+        })
     }
 }
 

@@ -13,69 +13,53 @@ struct MainView: View {
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
-    @SceneStorage("currentView") var currentView: SubView = .home
+    @SceneStorage("currentRootView") var currentView: SubView = .home
     @State var navigationCurrentView: SubView? = .home
 
     enum SubView: String {
         case home
         case publicGames
     }
-    
-    var tabView: some View {
-        TabView(selection: $currentView) {
-            NavigationView {
-                HomeView()
-            }
-            .tabItem {
-                Image(systemName: "house")
-                Text("Home")
-            }.tag(SubView.home)
-
-            NavigationView {
-                PublicGamesList()
-            }
-            .tabItem {
-                Image(systemName: "person.3")
-                Text("Public games")
-            }.tag(SubView.publicGames)
-        }
-    }
-    
-    var sideBarView: some View {
-        NavigationView {
-            List {
-                NavigationLink(destination: HomeView(), tag: SubView.home, selection: $navigationCurrentView) {
-                    Label("Home", systemImage: "house")
+        
+    var body: some View {
+        var compactSizeClass = false
+        #if os(iOS)
+        compactSizeClass = horizontalSizeClass == .compact
+        #endif
+        return NavigationView {
+            if compactSizeClass {
+                switch currentView {
+                case .home:
+                    HomeView()
+                case .publicGames:
+                    PublicGamesList()
                 }
-                NavigationLink(destination: PublicGamesList()) {
-                    Label("Public games", systemImage: "person.3")
+            } else {
+                List {
+                    NavigationLink(
+                        destination: HomeView(),
+                        tag: SubView.home,
+                        selection: $navigationCurrentView) {
+                        Label("Home", systemImage: "house")
+                    }
+                    NavigationLink(
+                        destination: PublicGamesList(),
+                        tag: SubView.publicGames,
+                        selection: $navigationCurrentView) {
+                        Label("Public games", systemImage: "person.3")
+                    }
                 }
+                .listStyle(SidebarListStyle())
             }
-            .listStyle(SidebarListStyle())
-            Text("Detail")
         }
         .onChange(of: currentView) { newView in
-            navigationCurrentView = newView
-        }
-        .onChange(of: navigationCurrentView) { newView in
-            if let navigationCurrentView = newView {
-                currentView = navigationCurrentView
+            DispatchQueue.main.async {
+                withAnimation {
+                    navigationCurrentView = newView
+                }
             }
         }
-    }
-    
-    var body: some View {
-        return Group {
-            #if os(iOS)
-            if horizontalSizeClass == .compact {
-                tabView
-            } else {
-                sideBarView
-            }
-            #else
-            sideBarView
-            #endif
-        }.onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase) { phase in
             if phase == .active {
                 ogs.ensureConnect()
                 if ogs.isLoggedIn {
@@ -87,8 +71,41 @@ struct MainView: View {
     }
 }
 
+struct RootViewSwitchingMenu: ViewModifier {
+    @SceneStorage("currentRootView") var currentView: MainView.SubView = .home
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    func body(content: Content) -> some View {
+        var compactSizeClass = false
+        #if os(iOS)
+        compactSizeClass = horizontalSizeClass == .compact
+        #endif
+        
+        return content.toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Menu {
+                    Button(action: { currentView = .home }) {
+                        Label("Home", systemImage: "house")
+                    }
+                    Button(action: { currentView = .publicGames }) {
+                        Label("Public games", systemImage: "person.3")
+                    }
+                }
+                label: {
+                    Label("Navigation", systemImage: currentView == .home ? "house" : "person.3")
+                }
+                .disabled(!compactSizeClass)
+                .opacity(compactSizeClass ? 1 : 0)
+            }
+        }
+    }
+}
+
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         MainView()
+            .environmentObject(OGSService.previewInstance())
     }
 }

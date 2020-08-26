@@ -27,7 +27,7 @@ class TimeUtilities {
         if daysLeft > 1 {
             var result = "\(daysLeft) days"
             if hoursLeft > 0 {
-                result += " \(hoursLeft) hour"
+                result += " \(hoursLeft) h"
             }
             if hoursLeft > 1 {
                 result += "s"
