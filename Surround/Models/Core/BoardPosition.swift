@@ -73,6 +73,7 @@ class BoardPosition {
         self.previousPosition = previousPosition
         self.nextToMove = previousPosition.nextToMove.opponentColor()
         self.board = previousPosition.board
+        self.captures = previousPosition.captures
         self.lastMoveNumber = previousPosition.lastMoveNumber + 1
     }
     

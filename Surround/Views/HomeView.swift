@@ -12,6 +12,7 @@ struct HomeView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     
     @State var gameDetailCancellable: AnyCancellable?
@@ -95,6 +96,14 @@ struct HomeView: View {
         .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
     
+    func showGameDetail(game: Game) {
+        self.gameToShowDetail = game
+        self.showGameDetail = true
+        self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
+        }, receiveValue: { game in
+        })
+    }
+    
     var activeGamesView: some View {
         Group {
             if ogs.sortedActiveGamesOnUserTurn.count + ogs.sortedActiveGamesNotOnUserTurn.count == 0 {
@@ -106,35 +115,25 @@ struct HomeView: View {
                             ForEach(ogs.sortedActiveGamesOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    self.gameToShowDetail = game
-                                    self.showGameDetail = true
-                                    self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-                                    }, receiveValue: { game in
-                                    })
+                                    showGameDetail(game: game)
                                 }
-                                    .padding(.vertical, displayMode == .full ? nil : 0)
-                                    .padding(.horizontal)
-                                    .environmentObject(ogs)
+                                .padding(.vertical, displayMode == .full ? nil : 0)
+                                .padding(.horizontal)
                             }
                         }
                         Section(header: sectionHeader(title: "Opponents' move")) {
                             ForEach(ogs.sortedActiveGamesNotOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    self.gameToShowDetail = game
-                                    self.showGameDetail = true
-                                    self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-                                    }, receiveValue: { game in
-                                    })
+                                    self.showGameDetail(game: game)
                                 }
-                                    .padding(.vertical, displayMode == .full ? nil : 0)
-                                    .padding(.horizontal)
-                                    .environmentObject(ogs)
+                                .padding(.vertical, displayMode == .full ? nil : 0)
+                                .padding(.horizontal)
                             }
                         }
                         Spacer()
                     }
-                    .background(Color(UIColor.systemGray4))
+                    .background(colorScheme == .dark ? Color(UIColor.systemGray4) : Color.white)
                 }
             }
         }
@@ -147,7 +146,7 @@ struct HomeView: View {
             } else {
                 loginView
             }
-            NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: $showGameDetail) {
+            NavigationLink(destination: gameToShowDetail == nil ? nil : CorrespondenceGamesView(currentGame: gameToShowDetail!), isActive: $showGameDetail) {
                 EmptyView()
             }
         }

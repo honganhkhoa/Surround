@@ -16,6 +16,11 @@ enum TimeControlSystem {
     case None
 }
 
+enum TimeControlSpeed: String, Codable {
+    case live
+    case correspondence
+}
+
 @dynamicMemberLookup
 struct TimeControl: Codable {
     struct TimeControlCodingData: Codable {
@@ -29,7 +34,7 @@ struct TimeControl: Codable {
         var perMove: Int?
         var stonesPerPeriod: Int?
         var totalTime: Int?
-        var speed: String?
+        var speed: TimeControlSpeed?
         var pauseOnWeekend: Bool?
     }
     

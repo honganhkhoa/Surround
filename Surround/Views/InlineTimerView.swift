@@ -9,23 +9,25 @@ import SwiftUI
 
 struct InlineByoYomiTimerView: View {
     var thinkingTime: ThinkingTime
+    var mainFont: Font
+    var subFont: Font
     
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        return HStack(alignment: .firstTextBaseline) {
             if thinkingTime.thinkingTime! > 0 {
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-                    .font(Font.subheadline.monospacedDigit())
+                    .font(mainFont)
                 Text("(\(thinkingTime.periods!))")
-                    .font(Font.caption.monospacedDigit())
+                    .font(subFont)
             } else {
                 Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
-                    .font(Font.subheadline.monospacedDigit())
+                    .font(mainFont)
                 if thinkingTime.periodsLeft! > 1 {
                     Text("(\(thinkingTime.periodsLeft!))")
-                        .font(Font.caption.monospacedDigit())
+                        .font(subFont)
                 } else {
                     Text("SD")
-                        .font(Font.caption.bold())
+                        .font(subFont.bold())
                         .foregroundColor(Color.red)
                 }
             }
@@ -35,23 +37,27 @@ struct InlineByoYomiTimerView: View {
 
 struct InlineFischerTimerView: View {
     var thinkingTime: ThinkingTime
-    
+    var mainFont: Font
+    var subFont: Font
+
     var body: some View {
         Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-            .font(Font.subheadline.monospacedDigit())
+            .font(mainFont)
     }
 }
 
 struct InlineCanadianTimerView: View {
     var thinkingTime: ThinkingTime
-    
+    var mainFont: Font
+    var subFont: Font
+
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
             Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-                .font(Font.subheadline.monospacedDigit())
+                .font(mainFont)
         } else {
             Text("\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
-                .font(Font.subheadline.monospacedDigit())
+                .font(mainFont)
         }
         
     }
@@ -59,10 +65,12 @@ struct InlineCanadianTimerView: View {
 
 struct InlineSimpleTimerView: View {
     var thinkingTime: ThinkingTime
-    
+    var mainFont: Font
+    var subFont: Font
+
     var body: some View {
         Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-            .font(Font.subheadline.monospacedDigit())
+            .font(mainFont)
     }
 }
 
@@ -70,6 +78,8 @@ struct InlineTimerView: View {
     var timeControl: TimeControl?
     var clock: Clock?
     var player: StoneColor
+    var mainFont: Font?
+    var subFont: Font?
 
     var body: some View {
         guard let clock = clock, let timeControl = timeControl else {
@@ -77,20 +87,22 @@ struct InlineTimerView: View {
         }
         
         let thinkingTime = player == .black ? clock.blackTime : clock.whiteTime
-        
+        let mainFont = self.mainFont ?? Font.subheadline.monospacedDigit()
+        let subFont = self.subFont ?? Font.caption.monospacedDigit()
+
         return AnyView(HStack {
             if clock.currentPlayer == player {
                 Image(systemName: "hourglass")
             }
             switch timeControl.system {
             case .ByoYomi:
-                InlineByoYomiTimerView(thinkingTime: thinkingTime)
+                InlineByoYomiTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
             case .Fischer:
-                InlineFischerTimerView(thinkingTime: thinkingTime)
+                InlineFischerTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
             case .Canadian:
-                InlineCanadianTimerView(thinkingTime: thinkingTime)
+                InlineCanadianTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
             case .Simple, .Absolute:
-                InlineSimpleTimerView(thinkingTime: thinkingTime)
+                InlineSimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
             default:
                 Text("").font(.subheadline)
             }
