@@ -12,13 +12,12 @@ import Combine
 struct ActiveGamesCarousel: View {
     @EnvironmentObject var ogs: OGSService
     @Binding var currentGame: Game
-    @State var activeGames: [Game] = []
     @Namespace var selectingGame
 
     var body: some View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
-                ForEach(self.activeGames) { game in
+                ForEach(ogs.sortedActiveGames) { game in
                     VStack(alignment: .trailing) {
                         ZStack(alignment: .center) {
                             if game.clock?.currentPlayerId == ogs.user?.id {
@@ -41,30 +40,27 @@ struct ActiveGamesCarousel: View {
                             }
                         }
                         .frame(width: 130, height: 130)
-                        InlineTimerView(
-                            timeControl: game.gameData?.timeControl,
-                            clock: game.clock,
-                            player: game.blackId == ogs.user?.id ? .black : .white,
-                            mainFont: Font.caption.monospacedDigit(),
-                            subFont: Font.caption2.monospacedDigit()
-                        )
-                        .padding(0)
-                        .offset(x: -5)
+//                        InlineTimerView(
+//                            timeControl: game.gameData?.timeControl,
+//                            clock: game.clock,
+//                            player: game.blackId == ogs.user?.id ? .black : .white,
+//                            mainFont: Font.caption.monospacedDigit(),
+//                            subFont: Font.caption2.monospacedDigit()
+//                        )
+//                        .padding(0)
+//                        .offset(x: -5)
                     }.padding(.horizontal, 2.5)
                 }
             }
             .padding(.horizontal, 5)
         }
-        .frame(height: 160)
-        .onAppear {
-            self.activeGames = ogs.sortedActiveGamesOnUserTurn + ogs.sortedActiveGamesNotOnUserTurn
-        }
+        .frame(height: 140)
     }
 }
 
 struct CorrespondenceGamesPlayerInfo: View {
     @EnvironmentObject var ogs: OGSService
-    var currentGame: Game
+    @ObservedObject var currentGame: Game
     var geometry: GeometryProxy
 
     func playerIcon(color: StoneColor) -> some View {
@@ -141,13 +137,14 @@ struct CorrespondenceGamesPlayerInfo: View {
                 gradient: Gradient(colors: [Color(UIColor.darkGray), Color.white]),
                 startPoint: userColor == .black ? .topLeading : .bottomTrailing,
                 endPoint: userColor == .black ? .bottomTrailing : .topLeading)
+                .shadow(radius: 2)
         )
     }
 }
 
 struct CorrespondenceGamesView: View {
     @EnvironmentObject var ogs: OGSService
-    @StateObject var currentGame: Game
+    @State var currentGame: Game
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
     @State var submitMoveCancellable: AnyCancellable?
@@ -239,6 +236,55 @@ struct CorrespondenceGamesView: View {
         }
     }
     
+    var controlRow: some View {
+        HStack {
+            if undoacceptable {
+                Menu {
+                    Button(action: { ogs.acceptUndo(game: currentGame, moveNumber: currentGame.undoRequested!) }) {
+                        Label("Accept undo", systemImage: "arrow.uturn.left")
+                    }
+                }
+                label: {
+                    Text("\(status) ▾").font(Font.title2.bold())
+                }
+            } else {
+                Text(status).font(Font.title2.bold())
+            }
+            Spacer()
+            if submitMoveCancellable == nil {
+                if let pendingMove = pendingMove {
+                    Button(action: {
+                        submitMove(move: pendingMove)
+                    }) {
+                        Text("Submit move")
+                    }
+                } else if isUserTurn {
+                    Button(action: { self.showingPassAlert = true }) {
+                        Text("Pass")
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+            Menu {
+                if undoable {
+                    Button(action: { ogs.requestUndo(game: currentGame) }) {
+                        Label("Request undo", systemImage: "arrow.uturn.left")
+                    }
+                }
+                Button(action: {}) {
+                    Label("Resign", systemImage: "flag").accentColor(.red)
+                }
+            }
+            label: {
+                Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
+            }
+//            .frame(minHeight: 44)
+            .padding(.leading)
+        }
+        .padding(.horizontal)
+    }
+    
     var body: some View {
         let userColor: StoneColor = currentGame.blackId == ogs.user?.id ? .black : .white
         let players = currentGame.gameData!.players
@@ -247,63 +293,20 @@ struct CorrespondenceGamesView: View {
         return GeometryReader { geometry -> AnyView in
             let boardSize = min(geometry.size.width, geometry.size.height)
             return AnyView(VStack(alignment: .leading) {
-//                ActiveGamesCarousel(currentGame: $currentGame)
-//                    .padding(.top)
                 CorrespondenceGamesPlayerInfo(currentGame: currentGame, geometry: geometry)
                 Spacer()
-                HStack {
-                    if undoacceptable {
-                        Menu {
-                            Button(action: { ogs.acceptUndo(game: currentGame, moveNumber: currentGame.undoRequested!) }) {
-                                Label("Accept undo", systemImage: "arrow.uturn.left")
-                            }
-                        }
-                        label: {
-                            Text("\(status) ▾").font(Font.title2.bold())
-                        }
-                    } else {
-                        Text(status).font(Font.title2.bold())
-                    }
-                    Spacer()
-                    if submitMoveCancellable == nil {
-                        if let pendingMove = pendingMove {
-                            Button(action: {
-                                submitMove(move: pendingMove)
-                            }) {
-                                Text("Submit move")
-                            }
-                        } else if isUserTurn {
-                            Button(action: { self.showingPassAlert = true }) {
-                                Text("Pass")
-                            }
-                        }
-                    } else {
-                        ProgressView()
-                    }
-                    Menu {
-                        if undoable {
-                            Button(action: { ogs.requestUndo(game: currentGame) }) {
-                                Label("Request undo", systemImage: "arrow.uturn.left")
-                            }
-                        }
-                        Button(action: {}) {
-                            Label("Resign", systemImage: "flag").accentColor(.red)
-                        }
-                    }
-                    label: {
-                        Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
-                    }
-                    .frame(minHeight: 44)
-                    .padding(.leading)
-                }
-                .padding(.horizontal)
+                controlRow
                 Spacer()
                 BoardView(
                     boardPosition: currentGame.currentPosition,
                     editable: isUserTurn,
                     newMove: $pendingMove,
                     newPosition: $pendingPosition
-                ).frame(width: boardSize, height: boardSize)
+                )
+                .frame(width: boardSize, height: boardSize)
+                if geometry.size.height / geometry.size.width > 1.8 {
+                    ActiveGamesCarousel(currentGame: $currentGame)
+                }
             })
         }
         .toolbar {
@@ -313,7 +316,7 @@ struct CorrespondenceGamesView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity)
+//        .frame(maxHeight: .infinity)
         .alert(isPresented: $showingPassAlert) {
             Alert(
                 title: Text("Are you sure you want to pass?"),
@@ -326,6 +329,11 @@ struct CorrespondenceGamesView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("vs \(opponent.username)")
+        .onAppear {
+            for game in ogs.sortedActiveGames {
+                ogs.updateDetailsOfConnectedGame(game: game)
+            }
+        }
     }
 }
 

@@ -111,14 +111,18 @@ struct TimerView_Previews: PreviewProvider {
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
             currentPlayer: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000)
+            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
+        )
 
         let timeControl2 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "fischer", initialTime: 600, timeIncrement: 30, maxTime: 600))
         let clock2 = Clock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
             currentPlayer: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000)
+            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
+        )
 
         return Group {
             TimerView(timeControl: timeControl1, clock: clock1, player: .black)

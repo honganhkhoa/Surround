@@ -40,7 +40,7 @@ struct HomeView: View {
 
     var loginView: some View {
         ScrollView {
-            GroupBox(label: Text("Sign in to your online-go.com account to see your games here.")) {
+            GroupBox(label: Text("Sign in to your online-go.com account to see your games here.").fixedSize(horizontal: false, vertical: true)) {
                 EmptyView()
             }.padding(.horizontal)
             GroupBox() {
@@ -99,9 +99,6 @@ struct HomeView: View {
     func showGameDetail(game: Game) {
         self.gameToShowDetail = game
         self.showGameDetail = true
-        self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-        }, receiveValue: { game in
-        })
     }
     
     var activeGamesView: some View {

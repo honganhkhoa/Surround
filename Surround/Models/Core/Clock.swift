@@ -28,8 +28,11 @@ struct Clock {
     var whiteTime: ThinkingTime
     var currentPlayer: StoneColor
     var lastMoveTime: Double
+    var pausedTime: Double?
     var started: Bool = false
-    var currentPlayerId: Int?
+    var currentPlayerId: Int
+    var blackPlayerId: Int
+    var whitePlayerId: Int
 }
 
 extension Clock: Decodable {
@@ -41,6 +44,7 @@ extension Clock: Decodable {
         case currentPlayer
         case lastMove
         case startMode
+        case pausedSince
     }
     
     init(from decoder: Decoder) throws {
@@ -65,24 +69,32 @@ extension Clock: Decodable {
         whiteTime.periodTimeLeft = whiteTime.periodTime
         whiteTime.blockTimeLeft = whiteTime.blockTime
         
-        let blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
+        blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
+        whitePlayerId = try container.decode(Int.self, forKey: .whitePlayerId)
         currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
         currentPlayer = currentPlayerId == blackPlayerId ? .black : .white
         
         lastMoveTime = try container.decode(Double.self, forKey: .lastMove)
         started = !container.contains(.startMode)
+        
+        pausedTime = try container.decodeIfPresent(Double.self, forKey: .pausedSince)
     }
     
     mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0) {
         guard started else {
             return
         }
-        let secondsSinceLastMove = floor((Date().timeIntervalSince1970 * 1000 - (lastMoveTime + serverTimeOffset)) / 1000)
-        if secondsSinceLastMove > 0 {
+        // goban/lib/goban.js:~8246
+
+        let now = Date().timeIntervalSince1970 * 1000
+        let since = pausedTime == nil ? now : max(pausedTime!, lastMoveTime)
+        let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
+
+        if secondsElapsed > 0 {
             var thinkingTime = currentPlayer == .black ? blackTime : whiteTime
             switch system {
             case .ByoYomi(_, _, let periodTime):
-                var timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
                 if timeLeft > 0 {
                     thinkingTime.thinkingTimeLeft = timeLeft
                 } else {
@@ -100,9 +112,9 @@ extension Clock: Decodable {
                     }
                 }
             case .Fischer(_, _, _):
-                thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsElapsed
             case .Canadian(_, let periodTime, _):
-                var timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
                 if timeLeft > 0 {
                     thinkingTime.thinkingTimeLeft = timeLeft
                 } else {
@@ -111,7 +123,7 @@ extension Clock: Decodable {
                     thinkingTime.blockTimeLeft = timeLeft
                 }
             case .Simple, .Absolute:
-                let timeLeft = thinkingTime.thinkingTime! - secondsSinceLastMove
+                let timeLeft = thinkingTime.thinkingTime! - secondsElapsed
                 thinkingTime.thinkingTimeLeft = timeLeft
             default:
                 break

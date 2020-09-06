@@ -80,6 +80,7 @@ struct InlineTimerView: View {
     var player: StoneColor
     var mainFont: Font?
     var subFont: Font?
+    var pauseControl: OGSPauseControl?
 
     var body: some View {
         guard let clock = clock, let timeControl = timeControl else {
@@ -90,8 +91,25 @@ struct InlineTimerView: View {
         let mainFont = self.mainFont ?? Font.subheadline.monospacedDigit()
         let subFont = self.subFont ?? Font.caption.monospacedDigit()
 
-        return AnyView(HStack {
-            if clock.currentPlayer == player {
+        var pausedText = "Paused"
+        let isPaused = pauseControl?.isPaused() ?? false
+        if isPaused {
+            if pauseControl?.weekend ?? false {
+                pausedText = "Weekend"
+            }
+            
+            if pauseControl?.system ?? false {
+                pausedText = "System"
+            }
+            
+            let playerId = player == .black ? clock.blackPlayerId : clock.whitePlayerId
+            if pauseControl?.vacationPlayerIds.contains(playerId) ?? false {
+                pausedText = "Vacation"
+            }
+        }
+        
+        return AnyView(HStack(alignment: .firstTextBaseline) {
+            if clock.currentPlayer == player && !isPaused {
                 Image(systemName: "hourglass")
             }
             switch timeControl.system {
@@ -104,7 +122,10 @@ struct InlineTimerView: View {
             case .Simple, .Absolute:
                 InlineSimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
             default:
-                Text("").font(.subheadline)
+                Text("").font(mainFont)
+            }
+            if isPaused {
+                Text(pausedText).font(subFont.bold())
             }
         })
     }
@@ -117,14 +138,18 @@ struct InlineTimerView_Previews: PreviewProvider {
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
             currentPlayer: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000)
+            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
+        )
         
         let timeControl2 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "fischer", initialTime: 600, timeIncrement: 30, maxTime: 600))
         let clock2 = Clock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
             currentPlayer: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000)
+            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
+        )
 
         return Group {
             InlineTimerView(timeControl: timeControl1, clock: clock1, player: .black)

@@ -59,6 +59,7 @@ class OGSService: ObservableObject {
     @Published var user: OGSUser? = nil
     @Published private(set) public var sortedActiveGamesOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveGamesNotOnUserTurn: [Game] = []
+    @Published private(set) public var sortedActiveGames: [Game] = []
     
     private var activeGamesSortingCancellable: AnyCancellable?
     
@@ -84,6 +85,7 @@ class OGSService: ObservableObject {
         }
         self.sortedActiveGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
         self.sortedActiveGamesNotOnUserTurn = gamesOnOppornentTurn.sorted(by: thinkingTimeLeftIncreasing)
+        self.sortedActiveGames = self.sortedActiveGamesOnUserTurn + self.sortedActiveGamesNotOnUserTurn
     }
     
     private init(forPreview: Bool = false) {
@@ -370,6 +372,21 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    var gameDetailCancellable = [Int: AnyCancellable]()
+    func updateDetailsOfConnectedGame(game: Game) {
+        if let gameId = game.ogsID {
+            if connectedGames[gameId] != nil {
+                if gameDetailCancellable[gameId] == nil {
+                    gameDetailCancellable[gameId] = self.getGameDetailAndConnect(gameID: gameId).sink(
+                        receiveCompletion: { _ in
+                            self.gameDetailCancellable.removeValue(forKey: gameId)
+                        },
+                        receiveValue: { _ in })
+                }
+            }
+        }
+    }
+    
     func updateActiveGames(withShortGameData gameData: [String: Any]) {
         if let gameId = gameData["id"] as? Int {
             if let game = self.activeGames[gameId] {
@@ -461,6 +478,9 @@ class OGSService: ObservableObject {
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     do {
                         connectedGame.clock = try decoder.decode(Clock.self, from: clockdata)
+                        if let timeControlSystem = connectedGame.gameData?.timeControl.system {
+                            connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency)
+                        }
                         if let _ = self.activeGames[gameId] {
                             // Trigger active games publisher
                             self.activeGames[gameId] = connectedGame
