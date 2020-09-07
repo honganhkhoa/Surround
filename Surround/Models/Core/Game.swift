@@ -12,7 +12,11 @@ enum GameID: Hashable {
     case OGS(Int)
 }
 
-class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
+class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equatable {
+    static func == (lhs: Game, rhs: Game) -> Bool {
+        return lhs.ID == rhs.ID
+    }
+    
     @Published var gameData: OGSGame? {
         didSet {
             if let data = gameData {
@@ -78,6 +82,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible {
     }
     var initialPosition: BoardPosition
     var ID: GameID
+    var ogsURL: URL? {
+        if case .OGS(let id) = self.ID {
+            return URL(string: "\(OGSService.ogsRoot)/game/\(id)")
+        }
+        return nil
+    }
     @Published var ogsRawData: [String: Any]?
     @Published var clock: Clock?
     

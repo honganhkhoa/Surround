@@ -42,7 +42,7 @@ class OGSService: ObservableObject {
         return ogs
     }
 
-    private static let ogsRoot = "https://online-go.com"
+    static let ogsRoot = "https://online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
     private let socketManager: SocketManager

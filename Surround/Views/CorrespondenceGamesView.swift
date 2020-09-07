@@ -13,48 +13,80 @@ struct ActiveGamesCarousel: View {
     @EnvironmentObject var ogs: OGSService
     @Binding var currentGame: Game
     @Namespace var selectingGame
+    var activeGames: [Game]
+    @State var scrollTarget: GameID?
+    @State var discardNextScrollTarget = false
+    @State var renderedCurrentGame: PassthroughSubject<Bool, Never> = PassthroughSubject<Bool, Never>()
+    @State var renderedCurrentGameCollected: AnyPublisher<[Bool], Never> = PassthroughSubject<[Bool], Never>().eraseToAnyPublisher()
 
     var body: some View {
         ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(ogs.sortedActiveGames) { game in
-                    VStack(alignment: .trailing) {
-                        ZStack(alignment: .center) {
-                            if game.clock?.currentPlayerId == ogs.user?.id {
-                                Color(UIColor.systemTeal).cornerRadius(3)
-                            }
-                            BoardView(boardPosition: game.currentPosition)
-                                .frame(width: 120, height: 120)
-                                .padding(.horizontal, 5)
-                                .onTapGesture {
-                                    withAnimation {
-                                        currentGame = game
-                                    }
+            ScrollViewReader { scrollView in
+                LazyHStack(spacing: 0) {
+                    ForEach(activeGames) { game in
+                        VStack(alignment: .trailing) {
+                            ZStack(alignment: .center) {
+                                if game.clock?.currentPlayerId == ogs.user?.id {
+                                    Color(UIColor.systemTeal).cornerRadius(3)
+                                } else {
+                                    Color(.white)
                                 }
-                            if game.ID == currentGame.ID {
-                                RoundedRectangle(cornerRadius: 3)
-                                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                                    .padding(1)
-                                    .foregroundColor(.black)
-                                    .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
+                                BoardView(boardPosition: game.currentPosition)
+                                    .frame(width: 120, height: 120)
+                                    .padding(.horizontal, 5)
+                                    .onTapGesture {
+                                        withAnimation {
+                                            discardNextScrollTarget = true
+                                            currentGame = game
+                                            scrollTarget = currentGame.ID
+                                        }
+                                    }
+                                if game.ID == currentGame.ID {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                                        .padding(1)
+                                        .foregroundColor(.black)
+                                        .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
+                                }
+                            }
+                            .frame(width: 130, height: 130)
+                        }
+                        .padding(.horizontal, 2.5)
+                        .id(game.ID)
+                        .onChange(of: currentGame) { _ in
+                            self.renderedCurrentGame.send(game == currentGame)
+                        }
+                    }
+                }
+                .padding(.horizontal, 5)
+                .onChange(of: scrollTarget) { target in
+                    if let target = target {
+                        if discardNextScrollTarget {
+                            discardNextScrollTarget = false
+                        } else {
+                            DispatchQueue.main.async {
+                                withAnimation {
+                                    scrollView.scrollTo(target, anchor: .leading)
+                                }
                             }
                         }
-                        .frame(width: 130, height: 130)
-//                        InlineTimerView(
-//                            timeControl: game.gameData?.timeControl,
-//                            clock: game.clock,
-//                            player: game.blackId == ogs.user?.id ? .black : .white,
-//                            mainFont: Font.caption.monospacedDigit(),
-//                            subFont: Font.caption2.monospacedDigit()
-//                        )
-//                        .padding(0)
-//                        .offset(x: -5)
-                    }.padding(.horizontal, 2.5)
+                    }
                 }
             }
-            .padding(.horizontal, 5)
         }
         .frame(height: 140)
+        .coordinateSpace(name: "ActiveGames")
+        .onReceive(renderedCurrentGameCollected) { rendered in
+            if rendered.allSatisfy({ !$0 }) {
+                if scrollTarget != currentGame.ID {
+                    scrollTarget = currentGame.ID
+                }
+            }
+        }
+        .onAppear {
+            scrollTarget = currentGame.ID
+            self.renderedCurrentGameCollected = self.renderedCurrentGame.collect(.byTime(DispatchQueue.main, 1.0)).eraseToAnyPublisher()
+        }
     }
 }
 
@@ -130,7 +162,7 @@ struct CorrespondenceGamesPlayerInfo: View {
             .offset(y: -20)
             .padding(.bottom, -20)
         }
-        .padding(.vertical, geometry.size.width <= 320 ? 10 : nil)
+        .padding(.vertical, geometry.size.width <= 375 ? 10 : nil)
         .padding(.horizontal)
         .background(
             LinearGradient(
@@ -149,7 +181,19 @@ struct CorrespondenceGamesView: View {
     @State var pendingPosition: BoardPosition? = nil
     @State var submitMoveCancellable: AnyCancellable?
     @State var showingPassAlert = false
-    
+    @State var activeGames: [Game] = []
+    @State var activeGameByOGSID: [Int: Game] = [:]
+
+    func updateActiveGameList() {
+        self.activeGames = []
+        for game in ogs.sortedActiveGames {
+            self.activeGames.append(game)
+            if let ogsID = game.ogsID {
+                self.activeGameByOGSID[ogsID] = game
+            }
+        }
+    }
+
     func submitMove(move: Move) {
         self.submitMoveCancellable = ogs.submitMove(move: move, forGame: currentGame)
             .zip(currentGame.$currentPosition.setFailureType(to: Error.self))
@@ -160,6 +204,19 @@ struct CorrespondenceGamesView: View {
                 self.pendingPosition = nil
                 self.submitMoveCancellable = nil
             })
+    }
+    
+    func goToNextGame() {
+        if let currentIndex = activeGames.firstIndex(where: { game in game.ID == currentGame.ID }) {
+            for game in activeGames[currentIndex.advanced(by: 1)..<activeGames.endIndex] + activeGames[activeGames.startIndex..<currentIndex] {
+                if game.clock?.currentPlayerId == ogs.user?.id {
+                    withAnimation {
+                        currentGame = game
+                    }
+                    break
+                }
+            }
+        }
     }
 
     var isUserPlaying: Bool {
@@ -237,7 +294,7 @@ struct CorrespondenceGamesView: View {
     }
     
     var controlRow: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline) {
             if undoacceptable {
                 Menu {
                     Button(action: { ogs.acceptUndo(game: currentGame, moveNumber: currentGame.undoRequested!) }) {
@@ -258,19 +315,34 @@ struct CorrespondenceGamesView: View {
                     }) {
                         Text("Submit move")
                     }
-                } else if isUserTurn {
-                    Button(action: { self.showingPassAlert = true }) {
-                        Text("Pass")
+                } else {
+                    if isUserTurn {
+                        Button(action: { self.showingPassAlert = true }) {
+                            Text("Pass")
+                        }
+                    } else {
+                        if ogs.sortedActiveGamesOnUserTurn.count > 0 {
+                            Button(action: goToNextGame) {
+                                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                    Text("Next")
+                                    Text("(\(ogs.sortedActiveGamesOnUserTurn.count))")
+                                        .font(Font.caption2.bold())
+                                }
+                            }
+                        }
                     }
                 }
             } else {
-                ProgressView()
+                ProgressView().alignmentGuide(.firstTextBaseline, computeValue: { viewDimension in
+                    viewDimension.height
+                })
             }
             Menu {
-                if undoable {
-                    Button(action: { ogs.requestUndo(game: currentGame) }) {
-                        Label("Request undo", systemImage: "arrow.uturn.left")
-                    }
+                Button(action: { ogs.requestUndo(game: currentGame) }) {
+                    Label("Request undo", systemImage: "arrow.uturn.left")
+                }.disabled(!undoable)
+                Button(action: { UIApplication.shared.open(currentGame.ogsURL!) }) {
+                    Label("Open in browser", systemImage: "safari")
                 }
                 Button(action: {}) {
                     Label("Resign", systemImage: "flag").accentColor(.red)
@@ -305,7 +377,7 @@ struct CorrespondenceGamesView: View {
                 )
                 .frame(width: boardSize, height: boardSize)
                 if geometry.size.height / geometry.size.width > 1.8 {
-                    ActiveGamesCarousel(currentGame: $currentGame)
+                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
             })
         }
@@ -330,9 +402,13 @@ struct CorrespondenceGamesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("vs \(opponent.username)")
         .onAppear {
-            for game in ogs.sortedActiveGames {
+            updateActiveGameList()
+            for game in activeGames {
                 ogs.updateDetailsOfConnectedGame(game: game)
             }
+        }
+        .onReceive(ogs.$sortedActiveGames) { sortedActiveGames in
+            
         }
     }
 }
@@ -341,7 +417,7 @@ struct CorrespondenceGamesView_Previews: PreviewProvider {
     static var previews: some View {
         let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
         return NavigationView {
-            CorrespondenceGamesView(currentGame: games[1])
+            CorrespondenceGamesView(currentGame: games[0], activeGames: games)
                 .environmentObject(
                     OGSService.previewInstance(
                         user: OGSUser(username: "kata-bot", id: 592684),
