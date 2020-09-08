@@ -80,14 +80,15 @@ extension Clock: Decodable {
         pausedTime = try container.decodeIfPresent(Double.self, forKey: .pausedSince)
     }
     
-    mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0) {
+    mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
         guard started else {
             return
         }
         // goban/lib/goban.js:~8246
 
+        let paused = pauseControl?.isPaused() ?? false
         let now = Date().timeIntervalSince1970 * 1000
-        let since = pausedTime == nil ? now : max(pausedTime!, lastMoveTime)
+        let since = paused ? max(pausedTime!, lastMoveTime) : now
         let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
 
         if secondsElapsed > 0 {

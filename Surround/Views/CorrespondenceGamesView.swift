@@ -29,7 +29,7 @@ struct ActiveGamesCarousel: View {
                                 if game.clock?.currentPlayerId == ogs.user?.id {
                                     Color(UIColor.systemTeal).cornerRadius(3)
                                 } else {
-                                    Color(.white)
+                                    Color(UIColor.systemBackground)
                                 }
                                 BoardView(boardPosition: game.currentPosition)
                                     .frame(width: 120, height: 120)
@@ -45,7 +45,7 @@ struct ActiveGamesCarousel: View {
                                     RoundedRectangle(cornerRadius: 3)
                                         .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
                                         .padding(1)
-                                        .foregroundColor(.black)
+                                        .foregroundColor(Color(UIColor.label))
                                         .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
                                 }
                             }
@@ -75,7 +75,6 @@ struct ActiveGamesCarousel: View {
             }
         }
         .frame(height: 140)
-        .coordinateSpace(name: "ActiveGames")
         .onReceive(renderedCurrentGameCollected) { rendered in
             if rendered.allSatisfy({ !$0 }) {
                 if scrollTarget != currentGame.ID {
@@ -93,7 +92,8 @@ struct ActiveGamesCarousel: View {
 struct CorrespondenceGamesPlayerInfo: View {
     @EnvironmentObject var ogs: OGSService
     @ObservedObject var currentGame: Game
-    var geometry: GeometryProxy
+    @Environment(\.colorScheme) private var colorScheme
+    var reduceVerticalPadding = false
 
     func playerIcon(color: StoneColor) -> some View {
         let icon = currentGame.playerIcon(for: color, size: 64)
@@ -118,7 +118,7 @@ struct CorrespondenceGamesPlayerInfo: View {
         let userCaptures = currentGame.currentPosition.captures[userColor] ?? 0
         let opponentCaptures = currentGame.currentPosition.captures[userColor.opponentColor()] ?? 0
 
-        return VStack {
+        return VStack(spacing: 0) {
             HStack {
                 playerIcon(color: userColor)
                 VStack(alignment: .trailing) {
@@ -159,14 +159,18 @@ struct CorrespondenceGamesPlayerInfo: View {
                 }
                 playerIcon(color: userColor.opponentColor())
             }
-            .offset(y: -20)
-            .padding(.bottom, -20)
+            .offset(y: -10)
+            .padding(.bottom, -10)
         }
-        .padding(.vertical, geometry.size.width <= 375 ? 10 : nil)
+        .padding(.vertical, reduceVerticalPadding ? 10 : 15)
         .padding(.horizontal)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color(UIColor.darkGray), Color.white]),
+                gradient: Gradient(
+                    colors: colorScheme == .dark ?
+                        [Color.black, Color(UIColor.darkGray)] :
+                        [Color(UIColor.darkGray), Color.white]
+                ),
                 startPoint: userColor == .black ? .topLeading : .bottomTrailing,
                 endPoint: userColor == .black ? .bottomTrailing : .topLeading)
                 .shadow(radius: 2)
@@ -363,12 +367,21 @@ struct CorrespondenceGamesView: View {
         let opponent = userColor == .black ? players.white : players.black
         
         return GeometryReader { geometry -> AnyView in
-            let boardSize = min(geometry.size.width, geometry.size.height)
+            let boardSize: CGFloat = min(geometry.size.width, geometry.size.height)
+            let controlRowHeight: CGFloat = NSString(string: status).boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
+            let usableHeight: CGFloat = geometry.size.height + geometry.safeAreaInsets.bottom / 2
+            let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
+            let spacing: CGFloat = 10.0
+            let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
+            let showsActiveGamesCarousel = remainingHeight >= 135
+            let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
+            
             return AnyView(VStack(alignment: .leading) {
-                CorrespondenceGamesPlayerInfo(currentGame: currentGame, geometry: geometry)
-                Spacer()
+//                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
+                CorrespondenceGamesPlayerInfo(currentGame: currentGame, reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
+                Spacer(minLength: spacing)
                 controlRow
-                Spacer()
+                Spacer(minLength: spacing)
                 BoardView(
                     boardPosition: currentGame.currentPosition,
                     editable: isUserTurn,
@@ -376,7 +389,7 @@ struct CorrespondenceGamesView: View {
                     newPosition: $pendingPosition
                 )
                 .frame(width: boardSize, height: boardSize)
-                if geometry.size.height / geometry.size.width > 1.8 {
+                if showsActiveGamesCarousel {
                     ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
             })

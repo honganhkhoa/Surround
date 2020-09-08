@@ -104,7 +104,7 @@ class OGSService: ObservableObject {
             for game in connectedGames.values {
                 if game.gameData?.outcome == nil && !(game.gameData?.pauseControl?.isPaused() ?? false) {
                     if let timeControlSystem = game.gameData?.timeControl.system {
-                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency)
+                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency, pauseControl: game.gameData?.pauseControl)
                     }
                 }
             }
@@ -112,7 +112,6 @@ class OGSService: ObservableObject {
         
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).sink(receiveValue: { activeGamesValues in
             if let activeGames = activeGamesValues.last {
-                print("xxxxxxx \(activeGames) \(activeGames.count)")
                 self.sortActiveGames(activeGames: activeGames.values)
             }
         })
@@ -479,7 +478,7 @@ class OGSService: ObservableObject {
                     do {
                         connectedGame.clock = try decoder.decode(Clock.self, from: clockdata)
                         if let timeControlSystem = connectedGame.gameData?.timeControl.system {
-                            connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency)
+                            connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.gameData?.pauseControl)
                         }
                         if let _ = self.activeGames[gameId] {
                             // Trigger active games publisher
