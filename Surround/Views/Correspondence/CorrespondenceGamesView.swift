@@ -355,6 +355,10 @@ struct CorrespondenceGamesView: View {
                 ogs.updateDetailsOfConnectedGame(game: game)
             }
         }
+        .onChange(of: currentGame) { _ in
+            self.pendingMove = nil
+            self.pendingPosition = nil
+        }
         .onReceive(ogs.$sortedActiveGames) { sortedActiveGames in
             
         }

@@ -53,6 +53,16 @@ struct Goban: View {
 
     var body: some View {
         let size = cellSize(geometry: geometry, boardSize: max(width, height))
+        var starPoints = [[CGFloat]]()
+        if size > 10 {
+            if height == 19 && width == 19 {
+                starPoints = [3, 9, 15].flatMap({ x in [3, 9, 15].map({ y in [x, y] })})
+            } else if height == 13 && width == 13 {
+                starPoints = [[3, 3], [3, 9], [6, 6], [9, 3], [9, 9]]
+            } else if height == 9 && width == 9 {
+                starPoints = [[2, 2], [2, 6], [4, 4], [6, 2], [6, 6]]
+            }
+        }
         return Group {
             ZStack {
                 Path { path in
@@ -66,6 +76,15 @@ struct Goban: View {
                     }
                 }
                 .stroke(Color.black, lineWidth: size < 10 ? 0.5 : 1)
+                if starPoints.count > 0 {
+                    Path { path in
+                        for starPoint in starPoints {
+                            let starPointSize: CGFloat = size > 20 ? 6.0 : 4.0
+                            let starPointRect = CGRect(x: (starPoint[0] + 0.5) * size - starPointSize / 2, y: (starPoint[1] + 0.5) * size - starPointSize / 2, width: starPointSize, height: starPointSize)
+                            path.addEllipse(in: starPointRect)
+                        }
+                    }.fill(Color.black)
+                }
                 if hoveredPoint.wrappedValue != nil {
                     Path { path in
                         path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
@@ -174,6 +193,12 @@ struct Stones: View {
             Path(whiteLivingPath).fill(Color.white)
             Path(whiteLivingPath).stroke(Color.gray)
             Path(blackLivingPath).fill(Color.black)
+            if size > 20 {
+                Path(blackLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.5, green: 0.5, blue: 0.5), radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(blackLivingPath))
+                Path(whiteLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.85, green: 0.85, blue: 0.85), radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(whiteLivingPath))
+            }
             
             if boardPosition.removedStones != nil {
                 Path(whiteCapturedPath).fill(Color.white).opacity(0.5)
@@ -287,7 +312,7 @@ struct BoardView_Previews: PreviewProvider {
         let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         return Group {
             BoardView(boardPosition: boardPosition)
-                .previewLayout(.fixed(width: 375, height: 500))
+                .previewLayout(.fixed(width: 500, height: 500))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 120, height: 120))
             BoardView(boardPosition: game2.currentPosition)
