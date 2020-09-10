@@ -50,6 +50,7 @@ struct MainView: View {
                     }
                 }
                 .listStyle(SidebarListStyle())
+                HomeView()
             }
         }
         .onChange(of: currentView) { newView in
