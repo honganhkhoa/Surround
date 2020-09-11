@@ -10,6 +10,7 @@ import Combine
 
 struct ActiveGamesCarousel: View {
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var currentGame: Game
     @Namespace var selectingGame
     var activeGames: [Game]
@@ -28,7 +29,11 @@ struct ActiveGamesCarousel: View {
                 if game.clock?.currentPlayerId == ogs.user?.id {
                     Color(UIColor.systemTeal).cornerRadius(3)
                 } else {
-                    Color(UIColor.systemBackground)
+                    if colorScheme == .dark {
+                        Color(UIColor.systemGray5)
+                    } else {
+                        Color(UIColor.systemBackground)
+                    }
                 }
                 BoardView(boardPosition: game.currentPosition)
                     .frame(width: cellSize, height: cellSize)

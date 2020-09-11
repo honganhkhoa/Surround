@@ -35,7 +35,7 @@ struct MainView: View {
                     PublicGamesList()
                 }
             } else {
-                List {
+                List(selection: $navigationCurrentView) {
                     NavigationLink(
                         destination: HomeView(),
                         tag: SubView.home,
@@ -46,11 +46,18 @@ struct MainView: View {
                         destination: PublicGamesList(),
                         tag: SubView.publicGames,
                         selection: $navigationCurrentView) {
-                        Label("Public games", systemImage: "person.3")
+                        Label("Public games", systemImage: "person.2")
                     }
                 }
                 .listStyle(SidebarListStyle())
-                HomeView()
+                if let navigationCurrentView = navigationCurrentView {
+                    switch navigationCurrentView {
+                    case .home:
+                        HomeView()
+                    case .publicGames:
+                        PublicGamesList()
+                    }
+                }
             }
         }
         .onChange(of: currentView) { newView in
@@ -91,11 +98,11 @@ struct RootViewSwitchingMenu: ViewModifier {
                         Label("Home", systemImage: "house")
                     }
                     Button(action: { currentView = .publicGames }) {
-                        Label("Public games", systemImage: "person.3")
+                        Label("Public games", systemImage: "person.2")
                     }
                 }
                 label: {
-                    Label("Navigation", systemImage: currentView == .home ? "house" : "person.3")
+                    Label("Navigation", systemImage: currentView == .home ? "house" : "person.2")
                 }
                 .disabled(!compactSizeClass)
                 .opacity(compactSizeClass ? 1 : 0)

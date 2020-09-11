@@ -13,6 +13,7 @@ struct CorrespondenceGamesView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @State var currentGame: Game
     @State var pendingMove: Move? = nil
@@ -219,40 +220,26 @@ struct CorrespondenceGamesView: View {
             print("Geometry \(geometry.size)")
             
             let boardSize: CGFloat = min(geometry.size.width, geometry.size.height)
-            if geometry.size.width < geometry.size.height {
-                let controlRowHeight: CGFloat = NSString(string: status).boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
-                let usableHeight: CGFloat = geometry.size.height + geometry.safeAreaInsets.bottom / 2
-                let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
-                let spacing: CGFloat = 10.0
-                let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
-                let showsActiveGamesCarousel = remainingHeight >= 135
-                let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
+            let controlRowHeight: CGFloat = NSString(string: status).boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
+            let usableHeight: CGFloat = geometry.size.height
+            let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
+            let spacing: CGFloat = 10.0
+            let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
+            let showsActiveGamesCarousel = remainingHeight >= 140 || (remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 140)
+            let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
 
-                return AnyView(erasing: VStack(alignment: .leading) {
-    //                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
-                    CorrespondenceGamesPlayerInfo(currentGame: currentGame, reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
-                    Spacer(minLength: spacing)
-                    controlRow
-                        .padding(.horizontal)
-                    Spacer(minLength: spacing)
-                    boardView.frame(width: boardSize, height: boardSize)
-                    if showsActiveGamesCarousel {
-                        ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
-                    }
-                })
-            } else {
-                return AnyView(erasing: HStack(spacing: 0) {
-                    VStack {
-                        CorrespondenceGamesPlayerInfo(currentGame: currentGame)
-                        Spacer()
-                        controlRow
-                            .padding(.horizontal)
-                        Spacer()
-//                        ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
-                    }
-                    boardView.frame(width: boardSize, height: boardSize)
-                })
-            }
+            return AnyView(erasing: VStack(alignment: .leading) {
+//                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
+                CorrespondenceGamesPlayerInfo(currentGame: currentGame, reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
+                Spacer(minLength: spacing)
+                controlRow
+                    .padding(.horizontal)
+                Spacer(minLength: spacing)
+                boardView.frame(width: boardSize, height: boardSize)
+                if showsActiveGamesCarousel {
+                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                }
+            })
         }
     }
     
@@ -330,10 +317,15 @@ struct CorrespondenceGamesView: View {
                 regularBody
             }
         }
+        .background(
+            colorScheme == .dark ?
+                Color(UIColor.systemGray5).edgesIgnoringSafeArea(.bottom) :
+                Color.white.edgesIgnoringSafeArea(.bottom)
+        )
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {}) {
-                    Label("Active games carousel", systemImage: "squares.below.rectangle")
+                    Label("Active games carousel", systemImage: "gearshape.2")
                 }
             }
         }
@@ -372,16 +364,17 @@ struct CorrespondenceGamesView_Previews: PreviewProvider {
             CorrespondenceGamesView(currentGame: games[0], activeGames: games)
         }
         .navigationViewStyle(StackNavigationViewStyle())
-//        .previewLayout(.fixed(width: 750, height: 704))
-        .previewLayout(.fixed(width: 1024, height: 768))
-//        .previewLayout(.fixed(width: 768, height: 1024))
-//        .previewLayout(.fixed(width: 375, height: 812))
-//        .previewLayout(.fixed(width: 568, height: 320))
         .environmentObject(
             OGSService.previewInstance(
                 user: OGSUser(username: "kata-bot", id: 592684),
                 activeGames: games
             )
         )
+//        .previewLayout(.fixed(width: 750, height: 704))
+//        .previewLayout(.fixed(width: 1024, height: 768))
+//        .previewLayout(.fixed(width: 768, height: 1024))
+//        .previewLayout(.fixed(width: 375, height: 812))
+//        .previewLayout(.fixed(width: 568, height: 320))
+        .colorScheme(.dark)
     }
 }

@@ -130,7 +130,7 @@ struct HomeView: View {
                         }
                         Spacer()
                     }
-                    .background(colorScheme == .dark ? Color(UIColor.systemGray4) : Color.white)
+                    .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
                 }
             }
         }
@@ -181,6 +181,6 @@ struct HomeView_Previews: PreviewProvider {
                     .environmentObject(OGSService.previewInstance())
             }
             .navigationViewStyle(StackNavigationViewStyle())
-        }
+        }.colorScheme(.dark)
     }
 }

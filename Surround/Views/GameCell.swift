@@ -118,6 +118,7 @@ struct GameCell: View {
                 .frame(maxHeight: .infinity)
                 PlayerInfoLine(game: game, color: .white, displayMode: displayMode)
             }
+            .contentShape(Rectangle())
         } else {
             GeometryReader { geometry in
                 HStack {
@@ -128,7 +129,9 @@ struct GameCell: View {
                         PlayerInfoLine(game: game, color: .white, displayMode: displayMode)
                     }
                 }
-            }.frame(minHeight: 120)
+            }
+            .frame(minHeight: 120)
+            .contentShape(Rectangle())
         }
     }
 }

@@ -28,14 +28,13 @@ struct CorrespondenceGamesPlayerInfo: View {
                         Color.gray
                     }
                 }
-                .shadow(radius: 2)
+                .background(Color.gray)
                 .frame(width: playerIconSize, height: playerIconSize)
+                .shadow(radius: 2)
                 Stone(color: color, shadowRadius: 1)
                     .frame(width: 20, height: 20)
                     .offset(x: 10, y: 10)
             }
-            .background(Color.gray)
-            .frame(width: playerIconSize, height: playerIconSize)
         }
     }
 
@@ -73,7 +72,7 @@ struct CorrespondenceGamesPlayerInfo: View {
                             }
                         }
                     }
-                }
+                }.frame(height: playerIconSize)
                 if currentGame.clock?.currentPlayer == userColor {
                     Image(systemName: "hourglass")
                 }
@@ -102,7 +101,7 @@ struct CorrespondenceGamesPlayerInfo: View {
                                 .font(Font.caption.monospacedDigit())
                         }
                     }
-                }
+                }.frame(height: playerIconSize)
                 playerIcon(color: userColor.opponentColor())
             }
             .offset(y: playerIconsOffset)
@@ -128,7 +127,7 @@ struct CorrespondenceGamesPlayerInfo_Previews: PreviewProvider {
     static var previews: some View {
         let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
         return Group {
-            CorrespondenceGamesPlayerInfo(currentGame: games[0])
+            CorrespondenceGamesPlayerInfo(currentGame: games[2])
                 .previewLayout(.fixed(width: 320, height: 200))
             CorrespondenceGamesPlayerInfo(currentGame: games[0], playerIconSize: 96, showsPlayersName: true)
                 .previewLayout(.fixed(width: 500, height: 300))

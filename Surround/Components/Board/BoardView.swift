@@ -17,26 +17,36 @@ struct Stone: View {
     var shadowRadius: CGFloat = 0.0
     
     var body: some View {
-        Group {
-            switch color {
-            case .black:
-                if shadowRadius > 0 {
-                    Circle().fill(Color.black).shadow(radius: shadowRadius)
-                } else {
-                    Circle().fill(Color.black)
-                }
-            case .white:
-                ZStack {
+        GeometryReader { geometry -> AnyView in
+            let size = geometry.size.width
+            let path = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size, height: size), transform: nil)
+            return AnyView(erasing: Group {
+                switch color {
+                case .black:
                     if shadowRadius > 0 {
-                        Circle().fill(Color.white).shadow(radius: shadowRadius)
+                        ZStack {
+                            Path(path).fill(Color.black).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                                .clipShape(Circle())
+                        }
                     } else {
-                        Circle().fill(Color.white)
+                        Circle().fill(Color.black)
                     }
-                    Circle().stroke(Color.gray)
+                case .white:
+                    ZStack {
+                        if shadowRadius > 0 {
+                            Path(path).fill(Color(red: 0.85, green: 0.85, blue: 0.85)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                                .clipShape(Circle())
+                        } else {
+                            Circle().fill(Color.white)
+                        }
+                        Circle().stroke(Color.gray, lineWidth: 0.5)
+                    }
                 }
-            }
+            }.aspectRatio(1, contentMode: .fit)
+            )
         }
-        .aspectRatio(1, contentMode: .fit)
     }
 }
 
@@ -50,6 +60,7 @@ struct Goban: View {
     var hoveredPoint: Binding<[Int]?> = .constant(nil)
     var isHoveredPointValid: Bool? = nil
     var selectedPoint: Binding<[Int]?> = .constant(nil)
+    @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
 
     var body: some View {
         let size = cellSize(geometry: geometry, boardSize: max(width, height))
@@ -102,11 +113,18 @@ struct Goban: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged({ value in
+                    if self.selectionFeedbackGenerator == nil {
+                        self.selectionFeedbackGenerator = UISelectionFeedbackGenerator()
+                        self.selectionFeedbackGenerator?.prepare()
+                    }
                     selectedPoint.wrappedValue = nil
                     currentRow = Int((value.location.y / size - 0.5).rounded())
                     currentColumn = Int((value.location.x / size - 0.5).rounded())
                     if currentColumn >= 0 && currentColumn < width && currentRow >= 0 && currentRow < height {
-                        hoveredPoint.wrappedValue = [currentRow, currentColumn]
+                        if hoveredPoint.wrappedValue != [currentRow, currentColumn] {
+                            hoveredPoint.wrappedValue = [currentRow, currentColumn]
+                            self.selectionFeedbackGenerator?.selectionChanged()
+                        }
                     } else {
                         hoveredPoint.wrappedValue = nil
                     }
@@ -115,9 +133,13 @@ struct Goban: View {
                     if isHoveredPointValid ?? false {
                         if let hoveredPoint = hoveredPoint.wrappedValue {
                             selectedPoint.wrappedValue = hoveredPoint
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        } else {
+                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
                         }
                     }
                     hoveredPoint.wrappedValue = nil
+                    self.selectionFeedbackGenerator = nil
                 }
         )
     }
@@ -187,17 +209,24 @@ struct Stones: View {
             }
         }
         
-        let lastMoveIndicatorWidth: CGFloat = size > 20 ? 2 : (size > 10 ? 1 : 0.5)
+        let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1 : 0.5)
+        let drawsShadow = size >= 14
         
         return ZStack {
-            Path(whiteLivingPath).fill(Color.white)
-            Path(whiteLivingPath).stroke(Color.gray)
-            Path(blackLivingPath).fill(Color.black)
-            if size > 20 {
-                Path(blackLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.5, green: 0.5, blue: 0.5), radius: size / 4, x: -size / 4, y: -size / 4)
+            if drawsShadow {
+                Path(whiteLivingPath).fill(Color(red: 0.85, green: 0.85, blue: 0.85))
+                    .shadow(radius: 2, x: 2, y:2)
+                Path(whiteLivingPath).stroke(Color.gray)
+                Path(blackLivingPath).fill(Color.black)
+                    .shadow(radius: 2, x: 2, y:2)
+                Path(blackLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
                     .clipShape(Path(blackLivingPath))
-                Path(whiteLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.85, green: 0.85, blue: 0.85), radius: size / 4, x: -size / 4, y: -size / 4)
+                Path(whiteLivingPath).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
                     .clipShape(Path(whiteLivingPath))
+            } else {
+                Path(whiteLivingPath).fill(Color.white)
+                Path(whiteLivingPath).stroke(Color.gray)
+                Path(blackLivingPath).fill(Color.black)
             }
             
             if boardPosition.removedStones != nil {
@@ -311,12 +340,18 @@ struct BoardView_Previews: PreviewProvider {
         let game3 = TestData.Resigned19x19HandicappedWithInitialState
         let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         return Group {
+            Stone(color: .black, shadowRadius: 2)
+                .frame(width: 25, height: 25)
+                .previewLayout(.fixed(width: 100, height: 50))
+            Stone(color: .white, shadowRadius: 2)
+                .frame(width: 25, height: 25)
+                .previewLayout(.fixed(width: 100, height: 50))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 120, height: 120))
             BoardView(boardPosition: game2.currentPosition)
-                .previewLayout(.fixed(width: 375, height: 500))
+                .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: game3.currentPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: game4.currentPosition)
