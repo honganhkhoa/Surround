@@ -1,24 +1,25 @@
 //
-//  CorrespondenceGamesPlayerInfo.swift
+//  PlayersBannerView.swift
 //  Surround
 //
-//  Created by Anh Khoa Hong on 9/9/20.
+//  Created by Anh Khoa Hong on 9/11/20.
 //
 
 import SwiftUI
 import URLImage
 
-struct CorrespondenceGamesPlayerInfo: View {
+struct PlayersBannerView: View {
     @EnvironmentObject var ogs: OGSService
-    @ObservedObject var currentGame: Game
+    @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
+    var topLeftPlayerColor = StoneColor.black
     var reduceVerticalPadding = false
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
 
     func playerIcon(color: StoneColor) -> some View {
-        let icon = currentGame.playerIcon(for: color, size: Int(playerIconSize))
+        let icon = game.playerIcon(for: color, size: Int(playerIconSize))
         return VStack {
             ZStack(alignment: .bottomTrailing) {
                 Group {
@@ -39,70 +40,69 @@ struct CorrespondenceGamesPlayerInfo: View {
     }
 
     var body: some View {
-        let userColor: StoneColor = currentGame.blackId == ogs.user?.id ? .black : .white
-        let userCaptures = currentGame.currentPosition.captures[userColor] ?? 0
-        let opponentCaptures = currentGame.currentPosition.captures[userColor.opponentColor()] ?? 0
-        let users = [
-            StoneColor.black: ["name": currentGame.blackName, "rank": currentGame.blackFormattedRank],
-            StoneColor.white: ["name": currentGame.whiteName, "rank": currentGame.whiteFormattedRank]
+        let topLeftCaptures = game.currentPosition.captures[topLeftPlayerColor] ?? 0
+        let bottomRightCaptures = game.currentPosition.captures[topLeftPlayerColor.opponentColor()] ?? 0
+        let players = [
+            StoneColor.black: ["name": game.blackName, "rank": game.blackFormattedRank],
+            StoneColor.white: ["name": game.whiteName, "rank": game.whiteFormattedRank]
         ]
-        let user = users[userColor]!
-        let opponent = users[userColor.opponentColor()]!
+        let topLeftPlayer = players[topLeftPlayerColor]!
+        let bottomRightPlayer = players[topLeftPlayerColor.opponentColor()]!
 
         return VStack(spacing: 0) {
             HStack {
-                playerIcon(color: userColor)
+                playerIcon(color: topLeftPlayerColor)
                 VStack(alignment: .leading) {
                     if showsPlayersName {
                         HStack {
-                            Text(user["name"]!).font(Font.body.bold())
-                            Text("[\(user["rank"]!)]").font(Font.caption.bold())
+                            Text(topLeftPlayer["name"]!).font(Font.body.bold())
+                            Text("[\(topLeftPlayer["rank"]!)]").font(Font.caption.bold())
                         }
                     }
                     VStack(alignment: .trailing) {
-                        TimerView(timeControl: currentGame.gameData?.timeControl, clock: currentGame.clock, player: userColor)
-                        if userCaptures > 0 {
-                            Text("\(userCaptures) capture\(userCaptures > 1 ? "s" : "")")
+                        TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: topLeftPlayerColor)
+                        if topLeftCaptures > 0 {
+                            Text("\(topLeftCaptures) capture\(topLeftCaptures > 1 ? "s" : "")")
                                 .font(Font.caption.monospacedDigit())
                         }
-                        if let komi = currentGame.gameData?.komi {
-                            if userColor == .white && komi != 0 {
+                        if let komi = game.gameData?.komi {
+                            if topLeftPlayerColor == .white && komi != 0 {
                                 Text("\(String(format: "%.1f", komi)) komi")
                                     .font(Font.caption.monospacedDigit())
                             }
                         }
                     }
                 }.frame(height: playerIconSize)
-                if currentGame.clock?.currentPlayer == userColor {
+                if game.clock?.currentPlayer == topLeftPlayerColor {
                     Image(systemName: "hourglass")
                 }
                 Spacer()
             }
             HStack {
                 Spacer()
-                if currentGame.clock?.currentPlayer != userColor {
+                if game.clock?.currentPlayer != topLeftPlayerColor {
                     Image(systemName: "hourglass")
                 }
                 VStack(alignment: .trailing) {
                     if showsPlayersName {
                         HStack {
-                            Text(opponent["name"]!).font(Font.body.bold())
-                            Text("[\(opponent["rank"]!)]").font(Font.caption.bold())
+                            Text(bottomRightPlayer["name"]!).font(Font.body.bold())
+                            Text("[\(bottomRightPlayer["rank"]!)]").font(Font.caption.bold())
                         }
                     }
-                    TimerView(timeControl: currentGame.gameData?.timeControl, clock: currentGame.clock, player: userColor.opponentColor())
-                    if opponentCaptures > 0 {
-                        Text("\(opponentCaptures) capture\(opponentCaptures > 1 ? "s" : "")")
+                    TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: topLeftPlayerColor.opponentColor())
+                    if bottomRightCaptures > 0 {
+                        Text("\(bottomRightCaptures) capture\(bottomRightCaptures > 1 ? "s" : "")")
                             .font(.caption)
                     }
-                    if let komi = currentGame.gameData?.komi {
-                        if userColor.opponentColor() == .white && komi != 0 {
+                    if let komi = game.gameData?.komi {
+                        if topLeftPlayerColor.opponentColor() == .white && komi != 0 {
                             Text("\(String(format: "%.1f", komi)) komi")
                                 .font(Font.caption.monospacedDigit())
                         }
                     }
                 }.frame(height: playerIconSize)
-                playerIcon(color: userColor.opponentColor())
+                playerIcon(color: topLeftPlayerColor.opponentColor())
             }
             .offset(y: playerIconsOffset)
             .padding(.bottom, playerIconsOffset)
@@ -116,29 +116,20 @@ struct CorrespondenceGamesPlayerInfo: View {
                         [Color.black, Color(UIColor.darkGray)] :
                         [Color(UIColor.darkGray), Color.white]
                 ),
-                startPoint: userColor == .black ? .topLeading : .bottomTrailing,
-                endPoint: userColor == .black ? .bottomTrailing : .topLeading)
+                startPoint: topLeftPlayerColor == .black ? .topLeading : .bottomTrailing,
+                endPoint: topLeftPlayerColor == .black ? .bottomTrailing : .topLeading)
                 .shadow(radius: 2)
         )
-    }
-}
+    }}
 
-struct CorrespondenceGamesPlayerInfo_Previews: PreviewProvider {
+struct PlayersBannerView_Previews: PreviewProvider {
     static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
         return Group {
-            CorrespondenceGamesPlayerInfo(currentGame: games[2])
+            PlayersBannerView(game: TestData.Ongoing19x19wBot1)
                 .previewLayout(.fixed(width: 320, height: 200))
-            CorrespondenceGamesPlayerInfo(currentGame: games[0], playerIconSize: 96, showsPlayersName: true)
+            PlayersBannerView(game: TestData.Ongoing19x19wBot2, playerIconSize: 96, showsPlayersName: true)
                 .previewLayout(.fixed(width: 500, height: 300))
                 .colorScheme(.dark)
         }
-        .environmentObject(
-            OGSService.previewInstance(
-                user: OGSUser(username: "kata-bot", id: 592684),
-                activeGames: games
-            )
-        )
-
     }
 }

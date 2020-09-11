@@ -16,9 +16,11 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     
     @State var gameDetailCancellable: AnyCancellable?
-    @State var showGameDetail = false
-    @State var gameToShowDetail: Game? = nil
-    
+    @State var showCorrespondenceGameDetail = false
+    @State var correspondenceGameToShowDetail: Game? = nil
+    @State var showLiveGameDetail = false
+    @State var liveGameToShowDetail: Game? = nil
+
     @State var username = ""
     @State var password = ""
     @State var loginCancellable: AnyCancellable?
@@ -96,33 +98,50 @@ struct HomeView: View {
         .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
     
-    func showGameDetail(game: Game) {
-        self.gameToShowDetail = game
-        self.showGameDetail = true
+    func showCorrespondenceGameDetail(game: Game) {
+        self.correspondenceGameToShowDetail = game
+        self.showCorrespondenceGameDetail = true
     }
-    
+
+    func showLiveGameDetail(game: Game) {
+        self.liveGameToShowDetail = game
+        self.showLiveGameDetail = true
+    }
+
     var activeGamesView: some View {
         Group {
-            if ogs.sortedActiveGamesOnUserTurn.count + ogs.sortedActiveGamesNotOnUserTurn.count == 0 {
+            if ogs.sortedActiveCorrespondenceGames.count + ogs.liveGames.count == 0 {
                 ProgressView()
             } else {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))], pinnedViews: [.sectionHeaders]) {
+                        if ogs.liveGames.count > 0 {
+                            Section(header: sectionHeader(title: "Live games")) {
+                                ForEach(ogs.liveGames) { game in
+                                    GameCell(game: game, displayMode: displayMode)
+                                    .onTapGesture {
+                                        showLiveGameDetail(game: game)
+                                    }
+                                    .padding(.vertical, displayMode == .full ? nil : 0)
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
                         Section(header: sectionHeader(title: "Your move")) {
-                            ForEach(ogs.sortedActiveGamesOnUserTurn) { game in
+                            ForEach(ogs.sortedActiveCorrespondenceGamesOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    showGameDetail(game: game)
+                                    showCorrespondenceGameDetail(game: game)
                                 }
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }
                         }
                         Section(header: sectionHeader(title: "Opponents' move")) {
-                            ForEach(ogs.sortedActiveGamesNotOnUserTurn) { game in
+                            ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    self.showGameDetail(game: game)
+                                    self.showCorrespondenceGameDetail(game: game)
                                 }
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
@@ -143,7 +162,10 @@ struct HomeView: View {
             } else {
                 loginView
             }
-            NavigationLink(destination: gameToShowDetail == nil ? nil : CorrespondenceGamesView(currentGame: gameToShowDetail!), isActive: $showGameDetail) {
+            NavigationLink(destination: correspondenceGameToShowDetail == nil ? nil : CorrespondenceGamesView(currentGame: correspondenceGameToShowDetail!), isActive: $showCorrespondenceGameDetail) {
+                EmptyView()
+            }
+            NavigationLink(destination: liveGameToShowDetail == nil ? nil : LiveGameView(game: liveGameToShowDetail!), isActive: $showLiveGameDetail) {
                 EmptyView()
             }
         }
@@ -165,13 +187,14 @@ struct HomeView: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        Group {
+        var games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
+        return Group {
             NavigationView {
                 HomeView()
                     .environmentObject(
                         OGSService.previewInstance(
                             user: OGSUser(username: "kata-bot", id: 592684),
-                            activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
+                            activeGames: games
                         )
                     )
             }

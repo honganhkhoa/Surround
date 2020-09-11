@@ -57,22 +57,28 @@ class OGSService: ObservableObject {
     @Published private(set) public var unsortedActiveGames: [Game] = []
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
-    @Published private(set) public var sortedActiveGamesOnUserTurn: [Game] = []
-    @Published private(set) public var sortedActiveGamesNotOnUserTurn: [Game] = []
-    @Published private(set) public var sortedActiveGames: [Game] = []
+    @Published private(set) public var sortedActiveCorrespondenceGamesOnUserTurn: [Game] = []
+    @Published private(set) public var sortedActiveCorrespondenceGamesNotOnUserTurn: [Game] = []
+    @Published private(set) public var sortedActiveCorrespondenceGames: [Game] = []
+    @Published private(set) public var liveGames: [Game] = []
     
     private var activeGamesSortingCancellable: AnyCancellable?
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
         var gamesOnOppornentTurn: [Game] = []
+        var liveGames: [Game] = []
         for game in activeGames {
-            if let clock = game.clock {
-                if clock.currentPlayerId == self.user?.id {
-                    gamesOnUserTurn.append(game)
-                } else {
-                    gamesOnOppornentTurn.append(game)
+            if game.gameData?.timeControl.speed == .correspondence {
+                if let clock = game.clock {
+                    if clock.currentPlayerId == self.user?.id {
+                        gamesOnUserTurn.append(game)
+                    } else {
+                        gamesOnOppornentTurn.append(game)
+                    }
                 }
+            } else {
+                liveGames.append(game)
             }
         }
         let thinkingTimeLeftIncreasing: (Game, Game) -> Bool =  { game1, game2 in
@@ -83,9 +89,10 @@ class OGSService: ObservableObject {
             }
             return false
         }
-        self.sortedActiveGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
-        self.sortedActiveGamesNotOnUserTurn = gamesOnOppornentTurn.sorted(by: thinkingTimeLeftIncreasing)
-        self.sortedActiveGames = self.sortedActiveGamesOnUserTurn + self.sortedActiveGamesNotOnUserTurn
+        self.sortedActiveCorrespondenceGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
+        self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOppornentTurn.sorted(by: thinkingTimeLeftIncreasing)
+        self.sortedActiveCorrespondenceGames = self.sortedActiveCorrespondenceGamesOnUserTurn + self.sortedActiveCorrespondenceGamesNotOnUserTurn
+        self.liveGames = liveGames
     }
     
     private init(forPreview: Bool = false) {

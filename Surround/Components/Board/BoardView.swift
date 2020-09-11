@@ -225,7 +225,7 @@ struct Stones: View {
                     .clipShape(Path(whiteLivingPath))
             } else {
                 Path(whiteLivingPath).fill(Color.white)
-                Path(whiteLivingPath).stroke(Color.gray)
+                Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
                 Path(blackLivingPath).fill(Color.black)
             }
             

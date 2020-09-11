@@ -25,7 +25,7 @@ struct CorrespondenceGamesView: View {
 
     func updateActiveGameList() {
         self.activeGames = []
-        for game in ogs.sortedActiveGames {
+        for game in ogs.sortedActiveCorrespondenceGames {
             self.activeGames.append(game)
             if let ogsID = game.ogsID {
                 self.activeGameByOGSID[ogsID] = game
@@ -164,11 +164,11 @@ struct CorrespondenceGamesView: View {
                             Text("Pass")
                         }
                     } else {
-                        if ogs.sortedActiveGamesOnUserTurn.count > 0 {
+                        if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
                             Button(action: goToNextGame) {
                                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                                     Text("Next")
-                                    Text("(\(ogs.sortedActiveGamesOnUserTurn.count))")
+                                    Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
                                         .font(Font.caption2.bold())
                                 }
                             }
@@ -215,6 +215,10 @@ struct CorrespondenceGamesView: View {
         )
     }
     
+    func userColor(in game: Game) -> StoneColor {
+        return ogs.user?.id == game.blackId ? .black : .white
+    }
+    
     var compactBody: some View {
         GeometryReader { geometry -> AnyView in
             print("Geometry \(geometry.size)")
@@ -230,14 +234,14 @@ struct CorrespondenceGamesView: View {
 
             return AnyView(erasing: VStack(alignment: .leading) {
 //                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
-                CorrespondenceGamesPlayerInfo(currentGame: currentGame, reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
+                PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
                 Spacer(minLength: spacing)
                 controlRow
                     .padding(.horizontal)
                 Spacer(minLength: spacing)
                 boardView.frame(width: boardSize, height: boardSize)
                 if showsActiveGamesCarousel {
-                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                    ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
             })
         }
@@ -264,12 +268,12 @@ struct CorrespondenceGamesView: View {
                 return AnyView(EmptyView())
             }
             return AnyView(erasing: VStack(spacing: 0) {
-                ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 Spacer(minLength: 0)
                 if horizontal {
                     HStack(alignment: .top, spacing: 15) {
                         VStack(alignment: .trailing) {
-                            CorrespondenceGamesPlayerInfo(currentGame: currentGame, playerIconSize: 80, playerIconsOffset: playerIconsOffset, showsPlayersName: true)
+                            PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), playerIconSize: 80, playerIconsOffset: playerIconsOffset, showsPlayersName: true)
                                 .frame(minWidth: 300)
                             Spacer().frame(maxHeight: 15)
                             VStack(alignment: .trailing) {
@@ -286,7 +290,7 @@ struct CorrespondenceGamesView: View {
                     .frame(height: boardSizeLimit + 15 * 2)
                 } else {
                     VStack(alignment: .center, spacing: 0) {
-                        CorrespondenceGamesPlayerInfo(currentGame: currentGame, playerIconSize: 80, playerIconsOffset: -80, showsPlayersName: true)
+                        PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), playerIconSize: 80, playerIconsOffset: -80, showsPlayersName: true)
                         Spacer(minLength: 15)
                         controlRow
                         Spacer(minLength: 15)
@@ -351,7 +355,7 @@ struct CorrespondenceGamesView: View {
             self.pendingMove = nil
             self.pendingPosition = nil
         }
-        .onReceive(ogs.$sortedActiveGames) { sortedActiveGames in
+        .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             
         }
     }
