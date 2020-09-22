@@ -106,6 +106,10 @@ struct InlineTimerView: View {
             if pauseControl?.vacationPlayerIds.contains(playerId) ?? false {
                 pausedText = "Vacation"
             }
+
+            if pauseControl?.stoneRemoval ?? false {
+                pausedText = "Stone removal"
+            }            
         }
         
         return AnyView(HStack(alignment: .firstTextBaseline) {

@@ -60,6 +60,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 clock = data.clock
                 
                 undoRequested = data.undoRequested
+                
+                if data.phase == .stoneRemoval {
+                    computeScoresAndUpdate()
+                }
             }
         }
     }
@@ -168,5 +172,111 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         currentPosition = position
         self.undoRequested = nil
+    }
+    
+    func computeScore() -> GameScores? {
+        guard let gameData = gameData else {
+            return nil
+        }
+        var score = GameScores(
+            black: PlayerScore(
+                handicap: 0,
+                komi: 0,
+                scoringPositions: Set<[Int]>(),
+                stones: 0,
+                territory: 0,
+                prisoners: 0,
+                total: 0
+            ),
+            white: PlayerScore(
+                handicap: gameData.handicap,
+                komi: gameData.komi,
+                scoringPositions: Set<[Int]>(),
+                stones: 0,
+                territory: 0,
+                prisoners: 0,
+                total: 0
+            )
+        )
+        let stoneGroups = self.currentPosition.constructStoneGroups()
+        
+        if gameData.agaHandicapScoring && score.white.handicap > 0 {
+            score.white.handicap -= 1
+        }
+        
+        if gameData.scoreTerritory {
+            for group in stoneGroups {
+                group.computeTerritory()
+                if group.isTerritory {
+                    if group.territoryColor == .black {
+                        score.black.scoringPositions.formUnion(group.points)
+                        if !group.isDame {
+                            score.black.territory += group.points.count
+                        }
+                    } else {
+                        score.white.scoringPositions.formUnion(group.points)
+                        if !group.isDame {
+                            score.white.territory += group.points.count
+                        }
+                    }
+                }
+            }
+        }
+        
+        for row in 0..<width {
+            for column in 0..<height {
+                if case .hasStone(let color) = currentPosition[row, column] {
+                    let isRemoved = currentPosition.removedStones?.contains([row, column]) ?? false
+                    if !isRemoved && gameData.scoreStones {
+                        if color == .black {
+                            score.black.stones += 1
+                            score.black.scoringPositions.insert([row, column])
+                        } else {
+                            score.white.stones += 1
+                            score.white.scoringPositions.insert([row, column])
+                        }
+                    }
+                    if isRemoved && gameData.scorePrisoners {
+                        if color == .black {
+                            score.white.prisoners += 1
+                        } else {
+                            score.black.prisoners += 1
+                        }
+                    }
+                }
+            }
+        }
+        
+        if gameData.scorePrisoners {
+            score.white.prisoners += currentPosition.captures[.white] ?? 0
+            score.black.prisoners += currentPosition.captures[.black] ?? 0
+        }
+        
+        score.black.total = Double(score.black.stones + score.black.territory + score.black.prisoners) + score.black.komi
+        score.white.total = Double(score.white.stones + score.white.territory + score.white.prisoners) + score.white.komi
+        if gameData.scoreHandicap {
+            score.black.total += Double(score.black.handicap)
+            score.white.total += Double(score.white.handicap)
+        }
+        
+        return score
+    }
+    
+    func computeScoresAndUpdate() {
+        DispatchQueue.global().async {
+            if let score = self.computeScore() {
+                DispatchQueue.main.async {
+//                    self.objectWillChange.send()
+                    self.currentPosition.gameScores = score
+                }
+            }
+        }
+    }
+    
+    func setRemovedStones(removedString: String) {
+        self.currentPosition.removedStones = BoardPosition.points(fromPositionString: removedString)
+        if self.gameData?.phase == .stoneRemoval {
+            self.computeScoresAndUpdate()
+        }
     }
 }

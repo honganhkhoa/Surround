@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import URLImage
 import Combine
 
 struct CorrespondenceGamesView: View {
@@ -39,9 +38,11 @@ struct CorrespondenceGamesView: View {
             .sink(receiveCompletion: { _ in
                 self.submitMoveCancellable = nil
             }, receiveValue: { _ in
-                self.pendingMove = nil
-                self.pendingPosition = nil
-                self.submitMoveCancellable = nil
+                DispatchQueue.main.async {
+                    self.pendingMove = nil
+                    self.pendingPosition = nil
+                    self.submitMoveCancellable = nil
+                }
             })
     }
     
@@ -70,7 +71,7 @@ struct CorrespondenceGamesView: View {
             return false
         }
 
-        guard currentGame.gameData?.phase == "play" else {
+        guard currentGame.gameData?.phase == .play else {
             return false
         }
         
@@ -83,7 +84,7 @@ struct CorrespondenceGamesView: View {
             return false
         }
         
-        guard currentGame.gameData?.phase == "play" && currentGame.gameData?.outcome == nil else {
+        guard currentGame.gameData?.phase == .play && currentGame.gameData?.outcome == nil else {
             return false
         }
         
@@ -113,6 +114,9 @@ struct CorrespondenceGamesView: View {
                 return "White wins by \(outcome)"
             }
         } else {
+            if currentGame.gameData?.phase == .stoneRemoval {
+                return "Stone Removal Phase"
+            }
             if currentGame.undoRequested != nil {
                 return "Undo requested"
             }
@@ -234,7 +238,7 @@ struct CorrespondenceGamesView: View {
 
             return AnyView(erasing: VStack(alignment: .leading) {
 //                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
-                PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
+                PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame).opponentColor(), reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
                 Spacer(minLength: spacing)
                 controlRow
                     .padding(.horizontal)
@@ -273,7 +277,7 @@ struct CorrespondenceGamesView: View {
                 if horizontal {
                     HStack(alignment: .top, spacing: 15) {
                         VStack(alignment: .trailing) {
-                            PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), playerIconSize: 80, playerIconsOffset: playerIconsOffset, showsPlayersName: true)
+                            PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame).opponentColor(), playerIconSize: 80, playerIconsOffset: playerIconsOffset, showsPlayersName: true)
                                 .frame(minWidth: 300)
                             Spacer().frame(maxHeight: 15)
                             VStack(alignment: .trailing) {
@@ -290,7 +294,7 @@ struct CorrespondenceGamesView: View {
                     .frame(height: boardSizeLimit + 15 * 2)
                 } else {
                     VStack(alignment: .center, spacing: 0) {
-                        PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame), playerIconSize: 80, playerIconsOffset: -80, showsPlayersName: true)
+                        PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame).opponentColor(), playerIconSize: 80, playerIconsOffset: -80, showsPlayersName: true)
                         Spacer(minLength: 15)
                         controlRow
                         Spacer(minLength: 15)

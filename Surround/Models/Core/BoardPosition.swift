@@ -5,9 +5,10 @@
 //  Created by Anh Khoa Hong on 4/18/20.
 //
 
+import Foundation
 import Dispatch
 
-enum PointState {
+enum PointState: Equatable {
     case empty
     case hasStone(StoneColor)
 }
@@ -46,7 +47,53 @@ enum MoveError: Error {
     case suicidalMove
 }
 
-class BoardPosition {
+class StoneGroup: Equatable, Hashable {
+    var points: Set<[Int]>
+    var state: PointState
+    var isDame: Bool
+    var neighbors = Set<StoneGroup>()
+
+    var debugDescription: String {
+        "\(points.count) points: \(points.map({ "[\($0[0]), \($0[1])]" }).joined(separator: ", "))"
+    }
+    
+    init(points: Set<[Int]>, state: PointState, isDame: Bool) {
+        self.points = points
+        self.state = state
+        self.isDame = isDame
+    }
+    
+    static func == (lhs: StoneGroup, rhs: StoneGroup) -> Bool {
+        return lhs.points == rhs.points
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(points)
+    }
+
+    var isTerritory = false
+    var territoryColor = StoneColor.black
+    func computeTerritory() {
+        guard state == .empty else {
+            return
+        }
+        
+        for neighbor in neighbors {
+            if case .hasStone(let color) = neighbor.state {
+                for neighbor in neighbors {
+                    if neighbor.state != .empty && neighbor.state != .hasStone(color) {
+                        return
+                    }
+                }
+                isTerritory = true
+                territoryColor = color
+                break
+            }
+        }
+    }
+}
+
+class BoardPosition: ObservableObject {
     var width: Int
     var height: Int
     var board: [[PointState]]
@@ -54,9 +101,9 @@ class BoardPosition {
     var previousPosition: BoardPosition?
     var lastMove: Move?
     var captures: [StoneColor: Int] = [.black: 0, .white: 0]
-    var removedStones: Set<[Int]>?
-    var gameScores: GameScores?
-    var estimatedScores: [[PointState]]?
+    @Published var removedStones: Set<[Int]>?
+    @Published var gameScores: GameScores?
+    @Published var estimatedScores: [[PointState]]?
     var lastMoveNumber = 0
     
     init(width: Int, height: Int) {
@@ -284,4 +331,80 @@ class BoardPosition {
             }
         }
     }
+    
+    private var _stoneGroupId: [[Int]] = []
+    private var _currentGroupId = 0
+    
+    private func _constructStoneGroupFromPoint(row: Int, column: Int, state: PointState, isDame: Bool) -> StoneGroup {
+        var pointsForGroup = Set([[row, column]])
+        var currentPoints = Set(pointsForGroup)
+        let isRemoved: ([Int]) -> Bool = { self.removedStones?.contains($0) ?? false }
+        var groupCondition: ([Int]) -> Bool =
+            {
+                // Dame group
+                self[$0] == .empty && isRemoved($0)
+            }
+            
+        if !isDame {
+            groupCondition = {
+                if isRemoved($0) {
+                    if self[$0] == .empty {
+                        // a dame point
+                        return false
+                    }
+                    return state == .empty
+                } else {
+                    return self[$0] == state
+                }
+            }
+        }
+        while currentPoints.count > 0 {
+            var nextPoints = Set<[Int]>()
+            for point in currentPoints {
+                for neighbor in neighbors(point: point) {
+                    if groupCondition(neighbor) {
+                        if _stoneGroupId[neighbor[0]][neighbor[1]] == 0 {
+                            _stoneGroupId[neighbor[0]][neighbor[1]] = _currentGroupId
+                            nextPoints.insert(neighbor)
+                            pointsForGroup.insert(neighbor)
+                        }
+                    }
+                }
+            }
+            currentPoints = nextPoints
+        }
+        let group = StoneGroup(points: pointsForGroup, state: state, isDame: isDame)
+        return group
+    }
+    
+    func constructStoneGroups() -> [StoneGroup] {
+        _stoneGroupId = Array(repeating: Array(repeating: 0, count: self.width), count: self.height)
+        _currentGroupId = 0
+        var groups = [StoneGroup]()
+        var groupById = [Int: StoneGroup]()
+        for row in 0..<height {
+            for column in 0..<width {
+                if _stoneGroupId[row][column] == 0 {
+                    _currentGroupId += 1
+                    _stoneGroupId[row][column] = _currentGroupId
+                    let isRemoved = self.removedStones?.contains([row, column]) ?? false
+                    let newGroup = _constructStoneGroupFromPoint(row: row, column: column, state: isRemoved ? .empty : self[row, column], isDame: isRemoved && self[row, column] == .empty)
+                    groups.append(newGroup)
+                    groupById[_currentGroupId] = newGroup
+                }
+            }
+        }
+        for group in groups {
+            for point in group.points {
+                for neighbor in neighbors(point: point) {
+                    let neighborGroupId = _stoneGroupId[neighbor[0]][neighbor[1]]
+                    group.neighbors.insert(groupById[neighborGroupId]!)
+                }
+            }
+        }
+        for row in 0..<height {
+            print(_stoneGroupId[row])
+        }
+        return groups
+    }    
 }

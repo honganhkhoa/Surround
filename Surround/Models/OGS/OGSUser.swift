@@ -20,4 +20,8 @@ struct OGSUser : Codable {
     var provisional: Int?
     var icon: String?
     var supporter: Bool?
+    
+    // In-game
+    var acceptedStones: String?
+    var acceptedStrickSekiMode: Bool?
 }

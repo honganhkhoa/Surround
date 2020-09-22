@@ -73,7 +73,7 @@ struct GameDetail: View {
             return false
         }
 
-        guard game.gameData?.phase == "play" else {
+        guard game.gameData?.phase == .play else {
             return false
         }
         
@@ -86,7 +86,7 @@ struct GameDetail: View {
             return false
         }
         
-        guard game.gameData?.phase == "play" && game.gameData?.outcome == nil else {
+        guard game.gameData?.phase == .play && game.gameData?.outcome == nil else {
             return false
         }
         

@@ -39,67 +39,118 @@ struct PlayersBannerView: View {
         }
     }
 
-    var body: some View {
-        let topLeftCaptures = game.currentPosition.captures[topLeftPlayerColor] ?? 0
-        let bottomRightCaptures = game.currentPosition.captures[topLeftPlayerColor.opponentColor()] ?? 0
-        let players = [
-            StoneColor.black: ["name": game.blackName, "rank": game.blackFormattedRank],
-            StoneColor.white: ["name": game.whiteName, "rank": game.whiteFormattedRank]
-        ]
-        let topLeftPlayer = players[topLeftPlayerColor]!
-        let bottomRightPlayer = players[topLeftPlayerColor.opponentColor()]!
+    func playerInfoColumn(color: StoneColor, leftSide: Bool) -> some View {
+        let playerName = color == .black ? game.blackName : game.whiteName
+        let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
+        let captures = game.currentPosition.captures[color] ?? 0
+        return VStack(alignment: leftSide ? .leading : .trailing) {
+            if showsPlayersName {
+                HStack {
+                    Text(playerName).font(Font.body.bold())
+                    Text("[\(playerRank)]").font(Font.caption.bold())
+                }
+            }
+            VStack(alignment: .trailing) {
+                TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
+                if captures > 0 {
+                    Text("\(captures) capture\(captures > 1 ? "s" : "")")
+                        .font(Font.caption.monospacedDigit())
+                }
+                if let komi = game.gameData?.komi {
+                    if color == .white && komi != 0 {
+                        Text("\(String(format: "%.1f", komi)) komi")
+                            .font(Font.caption.monospacedDigit())
+                    }
+                }
+            }
+        }
+    }
+    
+    func scoreColumn(color: StoneColor, leftSide: Bool) -> some View {
+        let playerName = color == .black ? game.blackName : game.whiteName
+        let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
+        let scores = game.currentPosition.gameScores ?? game.gameData?.score
+        let score = color == .black ? scores?.black : scores?.white
 
+        return VStack(alignment: leftSide ? .leading : .trailing) {
+            if showsPlayersName {
+                HStack {
+                    Text(playerName).font(Font.body.bold())
+                    Text("[\(playerRank)]").font(Font.caption.bold())
+                }
+            }
+            if let score = score, let gameData = game.gameData {
+                HStack {
+                    VStack(alignment: .trailing) {
+                        Group {
+                            if gameData.scoreTerritory {
+                                Text("\(score.territory)")
+                            }
+                            if gameData.scoreStones {
+                                Text("\(score.stones)")
+                            }
+                            if gameData.scorePrisoners {
+                                Text("\(score.prisoners)")
+                            }
+                            if score.komi > 0 {
+                                Text("\(String(format: "%.1f", score.komi))")
+                            }
+                        }.font(Font.footnote.monospacedDigit())
+                        Text("\((String(format: score.komi > 0 ? "%.1f" : "%.0f", score.total)))")
+                            .font(Font.footnote.monospacedDigit().bold())
+                    }
+                    VStack(alignment: .leading) {
+                        Group {
+                            if gameData.scoreTerritory {
+                                Text("Territory")
+                            }
+                            if gameData.scoreStones {
+                                Text("Stone")
+                            }
+                            if gameData.scorePrisoners {
+                                Text("Captures")
+                            }
+                            if score.komi > 0 {
+                                Text("Komi")
+                            }
+                        }.font(Font.footnote)
+                        Text("Total").font(Font.footnote.bold())
+                    }
+                }.padding([leftSide ? .leading : .trailing], 15)
+            }
+        }
+    }
+    
+    var body: some View {
+        var isPaused: Bool {
+            game.gameData?.pauseControl?.isPaused() ?? false
+        }
+        
         return VStack(spacing: 0) {
             HStack {
                 playerIcon(color: topLeftPlayerColor)
-                VStack(alignment: .leading) {
-                    if showsPlayersName {
-                        HStack {
-                            Text(topLeftPlayer["name"]!).font(Font.body.bold())
-                            Text("[\(topLeftPlayer["rank"]!)]").font(Font.caption.bold())
-                        }
-                    }
-                    VStack(alignment: .trailing) {
-                        TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: topLeftPlayerColor)
-                        if topLeftCaptures > 0 {
-                            Text("\(topLeftCaptures) capture\(topLeftCaptures > 1 ? "s" : "")")
-                                .font(Font.caption.monospacedDigit())
-                        }
-                        if let komi = game.gameData?.komi {
-                            if topLeftPlayerColor == .white && komi != 0 {
-                                Text("\(String(format: "%.1f", komi)) komi")
-                                    .font(Font.caption.monospacedDigit())
-                            }
-                        }
+                Group {
+                    if game.gameData?.phase == .play {
+                        playerInfoColumn(color: topLeftPlayerColor, leftSide: true)
+                    } else {
+                        scoreColumn(color: topLeftPlayerColor, leftSide: true)
                     }
                 }.frame(height: playerIconSize)
-                if game.clock?.currentPlayer == topLeftPlayerColor {
+                if !isPaused && game.clock?.currentPlayer == topLeftPlayerColor {
                     Image(systemName: "hourglass")
                 }
                 Spacer()
             }
             HStack {
                 Spacer()
-                if game.clock?.currentPlayer != topLeftPlayerColor {
+                if !isPaused && game.clock?.currentPlayer != topLeftPlayerColor {
                     Image(systemName: "hourglass")
                 }
-                VStack(alignment: .trailing) {
-                    if showsPlayersName {
-                        HStack {
-                            Text(bottomRightPlayer["name"]!).font(Font.body.bold())
-                            Text("[\(bottomRightPlayer["rank"]!)]").font(Font.caption.bold())
-                        }
-                    }
-                    TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: topLeftPlayerColor.opponentColor())
-                    if bottomRightCaptures > 0 {
-                        Text("\(bottomRightCaptures) capture\(bottomRightCaptures > 1 ? "s" : "")")
-                            .font(.caption)
-                    }
-                    if let komi = game.gameData?.komi {
-                        if topLeftPlayerColor.opponentColor() == .white && komi != 0 {
-                            Text("\(String(format: "%.1f", komi)) komi")
-                                .font(Font.caption.monospacedDigit())
-                        }
+                Group {
+                    if game.gameData?.phase == .play {
+                        playerInfoColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
+                    } else {
+                        scoreColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
                     }
                 }.frame(height: playerIconSize)
                 playerIcon(color: topLeftPlayerColor.opponentColor())
@@ -127,7 +178,7 @@ struct PlayersBannerView_Previews: PreviewProvider {
         return Group {
             PlayersBannerView(game: TestData.Ongoing19x19wBot1)
                 .previewLayout(.fixed(width: 320, height: 200))
-            PlayersBannerView(game: TestData.Ongoing19x19wBot2, playerIconSize: 96, showsPlayersName: true)
+            PlayersBannerView(game: TestData.Scored19x19Korean, playerIconSize: 96, showsPlayersName: true)
                 .previewLayout(.fixed(width: 500, height: 300))
                 .colorScheme(.dark)
         }

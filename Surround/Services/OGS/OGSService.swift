@@ -70,11 +70,15 @@ class OGSService: ObservableObject {
         var liveGames: [Game] = []
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
-                if let clock = game.clock {
-                    if clock.currentPlayerId == self.user?.id {
-                        gamesOnUserTurn.append(game)
-                    } else {
-                        gamesOnOppornentTurn.append(game)
+                if game.gameData?.phase == .stoneRemoval {
+                    gamesOnUserTurn.append(game)
+                } else {
+                    if let clock = game.clock {
+                        if clock.currentPlayerId == self.user?.id {
+                            gamesOnUserTurn.append(game)
+                        } else {
+                            gamesOnOppornentTurn.append(game)
+                        }
                     }
                 }
             } else {
@@ -426,6 +430,7 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/clock")
         self.socket.off("game/\(ogsID)/undo_accepted")
         self.socket.off("game/\(ogsID)/undo_requested")
+        self.socket.off("game/\(ogsID)/removed_stones")
         
         connectedGames[ogsID] = nil
     }
@@ -509,6 +514,15 @@ class OGSService: ObservableObject {
             if let moveNumber = undoData[0] as? Int {
                 if let connectedGame = self.connectedGames[ogsID] {
                     connectedGame.undoRequested = moveNumber
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/removed_stones") { removedStoneData, ack in
+            if let removedStoneData = removedStoneData[0] as? [String: Any] {
+                if let removedString = removedStoneData["all_removed"] as? String {
+                    if let connectedGame = self.connectedGames[ogsID] {
+                        connectedGame.setRemovedStones(removedString: removedString)
+                    }
                 }
             }
         }

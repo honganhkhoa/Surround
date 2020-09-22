@@ -29,6 +29,7 @@ class TestData {
     static var Ongoing19x19wBot1: Game { sampleGame(id: 5) }
     static var Ongoing19x19wBot2: Game { sampleGame(id: 6) }
     static var Ongoing19x19wBot3: Game { sampleGame(id: 7) }
+    static var StoneRemoval9x9: Game { sampleGame(id: 8) }
 
     static func sampleGame(id: Int = 0) -> Game {
         let decoder = JSONDecoder()
@@ -5750,6 +5751,315 @@ class TestData {
             }
           },
           "auto_score": true
+        }
+        """],
+        // MARK: - Stone removal, 9x9
+        // MARK: - #27053412
+        ["""
+        {
+          "white_player_id": 765826,
+          "black_player_id": 314459,
+          "group_ids": [],
+          "game_id": 27053412,
+          "game_name": "Test game",
+          "private": true,
+          "pause_on_weekends": true,
+          "players": {
+            "black": {
+              "username": "HongAnhKhoa",
+              "rank": 27.652311797920667,
+              "professional": false,
+              "id": 314459
+            },
+            "white": {
+              "username": "hakhoa",
+              "rank": 17.749501175185603,
+              "professional": false,
+              "id": 765826
+            }
+          },
+          "ranked": false,
+          "disable_analysis": false,
+          "handicap": 0,
+          "komi": 6.5,
+          "width": 9,
+          "height": 9,
+          "rules": "japanese",
+          "time_control": {
+            "system": "fischer",
+            "time_control": "fischer",
+            "speed": "correspondence",
+            "pause_on_weekends": true,
+            "time_increment": 86400,
+            "initial_time": 259200,
+            "max_time": 604800
+          },
+          "phase": "stone removal",
+          "initial_player": "black",
+          "moves": [
+            [
+              6,
+              2,
+              118758
+            ],
+            [
+              3,
+              5,
+              2396
+            ],
+            [
+              3,
+              6,
+              2760
+            ],
+            [
+              2,
+              6,
+              2588
+            ],
+            [
+              1,
+              6,
+              2699
+            ],
+            [
+              2,
+              7,
+              2478
+            ],
+            [
+              4,
+              7,
+              2909
+            ],
+            [
+              2,
+              4,
+              2992
+            ],
+            [
+              1,
+              4,
+              2380
+            ],
+            [
+              5,
+              5,
+              2473
+            ],
+            [
+              1,
+              5,
+              2370
+            ],
+            [
+              2,
+              5,
+              2495
+            ],
+            [
+              6,
+              7,
+              2322
+            ],
+            [
+              2,
+              2,
+              2514
+            ],
+            [
+              1,
+              3,
+              2270
+            ],
+            [
+              5,
+              3,
+              2291
+            ],
+            [
+              4,
+              4,
+              2274
+            ],
+            [
+              4,
+              5,
+              2602
+            ],
+            [
+              5,
+              2,
+              2272
+            ],
+            [
+              4,
+              2,
+              2352
+            ],
+            [
+              4,
+              3,
+              2362
+            ],
+            [
+              4,
+              1,
+              2495
+            ],
+            [
+              5,
+              4,
+              2473
+            ],
+            [
+              6,
+              4,
+              2340
+            ],
+            [
+              6,
+              3,
+              2451
+            ],
+            [
+              7,
+              4,
+              2484
+            ],
+            [
+              7,
+              6,
+              2309
+            ],
+            [
+              6,
+              6,
+              2635
+            ],
+            [
+              3,
+              3,
+              7001
+            ],
+            [
+              2,
+              3,
+              6666
+            ],
+            [
+              7,
+              1,
+              5511
+            ],
+            [
+              1,
+              1,
+              5306
+            ],
+            [
+              3,
+              2,
+              8300
+            ],
+            [
+              3,
+              1,
+              3865
+            ],
+            [
+              6,
+              0,
+              3658
+            ],
+            [
+              1,
+              7,
+              5284
+            ],
+            [
+              2,
+              0,
+              10387
+            ],
+            [
+              2,
+              1,
+              2608
+            ],
+            [
+              5,
+              6,
+              2285
+            ],
+            [
+              3,
+              7,
+              2521
+            ],
+            [
+              -1,
+              -1,
+              236411
+            ],
+            [
+              -1,
+              -1,
+              4793
+            ]
+          ],
+          "allow_self_capture": false,
+          "automatic_stone_removal": false,
+          "free_handicap_placement": false,
+          "aga_handicap_scoring": false,
+          "allow_ko": false,
+          "allow_superko": true,
+          "superko_algorithm": "noresult",
+          "score_territory": true,
+          "score_territory_in_seki": false,
+          "score_stones": false,
+          "score_handicap": false,
+          "score_prisoners": true,
+          "score_passes": true,
+          "white_must_pass_last": false,
+          "opponent_plays_first_after_resume": true,
+          "strict_seki_mode": false,
+          "initial_state": {
+            "black": "",
+            "white": ""
+          },
+          "start_time": 1600660234,
+          "original_disable_analysis": false,
+          "clock": {
+            "game_id": 27053412,
+            "current_player": 314459,
+            "black_player_id": 314459,
+            "white_player_id": 765826,
+            "title": "Test game",
+            "last_move": 1600660724340,
+            "expiration": 1601265524340,
+            "black_time": {
+              "thinking_time": 604800,
+              "skip_bonus": false
+            },
+            "white_time": {
+              "thinking_time": 604800,
+              "skip_bonus": false
+            },
+            "pause_delta": 0,
+            "expiration_delta": 604800000,
+            "now": 1600674100975,
+            "paused_since": 1600660724340,
+            "stone_removal_mode": true,
+            "stone_removal_expiration": 1600747125281
+          },
+          "pause_control": {
+            "stone-removal": true,
+            "vacation-314459": true
+          },
+          "paused_since": 1600660724340,
+          "removed": "cahaiafbgbibdchcicbdddedfdhdidbeeefeiebfgfhfifbgdgigehfhhhiheifigihiii",
+          "auto_scoring_done": true
         }
         """]
     ]

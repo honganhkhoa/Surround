@@ -35,7 +35,7 @@ struct Stone: View {
                 case .white:
                     ZStack {
                         if shadowRadius > 0 {
-                            Path(path).fill(Color(red: 0.85, green: 0.85, blue: 0.85)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                            Path(path).fill(Color(red: 0.75, green: 0.75, blue: 0.75)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
                             Path(path).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
                                 .clipShape(Circle())
                         } else {
@@ -146,7 +146,7 @@ struct Goban: View {
 }
 
 struct Stones: View {
-    var boardPosition: BoardPosition
+    @ObservedObject var boardPosition: BoardPosition
     var geometry: GeometryProxy
     var isLastMovePending = false
 
@@ -161,6 +161,7 @@ struct Stones: View {
         let blackCapturedPath = CGMutablePath()
         let whiteScoreIndicator = CGMutablePath()
         let blackScoreIndicator = CGMutablePath()
+        let dameIndicator = CGMutablePath()
         let whiteEstimatedScore = CGMutablePath()
         let blackEstimatedScore = CGMutablePath()
         
@@ -191,10 +192,15 @@ struct Stones: View {
                     width: scoringRectSize,
                     height: scoringRectSize)
                 if let scores = boardPosition.gameScores {
-                    if scores.black.scoringPositions.contains([row, column]) {
-                        blackScoreIndicator.addRect(scoringRect)
-                    } else if scores.white.scoringPositions.contains([row, column]) {
-                        whiteScoreIndicator.addRect(scoringRect)
+                    let isRemoved = boardPosition.removedStones?.contains([row, column]) ?? false
+                    if boardPosition[row, column] == .empty && isRemoved {
+                        dameIndicator.addRect(scoringRect)
+                    } else {
+                        if scores.black.scoringPositions.contains([row, column]) {
+                            blackScoreIndicator.addRect(scoringRect)
+                        } else if scores.white.scoringPositions.contains([row, column]) {
+                            whiteScoreIndicator.addRect(scoringRect)
+                        }
                     }
                 }
                 if let estimatedScores = boardPosition.estimatedScores {
@@ -210,15 +216,16 @@ struct Stones: View {
         }
         
         let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1 : 0.5)
+        let shadowOffset: CGFloat = size > 30 ? 2 : 1
         let drawsShadow = size >= 14
         
         return ZStack {
             if drawsShadow {
-                Path(whiteLivingPath).fill(Color(red: 0.85, green: 0.85, blue: 0.85))
-                    .shadow(radius: 2, x: 2, y:2)
+                Path(whiteLivingPath).fill(Color(red: 0.75, green: 0.75, blue: 0.75))
+                    .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
                 Path(whiteLivingPath).stroke(Color.gray)
                 Path(blackLivingPath).fill(Color.black)
-                    .shadow(radius: 2, x: 2, y:2)
+                    .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
                 Path(blackLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
                     .clipShape(Path(blackLivingPath))
                 Path(whiteLivingPath).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
@@ -259,10 +266,11 @@ struct Stones: View {
             }
             
             if boardPosition.gameScores != nil {
+                Path(dameIndicator).stroke(Color(UIColor.systemIndigo), lineWidth: lastMoveIndicatorWidth)
                 Path(whiteScoreIndicator).fill(Color.white)
                 Path(blackScoreIndicator).fill(Color.black)
             }
-            
+
             if boardPosition.estimatedScores != nil {
                 Path(whiteEstimatedScore).fill(Color.white)
                 Path(blackEstimatedScore).fill(Color.black)
@@ -275,6 +283,7 @@ struct Stones: View {
 struct BoardView: View {
     var boardPosition: BoardPosition
     var editable = false
+    var stoneRemovalPhase = false
     var newMove: Binding<Move?> = .constant(nil)
     var newPosition: Binding<BoardPosition?> = .constant(nil)
     @State var hoveredPoint: [Int]? = nil
@@ -346,6 +355,20 @@ struct BoardView_Previews: PreviewProvider {
             Stone(color: .white, shadowRadius: 2)
                 .frame(width: 25, height: 25)
                 .previewLayout(.fixed(width: 100, height: 50))
+            ZStack {
+                Rectangle().fill(Color(UIColor.systemGray5))
+                Stone(color: .black, shadowRadius: 2)
+                    .frame(width: 25, height: 25)
+            }
+            .previewLayout(.fixed(width: 100, height: 50))
+            .colorScheme(.dark)
+            ZStack {
+                Rectangle().fill(Color(UIColor.systemGray5))
+                Stone(color: .white, shadowRadius: 2)
+                    .frame(width: 25, height: 25)
+            }
+            .previewLayout(.fixed(width: 100, height: 50))
+            .colorScheme(.dark)
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))
             BoardView(boardPosition: boardPosition)
