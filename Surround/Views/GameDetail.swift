@@ -73,7 +73,7 @@ struct GameDetail: View {
             return false
         }
 
-        guard game.gameData?.phase == .play else {
+        guard game.gamePhase == .play else {
             return false
         }
         
@@ -86,7 +86,7 @@ struct GameDetail: View {
             return false
         }
         
-        guard game.gameData?.phase == .play && game.gameData?.outcome == nil else {
+        guard game.gamePhase == .play && game.gameData?.outcome == nil else {
             return false
         }
         
@@ -165,7 +165,7 @@ struct GameDetail: View {
             }
             BoardView(
                 boardPosition: game.currentPosition,
-                editable: isUserTurn,
+                playable: isUserTurn,
                 newMove: $pendingMove,
                 newPosition: $pendingPosition
             ).layoutPriority(1)

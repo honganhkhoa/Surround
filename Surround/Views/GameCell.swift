@@ -110,8 +110,7 @@ struct GameCell: View {
                 PlayerInfoLine(game: game, color: .black, displayMode: displayMode)
                 ZStack {
                     BoardView(
-                        boardPosition: game.currentPosition,
-                        stoneRemovalPhase: game.gameData?.phase == .stoneRemoval
+                        boardPosition: game.currentPosition
                     )
                     .scaledToFit()
                     if game.gameData?.outcome != nil {

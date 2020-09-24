@@ -70,7 +70,7 @@ class OGSService: ObservableObject {
         var liveGames: [Game] = []
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
-                if game.gameData?.phase == .stoneRemoval {
+                if game.gamePhase == .stoneRemoval {
                     gamesOnUserTurn.append(game)
                 } else {
                     if let clock = game.clock {
@@ -431,6 +431,8 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/undo_accepted")
         self.socket.off("game/\(ogsID)/undo_requested")
         self.socket.off("game/\(ogsID)/removed_stones")
+        self.socket.off("game/\(ogsID)/removed_stones_accepted")
+        self.socket.off("game/\(ogsID)/phase")
         
         connectedGames[ogsID] = nil
     }
@@ -526,6 +528,24 @@ class OGSService: ObservableObject {
                 }
             }
         }
+        self.socket.on("game/\(ogsID)/removed_stones_accepted") { data, ack in
+            if let removedStoneAcceptedData = data[0] as? [String: Any] {
+                if let connectedGame = self.connectedGames[ogsID] {
+                    if let playerId = removedStoneAcceptedData["player_id"] as? Int,
+                       let stones = removedStoneAcceptedData["stones"] as? String {
+                        let color: StoneColor = playerId == connectedGame.blackId ? .black : .white
+                        connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
+                    }
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/phase") { data, ack in
+            if let phase = OGSGamePhase(rawValue: data[0] as? String ?? "") {
+                if let connectedGame = self.connectedGames[ogsID] {
+                    connectedGame.gamePhase = phase
+                }
+            }
+        }
     }
     
     func createGame(fromShortGameData gameData: [String: Any]) -> Game? {
@@ -559,6 +579,51 @@ class OGSService: ObservableObject {
                 }
             }
         }.eraseToAnyPublisher()
+    }
+    
+    func toggleRemovedStones(stones: Set<[Int]>, forGame game: Game) -> AnyPublisher<Void, Error> {
+        guard let ogsUIConfig = self.ogsUIConfig else {
+            return Fail(error: ServiceError.notLoggedIn).eraseToAnyPublisher()
+        }
+
+        return Future<Void, Error> { promise in
+            if let gameId = game.gameData?.gameId {
+                let userId = ogsUIConfig.user.id
+                var toBeAdded = Set<[Int]>()
+                var toBeRemoved = Set<[Int]>()
+                for point in stones {
+                    if game.currentPosition.removedStones?.contains(point) ?? false {
+                        toBeAdded.insert(point)
+                    } else {
+                        toBeRemoved.insert(point)
+                    }
+                }
+                if toBeAdded.count > 0 {
+                    self.socket.emit("game/removed_stones/set", ["game_id": gameId, "player_id": userId, "removed": 0, "stones": BoardPosition.positionString(fromPoints: toBeAdded)])
+                }
+                if toBeRemoved.count > 0 {
+                    self.socket.emit("game/removed_stones/set", ["game_id": gameId, "player_id": userId, "removed": 1, "stones": BoardPosition.positionString(fromPoints: toBeRemoved)])
+                }
+                promise(.success(()))
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func acceptRemovedStone(game: Game) {
+        if let ogsID = game.ogsID, let userId = self.user?.id {
+            self.socket.emit("game/removed_stones/accept", [
+                "game_id": ogsID,
+                "player_id": userId,
+                "stones": BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? Set<[Int]>()),
+                "strick_seki_mode": false
+            ])
+        }
+    }
+    
+    func resumeGameFromStoneRemoval(game: Game) {
+        if let ogsID = game.ogsID, let userId = self.user?.id {
+            self.socket.emit("game/removed_stones/reject", ["game_id": ogsID, "player_id": userId])
+        }
     }
     
     func requestUndo(game: Game) {

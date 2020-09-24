@@ -17,10 +17,13 @@ struct CorrespondenceGamesView: View {
     @State var currentGame: Game
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
-    @State var submitMoveCancellable: AnyCancellable?
-    @State var showingPassAlert = false
+    @State var ogsRequestCancellable: AnyCancellable?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
+    @State var stoneRemovalSelectedPoints = Set<[Int]>()
+
+    @State var showingPassAlert = false
+    @State var showingResumeFromStoneRemovalAlert = false
 
     func updateActiveGameList() {
         self.activeGames = []
@@ -33,17 +36,48 @@ struct CorrespondenceGamesView: View {
     }
 
     func submitMove(move: Move) {
-        self.submitMoveCancellable = ogs.submitMove(move: move, forGame: currentGame)
+        self.ogsRequestCancellable = ogs.submitMove(move: move, forGame: currentGame)
             .zip(currentGame.$currentPosition.setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
-                self.submitMoveCancellable = nil
+                DispatchQueue.main.async {
+                    self.ogsRequestCancellable = nil
+                }
             }, receiveValue: { _ in
                 DispatchQueue.main.async {
                     self.pendingMove = nil
                     self.pendingPosition = nil
-                    self.submitMoveCancellable = nil
+                    self.ogsRequestCancellable = nil
                 }
             })
+    }
+    
+    func toggleRemovedStones(stones: Set<[Int]>) {
+        self.ogsRequestCancellable = ogs.toggleRemovedStones(stones: stones, forGame: currentGame)
+            .zip(currentGame.currentPosition.$removedStones.setFailureType(to: Error.self))
+            .sink(receiveCompletion: { _ in
+                DispatchQueue.main.async {
+                    self.ogsRequestCancellable = nil
+                }
+            }, receiveValue: { _ in
+                DispatchQueue.main.async {
+                    self.stoneRemovalSelectedPoints.removeAll()
+                    self.ogsRequestCancellable = nil
+                }
+            })
+    }
+    
+    func acceptRemovedStones() {
+        ogs.acceptRemovedStone(game: currentGame)
+        self.ogsRequestCancellable = currentGame.$removedStonesAccepted.sink(receiveValue: { _ in
+            self.ogsRequestCancellable = nil
+        })
+    }
+    
+    func resumeGameFromStoneRemoval() {
+        ogs.resumeGameFromStoneRemoval(game: currentGame)
+        self.ogsRequestCancellable = currentGame.$gamePhase.sink(receiveValue: { _ in
+            self.ogsRequestCancellable = nil
+        })
     }
     
     func goToNextGame() {
@@ -71,7 +105,7 @@ struct CorrespondenceGamesView: View {
             return false
         }
 
-        guard currentGame.gameData?.phase == .play else {
+        guard currentGame.gamePhase == .play else {
             return false
         }
         
@@ -84,7 +118,7 @@ struct CorrespondenceGamesView: View {
             return false
         }
         
-        guard currentGame.gameData?.phase == .play && currentGame.gameData?.outcome == nil else {
+        guard currentGame.gamePhase == .play && currentGame.gameData?.outcome == nil else {
             return false
         }
         
@@ -114,7 +148,7 @@ struct CorrespondenceGamesView: View {
                 return "White wins by \(outcome)"
             }
         } else {
-            if currentGame.gameData?.phase == .stoneRemoval {
+            if currentGame.gamePhase == .stoneRemoval {
                 return "Stone Removal Phase"
             }
             if currentGame.undoRequested != nil {
@@ -155,26 +189,31 @@ struct CorrespondenceGamesView: View {
     
     var actionButtons: some View {
         HStack(alignment: .firstTextBaseline) {
-            if submitMoveCancellable == nil {
-                if let pendingMove = pendingMove {
-                    Button(action: {
-                        submitMove(move: pendingMove)
-                    }) {
-                        Text("Submit move")
-                    }
-                } else {
-                    if isUserTurn {
+            if ogsRequestCancellable == nil {
+                let isUserTurnToPlay = currentGame.gamePhase == .play && isUserTurn
+                let userNeedsToAcceptStoneRemoval = currentGame.gamePhase == .stoneRemoval
+                    && currentGame.removedStonesAccepted[userColor(in: currentGame)] != currentGame.currentPosition.removedStones
+                if isUserTurnToPlay {
+                    if let pendingMove = pendingMove {
+                        Button(action: { submitMove(move: pendingMove)}) {
+                            Text("Submit move")
+                        }
+                    } else {
                         Button(action: { self.showingPassAlert = true }) {
                             Text("Pass")
                         }
-                    } else {
-                        if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
-                            Button(action: goToNextGame) {
-                                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                    Text("Next")
-                                    Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
-                                        .font(Font.caption2.bold())
-                                }
+                    }
+                } else if userNeedsToAcceptStoneRemoval {
+                    Button(action: { acceptRemovedStones() }) {
+                        Text("Accept")
+                    }
+                } else {
+                    if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
+                        Button(action: goToNextGame) {
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text("Next")
+                                Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
+                                    .font(Font.caption2.bold())
                             }
                         }
                     }
@@ -185,9 +224,15 @@ struct CorrespondenceGamesView: View {
                 })
             }
             Menu {
-                Button(action: { ogs.requestUndo(game: currentGame) }) {
-                    Label("Request undo", systemImage: "arrow.uturn.left")
-                }.disabled(!undoable)
+                if currentGame.gamePhase == .play {
+                    Button(action: { ogs.requestUndo(game: currentGame) }) {
+                        Label("Request undo", systemImage: "arrow.uturn.left")
+                    }.disabled(!undoable)
+                } else if currentGame.gamePhase == .stoneRemoval {
+                    Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
+                        Label("Resume game", systemImage: "play")
+                    }
+                }
                 Button(action: { UIApplication.shared.open(currentGame.ogsURL!) }) {
                     Label("Open in browser", systemImage: "safari")
                 }
@@ -199,6 +244,31 @@ struct CorrespondenceGamesView: View {
                 Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
             }
             .padding(.leading)
+            
+            // Putting these inside conditional views above does not seem to work well
+            Rectangle().frame(width: 0, height: 0)
+                .alert(isPresented: $showingResumeFromStoneRemovalAlert) {
+                    Alert(
+                        title: Text("Are you sure you want to resume the game?"),
+                        message: nil,
+                        primaryButton: .destructive(Text("Resume")) {
+                            self.resumeGameFromStoneRemoval()
+                        },
+                        secondaryButton: .cancel(Text("Cancel"))
+                    )
+                }
+            Rectangle().frame(width: 0, height: 0)
+                .alert(isPresented: $showingPassAlert) {
+                    Alert(
+                        title: Text("Are you sure you want to pass?"),
+                        message: nil,
+                        primaryButton: .destructive(Text("Pass")) {
+                            self.submitMove(move: .pass)
+                        },
+                        secondaryButton: .cancel(Text("Cancel"))
+                    )
+                }
+
         }
     }
     
@@ -213,9 +283,11 @@ struct CorrespondenceGamesView: View {
     var boardView: some View {
         BoardView(
             boardPosition: currentGame.currentPosition,
-            editable: isUserTurn,
+            playable: isUserTurn,
+            stoneRemovable: isUserPlaying && currentGame.gamePhase == .stoneRemoval,
             newMove: $pendingMove,
-            newPosition: $pendingPosition
+            newPosition: $pendingPosition,
+            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
     }
     
@@ -337,16 +409,6 @@ struct CorrespondenceGamesView: View {
                 }
             }
         }
-        .alert(isPresented: $showingPassAlert) {
-            Alert(
-                title: Text("Are you sure you want to pass?"),
-                message: nil,
-                primaryButton: .destructive(Text("Pass")) {
-                    self.submitMove(move: .pass)
-                },
-                secondaryButton: .cancel(Text("Cancel"))
-            )
-        }
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("vs \(opponent.username) [\(opponentRank)]")
         .onAppear {
@@ -358,6 +420,9 @@ struct CorrespondenceGamesView: View {
         .onChange(of: currentGame) { _ in
             self.pendingMove = nil
             self.pendingPosition = nil
+        }
+        .onChange(of: stoneRemovalSelectedPoints) { selectedPoints in
+            self.toggleRemovedStones(stones: selectedPoints)
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             

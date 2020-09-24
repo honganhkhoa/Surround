@@ -26,7 +26,9 @@ struct ActiveCorrespondenceGamesCarousel: View {
     func gameCell(game: Game) -> some View {
         VStack(alignment: .trailing) {
             ZStack(alignment: .center) {
-                if game.clock?.currentPlayerId == ogs.user?.id {
+                if game.gamePhase == .stoneRemoval {
+                    Color(UIColor.systemOrange).cornerRadius(3)
+                } else if game.clock?.currentPlayerId == ogs.user?.id {
                     Color(UIColor.systemTeal).cornerRadius(3)
                 } else {
                     if colorScheme == .dark {
@@ -78,7 +80,7 @@ struct ActiveCorrespondenceGamesCarousel: View {
                         } else {
                             DispatchQueue.main.async {
                                 withAnimation {
-                                    scrollView.scrollTo(target, anchor: .leading)
+                                    scrollView.scrollTo(target)
                                 }
                             }
                         }

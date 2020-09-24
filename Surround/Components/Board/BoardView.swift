@@ -54,7 +54,7 @@ struct Goban: View {
     var geometry: GeometryProxy
     var width: Int
     var height: Int
-    var editable = false
+    var playable = false
     @State var currentRow = -1
     @State var currentColumn = -1
     var hoveredPoint: Binding<[Int]?> = .constant(nil)
@@ -280,25 +280,109 @@ struct Stones: View {
     }
 }
 
+struct StoneRemovalOverlay: View {
+    @ObservedObject var boardPosition: BoardPosition
+    var geometry: GeometryProxy
+    @State var currentRow = -1
+    @State var currentColumn = -1
+    @State var hoveredGroup = Set<[Int]>()
+    var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
+
+    var body: some View {
+        let width = boardPosition.width
+        let height = boardPosition.height
+        let size = cellSize(geometry: geometry, boardSize: max(width, height))
+
+        let toBeRemovedPath = CGMutablePath()
+        let toBeAddedPath = CGMutablePath()
+        
+        for point in hoveredGroup {
+            let row = point[0]
+            let column = point[1]
+            
+            let indicatorRectSize = max(size / 3, 3)
+            let indicatorRectPadding = (size - indicatorRectSize) / 2
+            let indicatorRect = CGRect(
+                x: CGFloat(column) * size + indicatorRectPadding,
+                y: CGFloat(row) * size + indicatorRectPadding,
+                width: indicatorRectSize,
+                height: indicatorRectSize)
+            
+            if boardPosition.removedStones?.contains([row, column]) ?? false {
+                toBeAddedPath.move(to: CGPoint(x: indicatorRect.midX, y: indicatorRect.minY))
+                toBeAddedPath.addLine(to: CGPoint(x: indicatorRect.midX, y: indicatorRect.maxY))
+                toBeAddedPath.move(to: CGPoint(x: indicatorRect.minX, y: indicatorRect.midY))
+                toBeAddedPath.addLine(to: CGPoint(x: indicatorRect.maxX, y: indicatorRect.midY))
+            } else {
+                toBeRemovedPath.move(to: CGPoint(x: indicatorRect.minX, y: indicatorRect.maxY))
+                toBeRemovedPath.addLine(to: CGPoint(x: indicatorRect.maxX, y: indicatorRect.minY))
+                toBeRemovedPath.move(to: CGPoint(x: indicatorRect.minX, y: indicatorRect.minY))
+                toBeRemovedPath.addLine(to: CGPoint(x: indicatorRect.maxX, y: indicatorRect.maxY))
+            }
+        }
+        let indicatorWidth: CGFloat = size >= 20 ? 2.5 : (size > 10 ? 2 : 1)
+//        let coordinateLineWidth: CGFloat = size < 10 ? 0.5 : 1
+        
+        return ZStack {
+            Color.clear
+//            if currentRow != -1 && currentColumn != -1 {
+//                Path { path in
+//                    path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
+//                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(currentRow) + 0.5) * size))
+//
+//                    path.move(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: size / 2))
+//                    path.addLine(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+//                }.stroke(Color(UIColor.systemTeal), lineWidth: coordinateLineWidth)
+//            }
+            Path(toBeRemovedPath).stroke(Color(UIColor.systemRed), lineWidth: indicatorWidth)
+            Path(toBeAddedPath).stroke(Color(UIColor.systemGreen), lineWidth: indicatorWidth)
+        }
+        .frame(width: size * CGFloat(width), height: size * CGFloat(height))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged({ value in
+                    let newRow = Int((value.location.y / size - 0.5).rounded())
+                    let newColumn = Int((value.location.x / size - 0.5).rounded())
+                    
+                    if newColumn >= 0 && newColumn < width && newRow >= 0 && newRow < height {
+                        if newRow != currentRow || newColumn != currentColumn {
+                            currentRow = newRow
+                            currentColumn = newColumn
+                            if !hoveredGroup.contains([newRow, newColumn]) {
+                                hoveredGroup = self.boardPosition.groupForStoneRemoval(atRow: newRow, column: newColumn)
+                            }
+                        }
+                    } else {
+                        currentRow = -1
+                        currentColumn = -1
+                        hoveredGroup.removeAll()
+                    }
+                })
+                .onEnded { _ in
+                    stoneRemovalSelectedPoints.wrappedValue = hoveredGroup
+                    currentRow = -1
+                    currentColumn = -1
+                }
+        )
+        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { newSelectedPoints in
+            if newSelectedPoints.count == 0 {
+                hoveredGroup.removeAll()
+            }
+        }
+    }
+}
+
 struct BoardView: View {
-    var boardPosition: BoardPosition
-    var editable = false
-    var stoneRemovalPhase = false
+    @ObservedObject var boardPosition: BoardPosition
+    var playable = false
+    var stoneRemovable = false
     var newMove: Binding<Move?> = .constant(nil)
     var newPosition: Binding<BoardPosition?> = .constant(nil)
     @State var hoveredPoint: [Int]? = nil
     @State var isHoveredPointValid: Bool? = nil
     @State var selectedPoint: [Int]? = nil
-    
-//        .onTapGesture {
-//            do {
-//                print("Making move... (\(row), \(column))")
-//                self.boardPosition = try self.boardPosition.makeMove(move: .placeStone(row, column))
-//                print("Done")
-//            } catch {
-//                print("Move error")
-//            }
-//        }
+    var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
     
     var body: some View {
 //        self.boardPosition.printPosition()
@@ -311,12 +395,12 @@ struct BoardView: View {
                     geometry: geometry,
                     width: boardPosition.width,
                     height: boardPosition.height,
-                    editable: editable,
+                    playable: playable,
                     hoveredPoint: $hoveredPoint,
                     isHoveredPointValid: isHoveredPointValid,
                     selectedPoint: $selectedPoint
                 )
-                .allowsHitTesting(editable)
+                .allowsHitTesting(playable)
                 .onChange(of: hoveredPoint) { value in
                     if let hoveredPoint = hoveredPoint {
                         do {
@@ -335,6 +419,13 @@ struct BoardView: View {
                     }
                 }
                 Stones(boardPosition: displayedPosition, geometry: geometry, isLastMovePending: newMove.wrappedValue != nil)
+                if stoneRemovable {
+                    StoneRemovalOverlay(
+                        boardPosition: boardPosition,
+                        geometry: geometry,
+                        stoneRemovalSelectedPoints: stoneRemovalSelectedPoints
+                    )
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
         }

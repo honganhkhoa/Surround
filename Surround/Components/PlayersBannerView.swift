@@ -71,6 +71,20 @@ struct PlayersBannerView: View {
         let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
         let scores = game.currentPosition.gameScores ?? game.gameData?.score
         let score = color == .black ? scores?.black : scores?.white
+        
+        let stoneRemovalStatus = { () -> AnyView in
+            if let removedStonesAccepted = game.removedStonesAccepted[color] {
+                if removedStonesAccepted == game.currentPosition.removedStones {
+                    return AnyView(erasing: Image(systemName: "checkmark.circle.fill")
+                        .font(Font.title3)
+                        .foregroundColor(Color(UIColor.systemGreen))
+                    )
+                }
+            }
+            return AnyView(erasing: Image(systemName: "hourglass")
+                .font(Font.title3)
+            )
+        }()
 
         return VStack(alignment: leftSide ? .leading : .trailing) {
             if showsPlayersName {
@@ -81,6 +95,9 @@ struct PlayersBannerView: View {
             }
             if let score = score, let gameData = game.gameData {
                 HStack {
+                    if !leftSide && game.gamePhase == .stoneRemoval {
+                        stoneRemovalStatus
+                    }
                     VStack(alignment: .trailing) {
                         Group {
                             if gameData.scoreTerritory {
@@ -116,6 +133,9 @@ struct PlayersBannerView: View {
                         }.font(Font.footnote)
                         Text("Total").font(Font.footnote.bold())
                     }
+                    if leftSide && game.gamePhase == .stoneRemoval {
+                        stoneRemovalStatus
+                    }
                 }.padding([leftSide ? .leading : .trailing], 15)
             }
         }
@@ -130,7 +150,7 @@ struct PlayersBannerView: View {
             HStack {
                 playerIcon(color: topLeftPlayerColor)
                 Group {
-                    if game.gameData?.phase == .play {
+                    if game.gamePhase == .play {
                         playerInfoColumn(color: topLeftPlayerColor, leftSide: true)
                     } else {
                         scoreColumn(color: topLeftPlayerColor, leftSide: true)
@@ -147,7 +167,7 @@ struct PlayersBannerView: View {
                     Image(systemName: "hourglass")
                 }
                 Group {
-                    if game.gameData?.phase == .play {
+                    if game.gamePhase == .play {
                         playerInfoColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
                     } else {
                         scoreColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)

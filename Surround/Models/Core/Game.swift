@@ -24,6 +24,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 self.whiteRank = data.players.white.rank
                 self.blackId = data.players.black.id
                 self.whiteId = data.players.white.id
+                if let blackAcceptedRemovedStones = data.players.black.acceptedStones {
+                    self.removedStonesAccepted[.black] = BoardPosition.points(fromPositionString: blackAcceptedRemovedStones)
+                }
+                if let whiteAcceptedRemovedStones = data.players.white.acceptedStones {
+                    self.removedStonesAccepted[.white] = BoardPosition.points(fromPositionString:  whiteAcceptedRemovedStones)
+                }
+                
                 var position = initialPosition
                 do {
                     var firstNonHandicapMoveIndex = 0
@@ -60,10 +67,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 clock = data.clock
                 
                 undoRequested = data.undoRequested
-                
-                if data.phase == .stoneRemoval {
-                    computeScoresAndUpdate()
-                }
+
+                // Put this at the end since it will trigger score computing
+                self.gamePhase = data.phase
             }
         }
     }
@@ -94,6 +100,20 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     @Published var ogsRawData: [String: Any]?
     @Published var clock: Clock?
+    @Published var gamePhase: OGSGamePhase? {
+        didSet {
+            if gamePhase == .stoneRemoval {
+                computeScoresAndUpdate()
+            } else {
+                DispatchQueue.main.async {
+                    self.currentPosition.gameScores = nil
+                    self.currentPosition.removedStones = nil
+                }
+            }
+        }
+    }
+    @Published var removedStonesAccepted = [StoneColor: Set<[Int]>]()
+    lazy var computeQueue = DispatchQueue(label: "com.honganhkhoa.Surround.computeQueue", qos: .default)
     
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
@@ -263,10 +283,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func computeScoresAndUpdate() {
-        DispatchQueue.global().async {
+        computeQueue.async {
             if let score = self.computeScore() {
                 DispatchQueue.main.async {
-//                    self.objectWillChange.send()
+                    self.objectWillChange.send()
                     self.currentPosition.gameScores = score
                 }
             }

@@ -8,6 +8,8 @@
 import Foundation
 import Dispatch
 
+private let coordinateLabels = "abcdefghijklmnopqrstuvwxyz".map { $0 }
+
 enum PointState: Equatable {
     case empty
     case hasStone(StoneColor)
@@ -29,12 +31,10 @@ enum Move {
     case placeStone(Int, Int)
     case pass
     
-    static private let coordinateLabels = "abcdefghijklmnopqrstuvwxyz".map { $0 }
-    
     func toOGSString() -> String {
         switch self {
         case .placeStone(let row, let column):
-            return "\(Move.coordinateLabels[column])\(Move.coordinateLabels[row])"
+            return "\(coordinateLabels[column])\(coordinateLabels[row])"
         case .pass:
             return ".."
         }
@@ -50,6 +50,7 @@ enum MoveError: Error {
 class StoneGroup: Equatable, Hashable {
     var points: Set<[Int]>
     var state: PointState
+    var originalState: PointState
     var isDame: Bool
     var neighbors = Set<StoneGroup>()
 
@@ -57,10 +58,11 @@ class StoneGroup: Equatable, Hashable {
         "\(points.count) points: \(points.map({ "[\($0[0]), \($0[1])]" }).joined(separator: ", "))"
     }
     
-    init(points: Set<[Int]>, state: PointState, isDame: Bool) {
+    init(points: Set<[Int]>, state: PointState, isDame: Bool, originalState: PointState) {
         self.points = points
         self.state = state
         self.isDame = isDame
+        self.originalState = originalState
     }
     
     static func == (lhs: StoneGroup, rhs: StoneGroup) -> Bool {
@@ -300,6 +302,19 @@ class BoardPosition: ObservableObject {
         return result
     }
     
+    static func positionString(fromPoints points: Set<[Int]>) -> String {
+        var result = ""
+        let sortedPoints = points.sorted {
+            return $0[0] < $1[0] || ($0[0] == $1[0] && $0[1] < $1[1])
+        }
+        for point in sortedPoints {
+            let row = point[0]
+            let column = point[1]
+            result += "\(coordinateLabels[column])\(coordinateLabels[row])"
+        }
+        return result
+    }
+    
     func estimateScore() {
         DispatchQueue.global().async { [self] in
             var data = board.joined().map({ state -> CInt in
@@ -334,6 +349,10 @@ class BoardPosition: ObservableObject {
     
     private var _stoneGroupId: [[Int]] = []
     private var _currentGroupId = 0
+    private var _stoneGroupById = [Int: StoneGroup]()
+    private func stoneGroup(atRow row: Int, column: Int) -> StoneGroup? {
+        return _stoneGroupById[_stoneGroupId[row][column]]
+    }
     
     private func _constructStoneGroupFromPoint(row: Int, column: Int, state: PointState, isDame: Bool) -> StoneGroup {
         var pointsForGroup = Set([[row, column]])
@@ -373,7 +392,7 @@ class BoardPosition: ObservableObject {
             }
             currentPoints = nextPoints
         }
-        let group = StoneGroup(points: pointsForGroup, state: state, isDame: isDame)
+        let group = StoneGroup(points: pointsForGroup, state: state, isDame: isDame, originalState: self[row, column])
         return group
     }
     
@@ -381,7 +400,7 @@ class BoardPosition: ObservableObject {
         _stoneGroupId = Array(repeating: Array(repeating: 0, count: self.width), count: self.height)
         _currentGroupId = 0
         var groups = [StoneGroup]()
-        var groupById = [Int: StoneGroup]()
+        _stoneGroupById = [Int: StoneGroup]()
         for row in 0..<height {
             for column in 0..<width {
                 if _stoneGroupId[row][column] == 0 {
@@ -390,7 +409,7 @@ class BoardPosition: ObservableObject {
                     let isRemoved = self.removedStones?.contains([row, column]) ?? false
                     let newGroup = _constructStoneGroupFromPoint(row: row, column: column, state: isRemoved ? .empty : self[row, column], isDame: isRemoved && self[row, column] == .empty)
                     groups.append(newGroup)
-                    groupById[_currentGroupId] = newGroup
+                    _stoneGroupById[_currentGroupId] = newGroup
                 }
             }
         }
@@ -398,7 +417,7 @@ class BoardPosition: ObservableObject {
             for point in group.points {
                 for neighbor in neighbors(point: point) {
                     let neighborGroupId = _stoneGroupId[neighbor[0]][neighbor[1]]
-                    group.neighbors.insert(groupById[neighborGroupId]!)
+                    group.neighbors.insert(_stoneGroupById[neighborGroupId]!)
                 }
             }
         }
@@ -406,5 +425,38 @@ class BoardPosition: ObservableObject {
             print(_stoneGroupId[row])
         }
         return groups
-    }    
+    }
+    
+    func groupForStoneRemoval(atRow row:Int, column: Int) -> Set<[Int]> {
+        guard let stoneGroup = stoneGroup(atRow: row, column: column) else {
+            return Set<[Int]>()
+        }
+        
+        if stoneGroup.originalState == .empty {
+            return stoneGroup.points
+        }
+
+        var result = stoneGroup.points
+        var visitedGroup = Set<StoneGroup>([stoneGroup])
+        var spaceGroups = stoneGroup.neighbors.filter({ $0.state == .empty })
+        visitedGroup.formUnion(spaceGroups)
+        while spaceGroups.count > 0 {
+            var nextSpaceGroups = Set<StoneGroup>()
+            for spaceGroup in spaceGroups {
+                for neighborGroup in spaceGroup.neighbors {
+                    if !visitedGroup.contains(neighborGroup) {
+                        visitedGroup.insert(neighborGroup)
+                        if neighborGroup.originalState != .empty && neighborGroup.originalState == stoneGroup.originalState {
+                            result.formUnion(neighborGroup.points)
+                            let newSpaceGroups = neighborGroup.neighbors.filter({ $0.state == .empty })
+                            nextSpaceGroups.formUnion(newSpaceGroups)
+                            visitedGroup.formUnion(newSpaceGroups)
+                        }
+                    }
+                }
+            }
+            spaceGroups = nextSpaceGroups
+        }
+        return result
+    }
 }

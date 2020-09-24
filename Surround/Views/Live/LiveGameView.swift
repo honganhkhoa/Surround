@@ -46,7 +46,7 @@ struct LiveGameView: View {
             return false
         }
 
-        guard game.gameData?.phase == .play else {
+        guard game.gamePhase == .play else {
             return false
         }
         
@@ -59,7 +59,7 @@ struct LiveGameView: View {
             return false
         }
         
-        guard game.gameData?.phase == .play && game.gameData?.outcome == nil else {
+        guard game.gamePhase == .play && game.gameData?.outcome == nil else {
             return false
         }
         
@@ -175,7 +175,7 @@ struct LiveGameView: View {
     var boardView: some View {
         BoardView(
             boardPosition: game.currentPosition,
-            editable: isUserTurn,
+            playable: isUserTurn,
             newMove: $pendingMove,
             newPosition: $pendingPosition
         )
