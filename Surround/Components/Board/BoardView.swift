@@ -140,6 +140,8 @@ struct Goban: View {
                     }
                 })
                 .onEnded { _ in
+                    highlightedRow = -1
+                    highlightedColumn = -1
                     if isHoveredPointValid ?? false {
                         if let hoveredPoint = hoveredPoint.wrappedValue {
                             selectedPoint.wrappedValue = hoveredPoint
@@ -398,7 +400,7 @@ struct BoardView: View {
             newPosition.wrappedValue! : boardPosition
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Color(red: 0.86, green: 0.69, blue: 0.42, opacity: 1.00).shadow(radius: 2)
+                Color(red: 0.87, green: 0.64, blue: 0.30).shadow(radius: 2)
                 Goban(
                     geometry: geometry,
                     width: boardPosition.width,

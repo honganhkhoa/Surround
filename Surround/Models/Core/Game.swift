@@ -325,4 +325,28 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             self.computeScoresAndUpdate()
         }
     }
+    
+    var isUserPlaying: Bool {
+        guard let user = ogs?.user else {
+            return false
+        }
+        return user.id == self.blackId || user.id == self.whiteId
+    }
+    
+    var isUserTurn: Bool {
+        guard isUserPlaying else {
+            return false
+        }
+        
+        guard let user = ogs?.user else {
+            return false
+        }
+        
+        guard self.gamePhase == .play else {
+            return false
+        }
+        
+        return (self.clock?.currentPlayer == .black && user.id == self.blackId) ||
+            (self.clock?.currentPlayer == .white && user.id == self.whiteId)
+    }
 }

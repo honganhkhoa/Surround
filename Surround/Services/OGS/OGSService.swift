@@ -71,8 +71,11 @@ class OGSService: ObservableObject {
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
                 if game.gamePhase == .stoneRemoval {
-                    gamesOnUserTurn.append(game)
-                } else {
+                    let userColor: StoneColor = self.user?.id == game.blackId ? .black : .white
+                    if game.removedStonesAccepted[userColor] != nil && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
+                        gamesOnUserTurn.append(game)
+                    }
+                } else if game.gamePhase != .finished {
                     if let clock = game.clock {
                         if clock.currentPlayerId == self.user?.id {
                             gamesOnUserTurn.append(game)

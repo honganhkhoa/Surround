@@ -44,6 +44,7 @@
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
+		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -115,6 +116,7 @@
 		BCAE413924D1234500B5DB74 /* se_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = se_wrapper.cpp; sourceTree = "<group>"; };
 		BCAE413C24D1299C00B5DB74 /* Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Bridging-Header.h"; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
+		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -272,6 +274,7 @@
 				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
 				BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */,
 				BC042B3F24AB2DD10050B2D1 /* Board */,
+				BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -488,6 +491,7 @@
 				BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */,
 				BC042B4824AB2DD10050B2D1 /* TimerView.swift in Sources */,
 				BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */,
+				BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */,
 				BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */,
 				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
 				BC333849250B6EC60002F4D8 /* LiveGameView.swift in Sources */,
