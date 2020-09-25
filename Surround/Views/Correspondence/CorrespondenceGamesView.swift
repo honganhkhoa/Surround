@@ -21,6 +21,7 @@ struct CorrespondenceGamesView: View {
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
+    @State var stoneRemovalOption: StoneRemovalOption = .toggleGroup
 
     @State var showingPassAlert = false
     @State var showingResumeFromStoneRemovalAlert = false
@@ -229,6 +230,10 @@ struct CorrespondenceGamesView: View {
                         Label("Request undo", systemImage: "arrow.uturn.left")
                     }.disabled(!undoable)
                 } else if currentGame.gamePhase == .stoneRemoval {
+                    Picker(selection: $stoneRemovalOption, label: Text("Stone removal option")) {
+                        Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
+                        Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
+                    }
                     Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
                         Label("Resume game", systemImage: "play")
                     }
@@ -285,6 +290,7 @@ struct CorrespondenceGamesView: View {
             boardPosition: currentGame.currentPosition,
             playable: isUserTurn,
             stoneRemovable: isUserPlaying && currentGame.gamePhase == .stoneRemoval,
+            stoneRemovalOption: stoneRemovalOption,
             newMove: $pendingMove,
             newPosition: $pendingPosition,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints

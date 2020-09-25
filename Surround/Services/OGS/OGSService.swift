@@ -365,6 +365,7 @@ class OGSService: ObservableObject {
                                 } else {
                                     let game = Game(ogsGame: ogsGame)
                                     game.ogsRawData = data
+                                    game.ogs = self
                                     self.connect(to: game)
                                     promise(.success(game))
                                 }
@@ -561,6 +562,7 @@ class OGSService: ObservableObject {
                 whiteName: white["username"] as? String ?? "",
                 gameId: .OGS(gameId)
             )
+            game.ogs = self
             return game
         }
         return nil

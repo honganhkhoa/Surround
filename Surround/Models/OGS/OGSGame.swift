@@ -115,6 +115,7 @@ struct OGSGame: Decodable {
     var scoreTerritoryInSeki: Bool
     var strictSekiMode: Bool
     var agaHandicapScoring: Bool
+    var autoScoringDone: Bool?
     
     var undoRequested: Int?
     var phase: OGSGamePhase

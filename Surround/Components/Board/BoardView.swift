@@ -7,9 +7,14 @@
 
 import SwiftUI
 
-func cellSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
+func stoneSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
     return CGFloat(
         floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize) / 2) * 2)
+}
+
+enum StoneRemovalOption: Int {
+    case toggleGroup
+    case toggleSinglePoint
 }
 
 struct Stone: View {
@@ -55,15 +60,17 @@ struct Goban: View {
     var width: Int
     var height: Int
     var playable = false
-    @State var currentRow = -1
-    @State var currentColumn = -1
+    var stoneRemovable = false
+    @Binding var highlightedRow: Int
+    @Binding var highlightedColumn: Int
     var hoveredPoint: Binding<[Int]?> = .constant(nil)
     var isHoveredPointValid: Bool? = nil
     var selectedPoint: Binding<[Int]?> = .constant(nil)
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
 
     var body: some View {
-        let size = cellSize(geometry: geometry, boardSize: max(width, height))
+        print(highlightedRow, highlightedColumn)
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
         var starPoints = [[CGFloat]]()
         if size > 10 {
             if height == 19 && width == 19 {
@@ -74,6 +81,9 @@ struct Goban: View {
                 starPoints = [[2, 2], [2, 6], [4, 4], [6, 2], [6, 6]]
             }
         }
+        let highlightColor = stoneRemovable
+            ? UIColor.systemTeal
+            : (isHoveredPointValid ?? false) ? UIColor.systemGreen : UIColor.systemRed
         return Group {
             ZStack {
                 Path { path in
@@ -96,15 +106,15 @@ struct Goban: View {
                         }
                     }.fill(Color.black)
                 }
-                if hoveredPoint.wrappedValue != nil {
+                if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
                     Path { path in
-                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
-                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(currentRow) + 0.5) * size))
+                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(highlightedRow) + 0.5) * size))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(highlightedRow) + 0.5) * size))
 
-                        path.move(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: size / 2))
-                        path.addLine(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                        path.move(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
-                    .stroke(isHoveredPointValid ?? false ? Color.green : Color.red, lineWidth: 2)
+                    .stroke(Color(highlightColor), lineWidth: 2)
                 }
             }
         }
@@ -118,11 +128,11 @@ struct Goban: View {
                         self.selectionFeedbackGenerator?.prepare()
                     }
                     selectedPoint.wrappedValue = nil
-                    currentRow = Int((value.location.y / size - 0.5).rounded())
-                    currentColumn = Int((value.location.x / size - 0.5).rounded())
-                    if currentColumn >= 0 && currentColumn < width && currentRow >= 0 && currentRow < height {
-                        if hoveredPoint.wrappedValue != [currentRow, currentColumn] {
-                            hoveredPoint.wrappedValue = [currentRow, currentColumn]
+                    highlightedRow = Int((value.location.y / size - 0.5).rounded())
+                    highlightedColumn = Int((value.location.x / size - 0.5).rounded())
+                    if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
+                        if hoveredPoint.wrappedValue != [highlightedRow, highlightedColumn] {
+                            hoveredPoint.wrappedValue = [highlightedRow, highlightedColumn]
                             self.selectionFeedbackGenerator?.selectionChanged()
                         }
                     } else {
@@ -154,7 +164,7 @@ struct Stones: View {
         let width = boardPosition.width
         let height = boardPosition.height
                 
-        let size = cellSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
         let whiteLivingPath = CGMutablePath()
         let blackLivingPath = CGMutablePath()
         let whiteCapturedPath = CGMutablePath()
@@ -282,16 +292,17 @@ struct Stones: View {
 
 struct StoneRemovalOverlay: View {
     @ObservedObject var boardPosition: BoardPosition
+    var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var geometry: GeometryProxy
-    @State var currentRow = -1
-    @State var currentColumn = -1
+    @Binding var highlightedRow: Int
+    @Binding var highlightedColumn: Int
     @State var hoveredGroup = Set<[Int]>()
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
 
     var body: some View {
         let width = boardPosition.width
         let height = boardPosition.height
-        let size = cellSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
 
         let toBeRemovedPath = CGMutablePath()
         let toBeAddedPath = CGMutablePath()
@@ -300,7 +311,7 @@ struct StoneRemovalOverlay: View {
             let row = point[0]
             let column = point[1]
             
-            let indicatorRectSize = max(size / 3, 3)
+            let indicatorRectSize = max(size / 2, 3)
             let indicatorRectPadding = (size - indicatorRectSize) / 2
             let indicatorRect = CGRect(
                 x: CGFloat(column) * size + indicatorRectPadding,
@@ -321,19 +332,9 @@ struct StoneRemovalOverlay: View {
             }
         }
         let indicatorWidth: CGFloat = size >= 20 ? 2.5 : (size > 10 ? 2 : 1)
-//        let coordinateLineWidth: CGFloat = size < 10 ? 0.5 : 1
         
         return ZStack {
             Color.clear
-//            if currentRow != -1 && currentColumn != -1 {
-//                Path { path in
-//                    path.move(to: CGPoint(x: size / 2, y: (CGFloat(currentRow) + 0.5) * size))
-//                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(currentRow) + 0.5) * size))
-//
-//                    path.move(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: size / 2))
-//                    path.addLine(to: CGPoint(x: (CGFloat(currentColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
-//                }.stroke(Color(UIColor.systemTeal), lineWidth: coordinateLineWidth)
-//            }
             Path(toBeRemovedPath).stroke(Color(UIColor.systemRed), lineWidth: indicatorWidth)
             Path(toBeAddedPath).stroke(Color(UIColor.systemGreen), lineWidth: indicatorWidth)
         }
@@ -346,23 +347,27 @@ struct StoneRemovalOverlay: View {
                     let newColumn = Int((value.location.x / size - 0.5).rounded())
                     
                     if newColumn >= 0 && newColumn < width && newRow >= 0 && newRow < height {
-                        if newRow != currentRow || newColumn != currentColumn {
-                            currentRow = newRow
-                            currentColumn = newColumn
+                        if newRow != highlightedRow || newColumn != highlightedColumn {
+                            highlightedRow = newRow
+                            highlightedColumn = newColumn
                             if !hoveredGroup.contains([newRow, newColumn]) {
-                                hoveredGroup = self.boardPosition.groupForStoneRemoval(atRow: newRow, column: newColumn)
+                                if stoneRemovalOption == .toggleGroup {
+                                    hoveredGroup = self.boardPosition.groupForStoneRemoval(atRow: newRow, column: newColumn)
+                                } else {
+                                    hoveredGroup = Set<[Int]>([[newRow, newColumn]])
+                                }
                             }
                         }
                     } else {
-                        currentRow = -1
-                        currentColumn = -1
+                        highlightedRow = -1
+                        highlightedColumn = -1
                         hoveredGroup.removeAll()
                     }
                 })
                 .onEnded { _ in
                     stoneRemovalSelectedPoints.wrappedValue = hoveredGroup
-                    currentRow = -1
-                    currentColumn = -1
+                    highlightedRow = -1
+                    highlightedColumn = -1
                 }
         )
         .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { newSelectedPoints in
@@ -377,11 +382,14 @@ struct BoardView: View {
     @ObservedObject var boardPosition: BoardPosition
     var playable = false
     var stoneRemovable = false
+    var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var newMove: Binding<Move?> = .constant(nil)
     var newPosition: Binding<BoardPosition?> = .constant(nil)
     @State var hoveredPoint: [Int]? = nil
     @State var isHoveredPointValid: Bool? = nil
     @State var selectedPoint: [Int]? = nil
+    @State var highlightedRow = -1
+    @State var highlightedColumn = -1
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
     
     var body: some View {
@@ -396,6 +404,9 @@ struct BoardView: View {
                     width: boardPosition.width,
                     height: boardPosition.height,
                     playable: playable,
+                    stoneRemovable: stoneRemovable,
+                    highlightedRow: $highlightedRow,
+                    highlightedColumn: $highlightedColumn,
                     hoveredPoint: $hoveredPoint,
                     isHoveredPointValid: isHoveredPointValid,
                     selectedPoint: $selectedPoint
@@ -422,7 +433,10 @@ struct BoardView: View {
                 if stoneRemovable {
                     StoneRemovalOverlay(
                         boardPosition: boardPosition,
+                        stoneRemovalOption: stoneRemovalOption,
                         geometry: geometry,
+                        highlightedRow: $highlightedRow,
+                        highlightedColumn: $highlightedColumn,
                         stoneRemovalSelectedPoints: stoneRemovalSelectedPoints
                     )
                 }

@@ -68,8 +68,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 
                 undoRequested = data.undoRequested
 
+                autoScoringDone = data.autoScoringDone
                 // Put this at the end since it will trigger score computing
-                self.gamePhase = data.phase
+                gamePhase = data.phase
             }
         }
     }
@@ -100,12 +101,37 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     @Published var ogsRawData: [String: Any]?
     @Published var clock: Clock?
+    var autoScoringDone: Bool?
+    var autoScoringCancellable: AnyCancellable?
+    var toggleRemovedStoneCancellable: AnyCancellable?
+    weak var ogs: OGSService?
     @Published var gamePhase: OGSGamePhase? {
         didSet {
             if gamePhase == .stoneRemoval {
-                computeScoresAndUpdate()
-            } else {
+                if !(autoScoringDone ?? false) {
+                    // Doing score estimating
+                    self.autoScoringCancellable = currentPosition.estimateTerritory(on: computeQueue)
+                        .receive(on: DispatchQueue.main)
+                        .sink(receiveValue: { territory in
+                            var estimatedRemovedStones = Set<[Int]>()
+                            for row in 0..<self.currentPosition.height {
+                                for column in 0..<self.currentPosition.width {
+                                    let isCaptured = self.currentPosition[row, column] != .empty && self.currentPosition[row, column] != territory[row][column]
+                                    let isDame = territory[row][column] == .empty && self.currentPosition[row, column] == .empty
+                                    if isCaptured || isDame {
+                                        estimatedRemovedStones.insert([row, column])
+                                    }
+                                }
+                            }
+                            self.toggleRemovedStoneCancellable = self.ogs?.toggleRemovedStones(stones: estimatedRemovedStones, forGame: self)
+                                .sink(receiveCompletion: { _ in}, receiveValue: { _ in})
+                    })
+                } else {
+                    computeScoresAndUpdate()
+                }
+            } else if gamePhase == .play {
                 DispatchQueue.main.async {
+                    self.autoScoringDone = nil
                     self.currentPosition.gameScores = nil
                     self.currentPosition.removedStones = nil
                 }
@@ -218,14 +244,14 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 total: 0
             )
         )
-        let stoneGroups = self.currentPosition.constructStoneGroups()
+        let territoryGroups = self.currentPosition.constructTerritoryGroups()
         
         if gameData.agaHandicapScoring && score.white.handicap > 0 {
             score.white.handicap -= 1
         }
         
         if gameData.scoreTerritory {
-            for group in stoneGroups {
+            for group in territoryGroups {
                 group.computeTerritory()
                 if group.isTerritory {
                     if group.territoryColor == .black {
@@ -295,7 +321,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     
     func setRemovedStones(removedString: String) {
         self.currentPosition.removedStones = BoardPosition.points(fromPositionString: removedString)
-        if self.gameData?.phase == .stoneRemoval {
+        if self.gamePhase == .stoneRemoval {
             self.computeScoresAndUpdate()
         }
     }
