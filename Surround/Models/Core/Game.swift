@@ -67,6 +67,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 clock = data.clock
                 
                 undoRequested = data.undoRequested
+                pauseControl = data.pauseControl
 
                 autoScoringDone = data.autoScoringDone
                 // Put this at the end since it will trigger score computing
@@ -100,7 +101,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return nil
     }
     @Published var ogsRawData: [String: Any]?
-    @Published var clock: Clock?
+    @Published var clock: OGSClock?
+    @Published var pauseControl: OGSPauseControl?
+    
     var autoScoringDone: Bool?
     var autoScoringCancellable: AnyCancellable?
     var toggleRemovedStoneCancellable: AnyCancellable?

@@ -43,6 +43,19 @@ struct PlayersBannerView: View {
         let playerName = color == .black ? game.blackName : game.whiteName
         let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
         let captures = game.currentPosition.captures[color] ?? 0
+        let playerId = color == .black ? game.blackId : game.whiteId
+        let pauseReason = game.pauseControl?.pauseReason(playerId: playerId)
+        let clockStatus = { () -> AnyView in
+            if pauseReason?.count ?? 0 > 0 {
+                return AnyView(
+                    erasing: Text(pauseReason ?? "").font(Font.footnote.bold())
+                )
+            } else if game.clock?.currentPlayerId == playerId {
+                return AnyView(erasing: Image(systemName: "hourglass"))
+            }
+            return AnyView(EmptyView())
+        }()
+        
         return VStack(alignment: leftSide ? .leading : .trailing) {
             if showsPlayersName {
                 HStack {
@@ -50,17 +63,23 @@ struct PlayersBannerView: View {
                     Text("[\(playerRank)]").font(Font.caption.bold())
                 }
             }
-            VStack(alignment: .trailing) {
-                TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
-                if captures > 0 {
-                    Text("\(captures) capture\(captures > 1 ? "s" : "")")
-                        .font(Font.caption.monospacedDigit())
+            HStack {
+                if !leftSide {
+                    clockStatus
                 }
-                if let komi = game.gameData?.komi {
-                    if color == .white && komi != 0 {
-                        Text("\(String(format: "%.1f", komi)) komi")
-                            .font(Font.caption.monospacedDigit())
+                VStack(alignment: .trailing) {
+                    TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
+                    Text("\(captures) capture\(captures != 1 ? "s" : "")")
+                        .font(Font.caption.monospacedDigit())
+                    if let komi = game.gameData?.komi {
+                        if color == .white && komi != 0 {
+                            Text("\(String(format: "%.1f", komi)) komi")
+                                .font(Font.caption.monospacedDigit())
+                        }
                     }
+                }
+                if leftSide {
+                    clockStatus
                 }
             }
         }
@@ -81,9 +100,25 @@ struct PlayersBannerView: View {
                     )
                 }
             }
-            return AnyView(erasing: Image(systemName: "hourglass")
-                .font(Font.title3)
-            )
+            let stoneRemovalExpiration = { () -> AnyView in
+                if let stoneRemovalTimeLeft = game.clock?.timeUntilExpiration {
+                    return AnyView(
+                        erasing: Text(timeString(timeLeft: stoneRemovalTimeLeft)).font(Font.footnote.bold())
+                    )
+                } else {
+                    return AnyView(erasing: EmptyView())
+                }
+            }()
+            return AnyView(erasing: HStack {
+                if !leftSide {
+                    stoneRemovalExpiration
+                }
+                Image(systemName: "hourglass")
+                    .font(Font.title3)
+                if leftSide {
+                    stoneRemovalExpiration
+                }
+            })
         }()
 
         return VStack(alignment: leftSide ? .leading : .trailing) {
@@ -122,7 +157,7 @@ struct PlayersBannerView: View {
                                 Text("Territory")
                             }
                             if gameData.scoreStones {
-                                Text("Stone")
+                                Text("Stones")
                             }
                             if gameData.scorePrisoners {
                                 Text("Captures")
@@ -141,34 +176,31 @@ struct PlayersBannerView: View {
         }
     }
     
+    var isPaused: Bool {
+        game.pauseControl?.isPaused() ?? false
+    }
+
     var body: some View {
-        var isPaused: Bool {
-            game.gameData?.pauseControl?.isPaused() ?? false
-        }
-        
+        let foregroundColor = game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
         return VStack(spacing: 0) {
             HStack {
                 playerIcon(color: topLeftPlayerColor)
                 Group {
                     if game.gamePhase == .play {
                         playerInfoColumn(color: topLeftPlayerColor, leftSide: true)
+                            .foregroundColor(Color(foregroundColor))
                     } else {
                         scoreColumn(color: topLeftPlayerColor, leftSide: true)
                     }
                 }.frame(height: playerIconSize)
-                if !isPaused && game.clock?.currentPlayer == topLeftPlayerColor {
-                    Image(systemName: "hourglass")
-                }
                 Spacer()
             }
             HStack {
                 Spacer()
-                if !isPaused && game.clock?.currentPlayer != topLeftPlayerColor {
-                    Image(systemName: "hourglass")
-                }
                 Group {
                     if game.gamePhase == .play {
                         playerInfoColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
+                            .foregroundColor(Color(foregroundColor))
                     } else {
                         scoreColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
                     }
@@ -178,7 +210,7 @@ struct PlayersBannerView: View {
             .offset(y: playerIconsOffset)
             .padding(.bottom, playerIconsOffset)
         }
-        .padding(.vertical, reduceVerticalPadding ? 10 : 15)
+        .padding(.vertical, reduceVerticalPadding ? 12 : 15)
         .padding(.horizontal)
         .background(
             LinearGradient(

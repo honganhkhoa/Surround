@@ -69,7 +69,6 @@ struct Goban: View {
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
 
     var body: some View {
-        print(highlightedRow, highlightedColumn)
         let size = stoneSize(geometry: geometry, boardSize: max(width, height))
         var starPoints = [[CGFloat]]()
         if size > 10 {
@@ -400,7 +399,7 @@ struct BoardView: View {
             newPosition.wrappedValue! : boardPosition
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Color(red: 0.87, green: 0.64, blue: 0.30).shadow(radius: 2)
+                Color(red: 0.86, green: 0.69, blue: 0.42).shadow(radius: 2)
                 Goban(
                     geometry: geometry,
                     width: boardPosition.width,

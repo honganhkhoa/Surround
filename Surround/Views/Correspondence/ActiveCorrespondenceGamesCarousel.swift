@@ -62,6 +62,8 @@ struct ActiveCorrespondenceGamesCarousel: View {
         .onChange(of: currentGame) { _ in
             self.renderedCurrentGame.send(game == currentGame)
         }
+        .contentShape(Rectangle())
+        .hoverEffect(.lift)
     }
     
     var horizontalScrollView: some View {

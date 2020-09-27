@@ -10,7 +10,7 @@ import Combine
 
 struct GameControlRow: View {
     @EnvironmentObject var ogs: OGSService
-    var game: Game
+    @ObservedObject var game: Game
     var horizontal = true
     var pendingMove: Binding<Move?> = .constant(nil)
     var pendingPosition: Binding<BoardPosition?> = .constant(nil)
@@ -132,38 +132,43 @@ struct GameControlRow: View {
     }
     
     var actionButtons: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(spacing: 0) {
             if ogsRequestCancellable == nil {
                 let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
                 let userNeedsToAcceptStoneRemoval = game.gamePhase == .stoneRemoval
                     && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
-                if isUserTurnToPlay {
-                    if let pendingMove = pendingMove.wrappedValue {
-                        Button(action: { submitMove(move: pendingMove)}) {
-                            Text("Submit move")
+                Group {
+                    if isUserTurnToPlay {
+                        if let pendingMove = pendingMove.wrappedValue {
+                            Button(action: { submitMove(move: pendingMove)}) {
+                                Text("Submit move")
+                            }
+                        } else {
+                            Button(action: { self.showingPassAlert = true }) {
+                                Text("Pass")
+                            }
+                        }
+                    } else if userNeedsToAcceptStoneRemoval {
+                        Button(action: { acceptRemovedStones() }) {
+                            Text("Accept")
                         }
                     } else {
-                        Button(action: { self.showingPassAlert = true }) {
-                            Text("Pass")
-                        }
-                    }
-                } else if userNeedsToAcceptStoneRemoval {
-                    Button(action: { acceptRemovedStones() }) {
-                        Text("Accept")
-                    }
-                } else {
-                    if let goToNextGame = goToNextGame {
-                        if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
-                            Button(action: goToNextGame) {
-                                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                    Text("Next")
-                                    Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
-                                        .font(Font.caption2.bold())
+                        if let goToNextGame = goToNextGame {
+                            if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
+                                Button(action: goToNextGame) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                        Text("Next")
+                                        Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
+                                            .font(Font.caption2.bold())
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                .padding(10)
+                .contentShape(RoundedRectangle(cornerRadius: 10))
+                .hoverEffect(.highlight)
             } else {
                 ProgressView().alignmentGuide(.firstTextBaseline, computeValue: { viewDimension in
                     viewDimension.height
@@ -174,6 +179,15 @@ struct GameControlRow: View {
                     Button(action: { ogs.requestUndo(game: game) }) {
                         Label("Request undo", systemImage: "arrow.uturn.left")
                     }.disabled(!undoable)
+                    if game.pauseControl?.userPauseDetail == nil {
+                        Button(action: { ogs.pause(game: game) }) {
+                            Label("Pause game", systemImage: "pause")
+                        }
+                    } else {
+                        Button(action: { ogs.resume(game: game) }) {
+                            Label("Resume game", systemImage: "play")
+                        }
+                    }
                 } else if game.gamePhase == .stoneRemoval {
                     Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
                         Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
@@ -192,8 +206,10 @@ struct GameControlRow: View {
             }
             label: {
                 Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
+                    .padding(15)
             }
-            .padding(.leading)
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .hoverEffect(.highlight)
             
             // Putting these inside conditional views above does not seem to work well
             Rectangle().frame(width: 0, height: 0)
@@ -222,17 +238,23 @@ struct GameControlRow: View {
         }
     }
     
+    var rowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: CGSize(width: 1024, height: 768), attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
+
     var body: some View {
         if horizontal {
-            HStack(alignment: .firstTextBaseline) {
+            HStack {
                 statusText
-                Spacer()
+                Spacer(minLength: 0)
                 actionButtons
             }
+            .padding([.trailing], -15)
+            .frame(height: rowHeight)
         } else {
             VStack(alignment: .trailing) {
                 statusText
+                    .frame(height: rowHeight)
                 actionButtons
+                    .padding([.trailing], -15)
             }
         }
     }
@@ -241,15 +263,17 @@ struct GameControlRow: View {
 struct GameControlRow_Previews: PreviewProvider {
     static var previews: some View {
         let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
-        return Group {
-            GameControlRow(game: games[0])
-                .previewLayout(.fixed(width: 320, height: 80))
-        }
-        .environmentObject(
-            OGSService.previewInstance(
-                user: OGSUser(username: "kata-bot", id: 592684),
-                activeGames: games
-            )
+        let ogs = OGSService.previewInstance(
+            user: OGSUser(username: "kata-bot", id: 592684),
+            activeGames: games
         )
+        for game in games {
+            game.ogs = ogs
+        }
+        return Group {
+            GameControlRow(game: games[2])
+                .previewLayout(.fixed(width: 320, height: 60))
+        }
+        .environmentObject(ogs)
     }
 }

@@ -13,7 +13,7 @@ struct OGSUserPauseDetail: Codable {
 }
 
 struct OGSPauseControl: Decodable {
-    var paused: OGSUserPauseDetail?
+    var userPauseDetail: OGSUserPauseDetail?
     var weekend: Bool?
     var system: Bool?
     var stoneRemoval: Bool?
@@ -42,7 +42,7 @@ struct OGSPauseControl: Decodable {
                     vacationPlayerIds.append(vacationPlayerId)
                 }
             case "paused":
-                paused = try container.decode(OGSUserPauseDetail.self, forKey: key)
+                userPauseDetail = try container.decode(OGSUserPauseDetail.self, forKey: key)
             case "weekend":
                 weekend = try container.decode(Bool.self, forKey: key)
             case "system":
@@ -53,12 +53,10 @@ struct OGSPauseControl: Decodable {
                 break
             }
         }
-//        print(container.allKeys)
-//        print(vacationPlayerIds)
     }
     
     func isPaused() -> Bool {
-        if self.paused != nil {
+        if self.userPauseDetail != nil {
             return true
         }
         
@@ -79,5 +77,38 @@ struct OGSPauseControl: Decodable {
         }
         
         return false
+    }
+    
+    func pauseReason(playerId: Int?) -> String {
+        guard self.isPaused() else {
+            return ""
+        }
+        
+        if let playerId = playerId {
+            if let userPauseDetail = userPauseDetail {
+                if userPauseDetail.pausingPlayerId == playerId {
+                    return "Paused, \(userPauseDetail.pausesLeft!) left"
+                } else {
+                    return "Paused"
+                }
+            }
+            if vacationPlayerIds.contains(playerId) {
+                return "Vacation"
+            }
+        }
+
+        if weekend ?? false {
+            return "Weekend"
+        }
+        
+        if system ?? false {
+            return "System"
+        }
+                
+        if stoneRemoval ?? false {
+            return "Stone removal"
+        }
+        
+        return "Paused"
     }
 }

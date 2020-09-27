@@ -23,7 +23,7 @@
 		BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
 		BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
 		BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3724AB2DD00050B2D1 /* OGSUser.swift */; };
-		BC042B5124AB2DD10050B2D1 /* Clock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* Clock.swift */; };
+		BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
 		BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
@@ -87,7 +87,7 @@
 		BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSPauseControl.swift; sourceTree = "<group>"; };
 		BC042B3624AB2DD00050B2D1 /* OGSGame.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSGame.swift; sourceTree = "<group>"; };
 		BC042B3724AB2DD00050B2D1 /* OGSUser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSUser.swift; sourceTree = "<group>"; };
-		BC042B3924AB2DD00050B2D1 /* Clock.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Clock.swift; sourceTree = "<group>"; };
+		BC042B3924AB2DD00050B2D1 /* OGSClock.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSClock.swift; sourceTree = "<group>"; };
 		BC042B3A24AB2DD00050B2D1 /* Game.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeControl.swift; sourceTree = "<group>"; };
 		BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardPosition.swift; sourceTree = "<group>"; };
@@ -252,6 +252,7 @@
 				BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */,
 				BC042B3624AB2DD00050B2D1 /* OGSGame.swift */,
 				BC042B3724AB2DD00050B2D1 /* OGSUser.swift */,
+				BC042B3924AB2DD00050B2D1 /* OGSClock.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -259,7 +260,6 @@
 		BC042B3824AB2DD00050B2D1 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				BC042B3924AB2DD00050B2D1 /* Clock.swift */,
 				BC042B3A24AB2DD00050B2D1 /* Game.swift */,
 				BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */,
 				BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */,
@@ -504,7 +504,7 @@
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC042B4A24AB2DD10050B2D1 /* GameDetail.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
-				BC042B5124AB2DD10050B2D1 /* Clock.swift in Sources */,
+				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
 				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,

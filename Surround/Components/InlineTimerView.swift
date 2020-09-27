@@ -76,7 +76,7 @@ struct InlineSimpleTimerView: View {
 
 struct InlineTimerView: View {
     var timeControl: TimeControl?
-    var clock: Clock?
+    var clock: OGSClock?
     var player: StoneColor
     var mainFont: Font?
     var subFont: Font?
@@ -91,45 +91,44 @@ struct InlineTimerView: View {
         let mainFont = self.mainFont ?? Font.subheadline.monospacedDigit()
         let subFont = self.subFont ?? Font.caption.monospacedDigit()
 
-        var pausedText = "Paused"
+        let playerId = player == .black ? clock.blackPlayerId : clock.whitePlayerId
         let isPaused = pauseControl?.isPaused() ?? false
-        if isPaused {
-            if pauseControl?.weekend ?? false {
-                pausedText = "Weekend"
-            }
-            
-            if pauseControl?.system ?? false {
-                pausedText = "System"
-            }
-            
-            let playerId = player == .black ? clock.blackPlayerId : clock.whitePlayerId
-            if pauseControl?.vacationPlayerIds.contains(playerId) ?? false {
-                pausedText = "Vacation"
-            }
-
-            if pauseControl?.stoneRemoval ?? false {
-                pausedText = "Stone removal"
-            }            
-        }
+        let pausedText = pauseControl?.pauseReason(playerId: playerId) ?? ""
         
         return AnyView(HStack(alignment: .firstTextBaseline) {
-            if clock.currentPlayer == player && !isPaused {
-                Image(systemName: "hourglass")
-            }
-            switch timeControl.system {
-            case .ByoYomi:
-                InlineByoYomiTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
-            case .Fischer:
-                InlineFischerTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
-            case .Canadian:
-                InlineCanadianTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
-            case .Simple, .Absolute:
-                InlineSimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
-            default:
-                Text("").font(mainFont)
-            }
-            if isPaused {
-                Text(pausedText).font(subFont.bold())
+            if !clock.started {
+                if let timeLeft = clock.timeUntilExpiration {
+                    if clock.currentPlayer == player {
+                        Image(systemName: "hourglass")
+                            .foregroundColor(Color(UIColor.systemIndigo))
+                        Text(timeString(timeLeft: timeLeft))
+                            .font(mainFont.bold())
+                            .foregroundColor(Color(UIColor.systemIndigo))
+                    } else {
+                        Text("Waiting...")
+                            .font(mainFont.bold())
+                            .foregroundColor(Color(UIColor.systemIndigo))
+                    }
+                }
+            } else {
+                if clock.currentPlayer == player && !isPaused {
+                    Image(systemName: "hourglass")
+                }
+                switch timeControl.system {
+                case .ByoYomi:
+                    InlineByoYomiTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
+                case .Fischer:
+                    InlineFischerTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
+                case .Canadian:
+                    InlineCanadianTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
+                case .Simple, .Absolute:
+                    InlineSimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
+                default:
+                    Text("").font(mainFont)
+                }
+                if isPaused {
+                    Text(pausedText).font(subFont.bold())
+                }
             }
         })
     }
@@ -138,7 +137,7 @@ struct InlineTimerView: View {
 struct InlineTimerView_Previews: PreviewProvider {
     static var previews: some View {
         let timeControl1 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "byoyomi", mainTime: 300, periods: 5, periodTime: 30))
-        let clock1 = Clock(
+        let clock1 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
             currentPlayer: .black,
@@ -147,7 +146,7 @@ struct InlineTimerView_Previews: PreviewProvider {
         )
         
         let timeControl2 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "fischer", initialTime: 600, timeIncrement: 30, maxTime: 600))
-        let clock2 = Clock(
+        let clock2 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
             currentPlayer: .black,

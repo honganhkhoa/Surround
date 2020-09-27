@@ -99,7 +99,7 @@ struct OGSGame: Decodable {
     var players: Players
     
     var timeControl: TimeControl
-    var clock: Clock
+    var clock: OGSClock
     var pauseControl: OGSPauseControl?
     
     var outcome: String?

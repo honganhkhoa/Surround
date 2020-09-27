@@ -66,7 +66,8 @@ struct CorrespondenceGamesView: View {
             game: currentGame,
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
-            goToNextGame: goToNextGame
+            goToNextGame: goToNextGame,
+            stoneRemovalOption: $stoneRemovalOption
         )
     }
     
@@ -102,7 +103,7 @@ struct CorrespondenceGamesView: View {
             print("Geometry \(geometry.size)")
             
             let boardSize: CGFloat = min(geometry.size.width, geometry.size.height)
-            let controlRowHeight: CGFloat = NSString(string: "Waiting for Opponent").boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
+            let controlRowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
             let usableHeight: CGFloat = geometry.size.height
             let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
             let spacing: CGFloat = 10.0
@@ -113,10 +114,10 @@ struct CorrespondenceGamesView: View {
             return AnyView(erasing: VStack(alignment: .leading) {
 //                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
                 PlayersBannerView(game: currentGame, topLeftPlayerColor: self.userColor(in: currentGame).opponentColor(), reduceVerticalPadding: reducedPlayerInfoVerticalPadding)
-                Spacer(minLength: spacing)
+                Spacer(minLength: spacing).frame(maxHeight: 15)
                 controlRow
                     .padding(.horizontal)
-                Spacer(minLength: spacing)
+                Spacer(minLength: spacing).frame(maxHeight: 15)
                 boardView.frame(width: boardSize, height: boardSize)
                 if showsActiveGamesCarousel {
                     ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)

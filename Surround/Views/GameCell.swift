@@ -41,7 +41,7 @@ struct PlayerInfoLine: View {
                         }
                     }
                     Spacer()
-                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.gameData?.pauseControl)
+                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
                 }
             }
         } else {
@@ -64,7 +64,7 @@ struct PlayerInfoLine: View {
                             }
                         }
                     }
-                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.gameData?.pauseControl)
+                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
                 }
                 Spacer()
             }

@@ -66,25 +66,27 @@ class OGSService: ObservableObject {
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
-        var gamesOnOppornentTurn: [Game] = []
+        var gamesOnOpponentTurn: [Game] = []
         var liveGames: [Game] = []
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
                 if game.gamePhase == .stoneRemoval {
                     let userColor: StoneColor = self.user?.id == game.blackId ? .black : .white
-                    if game.removedStonesAccepted[userColor] != nil && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
+                    if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
                         gamesOnUserTurn.append(game)
+                    } else {
+                        gamesOnOpponentTurn.append(game)
                     }
                 } else if game.gamePhase != .finished {
                     if let clock = game.clock {
                         if clock.currentPlayerId == self.user?.id {
                             gamesOnUserTurn.append(game)
                         } else {
-                            gamesOnOppornentTurn.append(game)
+                            gamesOnOpponentTurn.append(game)
                         }
                     }
                 }
-            } else {
+            } else if game.gameData?.timeControl.speed == .live {
                 liveGames.append(game)
             }
         }
@@ -97,7 +99,7 @@ class OGSService: ObservableObject {
             return false
         }
         self.sortedActiveCorrespondenceGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
-        self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOppornentTurn.sorted(by: thinkingTimeLeftIncreasing)
+        self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOpponentTurn.sorted(by: thinkingTimeLeftIncreasing)
         self.sortedActiveCorrespondenceGames = self.sortedActiveCorrespondenceGamesOnUserTurn + self.sortedActiveCorrespondenceGamesNotOnUserTurn
         self.liveGames = liveGames
     }
@@ -116,9 +118,9 @@ class OGSService: ObservableObject {
         
         timerCancellable = TimeUtilities.shared.timer.sink { [self] _ in
             for game in connectedGames.values {
-                if game.gameData?.outcome == nil && !(game.gameData?.pauseControl?.isPaused() ?? false) {
+                if game.gameData?.outcome == nil && !(game.pauseControl?.isPaused() ?? false) {
                     if let timeControlSystem = game.gameData?.timeControl.system {
-                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency, pauseControl: game.gameData?.pauseControl)
+                        game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency, pauseControl: game.pauseControl)
                     }
                 }
             }
@@ -494,9 +496,12 @@ class OGSService: ObservableObject {
                     let decoder = DictionaryDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     do {
-                        connectedGame.clock = try decoder.decode(Clock.self, from: clockdata)
+                        connectedGame.clock = try decoder.decode(OGSClock.self, from: clockdata)
+                        if let pauseControl = connectedGame.clock?.pauseControl {
+                            connectedGame.pauseControl = pauseControl
+                        }
                         if let timeControlSystem = connectedGame.gameData?.timeControl.system {
-                            connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.gameData?.pauseControl)
+                            connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.pauseControl)
                         }
                         if let _ = self.activeGames[gameId] {
                             // Trigger active games publisher
@@ -646,6 +651,18 @@ class OGSService: ObservableObject {
     func resign(game: Game) {
         if let ogsID = game.ogsID, let user = self.user {
             self.socket.emit("game/resign", ["game_id": ogsID, "player_id": user.id])
+        }
+    }
+    
+    func pause(game: Game) {
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/pause", ["game_id": ogsID, "player_id": user.id])
+        }
+    }
+    
+    func resume(game: Game) {
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/resume", ["game_id": ogsID, "player_id": user.id])
         }
     }
     

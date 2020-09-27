@@ -23,7 +23,13 @@ struct ThinkingTime: Codable {
     var blockTimeLeft: Double?
 }
 
-struct Clock {
+struct OGSPauseDetail: Decodable {
+    var pauseControl: OGSPauseControl?
+    var paused: Bool?
+    var pausedSince: Double?
+}
+
+struct OGSClock {
     var blackTime: ThinkingTime
     var whiteTime: ThinkingTime
     var currentPlayer: StoneColor
@@ -33,9 +39,12 @@ struct Clock {
     var currentPlayerId: Int
     var blackPlayerId: Int
     var whitePlayerId: Int
+    var pauseControl: OGSPauseControl?
+    var expiration: Double?
+    var timeUntilExpiration: TimeInterval?
 }
 
-extension Clock: Decodable {
+extension OGSClock: Decodable {
     enum CodingKeys: String, CodingKey {
         case blackTime
         case whiteTime
@@ -45,10 +54,12 @@ extension Clock: Decodable {
         case lastMove
         case startMode
         case pausedSince
+        case pause
+        case expiration
     }
     
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: Clock.CodingKeys.self)
+        let container = try decoder.container(keyedBy: OGSClock.CodingKeys.self)
         if let blackThinkingTime = try? container.decode(Double.self, forKey: .blackTime) {
             blackTime = ThinkingTime(thinkingTime: blackThinkingTime)
         } else {
@@ -77,17 +88,29 @@ extension Clock: Decodable {
         lastMoveTime = try container.decode(Double.self, forKey: .lastMove)
         started = !container.contains(.startMode)
         
+        expiration = try container.decodeIfPresent(Double.self, forKey: .expiration)
+        if let expiration = expiration {
+            timeUntilExpiration = expiration / 1000 - Date().timeIntervalSince1970
+        }
         pausedTime = try container.decodeIfPresent(Double.self, forKey: .pausedSince)
+        if let pauseDetail = try container.decodeIfPresent(OGSPauseDetail.self, forKey: .pause) {
+            pauseControl = pauseDetail.pauseControl
+        }
     }
     
     mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
-        guard started else {
+
+        let now = Date().timeIntervalSince1970 * 1000
+        if let expiration = expiration {
+            timeUntilExpiration = (expiration - (now + serverTimeOffset)) / 1000
+        }
+
+        if !started {
             return
         }
-        // goban/lib/goban.js:~8246
-
+        
+        // logic from GobanCore.ts -> GobanCore -> setGameClock -> make_player_clock
         let paused = pauseControl?.isPaused() ?? false
-        let now = Date().timeIntervalSince1970 * 1000
         let since = paused ? max(pausedTime!, lastMoveTime) : now
         let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
 

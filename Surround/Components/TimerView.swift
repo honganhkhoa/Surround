@@ -78,7 +78,7 @@ struct SimpleTimerView: View {
 
 struct TimerView: View {
     var timeControl: TimeControl?
-    var clock: Clock?
+    var clock: OGSClock?
     var player: StoneColor
     
     var body: some View {
@@ -87,27 +87,44 @@ struct TimerView: View {
             return AnyView(EmptyView())
         }
         
-        let thinkingTime = (player == .black ? clock.blackTime : clock.whiteTime)
+        if !clock.started {
+            if let timeLeft = clock.timeUntilExpiration {
+                if clock.currentPlayer == player {
+                    return AnyView(
+                        erasing: Text(timeString(timeLeft: timeLeft))
+                            .font(Font.subheadline.monospacedDigit().bold())
+                    )
+                } else {
+                    return AnyView(
+                        erasing: Text("Waiting...")
+                            .font(Font.subheadline.monospacedDigit().bold())
+                    )
+                }
+            }
+        } else {
+            let thinkingTime = (player == .black ? clock.blackTime : clock.whiteTime)
 
-        switch timeControl.system {
-        case .ByoYomi:
-            return AnyView(ByoYomiTimerView(thinkingTime: thinkingTime))
-        case .Fischer(_, let timeIncrement, _):
-            return AnyView(FischerTimerView(thinkingTime: thinkingTime, timeIncrement: timeIncrement))
-        case .Canadian(_, let periodTime, let stonesPerPeriod):
-            return AnyView(CanadianTimerView(thinkingTime: thinkingTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod))
-        case .Simple, .Absolute:
-            return AnyView(SimpleTimerView(thinkingTime: thinkingTime))
-        default:
-            return AnyView(EmptyView())
+            switch timeControl.system {
+            case .ByoYomi:
+                return AnyView(ByoYomiTimerView(thinkingTime: thinkingTime))
+            case .Fischer(_, let timeIncrement, _):
+                return AnyView(FischerTimerView(thinkingTime: thinkingTime, timeIncrement: timeIncrement))
+            case .Canadian(_, let periodTime, let stonesPerPeriod):
+                return AnyView(CanadianTimerView(thinkingTime: thinkingTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod))
+            case .Simple, .Absolute:
+                return AnyView(SimpleTimerView(thinkingTime: thinkingTime))
+            default:
+                return AnyView(EmptyView())
+            }
         }
+        return AnyView(EmptyView())
     }
 }
 
 struct TimerView_Previews: PreviewProvider {
     static var previews: some View {
         let timeControl1 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "byoyomi", mainTime: 300, periods: 5, periodTime: 30))
-        let clock1 = Clock(
+        let clock1 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
             currentPlayer: .black,
@@ -116,7 +133,7 @@ struct TimerView_Previews: PreviewProvider {
         )
 
         let timeControl2 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "fischer", initialTime: 600, timeIncrement: 30, maxTime: 600))
-        let clock2 = Clock(
+        let clock2 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
             currentPlayer: .black,
