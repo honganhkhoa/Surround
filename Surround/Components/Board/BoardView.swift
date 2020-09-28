@@ -175,7 +175,14 @@ struct Stones: View {
         let dameIndicator = CGMutablePath()
         let whiteEstimatedScore = CGMutablePath()
         let blackEstimatedScore = CGMutablePath()
-        
+
+        let whiteShadowPath1 = CGMutablePath()
+        let whiteShadowPath2 = CGMutablePath()
+        let blackShadowPath1 = CGMutablePath()
+        let blackShadowPath2 = CGMutablePath()
+        let drawsShadow = size >= 14
+        let shadowOffset: CGFloat = size > 30 ? 2 : 1
+
         for row in 0..<height {
             for column in 0..<width {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
@@ -189,8 +196,23 @@ struct Stones: View {
                         }
                     } else {
                         if stoneColor == .white {
+                            if drawsShadow {
+                                // Separate shadows of adjacent stones
+                                if (row + column) % 2 == 0 {
+                                    whiteShadowPath1.addEllipse(in: stoneRect)
+                                } else {
+                                    whiteShadowPath2.addEllipse(in: stoneRect)
+                                }
+                            }
                             whiteLivingPath.addEllipse(in: stoneRect)
                         } else {
+                            if drawsShadow {
+                                if (row + column) % 2 == 0 {
+                                    blackShadowPath1.addEllipse(in: stoneRect)
+                                } else {
+                                    blackShadowPath2.addEllipse(in: stoneRect)
+                                }
+                            }
                             blackLivingPath.addEllipse(in: stoneRect)
                         }
                     }
@@ -227,20 +249,23 @@ struct Stones: View {
         }
         
         let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1 : 0.5)
-        let shadowOffset: CGFloat = size > 30 ? 2 : 1
-        let drawsShadow = size >= 14
         
         return ZStack {
             if drawsShadow {
                 Path(whiteLivingPath).fill(Color(red: 0.75, green: 0.75, blue: 0.75))
                     .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                Path(whiteLivingPath).stroke(Color.gray)
+                Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
+                Path(whiteShadowPath1).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(whiteShadowPath1))
+                Path(whiteShadowPath2).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(whiteShadowPath2))
+
                 Path(blackLivingPath).fill(Color.black)
                     .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                Path(blackLivingPath).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(blackLivingPath))
-                Path(whiteLivingPath).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(whiteLivingPath))
+                Path(blackShadowPath1).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(blackShadowPath1))
+                Path(blackShadowPath2).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                    .clipShape(Path(blackShadowPath2))
             } else {
                 Path(whiteLivingPath).fill(Color.white)
                 Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
