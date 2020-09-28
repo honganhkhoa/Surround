@@ -71,6 +71,22 @@ struct GameControlRow: View {
         })
     }
     
+    func estimateTerritory() {
+        pendingMove.wrappedValue = nil
+        pendingPosition.wrappedValue = nil
+        self.ogsRequestCancellable = game.currentPosition.estimateTerritory(on: game.computeQueue)
+            .receive(on: DispatchQueue.main)
+            .sink { estimatedTerritory in
+                game.currentPosition.estimatedScores = estimatedTerritory
+                self.ogsRequestCancellable = nil
+            }
+    }
+    
+    func clearEstimatedTerritory() {
+        game.currentPosition.estimatedScores = nil
+        game.objectWillChange.send()
+    }
+    
     var statusText: some View {
         Group {
             if game.undoacceptable {
@@ -90,6 +106,55 @@ struct GameControlRow: View {
         }
     }
     
+    var actionsMenu: some View {
+        Menu {
+            Section {
+                if game.gamePhase == .play {
+                    Button(action: { self.estimateTerritory() }) {
+                        Label("Estimate score", systemImage: "dot.squareshape.split.2x2")
+                    }.disabled(game.gameData?.disableAnalysis ?? false)
+                    Button(action: { ogs.requestUndo(game: game) }) {
+                        Label("Request undo", systemImage: "arrow.uturn.left")
+                    }.disabled(!game.undoable)
+                    if game.pauseControl?.userPauseDetail == nil {
+                        Button(action: { ogs.pause(game: game) }) {
+                            Label("Pause game", systemImage: "pause")
+                        }
+                    } else {
+                        Button(action: { ogs.resume(game: game) }) {
+                            Label("Resume game", systemImage: "play")
+                        }
+                    }
+                } else if game.gamePhase == .stoneRemoval {
+                    Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
+                        Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
+                        Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
+                    }
+                    Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
+                        Label("Resume game", systemImage: "play")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            Section {
+                Button(action: { UIApplication.shared.open(game.ogsURL!) }) {
+                    Label("Open in browser", systemImage: "safari")
+                }
+            }
+            Section {
+                Button(action: {}) {
+                    Label("Resign", systemImage: "flag").foregroundColor(.red)
+                }
+            }
+        }
+        label: {
+            Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
+                .padding(15)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .hoverEffect(.highlight)
+    }
+    
     var actionButtons: some View {
         HStack(spacing: 0) {
             if ogsRequestCancellable == nil {
@@ -97,7 +162,12 @@ struct GameControlRow: View {
                 let userNeedsToAcceptStoneRemoval = game.gamePhase == .stoneRemoval
                     && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
                 Group {
-                    if isUserTurnToPlay {
+                    if game.currentPosition.estimatedScores != nil {
+                        Button(action: { clearEstimatedTerritory() }) {
+                            Text("Clear estimates")
+                                .minimumScaleFactor(0.7)
+                        }
+                    } else if isUserTurnToPlay {
                         if let pendingMove = pendingMove.wrappedValue {
                             Button(action: { submitMove(move: pendingMove)}) {
                                 Text("Submit move")
@@ -133,42 +203,8 @@ struct GameControlRow: View {
                     viewDimension.height
                 })
             }
-            Menu {
-                if game.gamePhase == .play {
-                    Button(action: { ogs.requestUndo(game: game) }) {
-                        Label("Request undo", systemImage: "arrow.uturn.left")
-                    }.disabled(!game.undoable)
-                    if game.pauseControl?.userPauseDetail == nil {
-                        Button(action: { ogs.pause(game: game) }) {
-                            Label("Pause game", systemImage: "pause")
-                        }
-                    } else {
-                        Button(action: { ogs.resume(game: game) }) {
-                            Label("Resume game", systemImage: "play")
-                        }
-                    }
-                } else if game.gamePhase == .stoneRemoval {
-                    Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
-                        Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
-                        Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
-                    }
-                    Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
-                        Label("Resume game", systemImage: "play")
-                    }
-                }
-                Button(action: { UIApplication.shared.open(game.ogsURL!) }) {
-                    Label("Open in browser", systemImage: "safari")
-                }
-                Button(action: {}) {
-                    Label("Resign", systemImage: "flag").accentColor(.red)
-                }
-            }
-            label: {
-                Label("More actions", systemImage: "ellipsis.circle.fill").labelStyle(IconOnlyLabelStyle())
-                    .padding(15)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10))
-            .hoverEffect(.highlight)
+            
+            actionsMenu
             
             // Putting these inside conditional views above does not seem to work well
             Rectangle().frame(width: 0, height: 0)

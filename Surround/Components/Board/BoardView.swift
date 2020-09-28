@@ -217,7 +217,7 @@ struct Stones: View {
                         }
                     }
                 }
-                let scoringRectSize = max(size / 4, 2)
+                let scoringRectSize = max(size / 3, 2)
                 let scoringRectPadding = (size - scoringRectSize) / 2
                 let scoringRect = CGRect(
                     x: CGFloat(column) * size + scoringRectPadding,
@@ -279,37 +279,43 @@ struct Stones: View {
             }
 
             if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
-                if isLastMovePending {
-                    Path { path in
-                        let centerX = CGFloat(lastColumn) * size + size / 2
-                        let centerY = CGFloat(lastRow) * size + size / 2
-                        path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
-                        path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
-                        path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
-                        path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
+                if boardPosition.estimatedScores == nil {
+                    if isLastMovePending {
+                        Path { path in
+                            let centerX = CGFloat(lastColumn) * size + size / 2
+                            let centerY = CGFloat(lastRow) * size + size / 2
+                            path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
+                            path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
+                            path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
+                            path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
+                        }
+                        .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
+                    } else {
+                        Path { path in
+                            path.addEllipse(in: CGRect(
+                                                x: CGFloat(lastColumn) * size + size / 4,
+                                                y: CGFloat(lastRow) * size + size / 4,
+                                                width: size / 2,
+                                                height: size / 2))
+                        }
+                        .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                     }
-                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
-                } else {
-                    Path { path in
-                        path.addEllipse(in: CGRect(
-                                            x: CGFloat(lastColumn) * size + size / 4,
-                                            y: CGFloat(lastRow) * size + size / 4,
-                                            width: size / 2,
-                                            height: size / 2))
-                    }
-                    .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                 }
             }
             
             if boardPosition.gameScores != nil {
                 Path(dameIndicator).stroke(Color(UIColor.systemIndigo), lineWidth: lastMoveIndicatorWidth)
                 Path(whiteScoreIndicator).fill(Color.white)
+                Path(whiteScoreIndicator).stroke(Color.gray, lineWidth: 0.5)
                 Path(blackScoreIndicator).fill(Color.black)
+                Path(blackScoreIndicator).stroke(Color.gray, lineWidth: 0.5)
             }
 
             if boardPosition.estimatedScores != nil {
                 Path(whiteEstimatedScore).fill(Color.white)
+                Path(whiteEstimatedScore).stroke(Color.gray, lineWidth: 0.5)
                 Path(blackEstimatedScore).fill(Color.black)
+                Path(blackEstimatedScore).stroke(Color.gray, lineWidth: 0.5)
             }
         }
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
@@ -437,7 +443,7 @@ struct BoardView: View {
                     isHoveredPointValid: isHoveredPointValid,
                     selectedPoint: $selectedPoint
                 )
-                .allowsHitTesting(playable)
+                .allowsHitTesting(playable && displayedPosition.estimatedScores == nil)
                 .onChange(of: hoveredPoint) { value in
                     if let hoveredPoint = hoveredPoint {
                         do {

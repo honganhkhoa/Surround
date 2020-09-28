@@ -360,6 +360,26 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             } else {
                 return "White wins by \(outcome)"
             }
+        } else if let estimatedScores = currentPosition.estimatedScores {
+            var whiteScore: Double = 0
+            var blackScore: Double = 0
+            for row in 0..<currentPosition.height {
+                for column in 0..<currentPosition.width {
+                    if case .hasStone(let color) = estimatedScores[row][column] {
+                        if color == .black {
+                            blackScore += 1
+                        } else {
+                            whiteScore += 1
+                        }
+                    }
+                }
+            }
+            let difference = whiteScore + (gameData?.komi ?? 0) - blackScore
+            if difference > 0 {
+                return String(format: "White by %.1f", difference)
+            } else {
+                return String(format: "Black by %.1f", -difference)
+            }
         } else {
             if gamePhase == .stoneRemoval {
                 return "Stone Removal Phase"
