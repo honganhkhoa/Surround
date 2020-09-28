@@ -352,4 +352,57 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return (self.clock?.currentPlayer == .black && user.id == self.blackId) ||
             (self.clock?.currentPlayer == .white && user.id == self.whiteId)
     }
+    
+    var status: String {
+        if let outcome = gameData?.outcome {
+            if gameData?.winner == blackId {
+                return "Black wins by \(outcome)"
+            } else {
+                return "White wins by \(outcome)"
+            }
+        } else {
+            if gamePhase == .stoneRemoval {
+                return "Stone Removal Phase"
+            }
+            if undoRequested != nil {
+                return "Undo requested"
+            }
+            if isUserPlaying {
+                if isUserTurn {
+                    if case .pass = currentPosition.lastMove {
+                        return "Opponent passed"
+                    } else {
+                        return "Your move"
+                    }
+                } else {
+                    return "Waiting for opponent"
+                }
+            } else {
+                if let currentPlayer = clock?.currentPlayer {
+                    return "\(currentPlayer == .black ? "Black" : "White") to move"
+                } else {
+                    return ""
+                }
+            }
+        }
+    }
+    
+    var undoable: Bool {
+        guard isUserPlaying else {
+            return false
+        }
+        
+        guard gamePhase == .play && gameData?.outcome == nil else {
+            return false
+        }
+        
+        return !isUserTurn && undoRequested == nil && currentPosition.lastMoveNumber > 0
+    }
+
+    var undoacceptable: Bool {
+        guard let undoRequested = undoRequested else {
+            return false
+        }
+        return isUserTurn && undoRequested == currentPosition.lastMoveNumber
+    }
 }

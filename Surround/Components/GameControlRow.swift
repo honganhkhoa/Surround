@@ -17,6 +17,7 @@ struct GameControlRow: View {
     var goToNextGame: (() -> ())?
     @State var ogsRequestCancellable: AnyCancellable?
     var stoneRemovalOption: Binding<StoneRemovalOption> = .constant(.toggleGroup)
+    var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
 
     @State var showingPassAlert = false
     @State var showingResumeFromStoneRemovalAlert = false
@@ -41,6 +42,21 @@ struct GameControlRow: View {
             })
     }
     
+    func toggleRemovedStones(stones: Set<[Int]>) {
+        self.ogsRequestCancellable = ogs.toggleRemovedStones(stones: stones, forGame: game)
+            .zip(game.currentPosition.$removedStones.setFailureType(to: Error.self))
+            .sink(receiveCompletion: { _ in
+                DispatchQueue.main.async {
+                    self.ogsRequestCancellable = nil
+                }
+            }, receiveValue: { _ in
+                DispatchQueue.main.async {
+                    self.stoneRemovalSelectedPoints.wrappedValue.removeAll()
+                    self.ogsRequestCancellable = nil
+                }
+            })
+    }
+
     func acceptRemovedStones() {
         ogs.acceptRemovedStone(game: game)
         self.ogsRequestCancellable = game.$removedStonesAccepted.sink(receiveValue: { _ in
@@ -55,76 +71,19 @@ struct GameControlRow: View {
         })
     }
     
-    var undoable: Bool {
-        guard game.isUserPlaying else {
-            return false
-        }
-        
-        guard game.gamePhase == .play && game.gameData?.outcome == nil else {
-            return false
-        }
-        
-        return !game.isUserTurn && game.undoRequested == nil && game.currentPosition.lastMoveNumber > 0
-    }
-    
-    var undoacceptable: Bool {
-        guard let undoRequested = game.undoRequested else {
-            return false
-        }
-        return game.isUserTurn && undoRequested == game.currentPosition.lastMoveNumber
-    }
-    
-    var defaultStatus: String {
-        if let currentPlayer = game.clock?.currentPlayer {
-            return "\(currentPlayer == .black ? "Black" : "White") to move"
-        } else {
-            return ""
-        }
-    }
-    
-    var status: String {
-        if let outcome = game.gameData?.outcome {
-            if game.gameData?.winner == game.gameData?.blackPlayerId {
-                return "Black wins by \(outcome)"
-            } else {
-                return "White wins by \(outcome)"
-            }
-        } else {
-            if game.gamePhase == .stoneRemoval {
-                return "Stone Removal Phase"
-            }
-            if game.undoRequested != nil {
-                return "Undo requested"
-            }
-            if game.isUserPlaying {
-                if game.isUserTurn {
-                    if case .pass = game.currentPosition.lastMove {
-                        return "Opponent passed"
-                    } else {
-                        return "Your move"
-                    }
-                } else {
-                    return "Waiting for opponent"
-                }
-            } else {
-                return defaultStatus
-            }
-        }
-    }
-    
     var statusText: some View {
         Group {
-            if undoacceptable {
+            if game.undoacceptable {
                 Menu {
                     Button(action: { ogs.acceptUndo(game: game, moveNumber: game.undoRequested!) }) {
                         Label("Accept undo", systemImage: "arrow.uturn.left")
                     }
                 }
                 label: {
-                    Text("\(status) ▾").font(Font.title2.bold())
+                    Text("\(game.status) ▾").font(Font.title2.bold())
                 }
             } else {
-                Text(status).font(Font.title2.bold())
+                Text(game.status).font(Font.title2.bold())
                     .allowsTightening(true)
                     .minimumScaleFactor(0.7)
             }
@@ -178,7 +137,7 @@ struct GameControlRow: View {
                 if game.gamePhase == .play {
                     Button(action: { ogs.requestUndo(game: game) }) {
                         Label("Request undo", systemImage: "arrow.uturn.left")
-                    }.disabled(!undoable)
+                    }.disabled(!game.undoable)
                     if game.pauseControl?.userPauseDetail == nil {
                         Button(action: { ogs.pause(game: game) }) {
                             Label("Pause game", systemImage: "pause")
@@ -241,21 +200,26 @@ struct GameControlRow: View {
     var rowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: CGSize(width: 1024, height: 768), attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
 
     var body: some View {
-        if horizontal {
-            HStack {
-                statusText
-                Spacer(minLength: 0)
-                actionButtons
+        Group {
+            if horizontal {
+                HStack {
+                    statusText
+                    Spacer(minLength: 0)
+                    actionButtons
+                }
+                .padding([.trailing], -15)
+                .frame(height: rowHeight)
+            } else {
+                VStack(alignment: .trailing, spacing: 0) {
+                    statusText
+                        .frame(height: rowHeight)
+                    actionButtons
+                        .padding([.trailing], -15)
+                }
             }
-            .padding([.trailing], -15)
-            .frame(height: rowHeight)
-        } else {
-            VStack(alignment: .trailing) {
-                statusText
-                    .frame(height: rowHeight)
-                actionButtons
-                    .padding([.trailing], -15)
-            }
+        }
+        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { selectedPoints in
+            self.toggleRemovedStones(stones: selectedPoints)
         }
     }
 }

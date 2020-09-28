@@ -32,21 +32,6 @@ struct CorrespondenceGamesView: View {
             }
         }
     }
-
-    func toggleRemovedStones(stones: Set<[Int]>) {
-        self.ogsRequestCancellable = ogs.toggleRemovedStones(stones: stones, forGame: currentGame)
-            .zip(currentGame.currentPosition.$removedStones.setFailureType(to: Error.self))
-            .sink(receiveCompletion: { _ in
-                DispatchQueue.main.async {
-                    self.ogsRequestCancellable = nil
-                }
-            }, receiveValue: { _ in
-                DispatchQueue.main.async {
-                    self.stoneRemovalSelectedPoints.removeAll()
-                    self.ogsRequestCancellable = nil
-                }
-            })
-    }
         
     func goToNextGame() {
         if let currentIndex = activeGames.firstIndex(where: { game in game.ID == currentGame.ID }) {
@@ -67,7 +52,8 @@ struct CorrespondenceGamesView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption
+            stoneRemovalOption: $stoneRemovalOption,
+            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
     }
     
@@ -78,7 +64,8 @@ struct CorrespondenceGamesView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption
+            stoneRemovalOption: $stoneRemovalOption,
+            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
     }
     
@@ -218,9 +205,7 @@ struct CorrespondenceGamesView: View {
         .onChange(of: currentGame) { _ in
             self.pendingMove = nil
             self.pendingPosition = nil
-        }
-        .onChange(of: stoneRemovalSelectedPoints) { selectedPoints in
-            self.toggleRemovedStones(stones: selectedPoints)
+            self.stoneRemovalSelectedPoints.removeAll()
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             
