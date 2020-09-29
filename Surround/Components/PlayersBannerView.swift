@@ -17,6 +17,10 @@ struct PlayersBannerView: View {
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
+    
+    var isOffsetEnoughForNames: Bool {
+        return playerIconsOffset + playerIconSize >= 30
+    }
 
     func playerIcon(color: StoneColor) -> some View {
         let icon = game.playerIcon(for: color, size: Int(playerIconSize))
@@ -38,10 +42,18 @@ struct PlayersBannerView: View {
             }
         }
     }
-
-    func playerInfoColumn(color: StoneColor, leftSide: Bool) -> some View {
+    
+    func playerName(color: StoneColor) -> some View {
         let playerName = color == .black ? game.blackName : game.whiteName
         let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
+        
+        return HStack {
+            Text(playerName).font(Font.body.bold())
+            Text("[\(playerRank)]").font(Font.caption.bold())
+        }
+    }
+
+    func playerInfoColumn(color: StoneColor, leftSide: Bool) -> some View {
         let captures = game.currentPosition.captures[color] ?? 0
         let playerId = color == .black ? game.blackId : game.whiteId
         let pauseReason = game.pauseControl?.pauseReason(playerId: playerId)
@@ -57,11 +69,8 @@ struct PlayersBannerView: View {
         }()
         
         return VStack(alignment: leftSide ? .leading : .trailing) {
-            if showsPlayersName {
-                HStack {
-                    Text(playerName).font(Font.body.bold())
-                    Text("[\(playerRank)]").font(Font.caption.bold())
-                }
+            if showsPlayersName && !isOffsetEnoughForNames {
+                playerName(color: color)
             }
             HStack {
                 if !leftSide {
@@ -86,8 +95,6 @@ struct PlayersBannerView: View {
     }
     
     func scoreColumn(color: StoneColor, leftSide: Bool) -> some View {
-        let playerName = color == .black ? game.blackName : game.whiteName
-        let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
         let scores = game.currentPosition.gameScores ?? game.gameData?.score
         let score = color == .black ? scores?.black : scores?.white
         
@@ -122,11 +129,8 @@ struct PlayersBannerView: View {
         }()
 
         return VStack(alignment: leftSide ? .leading : .trailing) {
-            if showsPlayersName {
-                HStack {
-                    Text(playerName).font(Font.body.bold())
-                    Text("[\(playerRank)]").font(Font.caption.bold())
-                }
+            if showsPlayersName && !isOffsetEnoughForNames {
+                playerName(color: color)
             }
             if let score = score, let gameData = game.gameData {
                 HStack {
@@ -182,33 +186,46 @@ struct PlayersBannerView: View {
 
     var body: some View {
         let foregroundColor = game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
+        let playersNameOutsideOfColumn = showsPlayersName && isOffsetEnoughForNames
         return VStack(spacing: 0) {
-            HStack {
-                playerIcon(color: topLeftPlayerColor)
-                Group {
-                    if game.gamePhase == .play {
-                        playerInfoColumn(color: topLeftPlayerColor, leftSide: true)
-                            .foregroundColor(Color(foregroundColor))
-                    } else {
-                        scoreColumn(color: topLeftPlayerColor, leftSide: true)
-                    }
-                }.frame(height: playerIconSize)
-                Spacer()
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    playerIcon(color: topLeftPlayerColor)
+                    Group {
+                        if game.gamePhase == .play {
+                            playerInfoColumn(color: topLeftPlayerColor, leftSide: true)
+                                .foregroundColor(Color(foregroundColor))
+                        } else {
+                            scoreColumn(color: topLeftPlayerColor, leftSide: true)
+                        }
+                    }.frame(height: playerIconSize)
+                    Spacer()
+                }
+                if playersNameOutsideOfColumn {
+                    playerName(color: topLeftPlayerColor)
+                        .frame(height: 20)
+                }
+            }.padding(.bottom, playersNameOutsideOfColumn ? -30 : 0)
+            VStack(alignment: .trailing, spacing: 5) {
+                if playersNameOutsideOfColumn {
+                    playerName(color: topLeftPlayerColor.opponentColor())
+                        .frame(height: 20)
+                }
+                HStack {
+                    Spacer()
+                    Group {
+                        if game.gamePhase == .play {
+                            playerInfoColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
+                                .foregroundColor(Color(foregroundColor))
+                        } else {
+                            scoreColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
+                        }
+                    }.frame(height: playerIconSize)
+                    playerIcon(color: topLeftPlayerColor.opponentColor())
+                }
             }
-            HStack {
-                Spacer()
-                Group {
-                    if game.gamePhase == .play {
-                        playerInfoColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
-                            .foregroundColor(Color(foregroundColor))
-                    } else {
-                        scoreColumn(color: topLeftPlayerColor.opponentColor(), leftSide: false)
-                    }
-                }.frame(height: playerIconSize)
-                playerIcon(color: topLeftPlayerColor.opponentColor())
-            }
-            .offset(y: playerIconsOffset)
-            .padding(.bottom, playerIconsOffset)
+            .offset(y: playerIconsOffset - (playersNameOutsideOfColumn ? 25 : 0))
+            .padding(.bottom, playerIconsOffset - (playersNameOutsideOfColumn ? 25 : 0))
         }
         .padding(.vertical, reducesVerticalPadding ? 12 : 15)
         .padding(.horizontal)
@@ -229,6 +246,8 @@ struct PlayersBannerView_Previews: PreviewProvider {
     static var previews: some View {
         return Group {
             PlayersBannerView(game: TestData.Ongoing19x19wBot1)
+                .previewLayout(.fixed(width: 320, height: 200))
+            PlayersBannerView(game: TestData.Ongoing19x19wBot1, showsPlayersName: true)
                 .previewLayout(.fixed(width: 320, height: 200))
             PlayersBannerView(game: TestData.Scored19x19Korean, playerIconSize: 96, showsPlayersName: true)
                 .previewLayout(.fixed(width: 500, height: 300))

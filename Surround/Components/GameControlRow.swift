@@ -165,7 +165,9 @@ struct GameControlRow: View {
         Group {
             if ogsRequestCancellable == nil {
                 let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
-                let userNeedsToAcceptStoneRemoval = game.gamePhase == .stoneRemoval
+                let userNeedsToAcceptStoneRemoval =
+                    game.isUserPlaying
+                    && game.gamePhase == .stoneRemoval
                     && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
                 Group {
                     if game.currentPosition.estimatedScores != nil {

@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 
 struct PublicGamesList: View {
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @State var games: [Game] = []
     @State var gameDetailCancellable: AnyCancellable?
@@ -32,18 +33,13 @@ struct PublicGamesList: View {
                             .padding()
                     }
                 }
+                .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
                 NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetailView(currentGame: gameToShowDetail!), isActive: $showDetail) {
                     EmptyView()
                 }
             }
         }
         .onAppear {
-//            self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: 25547938).sink(receiveCompletion: { _ in
-//            }, receiveValue: { game in
-//                self.gameToShowDetail = game
-//                self.showDetail = true
-//            })
-
             print("Appeared \(self)")
             if self.games.count == 0 && self.publicGamesCancellable == nil {
                 self.publicGamesCancellable = ogs.fetchAndConnectToPublicGames().sink(receiveCompletion: { completion in
@@ -68,17 +64,16 @@ struct PublicGamesList: View {
             }
         }
         .navigationBarTitle(Text("Public live games"))
-        .navigationBarItems(trailing: Button(action: {
-            ogs.logout()
-        }, label: {
-            Text("Logout")
-        }))
         .modifier(RootViewSwitchingMenu())
     }
 }
 
 struct PublicGamesList_Previews: PreviewProvider {
     static var previews: some View {
-        PublicGamesList()
+        NavigationView {
+            PublicGamesList()
+        }
+        .environmentObject(OGSService.previewInstance())
+        .colorScheme(.dark)
     }
 }

@@ -470,9 +470,9 @@ class OGSService: ObservableObject {
     //                print(gamedata[0])
                     let ogsGame = try decoder.decode(OGSGame.self, from: gamedata[0] as? [String: Any] ?? [:])
                     connectedGame.gameData = ogsGame
-                    if ogsGame.outcome != nil {
-                        self.disconnect(from: connectedGame)
-                    }
+//                    if ogsGame.outcome != nil {
+//                        self.disconnect(from: connectedGame)
+//                    }
     //                print(ogsGame)
                 } catch {
                     print(gameId, error)
@@ -669,7 +669,7 @@ class OGSService: ObservableObject {
     func fetchAndConnectToPublicGames() -> AnyPublisher<[Game], Error> {
         
         func queryPublicGames(promise: @escaping Future<[Game], Error>.Promise) {
-            self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 18]).timingOut(after: 3) { data in
+            self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 30]).timingOut(after: 3) { data in
     //            print(data)
                 if data.count > 0 {
                     if let gamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {

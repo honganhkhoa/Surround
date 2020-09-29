@@ -60,42 +60,66 @@ extension OGSClock: Decodable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: OGSClock.CodingKeys.self)
-        if let blackThinkingTime = try? container.decode(Double.self, forKey: .blackTime) {
-            blackTime = ThinkingTime(thinkingTime: blackThinkingTime)
-        } else {
-            blackTime = try container.decode(ThinkingTime.self, forKey: .blackTime)
-        }
-        blackTime.thinkingTimeLeft = blackTime.thinkingTime
-        blackTime.periodsLeft = blackTime.periods
-        blackTime.periodTimeLeft = blackTime.periodTime
-        blackTime.blockTimeLeft = blackTime.blockTime
 
-        if let whiteThinkingTime = try? container.decode(Double.self, forKey: .whiteTime) {
-            whiteTime = ThinkingTime(thinkingTime: whiteThinkingTime)
-        } else {
-            whiteTime = try container.decode(ThinkingTime.self, forKey: .whiteTime)
-        }
-        whiteTime.thinkingTimeLeft = whiteTime.thinkingTime
-        whiteTime.periodsLeft = whiteTime.periods
-        whiteTime.periodTimeLeft = whiteTime.periodTime
-        whiteTime.blockTimeLeft = whiteTime.blockTime
-        
-        blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
-        whitePlayerId = try container.decode(Int.self, forKey: .whitePlayerId)
-        currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
-        currentPlayer = currentPlayerId == blackPlayerId ? .black : .white
-        
-        lastMoveTime = try container.decode(Double.self, forKey: .lastMove)
-        started = !container.contains(.startMode)
-        
         expiration = try container.decodeIfPresent(Double.self, forKey: .expiration)
         if let expiration = expiration {
             timeUntilExpiration = expiration / 1000 - Date().timeIntervalSince1970
         }
+
+        blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
+        whitePlayerId = try container.decode(Int.self, forKey: .whitePlayerId)
+        currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
+        currentPlayer = currentPlayerId == blackPlayerId ? .black : .white
+
+        if let blackThinkingTime = try? container.decode(Double.self, forKey: .blackTime) {
+            if currentPlayer == .black {
+                blackTime = ThinkingTime(
+                    thinkingTime: timeUntilExpiration,
+                    thinkingTimeLeft: timeUntilExpiration
+                )
+            } else {
+                blackTime = ThinkingTime(
+                    thinkingTime: blackThinkingTime,
+                    thinkingTimeLeft: blackThinkingTime
+                )
+            }
+        } else {
+            blackTime = try container.decode(ThinkingTime.self, forKey: .blackTime)
+            blackTime.thinkingTimeLeft = blackTime.thinkingTime
+            blackTime.periodsLeft = blackTime.periods
+            blackTime.periodTimeLeft = blackTime.periodTime
+            blackTime.blockTimeLeft = blackTime.blockTime
+        }
+
+        if let whiteThinkingTime = try? container.decode(Double.self, forKey: .whiteTime) {
+            if currentPlayer == .white {
+                whiteTime = ThinkingTime(
+                    thinkingTime: timeUntilExpiration,
+                    thinkingTimeLeft: timeUntilExpiration
+                )
+            } else {
+                whiteTime = ThinkingTime(
+                    thinkingTime: whiteThinkingTime,
+                    thinkingTimeLeft: whiteThinkingTime
+                )
+            }
+        } else {
+            whiteTime = try container.decode(ThinkingTime.self, forKey: .whiteTime)
+            whiteTime.thinkingTimeLeft = whiteTime.thinkingTime
+            whiteTime.periodsLeft = whiteTime.periods
+            whiteTime.periodTimeLeft = whiteTime.periodTime
+            whiteTime.blockTimeLeft = whiteTime.blockTime
+        }
+                
+        lastMoveTime = try container.decode(Double.self, forKey: .lastMove)
+        started = !container.contains(.startMode)
+        
         pausedTime = try container.decodeIfPresent(Double.self, forKey: .pausedSince)
         if let pauseDetail = try container.decodeIfPresent(OGSPauseDetail.self, forKey: .pause) {
             pauseControl = pauseDetail.pauseControl
         }
+        
+        
     }
     
     mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
@@ -135,8 +159,6 @@ extension OGSClock: Decodable {
                         thinkingTime.periodTimeLeft = Int(timeLeft)
                     }
                 }
-            case .Fischer(_, _, _):
-                thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsElapsed
             case .Canadian(_, let periodTime, _):
                 var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
                 if timeLeft > 0 {
@@ -146,9 +168,8 @@ extension OGSClock: Decodable {
                     thinkingTime.thinkingTimeLeft = 0
                     thinkingTime.blockTimeLeft = timeLeft
                 }
-            case .Simple, .Absolute:
-                let timeLeft = thinkingTime.thinkingTime! - secondsElapsed
-                thinkingTime.thinkingTimeLeft = timeLeft
+            case .Simple, .Absolute, .Fischer(_, _, _):
+                thinkingTime.thinkingTimeLeft = timeUntilExpiration
             default:
                 break
             }
