@@ -16,10 +16,10 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     
     @State var gameDetailCancellable: AnyCancellable?
-    @State var showCorrespondenceGameDetail = false
-    @State var correspondenceGameToShowDetail: Game? = nil
-    @State var showLiveGameDetail = false
-    @State var liveGameToShowDetail: Game? = nil
+    @SceneStorage("showActiveGameDetail")
+    var showGameDetail = false
+    @SceneStorage("currentActiveOGSGameId")
+    var currentActiveOGSGameId = -1
 
     @State var username = ""
     @State var password = ""
@@ -98,14 +98,11 @@ struct HomeView: View {
         .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
     
-    func showCorrespondenceGameDetail(game: Game) {
-        self.correspondenceGameToShowDetail = game
-        self.showCorrespondenceGameDetail = true
-    }
-
-    func showLiveGameDetail(game: Game) {
-        self.liveGameToShowDetail = game
-        self.showLiveGameDetail = true
+    func showGameDetail(game: Game) {
+        if let ogsID = game.ogsID {
+            self.currentActiveOGSGameId = ogsID
+            self.showGameDetail = true
+        }
     }
 
     var activeGamesView: some View {
@@ -120,7 +117,7 @@ struct HomeView: View {
                                 ForEach(ogs.liveGames) { game in
                                     GameCell(game: game, displayMode: displayMode)
                                     .onTapGesture {
-                                        showLiveGameDetail(game: game)
+                                        showGameDetail(game: game)
                                     }
                                     .padding(.vertical, displayMode == .full ? nil : 0)
                                     .padding(.horizontal)
@@ -131,7 +128,7 @@ struct HomeView: View {
                             ForEach(ogs.sortedActiveCorrespondenceGamesOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    showCorrespondenceGameDetail(game: game)
+                                    showGameDetail(game: game)
                                 }
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
@@ -141,7 +138,7 @@ struct HomeView: View {
                             ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
-                                    self.showCorrespondenceGameDetail(game: game)
+                                    self.showGameDetail(game: game)
                                 }
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
@@ -156,16 +153,16 @@ struct HomeView: View {
     }
         
     var body: some View {
-        VStack {
+        let currentActiveGame = ogs.activeGames[currentActiveOGSGameId]
+        return VStack {
             if ogs.isLoggedIn {
                 activeGamesView
             } else {
                 loginView
             }
-            NavigationLink(destination: correspondenceGameToShowDetail == nil ? nil : CorrespondenceGamesView(currentGame: correspondenceGameToShowDetail!), isActive: $showCorrespondenceGameDetail) {
-                EmptyView()
-            }
-            NavigationLink(destination: liveGameToShowDetail == nil ? nil : LiveGameView(game: liveGameToShowDetail!), isActive: $showLiveGameDetail) {
+            NavigationLink(
+                destination: currentActiveGame == nil ? nil : GameDetailView(currentGame: currentActiveGame!),
+                isActive: $showGameDetail) {
                 EmptyView()
             }
         }

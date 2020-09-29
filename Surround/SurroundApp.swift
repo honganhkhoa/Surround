@@ -13,7 +13,7 @@ struct SurroundApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainViewWrapper()
         }
     }
 }

@@ -32,7 +32,7 @@ struct PublicGamesList: View {
                             .padding()
                     }
                 }
-                NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetail(game: gameToShowDetail!), isActive: $showDetail) {
+                NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetailView(currentGame: gameToShowDetail!), isActive: $showDetail) {
                     EmptyView()
                 }
             }

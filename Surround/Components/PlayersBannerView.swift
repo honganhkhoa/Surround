@@ -13,7 +13,7 @@ struct PlayersBannerView: View {
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
     var topLeftPlayerColor = StoneColor.black
-    var reduceVerticalPadding = false
+    var reducesVerticalPadding = false
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
@@ -210,7 +210,7 @@ struct PlayersBannerView: View {
             .offset(y: playerIconsOffset)
             .padding(.bottom, playerIconsOffset)
         }
-        .padding(.vertical, reduceVerticalPadding ? 12 : 15)
+        .padding(.vertical, reducesVerticalPadding ? 12 : 15)
         .padding(.horizontal)
         .background(
             LinearGradient(

@@ -20,6 +20,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var gameData: OGSGame? {
         didSet {
             if let data = gameData {
+                self.gameName = data.gameName
                 self.blackRank = data.players.black.rank
                 self.whiteRank = data.players.white.rank
                 self.blackId = data.players.black.id

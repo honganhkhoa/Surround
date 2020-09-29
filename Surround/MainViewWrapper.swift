@@ -7,9 +7,8 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct MainViewWrapper: View {
     @SceneStorage("sceneID") var sceneID = UUID().uuidString
-    @State var isLoggedIn = false
     
     var body: some View {
         let ogs = OGSService.instance(forSceneWithID: sceneID)
@@ -20,6 +19,6 @@ struct ContentView: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        MainViewWrapper()
     }
 }

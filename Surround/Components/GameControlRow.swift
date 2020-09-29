@@ -113,26 +113,30 @@ struct GameControlRow: View {
                     Button(action: { self.estimateTerritory() }) {
                         Label("Estimate score", systemImage: "dot.squareshape.split.2x2")
                     }.disabled(game.gameData?.disableAnalysis ?? false)
-                    Button(action: { ogs.requestUndo(game: game) }) {
-                        Label("Request undo", systemImage: "arrow.uturn.left")
-                    }.disabled(!game.undoable)
-                    if game.pauseControl?.userPauseDetail == nil {
-                        Button(action: { ogs.pause(game: game) }) {
-                            Label("Pause game", systemImage: "pause")
+                }
+                if game.isUserPlaying {
+                    if game.gamePhase == .play {
+                        Button(action: { ogs.requestUndo(game: game) }) {
+                            Label("Request undo", systemImage: "arrow.uturn.left")
+                        }.disabled(!game.undoable)
+                        if game.pauseControl?.userPauseDetail == nil {
+                            Button(action: { ogs.pause(game: game) }) {
+                                Label("Pause game", systemImage: "pause")
+                            }
+                        } else {
+                            Button(action: { ogs.resume(game: game) }) {
+                                Label("Resume game", systemImage: "play")
+                            }
                         }
-                    } else {
-                        Button(action: { ogs.resume(game: game) }) {
+                    } else if game.gamePhase == .stoneRemoval {
+                        Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
+                            Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
+                            Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
+                        }
+                        Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
                             Label("Resume game", systemImage: "play")
+                                .foregroundColor(.red)
                         }
-                    }
-                } else if game.gamePhase == .stoneRemoval {
-                    Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
-                        Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
-                        Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
-                    }
-                    Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
-                        Label("Resume game", systemImage: "play")
-                            .foregroundColor(.red)
                     }
                 }
             }
@@ -141,9 +145,11 @@ struct GameControlRow: View {
                     Label("Open in browser", systemImage: "safari")
                 }
             }
-            Section {
-                Button(action: {}) {
-                    Label("Resign", systemImage: "flag").foregroundColor(.red)
+            if game.isUserPlaying {
+                Section {
+                    Button(action: {}) {
+                        Label("Resign", systemImage: "flag").foregroundColor(.red)
+                    }
                 }
             }
         }
@@ -155,8 +161,8 @@ struct GameControlRow: View {
         .hoverEffect(.highlight)
     }
     
-    var actionButtons: some View {
-        HStack(spacing: 0) {
+    var mainActionButton: some View {
+        Group {
             if ogsRequestCancellable == nil {
                 let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
                 let userNeedsToAcceptStoneRemoval = game.gamePhase == .stoneRemoval
@@ -181,7 +187,7 @@ struct GameControlRow: View {
                         Button(action: { acceptRemovedStones() }) {
                             Text("Accept")
                         }
-                    } else {
+                    } else if game.isUserPlaying && game.gameData?.timeControl.speed == .correspondence {
                         if let goToNextGame = goToNextGame {
                             if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
                                 Button(action: goToNextGame) {
@@ -203,6 +209,12 @@ struct GameControlRow: View {
                     viewDimension.height
                 })
             }
+        }
+    }
+    
+    var actionButtons: some View {
+        HStack(spacing: 0) {
+            mainActionButton
             
             actionsMenu
             
