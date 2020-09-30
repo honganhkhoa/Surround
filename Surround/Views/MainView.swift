@@ -104,6 +104,8 @@ struct RootViewSwitchingMenu: ViewModifier {
                 }
                 label: {
                     Label("Navigation", systemImage: currentView == .home ? "house" : "person.2")
+                        .padding(10)
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .disabled(!compactSizeClass)
                 .opacity(compactSizeClass ? 1 : 0)

@@ -112,7 +112,10 @@ struct GameControlRow: View {
                 if game.gamePhase == .play {
                     Button(action: { self.estimateTerritory() }) {
                         Label("Estimate score", systemImage: "dot.squareshape.split.2x2")
-                    }.disabled(game.gameData?.disableAnalysis ?? false)
+                    }.disabled(
+                        game.isUserPlaying
+                        && (game.gameData?.disableAnalysis ?? false)
+                    )
                 }
                 if game.isUserPlaying {
                     if game.gamePhase == .play {

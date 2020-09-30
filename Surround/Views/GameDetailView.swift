@@ -79,8 +79,9 @@ struct GameView: View {
             Spacer(minLength: 10).frame(maxHeight: 15)
             controlRow
                 .padding(.horizontal)
-            Spacer(minLength: 10).frame(maxHeight: 15)
+            Spacer(minLength: 10)
             boardView.frame(width: compactBoardSize, height: compactBoardSize)
+            Spacer(minLength: 0)
         }
     }
     
@@ -133,10 +134,11 @@ struct GameView: View {
                             playerIconsOffset: -80,
                             showsPlayersName: true
                         )
-                        Spacer(minLength: 15)
+                        Spacer(minLength: 15).frame(maxHeight: 15)
                         controlRow
                         Spacer(minLength: 15)
                         boardView.frame(width: boardSizeLimit, height: boardSizeLimit)
+                        Spacer(minLength: 0)
                     }
                     .padding()
                     .frame(maxWidth: boardSizeLimit + 15 * 2)
