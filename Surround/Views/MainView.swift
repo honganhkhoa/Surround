@@ -50,6 +50,7 @@ struct MainView: View {
                     }
                 }
                 .listStyle(SidebarListStyle())
+                .navigationTitle("Surround")
                 if let navigationCurrentView = navigationCurrentView {
                     switch navigationCurrentView {
                     case .home:

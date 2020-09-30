@@ -11,9 +11,6 @@ import Combine
 struct PublicGamesList: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
-    @State var games: [Game] = []
-    @State var gameDetailCancellable: AnyCancellable?
-    @State var publicGamesCancellable: AnyCancellable?
     @State var gameToShowDetail: Game? = nil
     @State var showDetail = false
     
@@ -21,14 +18,11 @@ struct PublicGamesList: View {
         Group {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
-                    ForEach(games) { game in
+                    ForEach(ogs.sortedPublicGames) { game in
                         GameCell(game: game)
                             .onTapGesture {
                                 self.gameToShowDetail = game
                                 self.showDetail = true
-                                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: game.gameData!.gameId).sink(receiveCompletion: { _ in
-                                }, receiveValue: { value in
-                                })
                             }
                             .padding()
                     }
@@ -41,27 +35,7 @@ struct PublicGamesList: View {
         }
         .onAppear {
             print("Appeared \(self)")
-            if self.games.count == 0 && self.publicGamesCancellable == nil {
-                self.publicGamesCancellable = ogs.fetchAndConnectToPublicGames().sink(receiveCompletion: { completion in
-
-                }) { games in
-                    self.games = games
-                }
-            }
-        }
-        .onDisappear {
-            print("Disappeared \(self) \(String(describing: gameToShowDetail))")
-            for game in games {
-                if game.ID != gameToShowDetail?.ID {
-                    ogs.disconnect(from: game)
-                } else {
-                    print("Skipped")
-                }
-            }
-            DispatchQueue.main.async {
-                games = []
-                publicGamesCancellable = nil
-            }
+            ogs.fetchPublicGames()
         }
         .navigationBarTitle(Text("Public live games"))
         .modifier(RootViewSwitchingMenu())
@@ -73,7 +47,17 @@ struct PublicGamesList_Previews: PreviewProvider {
         NavigationView {
             PublicGamesList()
         }
-        .environmentObject(OGSService.previewInstance())
+        .navigationViewStyle(StackNavigationViewStyle())
+        .environmentObject(
+            OGSService.previewInstance(
+                publicGames: [
+                    TestData.Ongoing19x19HandicappedWithNoInitialState,
+                    TestData.Scored15x17,
+                    TestData.Resigned9x9Japanese,
+                    TestData.StoneRemoval9x9
+                ]
+            )
+        )
         .colorScheme(.dark)
     }
 }

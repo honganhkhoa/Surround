@@ -93,7 +93,7 @@ struct InlineTimerView: View {
 
         let playerId = player == .black ? clock.blackPlayerId : clock.whitePlayerId
         let isPaused = pauseControl?.isPaused() ?? false
-        let pausedText = pauseControl?.pauseReason(playerId: playerId) ?? ""
+        let pausedReason = pauseControl?.pauseReason(playerId: playerId) ?? ""
         
         return AnyView(HStack(alignment: .firstTextBaseline) {
             if !clock.started {
@@ -127,7 +127,7 @@ struct InlineTimerView: View {
                     Text("").font(mainFont)
                 }
                 if isPaused {
-                    Text(pausedText).font(subFont.bold())
+                    Text(pausedReason).font(subFont.bold())
                 }
             }
         })

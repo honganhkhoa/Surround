@@ -35,7 +35,7 @@ struct OGSClock {
     var currentPlayer: StoneColor
     var lastMoveTime: Double
     var pausedTime: Double?
-    var started: Bool = false
+    var started: Bool = true
     var currentPlayerId: Int
     var blackPlayerId: Int
     var whitePlayerId: Int
@@ -169,7 +169,11 @@ extension OGSClock: Decodable {
                     thinkingTime.blockTimeLeft = timeLeft
                 }
             case .Simple, .Absolute, .Fischer(_, _, _):
-                thinkingTime.thinkingTimeLeft = timeUntilExpiration
+                if paused {
+                    thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsElapsed
+                } else {
+                    thinkingTime.thinkingTimeLeft = timeUntilExpiration
+                }
             default:
                 break
             }

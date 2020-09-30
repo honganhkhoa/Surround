@@ -282,9 +282,15 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
         .onAppear {
-            updateActiveGameList()
-            for game in activeGames {
-                ogs.updateDetailsOfConnectedGame(game: game)
+            if let ogsId = currentGame.ogsID {
+                if ogs.activeGames[ogsId] != nil {
+                    updateActiveGameList()
+                    for game in activeGames {
+                        ogs.updateDetailsOfConnectedGame(game: game)
+                    }
+                } else {
+                    ogs.updateDetailsOfConnectedGame(game: currentGame)
+                }
             }
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in

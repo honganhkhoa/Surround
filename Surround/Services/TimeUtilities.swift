@@ -16,7 +16,7 @@ class TimeUtilities {
     }
     
     func formatTimeLeft(timeLeft: TimeInterval) -> String {
-        var secondsLeft = Int(timeLeft)
+        var secondsLeft = max(Int(timeLeft), 0)
         let daysLeft = secondsLeft / 86400
         secondsLeft -= daysLeft * 86400
         let hoursLeft = secondsLeft / 3600

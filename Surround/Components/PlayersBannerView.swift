@@ -18,8 +18,8 @@ struct PlayersBannerView: View {
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
     
-    var isOffsetEnoughForNames: Bool {
-        return playerIconsOffset + playerIconSize >= 30
+    var shouldShowNamesOutOfColumn: Bool {
+        return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
     }
 
     func playerIcon(color: StoneColor) -> some View {
@@ -69,7 +69,7 @@ struct PlayersBannerView: View {
         }()
         
         return VStack(alignment: leftSide ? .leading : .trailing) {
-            if showsPlayersName && !isOffsetEnoughForNames {
+            if showsPlayersName && !shouldShowNamesOutOfColumn {
                 playerName(color: color)
             }
             HStack {
@@ -129,7 +129,7 @@ struct PlayersBannerView: View {
         }()
 
         return VStack(alignment: leftSide ? .leading : .trailing) {
-            if showsPlayersName && !isOffsetEnoughForNames {
+            if showsPlayersName && !shouldShowNamesOutOfColumn {
                 playerName(color: color)
             }
             if let score = score, let gameData = game.gameData {
@@ -186,7 +186,7 @@ struct PlayersBannerView: View {
 
     var body: some View {
         let foregroundColor = game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
-        let playersNameOutsideOfColumn = showsPlayersName && isOffsetEnoughForNames
+        let playersNameOutsideOfColumn = showsPlayersName && shouldShowNamesOutOfColumn
         return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
