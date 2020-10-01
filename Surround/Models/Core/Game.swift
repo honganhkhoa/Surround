@@ -88,10 +88,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var currentPosition: BoardPosition
     @Published var undoRequested: Int?
     var blackFormattedRank: String {
-        return formattedRank(rank: blackRank, professional: gameData?.players.black.professional ?? false)
+        return formattedRankString(rank: blackRank, professional: gameData?.players.black.professional ?? false)
     }
     var whiteFormattedRank: String {
-        return formattedRank(rank: whiteRank, professional: gameData?.players.white.professional ?? false)
+        return formattedRankString(rank: whiteRank, professional: gameData?.players.white.professional ?? false)
     }
     var initialPosition: BoardPosition
     var ID: GameID
@@ -197,22 +197,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     func makeMove(move: Move) throws {
         self.currentPosition = try currentPosition.makeMove(move: move)
         self.undoRequested = nil
-    }
-    
-    private func formattedRank(rank: Double?, professional: Bool = false) -> String {
-        guard let rawRank = rank else {
-            return "?"
-        }
-        let displayedRank = Int(floor(rawRank))
-        if professional {
-            return "\(max(displayedRank - 36, 1))p"
-        } else {
-            if displayedRank >= 30 {
-                return "\(min(displayedRank - 30 + 1, 9))d"
-            } else {
-                return "\(30 - displayedRank)k"
-            }
-        }
     }
     
     func undoMove(numbered moveNumber: Int) {

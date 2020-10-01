@@ -19,6 +19,57 @@ struct MainView: View {
     enum SubView: String {
         case home
         case publicGames
+        case settings
+        
+        var systemImage: String {
+            switch self {
+            case .home:
+                return "house"
+            case .publicGames:
+                return "person.2"
+            case .settings:
+                return "gearshape.2"
+            }
+        }
+        
+        var title: String {
+            switch self {
+            case .home:
+                return "Home"
+            case .publicGames:
+                return "Public games"
+            case .settings:
+                return "Settings"
+            }
+        }
+        
+        var view: some View {
+            switch self {
+            case .home:
+                return AnyView(HomeView())
+            case .publicGames:
+                return AnyView(PublicGamesList())
+            case .settings:
+                return AnyView(SettingsView())
+            }
+        }
+
+        var label: some View {
+            Label(self.title, systemImage: self.systemImage)
+        }
+        
+        func navigationLink(currentView: Binding<SubView?>) -> some View {
+            NavigationLink(
+                destination: self.view,
+                tag: self,
+                selection: currentView) {self.label}
+        }
+        
+        func menuButton(currentView: Binding<SubView>) -> some View {
+            Button(action: { currentView.wrappedValue = self }) {
+                self.label
+            }
+        }
     }
         
     var body: some View {
@@ -28,36 +79,18 @@ struct MainView: View {
         #endif
         return NavigationView {
             if compactSizeClass {
-                switch currentView {
-                case .home:
-                    HomeView()
-                case .publicGames:
-                    PublicGamesList()
-                }
+                currentView.view
             } else {
                 List(selection: $navigationCurrentView) {
-                    NavigationLink(
-                        destination: HomeView(),
-                        tag: SubView.home,
-                        selection: $navigationCurrentView) {
-                        Label("Home", systemImage: "house")
-                    }
-                    NavigationLink(
-                        destination: PublicGamesList(),
-                        tag: SubView.publicGames,
-                        selection: $navigationCurrentView) {
-                        Label("Public games", systemImage: "person.2")
-                    }
+                    SubView.home.navigationLink(currentView: $navigationCurrentView)
+                    SubView.publicGames.navigationLink(currentView: $navigationCurrentView)
+                    Divider()
+                    SubView.settings.navigationLink(currentView: $navigationCurrentView)
                 }
                 .listStyle(SidebarListStyle())
                 .navigationTitle("Surround")
                 if let navigationCurrentView = navigationCurrentView {
-                    switch navigationCurrentView {
-                    case .home:
-                        HomeView()
-                    case .publicGames:
-                        PublicGamesList()
-                    }
+                    navigationCurrentView.view
                 }
             }
         }
@@ -70,11 +103,15 @@ struct MainView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                ogs.ensureConnect()
-                if ogs.isLoggedIn {
-                    ogs.updateUIConfig()
-                    ogs.loadOverview()
-                }
+                ogs.ensureConnect(thenExecute: {
+                    if ogs.isLoggedIn {
+                        ogs.updateUIConfig()
+                        ogs.loadOverview()
+                    }
+                    if currentView == .publicGames {
+                        ogs.fetchPublicGames()
+                    }
+                })
             }
         }
     }
@@ -95,15 +132,16 @@ struct RootViewSwitchingMenu: ViewModifier {
         return content.toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Menu {
-                    Button(action: { currentView = .home }) {
-                        Label("Home", systemImage: "house")
+                    Section {
+                        MainView.SubView.home.menuButton(currentView: $currentView)
+                        MainView.SubView.publicGames.menuButton(currentView: $currentView)
                     }
-                    Button(action: { currentView = .publicGames }) {
-                        Label("Public games", systemImage: "person.2")
+                    Section {
+                        MainView.SubView.settings.menuButton(currentView: $currentView)
                     }
                 }
                 label: {
-                    Label("Navigation", systemImage: currentView == .home ? "house" : "person.2")
+                    Label("Navigation", systemImage: currentView.systemImage)
                         .padding(10)
                         .contentShape(RoundedRectangle(cornerRadius: 10))
                 }

@@ -12,9 +12,23 @@ import DictionaryCoding
 import SocketIO
 import WebKit
 
-enum ServiceError: Error {
+enum OGSServiceError: Error {
     case invalidJSON
     case notLoggedIn
+    case loginError(error: String)
+}
+
+extension OGSServiceError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .invalidJSON:
+            return "Cannot decode server's response"
+        case .notLoggedIn:
+            return "Login required"
+        case .loginError(let error):
+            return error
+        }
+    }
 }
 
 class OGSService: ObservableObject {
@@ -140,11 +154,12 @@ class OGSService: ObservableObject {
         })
         
         self.checkLoginStatus()
-        self.ensureConnect()
-        if isLoggedIn {
-            self.updateUIConfig()
-            self.loadOverview()
-        }
+        self.ensureConnect(thenExecute: {
+            if self.isLoggedIn {
+                self.updateUIConfig()
+                self.loadOverview()
+            }
+        })
     }
     
     private func setUpSocketEventListeners() {
@@ -387,7 +402,7 @@ class OGSService: ObservableObject {
                             }
                         }
                     }
-                    promise(.failure(ServiceError.invalidJSON))
+                    promise(.failure(OGSServiceError.invalidJSON))
                 case .failure(let error):
                     promise(.failure(error))
                 }
@@ -424,12 +439,21 @@ class OGSService: ObservableObject {
         }
     }
         
-    func ensureConnect() {
-        guard socket.status != .connected && socket.status != .connecting else {
-            return
+    func ensureConnect(thenExecute callback: (() -> ())? = nil) {
+        if socket.status == .connected {
+            if let callback = callback {
+                callback()
+            }
+        } else {
+            if socket.status != .connecting {
+                socket.connect()
+            }
+            if let callback = callback {
+                socket.once(clientEvent: .connect, callback: { _, _ in
+                    callback()
+                })
+            }
         }
-        
-        socket.connect()
     }
     
     func disconnect(from game: Game) {
@@ -585,7 +609,7 @@ class OGSService: ObservableObject {
     
     func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
         guard let ogsUIConfig = self.ogsUIConfig else {
-            return Fail(error: ServiceError.notLoggedIn).eraseToAnyPublisher()
+            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
         }
         
         return Future<Void, Error> { promise in
@@ -600,7 +624,7 @@ class OGSService: ObservableObject {
     
     func toggleRemovedStones(stones: Set<[Int]>, forGame game: Game) -> AnyPublisher<Void, Error> {
         guard let ogsUIConfig = self.ogsUIConfig else {
-            return Fail(error: ServiceError.notLoggedIn).eraseToAnyPublisher()
+            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
         }
 
         return Future<Void, Error> { promise in
