@@ -76,7 +76,7 @@ struct LoginView: View {
                         Spacer()
                     }
                 }
-                NavigationLink(destination: ThirdPartyLoginView(type: .twitter), isActive: $isShowingFacebookLogin) {
+                NavigationLink(destination: ThirdPartyLoginView(type: .twitter), isActive: $isShowingTwitterLogin) {
                     HStack {
                         Text("Sign in with Twitter")
                             .padding(.vertical, 5)

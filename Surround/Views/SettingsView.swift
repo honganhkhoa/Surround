@@ -20,13 +20,13 @@ struct SettingsView: View {
     
     var body: some View {
         ScrollView {
-            HStack {
+            VStack {
                 if let user = ogs.user {
                     GroupBox(label: Text("Online-go.com Account")) {
                         HStack(alignment: .top) {
-                            if let url = user.iconURL(ofSize: 96) {
+                            if let url = user.iconURL(ofSize: 64) {
                                 URLImage(url)
-                                    .frame(width: 96, height: 96)
+                                    .frame(width: 64, height: 64)
                                     .background(Color.gray)
                                     .cornerRadius(10)
                             }
@@ -35,7 +35,7 @@ struct SettingsView: View {
                                     Text(user.username)
                                     Text("[\(user.formattedRank)]")
                                 }
-                                .font(.title)
+                                .font(.title3)
                                 Button(action: { ogs.logout() }) {
                                     Text("Logout")
                                 }
@@ -46,15 +46,29 @@ struct SettingsView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
+                    .padding(.horizontal)
                 } else {
                     LoginView()
                 }
+                GameplaySettings()
             }
             .frame(maxWidth: 600)
         }
-
         .navigationTitle("Settings")
         .modifier(RootViewSwitchingMenu())
+    }
+}
+
+struct GameplaySettings: View {
+    var body: some View {
+        GroupBox(label: Text("Gameplay")) {
+            Toggle("Haptics", isOn: SettingWithDefault(key: .hapticsFeedback).binding)
+            GroupBox(label: Text("Auto submiting moves")) {
+                Toggle("Live games", isOn: SettingWithDefault(key: .autoSubmitForLiveGames).binding)
+                Toggle("Correspondence games", isOn: SettingWithDefault(key: .autoSubmitForCorrespondenceGames).binding)
+            }
+        }
+        .padding(.horizontal)
     }
 }
 
@@ -66,12 +80,12 @@ struct SettingsView_Previews: PreviewProvider {
         .navigationViewStyle(StackNavigationViewStyle())
         .environmentObject(
             OGSService.previewInstance(
-//                user: OGSUser(
-//                    username: "kata-bot",
-//                    id: 592684,
-//                    ranking: 27,
-//                    icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-//                )
+                user: OGSUser(
+                    username: "kata-bot",
+                    id: 592684,
+                    ranking: 27,
+                    icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
+                )
             )
         )
     }

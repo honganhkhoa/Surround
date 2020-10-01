@@ -21,6 +21,9 @@ struct GameControlRow: View {
 
     @State var showingPassAlert = false
     @State var showingResumeFromStoneRemovalAlert = false
+    
+    @SettingWithDefault(key: .autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
+    @SettingWithDefault(key: .autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
     var userColor: StoneColor {
         return ogs.user?.id == game.blackId ? .black : .white
@@ -273,6 +276,17 @@ struct GameControlRow: View {
         }
         .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { selectedPoints in
             self.toggleRemovedStones(stones: selectedPoints)
+        }
+        .onChange(of: pendingMove.wrappedValue) { newPendingMove in
+            if let newPendingMove = newPendingMove {
+                if let timeControl = game.gameData?.timeControl {
+                    var shouldAutoSubmitMove = timeControl.speed == .correspondence && autoSubmitForCorrespondenceGames
+                    shouldAutoSubmitMove = shouldAutoSubmitMove || (timeControl.speed == .live && autoSubmitForLiveGames)
+                    if shouldAutoSubmitMove {
+                        self.submitMove(move: newPendingMove)
+                    }
+                }
+            }
         }
     }
 }

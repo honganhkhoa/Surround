@@ -175,6 +175,7 @@ struct GameDetailView: View {
     @State var activeGameByOGSID: [Int: Game] = [:]
     
     @SceneStorage("currentActiveOGSGameId") var currentActiveOGSGameId = -1
+    @State var showSettings = false
 
     var shouldShowActiveGamesCarousel: Bool {
 //        return true
@@ -271,8 +272,24 @@ struct GameDetailView: View {
         )
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {}) {
+                Button(action: { self.showSettings = true }) {
                     Label("Options", systemImage: "gearshape.2")
+                }
+            }
+        }
+        .sheet(isPresented: self.$showSettings) {
+            NavigationView {
+                VStack {
+                    GameplaySettings()
+                    Spacer()
+                }
+                .navigationTitle("Settings")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(action: { self.showSettings = false }) {
+                            Text("Done").bold()
+                        }
+                    }
                 }
             }
         }

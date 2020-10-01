@@ -77,7 +77,7 @@ struct GameCell: View {
     var displayMode: CellDisplayMode = .full
     @EnvironmentObject var ogs: OGSService
 
-    enum CellDisplayMode: String {
+    enum CellDisplayMode: String, Codable {
         case full
         case compact
     }

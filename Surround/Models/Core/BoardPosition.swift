@@ -28,7 +28,7 @@ enum StoneColor: String, Codable {
     }
 }
 
-enum Move {
+enum Move: Equatable {
     case placeStone(Int, Int)
     case pass
     

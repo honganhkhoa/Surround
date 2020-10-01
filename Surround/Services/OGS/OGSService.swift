@@ -215,6 +215,10 @@ class OGSService: ObservableObject {
                     self.disconnect(from: game)
                 }
                 activeGames.removeAll()
+                self.socket.once(clientEvent: .disconnect) { _, _ in
+                    self.ensureConnect()
+                }
+                self.socket.disconnect()
             }
             checkLoginStatus()
         }

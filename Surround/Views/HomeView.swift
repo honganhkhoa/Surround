@@ -21,11 +21,11 @@ struct HomeView: View {
     @SceneStorage("currentActiveOGSGameId")
     var currentActiveOGSGameId = -1
     
-    @AppStorage("homeViewDisplayMode") var displayMode: GameCell.CellDisplayMode = .full
+    @AppStorage(SettingKey<Any>.homeViewDisplayMode.name) var displayMode: GameCell.CellDisplayMode = .full
     
     init(previewGames: [Game] = []) {
         #if os(iOS)
-        if UserDefaults.standard.string(forKey: "homeViewDisplayMode") == nil {
+        if UserDefaults.standard[.homeViewDisplayMode] == nil {
             if UIScreen.main.traitCollection.horizontalSizeClass == .compact {
                 displayMode = .compact
             } else {
@@ -116,6 +116,11 @@ struct HomeView: View {
                 destination: currentActiveGame == nil ? nil : GameDetailView(currentGame: currentActiveGame!),
                 isActive: $showGameDetail) {
                 EmptyView()
+            }
+        }
+        .onAppear {
+            if currentActiveGame == nil {
+                showGameDetail = false
             }
         }
         .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")

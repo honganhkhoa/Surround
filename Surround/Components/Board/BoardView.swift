@@ -68,6 +68,8 @@ struct Goban: View {
     var selectedPoint: Binding<[Int]?> = .constant(nil)
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
 
+    @SettingWithDefault(key: .hapticsFeedback) var hapticsFeedbback: Bool
+    
     var body: some View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height))
         var starPoints = [[CGFloat]]()
@@ -122,7 +124,7 @@ struct Goban: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged({ value in
-                    if self.selectionFeedbackGenerator == nil {
+                    if self.selectionFeedbackGenerator == nil && self.hapticsFeedbback {
                         self.selectionFeedbackGenerator = UISelectionFeedbackGenerator()
                         self.selectionFeedbackGenerator?.prepare()
                     }
@@ -144,9 +146,13 @@ struct Goban: View {
                     if isHoveredPointValid ?? false {
                         if let hoveredPoint = hoveredPoint.wrappedValue {
                             selectedPoint.wrappedValue = hoveredPoint
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            if self.hapticsFeedbback {
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            }
                         } else {
-                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                            if self.hapticsFeedbback {
+                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                            }
                         }
                     }
                     hoveredPoint.wrappedValue = nil

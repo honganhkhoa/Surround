@@ -7,23 +7,34 @@
 
 import Foundation
 import Combine
+import SwiftUI
 
 // From https://www.swiftbysundell.com/articles/the-power-of-subscripts-in-swift/
-extension UserDefaults {
-    struct Key<Value> {
-        var name: String
-        var encoded: Bool = false
+struct SettingKey<Value> {
+    var name: String
+    var _defaultValue: Value?
+    var encoded: Bool = false
+    var defaultValue: Value {
+        _defaultValue!
     }
+    
+    internal init(name: String, encoded: Bool = false, defaultValue: Value? = nil) {
+        self.name = "com.honganhkhoa.Surround.\(name)"
+        self.encoded = encoded
+        self._defaultValue = defaultValue
+    }
+}
 
-    subscript<T>(key: Key<T>) -> T? where T: Codable {
+extension UserDefaults {
+    subscript<T>(key: SettingKey<T>) -> T? where T: Codable {
         get {
             if !key.encoded {
-                return value(forKey: key.name) as? T
+                return value(forKey: key.name) as? T ?? key._defaultValue
             } else {
                 if let result = data(forKey: key.name) {
                     return try? JSONDecoder().decode(T.self, from: result)
                 } else {
-                    return nil
+                    return key._defaultValue
                 }
             }
         }
@@ -43,8 +54,71 @@ extension UserDefaults {
     }
 }
 
-extension UserDefaults.Key {
-    static var ogsUIConfig: UserDefaults.Key<OGSUIConfig> {
+extension SettingKey {
+    static var ogsUIConfig: SettingKey<OGSUIConfig> {
         return .init(name: "ogsUIConfig", encoded: true)
+    }
+    
+    static var homeViewDisplayMode: SettingKey<GameCell.CellDisplayMode> {
+        return .init(name: "homeViewDisplayMode")
+    }
+    
+    static var hapticsFeedback: SettingKey<Bool> {
+        return .init(name: "hapticsFeedback", defaultValue: true)
+    }
+    
+    static var autoSubmitForLiveGames: SettingKey<Bool> {
+        return .init(name: "autoSubmitForLiveGames", defaultValue: false)
+    }
+    
+    static var autoSubmitForCorrespondenceGames: SettingKey<Bool> {
+        return .init(name: "autoSubmitForCorrespondenceGames", defaultValue: false)
+    }
+}
+
+@propertyWrapper
+struct Setting<Value> where Value: Codable {
+    var settingKey: SettingKey<Value>
+    
+    init(key: SettingKey<Value>) {
+        self.settingKey = key
+    }
+    
+    var wrappedValue: Value? {
+        get {
+            return UserDefaults.standard[settingKey]
+        }
+        set {
+            UserDefaults.standard[settingKey] = newValue
+        }
+    }
+}
+
+@propertyWrapper
+struct SettingWithDefault<Value> where Value: Codable {
+    var settingKey: SettingKey<Value>
+    
+    init(key: SettingKey<Value>) {
+        self.settingKey = key
+    }
+    
+    var wrappedValue: Value {
+        get {
+            return UserDefaults.standard[settingKey]!
+        }
+        set {
+            UserDefaults.standard[settingKey] = newValue
+        }
+    }
+    
+    var binding: Binding<Value> {
+        return Binding<Value>(
+            get: {
+                return self.wrappedValue
+            },
+            set: { newValue in
+                UserDefaults.standard[settingKey] = newValue
+            }
+        )
     }
 }
