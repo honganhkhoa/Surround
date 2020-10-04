@@ -222,6 +222,7 @@ struct Stones: View {
                             blackLivingPath.addEllipse(in: stoneRect)
                         }
                     }
+                    
                 }
                 let scoringRectSize = max(size / 3, 2)
                 let scoringRectPadding = (size - scoringRectSize) / 2
@@ -285,26 +286,28 @@ struct Stones: View {
             }
 
             if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
-                if boardPosition.estimatedScores == nil {
-                    if isLastMovePending {
-                        Path { path in
-                            let centerX = CGFloat(lastColumn) * size + size / 2
-                            let centerY = CGFloat(lastRow) * size + size / 2
-                            path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
-                            path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
-                            path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
-                            path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
+                if case .hasStone(let lastColor) = boardPosition[lastRow, lastColumn] {
+                    if boardPosition.estimatedScores == nil {
+                        if isLastMovePending {
+                            Path { path in
+                                let centerX = CGFloat(lastColumn) * size + size / 2
+                                let centerY = CGFloat(lastRow) * size + size / 2
+                                path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
+                                path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
+                                path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
+                                path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
+                            }
+                            .stroke(lastColor == .white ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
+                        } else {
+                            Path { path in
+                                path.addEllipse(in: CGRect(
+                                                    x: CGFloat(lastColumn) * size + size / 4,
+                                                    y: CGFloat(lastRow) * size + size / 4,
+                                                    width: size / 2,
+                                                    height: size / 2))
+                            }
+                            .stroke(lastColor == .white ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                         }
-                        .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
-                    } else {
-                        Path { path in
-                            path.addEllipse(in: CGRect(
-                                                x: CGFloat(lastColumn) * size + size / 4,
-                                                y: CGFloat(lastRow) * size + size / 4,
-                                                width: size / 2,
-                                                height: size / 2))
-                        }
-                        .stroke(boardPosition.nextToMove == .black ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                     }
                 }
             }

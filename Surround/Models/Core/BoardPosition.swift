@@ -46,6 +46,7 @@ enum MoveError: Error {
     case pointAlreadyOccupied
     case illegalKoMove
     case suicidalMove
+    case unexpectedInvalidMove
 }
 
 class TerritoryGroup: Equatable, Hashable {
@@ -237,6 +238,21 @@ class BoardPosition: ObservableObject {
         self.captures[color.opponentColor(), default: 0] += group.count
         for point in group {
             self[point] = .empty
+        }
+    }
+    
+    func makeHandicapPlacement(move: Move) throws -> BoardPosition {
+        switch move {
+        case .pass:
+            throw MoveError.unexpectedInvalidMove
+        case .placeStone(let row, let column):
+            if case .hasStone = self[row, column] {
+                throw MoveError.pointAlreadyOccupied
+            }
+            let newPosition = BoardPosition(fromPreviousPosition: self, lastMove: move)
+            newPosition.nextToMove = self.nextToMove
+            newPosition[row, column] = .hasStone(self.nextToMove)
+            return newPosition
         }
     }
     

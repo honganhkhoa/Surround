@@ -50,7 +50,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     if data.handicap > 0 && data.freeHandicapPlacement {
                         firstNonHandicapMoveIndex = min(data.handicap, data.moves.count)
                         for handicapMove in data.moves[..<firstNonHandicapMoveIndex] {
-                            position.putStone(row: handicapMove[1], column: handicapMove[0], color: .black)
+                            position = try position.makeHandicapPlacement(move: .placeStone(handicapMove[1], handicapMove[0]))
                         }
                         position.nextToMove = firstNonHandicapMoveIndex == data.handicap ? data.initialPlayer.opponentColor() : data.initialPlayer
                     }
@@ -104,6 +104,27 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var ogsRawData: [String: Any]?
     @Published var clock: OGSClock?
     @Published var pauseControl: OGSPauseControl?
+    var canBeCancelled: Bool {
+        if gamePhase != .play {
+            return false
+        }
+        
+        if gameData?.tournamentId != nil {
+            return false
+        }
+        
+        if gameData?.ladderId != nil {
+            return false
+        }
+        
+        var maxMovePlayed = 2
+        if let handicap = gameData?.handicap {
+            if gameData?.freeHandicapPlacement ?? false {
+                maxMovePlayed += handicap - 1
+            }
+        }
+        return currentPosition.lastMoveNumber < maxMovePlayed
+    }
     
     var autoScoringDone: Bool?
     var autoScoringCancellable: AnyCancellable?
@@ -195,6 +216,14 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func makeMove(move: Move) throws {
+        if let handicap = gameData?.handicap {
+            if gameData?.freeHandicapPlacement ?? false {
+                if currentPosition.lastMoveNumber < handicap - 1 {
+                    self.currentPosition = try currentPosition.makeHandicapPlacement(move: move)
+                    return
+                }
+            }
+        }
         self.currentPosition = try currentPosition.makeMove(move: move)
         self.undoRequested = nil
     }
@@ -401,7 +430,14 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             return false
         }
         
-        return !isUserTurn && undoRequested == nil && currentPosition.lastMoveNumber > 0
+        var minimumLastMove = 0
+        if let handicap = gameData?.handicap {
+            if gameData?.freeHandicapPlacement ?? false {
+                minimumLastMove = handicap
+            }
+        }
+        
+        return !isUserTurn && undoRequested == nil && currentPosition.lastMoveNumber > minimumLastMove
     }
 
     var undoacceptable: Bool {

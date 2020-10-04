@@ -22,6 +22,7 @@ struct GameControlRow: View {
     @State var showingPassAlert = false
     @State var showingResumeFromStoneRemovalAlert = false
     @State var showingResignAlert = false
+    @State var showingCancelAlert = false
     
     @SettingWithDefault(key: .autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @SettingWithDefault(key: .autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
@@ -154,8 +155,14 @@ struct GameControlRow: View {
             }
             if game.isUserPlaying {
                 Section {
-                    Button(action: { self.showingResignAlert = true }) {
-                        Label("Resign", systemImage: "flag").foregroundColor(.red)
+                    if game.canBeCancelled {
+                        Button(action: { self.showingCancelAlert = true }) {
+                            Label("Cancel game", systemImage: "xmark").foregroundColor(.red)
+                        }
+                    } else {
+                        Button(action: { self.showingResignAlert = true }) {
+                            Label("Resign", systemImage: "flag").foregroundColor(.red)
+                        }
                     }
                 }
             }
@@ -176,6 +183,7 @@ struct GameControlRow: View {
                     game.isUserPlaying
                     && game.gamePhase == .stoneRemoval
                     && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
+                let isHandicapPlacement = (game.gameData?.freeHandicapPlacement ?? false) && (game.currentPosition.lastMoveNumber < (game.gameData?.handicap ?? 0))
                 Group {
                     if game.currentPosition.estimatedScores != nil {
                         Button(action: { clearEstimatedTerritory() }) {
@@ -187,7 +195,7 @@ struct GameControlRow: View {
                             Button(action: { submitMove(move: pendingMove)}) {
                                 Text("Submit move")
                             }
-                        } else {
+                        } else if !isHandicapPlacement {
                             Button(action: { self.showingPassAlert = true }) {
                                 Text("Pass")
                             }
@@ -236,7 +244,7 @@ struct GameControlRow: View {
                         primaryButton: .destructive(Text("Resume")) {
                             self.resumeGameFromStoneRemoval()
                         },
-                        secondaryButton: .cancel(Text("Cancel"))
+                        secondaryButton: .cancel(Text("Dismiss"))
                     )
                 }
             Rectangle().frame(width: 0, height: 0)
@@ -247,7 +255,7 @@ struct GameControlRow: View {
                         primaryButton: .destructive(Text("Pass")) {
                             self.submitMove(move: .pass)
                         },
-                        secondaryButton: .cancel(Text("Cancel"))
+                        secondaryButton: .cancel(Text("Dismiss"))
                     )
                 }
             Rectangle().frame(width: 0, height: 0)
@@ -258,7 +266,18 @@ struct GameControlRow: View {
                         primaryButton: .destructive(Text("Resign")) {
                             ogs.resign(game: game)
                         },
-                        secondaryButton: .cancel(Text("Cancel"))
+                        secondaryButton: .cancel(Text("Dismiss"))
+                    )
+                }
+            Rectangle().frame(width: 0, height: 0)
+                .alert(isPresented: $showingCancelAlert) {
+                    Alert(
+                        title: Text("Are you sure you want to cancel this game?"),
+                        message: nil,
+                        primaryButton: .destructive(Text("Cancel game")) {
+                            ogs.cancel(game: game)
+                        },
+                        secondaryButton: .cancel(Text("Dismiss"))
                     )
                 }
 
