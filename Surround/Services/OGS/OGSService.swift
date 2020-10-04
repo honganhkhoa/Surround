@@ -80,6 +80,10 @@ class OGSService: ObservableObject {
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
     
+    @Published private(set) public var challengesReceived = [OGSChallenge]()
+    @Published private(set) public var challengesSent = [OGSChallenge]()
+    @Published private(set) public var isLoadingOverview = true
+    
     private var activeGamesSortingCancellable: AnyCancellable?
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
@@ -112,7 +116,9 @@ class OGSService: ObservableObject {
             if let clock1 = game1.clock, let clock2 = game2.clock {
                 let time1 = game1.blackId == self.user?.id ? clock1.blackTime : clock1.whiteTime
                 let time2 = game2.blackId == self.user?.id ? clock2.blackTime : clock2.whiteTime
-                return time1.thinkingTimeLeft! <= time2.thinkingTimeLeft!
+                let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
+                let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
+                return timeLeft1 <= timeLeft2
             }
             return false
         }
@@ -174,6 +180,7 @@ class OGSService: ObservableObject {
                 socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": drift, "latency": latency])
             }
             self.authenticateSocketIfLoggedIn()
+            self.socket.emit("ui-pushes/subscribe", ["channel": "undefined"])
 
             let previouslyConnectedGames = Array(connectedGames.values)
             connectedGames = [:]
@@ -199,6 +206,16 @@ class OGSService: ObservableObject {
         socket.on("active_game") { gameData, ack in
             if let activeGameData = gameData[0] as? [String: Any] {
                 self.updateActiveGames(withShortGameData: activeGameData)
+            }
+        }
+        
+        socket.on("ui-push") { data, ack in
+            if let data = data[0] as? [String: Any] {
+                if let event = data["event"] as? String {
+                    if event == "challenge-list-updated" {
+                        self.loadOverview()
+                    }
+                }
             }
         }
     }
@@ -348,6 +365,7 @@ class OGSService: ObservableObject {
             return
         }
         
+        isLoadingOverview = true
         AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseJSON { response in
             switch response.result {
             case .success:
@@ -372,10 +390,32 @@ class OGSService: ObservableObject {
                         self.unsortedActiveGames = unsortedActiveGames
                         self.activeGames = newActiveGames
                     }
+                    if let challenges = data["challenges"] as? [[String: Any]] {
+                        let decoder = DictionaryDecoder()
+                        decoder.keyDecodingStrategy = .convertFromSnakeCase
+                        var challengesSent = [OGSChallenge]()
+                        var challengesReceived = [OGSChallenge]()
+                        for challengeData in challenges {
+                            do {
+                                let challenge = try decoder.decode(OGSChallenge.self, from: challengeData)
+                                if challenge.challenger?.id == self.user?.id {
+                                    challengesSent.append(challenge)
+                                } else {
+                                    challengesReceived.append(challenge)
+                                }
+                            } catch {
+                                print("Error: ", error)
+                            }
+                        }
+                        self.challengesReceived = challengesReceived
+                        self.challengesSent = challengesSent
+                    }
                 }
             case .failure(let error):
                 print(error)
             }
+            
+            self.isLoadingOverview = false
         }
     }
     
@@ -688,7 +728,13 @@ class OGSService: ObservableObject {
             self.socket.emit("game/resign", ["game_id": ogsID, "player_id": user.id])
         }
     }
-    
+
+    func cancel(game: Game) {
+        if let ogsID = game.ogsID, let user = self.user {
+            self.socket.emit("game/cancel", ["game_id": ogsID, "player_id": user.id])
+        }
+    }
+
     func pause(game: Game) {
         if let ogsID = game.ogsID, let user = self.user {
             self.socket.emit("game/pause", ["game_id": ogsID, "player_id": user.id])
@@ -775,5 +821,52 @@ class OGSService: ObservableObject {
         case .twitter:
             return URL(string: "\(OGSService.ogsRoot)/login/twitter/")!
         }
+    }
+    
+    func withdrawOrDeclineChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)",
+                    method: .delete,
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
+                ).response { response in
+                    switch response.result {
+                    case .success:
+                        promise(.success(()))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
+                }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func acceptChallenge(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
+        return Future<Int, Error> { promise in
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)/accept",
+                    method: .post,
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
+                ).responseJSON { response in
+                    switch response.result {
+                    case .success:
+                        if let data = response.value as? [String: Any] {
+                            if let newGameId = data["game"] as? Int {
+                                promise(.success(newGameId))
+                            }
+                        }
+                        promise(.failure(OGSServiceError.invalidJSON))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
+                }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
+            }
+        }.eraseToAnyPublisher()
     }
 }

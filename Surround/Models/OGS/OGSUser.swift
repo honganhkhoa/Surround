@@ -49,6 +49,9 @@ func formattedRankString(rank: Double?, professional: Bool = false) -> String {
         return "?"
     }
     let displayedRank = Int(floor(rawRank))
+    if displayedRank == 0 {
+        return "?"
+    }
     if professional {
         return "\(max(displayedRank - 36, 1))p"
     } else {

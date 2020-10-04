@@ -182,6 +182,12 @@ struct GameDetailView: View {
         return currentGame.isUserPlaying && activeGames.count > 1 && currentGame.gameData?.timeControl.speed == .correspondence
     }
     
+    func updateDetailOfCurrentGameIfNecessary() {
+        if currentGame.ogsRawData == nil {
+            ogs.updateDetailsOfConnectedGame(game: currentGame)
+        }
+    }
+    
     func updateActiveGameList() {
         self.activeGames = []
         for game in ogs.sortedActiveCorrespondenceGames {
@@ -297,6 +303,9 @@ struct GameDetailView: View {
             if let ogsId = newGame.ogsID {
                 currentActiveOGSGameId = ogsId
             }
+            DispatchQueue.main.async {
+                self.updateDetailOfCurrentGameIfNecessary()
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
@@ -304,13 +313,9 @@ struct GameDetailView: View {
             if let ogsId = currentGame.ogsID {
                 if ogs.activeGames[ogsId] != nil {
                     updateActiveGameList()
-                    for game in activeGames {
-                        ogs.updateDetailsOfConnectedGame(game: game)
-                    }
-                } else {
-                    ogs.updateDetailsOfConnectedGame(game: currentGame)
                 }
             }
+            self.updateDetailOfCurrentGameIfNecessary()
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             

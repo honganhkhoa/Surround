@@ -35,7 +35,7 @@ struct TimeControl: Codable {
         var stonesPerPeriod: Int?
         var totalTime: Int?
         var speed: TimeControlSpeed?
-        var pauseOnWeekend: Bool?
+        var pauseOnWeekends: Bool?
     }
     
     var codingData: TimeControlCodingData
@@ -68,5 +68,69 @@ struct TimeControl: Codable {
         default:
             return .None
         }
+    }
+    
+    var shortDescription: String {
+        switch system {
+        case .Fischer(let initialTime, let timeIncrement, let maxTime):
+            return "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement)) up to \(durationString(seconds: maxTime))"
+        case .Simple(let perMove):
+            return "\(durationString(seconds: perMove))/move"
+        case .ByoYomi(let mainTime, let periods, let periodTime):
+            return "\(durationString(seconds: mainTime)) + \(periods) × \(durationString(seconds: periodTime))"
+        case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
+            return "\(durationString(seconds: mainTime)) + \(durationString(seconds: periodTime))/\(stonesPerPeriod)"
+        case .Absolute(let totalTime):
+            return durationString(seconds: totalTime)
+        case .None:
+            return "No time limits"
+        }
+    }
+    
+    var systemName: String {
+        switch system {
+        case .Fischer:
+            return "Fischer"
+        case .ByoYomi:
+            return "Japanese Byo-Yomi"
+        case .Canadian:
+            return "Canadian Byo-Yomi"
+        case .Absolute:
+            return "Absolute"
+        case .Simple:
+            return "Simple"
+        case .None:
+            return "None"
+        }
+    }
+
+    private func durationString(seconds: Int) -> String {
+        var secondsLeft = seconds
+        let weeks = secondsLeft / (86400 * 7)
+        secondsLeft %= 86400 * 7
+        let days = secondsLeft / 86400
+        secondsLeft %= 86400
+        let hours = secondsLeft / 3600
+        secondsLeft %= 3600
+        let minutes = secondsLeft / 60
+        secondsLeft %= 60
+        var result = ""
+        if weeks > 0 {
+            result += "\(weeks) week\(weeks == 1 ? "" : "s")"
+        }
+        if days > 0 {
+            result += " \(days) day\(days == 1 ? "" : "s")"
+        }
+        if hours > 0 {
+            result += " \(hours) hour\(hours == 1 ? "" : "s")"
+        }
+        if minutes > 0 {
+            result += " \(minutes) minute\(minutes == 1 ? "" : "s")"
+        }
+        if secondsLeft > 0 {
+            result += " \(secondsLeft) seconds\(secondsLeft == 1 ? "" : "s")"
+        }
+
+        return result.trimmingCharacters(in: .whitespaces)
     }
 }

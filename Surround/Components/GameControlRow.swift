@@ -21,6 +21,7 @@ struct GameControlRow: View {
 
     @State var showingPassAlert = false
     @State var showingResumeFromStoneRemovalAlert = false
+    @State var showingResignAlert = false
     
     @SettingWithDefault(key: .autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @SettingWithDefault(key: .autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
@@ -153,7 +154,7 @@ struct GameControlRow: View {
             }
             if game.isUserPlaying {
                 Section {
-                    Button(action: {}) {
+                    Button(action: { self.showingResignAlert = true }) {
                         Label("Resign", systemImage: "flag").foregroundColor(.red)
                     }
                 }
@@ -245,6 +246,17 @@ struct GameControlRow: View {
                         message: nil,
                         primaryButton: .destructive(Text("Pass")) {
                             self.submitMove(move: .pass)
+                        },
+                        secondaryButton: .cancel(Text("Cancel"))
+                    )
+                }
+            Rectangle().frame(width: 0, height: 0)
+                .alert(isPresented: $showingResignAlert) {
+                    Alert(
+                        title: Text("Are you sure you want to resign this game?"),
+                        message: nil,
+                        primaryButton: .destructive(Text("Resign")) {
+                            ogs.resign(game: game)
                         },
                         secondaryButton: .cancel(Text("Cancel"))
                     )

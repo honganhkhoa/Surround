@@ -60,6 +60,23 @@ enum OGSRule: String, Decodable {
     case korean
     case ing
     case nz
+    
+    var fullName: String {
+        switch self {
+        case .chinese:
+            return "Chinese"
+        case .aga:
+            return "AGA"
+        case .japanese:
+            return "Japanese"
+        case .korean:
+            return "Korean"
+        case .ing:
+            return "Ing SST"
+        case .nz:
+            return "New Zealand"
+        }
+    }
 }
 
 struct OGSGame: Decodable {
@@ -119,4 +136,7 @@ struct OGSGame: Decodable {
     
     var undoRequested: Int?
     var phase: OGSGamePhase
+    
+    var tournamentId: Int?
+    var ladderId: Int?
 }

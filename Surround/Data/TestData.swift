@@ -34,11 +34,11 @@ class TestData {
     static func sampleGame(id: Int = 0) -> Game {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let ogsGame = try! decoder.decode(OGSGame.self, from: testData[id][0].data(using: .utf8)!)
+        let ogsGame = try! decoder.decode(OGSGame.self, from: sampleGamesData[id][0].data(using: .utf8)!)
         return Game(ogsGame: ogsGame)
     }
     
-    static let testData : [[String]] = [
+    static let sampleGamesData : [[String]] = [
         // MARK: - W+ Scored, 19x19, Korean
         // MARK: - #18759438
         ["""

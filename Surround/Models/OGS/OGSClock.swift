@@ -83,12 +83,14 @@ extension OGSClock: Decodable {
                     thinkingTimeLeft: blackThinkingTime
                 )
             }
-        } else {
-            blackTime = try container.decode(ThinkingTime.self, forKey: .blackTime)
+        } else if let blackThinkingTime = try? container.decode(ThinkingTime.self, forKey: .blackTime) {
+            blackTime = blackThinkingTime
             blackTime.thinkingTimeLeft = blackTime.thinkingTime
             blackTime.periodsLeft = blackTime.periods
             blackTime.periodTimeLeft = blackTime.periodTime
             blackTime.blockTimeLeft = blackTime.blockTime
+        } else {
+            blackTime = ThinkingTime()
         }
 
         if let whiteThinkingTime = try? container.decode(Double.self, forKey: .whiteTime) {
@@ -103,12 +105,14 @@ extension OGSClock: Decodable {
                     thinkingTimeLeft: whiteThinkingTime
                 )
             }
-        } else {
-            whiteTime = try container.decode(ThinkingTime.self, forKey: .whiteTime)
+        } else if let whiteThinkingTime = try? container.decode(ThinkingTime.self, forKey: .whiteTime) {
+            whiteTime = whiteThinkingTime
             whiteTime.thinkingTimeLeft = whiteTime.thinkingTime
             whiteTime.periodsLeft = whiteTime.periods
             whiteTime.periodTimeLeft = whiteTime.periodTime
             whiteTime.blockTimeLeft = whiteTime.blockTime
+        } else {
+            whiteTime = ThinkingTime()
         }
                 
         lastMoveTime = try container.decode(Double.self, forKey: .lastMove)

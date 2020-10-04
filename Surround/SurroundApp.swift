@@ -23,9 +23,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     var allowsPortrait = false
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(3)), execute: {
+        DispatchQueue.main.async {
             self.allowsPortrait = true
-        })
+        }
         return true
     }
         

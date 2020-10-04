@@ -16,8 +16,8 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     
     @State var gameDetailCancellable: AnyCancellable?
-    @SceneStorage("showActiveGameDetail")
-    var showGameDetail = false
+    @State var showGameDetail = false
+    
     @SceneStorage("currentActiveOGSGameId")
     var currentActiveOGSGameId = -1
     
@@ -53,14 +53,42 @@ struct HomeView: View {
             self.showGameDetail = true
         }
     }
-
+    
     var activeGamesView: some View {
-        Group {
-            if ogs.sortedActiveCorrespondenceGames.count + ogs.liveGames.count == 0 {
-                ProgressView()
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))], pinnedViews: [.sectionHeaders]) {
+        let noItem = ogs.challengesSent.count +
+            ogs.challengesReceived.count +
+            ogs.liveGames.count +
+            ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
+            ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0
+        let isLoading = noItem && ogs.isLoadingOverview
+        return Group {
+            ScrollView {
+                if isLoading {
+                    ProgressView()
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320))], pinnedViews: [.sectionHeaders]) {
+                        if ogs.challengesReceived.count > 0 {
+                            Section(header: sectionHeader(title: "Challenges received")) {
+                                ForEach(ogs.challengesReceived) { challenge in
+                                    ChallengeCell(challenge: challenge)
+                                        .padding()
+                                        .background(Color(UIColor.systemBackground).shadow(radius: 2))
+                                        .padding(.vertical, 5)
+                                        .padding(.horizontal)
+                                }
+                            }
+                        }
+                        if ogs.challengesSent.count > 0 {
+                            Section(header: sectionHeader(title: "Challenges sent")) {
+                                ForEach(ogs.challengesSent) { challenge in
+                                    ChallengeCell(challenge: challenge)
+                                        .padding()
+                                        .background(Color(UIColor.systemBackground).shadow(radius: 2))
+                                        .padding(.vertical, 5)
+                                        .padding(.horizontal)
+                                }
+                            }
+                        }
                         if ogs.liveGames.count > 0 {
                             Section(header: sectionHeader(title: "Live games")) {
                                 ForEach(ogs.liveGames) { game in
@@ -100,6 +128,32 @@ struct HomeView: View {
             }
         }
     }
+    
+    func goToCurrentActiveGameIfReady() {
+        if currentActiveOGSGameId != -1 && gameDetailCancellable == nil {
+            if let currentActiveGame = ogs.activeGames[currentActiveOGSGameId] {
+                if currentActiveGame.gameData != nil {
+                    showGameDetail = true
+                } else {
+                    self.gameDetailCancellable = currentActiveGame.$gameData.sink(receiveValue: { _ in
+                        DispatchQueue.main.async {
+                            self.gameDetailCancellable?.cancel()
+                            self.gameDetailCancellable = nil
+                            self.goToCurrentActiveGameIfReady()
+                        }
+                    })
+                }
+            } else {
+                self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { _ in
+                    DispatchQueue.main.async {
+                        self.gameDetailCancellable?.cancel()
+                        self.gameDetailCancellable = nil
+                        self.goToCurrentActiveGameIfReady()
+                    }
+                })
+            }
+        }
+    }
         
     var body: some View {
         let currentActiveGame = ogs.activeGames[currentActiveOGSGameId]
@@ -119,9 +173,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            if currentActiveGame == nil {
-                showGameDetail = false
-            }
+            goToCurrentActiveGameIfReady()
         }
         .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")
         .toolbar {
@@ -136,6 +188,16 @@ struct HomeView: View {
             }
         }
         .modifier(RootViewSwitchingMenu())
+        .onChange(of: currentActiveOGSGameId) { _ in
+            DispatchQueue.main.async {
+                goToCurrentActiveGameIfReady()
+            }
+        }
+        .onChange(of: showGameDetail) { newValue in
+            if !newValue {
+                currentActiveOGSGameId = -1
+            }
+        }
     }
 }
 
