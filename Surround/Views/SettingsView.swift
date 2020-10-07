@@ -63,6 +63,7 @@ struct GameplaySettings: View {
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
             Toggle("Haptics", isOn: SettingWithDefault(key: .hapticsFeedback).binding)
+            Toggle("Voice coutdown", isOn: SettingWithDefault(key: .voiceCountdown).binding)
             GroupBox(label: Text("Auto submiting moves")) {
                 Toggle("Live games", isOn: SettingWithDefault(key: .autoSubmitForLiveGames).binding)
                 Toggle("Correspondence games", isOn: SettingWithDefault(key: .autoSubmitForCorrespondenceGames).binding)

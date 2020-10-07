@@ -74,6 +74,10 @@ extension SettingKey {
     static var autoSubmitForCorrespondenceGames: SettingKey<Bool> {
         return .init(name: "autoSubmitForCorrespondenceGames", defaultValue: false)
     }
+    
+    static var voiceCountdown: SettingKey<Bool> {
+        return .init(name: "voiceCountdown", defaultValue: false)
+    }
 }
 
 @propertyWrapper

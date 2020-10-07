@@ -14,8 +14,8 @@ struct ThinkingTime: Codable {
     // Byo-Yomi
     var periods: Int?
     var periodsLeft: Int?
-    var periodTime: Int?
-    var periodTimeLeft: Int?
+    var periodTime: Double?
+    var periodTimeLeft: Double?
 
     // Canadian
     var movesLeft: Int?
@@ -177,7 +177,7 @@ extension OGSClock: Decodable {
                     if timeLeft < 0 {
                         thinkingTime.periodTimeLeft = 0
                     } else {
-                        thinkingTime.periodTimeLeft = Int(timeLeft)
+                        thinkingTime.periodTimeLeft = timeLeft
                     }
                 }
             case .Canadian(_, let periodTime, _):

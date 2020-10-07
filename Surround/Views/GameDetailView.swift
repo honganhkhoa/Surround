@@ -299,6 +299,23 @@ struct GameDetailView: View {
                 }
             }
         }
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
+        .onAppear {
+            if currentGame.gameData?.timeControl.speed == .live {
+                UIApplication.shared.isIdleTimerDisabled = true
+            }
+            if let ogsId = currentGame.ogsID {
+                if ogs.activeGames[ogsId] != nil {
+                    updateActiveGameList()
+                }
+            }
+            self.updateDetailOfCurrentGameIfNecessary()
+        }
+        .onDisappear {
+            currentActiveOGSGameId = -1
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
         .onChange(of: currentGame) { newGame in
             if let ogsId = newGame.ogsID {
                 currentActiveOGSGameId = ogsId
@@ -306,16 +323,6 @@ struct GameDetailView: View {
             DispatchQueue.main.async {
                 self.updateDetailOfCurrentGameIfNecessary()
             }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
-        .onAppear {
-            if let ogsId = currentGame.ogsID {
-                if ogs.activeGames[ogsId] != nil {
-                    updateActiveGameList()
-                }
-            }
-            self.updateDetailOfCurrentGameIfNecessary()
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             

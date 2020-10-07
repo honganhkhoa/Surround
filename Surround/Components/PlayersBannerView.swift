@@ -7,6 +7,8 @@
 
 import SwiftUI
 import URLImage
+import AVFoundation
+import Combine
 
 struct PlayersBannerView: View {
     @EnvironmentObject var ogs: OGSService
@@ -17,6 +19,10 @@ struct PlayersBannerView: View {
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
+    @State var speechSynthesizer: AVSpeechSynthesizer?
+    @State var lastUtterance: String?
+    @State var clearLastUtteranceCancellable: AnyCancellable?
+    @SettingWithDefault(key: .voiceCountdown) var voiceCountdown: Bool
     
     var shouldShowNamesOutOfColumn: Bool {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
@@ -193,6 +199,12 @@ struct PlayersBannerView: View {
     var isPaused: Bool {
         game.pauseControl?.isPaused() ?? false
     }
+    
+    func initializeSpeechSynthesizerIfNecessary() {
+        if voiceCountdown && game.isUserPlaying && self.speechSynthesizer == nil {
+            self.speechSynthesizer = AVSpeechSynthesizer()
+        }
+    }
 
     var body: some View {
         let foregroundColor = game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
@@ -250,6 +262,49 @@ struct PlayersBannerView: View {
                 endPoint: topLeftPlayerColor == .black ? .bottomTrailing : .topLeading)
                 .shadow(radius: 2)
         )
+        .onAppear {
+            initializeSpeechSynthesizerIfNecessary()
+        }
+        .onChange(of: voiceCountdown) { _ in
+            DispatchQueue.main.async {
+                initializeSpeechSynthesizerIfNecessary()
+            }
+        }
+        .onDisappear {
+            speechSynthesizer = nil
+        }
+        .onReceive(game.$clock) { clock in
+            if let clock = clock {
+                if voiceCountdown && game.isUserTurn {
+                    let time = ogs.user?.id == game.blackId ? clock.blackTime : clock.whiteTime
+                    var timeLeft = time.thinkingTimeLeft ?? .infinity
+                    if timeLeft.isZero || timeLeft.isInfinite {
+                        timeLeft = time.blockTimeLeft ?? .infinity
+                    }
+                    if timeLeft.isZero || timeLeft.isInfinite {
+                        timeLeft = time.periodTimeLeft ?? .infinity
+                    }
+                    if timeLeft <= 10 {
+                        let utteranceString = "\(Int(timeLeft))"
+                        if utteranceString != lastUtterance {
+                            lastUtterance = utteranceString
+                            let utterance = AVSpeechUtterance(string: utteranceString)
+                            self.speechSynthesizer?.speak(utterance)
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: lastUtterance) { _ in
+            if clearLastUtteranceCancellable != nil {
+                clearLastUtteranceCancellable?.cancel()
+            }
+            clearLastUtteranceCancellable = Timer.publish(every: 3, on: .main, in: .common).autoconnect().sink(receiveValue: { _ in
+                self.lastUtterance = nil
+                self.clearLastUtteranceCancellable?.cancel()
+                self.clearLastUtteranceCancellable = nil
+            })
+        }
     }}
 
 struct PlayersBannerView_Previews: PreviewProvider {
