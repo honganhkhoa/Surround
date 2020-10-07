@@ -142,7 +142,9 @@ struct RootViewSwitchingMenu: ViewModifier {
                 }
                 label: {
                     Label("Navigation", systemImage: currentView.systemImage)
+                        .font(.title2)
                         .padding(10)
+                        .offset(x: -8)
                         .contentShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .disabled(!compactSizeClass)

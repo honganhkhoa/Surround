@@ -20,29 +20,33 @@ struct LoginView: View {
     @State var isShowingGoogleLogin = false
     @State var isShowingTwitterLogin = false
     
+    func login() {
+        if username.count > 0 && password.count > 0 {
+            loginCancellable = ogs.login(username: username, password: password)
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(let error) = completion {
+                            self.error = error.localizedDescription
+                        } else {
+                            self.error = nil
+                        }
+                        loginCancellable = nil
+                    }, receiveValue: { _ in }
+                )
+        }
+    }
+    
     var body: some View {
         VStack {
             GroupBox(label: Text("Sign in to your Online-go.com account")) {
                 TextField("Username", text: $username)
                     .autocapitalization(.none)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                SecureField("Password", text: $password)
+                SecureField("Password", text: $password, onCommit: { login() })
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                 HStack {
                     if loginCancellable == nil {
-                        Button(action: {
-                            loginCancellable = ogs.login(username: username, password: password)
-                                .sink(
-                                    receiveCompletion: { completion in
-                                        if case .failure(let error) = completion {
-                                            self.error = error.localizedDescription
-                                        } else {
-                                            self.error = nil
-                                        }
-                                        loginCancellable = nil
-                                    }, receiveValue: { _ in }
-                                )
-                        }) {
+                        Button(action: { login() }) {
                             Text("Sign in")
                                 .padding(.vertical, 10)
                         }
