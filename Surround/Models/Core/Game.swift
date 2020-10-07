@@ -343,6 +343,24 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
     }
     
+    func setAutoResign(playerId: Int, time: Double) {
+        guard playerId == blackId || playerId == whiteId else {
+            return
+        }
+        
+        let playerColor = playerId == blackId ? StoneColor.black : StoneColor.white
+        self.clock?.autoResignTime[playerColor] = time
+    }
+    
+    func clearAutoResign(playerId: Int) {
+        guard playerId == blackId || playerId == whiteId else {
+            return
+        }
+        
+        let playerColor = playerId == blackId ? StoneColor.black : StoneColor.white
+        self.clock?.autoResignTime.removeValue(forKey: playerColor)
+    }
+    
     var isUserPlaying: Bool {
         guard let user = ogs?.user else {
             return false

@@ -42,6 +42,10 @@ struct OGSClock {
     var pauseControl: OGSPauseControl?
     var expiration: Double?
     var timeUntilExpiration: TimeInterval?
+    
+    var blackTimeUntilAutoResign: TimeInterval?
+    var whiteTimeUntilAutoResign: TimeInterval?
+    var autoResignTime = [StoneColor: Double]()
 }
 
 extension OGSClock: Decodable {
@@ -129,8 +133,21 @@ extension OGSClock: Decodable {
     mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
 
         let now = Date().timeIntervalSince1970 * 1000
+
+        if let blackAutoResignTime = autoResignTime[.black] {
+            blackTimeUntilAutoResign = (blackAutoResignTime + serverTimeOffset - now) / 1000
+        } else {
+            blackTimeUntilAutoResign = nil
+        }
+        if let whiteAutoResignTime = autoResignTime[.white] {
+            whiteTimeUntilAutoResign = (whiteAutoResignTime + serverTimeOffset - now) / 1000
+        } else {
+            whiteTimeUntilAutoResign = nil
+        }
+        
+        // Expiration can be for stone removal or waiting to start (start mode)
         if let expiration = expiration {
-            timeUntilExpiration = (expiration - (now + serverTimeOffset)) / 1000
+            timeUntilExpiration = (expiration + serverTimeOffset - now) / 1000
         }
 
         if !started {

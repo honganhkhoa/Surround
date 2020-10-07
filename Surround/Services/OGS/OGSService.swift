@@ -514,6 +514,8 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/removed_stones")
         self.socket.off("game/\(ogsID)/removed_stones_accepted")
         self.socket.off("game/\(ogsID)/phase")
+        self.socket.off("game/\(ogsID)/auto_resign")
+        self.socket.off("game/\(ogsID)/clear_auto_resign")
         
         connectedGames[ogsID] = nil
     }
@@ -627,6 +629,28 @@ class OGSService: ObservableObject {
             if let phase = OGSGamePhase(rawValue: data[0] as? String ?? "") {
                 if let connectedGame = self.connectedGames[ogsID] {
                     connectedGame.gamePhase = phase
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/auto_resign") { data, ack in
+            if let autoResignData = data[0] as? [String: Any] {
+                if let playerId = autoResignData["player_id"] as? Int, let expiration = autoResignData["expiration"] as? Double {
+                    if let connectedGame = self.connectedGames[ogsID] {
+                        connectedGame.setAutoResign(
+                            playerId: playerId,
+                            time: expiration // / 1000 + (serverTimeOffset)
+                            // serverTimeOffset = drift - latency
+                        )
+                    }
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/clear_auto_resign") { data, ack in
+            if let clearAutoResignData = data[0] as? [String: Any] {
+                if let playerId = clearAutoResignData["player_id"] as? Int {
+                    if let connectedGame = self.connectedGames[ogsID] {
+                        connectedGame.clearAutoResign(playerId: playerId)
+                    }
                 }
             }
         }

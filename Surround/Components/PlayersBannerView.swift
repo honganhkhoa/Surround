@@ -57,6 +57,7 @@ struct PlayersBannerView: View {
         let captures = game.currentPosition.captures[color] ?? 0
         let playerId = color == .black ? game.blackId : game.whiteId
         let pauseReason = game.pauseControl?.pauseReason(playerId: playerId)
+        let timeUntilAutoResign = color == .black ? game.clock?.blackTimeUntilAutoResign : game.clock?.whiteTimeUntilAutoResign
         let clockStatus = { () -> AnyView in
             if pauseReason?.count ?? 0 > 0 {
                 return AnyView(
@@ -77,7 +78,16 @@ struct PlayersBannerView: View {
                     clockStatus
                 }
                 VStack(alignment: .trailing) {
-                    TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
+                    if let timeUntilAutoResign = timeUntilAutoResign {
+                        Group {
+                            Text("Disconnected")
+                                .font(Font.subheadline.bold())
+                            Label(timeString(timeLeft: timeUntilAutoResign), systemImage: "bolt.slash")
+                                .font(Font.subheadline.bold().monospacedDigit())
+                        }
+                    } else {
+                        TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
+                    }
                     Text("\(captures) capture\(captures != 1 ? "s" : "")")
                         .font(Font.caption.monospacedDigit())
                     if let komi = game.gameData?.komi {
