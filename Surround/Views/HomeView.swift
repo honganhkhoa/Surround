@@ -110,6 +110,12 @@ struct HomeView: View {
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }
+                            if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count == 0 {
+                                Text("No correspondence games on your turn")
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 30)
+                            }
                         }
                         Section(header: sectionHeader(title: "Opponents' move")) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
@@ -119,6 +125,12 @@ struct HomeView: View {
                                 }
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
+                            }
+                            if ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0 {
+                                Text("No correspondence games on your opponents' turn")
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 30)
                             }
                         }
                         Spacer()
@@ -143,7 +155,7 @@ struct HomeView: View {
                         }
                     })
                 }
-            } else {
+            } else if ogs.isLoadingOverview {
                 self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { _ in
                     DispatchQueue.main.async {
                         self.gameDetailCancellable?.cancel()
@@ -151,6 +163,8 @@ struct HomeView: View {
                         self.goToCurrentActiveGameIfReady()
                     }
                 })
+            } else {
+                currentActiveOGSGameId = -1
             }
         }
     }

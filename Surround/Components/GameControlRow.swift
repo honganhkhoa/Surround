@@ -105,6 +105,7 @@ struct GameControlRow: View {
                 }
             } else {
                 Text(game.status).font(Font.title2.bold())
+                    .lineLimit(1)
                     .allowsTightening(true)
                     .minimumScaleFactor(0.7)
             }

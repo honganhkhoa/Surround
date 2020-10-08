@@ -20,6 +20,7 @@ struct MainView: View {
         case home
         case publicGames
         case settings
+        case browser
         
         var systemImage: String {
             switch self {
@@ -29,6 +30,8 @@ struct MainView: View {
                 return "person.2"
             case .settings:
                 return "gearshape.2"
+            case .browser:
+                return "safari"
             }
         }
         
@@ -40,6 +43,8 @@ struct MainView: View {
                 return "Public games"
             case .settings:
                 return "Settings"
+            case .browser:
+                return "Web version"
             }
         }
         
@@ -51,6 +56,8 @@ struct MainView: View {
                 return AnyView(PublicGamesList())
             case .settings:
                 return AnyView(SettingsView())
+            case .browser:
+                return AnyView(OGSBrowserView())
             }
         }
 
@@ -86,6 +93,8 @@ struct MainView: View {
                     SubView.publicGames.navigationLink(currentView: $navigationCurrentView)
                     Divider()
                     SubView.settings.navigationLink(currentView: $navigationCurrentView)
+                    Divider()
+                    SubView.browser.navigationLink(currentView: $navigationCurrentView)
                 }
                 .listStyle(SidebarListStyle())
                 .navigationTitle("Surround")
@@ -138,6 +147,9 @@ struct RootViewSwitchingMenu: ViewModifier {
                     }
                     Section {
                         MainView.SubView.settings.menuButton(currentView: $currentView)
+                    }
+                    Section {
+                        MainView.SubView.browser.menuButton(currentView: $currentView)
                     }
                 }
                 label: {
