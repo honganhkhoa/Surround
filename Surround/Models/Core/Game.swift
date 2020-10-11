@@ -55,7 +55,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         position.nextToMove = firstNonHandicapMoveIndex == data.handicap ? data.initialPlayer.opponentColor() : data.initialPlayer
                     }
                     for move in data.moves[firstNonHandicapMoveIndex...] {
-                        position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
+                        position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]), allowsSelfCapture: data.allowSelfCapture)
                     }
                 } catch {
                     print(error)
@@ -224,7 +224,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 }
             }
         }
-        self.currentPosition = try currentPosition.makeMove(move: move)
+        self.currentPosition = try currentPosition.makeMove(move: move, allowsSelfCapture: gameData?.allowSelfCapture ?? false)
         self.undoRequested = nil
     }
     

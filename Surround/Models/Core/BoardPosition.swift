@@ -256,7 +256,7 @@ class BoardPosition: ObservableObject {
         }
     }
     
-    func makeMove(move: Move) throws -> BoardPosition {
+    func makeMove(move: Move, allowsSelfCapture: Bool = false) throws -> BoardPosition {
         switch move {
         case .pass:
             return BoardPosition(fromPreviousPosition: self, lastMove: move)
@@ -286,8 +286,13 @@ class BoardPosition: ObservableObject {
                     throw MoveError.illegalKoMove
                 }
             } else {
-                if newPosition.liberties(group: newPosition.stoneGroup(atRow: row, column: column)).count == 0 {
-                    throw MoveError.suicidalMove
+                let groupWithNewMove = newPosition.stoneGroup(atRow: row, column: column)
+                if newPosition.liberties(group: groupWithNewMove).count == 0 {
+                    if !allowsSelfCapture {
+                        throw MoveError.suicidalMove
+                    } else {
+                        newPosition.captureGroup(group: groupWithNewMove)
+                    }
                 }
             }
             

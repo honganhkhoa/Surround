@@ -52,6 +52,7 @@ struct GameView: View {
             stoneRemovalOption: stoneRemovalOption,
             newMove: $pendingMove,
             newPosition: $pendingPosition,
+            allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
     }

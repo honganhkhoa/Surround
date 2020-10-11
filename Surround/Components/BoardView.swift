@@ -426,6 +426,7 @@ struct BoardView: View {
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var newMove: Binding<Move?> = .constant(nil)
     var newPosition: Binding<BoardPosition?> = .constant(nil)
+    var allowsSelfCapture: Bool = false
     @State var hoveredPoint: [Int]? = nil
     @State var isHoveredPointValid: Bool? = nil
     @State var selectedPoint: [Int]? = nil
@@ -456,7 +457,7 @@ struct BoardView: View {
                 .onChange(of: hoveredPoint) { value in
                     if let hoveredPoint = hoveredPoint {
                         do {
-                            newPosition.wrappedValue = try boardPosition.makeMove(move: .placeStone(hoveredPoint[0], hoveredPoint[1]))
+                            newPosition.wrappedValue = try boardPosition.makeMove(move: .placeStone(hoveredPoint[0], hoveredPoint[1]), allowsSelfCapture: allowsSelfCapture)
                             isHoveredPointValid = true
                         } catch {
                             isHoveredPointValid = false
