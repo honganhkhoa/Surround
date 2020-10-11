@@ -174,7 +174,6 @@ struct GameDetailView: View {
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
     
-    @SceneStorage("currentActiveOGSGameId") var currentActiveOGSGameId = -1
     @State var showSettings = false
 
     var shouldShowActiveGamesCarousel: Bool {
@@ -313,13 +312,9 @@ struct GameDetailView: View {
             self.updateDetailOfCurrentGameIfNecessary()
         }
         .onDisappear {
-            currentActiveOGSGameId = -1
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: currentGame) { newGame in
-            if let ogsId = newGame.ogsID {
-                currentActiveOGSGameId = ogsId
-            }
             DispatchQueue.main.async {
                 self.updateDetailOfCurrentGameIfNecessary()
             }

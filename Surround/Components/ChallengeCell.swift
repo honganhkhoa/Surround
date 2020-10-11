@@ -14,8 +14,8 @@ struct ChallengeCell: View {
     var challenge: OGSChallenge
     @State var ogsRequestCancellable: AnyCancellable?
     
-    @SceneStorage("currentActiveOGSGameId")
-    var currentActiveOGSGameId = -1
+    @SceneStorage("activeOGSGameIdToOpen")
+    var activeOGSGameIdToOpen = -1
 
     func withdrawOrDeclineChallenge(challenge: OGSChallenge) {
         self.ogsRequestCancellable = ogs.withdrawOrDeclineChallenge(challenge: challenge)
@@ -32,7 +32,7 @@ struct ChallengeCell: View {
                 self.ogsRequestCancellable = nil
             }, receiveValue: { value in
                 let newGameId = value.0
-                currentActiveOGSGameId = newGameId
+                activeOGSGameIdToOpen = newGameId
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
             })

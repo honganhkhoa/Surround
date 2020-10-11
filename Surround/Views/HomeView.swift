@@ -16,10 +16,11 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     
     @State var gameDetailCancellable: AnyCancellable?
-    @State var showGameDetail = false
+    @State var showingGameDetail = false
+    @State var currentActiveOGSGameId = -1
     
-    @SceneStorage("currentActiveOGSGameId")
-    var currentActiveOGSGameId = -1
+    @SceneStorage("activeOGSGameIdToOpen")
+    var activeOGSGameIdToOpen = -1
     
     @AppStorage(SettingKey<Any>.homeViewDisplayMode.name) var displayMode: GameCell.CellDisplayMode = .full
     
@@ -48,9 +49,10 @@ struct HomeView: View {
     }
     
     func showGameDetail(game: Game) {
+        print("Opening game \(game)")
         if let ogsID = game.ogsID {
             self.currentActiveOGSGameId = ogsID
-            self.showGameDetail = true
+            self.showingGameDetail = true
         }
     }
     
@@ -141,36 +143,51 @@ struct HomeView: View {
         }
     }
     
-    func goToCurrentActiveGameIfReady() {
-        if currentActiveOGSGameId != -1 && gameDetailCancellable == nil {
-            if let currentActiveGame = ogs.activeGames[currentActiveOGSGameId] {
-                if currentActiveGame.gameData != nil {
-                    showGameDetail = true
+    func openRequestedActiveGameIfReady() {
+        print("Checking game #\(activeOGSGameIdToOpen)")
+        if !showingGameDetail && activeOGSGameIdToOpen != -1 && gameDetailCancellable == nil {
+            print("Continue checking game #\(activeOGSGameIdToOpen)")
+            if let game = ogs.activeGames[activeOGSGameIdToOpen] {
+                if game.gameData != nil {
+                    self.showGameDetail(game: game)
+                    activeOGSGameIdToOpen = -1
+                    self.gameDetailCancellable?.cancel()
+                    self.gameDetailCancellable = nil
                 } else {
-                    self.gameDetailCancellable = currentActiveGame.$gameData.sink(receiveValue: { _ in
-                        DispatchQueue.main.async {
-                            self.gameDetailCancellable?.cancel()
-                            self.gameDetailCancellable = nil
-                            self.goToCurrentActiveGameIfReady()
+                    print("Waiting for game data of #\(activeOGSGameIdToOpen)")
+                    self.gameDetailCancellable = game.$gameData.sink(receiveValue: { newGameData in
+                        if newGameData != nil {
+                            DispatchQueue.main.async {
+                                self.gameDetailCancellable?.cancel()
+                                self.gameDetailCancellable = nil
+                                self.openRequestedActiveGameIfReady()
+                            }
                         }
                     })
                 }
-            } else if ogs.isLoadingOverview {
-                self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { _ in
-                    DispatchQueue.main.async {
-                        self.gameDetailCancellable?.cancel()
-                        self.gameDetailCancellable = nil
-                        self.goToCurrentActiveGameIfReady()
+            } else {
+                print("Waiting for #\(activeOGSGameIdToOpen) to become active")
+                self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { newActiveGames in
+                    if newActiveGames[activeOGSGameIdToOpen] != nil {
+                        DispatchQueue.main.async {
+                            self.gameDetailCancellable?.cancel()
+                            self.gameDetailCancellable = nil
+                            self.openRequestedActiveGameIfReady()
+                        }
                     }
                 })
-            } else {
-                currentActiveOGSGameId = -1
             }
         }
     }
         
     var body: some View {
         let currentActiveGame = ogs.activeGames[currentActiveOGSGameId]
+        if let currentActiveGame = currentActiveGame {
+            print("Reloading..., current active game #\(currentActiveGame) for id #\(currentActiveOGSGameId)")
+        } else {
+            print("Reloading..., no current active game for id #\(currentActiveOGSGameId)")
+        }
+        print("Waiting to open game #\(activeOGSGameIdToOpen)")
         return VStack {
             if ogs.isLoggedIn {
                 activeGamesView
@@ -182,12 +199,16 @@ struct HomeView: View {
             }
             NavigationLink(
                 destination: currentActiveGame == nil ? nil : GameDetailView(currentGame: currentActiveGame!),
-                isActive: $showGameDetail) {
+                isActive: $showingGameDetail) {
                 EmptyView()
             }
         }
         .onAppear {
-            goToCurrentActiveGameIfReady()
+            if activeOGSGameIdToOpen != -1 {
+                DispatchQueue.main.async {
+                    openRequestedActiveGameIfReady()
+                }
+            }
         }
         .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")
         .toolbar {
@@ -202,14 +223,11 @@ struct HomeView: View {
             }
         }
         .modifier(RootViewSwitchingMenu())
-        .onChange(of: currentActiveOGSGameId) { _ in
-            DispatchQueue.main.async {
-                goToCurrentActiveGameIfReady()
-            }
-        }
-        .onChange(of: showGameDetail) { newValue in
-            if !newValue {
-                currentActiveOGSGameId = -1
+        .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in
+            if ogsGameIdToOpen != -1 {
+                DispatchQueue.main.async {
+                    openRequestedActiveGameIfReady()
+                }
             }
         }
     }
