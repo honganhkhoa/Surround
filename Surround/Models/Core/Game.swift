@@ -65,10 +65,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     currentPosition.removedStones = BoardPosition.points(fromPositionString: removedStones)
                 }
                 currentPosition.gameScores = gameData?.score
+
+                pauseControl = data.pauseControl
                 clock = data.clock
                 
                 undoRequested = data.undoRequested
-                pauseControl = data.pauseControl
 
                 autoScoringDone = data.autoScoringDone
                 // Put this at the end since it will trigger score computing

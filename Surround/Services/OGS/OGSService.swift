@@ -66,6 +66,9 @@ class OGSService: ObservableObject {
     private var pingCancellale: AnyCancellable?
     private var drift = 0.0
     private var latency = 0.0
+    var serverTimeOffset: Double {
+        return drift - latency
+    }
     private var connectedGames = [Int: Game]()
 
     @Published private(set) public var activeGames = [Int: Game]()
@@ -186,9 +189,7 @@ class OGSService: ObservableObject {
             connectedGames = [:]
             for game in previouslyConnectedGames {
                 if case .OGS(let ogsID) = game.ID {
-                    self.socket.off("game/\(ogsID)/gamedata")
-                    self.socket.off("game/\(ogsID)/move")
-                    self.socket.off("game/\(ogsID)/clock")
+                    unsubscribeWebsocketEvent(forGameWithId: ogsID)
                     self.connect(to: game)
                 }
             }
@@ -373,6 +374,8 @@ class OGSService: ObservableObject {
                     if let activeGames = data["active_games"] as? [[String: Any]] {
                         var newActiveGames = [Int:Game]()
                         var unsortedActiveGames = [Game]()
+                        let decoder = DictionaryDecoder()
+                        decoder.keyDecodingStrategy = .convertFromSnakeCase
                         for gameData in activeGames {
                             if let gameId = gameData["id"] as? Int {
                                 if let game = self.activeGames[gameId] {
@@ -385,10 +388,17 @@ class OGSService: ObservableObject {
                                         self.connect(to: newGame)
                                     }
                                 }
+                                if let gameData = gameData["json"] as? [String: Any] {
+                                    if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
+                                        newActiveGames[gameId]?.gameData = ogsGame
+                                        newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
+                                    }
+                                }
                             }
                         }
                         self.unsortedActiveGames = unsortedActiveGames
                         self.activeGames = newActiveGames
+                        self.sortActiveGames(activeGames: self.activeGames.values)
                     }
                     if let challenges = data["challenges"] as? [[String: Any]] {
                         let decoder = DictionaryDecoder()
@@ -500,12 +510,7 @@ class OGSService: ObservableObject {
         }
     }
     
-    func disconnect(from game: Game) {
-        guard case .OGS(let ogsID) = game.ID else {
-            return
-        }
-
-        self.socket.emit("game/disconnect", ["game_id": ogsID])
+    func unsubscribeWebsocketEvent(forGameWithId ogsID: Int) {
         self.socket.off("game/\(ogsID)/gamedata")
         self.socket.off("game/\(ogsID)/move")
         self.socket.off("game/\(ogsID)/clock")
@@ -516,7 +521,15 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/phase")
         self.socket.off("game/\(ogsID)/auto_resign")
         self.socket.off("game/\(ogsID)/clear_auto_resign")
-        
+    }
+    
+    func disconnect(from game: Game) {
+        guard case .OGS(let ogsID) = game.ID else {
+            return
+        }
+
+        self.socket.emit("game/disconnect", ["game_id": ogsID])
+        unsubscribeWebsocketEvent(forGameWithId: ogsID)
         connectedGames[ogsID] = nil
     }
     

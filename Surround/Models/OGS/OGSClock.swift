@@ -126,8 +126,6 @@ extension OGSClock: Decodable {
         if let pauseDetail = try container.decodeIfPresent(OGSPauseDetail.self, forKey: .pause) {
             pauseControl = pauseDetail.pauseControl
         }
-        
-        
     }
     
     mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
