@@ -22,11 +22,12 @@ struct HomeView: View {
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
     
-    @AppStorage(SettingKey<Any>.homeViewDisplayMode.name) var displayMode: GameCell.CellDisplayMode = .full
+    @AppStorage(SettingKey<Any>.homeViewDisplayMode.name, store: userDefaults)
+    var displayMode: GameCell.CellDisplayMode = .full
     
     init(previewGames: [Game] = []) {
         #if os(iOS)
-        if UserDefaults.standard[.homeViewDisplayMode] == nil {
+        if userDefaults[.homeViewDisplayMode] == nil {
             if UIScreen.main.traitCollection.horizontalSizeClass == .compact {
                 displayMode = .compact
             } else {

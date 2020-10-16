@@ -1,0 +1,190 @@
+//
+//  SurroundWidgets.swift
+//  SurroundWidgets
+//
+//  Created by Anh Khoa Hong on 10/15/20.
+//
+
+import WidgetKit
+import SwiftUI
+import Alamofire
+import DictionaryCoding
+
+struct Provider: TimelineProvider {
+    func placeholder(in context: Context) -> CorrespondenceGamesEntry {
+        CorrespondenceGamesEntry(date: Date())
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (CorrespondenceGamesEntry) -> ()) {
+        let entry = CorrespondenceGamesEntry(date: Date())
+        completion(entry)
+    }
+    
+    func parseAndSortActiveGames(fromData activeGamesData: [[String: Any]]) -> [Game] {
+        var result = [Game]()
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        for gameData in activeGamesData {
+            if let jsonData = gameData["json"] as? [String: Any] {
+                if let ogsGame = try? decoder.decode(OGSGame.self, from: jsonData) {
+                    let game = Game(ogsGame: ogsGame)
+                    game.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: game.pauseControl)
+                    result.append(game)
+                }
+            }
+        }
+        
+        let userId = userDefaults[.ogsUIConfig]?.user.id ?? -1
+        let isGamesInIncreasingOrder: (Game, Game) -> Bool = { game1, game2 in
+            if let clock1 = game1.clock, let clock2 = game2.clock {
+                let isGame1OnUserTurn = clock1.currentPlayerId == userId
+                let isGame2OnUserTurn = clock2.currentPlayerId == userId
+                if isGame1OnUserTurn != isGame2OnUserTurn {
+                    return isGame1OnUserTurn
+                }
+
+                let time1 = game1.blackId == userId ? clock1.blackTime : clock1.whiteTime
+                let time2 = game2.blackId == userId ? clock2.blackTime : clock2.whiteTime
+                let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
+                let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
+                return timeLeft1 <= timeLeft2
+            }
+            return false
+        }
+        
+        return result.sorted(by: isGamesInIncreasingOrder)
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+        let currentDate = Date()
+        let nextReloadDate = currentDate.advanced(by: 15 * 60)
+
+        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
+            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
+            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
+            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
+            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
+                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
+                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
+                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseJSON { response in
+                    let currentDate = Date()
+                    let nextReloadDate = currentDate.advanced(by: 15 * 60)
+                    switch response.result {
+                    case .success:
+                        if let data = response.value as? [String: Any] {
+                            if let activeGames = data["active_games"] as? [[String: Any]] {
+                                let games = parseAndSortActiveGames(fromData: activeGames)
+                                let entry = CorrespondenceGamesEntry(
+                                    date: currentDate,
+                                    games: games,
+                                    widgetFamily: context.family,
+                                    noGamesMessage: "You don't have any correspondence games at the moment"
+                                )
+                                completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                                return
+                            }
+                        }
+                    case .failure:
+                        break
+                    }
+                    
+                    let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Failed to load your correspondence games")
+                    completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                }
+            }
+        } else {
+            let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Sign in to your online-go.com account to see your correspondence games here")
+            completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+        }
+    }
+}
+
+struct CorrespondenceGamesEntry: TimelineEntry {
+    var date: Date
+    var games: [Game] = []
+    var widgetFamily: WidgetFamily = .systemSmall
+    var noGamesMessage: String?
+    var debugMessage: String?
+}
+
+struct CorrespondenceGamesWidgetView : View {
+    var entry: Provider.Entry
+
+    var gamesCount: Int {
+        switch entry.widgetFamily {
+        case .systemSmall:
+            return 1
+        case .systemMedium:
+            return 2
+        case .systemLarge:
+            return 4
+        @unknown default:
+            return 1
+        }
+    }
+    
+    var body: some View {
+        let games = entry.games[0..<min(self.gamesCount, entry.games.count)]
+        if games.count > 0 {
+            return AnyView(
+                erasing: LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 5) {
+                    ForEach(games) { game in
+                        VStack(spacing: 0) {
+                            Text(entry.debugMessage ?? "10")
+                                .font(.caption)
+                            BoardView(boardPosition: game.currentPosition)
+                                .aspectRatio(contentMode: .fill)
+                                .padding(.horizontal, 5)
+                        }
+                    }
+                }.padding(5)
+            )
+        } else {
+            return AnyView(
+                Text(entry.noGamesMessage ?? "Failed to load your correspondence games")
+                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+                    .padding()
+            )
+        }
+    }
+}
+
+@main
+struct SurroundWidgets: Widget {
+    let kind: String = "com.honganhkhoa.Surround.CorrespondenceWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            CorrespondenceGamesWidgetView(entry: entry)
+        }
+        .configurationDisplayName("My Widget")
+        .description("This is an example widget.")
+    }
+}
+
+struct SurroundWidgets_Previews: PreviewProvider {
+    static var previews: some View {
+        return Group {
+            ForEach(0..<3) { familyId in
+                let family = [
+                    0: WidgetFamily.systemSmall,
+                    1: WidgetFamily.systemMedium,
+                    2: WidgetFamily.systemLarge
+                ][familyId]!
+                CorrespondenceGamesWidgetView(
+                    entry: CorrespondenceGamesEntry(
+                        date: Date(),
+                        games: [
+                            TestData.Ongoing19x19wBot1,
+                            TestData.Ongoing19x19wBot2,
+                            TestData.Ongoing19x19wBot3
+                        ],
+                        widgetFamily: family
+                    )
+                )
+                .previewContext(WidgetPreviewContext(family: family))
+            }
+        }
+    }
+}

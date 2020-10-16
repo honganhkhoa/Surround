@@ -45,6 +45,30 @@
 		BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */; };
 		BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */; };
 		BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC55D2D524B81E90003E20E7 /* HomeView.swift */; };
+		BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937925380A9F002B2200 /* WidgetKit.framework */; };
+		BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937B25380A9F002B2200 /* SwiftUI.framework */; };
+		BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC64937E25380A9F002B2200 /* SurroundWidgets.swift */; };
+		BC64938125380AA1002B2200 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC64938025380AA1002B2200 /* Assets.xcassets */; };
+		BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BC64939625380D96002B2200 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
+		BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
+		BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
+		BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
+		BC6493A325380DCA002B2200 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
+		BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
+		BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
+		BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3724AB2DD00050B2D1 /* OGSUser.swift */; };
+		BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
+		BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
+		BC6493C125381002002B2200 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
+		BC6493C625381006002B2200 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
+		BC6493D92538112F002B2200 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493D82538112F002B2200 /* Alamofire */; };
+		BC6493DB25381133002B2200 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DA25381133002B2200 /* DictionaryCoding */; };
+		BC6493DD2538113A002B2200 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DC2538113A002B2200 /* SocketIO */; };
+		BC6493EA253811EE002B2200 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
+		BC6493EF25381201002B2200 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -67,7 +91,28 @@
 			remoteGlobalIDString = BC042AEE24AB2CF40050B2D1;
 			remoteInfo = Surround;
 		};
+		BC64938325380AA2002B2200 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC64937625380A9F002B2200;
+			remoteInfo = SurroundWidgetsExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BC64938625380AA2002B2200 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -111,6 +156,14 @@
 		BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBrowserView.swift; sourceTree = "<group>"; };
 		BC55D2D524B81E90003E20E7 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC64937925380A9F002B2200 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		BC64937B25380A9F002B2200 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		BC64937E25380A9F002B2200 /* SurroundWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundWidgets.swift; sourceTree = "<group>"; };
+		BC64938025380AA1002B2200 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BC64938225380AA1002B2200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BC6493F425382011002B2200 /* Surround.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Surround.entitlements; sourceTree = "<group>"; };
+		BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -155,15 +208,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BC64937425380A9F002B2200 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC6493D92538112F002B2200 /* Alamofire in Frameworks */,
+				BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */,
+				BC6493DB25381133002B2200 /* DictionaryCoding in Frameworks */,
+				BC6493DD2538113A002B2200 /* SocketIO in Frameworks */,
+				BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		BC042AE624AB2CF40050B2D1 = {
 			isa = PBXGroup;
 			children = (
+				BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */,
 				BC042AF124AB2CF50050B2D1 /* Surround */,
 				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
+				BC64937D25380A9F002B2200 /* SurroundWidgets */,
+				BC64937825380A9F002B2200 /* Frameworks */,
 				BC042AF024AB2CF50050B2D1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -174,6 +242,7 @@
 				BC042AEF24AB2CF50050B2D1 /* Surround.app */,
 				BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */,
 				BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */,
+				BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -181,6 +250,7 @@
 		BC042AF124AB2CF50050B2D1 /* Surround */ = {
 			isa = PBXGroup;
 			children = (
+				BC6493F425382011002B2200 /* Surround.entitlements */,
 				BCAE412C24D1213100B5DB74 /* ScoreEstimator */,
 				BC042B3224AB2DD00050B2D1 /* Models */,
 				BC042B4124AB2DD10050B2D1 /* Services */,
@@ -312,6 +382,25 @@
 			path = OGS;
 			sourceTree = "<group>";
 		};
+		BC64937825380A9F002B2200 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BC64937925380A9F002B2200 /* WidgetKit.framework */,
+				BC64937B25380A9F002B2200 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		BC64937D25380A9F002B2200 /* SurroundWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				BC64937E25380A9F002B2200 /* SurroundWidgets.swift */,
+				BC64938025380AA1002B2200 /* Assets.xcassets */,
+				BC64938225380AA1002B2200 /* Info.plist */,
+			);
+			path = SurroundWidgets;
+			sourceTree = "<group>";
+		};
 		BCAE412C24D1213100B5DB74 /* ScoreEstimator */ = {
 			isa = PBXGroup;
 			children = (
@@ -343,10 +432,12 @@
 				BC042AEB24AB2CF40050B2D1 /* Sources */,
 				BC042AEC24AB2CF40050B2D1 /* Frameworks */,
 				BC042AED24AB2CF40050B2D1 /* Resources */,
+				BC64938625380AA2002B2200 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BC64938425380AA2002B2200 /* PBXTargetDependency */,
 			);
 			name = Surround;
 			packageProductDependencies = (
@@ -395,6 +486,28 @@
 			productReference = BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		BC64937625380A9F002B2200 /* SurroundWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BC64938925380AA2002B2200 /* Build configuration list for PBXNativeTarget "SurroundWidgetsExtension" */;
+			buildPhases = (
+				BC64937325380A9F002B2200 /* Sources */,
+				BC64937425380A9F002B2200 /* Frameworks */,
+				BC64937525380A9F002B2200 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SurroundWidgetsExtension;
+			packageProductDependencies = (
+				BC6493D82538112F002B2200 /* Alamofire */,
+				BC6493DA25381133002B2200 /* DictionaryCoding */,
+				BC6493DC2538113A002B2200 /* SocketIO */,
+			);
+			productName = SurroundWidgetsExtension;
+			productReference = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -414,6 +527,9 @@
 					BC042B0A24AB2CFA0050B2D1 = {
 						CreatedOnToolsVersion = 12.0;
 						TestTargetID = BC042AEE24AB2CF40050B2D1;
+					};
+					BC64937625380A9F002B2200 = {
+						CreatedOnToolsVersion = 12.0;
 					};
 				};
 			};
@@ -439,6 +555,7 @@
 				BC042AEE24AB2CF40050B2D1 /* Surround */,
 				BC042AFF24AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
+				BC64937625380A9F002B2200 /* SurroundWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -466,6 +583,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC64937525380A9F002B2200 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC64938125380AA1002B2200 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -528,6 +653,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BC64937325380A9F002B2200 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */,
+				BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */,
+				BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */,
+				BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */,
+				BC6493C125381002002B2200 /* se_wrapper.cpp in Sources */,
+				BC6493A325380DCA002B2200 /* OGSPauseControl.swift in Sources */,
+				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
+				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
+				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
+				BC6493EF25381201002B2200 /* TestData.swift in Sources */,
+				BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */,
+				BC6493C625381006002B2200 /* Goban.cc in Sources */,
+				BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */,
+				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
+				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,
+				BC64939625380D96002B2200 /* Game.swift in Sources */,
+				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -540,6 +689,11 @@
 			isa = PBXTargetDependency;
 			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
 			targetProxy = BC042B0C24AB2CFA0050B2D1 /* PBXContainerItemProxy */;
+		};
+		BC64938425380AA2002B2200 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC64937625380A9F002B2200 /* SurroundWidgetsExtension */;
+			targetProxy = BC64938325380AA2002B2200 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -601,6 +755,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -655,6 +810,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -663,8 +819,10 @@
 		BC042B1524AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
@@ -676,7 +834,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
@@ -688,8 +846,10 @@
 		BC042B1624AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
@@ -701,7 +861,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
@@ -794,6 +954,56 @@
 			};
 			name = Release;
 		};
+		BC64938725380AA2002B2200 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				GCC_PREPROCESSOR_DEFINITIONS = "";
+				INFOPLIST_FILE = SurroundWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				OTHER_SWIFT_FLAGS = "-D WIDGET";
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BC64938825380AA2002B2200 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				GCC_PREPROCESSOR_DEFINITIONS = "";
+				INFOPLIST_FILE = SurroundWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				OTHER_SWIFT_FLAGS = "-D WIDGET";
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -829,6 +1039,15 @@
 			buildConfigurations = (
 				BC042B1B24AB2CFA0050B2D1 /* Debug */,
 				BC042B1C24AB2CFA0050B2D1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BC64938925380AA2002B2200 /* Build configuration list for PBXNativeTarget "SurroundWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC64938725380AA2002B2200 /* Debug */,
+				BC64938825380AA2002B2200 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -890,6 +1109,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		BC6493D82538112F002B2200 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		BC6493DA25381133002B2200 /* DictionaryCoding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			productName = DictionaryCoding;
+		};
+		BC6493DC2538113A002B2200 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

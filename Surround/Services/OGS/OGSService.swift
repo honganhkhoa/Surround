@@ -223,10 +223,10 @@ class OGSService: ObservableObject {
     
     var ogsUIConfig: OGSUIConfig? {
         get {
-            return UserDefaults.standard[.ogsUIConfig]
+            return userDefaults[.ogsUIConfig]
         }
         set {
-            UserDefaults.standard[.ogsUIConfig] = newValue
+            userDefaults[.ogsUIConfig] = newValue
             if newValue == nil {
                 Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
                 for game in activeGames.values {
@@ -249,8 +249,19 @@ class OGSService: ObservableObject {
                 receiveCompletion: { _ in },
                 receiveValue: { uiConfig in
                     self.ogsUIConfig = uiConfig
+                    self.updateSessionId()
                     self.uiConfigCancellable = nil
                 })
+        }
+    }
+    
+    func updateSessionId() {
+        if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: self.ogsRoot)!) {
+            for cookie in cookies {
+                if cookie.name == "sessionid" {
+                    userDefaults[.ogsSessionId] = cookie.value
+                }
+            }
         }
     }
     
@@ -272,6 +283,7 @@ class OGSService: ObservableObject {
                 }
             }
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
+            self.updateSessionId()
             self.ogsUIConfig = config
             self.loadOverview()
             self.authenticateSocketIfLoggedIn()
@@ -304,16 +316,24 @@ class OGSService: ObservableObject {
     private func checkLoginStatus() {
         isLoggedIn = {
             if let ogsUIConfig = self.ogsUIConfig {
-                if let csrfToken = ogsUIConfig.csrfToken {
-                    if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: ogsRoot)!) {
-                        for cookie in cookies {
-                            if cookie.name == "csrftoken" {
-                                return true
-                            }
+                var hasCSRFToken = false
+                var hasSessionId = false
+                if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: ogsRoot)!) {
+                    for cookie in cookies {
+                        if cookie.name == "csrftoken" {
+                            hasCSRFToken = true
+                        }
+                        if cookie.name == "sessionid" {
+                            hasSessionId = true
                         }
                     }
-                    
-                    if let domain = URL(string: ogsRoot)?.host {
+                }
+                if (!hasCSRFToken && ogsUIConfig.csrfToken == nil) || (!hasSessionId && userDefaults[.ogsSessionId] == nil) {
+                    return false
+                }
+                let domain = URL(string: ogsRoot)!.host!
+                if let csrfToken = ogsUIConfig.csrfToken {
+                    if !hasCSRFToken {
                         if let cookie = HTTPCookie(properties: [
                             .name: "csrftoken",
                             .value: csrfToken,
@@ -321,16 +341,26 @@ class OGSService: ObservableObject {
                             .path: "/"
                         ]) {
                             Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
-                            return true
+                            hasCSRFToken = true
                         }
                     }
-                    return false
-                } else {
-                    return false
                 }
-            } else {
-                return false
+                if let sessionId = userDefaults[.ogsSessionId] {
+                    if !hasSessionId {
+                        if let cookie = HTTPCookie(properties: [
+                            .name: "sessionid",
+                            .value: sessionId,
+                            .domain: domain,
+                            .path: "/"
+                        ]) {
+                            Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                            hasSessionId = true
+                        }
+                    }
+                }
+                return hasCSRFToken && hasSessionId
             }
+            return false
         }()
         if isLoggedIn {
             user = self.ogsUIConfig?.user
@@ -836,6 +866,9 @@ class OGSService: ObservableObject {
             for cookie in cookies {
                 if cookie.domain == host {
                     Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                    if cookie.name == "sessionid" {
+                        userDefaults[.ogsSessionId] = cookie.value
+                    }
                 }
             }
             return self.fetchUIConfig()
@@ -849,6 +882,7 @@ class OGSService: ObservableObject {
         .eraseToAnyPublisher()
     }
     
+    #if !WIDGET
     static func thirdPartyLoginURL(type: ThirdPartyLoginWebView.ThirdParty) -> URL {
         switch type {
         case .facebook:
@@ -859,6 +893,7 @@ class OGSService: ObservableObject {
             return URL(string: "\(OGSService.ogsRoot)/login/twitter/")!
         }
     }
+    #endif
     
     func withdrawOrDeclineChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in

@@ -9,6 +9,9 @@ import Foundation
 import Combine
 import SwiftUI
 
+let userDefaultsSuite = "group.com.honganhkhoa.Surround"
+let userDefaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
+
 // From https://www.swiftbysundell.com/articles/the-power-of-subscripts-in-swift/
 struct SettingKey<Value> {
     var name: String
@@ -59,9 +62,15 @@ extension SettingKey {
         return .init(name: "ogsUIConfig", encoded: true)
     }
     
+    static var ogsSessionId: SettingKey<String> {
+        return .init(name: "ogsSessionId")
+    }
+    
+    #if !WIDGET
     static var homeViewDisplayMode: SettingKey<GameCell.CellDisplayMode> {
         return .init(name: "homeViewDisplayMode")
     }
+    #endif
     
     static var hapticsFeedback: SettingKey<Bool> {
         return .init(name: "hapticsFeedback", defaultValue: true)
@@ -90,10 +99,10 @@ struct Setting<Value> where Value: Codable {
     
     var wrappedValue: Value? {
         get {
-            return UserDefaults.standard[settingKey]
+            return userDefaults[settingKey]
         }
         set {
-            UserDefaults.standard[settingKey] = newValue
+            userDefaults[settingKey] = newValue
         }
     }
 }
@@ -108,10 +117,10 @@ struct SettingWithDefault<Value> where Value: Codable {
     
     var wrappedValue: Value {
         get {
-            return UserDefaults.standard[settingKey]!
+            return userDefaults[settingKey]!
         }
         set {
-            UserDefaults.standard[settingKey] = newValue
+            userDefaults[settingKey] = newValue
         }
     }
     
@@ -121,7 +130,7 @@ struct SettingWithDefault<Value> where Value: Codable {
                 return self.wrappedValue
             },
             set: { newValue in
-                UserDefaults.standard[settingKey] = newValue
+                userDefaults[settingKey] = newValue
             }
         )
     }
