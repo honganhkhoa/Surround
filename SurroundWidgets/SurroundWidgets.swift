@@ -78,7 +78,7 @@ struct Provider: TimelineProvider {
                                     date: currentDate,
                                     games: games,
                                     widgetFamily: context.family,
-                                    noGamesMessage: "You don't have any correspondence games at the moment"
+                                    noGamesMessage: "You don't have any correspondence games at the moment."
                                 )
                                 completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                                 return
@@ -88,12 +88,12 @@ struct Provider: TimelineProvider {
                         break
                     }
                     
-                    let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Failed to load your correspondence games")
+                    let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Failed to load your correspondence games.")
                     completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                 }
             }
         } else {
-            let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Sign in to your online-go.com account to see your correspondence games here")
+            let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Sign in to your online-go.com account to see your correspondence games here.")
             completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
         }
     }
@@ -123,29 +123,153 @@ struct CorrespondenceGamesWidgetView : View {
         }
     }
     
-    var body: some View {
+    func timer(game: Game) -> some View {
+        let userId = userDefaults[.ogsUIConfig]?.user.id
+        if let clock = game.clock, let timeControlSystem = game.gameData?.timeControl.system {
+            let thinkingTime = clock.blackPlayerId == userId ? clock.blackTime : clock.whiteTime
+            var timeLeft = thinkingTime.thinkingTimeLeft
+            var auxiliaryLabel = ""
+            switch timeControlSystem {
+            case .ByoYomi:
+                if thinkingTime.thinkingTime! > 0 {
+                    auxiliaryLabel = " (\(thinkingTime.periods!))"
+                } else {
+                    timeLeft = thinkingTime.periodTimeLeft
+                    if thinkingTime.periodsLeft! > 1 {
+                        auxiliaryLabel = " (\(thinkingTime.periodsLeft!))"
+                    } else {
+                        auxiliaryLabel = " (SD)"
+                    }
+                }
+            case .Canadian:
+                if thinkingTime.thinkingTime == 0 {
+                    timeLeft = thinkingTime.blockTimeLeft
+                    auxiliaryLabel = "/\(thinkingTime.movesLeft!)"
+                }
+            default:
+                break
+            }
+            return AnyView(HStack(spacing: 0) {
+                Spacer()
+                if let timeLeft = timeLeft {
+                    if (game.pauseControl?.isPaused() ?? false) || game.clock?.currentPlayerId != userId {
+                        Text(timeString(timeLeft: timeLeft))
+                            .multilineTextAlignment(.trailing)
+                    } else {
+                        Text(Date().addingTimeInterval(timeLeft), style: .timer)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+                if auxiliaryLabel == " (SD)" {
+                    Text(auxiliaryLabel).foregroundColor(.red)
+                } else {
+                    Text(auxiliaryLabel)
+                }
+            }.font(Font.caption2.monospacedDigit().bold()))
+        }
+        return AnyView(EmptyView())
+    }
+    
+    func gameCell(game: Game, boardSize: CGFloat) -> some View {
+        let userId = userDefaults[.ogsUIConfig]?.user.id
+
+        return VStack(spacing: 0) {
+            ZStack {
+                if game.clock?.currentPlayerId == userId || true {
+                    Color(.systemTeal)
+                        .frame(width: boardSize + 6, height: boardSize + 6)
+                        .cornerRadius(10)
+                }
+                BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
+                    .frame(width: boardSize, height: boardSize)
+                    .padding(3)
+            }
+            HStack {
+                timer(game: game)
+                if let userId = userId {
+                    if let pauseReason = game.pauseControl?.pauseReason(playerId: userId) {
+                        Text(pauseReason).font(Font.caption2.bold())
+                    }
+                }
+            }.frame(width: boardSize)
+        }
+    }
+    
+    var boards: some View {
         let games = entry.games[0..<min(self.gamesCount, entry.games.count)]
-        if games.count > 0 {
+
+        return GeometryReader { geometry -> AnyView in
+            var boardMaxHeight = geometry.size.height - 15
+            if entry.widgetFamily == .systemLarge && games.count > 1 {
+                boardMaxHeight = (boardMaxHeight - 20) / 2
+            }
+            var boardMaxWidth = geometry.size.width - 20
+            if entry.widgetFamily != .systemSmall {
+                boardMaxWidth = (boardMaxWidth - 20) / 2
+            }
+            let boardSize = min(boardMaxWidth, boardMaxHeight - 15)
             return AnyView(
-                erasing: LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 5) {
-                    ForEach(games) { game in
-                        VStack(spacing: 0) {
-                            Text(entry.debugMessage ?? "10")
-                                .font(.caption)
-                            BoardView(boardPosition: game.currentPosition)
-                                .aspectRatio(contentMode: .fill)
-                                .padding(.horizontal, 5)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        gameCell(game: games[0], boardSize: boardSize)
+                        Spacer(minLength: 0)
+                        if games.count > 1 {
+                            gameCell(game: games[1], boardSize: boardSize)
+                            Spacer(minLength: 0)
                         }
                     }
-                }.padding(5)
+                    Spacer(minLength: 0)
+                    if games.count > 2 {
+                        HStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            gameCell(game: games[2], boardSize: boardSize)
+                            Spacer(minLength: 0)
+                            if games.count > 3 {
+                                gameCell(game: games[3], boardSize: boardSize)
+                                Spacer(minLength: 0)
+                            }
+                        }
+                    }
+                }
             )
-        } else {
-            return AnyView(
-                Text(entry.noGamesMessage ?? "Failed to load your correspondence games")
-                    .multilineTextAlignment(.center)
+        }
+    }
+    
+    var body: some View {
+        let games = entry.games[0..<min(self.gamesCount, entry.games.count)]
+        let userId = userDefaults[.ogsUIConfig]?.user.id
+        var numberOfGamesOnUserTurn = 0
+        for game in entry.games {
+            if game.clock?.currentPlayerId == userId {
+                numberOfGamesOnUserTurn += 1
+            }
+        }
+
+        return ZStack {
+            Color(UIColor.systemGray4)
+            if games.count > 0 {
+                HStack(alignment: .center, spacing: 0) {
+                    boards
+                        .padding(.vertical, 5)
+                    ZStack {
+                        Color(.systemIndigo)
+                            .frame(width: 25)
+                        Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(-90))
+                            .fixedSize()
+                    }
+                    .frame(width: 25)
+                }
+            } else {
+                Text(entry.noGamesMessage ?? "Failed to load your correspondence games.")
                     .font(.subheadline)
                     .padding()
-            )
+            }
         }
     }
 }
@@ -158,8 +282,8 @@ struct SurroundWidgets: Widget {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             CorrespondenceGamesWidgetView(entry: entry)
         }
-        .configurationDisplayName("My Widget")
-        .description("This is an example widget.")
+        .configurationDisplayName("Correspondence Games Widget")
+        .description("This Widget display a summary of your correspondence games on online-go.com.")
     }
 }
 

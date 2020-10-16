@@ -9,7 +9,7 @@ import SwiftUI
 
 func stoneSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
     return CGFloat(
-        floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize) / 2) * 2)
+        floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize)))
 }
 
 enum StoneRemovalOption: Int {
@@ -433,6 +433,7 @@ struct BoardView: View {
     @State var highlightedRow = -1
     @State var highlightedColumn = -1
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
+    var cornerRadius: CGFloat = 0.0
     
     var body: some View {
 //        self.boardPosition.printPosition()
@@ -440,7 +441,7 @@ struct BoardView: View {
             newPosition.wrappedValue! : boardPosition
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Color(red: 0.86, green: 0.69, blue: 0.42).shadow(radius: 2)
+                Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
                 Goban(
                     geometry: geometry,
                     width: boardPosition.width,
