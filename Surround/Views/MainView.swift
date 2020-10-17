@@ -15,6 +15,9 @@ struct MainView: View {
     @EnvironmentObject var ogs: OGSService
     @SceneStorage("currentRootView") var currentView: SubView = .home
     @State var navigationCurrentView: SubView? = .home
+    
+    @SceneStorage("activeOGSGameIdToOpen")
+    var activeOGSGameIdToOpen = -1
 
     enum SubView: String {
         case home
@@ -121,6 +124,21 @@ struct MainView: View {
                         ogs.fetchPublicGames()
                     }
                 })
+            }
+        }
+        .onOpenURL { url in
+            if let rootViewName = url.host, let rootView = SubView(rawValue: rootViewName) {
+                currentView = rootView
+                switch rootView {
+                case .home:
+                    if url.pathComponents.count > 1 {
+                        if let ogsGameId = Int(url.pathComponents[1]) {
+                            activeOGSGameIdToOpen = ogsGameId
+                        }
+                    }
+                default:
+                    break
+                }
             }
         }
     }

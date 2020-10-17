@@ -56,9 +56,6 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        let currentDate = Date()
-        let nextReloadDate = currentDate.advanced(by: 15 * 60)
-
         if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
             let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
             let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
@@ -93,6 +90,9 @@ struct Provider: TimelineProvider {
                 }
             }
         } else {
+            let currentDate = Date()
+            let nextReloadDate = currentDate.advanced(by: 15 * 60)
+
             let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Sign in to your online-go.com account to see your correspondence games here.")
             completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
         }
@@ -155,9 +155,13 @@ struct CorrespondenceGamesWidgetView : View {
                     if (game.pauseControl?.isPaused() ?? false) || game.clock?.currentPlayerId != userId {
                         Text(timeString(timeLeft: timeLeft))
                             .multilineTextAlignment(.trailing)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     } else {
                         Text(Date().addingTimeInterval(timeLeft), style: .timer)
                             .multilineTextAlignment(.trailing)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 if auxiliaryLabel == " (SD)" {
@@ -174,21 +178,26 @@ struct CorrespondenceGamesWidgetView : View {
         let userId = userDefaults[.ogsUIConfig]?.user.id
 
         return VStack(spacing: 0) {
-            ZStack {
-                if game.clock?.currentPlayerId == userId || true {
-                    Color(.systemTeal)
-                        .frame(width: boardSize + 6, height: boardSize + 6)
-                        .cornerRadius(10)
+            Link(destination: URL(string: "surround://home/\(game.ogsID!)")!) {
+                ZStack {
+                    if game.clock?.currentPlayerId == userId || true {
+                        Color(.systemTeal)
+                            .frame(width: boardSize + 6, height: boardSize + 6)
+                            .cornerRadius(10)
+                    }
+                    BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
+                        .frame(width: boardSize, height: boardSize)
+                        .padding(3)
                 }
-                BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
-                    .frame(width: boardSize, height: boardSize)
-                    .padding(3)
             }
             HStack {
                 timer(game: game)
                 if let userId = userId {
                     if let pauseReason = game.pauseControl?.pauseReason(playerId: userId) {
-                        Text(pauseReason).font(Font.caption2.bold())
+                        Text(pauseReason)
+                            .font(Font.caption2.bold())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
             }.frame(width: boardSize)
@@ -214,6 +223,11 @@ struct CorrespondenceGamesWidgetView : View {
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
                         gameCell(game: games[0], boardSize: boardSize)
+                            .widgetURL(
+                                self.gamesCount == 1
+                                    ? URL(string: "surround://home/\(games[0].ogsID!)")!
+                                    : URL(string: "surround://home")!
+                            )
                         Spacer(minLength: 0)
                         if games.count > 1 {
                             gameCell(game: games[1], boardSize: boardSize)
@@ -252,7 +266,7 @@ struct CorrespondenceGamesWidgetView : View {
             if games.count > 0 {
                 HStack(alignment: .center, spacing: 0) {
                     boards
-                        .padding(.vertical, 5)
+                        .padding(.top, 5)
                     ZStack {
                         Color(.systemIndigo)
                             .frame(width: 25)
@@ -284,6 +298,7 @@ struct SurroundWidgets: Widget {
         }
         .configurationDisplayName("Correspondence Games Widget")
         .description("This Widget display a summary of your correspondence games on online-go.com.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 

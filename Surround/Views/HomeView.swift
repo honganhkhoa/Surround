@@ -189,6 +189,7 @@ struct HomeView: View {
             print("Reloading..., no current active game for id #\(currentActiveOGSGameId)")
         }
         print("Waiting to open game #\(activeOGSGameIdToOpen)")
+        print("Showing game detail: \(showingGameDetail)")
         return VStack {
             if ogs.isLoggedIn {
                 activeGamesView
@@ -226,8 +227,20 @@ struct HomeView: View {
         .modifier(RootViewSwitchingMenu())
         .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
-                DispatchQueue.main.async {
-                    openRequestedActiveGameIfReady()
+                if ogsGameIdToOpen != currentActiveOGSGameId {
+                    if showingGameDetail {
+                        showingGameDetail = false
+                        DispatchQueue.main.asyncAfter(
+                            deadline: DispatchTime.now().advanced(by: .seconds(1)),
+                            execute: {
+                                openRequestedActiveGameIfReady()
+                            }
+                        )
+                    } else {
+                        DispatchQueue.main.async {
+                            openRequestedActiveGameIfReady()
+                        }
+                    }
                 }
             }
         }
