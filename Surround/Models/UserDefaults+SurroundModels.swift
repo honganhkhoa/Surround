@@ -66,6 +66,14 @@ extension SettingKey {
         return .init(name: "ogsSessionId")
     }
     
+    static var latestOGSOverview: SettingKey<Data> {
+        return .init(name: "latestOGSOverview")
+    }
+    
+    static var latestOGSOverviewTime: SettingKey<Date> {
+        return .init(name: "latestOGSOverviewTime")
+    }
+    
     #if !WIDGET
     static var homeViewDisplayMode: SettingKey<GameCell.CellDisplayMode> {
         return .init(name: "homeViewDisplayMode")

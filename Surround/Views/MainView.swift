@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 struct MainView: View {
     #if os(iOS)
@@ -124,6 +125,8 @@ struct MainView: View {
                         ogs.fetchPublicGames()
                     }
                 })
+            } else if phase == .background {
+                WidgetCenter.shared.reloadAllTimelines()
             }
         }
         .onOpenURL { url in

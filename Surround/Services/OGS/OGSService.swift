@@ -11,6 +11,7 @@ import Alamofire
 import DictionaryCoding
 import SocketIO
 import WebKit
+import WidgetKit
 
 enum OGSServiceError: Error {
     case invalidJSON
@@ -228,6 +229,7 @@ class OGSService: ObservableObject {
         set {
             userDefaults[.ogsUIConfig] = newValue
             if newValue == nil {
+                userDefaults[.ogsSessionId] = nil
                 Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
                 for game in activeGames.values {
                     self.disconnect(from: game)
@@ -397,10 +399,13 @@ class OGSService: ObservableObject {
         }
         
         isLoadingOverview = true
-        AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseJSON { response in
+        AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseData { response in
             switch response.result {
             case .success:
-                if let data = response.value as? [String: Any] {
+                if let responseValue = response.value, let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
+                    userDefaults[.latestOGSOverview] = responseValue
+                    userDefaults[.latestOGSOverviewTime] = Date()
+                    WidgetCenter.shared.reloadAllTimelines()
                     if let activeGames = data["active_games"] as? [[String: Any]] {
                         var newActiveGames = [Int:Game]()
                         var unsortedActiveGames = [Game]()
