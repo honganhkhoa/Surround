@@ -69,6 +69,10 @@
 		BC6493DD2538113A002B2200 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DC2538113A002B2200 /* SocketIO */; };
 		BC6493EA253811EE002B2200 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC6493EF25381201002B2200 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BC649414253DA44C002B2200 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
+		BC649421253DAD89002B2200 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
+		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -164,6 +168,8 @@
 		BC64938225380AA1002B2200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC6493F425382011002B2200 /* Surround.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Surround.entitlements; sourceTree = "<group>"; };
 		BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		BC649413253DA44C002B2200 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -368,18 +374,12 @@
 		BC042B4124AB2DD10050B2D1 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				BC042B4224AB2DD10050B2D1 /* OGS */,
+				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
+				BC649413253DA44C002B2200 /* NotificationService.swift */,
+				BC649426253FF940002B2200 /* NavigationService.swift */,
 			);
 			path = Services;
-			sourceTree = "<group>";
-		};
-		BC042B4224AB2DD10050B2D1 /* OGS */ = {
-			isa = PBXGroup;
-			children = (
-				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
-			);
-			path = OGS;
 			sourceTree = "<group>";
 		};
 		BC64937825380A9F002B2200 /* Frameworks */ = {
@@ -621,12 +621,14 @@
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
+				BC649427253FF941002B2200 /* NavigationService.swift in Sources */,
 				BC0F1C452525946100E3E66B /* LoginView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
+				BC649414253DA44C002B2200 /* NotificationService.swift in Sources */,
 				BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */,
 				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,
 				BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */,
@@ -661,6 +663,7 @@
 				BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */,
 				BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */,
 				BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */,
+				BC649421253DAD89002B2200 /* NotificationService.swift in Sources */,
 				BC6493C125381002002B2200 /* se_wrapper.cpp in Sources */,
 				BC6493A325380DCA002B2200 /* OGSPauseControl.swift in Sources */,
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
@@ -673,6 +676,7 @@
 				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
 				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,
 				BC64939625380D96002B2200 /* Game.swift in Sources */,
+				BC649428253FF942002B2200 /* NavigationService.swift in Sources */,
 				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

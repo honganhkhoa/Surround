@@ -393,7 +393,7 @@ class OGSService: ObservableObject {
     }
 
     
-    func loadOverview() {
+    func loadOverview(finishCallback: (() -> ())? = nil) {
         guard isLoggedIn else {
             return
         }
@@ -461,6 +461,9 @@ class OGSService: ObservableObject {
             }
             
             self.isLoadingOverview = false
+            if let finishCallback = finishCallback {
+                finishCallback()
+            }
         }
     }
     

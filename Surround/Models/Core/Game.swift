@@ -134,7 +134,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var gamePhase: OGSGamePhase? {
         didSet {
             if gamePhase == .stoneRemoval {
-                if !(autoScoringDone ?? false) {
+                if !(autoScoringDone ?? false) && isUserPlaying {
                     // Doing score estimating
                     self.autoScoringCancellable = currentPosition.estimateTerritory(on: computeQueue)
                         .receive(on: DispatchQueue.main)
@@ -214,6 +214,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.initialPosition = BoardPosition(width: width, height: height)
         self.currentPosition = self.initialPosition
         self.gameData = ogsGame
+        self.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: self.pauseControl)
     }
     
     func makeMove(move: Move) throws {

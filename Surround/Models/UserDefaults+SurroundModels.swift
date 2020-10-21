@@ -95,6 +95,34 @@ extension SettingKey {
     static var voiceCountdown: SettingKey<Bool> {
         return .init(name: "voiceCountdown", defaultValue: false)
     }
+    
+    static var notificationEnabled: SettingKey<Bool> {
+        return .init(name: "notification.enabled", defaultValue: false)
+    }
+    
+    static var notificationOnUserTurn: SettingKey<Bool> {
+        return .init(name: "notification.onUserTurn", defaultValue: true)
+    }
+    
+    static var notificationOnNewGame: SettingKey<Bool> {
+        return .init(name: "notification.onNewGame", defaultValue: true)
+    }
+        
+    static var notiticationOnGameEnd: SettingKey<Bool> {
+        return .init(name: "notification.onGameEnd", defaultValue: true)
+    }
+
+    static var notificationOnTimeRunningOut: SettingKey<Bool> {
+        return .init(name: "notification.onTimeRunningOut", defaultValue: true)
+    }
+    
+    static var notificationOnChallengeReceived: SettingKey<Bool> {
+        return .init(name: "notification.onChallengeReceived", defaultValue: true)
+    }
+    
+    static var latestNotificationCheck: SettingKey<Date> {
+        return .init(name: "latestNotificationCheck")
+    }
 }
 
 @propertyWrapper

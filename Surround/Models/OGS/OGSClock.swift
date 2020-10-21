@@ -21,6 +21,14 @@ struct ThinkingTime: Codable {
     var movesLeft: Int?
     var blockTime: Double?
     var blockTimeLeft: Double?
+    
+    var timeLeft: Double? {
+        if thinkingTimeLeft == 0 {
+            return periodTimeLeft ?? blockTimeLeft ?? thinkingTimeLeft
+        } else {
+            return thinkingTimeLeft ?? periodTimeLeft ?? blockTimeLeft
+        }
+    }
 }
 
 struct OGSPauseDetail: Decodable {

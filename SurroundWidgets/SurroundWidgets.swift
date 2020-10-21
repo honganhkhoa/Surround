@@ -62,7 +62,6 @@ struct Provider: TimelineProvider {
             if let jsonData = gameData["json"] as? [String: Any] {
                 if let ogsGame = try? decoder.decode(OGSGame.self, from: jsonData) {
                     let game = Game(ogsGame: ogsGame)
-                    game.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: game.pauseControl)
                     result.append(game)
                 }
             }
@@ -122,6 +121,9 @@ struct Provider: TimelineProvider {
                     
                     if let overviewData = overviewData {
                         if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
+                            if let oldOverviewData = userDefaults[.latestOGSOverview] {
+                                NotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData)
+                            }
                             userDefaults[.latestOGSOverview] = overviewData
                             userDefaults[.latestOGSOverviewTime] = Date()
                             if let entry = getEntry(fromOverviewJSON: data, context: context) {
@@ -234,7 +236,7 @@ struct CorrespondenceGamesWidgetView : View {
     
     func gameCell(game: Game, boardSize: CGFloat) -> some View {
         return VStack(spacing: 0) {
-            Link(destination: URL(string: "surround://home/\(game.ogsID!)")!) {
+            Link(destination: NavigationService.appURL(rootView: .home, game: game)!) {
                 ZStack {
                     if game.clock?.currentPlayerId == userId {
                         Color(.systemTeal)
@@ -281,8 +283,8 @@ struct CorrespondenceGamesWidgetView : View {
                         gameCell(game: gamesToDisplay[0], boardSize: boardSize)
                             .widgetURL(
                                 self.gamesCount == 1
-                                    ? URL(string: "surround://home/\(gamesToDisplay[0].ogsID!)")!
-                                    : URL(string: "surround://home")!
+                                    ? NavigationService.appURL(rootView: .home, game: gamesToDisplay[0])!
+                                    : NavigationService.appURL(rootView: .home)!
                             )
                         Spacer(minLength: 0)
                         if gamesToDisplay.count > 1 {

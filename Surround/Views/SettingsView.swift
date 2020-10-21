@@ -18,39 +18,73 @@ struct SettingsView: View {
     @State var isShowingGoogleLogin = false
     @State var isShowingTwitterLogin = false
     
+    @State var notificationEnabled = SettingWithDefault(key: .notificationEnabled).wrappedValue
+    
+    var accountSettings: some View {
+        Group {
+            if let user = ogs.user {
+                GroupBox(label: Text("Online-go.com Account")) {
+                    HStack(alignment: .top) {
+                        if let url = user.iconURL(ofSize: 64) {
+                            URLImage(url)
+                                .frame(width: 64, height: 64)
+                                .background(Color.gray)
+                                .cornerRadius(10)
+                        }
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text(user.username)
+                                Text("[\(user.formattedRank)]")
+                            }
+                            .font(.title3)
+                            Button(action: { ogs.logout() }) {
+                                Text("Logout")
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                            .hoverEffect()
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal)
+            } else {
+                LoginView()
+            }
+        }
+    }
+    
+    var notificationSettings: some View {
+        return GroupBox(label: Toggle("Notifications", isOn: $notificationEnabled)) {
+            GroupBox(label: Text("Send a notification on...")) {
+                Toggle("My turn", isOn: SettingWithDefault(key: .notificationOnUserTurn).binding)
+                Toggle("Time running low", isOn: SettingWithDefault(key: .notificationOnTimeRunningOut).binding)
+                Toggle("Challenge received", isOn: SettingWithDefault(key: .notificationOnChallengeReceived).binding)
+                Toggle("A game starts", isOn: SettingWithDefault(key: .notificationOnNewGame).binding)
+                Toggle("A game ends", isOn: SettingWithDefault(key: .notiticationOnGameEnd).binding)
+            }
+            .disabled(!notificationEnabled)
+        }
+        .padding(.horizontal)
+        .onChange(of: notificationEnabled) { enabled in
+            userDefaults[.notificationEnabled] = enabled
+            if enabled {
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { (granted, error) in
+                    if let error = error {
+                        print(error)
+                    }
+                    print("Notifications permission granted: \(granted)")
+                }
+            }
+        }
+    }
+    
     var body: some View {
         ScrollView {
             VStack {
-                if let user = ogs.user {
-                    GroupBox(label: Text("Online-go.com Account")) {
-                        HStack(alignment: .top) {
-                            if let url = user.iconURL(ofSize: 64) {
-                                URLImage(url)
-                                    .frame(width: 64, height: 64)
-                                    .background(Color.gray)
-                                    .cornerRadius(10)
-                            }
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Text(user.username)
-                                    Text("[\(user.formattedRank)]")
-                                }
-                                .font(.title3)
-                                Button(action: { ogs.logout() }) {
-                                    Text("Logout")
-                                }
-                                .contentShape(RoundedRectangle(cornerRadius: 10))
-                                .hoverEffect()
-                            }
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .padding(.horizontal)
-                } else {
-                    LoginView()
-                }
+                accountSettings
                 GameplaySettings()
+                notificationSettings
             }
             .frame(maxWidth: 600)
         }
