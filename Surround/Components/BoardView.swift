@@ -68,7 +68,7 @@ struct Goban: View {
     var selectedPoint: Binding<[Int]?> = .constant(nil)
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
 
-    @SettingWithDefault(key: .hapticsFeedback) var hapticsFeedbback: Bool
+    @Setting(.hapticsFeedback) var hapticsFeedbback: Bool
     
     var body: some View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height))

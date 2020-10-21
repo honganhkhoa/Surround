@@ -22,7 +22,7 @@ struct PlayersBannerView: View {
     @State var speechSynthesizer: AVSpeechSynthesizer?
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
-    @SettingWithDefault(key: .voiceCountdown) var voiceCountdown: Bool
+    @Setting(.voiceCountdown) var voiceCountdown: Bool
     
     var shouldShowNamesOutOfColumn: Bool {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80

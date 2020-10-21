@@ -24,8 +24,8 @@ struct GameControlRow: View {
     @State var showingResignAlert = false
     @State var showingCancelAlert = false
     
-    @SettingWithDefault(key: .autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
-    @SettingWithDefault(key: .autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
+    @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
+    @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
     var userColor: StoneColor {
         return ogs.user?.id == game.blackId ? .black : .white

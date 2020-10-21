@@ -18,7 +18,7 @@ struct SettingsView: View {
     @State var isShowingGoogleLogin = false
     @State var isShowingTwitterLogin = false
     
-    @State var notificationEnabled = SettingWithDefault(key: .notificationEnabled).wrappedValue
+    @State var notificationEnabled = Setting(.notificationEnabled).wrappedValue
     
     var accountSettings: some View {
         Group {
@@ -57,11 +57,11 @@ struct SettingsView: View {
     var notificationSettings: some View {
         return GroupBox(label: Toggle("Notifications", isOn: $notificationEnabled)) {
             GroupBox(label: Text("Send a notification on...")) {
-                Toggle("My turn", isOn: SettingWithDefault(key: .notificationOnUserTurn).binding)
-                Toggle("Time running low", isOn: SettingWithDefault(key: .notificationOnTimeRunningOut).binding)
-                Toggle("Challenge received", isOn: SettingWithDefault(key: .notificationOnChallengeReceived).binding)
-                Toggle("A game starts", isOn: SettingWithDefault(key: .notificationOnNewGame).binding)
-                Toggle("A game ends", isOn: SettingWithDefault(key: .notiticationOnGameEnd).binding)
+                Toggle("My turn", isOn: Setting(.notificationOnUserTurn).binding)
+                Toggle("Time running low", isOn: Setting(.notificationOnTimeRunningOut).binding)
+                Toggle("Challenge received", isOn: Setting(.notificationOnChallengeReceived).binding)
+                Toggle("A game starts", isOn: Setting(.notificationOnNewGame).binding)
+                Toggle("A game ends", isOn: Setting(.notiticationOnGameEnd).binding)
             }
             .disabled(!notificationEnabled)
         }
@@ -96,11 +96,11 @@ struct SettingsView: View {
 struct GameplaySettings: View {
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
-            Toggle("Haptics", isOn: SettingWithDefault(key: .hapticsFeedback).binding)
-            Toggle("Voice coutdown", isOn: SettingWithDefault(key: .voiceCountdown).binding)
+            Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
+            Toggle("Voice coutdown", isOn: Setting(.voiceCountdown).binding)
             GroupBox(label: Text("Auto submiting moves")) {
-                Toggle("Live games", isOn: SettingWithDefault(key: .autoSubmitForLiveGames).binding)
-                Toggle("Correspondence games", isOn: SettingWithDefault(key: .autoSubmitForCorrespondenceGames).binding)
+                Toggle("Live games", isOn: Setting(.autoSubmitForLiveGames).binding)
+                Toggle("Correspondence games", isOn: Setting(.autoSubmitForCorrespondenceGames).binding)
             }
         }
         .padding(.horizontal)

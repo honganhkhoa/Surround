@@ -119,17 +119,13 @@ extension SettingKey {
     static var notificationOnChallengeReceived: SettingKey<Bool> {
         return .init(name: "notification.onChallengeReceived", defaultValue: true)
     }
-    
-    static var latestNotificationCheck: SettingKey<Date> {
-        return .init(name: "latestNotificationCheck")
-    }
 }
 
 @propertyWrapper
-struct Setting<Value> where Value: Codable {
+struct OptionalSetting<Value> where Value: Codable {
     var settingKey: SettingKey<Value>
     
-    init(key: SettingKey<Value>) {
+    init(_ key: SettingKey<Value>) {
         self.settingKey = key
     }
     
@@ -144,10 +140,10 @@ struct Setting<Value> where Value: Codable {
 }
 
 @propertyWrapper
-struct SettingWithDefault<Value> where Value: Codable {
+struct Setting<Value> where Value: Codable {
     var settingKey: SettingKey<Value>
     
-    init(key: SettingKey<Value>) {
+    init(_ key: SettingKey<Value>) {
         self.settingKey = key
     }
     

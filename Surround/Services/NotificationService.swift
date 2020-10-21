@@ -73,19 +73,27 @@ class NotificationService {
     }
     
     func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game) {
-        if let lastNotificationCheck = userDefaults[.latestNotificationCheck] {
+        if let lastCheck = userDefaults[.latestOGSOverviewTime] {
             if oldGame.clock?.currentPlayerId == userId
                 && newGame.clock?.currentPlayerId == userId
                 && userId != nil {
                 let thinkingTime = userId == newGame.blackId ? newGame.clock?.blackTime : newGame.clock?.whiteTime
                 if let timeLeft = thinkingTime?.timeLeft {
-                    let lastTimeLeft = timeLeft.advanced(by: -Date().timeIntervalSince(lastNotificationCheck))
+                    let lastTimeLeft = timeLeft.advanced(by: -Date().timeIntervalSince(lastCheck))
                     let twelveHours = Double(12 * 3600)
+                    let threeHours = Double(3 * 3600)
+                    let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
-                        let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
                         self.scheduleNotification(
                             title: "Time running out",
                             message: "You have 12 hours to make your move in the game with \(opponentName)",
+                            game: newGame,
+                            setting: .notificationOnTimeRunningOut
+                        )
+                    } else if lastTimeLeft > threeHours && timeLeft <= threeHours {
+                        self.scheduleNotification(
+                            title: "Time running out",
+                            message: "You have 3 hours to make your move in the game with \(opponentName)",
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
@@ -102,9 +110,10 @@ class NotificationService {
                 let result = newGame.gameData?.winner == userId ? "won" : "lost"
                 self.scheduleNotification(
                     title: "Game has ended",
-                    message: "Your game with \(opponentName) has ended. You \(result) by \(outcome)",
+                    message: "Your game with \(opponentName) has ended. You \(result) by \(outcome).",
                     game: newGame,
-                    setting: .notiticationOnGameEnd)
+                    setting: .notiticationOnGameEnd
+                )
             }
         }
     }
@@ -147,7 +156,6 @@ class NotificationService {
                     self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame)
                 }
             }
-            userDefaults[.latestNotificationCheck] = Date()
         }
     }
 }
