@@ -79,10 +79,16 @@ class NotificationService {
                 && userId != nil {
                 let thinkingTime = userId == newGame.blackId ? newGame.clock?.blackTime : newGame.clock?.whiteTime
                 if let timeLeft = thinkingTime?.timeLeft {
-                    let lastTimeLeft = timeLeft.advanced(by: -Date().timeIntervalSince(lastCheck))
+                    let lastTimeLeft = timeLeft + Date().timeIntervalSince(lastCheck)
                     let twelveHours = Double(12 * 3600)
                     let threeHours = Double(3 * 3600)
                     let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
+//                    self.scheduleNotification(
+//                        title: "\(newGame.blackName) vs. \(newGame.whiteName)",
+//                        message: "\(lastTimeLeft) -> \(timeLeft), \(twelveHours), \(threeHours)",
+//                        game: newGame,
+//                        setting: .notificationEnabled
+//                    )
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
                         self.scheduleNotification(
                             title: "Time running out",

@@ -88,6 +88,9 @@ class OGSService: ObservableObject {
     @Published private(set) public var challengesSent = [OGSChallenge]()
     @Published private(set) public var isLoadingOverview = true
     
+    @Published private(set) public var socketStatus: SocketIOStatus = .connecting
+    @Published private(set) public var socketStatusString = "Connecting..."
+    
     private var activeGamesSortingCancellable: AnyCancellable?
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
@@ -134,7 +137,7 @@ class OGSService: ObservableObject {
     
     private init(forPreview: Bool = false) {
         socketManager = SocketManager(socketURL: URL(string: ogsRoot)!, config: [
-            .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(750), .reconnectWaitMax(10000)
+            .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(1), .reconnectWaitMax(10)
         ])
         socket = socketManager.defaultSocket
         
@@ -177,6 +180,25 @@ class OGSService: ObservableObject {
             if event.event != "active-bots" {
                 print(event)
             }
+        }
+        
+        socket.on(clientEvent: .statusChange) { newStatus, _ in
+            if let status = newStatus[0] as? SocketIOStatus {
+                self.socketStatus = status
+                switch status {
+                case .connected:
+                    self.socketStatusString = "Connected."
+                case .disconnected:
+                    self.socketStatusString = "Disconnected."
+                default:
+                    break
+                }
+                print("Status changing to \(status)")
+            }
+        }
+        
+        socket.on(clientEvent: .reconnect) { _, _ in
+            self.socketStatusString = "Reconnecting..."
         }
                 
         socket.on(clientEvent: .connect) { [self] _, _ in

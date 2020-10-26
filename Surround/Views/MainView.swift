@@ -41,24 +41,45 @@ struct MainView: View {
         #if os(iOS)
         compactSizeClass = horizontalSizeClass == .compact
         #endif
-        return NavigationView {
-            if compactSizeClass {
-                currentView.view
-            } else {
-                List(selection: $navigationCurrentView) {
-                    RootView.home.navigationLink(currentView: $navigationCurrentView)
-                    RootView.publicGames.navigationLink(currentView: $navigationCurrentView)
-                    Divider()
-                    RootView.settings.navigationLink(currentView: $navigationCurrentView)
-                    Divider()
-                    RootView.browser.navigationLink(currentView: $navigationCurrentView)
-                }
-                .listStyle(SidebarListStyle())
-                .navigationTitle("Surround")
-                if let navigationCurrentView = navigationCurrentView {
-                    navigationCurrentView.view
+        return ZStack(alignment: .top) {
+            NavigationView {
+                if compactSizeClass {
+                    currentView.view
+                } else {
+                    List(selection: $navigationCurrentView) {
+                        RootView.home.navigationLink(currentView: $navigationCurrentView)
+                        RootView.publicGames.navigationLink(currentView: $navigationCurrentView)
+                        Divider()
+                        RootView.settings.navigationLink(currentView: $navigationCurrentView)
+                        Divider()
+                        RootView.browser.navigationLink(currentView: $navigationCurrentView)
+                    }
+                    .listStyle(SidebarListStyle())
+                    .navigationTitle("Surround")
+                    if let navigationCurrentView = navigationCurrentView {
+                        navigationCurrentView.view
+                    }
                 }
             }
+            ZStack {
+                HStack(spacing: 5) {
+                    Group {
+                        if ogs.socketStatus == .connecting {
+                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            EmptyView()
+                        }
+                    }
+                    Text(ogs.socketStatusString).bold().foregroundColor(.white)
+                }
+                .animation(.easeInOut, value: ogs.socketStatusString)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color(.systemIndigo))
+            .cornerRadius(10)
+            .opacity(ogs.socketStatus == .connected ? 0 : 1)
+            .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
         }
         .onChange(of: currentView) { newView in
             DispatchQueue.main.async {
