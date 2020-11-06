@@ -9,11 +9,14 @@ import Foundation
 import UIKit
 import DictionaryCoding
 import Alamofire
+import WidgetKit
 
 class NotificationService {
     static let shared = NotificationService()
     
     var userId: Int? { userDefaults[.ogsUIConfig]?.user.id }
+    var notificationCheckCounter = [String: Int]()
+    var notificationScheduledCounter = [String: Int]()
     
     func activeOGSGamesById(from data: [String: Any]) -> [Int: Game] {
         var result = [Int: Game]()
@@ -58,8 +61,9 @@ class NotificationService {
         }
     }
     
-    func scheduleNewMoveNotificationIfNecessary(oldGame: Game, newGame: Game) {
+    func scheduleNewMoveNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
         let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
+//        print(oldGame.ogsID, oldGame.clock?.currentPlayerId, newGame.clock?.currentPlayerId)
         if oldGame.clock?.currentPlayerId != newGame.clock?.currentPlayerId
             && newGame.clock?.currentPlayerId == userId
             && userId != nil {
@@ -69,10 +73,12 @@ class NotificationService {
                 game: newGame,
                 setting: .notificationOnUserTurn
             )
+            return true
         }
+        return false
     }
     
-    func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game) {
+    func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
         if let lastCheck = userDefaults[.latestOGSOverviewTime] {
             if oldGame.clock?.currentPlayerId == userId
                 && newGame.clock?.currentPlayerId == userId
@@ -96,6 +102,7 @@ class NotificationService {
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
+                        return true
                     } else if lastTimeLeft > threeHours && timeLeft <= threeHours {
                         self.scheduleNotification(
                             title: "Time running out",
@@ -103,13 +110,15 @@ class NotificationService {
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
+                        return true
                     }
                 }
             }
         }
+        return false
     }
     
-    func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game) {
+    func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
         if let outcome = newGame.gameData?.outcome {
             if oldGame.gameData?.outcome == nil {
                 let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
@@ -120,11 +129,13 @@ class NotificationService {
                     game: newGame,
                     setting: .notiticationOnGameEnd
                 )
+                return true
             }
         }
+        return false
     }
     
-    func scheduleGameEndNotificationIfNecessary(oldGame: Game) {
+    func scheduleGameEndNotificationIfNecessary(oldGame: Game, completionHandler: ((Bool) -> Void)? = nil) {
         if let ogsId = oldGame.ogsID {
             AF.request("\(OGSService.ogsRoot)/api/v1/games/\(ogsId)").responseJSON { response in
                 if case .success = response.result {
@@ -134,18 +145,47 @@ class NotificationService {
                             decoder.keyDecodingStrategy = .convertFromSnakeCase
                             if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
                                 let newGame = Game(ogsGame: ogsGame)
-                                self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
+                                let result = self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
+                                if let callback = completionHandler {
+                                    callback(result)
+                                }
+                                return
                             }
                         }
                     }
                 }
+                if let callback = completionHandler {
+                    callback(false)
+                }
+            }
+        } else {
+            if let callback = completionHandler {
+                callback(false)
             }
         }
     }
     
-    func scheduleNotificationsIfNecessary(withOldOverviewData oldData: Data, newOverviewData newData: Data) {
+    func scheduleNotificationsIfNecessary(withOldOverviewData oldData: Data, newOverviewData newData: Data, completionHandler: ((Int) -> Void)? = nil) {
         guard userDefaults[.notificationEnabled] == true else {
+            if let callback = completionHandler {
+                callback(0)
+            }
             return
+        }
+        
+        let sessionId = UUID().uuidString
+        self.notificationCheckCounter[sessionId] = 0
+        self.notificationScheduledCounter[sessionId] = 0
+        
+        let checkForCompletion: () -> Void = {
+            if self.notificationCheckCounter[sessionId] == 0 {
+                if let callback = completionHandler {
+                    let result = self.notificationScheduledCounter[sessionId]
+                    self.notificationScheduledCounter.removeValue(forKey: sessionId)
+                    self.notificationCheckCounter.removeValue(forKey: sessionId)
+                    callback(result!)
+                }
+            }
         }
         
         if let oldData = try? JSONSerialization.jsonObject(with: oldData) as? [String: Any],
@@ -155,13 +195,64 @@ class NotificationService {
 //            self.scheduleNotification(title: "Test", message: "Testing...", game: newActiveGamesById.values.first!, setting: .notificationEnabled)
             for oldGame in oldActiveGamesById.values {
                 if let newGame = newActiveGamesById[oldGame.ogsID!] {
-                    self.scheduleNewMoveNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
-                    self.scheduleTimeRunningOutNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
-                    self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
+                    if self.scheduleNewMoveNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                        self.notificationScheduledCounter[sessionId]! += 1
+                    }
+                    if self.scheduleTimeRunningOutNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                        self.notificationScheduledCounter[sessionId]! += 1
+                    }
+                    if self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                        self.notificationScheduledCounter[sessionId]! += 1
+                    }
                 } else {
-                    self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame)
+                    self.notificationCheckCounter[sessionId]! += 1
+                    self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, completionHandler: { notified in
+                        if notified {
+                            self.notificationScheduledCounter[sessionId]! += 1
+                        }
+                        self.notificationCheckCounter[sessionId]! -= 1
+                        checkForCompletion()
+                    })
                 }
             }
+        }
+        checkForCompletion()
+    }
+    
+    func checkForNewNotifications(completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
+            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
+            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
+            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
+            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
+                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
+                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
+                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseData { response in
+                    if case .failure = response.result {
+                        completionHandler(.failed)
+                        return
+                    }
+
+                    if let newOverviewData = response.value {
+                        if let oldOverviewData = userDefaults[.latestOGSOverview] {
+                            self.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: newOverviewData, completionHandler: { notificationScheduled in
+                                if notificationScheduled > 0 {
+                                    completionHandler(.newData)
+                                } else {
+                                    completionHandler(.noData)
+                                }
+                            })
+                        } else {
+                            completionHandler(.newData)
+                        }
+                        userDefaults[.latestOGSOverview] = newOverviewData
+                        userDefaults[.latestOGSOverviewTime] = Date()
+                        WidgetCenter.shared.reloadAllTimelines()
+                    }
+                }
+            }
+        } else {
+            completionHandler(.failed)
         }
     }
 }

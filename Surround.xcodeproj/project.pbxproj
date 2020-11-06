@@ -73,6 +73,7 @@
 		BC649421253DAD89002B2200 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -170,6 +171,7 @@
 		BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		BC649413253DA44C002B2200 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
+		BC7407DA25493B71001D5581 /* SurroundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundService.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -234,9 +236,9 @@
 			children = (
 				BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */,
 				BC042AF124AB2CF50050B2D1 /* Surround */,
+				BC64937D25380A9F002B2200 /* SurroundWidgets */,
 				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
-				BC64937D25380A9F002B2200 /* SurroundWidgets */,
 				BC64937825380A9F002B2200 /* Frameworks */,
 				BC042AF024AB2CF50050B2D1 /* Products */,
 			);
@@ -378,6 +380,7 @@
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
 				BC649413253DA44C002B2200 /* NotificationService.swift */,
 				BC649426253FF940002B2200 /* NavigationService.swift */,
+				BC7407DA25493B71001D5581 /* SurroundService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -620,6 +623,7 @@
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
+				BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC649427253FF941002B2200 /* NavigationService.swift in Sources */,
 				BC0F1C452525946100E3E66B /* LoginView.swift in Sources */,

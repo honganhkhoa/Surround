@@ -122,13 +122,21 @@ struct Provider: TimelineProvider {
                     if let overviewData = overviewData {
                         if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
                             if let oldOverviewData = userDefaults[.latestOGSOverview] {
-                                NotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData)
-                            }
-                            userDefaults[.latestOGSOverview] = overviewData
-                            userDefaults[.latestOGSOverviewTime] = Date()
-                            if let entry = getEntry(fromOverviewJSON: data, context: context) {
-                                completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                                NotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, completionHandler: { _ in
+                                    if let entry = getEntry(fromOverviewJSON: data, context: context) {
+                                        completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                                    }
+                                })
+                                userDefaults[.latestOGSOverview] = overviewData
+                                userDefaults[.latestOGSOverviewTime] = Date()
                                 return
+                            } else {
+                                userDefaults[.latestOGSOverview] = overviewData
+                                userDefaults[.latestOGSOverviewTime] = Date()
+                                if let entry = getEntry(fromOverviewJSON: data, context: context) {
+                                    completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                                    return
+                                }
                             }
                         }
                     }

@@ -12,8 +12,10 @@ struct MainViewWrapper: View {
     
     var body: some View {
         let ogs = OGSService.instance(forSceneWithID: sceneID)
+        let sgs = SurroundService.instance(forSceneWithID: sceneID)
         return MainView()
             .environmentObject(ogs)
+            .environmentObject(sgs)
     }
 }
 

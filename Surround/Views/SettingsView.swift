@@ -72,6 +72,10 @@ struct SettingsView: View {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { (granted, error) in
                     if let error = error {
                         print(error)
+                    } else if granted {
+                        DispatchQueue.main.async {
+                            UIApplication.shared.registerForRemoteNotifications()
+                        }
                     }
                     print("Notifications permission granted: \(granted)")
                 }
@@ -97,7 +101,7 @@ struct GameplaySettings: View {
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
-            Toggle("Voice coutdown", isOn: Setting(.voiceCountdown).binding)
+            Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
             GroupBox(label: Text("Auto submiting moves")) {
                 Toggle("Live games", isOn: Setting(.autoSubmitForLiveGames).binding)
                 Toggle("Correspondence games", isOn: Setting(.autoSubmitForCorrespondenceGames).binding)

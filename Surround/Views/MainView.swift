@@ -19,6 +19,7 @@ struct MainView: View {
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
+    @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     
     func navigateTo(appURL: URL) {
         if let rootViewName = appURL.host, let rootView = RootView(rawValue: rootViewName) {
@@ -61,25 +62,27 @@ struct MainView: View {
                     }
                 }
             }
-            ZStack {
-                HStack(spacing: 5) {
-                    Group {
-                        if ogs.socketStatus == .connecting {
-                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            EmptyView()
+            if ogs.isLoggedIn {
+                ZStack {
+                    HStack(spacing: 5) {
+                        Group {
+                            if ogs.socketStatus == .connecting {
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                EmptyView()
+                            }
                         }
+                        Text(ogs.socketStatusString).bold().foregroundColor(.white)
                     }
-                    Text(ogs.socketStatusString).bold().foregroundColor(.white)
+                    .animation(.easeInOut, value: ogs.socketStatusString)
                 }
-                .animation(.easeInOut, value: ogs.socketStatusString)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color(.systemIndigo))
+                .cornerRadius(10)
+                .opacity(ogs.socketStatus == .connected ? 0 : 1)
+                .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color(.systemIndigo))
-            .cornerRadius(10)
-            .opacity(ogs.socketStatus == .connected ? 0 : 1)
-            .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
         }
         .onChange(of: currentView) { newView in
             DispatchQueue.main.async {
@@ -100,9 +103,16 @@ struct MainView: View {
                     }
                 })
             } else if phase == .background {
-                ogs.loadOverview {
+                self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
                     WidgetCenter.shared.reloadAllTimelines()
-                }
+                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                    self.backgroundTaskID = .invalid
+                })
+                ogs.loadOverview(finishCallback: {
+                    WidgetCenter.shared.reloadAllTimelines()
+                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                    self.backgroundTaskID = .invalid
+                })
             }
         }
         .onOpenURL { url in

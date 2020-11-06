@@ -261,8 +261,15 @@ class OGSService: ObservableObject {
                     self.ensureConnect()
                 }
                 self.socket.disconnect()
+            } else {
+                self.updateSessionId()
             }
             checkLoginStatus()
+            #if !WIDGET
+            if isLoggedIn && (userDefaults[.notificationEnabled] == true) {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+            #endif
         }
     }
     
@@ -270,12 +277,11 @@ class OGSService: ObservableObject {
     func updateUIConfig() {
         if uiConfigCancellable == nil {
             uiConfigCancellable = self.fetchUIConfig().sink(
-                receiveCompletion: { _ in },
-                receiveValue: { uiConfig in
-                    self.ogsUIConfig = uiConfig
-                    self.updateSessionId()
+                receiveCompletion: { _ in
                     self.uiConfigCancellable = nil
-                })
+                },
+                receiveValue: { _ in }
+            )
         }
     }
     
@@ -307,7 +313,6 @@ class OGSService: ObservableObject {
                 }
             }
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
-            self.updateSessionId()
             self.ogsUIConfig = config
             self.loadOverview()
             self.authenticateSocketIfLoggedIn()

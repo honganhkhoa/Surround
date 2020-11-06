@@ -119,6 +119,10 @@ extension SettingKey {
     static var notificationOnChallengeReceived: SettingKey<Bool> {
         return .init(name: "notification.onChallengeReceived", defaultValue: true)
     }
+    
+    static var sgsAccessToken: SettingKey<String> {
+        return .init(name: "sgsAccessToken")
+    }
 }
 
 @propertyWrapper
