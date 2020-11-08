@@ -24,17 +24,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
+        DispatchQueue.main.async {
+            self.allowsPortrait = true
+        }
+
         if userDefaults[.notificationEnabled] == true {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
                 UNUserNotificationCenter.current().delegate = self
             }
         }
-        DispatchQueue.main.async {
-            self.allowsPortrait = true
-        }
+        
+        NotificationService.shared.registerAppRefreshTask()
+        
         return true
     }
-        
+    
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         if UIDevice.current.userInterfaceIdiom == .phone {
             return .portrait
@@ -53,8 +57,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         let content = UNMutableNotificationContent()
-        content.title = "Test"
-        content.body = "Silent notification"
+        content.title = "[Debug] Checking for new data"
+        content.body = "From background push"
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
         NotificationService.shared.checkForNewNotifications(completionHandler: completionHandler)

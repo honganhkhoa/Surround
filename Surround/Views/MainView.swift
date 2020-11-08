@@ -103,6 +103,7 @@ struct MainView: View {
                     }
                 })
             } else if phase == .background {
+                NotificationService.shared.scheduleAppRefresh()
                 self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
                     WidgetCenter.shared.reloadAllTimelines()
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)

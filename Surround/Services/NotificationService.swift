@@ -10,6 +10,7 @@ import UIKit
 import DictionaryCoding
 import Alamofire
 import WidgetKit
+import BackgroundTasks
 
 class NotificationService {
     static let shared = NotificationService()
@@ -82,7 +83,8 @@ class NotificationService {
         if let lastCheck = userDefaults[.latestOGSOverviewTime] {
             if oldGame.clock?.currentPlayerId == userId
                 && newGame.clock?.currentPlayerId == userId
-                && userId != nil {
+                && userId != nil
+                && !(newGame.pauseControl?.isPaused() ?? false) {
                 let thinkingTime = userId == newGame.blackId ? newGame.clock?.blackTime : newGame.clock?.whiteTime
                 if let timeLeft = thinkingTime?.timeLeft {
                     let lastTimeLeft = timeLeft + Date().timeIntervalSince(lastCheck)
@@ -255,4 +257,28 @@ class NotificationService {
             completionHandler(.failed)
         }
     }
+
+    func scheduleAppRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+    
+    #if !WIDGET
+    func registerAppRefreshTask() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.honganhkhoa.Surround.checkOverview", using: nil, launchHandler: { task in
+            
+            let content = UNMutableNotificationContent()
+            content.title = "[Debug] Checking for new data"
+            content.body = "From background fetch"
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+
+            self.scheduleAppRefresh()
+            self.checkForNewNotifications(completionHandler: { result in
+                task.setTaskCompleted(success: result != .failed)
+            })
+        })
+    }
+    #endif
 }
