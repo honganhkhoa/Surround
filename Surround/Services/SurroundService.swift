@@ -74,4 +74,19 @@ class SurroundService: ObservableObject {
             }
         }
     }
+    
+    func setPushEnabled(enabled: Bool) {
+        if let accessToken = userDefaults[.sgsAccessToken] {
+            AF.request(
+                "\(self.sgsRoot)/enable_push",
+                method: .post,
+                parameters: [
+                    "enabled": enabled
+                ],
+                headers: [.authorization(accessToken)]
+            ).responseJSON(completionHandler: { _ in
+                
+            })
+        }
+    }
 }

@@ -10,6 +10,7 @@ import URLImage
 
 struct SettingsView: View {
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var sgs: SurroundService
     
     @State var username: String = ""
     @State var password: String = ""
@@ -68,6 +69,7 @@ struct SettingsView: View {
         .padding(.horizontal)
         .onChange(of: notificationEnabled) { enabled in
             userDefaults[.notificationEnabled] = enabled
+            sgs.setPushEnabled(enabled: enabled)
             if enabled {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { (granted, error) in
                     if let error = error {

@@ -259,9 +259,15 @@ class NotificationService {
     }
 
     func scheduleAppRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-        try? BGTaskScheduler.shared.submit(request)
+        if userDefaults[.notificationEnabled] == true {
+            let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
+            request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+            do {
+                try BGTaskScheduler.shared.submit(request)
+            } catch {
+                print(error)
+            }
+        }
     }
     
     #if !WIDGET
@@ -272,7 +278,11 @@ class NotificationService {
             content.title = "[Debug] Checking for new data"
             content.body = "From background fetch"
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-            UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    print(error)
+                }
+            }
 
             self.scheduleAppRefresh()
             self.checkForNewNotifications(completionHandler: { result in
