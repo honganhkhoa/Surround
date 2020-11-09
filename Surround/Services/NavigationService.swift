@@ -22,7 +22,7 @@ class NavigationService {
         return URL(string: urlString)
     }
     
-    #if !WIDGET
+    #if MAIN_APP
     func navigateTo(rootView: RootView, game: Game? = nil, ogsGameId: Int? = nil) {
         if let url = NavigationService.appURL(rootView: rootView, game: game, ogsGameId: ogsGameId) {
             UIApplication.shared.open(url)
@@ -73,7 +73,7 @@ enum RootView: String {
         }
     }
 
-    #if !WIDGET
+    #if MAIN_APP
     var view: some View {
         switch self {
         case .home:

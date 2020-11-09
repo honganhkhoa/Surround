@@ -74,7 +74,7 @@ extension SettingKey {
         return .init(name: "latestOGSOverviewTime")
     }
     
-    #if !WIDGET
+    #if MAIN_APP
     static var homeViewDisplayMode: SettingKey<GameCell.CellDisplayMode> {
         return .init(name: "homeViewDisplayMode")
     }

@@ -38,6 +38,34 @@
 		BC0F1C452525946100E3E66B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C442525946100E3E66B /* LoginView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C512527290900E3E66B /* ChallengeCell.swift */; };
+		BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2C2557FAEB005378F9 /* UserNotifications.framework */; };
+		BC285B2F2557FAEB005378F9 /* UserNotificationsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */; };
+		BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC285B312557FAEB005378F9 /* NotificationViewController.swift */; };
+		BC285B352557FAEB005378F9 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC285B332557FAEB005378F9 /* MainInterface.storyboard */; };
+		BC285B392557FAEB005378F9 /* SurroundNotificationContent.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BC285B4C2557FC78005378F9 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
+		BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
+		BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
+		BC285B5A2557FCAC005378F9 /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
+		BC285B5B2557FCAC005378F9 /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
+		BC285B5C2557FCAC005378F9 /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
+		BC285B5D2557FCAC005378F9 /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3724AB2DD00050B2D1 /* OGSUser.swift */; };
+		BC285B6B2557FCBA005378F9 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
+		BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
+		BC285B6D2557FCBA005378F9 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
+		BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		BC285B7E2557FD31005378F9 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
+		BC285B852557FD57005378F9 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
+		BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BC285B912557FD5C005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BC285B982557FDD6005378F9 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC285B972557FDD6005378F9 /* SocketIO */; };
+		BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
+		BC285BA42557FE8F005378F9 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BC285BB4255908CB005378F9 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
+		BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC025590B26005378F9 /* DictionaryCoding */; };
+		BC285BC825590B7F005378F9 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC725590B7F005378F9 /* Alamofire */; };
 		BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
 		BC4658AE2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */; };
@@ -96,6 +124,13 @@
 			remoteGlobalIDString = BC042AEE24AB2CF40050B2D1;
 			remoteInfo = Surround;
 		};
+		BC285B372557FAEB005378F9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC285B2A2557FAEB005378F9;
+			remoteInfo = SurroundNotificationContent;
+		};
 		BC64938325380AA2002B2200 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
@@ -113,6 +148,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed App Extensions */,
+				BC285B392557FAEB005378F9 /* SurroundNotificationContent.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -153,6 +189,13 @@
 		BC0F1C442525946100E3E66B /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
 		BC0F1C512527290900E3E66B /* ChallengeCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeCell.swift; sourceTree = "<group>"; };
+		BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationContent.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC285B2C2557FAEB005378F9 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
+		BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotificationsUI.framework; path = System/Library/Frameworks/UserNotificationsUI.framework; sourceTree = SDKROOT; };
+		BC285B312557FAEB005378F9 /* NotificationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationViewController.swift; sourceTree = "<group>"; };
+		BC285B342557FAEB005378F9 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/MainInterface.storyboard; sourceTree = "<group>"; };
+		BC285B362557FAEB005378F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationContent.entitlements; sourceTree = "<group>"; };
 		BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayersBannerView.swift; sourceTree = "<group>"; };
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
@@ -216,6 +259,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BC285B282557FAEB005378F9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC285BC825590B7F005378F9 /* Alamofire in Frameworks */,
+				BC285B2F2557FAEB005378F9 /* UserNotificationsUI.framework in Frameworks */,
+				BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */,
+				BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */,
+				BC285B982557FDD6005378F9 /* SocketIO in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BC64937425380A9F002B2200 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -237,6 +292,7 @@
 				BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */,
 				BC042AF124AB2CF50050B2D1 /* Surround */,
 				BC64937D25380A9F002B2200 /* SurroundWidgets */,
+				BC285B302557FAEB005378F9 /* SurroundNotificationContent */,
 				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
 				BC64937825380A9F002B2200 /* Frameworks */,
@@ -251,6 +307,7 @@
 				BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */,
 				BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */,
 				BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */,
+				BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -385,11 +442,24 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		BC285B302557FAEB005378F9 /* SurroundNotificationContent */ = {
+			isa = PBXGroup;
+			children = (
+				BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */,
+				BC285B312557FAEB005378F9 /* NotificationViewController.swift */,
+				BC285B332557FAEB005378F9 /* MainInterface.storyboard */,
+				BC285B362557FAEB005378F9 /* Info.plist */,
+			);
+			path = SurroundNotificationContent;
+			sourceTree = "<group>";
+		};
 		BC64937825380A9F002B2200 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				BC64937925380A9F002B2200 /* WidgetKit.framework */,
 				BC64937B25380A9F002B2200 /* SwiftUI.framework */,
+				BC285B2C2557FAEB005378F9 /* UserNotifications.framework */,
+				BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -441,6 +511,7 @@
 			);
 			dependencies = (
 				BC64938425380AA2002B2200 /* PBXTargetDependency */,
+				BC285B382557FAEB005378F9 /* PBXTargetDependency */,
 			);
 			name = Surround;
 			packageProductDependencies = (
@@ -489,6 +560,28 @@
 			productReference = BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BC285B3A2557FAEB005378F9 /* Build configuration list for PBXNativeTarget "SurroundNotificationContent" */;
+			buildPhases = (
+				BC285B272557FAEB005378F9 /* Sources */,
+				BC285B282557FAEB005378F9 /* Frameworks */,
+				BC285B292557FAEB005378F9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SurroundNotificationContent;
+			packageProductDependencies = (
+				BC285B972557FDD6005378F9 /* SocketIO */,
+				BC285BC025590B26005378F9 /* DictionaryCoding */,
+				BC285BC725590B7F005378F9 /* Alamofire */,
+			);
+			productName = SurroundNotificationContent;
+			productReference = BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		BC64937625380A9F002B2200 /* SurroundWidgetsExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BC64938925380AA2002B2200 /* Build configuration list for PBXNativeTarget "SurroundWidgetsExtension" */;
@@ -517,7 +610,7 @@
 		BC042AE724AB2CF40050B2D1 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 1200;
+				LastSwiftUpdateCheck = 1210;
 				LastUpgradeCheck = 1200;
 				TargetAttributes = {
 					BC042AEE24AB2CF40050B2D1 = {
@@ -530,6 +623,9 @@
 					BC042B0A24AB2CFA0050B2D1 = {
 						CreatedOnToolsVersion = 12.0;
 						TestTargetID = BC042AEE24AB2CF40050B2D1;
+					};
+					BC285B2A2557FAEB005378F9 = {
+						CreatedOnToolsVersion = 12.1;
 					};
 					BC64937625380A9F002B2200 = {
 						CreatedOnToolsVersion = 12.0;
@@ -559,6 +655,7 @@
 				BC042AFF24AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
 				BC64937625380A9F002B2200 /* SurroundWidgetsExtension */,
+				BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */,
 			);
 		};
 /* End PBXProject section */
@@ -586,6 +683,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC285B292557FAEB005378F9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC285B352557FAEB005378F9 /* MainInterface.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -659,6 +764,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BC285B272557FAEB005378F9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */,
+				BC285B5D2557FCAC005378F9 /* OGSUser.swift in Sources */,
+				BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */,
+				BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */,
+				BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */,
+				BC285B7E2557FD31005378F9 /* TestData.swift in Sources */,
+				BC285B5B2557FCAC005378F9 /* OGSChallenge.swift in Sources */,
+				BC285BB4255908CB005378F9 /* NotificationService.swift in Sources */,
+				BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */,
+				BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */,
+				BC285BA42557FE8F005378F9 /* Goban.cc in Sources */,
+				BC285B852557FD57005378F9 /* OGSService.swift in Sources */,
+				BC285B6B2557FCBA005378F9 /* UserDefaults+SurroundModels.swift in Sources */,
+				BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */,
+				BC285B6D2557FCBA005378F9 /* Game.swift in Sources */,
+				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
+				BC285B5C2557FCAC005378F9 /* OGSGame.swift in Sources */,
+				BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */,
+				BC285B5A2557FCAC005378F9 /* OGSClock.swift in Sources */,
+				BC285B4C2557FC78005378F9 /* BoardView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BC64937325380A9F002B2200 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -682,6 +814,7 @@
 				BC64939625380D96002B2200 /* Game.swift in Sources */,
 				BC649428253FF942002B2200 /* NavigationService.swift in Sources */,
 				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
+				BC285B912557FD5C005378F9 /* SurroundService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -698,12 +831,28 @@
 			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
 			targetProxy = BC042B0C24AB2CFA0050B2D1 /* PBXContainerItemProxy */;
 		};
+		BC285B382557FAEB005378F9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */;
+			targetProxy = BC285B372557FAEB005378F9 /* PBXContainerItemProxy */;
+		};
 		BC64938425380AA2002B2200 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = BC64937625380A9F002B2200 /* SurroundWidgetsExtension */;
 			targetProxy = BC64938325380AA2002B2200 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		BC285B332557FAEB005378F9 /* MainInterface.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				BC285B342557FAEB005378F9 /* Base */,
+			);
+			name = MainInterface.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		BC042B1224AB2CFA0050B2D1 /* Debug */ = {
@@ -843,6 +992,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.9.1;
+				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
@@ -870,6 +1020,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.9.1;
+				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
@@ -962,6 +1113,50 @@
 			};
 			name = Release;
 		};
+		BC285B3B2557FAEB005378F9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BC285B3C2557FAEB005378F9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		BC64938725380AA2002B2200 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -978,7 +1173,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.9.1;
-				OTHER_SWIFT_FLAGS = "-D WIDGET";
+				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1003,7 +1198,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.9.1;
-				OTHER_SWIFT_FLAGS = "-D WIDGET";
+				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1047,6 +1242,15 @@
 			buildConfigurations = (
 				BC042B1B24AB2CFA0050B2D1 /* Debug */,
 				BC042B1C24AB2CFA0050B2D1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BC285B3A2557FAEB005378F9 /* Build configuration list for PBXNativeTarget "SurroundNotificationContent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC285B3B2557FAEB005378F9 /* Debug */,
+				BC285B3C2557FAEB005378F9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1114,6 +1318,21 @@
 			productName = DictionaryCoding;
 		};
 		BC042B6424AB2F970050B2D1 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		BC285B972557FDD6005378F9 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			productName = SocketIO;
+		};
+		BC285BC025590B26005378F9 /* DictionaryCoding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			productName = DictionaryCoding;
+		};
+		BC285BC725590B7F005378F9 /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;

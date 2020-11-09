@@ -44,6 +44,8 @@ class NotificationService {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = message
+        content.categoryIdentifier = "GAME"
+        content.sound = .default
         content.userInfo = [
             "rootView": RootView.home.rawValue,
             "ogsGameId": game.ogsID!
@@ -70,7 +72,7 @@ class NotificationService {
             && userId != nil {
             self.scheduleNotification(
                 title: "Your turn",
-                message: "It is your turn in the game with \(opponentName)",
+                message: "It is your turn in the game with \(opponentName).",
                 game: newGame,
                 setting: .notificationOnUserTurn
             )
@@ -100,7 +102,7 @@ class NotificationService {
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
                         self.scheduleNotification(
                             title: "Time running out",
-                            message: "You have 12 hours to make your move in the game with \(opponentName)",
+                            message: "You have 12 hours to make your move in the game with \(opponentName).",
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
@@ -108,7 +110,7 @@ class NotificationService {
                     } else if lastTimeLeft > threeHours && timeLeft <= threeHours {
                         self.scheduleNotification(
                             title: "Time running out",
-                            message: "You have 3 hours to make your move in the game with \(opponentName)",
+                            message: "You have 3 hours to make your move in the game with \(opponentName).",
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
@@ -270,19 +272,19 @@ class NotificationService {
         }
     }
     
-    #if !WIDGET
+    #if MAIN_APP
     func registerAppRefreshTask() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.honganhkhoa.Surround.checkOverview", using: nil, launchHandler: { task in
             
-            let content = UNMutableNotificationContent()
-            content.title = "[Debug] Checking for new data"
-            content.body = "From background fetch"
-            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error = error {
-                    print(error)
-                }
-            }
+//            let content = UNMutableNotificationContent()
+//            content.title = "[Debug] Checking for new data"
+//            content.body = "From background fetch"
+//            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+//            UNUserNotificationCenter.current().add(request) { error in
+//                if let error = error {
+//                    print(error)
+//                }
+//            }
 
             self.scheduleAppRefresh()
             self.checkForNewNotifications(completionHandler: { result in

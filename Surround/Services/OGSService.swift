@@ -170,7 +170,30 @@ class OGSService: ObservableObject {
         self.ensureConnect(thenExecute: {
             if self.isLoggedIn {
                 self.updateUIConfig()
-                self.loadOverview()
+                self.loadOverview(finishCallback: {
+//                    if let game = self.sortedActiveCorrespondenceGames.first {
+//                        let content = UNMutableNotificationContent()
+//                        content.title = "[Debug] Test rich notification"
+//                        content.body = game.gameName ?? ""
+//                        content.categoryIdentifier = "GAME"
+//                        content.userInfo = [
+//                            "rootView": RootView.home.rawValue,
+//                            "ogsGameId": game.ogsID!
+//                        ]
+//
+//                        let uuidString = UUID().uuidString
+//                        let request = UNNotificationRequest(
+//                            identifier: uuidString,
+//                            content: content,
+//                            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
+//                        )
+//                        UNUserNotificationCenter.current().add(request) { (error) in
+//                           if let error = error {
+//                              print(error)
+//                           }
+//                        }
+//                    }
+                })
             }
         })
     }
@@ -265,7 +288,7 @@ class OGSService: ObservableObject {
                 self.updateSessionId()
             }
             checkLoginStatus()
-            #if !WIDGET
+            #if MAIN_APP
             if isLoggedIn && (userDefaults[.notificationEnabled] == true) {
                 UIApplication.shared.registerForRemoteNotifications()
             }
@@ -917,7 +940,7 @@ class OGSService: ObservableObject {
         .eraseToAnyPublisher()
     }
     
-    #if !WIDGET
+    #if MAIN_APP
     static func thirdPartyLoginURL(type: ThirdPartyLoginWebView.ThirdParty) -> URL {
         switch type {
         case .facebook:

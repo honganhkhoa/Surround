@@ -56,15 +56,18 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
     
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        let content = UNMutableNotificationContent()
-        content.title = "[Debug] Checking for new data"
-        content.body = "From background push"
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        
+//        let content = UNMutableNotificationContent()
+//        content.title = "[Debug] Checking for new data"
+//        content.body = "From background push"
+//        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+//        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        
         NotificationService.shared.checkForNewNotifications(completionHandler: completionHandler)
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        
         let userInfo = response.notification.request.content.userInfo
         if let rootViewString = userInfo["rootView"] as? String,
            let rootView = RootView(rawValue: rootViewString),
