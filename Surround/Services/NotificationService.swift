@@ -169,6 +169,17 @@ class NotificationService {
         }
     }
     
+    func scheduleNewGameNotificationIfNecessary(newGame: Game) -> Bool {
+        let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
+        self.scheduleNotification(
+            title: "Game started",
+            message: "Your game with \(opponentName) has started.",
+            game: newGame,
+            setting: .notificationOnNewGame
+        )
+        return true
+    }
+    
     func scheduleNotificationsIfNecessary(withOldOverviewData oldData: Data, newOverviewData newData: Data, completionHandler: ((Int) -> Void)? = nil) {
         guard userDefaults[.notificationEnabled] == true else {
             if let callback = completionHandler {
@@ -217,6 +228,13 @@ class NotificationService {
                         self.notificationCheckCounter[sessionId]! -= 1
                         checkForCompletion()
                     })
+                }
+            }
+            for newGame in newActiveGamesById.values {
+                if oldActiveGamesById[newGame.ogsID!] == nil {
+                    if self.scheduleNewGameNotificationIfNecessary(newGame: newGame) {
+                        self.notificationScheduledCounter[sessionId]! += 1
+                    }
                 }
             }
         }

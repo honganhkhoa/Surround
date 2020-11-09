@@ -50,6 +50,7 @@ class SurroundService: ObservableObject {
             if let accessToken = userDefaults[.sgsAccessToken] {
                 headers = [.authorization(accessToken)]
             }
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-1"
             AF.request(
                 "\(self.sgsRoot)/register",
                 method: .post,
@@ -59,7 +60,8 @@ class SurroundService: ObservableObject {
                     "ogsCsrfToken": ogsCsrfToken,
                     "ogsSessionId": ogsSessionId,
                     "pushToken": pushToken.map { String(format: "%02hhx", $0) }.joined(),
-                    "production": isProductionEnvironment()
+                    "production": isProductionEnvironment(),
+                    "version": version
                 ],
                 headers: headers
             ).responseJSON { response in

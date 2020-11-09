@@ -88,7 +88,7 @@ struct GameView: View {
     
     var regularBody: some View {
         GeometryReader { geometry -> AnyView in
-            print("Geometry \(geometry.size)")
+//            print("Geometry \(geometry.size)")
             let width = geometry.size.width
             let height = geometry.size.height - 15 * 2
             let boardSizeHorizontal = min(height, width - 300 - 15 * 3)
@@ -213,7 +213,7 @@ struct GameDetailView: View {
     
     var compactBody: some View {
         GeometryReader { geometry -> AnyView in
-            print("Geometry \(geometry.size)")
+//            print("Geometry \(geometry.size)")
             
             let boardSize: CGFloat = min(geometry.size.width, geometry.size.height)
             let controlRowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height

@@ -21,9 +21,14 @@ struct MainView: View {
     var activeOGSGameIdToOpen = -1
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     
+    init() {
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    }
+    
     func navigateTo(appURL: URL) {
         if let rootViewName = appURL.host, let rootView = RootView(rawValue: rootViewName) {
             currentView = rootView
+            navigationCurrentView = rootView
             switch rootView {
             case .home:
                 if appURL.pathComponents.count > 1 {
@@ -93,6 +98,7 @@ struct MainView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
                 ogs.ensureConnect(thenExecute: {
                     if ogs.isLoggedIn {
                         ogs.updateUIConfig()
@@ -105,12 +111,10 @@ struct MainView: View {
             } else if phase == .background {
                 NotificationService.shared.scheduleAppRefresh()
                 self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
-                    WidgetCenter.shared.reloadAllTimelines()
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid
                 })
                 ogs.loadOverview(finishCallback: {
-                    WidgetCenter.shared.reloadAllTimelines()
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid
                 })

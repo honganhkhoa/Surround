@@ -456,6 +456,7 @@ struct BoardView: View {
                 )
                 .allowsHitTesting(playable && displayedPosition.estimatedScores == nil)
                 .onChange(of: hoveredPoint) { value in
+                    isHoveredPointValid = nil
                     if let hoveredPoint = hoveredPoint {
                         do {
                             newPosition.wrappedValue = try boardPosition.makeMove(move: .placeStone(hoveredPoint[0], hoveredPoint[1]), allowsSelfCapture: allowsSelfCapture)

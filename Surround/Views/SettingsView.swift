@@ -60,7 +60,7 @@ struct SettingsView: View {
             GroupBox(label: Text("Send a notification on...")) {
                 Toggle("My turn", isOn: Setting(.notificationOnUserTurn).binding)
                 Toggle("Time running low", isOn: Setting(.notificationOnTimeRunningOut).binding)
-                Toggle("Challenge received", isOn: Setting(.notificationOnChallengeReceived).binding)
+//                Toggle("Challenge received", isOn: Setting(.notificationOnChallengeReceived).binding)
                 Toggle("A game starts", isOn: Setting(.notificationOnNewGame).binding)
                 Toggle("A game ends", isOn: Setting(.notiticationOnGameEnd).binding)
             }

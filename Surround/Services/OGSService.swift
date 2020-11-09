@@ -170,6 +170,11 @@ class OGSService: ObservableObject {
         self.ensureConnect(thenExecute: {
             if self.isLoggedIn {
                 self.updateUIConfig()
+                if let latestOverview = userDefaults[.latestOGSOverview] {
+                    if let overviewData = try? JSONSerialization.jsonObject(with: latestOverview) as? [String: Any] {
+                        self.processOverview(overview: overviewData)
+                    }
+                }
                 self.loadOverview(finishCallback: {
 //                    if let game = self.sortedActiveCorrespondenceGames.first {
 //                        let content = UNMutableNotificationContent()
@@ -442,6 +447,57 @@ class OGSService: ObservableObject {
         ])
     }
 
+    func processOverview(overview: [String: Any]) {
+        if let activeGames = overview["active_games"] as? [[String: Any]] {
+            var newActiveGames = [Int:Game]()
+            var unsortedActiveGames = [Game]()
+            let decoder = DictionaryDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            for gameData in activeGames {
+                if let gameId = gameData["id"] as? Int {
+                    if let game = self.activeGames[gameId] {
+                        newActiveGames[gameId] = game
+                        unsortedActiveGames.append(game)
+                    } else {
+                        if let newGame = self.createGame(fromShortGameData: gameData) {
+                            newActiveGames[gameId] = newGame
+                            unsortedActiveGames.append(newGame)
+                            self.connect(to: newGame)
+                        }
+                    }
+                    if let gameData = gameData["json"] as? [String: Any] {
+                        if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
+                            newActiveGames[gameId]?.gameData = ogsGame
+                            newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
+                        }
+                    }
+                }
+            }
+            self.unsortedActiveGames = unsortedActiveGames
+            self.activeGames = newActiveGames
+            self.sortActiveGames(activeGames: self.activeGames.values)
+        }
+        if let challenges = overview["challenges"] as? [[String: Any]] {
+            let decoder = DictionaryDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            var challengesSent = [OGSChallenge]()
+            var challengesReceived = [OGSChallenge]()
+            for challengeData in challenges {
+                do {
+                    let challenge = try decoder.decode(OGSChallenge.self, from: challengeData)
+                    if challenge.challenger?.id == self.user?.id {
+                        challengesSent.append(challenge)
+                    } else {
+                        challengesReceived.append(challenge)
+                    }
+                } catch {
+                    print("Error: ", error)
+                }
+            }
+            self.challengesReceived = challengesReceived
+            self.challengesSent = challengesSent
+        }
+    }
     
     func loadOverview(finishCallback: (() -> ())? = nil) {
         guard isLoggedIn else {
@@ -456,55 +512,8 @@ class OGSService: ObservableObject {
                     userDefaults[.latestOGSOverview] = responseValue
                     userDefaults[.latestOGSOverviewTime] = Date()
                     WidgetCenter.shared.reloadAllTimelines()
-                    if let activeGames = data["active_games"] as? [[String: Any]] {
-                        var newActiveGames = [Int:Game]()
-                        var unsortedActiveGames = [Game]()
-                        let decoder = DictionaryDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        for gameData in activeGames {
-                            if let gameId = gameData["id"] as? Int {
-                                if let game = self.activeGames[gameId] {
-                                    newActiveGames[gameId] = game
-                                    unsortedActiveGames.append(game)
-                                } else {
-                                    if let newGame = self.createGame(fromShortGameData: gameData) {
-                                        newActiveGames[gameId] = newGame
-                                        unsortedActiveGames.append(newGame)
-                                        self.connect(to: newGame)
-                                    }
-                                }
-                                if let gameData = gameData["json"] as? [String: Any] {
-                                    if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
-                                        newActiveGames[gameId]?.gameData = ogsGame
-                                        newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
-                                    }
-                                }
-                            }
-                        }
-                        self.unsortedActiveGames = unsortedActiveGames
-                        self.activeGames = newActiveGames
-                        self.sortActiveGames(activeGames: self.activeGames.values)
-                    }
-                    if let challenges = data["challenges"] as? [[String: Any]] {
-                        let decoder = DictionaryDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        var challengesSent = [OGSChallenge]()
-                        var challengesReceived = [OGSChallenge]()
-                        for challengeData in challenges {
-                            do {
-                                let challenge = try decoder.decode(OGSChallenge.self, from: challengeData)
-                                if challenge.challenger?.id == self.user?.id {
-                                    challengesSent.append(challenge)
-                                } else {
-                                    challengesReceived.append(challenge)
-                                }
-                            } catch {
-                                print("Error: ", error)
-                            }
-                        }
-                        self.challengesReceived = challengesReceived
-                        self.challengesSent = challengesSent
-                    }
+
+                    self.processOverview(overview: data)
                 }
             case .failure(let error):
                 print(error)

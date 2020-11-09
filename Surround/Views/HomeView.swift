@@ -244,6 +244,11 @@ struct HomeView: View {
                 }
             }
         }
+        .onChange(of: showingGameDetail) { newValue in
+            if !newValue {
+                currentActiveOGSGameId = -1
+            }
+        }
     }
 }
 
