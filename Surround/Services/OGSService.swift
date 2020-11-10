@@ -332,7 +332,7 @@ class OGSService: ObservableObject {
                 method: .post,
                 parameters: ["username": username, "password": password],
                 encoder: JSONParameterEncoder.default
-            ).responseData { response in
+            ).validate().responseData { response in
                 switch response.result {
                 case .success:
                     promise(.success(response.value!))
@@ -350,13 +350,14 @@ class OGSService: ObservableObject {
     
     func logout() {
         self.ogsUIConfig = nil
+        SurroundService.shared.unregisterDevice()
     }
     
     func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
         let jsonDecoder = JSONDecoder()
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
         return Future<Data, Error> { promise in
-            AF.request("\(self.ogsRoot)/api/v1/ui/config").responseData { response in
+            AF.request("\(self.ogsRoot)/api/v1/ui/config").validate().responseData { response in
                 switch response.result {
                 case .success:
                     promise(.success(response.value!))
@@ -499,36 +500,47 @@ class OGSService: ObservableObject {
         }
     }
     
-    func loadOverview(finishCallback: (() -> ())? = nil) {
+    var overviewLoadingCancellable: AnyCancellable?
+    func loadOverview(allowsCache: Bool = false, finishCallback: (() -> ())? = nil) {
         guard isLoggedIn else {
             return
         }
         
         isLoadingOverview = true
-        AF.request("\(self.ogsRoot)/api/v1/ui/overview").responseData { response in
-            switch response.result {
-            case .success:
-                if let responseValue = response.value, let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
-                    userDefaults[.latestOGSOverview] = responseValue
-                    userDefaults[.latestOGSOverviewTime] = Date()
-                    WidgetCenter.shared.reloadAllTimelines()
+        overviewLoadingCancellable = SurroundService.shared.getOGSOverview(allowsCache: allowsCache).catch { error in
+            return Future<[String: Any], Error> { promise in
+                AF.request("\(self.ogsRoot)/api/v1/ui/overview").validate().responseData { response in
+                    switch response.result {
+                    case .success:
+                        if let responseValue = response.value, let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
+                            userDefaults[.latestOGSOverview] = responseValue
+                            userDefaults[.latestOGSOverviewTime] = Date()
+                            WidgetCenter.shared.reloadAllTimelines()
 
-                    self.processOverview(overview: data)
+                            promise(.success(data))
+                        }
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
                 }
-            case .failure(let error):
+            }
+        }.sink(receiveCompletion: { result in
+            if case .failure(let error) = result {
                 print(error)
             }
-            
             self.isLoadingOverview = false
+            self.overviewLoadingCancellable = nil
             if let finishCallback = finishCallback {
                 finishCallback()
             }
-        }
+        }, receiveValue: { overviewData in
+            self.processOverview(overview: overviewData)
+        })
     }
     
     func getGameDetailAndConnect(gameID: Int) -> AnyPublisher<Game, Error> {
         return Future<Game, Error> { promise in
-            AF.request("\(self.ogsRoot)/api/v1/games/\(gameID)").responseJSON { response in
+            AF.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseJSON { response in
                 switch response.result {
                 case .success:
                     if let data = response.value as? [String: Any] {
@@ -969,7 +981,7 @@ class OGSService: ObservableObject {
                     "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)",
                     method: .delete,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
-                ).response { response in
+                ).validate().response { response in
                     switch response.result {
                     case .success:
                         promise(.success(()))
@@ -990,7 +1002,7 @@ class OGSService: ObservableObject {
                     "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)/accept",
                     method: .post,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
-                ).responseJSON { response in
+                ).validate().responseJSON { response in
                     switch response.result {
                     case .success:
                         if let data = response.value as? [String: Any] {

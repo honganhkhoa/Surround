@@ -20,6 +20,12 @@ struct SettingKey<Value> {
     var defaultValue: Value {
         _defaultValue!
     }
+    var mainName: String {
+        if let lastPart = name.split(separator: ".").last {
+            return String(lastPart)
+        }
+        return name
+    }
     
     internal init(name: String, encoded: Bool = false, defaultValue: Value? = nil) {
         self.name = "com.honganhkhoa.Surround.\(name)"

@@ -7,6 +7,12 @@
 
 import Foundation
 import Alamofire
+import Combine
+import WidgetKit
+
+enum SurroundServiceError: Error {
+    case notLoggedIn
+}
 
 class SurroundService: ObservableObject {
     static var shared = SurroundService()
@@ -40,6 +46,24 @@ class SurroundService: ObservableObject {
         return true
     }
     
+    func getPushSettingsString() -> String {
+        let pushSettingsKey: [SettingKey<Bool>] = [
+            .notificationOnUserTurn,
+            .notificationOnTimeRunningOut,
+            .notificationOnNewGame,
+            .notiticationOnGameEnd,
+            .notificationOnChallengeReceived
+        ]
+        var pushSettings = [String: Bool]()
+        for settingKey in pushSettingsKey {
+            pushSettings[settingKey.mainName] = userDefaults[settingKey]
+        }
+        if let pushSettingsData = try? JSONSerialization.data(withJSONObject: pushSettings) {
+            return String(data: pushSettingsData, encoding: .utf8) ?? ""
+        }
+        return ""
+    }
+    
     func registerDeviceIfLoggedIn(pushToken: Data) {
         if let uiconfig = userDefaults[.ogsUIConfig],
            let ogsSessionId = userDefaults[.ogsSessionId],
@@ -51,6 +75,7 @@ class SurroundService: ObservableObject {
                 headers = [.authorization(accessToken)]
             }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-1"
+            let pushSettings = getPushSettingsString()
             AF.request(
                 "\(self.sgsRoot)/register",
                 method: .post,
@@ -61,10 +86,11 @@ class SurroundService: ObservableObject {
                     "ogsSessionId": ogsSessionId,
                     "pushToken": pushToken.map { String(format: "%02hhx", $0) }.joined(),
                     "production": isProductionEnvironment(),
-                    "version": version
+                    "version": version,
+                    "pushSettings": pushSettings
                 ],
                 headers: headers
-            ).responseJSON { response in
+            ).validate().responseJSON { response in
                 switch response.result {
                 case .success:
                     if let accessToken = (response.value as? [String: Any])?["accessToken"] as? String {
@@ -77,6 +103,18 @@ class SurroundService: ObservableObject {
         }
     }
     
+    func unregisterDevice() {
+        if let accessToken = userDefaults[.sgsAccessToken] {
+            AF.request(
+                "\(self.sgsRoot)/unregister",
+                method: .post,
+                headers: [.authorization(accessToken)]
+            ).validate().responseJSON(completionHandler: { _ in
+                
+            })
+        }
+    }
+    
     func setPushEnabled(enabled: Bool) {
         if let accessToken = userDefaults[.sgsAccessToken] {
             AF.request(
@@ -86,9 +124,37 @@ class SurroundService: ObservableObject {
                     "enabled": enabled
                 ],
                 headers: [.authorization(accessToken)]
-            ).responseJSON(completionHandler: { _ in
+            ).validate().responseJSON(completionHandler: { _ in
                 
             })
         }
+    }
+    
+    func getOGSOverview(allowsCache: Bool = false) -> AnyPublisher<[String: Any], Error> {
+        return Future<[String: Any], Error> { promise in
+            if let accessToken = userDefaults[.sgsAccessToken] {
+                AF.request(
+                    "\(self.sgsRoot)/ogs_overview",
+                    parameters: ["allows_cache": allowsCache],
+                    headers: [.authorization(accessToken)]
+                ).validate().responseData(completionHandler: { response in
+                    if case .failure(let error) = response.result {
+                        promise(.failure(error))
+                        return
+                    }
+                    if let responseValue = response.value, let json = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
+                        userDefaults[.latestOGSOverview] = responseValue
+                        userDefaults[.latestOGSOverviewTime] = Date()
+                        WidgetCenter.shared.reloadAllTimelines()
+                        
+                        promise(.success(json))
+                    } else {
+                        promise(.failure(OGSServiceError.invalidJSON))
+                    }
+                })
+            } else {
+                promise(.failure(SurroundServiceError.notLoggedIn))
+            }
+        }.eraseToAnyPublisher()
     }
 }

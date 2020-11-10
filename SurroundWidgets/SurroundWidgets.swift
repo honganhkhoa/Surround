@@ -338,6 +338,7 @@ struct CorrespondenceGamesWidgetView : View {
                         .font(.subheadline)
                         .minimumScaleFactor(0.7)
                         .padding()
+                        .frame(maxWidth: .infinity)
                 }
                 ZStack {
                     Color(.systemIndigo)
@@ -393,6 +394,13 @@ struct SurroundWidgets_Previews: PreviewProvider {
                 )
                 .previewContext(WidgetPreviewContext(family: family))
             }
+            CorrespondenceGamesWidgetView(
+                entry: CorrespondenceGamesEntry(
+                    date: Date(),
+                    games: [],
+                    noGamesMessage: "You don't have any correspondence games at the moment."
+                )
+            ).previewContext(WidgetPreviewContext(family: .systemMedium))
         }
     }
 }
