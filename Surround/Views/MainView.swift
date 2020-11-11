@@ -109,7 +109,7 @@ struct MainView: View {
                     }
                 })
             } else if phase == .background {
-                NotificationService.shared.scheduleAppRefresh()
+                SurroundNotificationService.shared.scheduleAppRefresh()
                 self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid

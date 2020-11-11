@@ -12,8 +12,8 @@ import Alamofire
 import WidgetKit
 import BackgroundTasks
 
-class NotificationService {
-    static let shared = NotificationService()
+class SurroundNotificationService {
+    static let shared = SurroundNotificationService()
     
     var userId: Int? { userDefaults[.ogsUIConfig]?.user.id }
     var notificationCheckCounter = [String: Int]()

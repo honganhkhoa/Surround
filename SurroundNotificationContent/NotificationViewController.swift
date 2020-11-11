@@ -26,7 +26,7 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
         if let ogsGameId = notification.request.content.userInfo["ogsGameId"] as? Int {
             if let overview = userDefaults[.latestOGSOverview] {
                 if let overviewData = try? JSONSerialization.jsonObject(with: overview) as? [String: Any] {
-                    if let game = NotificationService.shared.activeOGSGamesById(from: overviewData)[ogsGameId] {
+                    if let game = SurroundNotificationService.shared.activeOGSGamesById(from: overviewData)[ogsGameId] {
                         let boardView = BoardView(boardPosition: game.currentPosition)
                         hostingViewController = UIHostingController(rootView: boardView)
                         hostingViewController?.view.frame = self.view.bounds

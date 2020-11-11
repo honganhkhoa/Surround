@@ -34,7 +34,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             }
         }
         
-        NotificationService.shared.registerAppRefreshTask()
+        SurroundNotificationService.shared.registerAppRefreshTask()
         
         return true
     }
@@ -63,7 +63,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 //        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
 //        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
         
-        NotificationService.shared.checkForNewNotifications(completionHandler: completionHandler)
+        SurroundNotificationService.shared.checkForNewNotifications(completionHandler: completionHandler)
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {

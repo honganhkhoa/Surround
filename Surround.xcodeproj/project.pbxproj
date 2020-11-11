@@ -62,7 +62,7 @@
 		BC285B982557FDD6005378F9 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC285B972557FDD6005378F9 /* SocketIO */; };
 		BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BC285BA42557FE8F005378F9 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
-		BC285BB4255908CB005378F9 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
+		BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC025590B26005378F9 /* DictionaryCoding */; };
 		BC285BC825590B7F005378F9 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC725590B7F005378F9 /* Alamofire */; };
@@ -97,8 +97,8 @@
 		BC6493DD2538113A002B2200 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DC2538113A002B2200 /* SocketIO */; };
 		BC6493EA253811EE002B2200 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC6493EF25381201002B2200 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
-		BC649414253DA44C002B2200 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
-		BC649421253DAD89002B2200 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* NotificationService.swift */; };
+		BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
+		BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
@@ -106,6 +106,28 @@
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
+		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
+		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
+		BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
+		BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
+		BCD214F1255A948E00F78E2A /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
+		BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
+		BCD214F3255A948E00F78E2A /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
+		BCD214F4255A948E00F78E2A /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
+		BCD214F5255A948E00F78E2A /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
+		BCD214F6255A948E00F78E2A /* OGSUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3724AB2DD00050B2D1 /* OGSUser.swift */; };
+		BCD214FD255A94A400F78E2A /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
+		BCD214FF255A94A400F78E2A /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BCD21500255A94A400F78E2A /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
+		BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
+		BCD21510255A953000F78E2A /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BCD2150F255A953000F78E2A /* SocketIO */; };
+		BCD21512255A953400F78E2A /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BCD21511255A953400F78E2A /* Alamofire */; };
+		BCD21514255A953800F78E2A /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BCD21513255A953800F78E2A /* DictionaryCoding */; };
+		BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
+		BCD21522255A954E00F78E2A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 /* End PBXBuildFile section */
 
@@ -138,6 +160,13 @@
 			remoteGlobalIDString = BC64937625380A9F002B2200;
 			remoteInfo = SurroundWidgetsExtension;
 		};
+		BCD214DB255A946D00F78E2A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BCD214D5255A946D00F78E2A;
+			remoteInfo = SurroundNotificationService;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -149,6 +178,7 @@
 			files = (
 				BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed App Extensions */,
 				BC285B392557FAEB005378F9 /* SurroundNotificationContent.appex in Embed App Extensions */,
+				BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -212,7 +242,7 @@
 		BC64938225380AA1002B2200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC6493F425382011002B2200 /* Surround.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Surround.entitlements; sourceTree = "<group>"; };
 		BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundWidgetsExtension.entitlements; sourceTree = "<group>"; };
-		BC649413253DA44C002B2200 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		BC649413253DA44C002B2200 /* SurroundNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundNotificationService.swift; sourceTree = "<group>"; };
 		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		BC7407DA25493B71001D5581 /* SurroundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundService.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
@@ -230,6 +260,10 @@
 		BCAE413924D1234500B5DB74 /* se_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = se_wrapper.cpp; sourceTree = "<group>"; };
 		BCAE413C24D1299C00B5DB74 /* Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Bridging-Header.h"; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
+		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BCD2150E255A952300F78E2A /* SurroundNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationService.entitlements; sourceTree = "<group>"; };
 		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -283,6 +317,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BCD214D3255A946D00F78E2A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BCD21510255A953000F78E2A /* SocketIO in Frameworks */,
+				BCD21514255A953800F78E2A /* DictionaryCoding in Frameworks */,
+				BCD21512255A953400F78E2A /* Alamofire in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -293,6 +337,7 @@
 				BC042AF124AB2CF50050B2D1 /* Surround */,
 				BC64937D25380A9F002B2200 /* SurroundWidgets */,
 				BC285B302557FAEB005378F9 /* SurroundNotificationContent */,
+				BCD214D7255A946D00F78E2A /* SurroundNotificationService */,
 				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
 				BC64937825380A9F002B2200 /* Frameworks */,
@@ -308,6 +353,7 @@
 				BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */,
 				BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */,
 				BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */,
+				BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -435,7 +481,7 @@
 			children = (
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
-				BC649413253DA44C002B2200 /* NotificationService.swift */,
+				BC649413253DA44C002B2200 /* SurroundNotificationService.swift */,
 				BC649426253FF940002B2200 /* NavigationService.swift */,
 				BC7407DA25493B71001D5581 /* SurroundService.swift */,
 			);
@@ -495,6 +541,16 @@
 			path = ScoreEstimator;
 			sourceTree = "<group>";
 		};
+		BCD214D7255A946D00F78E2A /* SurroundNotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				BCD2150E255A952300F78E2A /* SurroundNotificationService.entitlements */,
+				BCD214D8255A946D00F78E2A /* NotificationService.swift */,
+				BCD214DA255A946D00F78E2A /* Info.plist */,
+			);
+			path = SurroundNotificationService;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -512,6 +568,7 @@
 			dependencies = (
 				BC64938425380AA2002B2200 /* PBXTargetDependency */,
 				BC285B382557FAEB005378F9 /* PBXTargetDependency */,
+				BCD214DC255A946D00F78E2A /* PBXTargetDependency */,
 			);
 			name = Surround;
 			packageProductDependencies = (
@@ -604,6 +661,28 @@
 			productReference = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BCD214D5255A946D00F78E2A /* SurroundNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BCD214E0255A946E00F78E2A /* Build configuration list for PBXNativeTarget "SurroundNotificationService" */;
+			buildPhases = (
+				BCD214D2255A946D00F78E2A /* Sources */,
+				BCD214D3255A946D00F78E2A /* Frameworks */,
+				BCD214D4255A946D00F78E2A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SurroundNotificationService;
+			packageProductDependencies = (
+				BCD2150F255A953000F78E2A /* SocketIO */,
+				BCD21511255A953400F78E2A /* Alamofire */,
+				BCD21513255A953800F78E2A /* DictionaryCoding */,
+			);
+			productName = SurroundNotificationService;
+			productReference = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -629,6 +708,9 @@
 					};
 					BC64937625380A9F002B2200 = {
 						CreatedOnToolsVersion = 12.0;
+					};
+					BCD214D5255A946D00F78E2A = {
+						CreatedOnToolsVersion = 12.1;
 					};
 				};
 			};
@@ -656,6 +738,7 @@
 				BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
 				BC64937625380A9F002B2200 /* SurroundWidgetsExtension */,
 				BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */,
+				BCD214D5255A946D00F78E2A /* SurroundNotificationService */,
 			);
 		};
 /* End PBXProject section */
@@ -702,6 +785,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BCD214D4255A946D00F78E2A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -737,7 +827,7 @@
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
-				BC649414253DA44C002B2200 /* NotificationService.swift in Sources */,
+				BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */,
 				BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */,
 				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,
 				BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */,
@@ -775,7 +865,7 @@
 				BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */,
 				BC285B7E2557FD31005378F9 /* TestData.swift in Sources */,
 				BC285B5B2557FCAC005378F9 /* OGSChallenge.swift in Sources */,
-				BC285BB4255908CB005378F9 /* NotificationService.swift in Sources */,
+				BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */,
 				BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */,
 				BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */,
 				BC285BA42557FE8F005378F9 /* Goban.cc in Sources */,
@@ -799,7 +889,7 @@
 				BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */,
 				BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */,
 				BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */,
-				BC649421253DAD89002B2200 /* NotificationService.swift in Sources */,
+				BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */,
 				BC6493C125381002002B2200 /* se_wrapper.cpp in Sources */,
 				BC6493A325380DCA002B2200 /* OGSPauseControl.swift in Sources */,
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
@@ -815,6 +905,31 @@
 				BC649428253FF942002B2200 /* NavigationService.swift in Sources */,
 				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
 				BC285B912557FD5C005378F9 /* SurroundService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BCD214D2255A946D00F78E2A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */,
+				BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */,
+				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,
+				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
+				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
+				BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */,
+				BCD214F4255A948E00F78E2A /* OGSUIConfig.swift in Sources */,
+				BCD214FF255A94A400F78E2A /* SurroundService.swift in Sources */,
+				BCD214F1255A948E00F78E2A /* UserDefaults+SurroundModels.swift in Sources */,
+				BCD21522255A954E00F78E2A /* Goban.cc in Sources */,
+				BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */,
+				BCD214FD255A94A400F78E2A /* NavigationService.swift in Sources */,
+				BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */,
+				BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */,
+				BCD214F3255A948E00F78E2A /* Game.swift in Sources */,
+				BCD214F5255A948E00F78E2A /* OGSGame.swift in Sources */,
+				BCD21500255A94A400F78E2A /* SurroundNotificationService.swift in Sources */,
+				BCD214F6255A948E00F78E2A /* OGSUser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -840,6 +955,11 @@
 			isa = PBXTargetDependency;
 			target = BC64937625380A9F002B2200 /* SurroundWidgetsExtension */;
 			targetProxy = BC64938325380AA2002B2200 /* PBXContainerItemProxy */;
+		};
+		BCD214DC255A946D00F78E2A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BCD214D5255A946D00F78E2A /* SurroundNotificationService */;
+			targetProxy = BCD214DB255A946D00F78E2A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1207,6 +1327,50 @@
 			};
 			name = Release;
 		};
+		BCD214DE255A946E00F78E2A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BCD214DF255A946E00F78E2A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 269H7P4WSN;
+				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.9.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1260,6 +1424,15 @@
 			buildConfigurations = (
 				BC64938725380AA2002B2200 /* Debug */,
 				BC64938825380AA2002B2200 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BCD214E0255A946E00F78E2A /* Build configuration list for PBXNativeTarget "SurroundNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BCD214DE255A946E00F78E2A /* Debug */,
+				BCD214DF255A946E00F78E2A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1351,6 +1524,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
+		};
+		BCD2150F255A953000F78E2A /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			productName = SocketIO;
+		};
+		BCD21511255A953400F78E2A /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		BCD21513255A953800F78E2A /* DictionaryCoding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			productName = DictionaryCoding;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
