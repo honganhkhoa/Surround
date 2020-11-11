@@ -114,6 +114,7 @@ struct MainView: View {
                     self.backgroundTaskID = .invalid
                 })
                 WidgetCenter.shared.reloadAllTimelines()
+                userDefaults[.cachedOGSGames] = [Int: Data]()
                 UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                 self.backgroundTaskID = .invalid
             }

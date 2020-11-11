@@ -129,6 +129,10 @@ extension SettingKey {
     static var sgsAccessToken: SettingKey<String> {
         return .init(name: "sgsAccessToken")
     }
+    
+    static var cachedOGSGames: SettingKey<[Int: Data]> {
+        return .init(name: "cachedOGSGames", encoded: true, defaultValue: [Int: Data]())
+    }
 }
 
 @propertyWrapper

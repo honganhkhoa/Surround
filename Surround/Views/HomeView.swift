@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import DictionaryCoding
 
 struct HomeView: View {
     #if os(iOS)
@@ -166,18 +167,32 @@ struct HomeView: View {
                         }
                     })
                 }
-            } else {
-                print("Waiting for #\(activeOGSGameIdToOpen) to become active")
-                self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { newActiveGames in
-                    if newActiveGames[activeOGSGameIdToOpen] != nil {
-                        DispatchQueue.main.async {
-                            self.gameDetailCancellable?.cancel()
-                            self.gameDetailCancellable = nil
-                            self.openRequestedActiveGameIfReady()
-                        }
-                    }
-                })
+                return
             }
+
+            if let cachedGameData = userDefaults[.cachedOGSGames]?[activeOGSGameIdToOpen] {
+                if let ogsGame = try? JSONSerialization.jsonObject(with: cachedGameData) as? [String: Any] {
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    if let ogsGame = try? decoder.decode(OGSGame.self, from: ogsGame) {
+                        let game = Game(ogsGame: ogsGame)
+                        self.showGameDetail(game: game)
+                        activeOGSGameIdToOpen = -1
+                        return
+                    }
+                }
+            }
+
+            print("Waiting for #\(activeOGSGameIdToOpen) to become active")
+            self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { newActiveGames in
+                if newActiveGames[activeOGSGameIdToOpen] != nil {
+                    DispatchQueue.main.async {
+                        self.gameDetailCancellable?.cancel()
+                        self.gameDetailCancellable = nil
+                        self.openRequestedActiveGameIfReady()
+                    }
+                }
+            })
         }
     }
         
