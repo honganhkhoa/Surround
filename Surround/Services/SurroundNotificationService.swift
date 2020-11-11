@@ -41,6 +41,21 @@ class SurroundNotificationService {
             return
         }
 
+        UNUserNotificationCenter.current().getDeliveredNotifications(completionHandler: { notifications in
+            var toBeRemovedNotificationIndentifiers = [String]()
+            for notification in notifications {
+                let userInfo = notification.request.content.userInfo
+                if let ogsGameId = userInfo["ogsGameId"] as? Int, let notificationCategory = userInfo["notificationCategory"] as? String {
+                    if ogsGameId == game.ogsID && notificationCategory == setting.mainName {
+                        toBeRemovedNotificationIndentifiers.append(notification.request.identifier)
+                    }
+                }
+            }
+            if toBeRemovedNotificationIndentifiers.count > 0 {
+                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: toBeRemovedNotificationIndentifiers)
+            }
+        })
+        
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = message
@@ -48,7 +63,8 @@ class SurroundNotificationService {
         content.sound = .default
         content.userInfo = [
             "rootView": RootView.home.rawValue,
-            "ogsGameId": game.ogsID!
+            "ogsGameId": game.ogsID!,
+            "notificationCategory": setting.mainName
         ]
 
         let uuidString = UUID().uuidString
@@ -241,59 +257,59 @@ class SurroundNotificationService {
         checkForCompletion()
     }
     
-    func checkForNewNotifications(completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
-            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
-            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
-            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
-            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
-                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
-                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
-                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseData { response in
-                    if case .failure = response.result {
-                        completionHandler(.failed)
-                        return
-                    }
+//    func checkForNewNotifications(completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+//        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
+//            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
+//            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
+//            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
+//            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
+//                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
+//                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
+//                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseData { response in
+//                    if case .failure = response.result {
+//                        completionHandler(.failed)
+//                        return
+//                    }
+//
+//                    if let newOverviewData = response.value {
+//                        if let oldOverviewData = userDefaults[.latestOGSOverview] {
+//                            self.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: newOverviewData, completionHandler: { notificationScheduled in
+//                                if notificationScheduled > 0 {
+//                                    completionHandler(.newData)
+//                                } else {
+//                                    completionHandler(.noData)
+//                                }
+//                            })
+//                        } else {
+//                            completionHandler(.newData)
+//                        }
+//                        userDefaults[.latestOGSOverview] = newOverviewData
+//                        userDefaults[.latestOGSOverviewTime] = Date()
+//                        WidgetCenter.shared.reloadAllTimelines()
+//                    }
+//                }
+//            }
+//        } else {
+//            completionHandler(.failed)
+//        }
+//    }
 
-                    if let newOverviewData = response.value {
-                        if let oldOverviewData = userDefaults[.latestOGSOverview] {
-                            self.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: newOverviewData, completionHandler: { notificationScheduled in
-                                if notificationScheduled > 0 {
-                                    completionHandler(.newData)
-                                } else {
-                                    completionHandler(.noData)
-                                }
-                            })
-                        } else {
-                            completionHandler(.newData)
-                        }
-                        userDefaults[.latestOGSOverview] = newOverviewData
-                        userDefaults[.latestOGSOverviewTime] = Date()
-                        WidgetCenter.shared.reloadAllTimelines()
-                    }
-                }
-            }
-        } else {
-            completionHandler(.failed)
-        }
-    }
-
-    func scheduleAppRefresh() {
-        if userDefaults[.notificationEnabled] == true {
-            let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
-            request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-            do {
-                try BGTaskScheduler.shared.submit(request)
-            } catch {
-                print(error)
-            }
-        }
-    }
-    
-    #if MAIN_APP
-    func registerAppRefreshTask() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.honganhkhoa.Surround.checkOverview", using: nil, launchHandler: { task in
-            
+//    func scheduleAppRefresh() {
+//        if userDefaults[.notificationEnabled] == true {
+//            let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
+//            request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+//            do {
+//                try BGTaskScheduler.shared.submit(request)
+//            } catch {
+//                print(error)
+//            }
+//        }
+//    }
+//
+//    #if MAIN_APP
+//    func registerAppRefreshTask() {
+//        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.honganhkhoa.Surround.checkOverview", using: nil, launchHandler: { task in
+//
 //            let content = UNMutableNotificationContent()
 //            content.title = "[Debug] Checking for new data"
 //            content.body = "From background fetch"
@@ -303,12 +319,12 @@ class SurroundNotificationService {
 //                    print(error)
 //                }
 //            }
-
-            self.scheduleAppRefresh()
-            self.checkForNewNotifications(completionHandler: { result in
-                task.setTaskCompleted(success: result != .failed)
-            })
-        })
-    }
-    #endif
+//
+//            self.scheduleAppRefresh()
+//            self.checkForNewNotifications(completionHandler: { result in
+//                task.setTaskCompleted(success: result != .failed)
+//            })
+//        })
+//    }
+//    #endif
 }

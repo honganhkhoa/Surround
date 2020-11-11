@@ -143,9 +143,6 @@ class SurroundService: ObservableObject {
                         return
                     }
                     if let responseValue = response.value, let json = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
-                        userDefaults[.latestOGSOverview] = responseValue
-                        userDefaults[.latestOGSOverviewTime] = Date()
-                        WidgetCenter.shared.reloadAllTimelines()
                         
                         promise(.success(json))
                     } else {

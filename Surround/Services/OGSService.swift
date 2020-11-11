@@ -513,9 +513,6 @@ class OGSService: ObservableObject {
                     switch response.result {
                     case .success:
                         if let responseValue = response.value, let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
-                            userDefaults[.latestOGSOverview] = responseValue
-                            userDefaults[.latestOGSOverviewTime] = Date()
-                            WidgetCenter.shared.reloadAllTimelines()
 
                             promise(.success(data))
                         }
@@ -533,8 +530,13 @@ class OGSService: ObservableObject {
             if let finishCallback = finishCallback {
                 finishCallback()
             }
-        }, receiveValue: { overviewData in
-            self.processOverview(overview: overviewData)
+        }, receiveValue: { overviewValue in
+            if let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue) {
+                userDefaults[.latestOGSOverview] = overviewData
+                userDefaults[.latestOGSOverviewTime] = Date()
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+            self.processOverview(overview: overviewValue)
         })
     }
     

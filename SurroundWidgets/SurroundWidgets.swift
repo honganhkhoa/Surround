@@ -9,8 +9,9 @@ import WidgetKit
 import SwiftUI
 import Alamofire
 import DictionaryCoding
+import Combine
 
-struct Provider: TimelineProvider {
+class Provider: TimelineProvider {
     var isLoggedIn: Bool {
         return userDefaults[.ogsUIConfig]?.csrfToken != nil && userDefaults[.ogsSessionId] != nil
     }
@@ -88,10 +89,11 @@ struct Provider: TimelineProvider {
         return result.sorted(by: isGamesInIncreasingOrder)
     }
 
+    var overviewLoadingCancellable: AnyCancellable?
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         if let lastOverviewUpdate = userDefaults[.latestOGSOverviewTime] {
             let currentDate = Date()
-            if currentDate.timeIntervalSince(lastOverviewUpdate) < 10 && isLoggedIn {
+            if currentDate.timeIntervalSince(lastOverviewUpdate) < 60 && isLoggedIn {
                 if let overviewData = userDefaults[.latestOGSOverview] {
                     if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
                         if let entry = getEntry(fromOverviewJSON: data, context: context) {
@@ -104,53 +106,71 @@ struct Provider: TimelineProvider {
             }
         }
         
-        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
-            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
-            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
-            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
-            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
-                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
-                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
-                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseData { response in
-                    let currentDate = Date()
-                    let nextReloadDate = currentDate.advanced(by: 15 * 60)
-                    var overviewData = response.value
-                    if case .failure = response.result {
-                        overviewData = userDefaults[.latestOGSOverview]
-                    }
-                    
-                    if let overviewData = overviewData {
-                        if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
-                            if let oldOverviewData = userDefaults[.latestOGSOverview] {
-                                SurroundNotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, completionHandler: { _ in
-                                    if let entry = getEntry(fromOverviewJSON: data, context: context) {
-                                        completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
-                                    }
-                                })
-                                userDefaults[.latestOGSOverview] = overviewData
-                                userDefaults[.latestOGSOverviewTime] = Date()
-                                return
-                            } else {
-                                userDefaults[.latestOGSOverview] = overviewData
-                                userDefaults[.latestOGSOverviewTime] = Date()
-                                if let entry = getEntry(fromOverviewJSON: data, context: context) {
-                                    completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+        overviewLoadingCancellable = SurroundService.shared.getOGSOverview().catch { error in
+            return Future<[String: Any], Error> { promise in
+                if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
+                    let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
+                    let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
+                    let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
+                    if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
+                        Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
+                        Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
+                        AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").validate().responseData { response in
+                            var overviewData = response.value
+                            if case .failure = response.result {
+                                overviewData = userDefaults[.latestOGSOverview]
+                            }
+                            
+                            if let overviewData = overviewData {
+                                if let overviewValue = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
+                                    promise(.success(overviewValue))
                                     return
                                 }
                             }
+                            promise(.failure(OGSServiceError.invalidJSON))
                         }
+                    } else {
+                        promise(.failure(OGSServiceError.notLoggedIn))
                     }
-                    
+                } else {
+                    promise(.failure(OGSServiceError.notLoggedIn))
+                }
+            }.eraseToAnyPublisher()
+        }.sink(receiveCompletion: { result in
+            if case .failure(let error) = result {
+                let currentDate = Date()
+                let nextReloadDate = currentDate.advanced(by: 15 * 60)
+
+                if case OGSServiceError.notLoggedIn = error {
+                    completion(Timeline(entries: [self.notLoggedInEntry], policy: .after(nextReloadDate)))
+                } else {
                     let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Failed to load your correspondence games.")
                     completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                 }
             }
-        } else {
+        }, receiveValue: { overviewValue in
+            let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue)
             let currentDate = Date()
             let nextReloadDate = currentDate.advanced(by: 15 * 60)
 
-            completion(Timeline(entries: [notLoggedInEntry], policy: .after(nextReloadDate)))
-        }
+            if let oldOverviewData = userDefaults[.latestOGSOverview], let overviewData = overviewData {
+                SurroundNotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, completionHandler: { _ in
+                    if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
+                        completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                    }
+                })
+                userDefaults[.latestOGSOverview] = overviewData
+                userDefaults[.latestOGSOverviewTime] = Date()
+                return
+            } else {
+                userDefaults[.latestOGSOverview] = overviewData
+                userDefaults[.latestOGSOverviewTime] = Date()
+                if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
+                    completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                    return
+                }
+            }
+        })
     }
 }
 

@@ -21,8 +21,6 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
     func didReceive(_ notification: UNNotification) {
         self.view.subviews.forEach { $0.removeFromSuperview() }
         
-        print("****** didReceive")
-        
         if let ogsGameId = notification.request.content.userInfo["ogsGameId"] as? Int {
             if let overview = userDefaults[.latestOGSOverview] {
                 if let overviewData = try? JSONSerialization.jsonObject(with: overview) as? [String: Any] {

@@ -109,15 +109,13 @@ struct MainView: View {
                     }
                 })
             } else if phase == .background {
-                SurroundNotificationService.shared.scheduleAppRefresh()
                 self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid
                 })
-                ogs.loadOverview(finishCallback: {
-                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                    self.backgroundTaskID = .invalid
-                })
+                WidgetCenter.shared.reloadAllTimelines()
+                UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                self.backgroundTaskID = .invalid
             }
         }
         .onOpenURL { url in
