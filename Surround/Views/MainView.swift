@@ -113,10 +113,21 @@ struct MainView: View {
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid
                 })
-                WidgetCenter.shared.reloadAllTimelines()
                 userDefaults[.cachedOGSGames] = [Int: Data]()
-                UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                self.backgroundTaskID = .invalid
+                WidgetCenter.shared.getCurrentConfigurations { result in
+                    if case .success(let widgetInfos) = result {
+                        if widgetInfos.count > 0 {
+                            WidgetCenter.shared.reloadAllTimelines()
+                            UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                            self.backgroundTaskID = .invalid
+                            return
+                        }
+                    }
+                    ogs.loadOverview(finishCallback: {
+                        UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                        self.backgroundTaskID = .invalid
+                    })
+                }
             }
         }
         .onOpenURL { url in

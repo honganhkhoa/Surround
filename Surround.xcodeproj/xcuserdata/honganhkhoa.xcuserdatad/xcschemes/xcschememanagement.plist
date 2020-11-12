@@ -9,12 +9,12 @@
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
-		<key>SurroundNotificationContent.xcscheme_^#shared#^_</key>
+		<key>SurroundNotificationContent.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>2</integer>
 		</dict>
-		<key>SurroundNotificationService.xcscheme_^#shared#^_</key>
+		<key>SurroundNotificationService.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>3</integer>
@@ -42,7 +42,17 @@
 			<key>primary</key>
 			<true/>
 		</dict>
+		<key>BC285B2A2557FAEB005378F9</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
 		<key>BC64937625380A9F002B2200</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>BCD214D5255A946D00F78E2A</key>
 		<dict>
 			<key>primary</key>
 			<true/>
