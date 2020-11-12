@@ -167,40 +167,6 @@ class OGSService: ObservableObject {
         })
         
         self.checkLoginStatus()
-        self.ensureConnect(thenExecute: {
-            if self.isLoggedIn {
-                self.updateUIConfig()
-                if let latestOverview = userDefaults[.latestOGSOverview] {
-                    if let overviewData = try? JSONSerialization.jsonObject(with: latestOverview) as? [String: Any] {
-                        self.processOverview(overview: overviewData)
-                    }
-                }
-                self.loadOverview(finishCallback: {
-//                    if let game = self.sortedActiveCorrespondenceGames.first {
-//                        let content = UNMutableNotificationContent()
-//                        content.title = "[Debug] Test rich notification"
-//                        content.body = game.gameName ?? ""
-//                        content.categoryIdentifier = "GAME"
-//                        content.userInfo = [
-//                            "rootView": RootView.home.rawValue,
-//                            "ogsGameId": game.ogsID!
-//                        ]
-//
-//                        let uuidString = UUID().uuidString
-//                        let request = UNNotificationRequest(
-//                            identifier: uuidString,
-//                            content: content,
-//                            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
-//                        )
-//                        UNUserNotificationCenter.current().add(request) { (error) in
-//                           if let error = error {
-//                              print(error)
-//                           }
-//                        }
-//                    }
-                })
-            }
-        })
     }
     
     private func setUpSocketEventListeners() {
@@ -532,8 +498,7 @@ class OGSService: ObservableObject {
             }
         }, receiveValue: { overviewValue in
             if let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue) {
-                userDefaults[.latestOGSOverview] = overviewData
-                userDefaults[.latestOGSOverviewTime] = Date()
+                userDefaults.updateLatestOGSOverview(overviewData: overviewData)
                 WidgetCenter.shared.reloadAllTimelines()
             }
             self.processOverview(overview: overviewValue)
@@ -688,6 +653,9 @@ class OGSService: ObservableObject {
                     } catch {
                         print(gameId, movedata, error)
                     }
+                    if let _ = self.activeGames[gameId] {
+                        userDefaults[.latestOGSOverviewOutdated] = true
+                    }
                 }
             }
         }
@@ -753,6 +721,9 @@ class OGSService: ObservableObject {
             if let phase = OGSGamePhase(rawValue: data[0] as? String ?? "") {
                 if let connectedGame = self.connectedGames[ogsID] {
                     connectedGame.gamePhase = phase
+                }
+                if let _ = self.activeGames[ogsID] {
+                    userDefaults[.latestOGSOverviewOutdated] = true
                 }
             }
         }

@@ -91,15 +91,17 @@ class Provider: TimelineProvider {
 
     var overviewLoadingCancellable: AnyCancellable?
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        if let lastOverviewUpdate = userDefaults[.latestOGSOverviewTime] {
-            let currentDate = Date()
-            if currentDate.timeIntervalSince(lastOverviewUpdate) < 60 && isLoggedIn {
-                if let overviewData = userDefaults[.latestOGSOverview] {
-                    if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
-                        if let entry = getEntry(fromOverviewJSON: data, context: context) {
-                            let nextReloadDate = currentDate.advanced(by: 15 * 60)
-                            completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
-                            return
+        if !(userDefaults[.latestOGSOverviewOutdated] ?? false) {
+            if let lastOverviewUpdate = userDefaults[.latestOGSOverviewTime] {
+                let currentDate = Date()
+                if currentDate.timeIntervalSince(lastOverviewUpdate) < 60 && isLoggedIn {
+                    if let overviewData = userDefaults[.latestOGSOverview] {
+                        if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
+                            if let entry = getEntry(fromOverviewJSON: data, context: context) {
+                                let nextReloadDate = currentDate.advanced(by: 15 * 60)
+                                completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
+                                return
+                            }
                         }
                     }
                 }
@@ -159,12 +161,12 @@ class Provider: TimelineProvider {
                         completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                     }
                 })
-                userDefaults[.latestOGSOverview] = overviewData
-                userDefaults[.latestOGSOverviewTime] = Date()
+                userDefaults.updateLatestOGSOverview(overviewData: overviewData)
                 return
             } else {
-                userDefaults[.latestOGSOverview] = overviewData
-                userDefaults[.latestOGSOverviewTime] = Date()
+                if let overviewData = overviewData {
+                    userDefaults.updateLatestOGSOverview(overviewData: overviewData)
+                }
                 if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
                     completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                     return

@@ -61,6 +61,12 @@ extension UserDefaults {
             }
         }
     }
+    
+    func updateLatestOGSOverview(overviewData: Data) {
+        self[.latestOGSOverview] = overviewData
+        self[.latestOGSOverviewTime] = Date()
+        self[.latestOGSOverviewOutdated] = false
+    }
 }
 
 extension SettingKey {
@@ -78,6 +84,10 @@ extension SettingKey {
     
     static var latestOGSOverviewTime: SettingKey<Date> {
         return .init(name: "latestOGSOverviewTime")
+    }
+    
+    static var latestOGSOverviewOutdated: SettingKey<Bool> {
+        return .init(name: "latestOGSOverviewOutdated", defaultValue: false)
     }
     
     #if MAIN_APP

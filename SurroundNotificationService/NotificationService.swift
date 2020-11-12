@@ -28,8 +28,7 @@ class NotificationService: UNNotificationServiceExtension {
             }
         }, receiveValue: { overviewValue in
             if let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue) {
-                userDefaults[.latestOGSOverview] = overviewData
-                userDefaults[.latestOGSOverviewTime] = Date()
+                userDefaults.updateLatestOGSOverview(overviewData: overviewData)
                 WidgetCenter.shared.reloadAllTimelines()
             }
 

@@ -20,9 +20,33 @@ struct MainView: View {
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    @State var widgetInfos = [WidgetInfo]()
+    @State var firstLaunch = true
     
-    init() {
+    func onAppActive(newLaunch: Bool) {
+        WidgetCenter.shared.getCurrentConfigurations { result in
+            if case .success(let widgetInfos) = result {
+                self.widgetInfos = widgetInfos
+            }
+        }
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        ogs.ensureConnect(thenExecute: {
+            if ogs.isLoggedIn {
+                ogs.updateUIConfig()
+                if newLaunch {
+                    if let latestOverview = userDefaults[.latestOGSOverview] {
+                        if let overviewData = try? JSONSerialization.jsonObject(with: latestOverview) as? [String: Any] {
+                            ogs.processOverview(overview: overviewData)
+                        }
+                    }
+                }
+                ogs.loadOverview()
+            }
+            if currentView == .publicGames {
+                ogs.fetchPublicGames()
+            }
+        })
+
     }
     
     func navigateTo(appURL: URL) {
@@ -43,6 +67,14 @@ struct MainView: View {
     }
     
     var body: some View {
+        if firstLaunch {
+            DispatchQueue.main.async {
+                if self.firstLaunch {
+                    self.firstLaunch = false
+                    self.onAppActive(newLaunch: true)
+                }
+            }
+        }
         var compactSizeClass = false
         #if os(iOS)
         compactSizeClass = horizontalSizeClass == .compact
@@ -98,31 +130,18 @@ struct MainView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-                ogs.ensureConnect(thenExecute: {
-                    if ogs.isLoggedIn {
-                        ogs.updateUIConfig()
-                        ogs.loadOverview()
-                    }
-                    if currentView == .publicGames {
-                        ogs.fetchPublicGames()
-                    }
-                })
+                self.onAppActive(newLaunch: false)
             } else if phase == .background {
                 self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
                     UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                     self.backgroundTaskID = .invalid
                 })
                 userDefaults[.cachedOGSGames] = [Int: Data]()
-                WidgetCenter.shared.getCurrentConfigurations { result in
-                    if case .success(let widgetInfos) = result {
-                        if widgetInfos.count > 0 {
-                            WidgetCenter.shared.reloadAllTimelines()
-                            UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                            self.backgroundTaskID = .invalid
-                            return
-                        }
-                    }
+                if self.widgetInfos.count > 0 {
+                    WidgetCenter.shared.reloadAllTimelines()
+                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+                    self.backgroundTaskID = .invalid
+                } else {
                     ogs.loadOverview(finishCallback: {
                         UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
                         self.backgroundTaskID = .invalid

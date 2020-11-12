@@ -109,12 +109,6 @@ class SurroundNotificationService {
                     let twelveHours = Double(12 * 3600)
                     let threeHours = Double(3 * 3600)
                     let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
-//                    self.scheduleNotification(
-//                        title: "\(newGame.blackName) vs. \(newGame.whiteName)",
-//                        message: "\(lastTimeLeft) -> \(timeLeft), \(twelveHours), \(threeHours)",
-//                        game: newGame,
-//                        setting: .notificationEnabled
-//                    )
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
                         self.scheduleNotification(
                             title: "Time running out",
@@ -256,75 +250,4 @@ class SurroundNotificationService {
         }
         checkForCompletion()
     }
-    
-//    func checkForNewNotifications(completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-//        if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
-//            let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
-//            let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
-//            let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])
-//            if let csrfCookie = csrfCookie, let sessionIdCookie = sessionIdCookie {
-//                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(csrfCookie)
-//                Session.default.sessionConfiguration.httpCookieStorage?.setCookie(sessionIdCookie)
-//                AF.request("\(OGSService.ogsRoot)/api/v1/ui/overview").responseData { response in
-//                    if case .failure = response.result {
-//                        completionHandler(.failed)
-//                        return
-//                    }
-//
-//                    if let newOverviewData = response.value {
-//                        if let oldOverviewData = userDefaults[.latestOGSOverview] {
-//                            self.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: newOverviewData, completionHandler: { notificationScheduled in
-//                                if notificationScheduled > 0 {
-//                                    completionHandler(.newData)
-//                                } else {
-//                                    completionHandler(.noData)
-//                                }
-//                            })
-//                        } else {
-//                            completionHandler(.newData)
-//                        }
-//                        userDefaults[.latestOGSOverview] = newOverviewData
-//                        userDefaults[.latestOGSOverviewTime] = Date()
-//                        WidgetCenter.shared.reloadAllTimelines()
-//                    }
-//                }
-//            }
-//        } else {
-//            completionHandler(.failed)
-//        }
-//    }
-
-//    func scheduleAppRefresh() {
-//        if userDefaults[.notificationEnabled] == true {
-//            let request = BGAppRefreshTaskRequest(identifier: "com.honganhkhoa.Surround.checkOverview")
-//            request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-//            do {
-//                try BGTaskScheduler.shared.submit(request)
-//            } catch {
-//                print(error)
-//            }
-//        }
-//    }
-//
-//    #if MAIN_APP
-//    func registerAppRefreshTask() {
-//        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.honganhkhoa.Surround.checkOverview", using: nil, launchHandler: { task in
-//
-//            let content = UNMutableNotificationContent()
-//            content.title = "[Debug] Checking for new data"
-//            content.body = "From background fetch"
-//            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-//            UNUserNotificationCenter.current().add(request) { error in
-//                if let error = error {
-//                    print(error)
-//                }
-//            }
-//
-//            self.scheduleAppRefresh()
-//            self.checkForNewNotifications(completionHandler: { result in
-//                task.setTaskCompleted(success: result != .failed)
-//            })
-//        })
-//    }
-//    #endif
 }

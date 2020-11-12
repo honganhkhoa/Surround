@@ -1101,7 +1101,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1112,7 +1112,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1130,7 +1130,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1141,7 +1141,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1240,7 +1240,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -1249,7 +1249,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1263,7 +1263,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -1272,7 +1272,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1288,7 +1288,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1297,7 +1297,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1314,7 +1314,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1323,7 +1323,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1338,7 +1338,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
@@ -1347,7 +1347,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1361,7 +1361,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
@@ -1370,7 +1370,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.1;
+				MARKETING_VERSION = 0.9.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
