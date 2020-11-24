@@ -497,6 +497,7 @@ struct BoardView_Previews: PreviewProvider {
         let game2 = TestData.Scored15x17
         let game3 = TestData.Resigned19x19HandicappedWithInitialState
         let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
+        let game5 = TestData.EuropeanChampionship
         return Group {
             Stone(color: .black, shadowRadius: 2)
                 .frame(width: 25, height: 25)
@@ -528,7 +529,7 @@ struct BoardView_Previews: PreviewProvider {
                 .previewLayout(.fixed(width: 375, height: 500))
             BoardView(boardPosition: game4.currentPosition)
                 .previewLayout(.fixed(width: 375, height: 500))
-            BoardView(boardPosition: boardPosition).colorScheme(.dark)
+            BoardView(boardPosition: game5.currentPosition).colorScheme(.dark)
                 .previewLayout(.fixed(width: 375, height: 500))
         }
     }

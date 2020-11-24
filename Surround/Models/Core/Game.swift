@@ -51,11 +51,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         firstNonHandicapMoveIndex = min(data.handicap, data.moves.count)
                         for handicapMove in data.moves[..<firstNonHandicapMoveIndex] {
                             position = try position.makeHandicapPlacement(move: .placeStone(handicapMove[1], handicapMove[0]))
+                            self.positionByLastMoveNumber[position.lastMoveNumber] = position
                         }
                         position.nextToMove = firstNonHandicapMoveIndex == data.handicap ? data.initialPlayer.opponentColor() : data.initialPlayer
                     }
                     for move in data.moves[firstNonHandicapMoveIndex...] {
                         position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]), allowsSelfCapture: data.allowSelfCapture)
+                        self.positionByLastMoveNumber[position.lastMoveNumber] = position
                     }
                 } catch {
                     print(error)
@@ -86,7 +88,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var blackId: Int?
     @Published var whiteId: Int?
     @Published var gameName: String?
-    @Published var currentPosition: BoardPosition
+    @Published var currentPosition: BoardPosition {
+        didSet {
+            self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
+        }
+    }
     @Published var undoRequested: Int?
     var blackFormattedRank: String {
         return formattedRankString(rank: blackRank, professional: gameData?.players.black.professional ?? false)
@@ -167,6 +173,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var removedStonesAccepted = [StoneColor: Set<[Int]>]()
     lazy var computeQueue = DispatchQueue(label: "com.honganhkhoa.Surround.computeQueue", qos: .default)
     
+    @Published var chatLog = [OGSChatLine]()
+    var positionByLastMoveNumber = [Int: BoardPosition]()
+    
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
             return "Game #\(id)"
@@ -200,6 +209,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.whiteName = whiteName
         self.ID = gameId
         self.initialPosition = BoardPosition(width: width, height: height)
+        self.positionByLastMoveNumber[self.initialPosition.lastMoveNumber] = self.initialPosition
         self.currentPosition = self.initialPosition
     }
     
@@ -212,6 +222,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.whiteId = ogsGame.players.white.id
         self.ID = .OGS(ogsGame.gameId)
         self.initialPosition = BoardPosition(width: width, height: height)
+        self.positionByLastMoveNumber[self.initialPosition.lastMoveNumber] = self.initialPosition
         self.currentPosition = self.initialPosition
         self.gameData = ogsGame
         self.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: self.pauseControl)
@@ -465,5 +476,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             return false
         }
         return isUserTurn && undoRequested == currentPosition.lastMoveNumber
+    }
+    
+    func addChatLine(_ line: OGSChatLine) {
+        if self.chatLog.count == 0 || self.chatLog.last!.timestamp <= line.timestamp {
+            self.chatLog.append(line)
+        } else {
+            var i = self.chatLog.count - 1
+            while (i >= 0 && self.chatLog[i].timestamp > line.timestamp) {
+                i -= 1
+            }
+            self.chatLog.insert(line, at: i + 1)
+        }
+    }
+    
+    func resetChats() {
+        self.chatLog.removeAll()
     }
 }

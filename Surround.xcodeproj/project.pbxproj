@@ -54,7 +54,6 @@
 		BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC285B6D2557FCBA005378F9 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		BC285B7E2557FD31005378F9 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
 		BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC285B852557FD57005378F9 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
@@ -67,6 +66,10 @@
 		BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC025590B26005378F9 /* DictionaryCoding */; };
 		BC285BC825590B7F005378F9 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC725590B7F005378F9 /* Alamofire */; };
 		BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */; };
+		BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
+		BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
+		BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
+		BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
 		BC4658AE2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */; };
 		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
@@ -96,7 +99,6 @@
 		BC6493DB25381133002B2200 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DA25381133002B2200 /* DictionaryCoding */; };
 		BC6493DD2538113A002B2200 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DC2538113A002B2200 /* SocketIO */; };
 		BC6493EA253811EE002B2200 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
-		BC6493EF25381201002B2200 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
 		BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
@@ -105,6 +107,53 @@
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
+		BCB98CAB256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
+		BCB98CAC256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
+		BCB98CAD256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
+		BCB98CAE256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
+		BCB98CB6256D130100B1F8FD /* game-18759438.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CB5256D130100B1F8FD /* game-18759438.json */; };
+		BCB98CB7256D130100B1F8FD /* game-18759438.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CB5256D130100B1F8FD /* game-18759438.json */; };
+		BCB98CB8256D130100B1F8FD /* game-18759438.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CB5256D130100B1F8FD /* game-18759438.json */; };
+		BCB98CB9256D130100B1F8FD /* game-18759438.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CB5256D130100B1F8FD /* game-18759438.json */; };
+		BCB98CC0256D143F00B1F8FD /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BCB98CC1256D144000B1F8FD /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BCB98CC2256D144100B1F8FD /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
+		BCB98CD0256D15B500B1F8FD /* game-23871959.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CCF256D15B500B1F8FD /* game-23871959.json */; };
+		BCB98CD1256D15B500B1F8FD /* game-23871959.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CCF256D15B500B1F8FD /* game-23871959.json */; };
+		BCB98CD2256D15B500B1F8FD /* game-23871959.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CCF256D15B500B1F8FD /* game-23871959.json */; };
+		BCB98CD3256D15B500B1F8FD /* game-23871959.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CCF256D15B500B1F8FD /* game-23871959.json */; };
+		BCB98CDB256D15F200B1F8FD /* game-25291907.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CDA256D15F200B1F8FD /* game-25291907.json */; };
+		BCB98CDC256D15F200B1F8FD /* game-25291907.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CDA256D15F200B1F8FD /* game-25291907.json */; };
+		BCB98CDD256D15F200B1F8FD /* game-25291907.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CDA256D15F200B1F8FD /* game-25291907.json */; };
+		BCB98CDE256D15F200B1F8FD /* game-25291907.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CDA256D15F200B1F8FD /* game-25291907.json */; };
+		BCB98CE6256D163600B1F8FD /* game-26268396.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CE5256D163600B1F8FD /* game-26268396.json */; };
+		BCB98CE7256D163600B1F8FD /* game-26268396.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CE5256D163600B1F8FD /* game-26268396.json */; };
+		BCB98CE8256D163600B1F8FD /* game-26268396.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CE5256D163600B1F8FD /* game-26268396.json */; };
+		BCB98CE9256D163600B1F8FD /* game-26268396.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CE5256D163600B1F8FD /* game-26268396.json */; };
+		BCB98CF1256D168200B1F8FD /* game-26268404.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CF0256D168200B1F8FD /* game-26268404.json */; };
+		BCB98CF2256D168200B1F8FD /* game-26268404.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CF0256D168200B1F8FD /* game-26268404.json */; };
+		BCB98CF3256D168200B1F8FD /* game-26268404.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CF0256D168200B1F8FD /* game-26268404.json */; };
+		BCB98CF4256D168200B1F8FD /* game-26268404.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CF0256D168200B1F8FD /* game-26268404.json */; };
+		BCB98CFC256D16B800B1F8FD /* game-26269354.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CFB256D16B800B1F8FD /* game-26269354.json */; };
+		BCB98CFD256D16B800B1F8FD /* game-26269354.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CFB256D16B800B1F8FD /* game-26269354.json */; };
+		BCB98CFE256D16B800B1F8FD /* game-26269354.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CFB256D16B800B1F8FD /* game-26269354.json */; };
+		BCB98CFF256D16B800B1F8FD /* game-26269354.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CFB256D16B800B1F8FD /* game-26269354.json */; };
+		BCB98D07256D16F600B1F8FD /* game-27053412.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D06256D16F600B1F8FD /* game-27053412.json */; };
+		BCB98D08256D16F600B1F8FD /* game-27053412.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D06256D16F600B1F8FD /* game-27053412.json */; };
+		BCB98D09256D16F600B1F8FD /* game-27053412.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D06256D16F600B1F8FD /* game-27053412.json */; };
+		BCB98D0A256D16F600B1F8FD /* game-27053412.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D06256D16F600B1F8FD /* game-27053412.json */; };
+		BCB98D12256D17D600B1F8FD /* game-25758368.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D11256D17D600B1F8FD /* game-25758368.json */; };
+		BCB98D13256D17D600B1F8FD /* game-25758368.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D11256D17D600B1F8FD /* game-25758368.json */; };
+		BCB98D14256D17D600B1F8FD /* game-25758368.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D11256D17D600B1F8FD /* game-25758368.json */; };
+		BCB98D15256D17D600B1F8FD /* game-25758368.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D11256D17D600B1F8FD /* game-25758368.json */; };
+		BCB98D1D256D185500B1F8FD /* game-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D1C256D185500B1F8FD /* game-27671778.json */; };
+		BCB98D1E256D185500B1F8FD /* game-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D1C256D185500B1F8FD /* game-27671778.json */; };
+		BCB98D1F256D185500B1F8FD /* game-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D1C256D185500B1F8FD /* game-27671778.json */; };
+		BCB98D20256D185500B1F8FD /* game-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D1C256D185500B1F8FD /* game-27671778.json */; };
+		BCB98D28256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
+		BCB98D29256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
+		BCB98D2A256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
+		BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
 		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -227,6 +276,7 @@
 		BC285B362557FAEB005378F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationContent.entitlements; sourceTree = "<group>"; };
 		BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayersBannerView.swift; sourceTree = "<group>"; };
+		BC361AB5256246B4000C47F4 /* OGSChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatLine.swift; sourceTree = "<group>"; };
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveCorrespondenceGamesCarousel.swift; sourceTree = "<group>"; };
@@ -259,6 +309,17 @@
 		BCAE413724D1213100B5DB74 /* Goban.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Goban.h; sourceTree = "<group>"; };
 		BCAE413924D1234500B5DB74 /* se_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = se_wrapper.cpp; sourceTree = "<group>"; };
 		BCAE413C24D1299C00B5DB74 /* Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Bridging-Header.h"; sourceTree = "<group>"; };
+		BCB98CAA256D129F00B1F8FD /* chat-27671778.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "chat-27671778.json"; sourceTree = "<group>"; };
+		BCB98CB5256D130100B1F8FD /* game-18759438.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-18759438.json"; sourceTree = "<group>"; };
+		BCB98CCF256D15B500B1F8FD /* game-23871959.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-23871959.json"; sourceTree = "<group>"; };
+		BCB98CDA256D15F200B1F8FD /* game-25291907.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25291907.json"; sourceTree = "<group>"; };
+		BCB98CE5256D163600B1F8FD /* game-26268396.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-26268396.json"; sourceTree = "<group>"; };
+		BCB98CF0256D168200B1F8FD /* game-26268404.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-26268404.json"; sourceTree = "<group>"; };
+		BCB98CFB256D16B800B1F8FD /* game-26269354.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-26269354.json"; sourceTree = "<group>"; };
+		BCB98D06256D16F600B1F8FD /* game-27053412.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-27053412.json"; sourceTree = "<group>"; };
+		BCB98D11256D17D600B1F8FD /* game-25758368.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25758368.json"; sourceTree = "<group>"; };
+		BCB98D1C256D185500B1F8FD /* game-27671778.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-27671778.json"; sourceTree = "<group>"; };
+		BCB98D27256D18C400B1F8FD /* game-25076729.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25076729.json"; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
@@ -382,6 +443,18 @@
 		BC042AF824AB2CFA0050B2D1 /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
+				BCB98D27256D18C400B1F8FD /* game-25076729.json */,
+				BCB98D1C256D185500B1F8FD /* game-27671778.json */,
+				BCB98D11256D17D600B1F8FD /* game-25758368.json */,
+				BCB98D06256D16F600B1F8FD /* game-27053412.json */,
+				BCB98CFB256D16B800B1F8FD /* game-26269354.json */,
+				BCB98CF0256D168200B1F8FD /* game-26268404.json */,
+				BCB98CE5256D163600B1F8FD /* game-26268396.json */,
+				BCB98CDA256D15F200B1F8FD /* game-25291907.json */,
+				BCB98CCF256D15B500B1F8FD /* game-23871959.json */,
+				BCB98CB5256D130100B1F8FD /* game-18759438.json */,
+				BCB98CAA256D129F00B1F8FD /* chat-27671778.json */,
+				BC042B3124AB2DD00050B2D1 /* TestData.swift */,
 				BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
@@ -424,7 +497,6 @@
 		BC042B3024AB2DD00050B2D1 /* Data */ = {
 			isa = PBXGroup;
 			children = (
-				BC042B3124AB2DD00050B2D1 /* TestData.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -448,6 +520,7 @@
 				BC042B3724AB2DD00050B2D1 /* OGSUser.swift */,
 				BC042B3924AB2DD00050B2D1 /* OGSClock.swift */,
 				BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */,
+				BC361AB5256246B4000C47F4 /* OGSChatLine.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -748,10 +821,21 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCB98CD0256D15B500B1F8FD /* game-23871959.json in Resources */,
+				BCB98CAB256D129F00B1F8FD /* chat-27671778.json in Resources */,
+				BCB98CE6256D163600B1F8FD /* game-26268396.json in Resources */,
+				BCB98D12256D17D600B1F8FD /* game-25758368.json in Resources */,
 				BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */,
+				BCB98D28256D18C400B1F8FD /* game-25076729.json in Resources */,
+				BCB98CB6256D130100B1F8FD /* game-18759438.json in Resources */,
+				BCB98D07256D16F600B1F8FD /* game-27053412.json in Resources */,
+				BCB98CF1256D168200B1F8FD /* game-26268404.json in Resources */,
+				BCB98D1D256D185500B1F8FD /* game-27671778.json in Resources */,
+				BCB98CDB256D15F200B1F8FD /* game-25291907.json in Resources */,
 				BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */,
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
 				BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */,
+				BCB98CFC256D16B800B1F8FD /* game-26269354.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -773,7 +857,18 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCB98CDD256D15F200B1F8FD /* game-25291907.json in Resources */,
+				BCB98D14256D17D600B1F8FD /* game-25758368.json in Resources */,
+				BCB98CAD256D129F00B1F8FD /* chat-27671778.json in Resources */,
+				BCB98D1F256D185500B1F8FD /* game-27671778.json in Resources */,
+				BCB98CD2256D15B500B1F8FD /* game-23871959.json in Resources */,
 				BC285B352557FAEB005378F9 /* MainInterface.storyboard in Resources */,
+				BCB98CF3256D168200B1F8FD /* game-26268404.json in Resources */,
+				BCB98D09256D16F600B1F8FD /* game-27053412.json in Resources */,
+				BCB98CB8256D130100B1F8FD /* game-18759438.json in Resources */,
+				BCB98CFE256D16B800B1F8FD /* game-26269354.json in Resources */,
+				BCB98CE8256D163600B1F8FD /* game-26268396.json in Resources */,
+				BCB98D2A256D18C400B1F8FD /* game-25076729.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -781,7 +876,18 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCB98CDC256D15F200B1F8FD /* game-25291907.json in Resources */,
+				BCB98D13256D17D600B1F8FD /* game-25758368.json in Resources */,
+				BCB98CAC256D129F00B1F8FD /* chat-27671778.json in Resources */,
+				BCB98D1E256D185500B1F8FD /* game-27671778.json in Resources */,
+				BCB98CD1256D15B500B1F8FD /* game-23871959.json in Resources */,
 				BC64938125380AA1002B2200 /* Assets.xcassets in Resources */,
+				BCB98CF2256D168200B1F8FD /* game-26268404.json in Resources */,
+				BCB98D08256D16F600B1F8FD /* game-27053412.json in Resources */,
+				BCB98CB7256D130100B1F8FD /* game-18759438.json in Resources */,
+				BCB98CFD256D16B800B1F8FD /* game-26269354.json in Resources */,
+				BCB98CE7256D163600B1F8FD /* game-26268396.json in Resources */,
+				BCB98D29256D18C400B1F8FD /* game-25076729.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -789,6 +895,17 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCB98CDE256D15F200B1F8FD /* game-25291907.json in Resources */,
+				BCB98D0A256D16F600B1F8FD /* game-27053412.json in Resources */,
+				BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */,
+				BCB98D15256D17D600B1F8FD /* game-25758368.json in Resources */,
+				BCB98CE9256D163600B1F8FD /* game-26268396.json in Resources */,
+				BCB98CFF256D16B800B1F8FD /* game-26269354.json in Resources */,
+				BCB98CD3256D15B500B1F8FD /* game-23871959.json in Resources */,
+				BCB98CB9256D130100B1F8FD /* game-18759438.json in Resources */,
+				BCB98CAE256D129F00B1F8FD /* chat-27671778.json in Resources */,
+				BCB98D20256D185500B1F8FD /* game-27671778.json in Resources */,
+				BCB98CF4256D168200B1F8FD /* game-26268404.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -818,6 +935,7 @@
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
+				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC649427253FF941002B2200 /* NavigationService.swift in Sources */,
@@ -863,7 +981,6 @@
 				BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */,
 				BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */,
 				BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */,
-				BC285B7E2557FD31005378F9 /* TestData.swift in Sources */,
 				BC285B5B2557FCAC005378F9 /* OGSChallenge.swift in Sources */,
 				BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */,
 				BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */,
@@ -871,7 +988,9 @@
 				BC285BA42557FE8F005378F9 /* Goban.cc in Sources */,
 				BC285B852557FD57005378F9 /* OGSService.swift in Sources */,
 				BC285B6B2557FCBA005378F9 /* UserDefaults+SurroundModels.swift in Sources */,
+				BCB98CC1256D144000B1F8FD /* TestData.swift in Sources */,
 				BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */,
+				BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC285B6D2557FCBA005378F9 /* Game.swift in Sources */,
 				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
 				BC285B5C2557FCAC005378F9 /* OGSGame.swift in Sources */,
@@ -895,10 +1014,11 @@
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
 				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
 				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
-				BC6493EF25381201002B2200 /* TestData.swift in Sources */,
 				BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */,
 				BC6493C625381006002B2200 /* Goban.cc in Sources */,
+				BCB98CC0256D143F00B1F8FD /* TestData.swift in Sources */,
 				BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */,
+				BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
 				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,
 				BC64939625380D96002B2200 /* Game.swift in Sources */,
@@ -915,6 +1035,7 @@
 				BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */,
 				BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */,
 				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,
+				BCB98CC2256D144100B1F8FD /* TestData.swift in Sources */,
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
 				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
 				BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */,
@@ -924,6 +1045,7 @@
 				BCD21522255A954E00F78E2A /* Goban.cc in Sources */,
 				BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */,
 				BCD214FD255A94A400F78E2A /* NavigationService.swift in Sources */,
+				BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */,
 				BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */,
 				BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */,
 				BCD214F3255A948E00F78E2A /* Game.swift in Sources */,

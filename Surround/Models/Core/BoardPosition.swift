@@ -40,6 +40,16 @@ enum Move: Equatable {
             return ".."
         }
     }
+    
+    static func fromMoveString(moveString: String) -> [Move] {
+        var result = [Move]()
+        for index in stride(from: 0, to: moveString.count, by: 2) {
+            let column = moveString[moveString.index(moveString.startIndex, offsetBy: index)].asciiValue! - "a".first!.asciiValue!
+            let row = moveString[moveString.index(moveString.startIndex, offsetBy: index + 1)].asciiValue! - "a".first!.asciiValue!
+            result.append(.placeStone(Int(row), Int(column)))
+        }
+        return result
+    }
 }
 
 enum MoveError: Error {

@@ -412,6 +412,13 @@ class OGSService: ObservableObject {
             "player_id": uiconfig.user.id,
             "username": uiconfig.user.username
         ])
+        socket.emit("chat/connect", [
+            "auth": uiconfig.chatAuth ?? "",
+            "player_id": uiconfig.user.id,
+            "ranking": uiconfig.user.ranking ?? 0,
+            "ui_class": uiconfig.user.uiClass ?? "",
+            "username": uiconfig.user.username
+        ])
     }
 
     func processOverview(overview: [String: Any]) {
@@ -429,7 +436,7 @@ class OGSService: ObservableObject {
                         if let newGame = self.createGame(fromShortGameData: gameData) {
                             newActiveGames[gameId] = newGame
                             unsortedActiveGames.append(newGame)
-                            self.connect(to: newGame)
+                            self.connect(to: newGame, withChat: true)
                         }
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
@@ -563,7 +570,7 @@ class OGSService: ObservableObject {
             } else {
                 if let game = self.createGame(fromShortGameData: gameData) {
                     self.activeGames[gameId] = game
-                    self.connect(to: game)
+                    self.connect(to: game, withChat: true)
                 }
             }
         }
@@ -597,6 +604,8 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/phase")
         self.socket.off("game/\(ogsID)/auto_resign")
         self.socket.off("game/\(ogsID)/clear_auto_resign")
+        self.socket.off("game/\(ogsID)/chat")
+        self.socket.off("game/\(ogsID)/reset-chats")
     }
     
     func disconnect(from game: Game) {
@@ -605,8 +614,17 @@ class OGSService: ObservableObject {
         }
 
         self.socket.emit("game/disconnect", ["game_id": ogsID])
+        self.disconnectChat(from: game)
         unsubscribeWebsocketEvent(forGameWithId: ogsID)
         connectedGames[ogsID] = nil
+    }
+    
+    func disconnectChat(from game: Game) {
+        guard case .OGS(let ogsID) = game.ID else {
+            return
+        }
+
+        self.socket.emit("chat/part", ["channel": "game-\(ogsID)"])
     }
     
     func connect(to game: Game, withChat: Bool = false) {
@@ -620,13 +638,16 @@ class OGSService: ObservableObject {
 
         guard self.socket.status == .connected else {
             socket.once(clientEvent: .connect, callback: {_,_ in
-                self.connect(to: game, withChat: withChat)
+                self.connect(to: game, withChat: false)
             })
             return
         }
 
         connectedGames[ogsID] = game
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])
+        if withChat {
+            self.socket.emit("chat/join", ["channel": "game-\(ogsID)"])
+        }
 
         self.socket.on("game/\(ogsID)/gamedata") { gamedata, ack in
             if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
@@ -747,6 +768,22 @@ class OGSService: ObservableObject {
                         connectedGame.clearAutoResign(playerId: playerId)
                     }
                 }
+            }
+        }
+        self.socket.on("game/\(ogsID)/chat") { data, ack in
+            if let connectedGame = self.connectedGames[ogsID] {
+                if let chatData = data[0] as? [String: Any] {
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    if let chatLine = try? decoder.decode(OGSChatLine.self, from: chatData) {
+                        connectedGame.addChatLine(chatLine)
+                    }
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/reset-chats") { data, ack in
+            if let connectedGame = self.connectedGames[ogsID] {
+                connectedGame.resetChats()
             }
         }
     }
