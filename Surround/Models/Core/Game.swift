@@ -479,6 +479,16 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func addChatLine(_ line: OGSChatLine) {
+        var line = line
+        if let variationData = line.variationData {
+            if let basePosition = self.positionByLastMoveNumber[variationData.fromMoveNumber] {
+                let variation = Variation(
+                    basePosition: basePosition,
+                    moves: variationData.moves
+                )
+                line.variation = variation
+            }
+        }
         if self.chatLog.count == 0 || self.chatLog.last!.timestamp <= line.timestamp {
             self.chatLog.append(line)
         } else {

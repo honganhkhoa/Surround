@@ -436,7 +436,7 @@ class OGSService: ObservableObject {
                         if let newGame = self.createGame(fromShortGameData: gameData) {
                             newActiveGames[gameId] = newGame
                             unsortedActiveGames.append(newGame)
-                            self.connect(to: newGame, withChat: true)
+                            self.connect(to: newGame)
                         }
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
@@ -570,7 +570,7 @@ class OGSService: ObservableObject {
             } else {
                 if let game = self.createGame(fromShortGameData: gameData) {
                     self.activeGames[gameId] = game
-                    self.connect(to: game, withChat: true)
+                    self.connect(to: game)
                 }
             }
         }
@@ -627,22 +627,33 @@ class OGSService: ObservableObject {
         self.socket.emit("chat/part", ["channel": "game-\(ogsID)"])
     }
     
+    func connectChat(in game: Game) {
+        guard case .OGS(let ogsID) = game.ID else {
+            return
+        }
+        
+        self.socket.emit("chat/join", ["channel": "game-\(ogsID)"])
+    }
+    
     func connect(to game: Game, withChat: Bool = false) {
         guard case .OGS(let ogsID) = game.ID else {
             return
         }
         
-        guard connectedGames[ogsID] == nil else {
+        guard connectedGames[ogsID] == nil || withChat else {
             return
         }
 
         guard self.socket.status == .connected else {
             socket.once(clientEvent: .connect, callback: {_,_ in
-                self.connect(to: game, withChat: false)
+                self.connect(to: game, withChat: withChat)
             })
             return
         }
 
+        if let connectedGame = connectedGames[ogsID] {
+            self.disconnect(from: connectedGame)
+        }
         connectedGames[ogsID] = game
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])
         if withChat {
@@ -654,13 +665,8 @@ class OGSService: ObservableObject {
                 let decoder = DictionaryDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 do {
-    //                print(gamedata[0])
                     let ogsGame = try decoder.decode(OGSGame.self, from: gamedata[0] as? [String: Any] ?? [:])
                     connectedGame.gameData = ogsGame
-//                    if ogsGame.outcome != nil {
-//                        self.disconnect(from: connectedGame)
-//                    }
-    //                print(ogsGame)
                 } catch {
                     print(gameId, error)
                 }

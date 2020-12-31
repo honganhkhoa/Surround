@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 struct OGSUser : Codable {
     var username: String
@@ -28,6 +29,17 @@ struct OGSUser : Codable {
     var formattedRank: String {
         let rank = self.rank ?? (self.ranking == nil ? nil : Double(self.ranking!))
         return formattedRankString(rank: rank, professional: professional ?? false)
+    }
+    
+    var uiColor: Color {
+        if uiClass?.contains("moderator") == true {
+            return .purple
+        } else if uiClass?.contains("professional") == true {
+            return .green
+        } else if uiClass?.contains("supporter") == true {
+            return .orange
+        }
+        return .blue
     }
     
     func iconURL(ofSize size: Int) -> URL? {

@@ -14,6 +14,10 @@ struct PublicGamesList: View {
     @State var gameToShowDetail: Game? = nil
     @State var showDetail = false
     
+    @SceneStorage("publicOGSGameIdToOpen")
+    var publicOGSGameIdToOpen = -1 // 27671778
+    @State var gameDetailCancellable: AnyCancellable?
+    
     var body: some View {
         Group {
             ScrollView {
@@ -36,6 +40,18 @@ struct PublicGamesList: View {
         .onAppear {
             print("Appeared \(self)")
             ogs.fetchPublicGames()
+            if publicOGSGameIdToOpen != -1 {
+                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: publicOGSGameIdToOpen).sink(
+                    receiveCompletion: { _ in
+                        self.publicOGSGameIdToOpen = -1
+                    },
+                    receiveValue: { game in
+                        if gameToShowDetail == nil {
+                            gameToShowDetail = game
+                            self.showDetail = true
+                        }
+                    })
+            }
         }
         .navigationBarTitle(Text("Public live games"))
         .modifier(RootViewSwitchingMenu())

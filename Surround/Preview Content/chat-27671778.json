@@ -19230,5 +19230,26 @@
             "body": "thanks",
             "chat_id": "5c862fd0-1200-11eb-8911-84f2bed3461f"
         }
+    },
+    {
+        "channel": "spectator",
+        "line": {
+            "date": 1603107834,
+            "move_number": 200,
+            "player_id": 445315,
+            "username": "BHydden",
+            "ranking": 20,
+            "ratings": {
+                "overall": {
+                    "rating": 1655.2,
+                    "deviation": 98.9,
+                    "volatility": 0.061568
+                }
+            },
+            "professional": 0,
+            "ui_class": "supporter moderator",
+            "body": "GG both ❤",
+            "chat_id":"cfcf9360-1af1-11eb-9b39-b9bf84cae00a"
+        }
     }
 ]

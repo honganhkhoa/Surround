@@ -17,44 +17,6 @@ enum StoneRemovalOption: Int {
     case toggleSinglePoint
 }
 
-struct Stone: View {
-    var color: StoneColor
-    var shadowRadius: CGFloat = 0.0
-    
-    var body: some View {
-        GeometryReader { geometry -> AnyView in
-            let size = geometry.size.width
-            let path = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size, height: size), transform: nil)
-            return AnyView(erasing: Group {
-                switch color {
-                case .black:
-                    if shadowRadius > 0 {
-                        ZStack {
-                            Path(path).fill(Color.black).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                                .clipShape(Circle())
-                        }
-                    } else {
-                        Circle().fill(Color.black)
-                    }
-                case .white:
-                    ZStack {
-                        if shadowRadius > 0 {
-                            Path(path).fill(Color(red: 0.75, green: 0.75, blue: 0.75)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                                .clipShape(Circle())
-                        } else {
-                            Circle().fill(Color.white)
-                        }
-                        Circle().stroke(Color.gray, lineWidth: 0.5)
-                    }
-                }
-            }.aspectRatio(1, contentMode: .fit)
-            )
-        }
-    }
-}
-
 struct Goban: View {
     var geometry: GeometryProxy
     var width: Int
@@ -162,8 +124,41 @@ struct Goban: View {
     }
 }
 
+struct VariationNumberings: View {
+    var variation: Variation
+    var cellSize: CGFloat
+    
+    var body: some View {
+        let labels = Array(variation.nonDuplicatingMoveCoordinatesByLabel.keys)
+        
+        return ZStack {
+            ForEach(labels, id: \.self) { label -> AnyView in
+                if let coordinate = variation.nonDuplicatingMoveCoordinatesByLabel[label] {
+                    let stoneColor: StoneColor = variation.position[coordinate] == .hasStone(.black) ? .black : .white
+                    let labelSize = cellSize >= 14 ? cellSize / 1.5 : cellSize
+                    return AnyView(
+                        Text("\(label)")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundColor(stoneColor == .black ? .white : .black)
+                            .minimumScaleFactor(0.2)
+                            .frame(width: labelSize, height: labelSize)
+                            .position(
+                                x: (CGFloat(coordinate[1]) + 0.5) * cellSize,
+                                y: (CGFloat(coordinate[0]) + 0.5) * cellSize
+                            )
+                    )
+                } else {
+                    return AnyView(EmptyView())
+                }
+            }
+        }
+    }
+}
+
 struct Stones: View {
     @ObservedObject var boardPosition: BoardPosition
+    var variation: Variation?
     var geometry: GeometryProxy
     var isLastMovePending = false
 
@@ -285,7 +280,9 @@ struct Stones: View {
                 Path(blackCapturedPath).fill(Color.black).opacity(0.5)
             }
 
-            if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
+            if let variation = variation {
+                VariationNumberings(variation: variation, cellSize: size)
+            } else if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
                 if case .hasStone(let lastColor) = boardPosition[lastRow, lastColumn] {
                     if boardPosition.estimatedScores == nil {
                         if isLastMovePending {
@@ -421,6 +418,7 @@ struct StoneRemovalOverlay: View {
 
 struct BoardView: View {
     @ObservedObject var boardPosition: BoardPosition
+    var variation: Variation?
     var playable = false
     var stoneRemovable = false
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
@@ -473,7 +471,7 @@ struct BoardView: View {
                         newMove.wrappedValue = nil
                     }
                 }
-                Stones(boardPosition: displayedPosition, geometry: geometry, isLastMovePending: newMove.wrappedValue != nil)
+                Stones(boardPosition: displayedPosition, variation: variation, geometry: geometry, isLastMovePending: newMove.wrappedValue != nil)
                 if stoneRemovable {
                     StoneRemovalOverlay(
                         boardPosition: boardPosition,
@@ -494,43 +492,24 @@ struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
         let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
-        let game2 = TestData.Scored15x17
-        let game3 = TestData.Resigned19x19HandicappedWithInitialState
-        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
-        let game5 = TestData.EuropeanChampionship
+//        let game2 = TestData.Scored15x17
+//        let game3 = TestData.Resigned19x19HandicappedWithInitialState
+//        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
+        let game5 = TestData.EuropeanChampionshipWithChat
+        let chatLine = game5.chatLog[31]
         return Group {
-            Stone(color: .black, shadowRadius: 2)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            Stone(color: .white, shadowRadius: 2)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            ZStack {
-                Rectangle().fill(Color(UIColor.systemGray5))
-                Stone(color: .black, shadowRadius: 2)
-                    .frame(width: 25, height: 25)
-            }
-            .previewLayout(.fixed(width: 100, height: 50))
-            .colorScheme(.dark)
-            ZStack {
-                Rectangle().fill(Color(UIColor.systemGray5))
-                Stone(color: .white, shadowRadius: 2)
-                    .frame(width: 25, height: 25)
-            }
-            .previewLayout(.fixed(width: 100, height: 50))
-            .colorScheme(.dark)
+            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation)
+                .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 120, height: 120))
-            BoardView(boardPosition: game2.currentPosition)
-                .previewLayout(.fixed(width: 375, height: 375))
-            BoardView(boardPosition: game3.currentPosition)
-                .previewLayout(.fixed(width: 375, height: 500))
-            BoardView(boardPosition: game4.currentPosition)
-                .previewLayout(.fixed(width: 375, height: 500))
-            BoardView(boardPosition: game5.currentPosition).colorScheme(.dark)
-                .previewLayout(.fixed(width: 375, height: 500))
+//            BoardView(boardPosition: game2.currentPosition)
+//                .previewLayout(.fixed(width: 375, height: 375))
+//            BoardView(boardPosition: game3.currentPosition)
+//                .previewLayout(.fixed(width: 375, height: 500))
+//            BoardView(boardPosition: game4.currentPosition)
+//                .previewLayout(.fixed(width: 375, height: 500))
         }
     }
 }

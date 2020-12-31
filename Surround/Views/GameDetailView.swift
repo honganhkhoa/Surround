@@ -183,6 +183,7 @@ struct GameDetailView: View {
     }
     
     func updateDetailOfCurrentGameIfNecessary() {
+        ogs.connect(to: currentGame, withChat: true)
         if currentGame.ogsRawData == nil {
             ogs.updateDetailsOfConnectedGame(game: currentGame)
         }
@@ -316,8 +317,11 @@ struct GameDetailView: View {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: currentGame) { newGame in
-            DispatchQueue.main.async {
-                self.updateDetailOfCurrentGameIfNecessary()
+            if newGame.ID != currentGame.ID {
+                ogs.disconnectChat(from: currentGame)
+                DispatchQueue.main.async {
+                    self.updateDetailOfCurrentGameIfNecessary()
+                }
             }
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in

@@ -31,7 +31,8 @@ class TestData {
     static var Ongoing19x19wBot2: Game { sampleGame(ogsId: 26268404) }
     static var Ongoing19x19wBot3: Game { sampleGame(ogsId: 26269354) }
     static var StoneRemoval9x9: Game { sampleGame(ogsId: 27053412) }
-    static var EuropeanChampionship: Game { sampleGame(ogsId: 27671778) }
+    static var EuropeanChampionshipWithChat: Game { sampleGame(ogsId: 27671778) }
+    // surround://publicGames/27671778
     
     static func sampleGame(ogsId: Int) -> Game {
         let fileURL = Bundle.main.url(forResource: "game-\(ogsId)", withExtension: "json")!

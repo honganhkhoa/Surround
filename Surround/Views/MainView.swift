@@ -19,6 +19,8 @@ struct MainView: View {
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
+    @SceneStorage("publicOGSGameIdToOpen")
+    var publicOGSGameIdToOpen = -1
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
@@ -58,6 +60,12 @@ struct MainView: View {
                 if appURL.pathComponents.count > 1 {
                     if let ogsGameId = Int(appURL.pathComponents[1]) {
                         activeOGSGameIdToOpen = ogsGameId
+                    }
+                }
+            case .publicGames:
+                if appURL.pathComponents.count > 1 {
+                    if let ogsGameId = Int(appURL.pathComponents[1]) {
+                        publicOGSGameIdToOpen = ogsGameId
                     }
                 }
             default:

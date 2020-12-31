@@ -41,7 +41,8 @@ struct OGSChatLine: Decodable {
     var moveNumber: Int
     var body: String
     var user: OGSUser
-    var variation: OGSChatLineVariation?
+    var variationData: OGSChatLineVariation?
+    var variation: Variation?
     
     struct OGSChatLineCodingData: Decodable {
         var body: String
@@ -100,5 +101,6 @@ struct OGSChatLine: Decodable {
             uiClass: codingData.line.uiClass,
             professional: codingData.line.professional
         )
+        variationData = codingData.line.variation
     }
 }
