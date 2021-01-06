@@ -80,12 +80,11 @@
 		BC5EEBE8259B33BE00675761 /* Stone.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEBE6259B33BE00675761 /* Stone.swift */; };
 		BC5EEBE9259B33BE00675761 /* Stone.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEBE6259B33BE00675761 /* Stone.swift */; };
 		BC5EEBF7259C42EC00675761 /* ChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEBF6259C42EC00675761 /* ChatLine.swift */; };
-		BC5EEBF8259C42EC00675761 /* ChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEBF6259C42EC00675761 /* ChatLine.swift */; };
-		BC5EEBF9259C42EC00675761 /* ChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEBF6259C42EC00675761 /* ChatLine.swift */; };
 		BC5EEC29259D851B00675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
 		BC5EEC2A259D851B00675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
 		BC5EEC2B259D851B00675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
 		BC5EEC32259D878100675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
+		BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC5D25A41D7900675761 /* ChatLog.swift */; };
 		BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937925380A9F002B2200 /* WidgetKit.framework */; };
 		BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937B25380A9F002B2200 /* SwiftUI.framework */; };
 		BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC64937E25380A9F002B2200 /* SurroundWidgets.swift */; };
@@ -297,6 +296,7 @@
 		BC5EEBE6259B33BE00675761 /* Stone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stone.swift; sourceTree = "<group>"; };
 		BC5EEBF6259C42EC00675761 /* ChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatLine.swift; sourceTree = "<group>"; };
 		BC5EEC28259D851B00675761 /* Variation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Variation.swift; sourceTree = "<group>"; };
+		BC5EEC5D25A41D7900675761 /* ChatLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatLog.swift; sourceTree = "<group>"; };
 		BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC64937925380A9F002B2200 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		BC64937B25380A9F002B2200 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -561,6 +561,7 @@
 				BC042B2A24AB2DD00050B2D1 /* GameCell.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
+				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -958,6 +959,7 @@
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC649427253FF941002B2200 /* NavigationService.swift in Sources */,
 				BC0F1C452525946100E3E66B /* LoginView.swift in Sources */,
+				BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
@@ -1011,7 +1013,6 @@
 				BCB98CC1256D144000B1F8FD /* TestData.swift in Sources */,
 				BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */,
 				BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */,
-				BC5EEBF9259C42EC00675761 /* ChatLine.swift in Sources */,
 				BC5EEBE9259B33BE00675761 /* Stone.swift in Sources */,
 				BC285B6D2557FCBA005378F9 /* Game.swift in Sources */,
 				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
@@ -1042,7 +1043,6 @@
 				BCB98CC0256D143F00B1F8FD /* TestData.swift in Sources */,
 				BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */,
 				BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */,
-				BC5EEBF8259C42EC00675761 /* ChatLine.swift in Sources */,
 				BC5EEBE8259B33BE00675761 /* Stone.swift in Sources */,
 				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
 				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,

@@ -493,7 +493,7 @@ struct BoardView_Previews: PreviewProvider {
         let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
 //        let game2 = TestData.Scored15x17
-//        let game3 = TestData.Resigned19x19HandicappedWithInitialState
+        let game3 = TestData.Resigned19x19HandicappedWithInitialState
 //        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         let game5 = TestData.EuropeanChampionshipWithChat
         let chatLine = game5.chatLog[31]
@@ -506,8 +506,8 @@ struct BoardView_Previews: PreviewProvider {
                 .previewLayout(.fixed(width: 120, height: 120))
 //            BoardView(boardPosition: game2.currentPosition)
 //                .previewLayout(.fixed(width: 375, height: 375))
-//            BoardView(boardPosition: game3.currentPosition)
-//                .previewLayout(.fixed(width: 375, height: 500))
+            BoardView(boardPosition: game3.currentPosition)
+                .previewLayout(.fixed(width: 80, height: 80))
 //            BoardView(boardPosition: game4.currentPosition)
 //                .previewLayout(.fixed(width: 375, height: 500))
         }

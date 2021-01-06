@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ChatLine: View {
     var chatLine: OGSChatLine
+    var showUsername = true
     var horizontalAlignment: HorizontalAlignment = .leading
     
     var body: some View {
@@ -16,21 +17,26 @@ struct ChatLine: View {
             if case .trailing = horizontalAlignment {
                 Spacer()
             }
-            VStack(alignment: horizontalAlignment) {
-                Text("\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
-                    .font(.caption2).bold()
-                    .foregroundColor(chatLine.user.uiColor)
-                if let variation = chatLine.variation {
-                    BoardView(boardPosition: variation.position, variation: variation)
-                        .frame(width: 176, height: 176)
+            VStack(alignment: horizontalAlignment, spacing: 2) {
+                if showUsername {
+                    Text("\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
+                        .font(.caption2).bold()
+                        .foregroundColor(chatLine.user.uiColor)
                 }
-                Text(chatLine.body)
-                    .font(.callout)
+                VStack(alignment: horizontalAlignment, spacing: 2) {
+                    if let variation = chatLine.variation {
+                        BoardView(boardPosition: variation.position, variation: variation)
+                            .frame(width: 176, height: 176)
+                            .padding(.top, 5)
+                    }
+                    Text(chatLine.body)
+                        .font(.callout)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(UIColor.systemGray4))
+                .cornerRadius(10)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color(UIColor.systemGray4))
-            .cornerRadius(10)
             if case .leading = horizontalAlignment {
                 Spacer()
             }

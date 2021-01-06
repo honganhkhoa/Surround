@@ -211,6 +211,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.initialPosition = BoardPosition(width: width, height: height)
         self.positionByLastMoveNumber[self.initialPosition.lastMoveNumber] = self.initialPosition
         self.currentPosition = self.initialPosition
+        self._postInit()
     }
     
     init(ogsGame: OGSGame) {
@@ -226,6 +227,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.currentPosition = self.initialPosition
         self.gameData = ogsGame
         self.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: self.pauseControl)
+        self._postInit()
+    }
+    
+    private func _postInit() {
+
     }
     
     func makeMove(move: Move) throws {

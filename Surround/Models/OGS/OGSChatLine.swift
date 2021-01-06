@@ -34,9 +34,9 @@ struct OGSChatLineVariation: Decodable {
     }
 }
 
-struct OGSChatLine: Decodable {
+struct OGSChatLine: Decodable, Identifiable, Hashable {
+    var id: String
     var channel: OGSChatChannel
-    var chatId: String
     var timestamp: Date
     var moveNumber: Int
     var body: String
@@ -44,7 +44,7 @@ struct OGSChatLine: Decodable {
     var variationData: OGSChatLineVariation?
     var variation: Variation?
     
-    struct OGSChatLineCodingData: Decodable {
+    struct OGSChatLineCodingData: Decodable, Hashable {
         var body: String
         var chatId: String
         var date: Double
@@ -73,9 +73,17 @@ struct OGSChatLine: Decodable {
             moveNumber = try container.decode(Int.self, forKey: .moveNumber)
             playerId = try container.decode(Int.self, forKey: .playerId)
             professional = try container.decode(Bool.self, forKey: .professional)
-            ranking = try container.decode(Int.self, forKey: .ranking)
+            ranking = Int(try container.decode(Double.self, forKey: .ranking))
             uiClass = try container.decode(String.self, forKey: .uiClass)
             username = try container.decode(String.self, forKey: .username)
+        }
+
+        static func == (lhs: OGSChatLine.OGSChatLineCodingData, rhs: OGSChatLine.OGSChatLineCodingData) -> Bool {
+            return lhs.chatId == rhs.chatId
+        }
+        
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(chatId)
         }
     }
     
@@ -90,7 +98,7 @@ struct OGSChatLine: Decodable {
         codingData = try container.decode(OGSChatCodingData.self)
         
         channel = codingData.channel
-        chatId = codingData.line.chatId
+        id = codingData.line.chatId
         timestamp = Date(timeIntervalSince1970: codingData.line.date)
         moveNumber = codingData.line.moveNumber
         body = codingData.line.body
@@ -102,5 +110,13 @@ struct OGSChatLine: Decodable {
             professional: codingData.line.professional
         )
         variationData = codingData.line.variation
+    }
+
+    static func == (lhs: OGSChatLine, rhs: OGSChatLine) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }

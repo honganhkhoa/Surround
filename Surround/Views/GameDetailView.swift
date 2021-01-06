@@ -8,7 +8,7 @@
 import SwiftUI
 import Combine
 
-struct GameView: View {
+struct SingleGameView: View {
     var compact: Bool
     var compactBoardSize: CGFloat = 0
     @ObservedObject var game: Game
@@ -16,6 +16,7 @@ struct GameView: View {
     var goToNextGame: (() -> ())?
     
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.colorScheme) private var colorScheme
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
@@ -121,6 +122,7 @@ struct GameView: View {
                             Spacer().frame(maxHeight: 15)
                             verticalControlRow
                             Spacer()
+                            ChatLog(game: game)
                         }
                         boardView.frame(width: boardSizeLimit, height: boardSizeLimit)
                     }
@@ -228,7 +230,7 @@ struct GameDetailView: View {
 
             return AnyView(erasing: VStack(alignment: .leading) {
 //                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
-                GameView(
+                SingleGameView(
                     compact: true,
                     compactBoardSize: boardSize,
                     game: currentGame,
@@ -247,7 +249,7 @@ struct GameDetailView: View {
             if shouldShowActiveGamesCarousel {
                 ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
             }
-            GameView(
+            SingleGameView(
                 compact: false,
                 game: currentGame,
                 goToNextGame: goToNextGame
