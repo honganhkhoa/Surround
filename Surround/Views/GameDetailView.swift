@@ -201,7 +201,7 @@ struct GameDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
 
-    @State var currentGame: Game
+    @State var currentGame: Game?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
     
@@ -210,13 +210,19 @@ struct GameDetailView: View {
 
     var shouldShowActiveGamesCarousel: Bool {
 //        return true
-        return currentGame.isUserPlaying && activeGames.count > 1 && currentGame.gameData?.timeControl.speed == .correspondence
+        if let currentGame = currentGame {
+            return currentGame.isUserPlaying && activeGames.count > 1 && currentGame.gameData?.timeControl.speed == .correspondence
+        } else {
+            return false
+        }
     }
     
     func updateDetailOfCurrentGameIfNecessary() {
-        ogs.connect(to: currentGame, withChat: true)
-        if currentGame.ogsRawData == nil {
-            ogs.updateDetailsOfConnectedGame(game: currentGame)
+        if let currentGame = currentGame {
+            ogs.connect(to: currentGame, withChat: true)
+            if currentGame.ogsRawData == nil {
+                ogs.updateDetailsOfConnectedGame(game: currentGame)
+            }
         }
     }
     
@@ -231,7 +237,7 @@ struct GameDetailView: View {
     }
         
     func goToNextGame() {
-        if let currentIndex = activeGames.firstIndex(where: { game in game.ID == currentGame.ID }) {
+        if let currentIndex = activeGames.firstIndex(where: { game in game.ID == currentGame?.ID }) {
             for game in activeGames[currentIndex.advanced(by: 1)..<activeGames.endIndex] + activeGames[activeGames.startIndex..<currentIndex] {
                 if game.clock?.currentPlayerId == ogs.user?.id {
                     withAnimation {
@@ -258,14 +264,15 @@ struct GameDetailView: View {
             let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
 
             return AnyView(erasing: VStack(alignment: .leading) {
-//                Text("\(usableHeight) \(controlRowHeight) \(remainingHeight)")
-                SingleGameView(
-                    compact: true,
-                    compactBoardSize: boardSize,
-                    game: currentGame,
-                    reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
-                    goToNextGame: goToNextGame
-                )
+                if let currentGame = currentGame {
+                    SingleGameView(
+                        compact: true,
+                        compactBoardSize: boardSize,
+                        game: currentGame,
+                        reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
+                        goToNextGame: goToNextGame
+                    )
+                }
                 if showsActiveGamesCarousel {
                     ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
@@ -282,17 +289,23 @@ struct GameDetailView: View {
                 if showsActiveGamesCarousel {
                     ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
-                SingleGameView(
-                    compact: false,
-                    game: currentGame,
-                    goToNextGame: goToNextGame,
-                    horizontal: horizontal
-                )
+                if let currentGame = currentGame {
+                    SingleGameView(
+                        compact: false,
+                        game: currentGame,
+                        goToNextGame: goToNextGame,
+                        horizontal: horizontal
+                    )
+                }
             })
         }
     }
     
     var body: some View {
+        guard let currentGame = currentGame else {
+            return AnyView(EmptyView())
+        }
+        
         var compactLayout = true
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
@@ -302,7 +315,7 @@ struct GameDetailView: View {
         let opponent = userColor == .black ? players.white : players.black
         let opponentRank = userColor == .black ? currentGame.whiteFormattedRank : currentGame.blackFormattedRank
 
-        return Group {
+        return AnyView(Group {
             if compactLayout {
                 compactBody
             } else {
@@ -349,21 +362,22 @@ struct GameDetailView: View {
                     updateActiveGameList()
                 }
             }
-            self.updateDetailOfCurrentGameIfNecessary()
+            DispatchQueue.main.async {
+                self.updateDetailOfCurrentGameIfNecessary()
+            }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
         }
-        .onChange(of: currentGame) { newGame in
+        .onChange(of: currentGame) { [currentGame] newGame in
             if newGame.ID != currentGame.ID {
-                ogs.disconnectChat(from: currentGame)
                 DispatchQueue.main.async {
                     self.updateDetailOfCurrentGameIfNecessary()
                 }
             }
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
-            
+
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
@@ -373,7 +387,7 @@ struct GameDetailView: View {
                     screenBounds.maxY == keyboardFrame.maxY &&
                     screenBounds.width == keyboardFrame.width
             }
-        }
+        })
     }
 }
 

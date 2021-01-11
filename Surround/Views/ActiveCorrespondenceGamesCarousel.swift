@@ -11,7 +11,7 @@ import Combine
 struct ActiveCorrespondenceGamesCarousel: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
-    @Binding var currentGame: Game
+    var currentGame: Binding<Game?>
     @Namespace var selectingGame
     var activeGames: [Game]
     @State var scrollTarget: GameID?
@@ -43,11 +43,11 @@ struct ActiveCorrespondenceGamesCarousel: View {
                     .onTapGesture {
                         withAnimation {
                             discardNextScrollTarget = true
-                            currentGame = game
-                            scrollTarget = currentGame.ID
+                            currentGame.wrappedValue = game
+                            scrollTarget = currentGame.wrappedValue?.ID
                         }
                     }
-                if game.ID == currentGame.ID {
+                if game.ID == currentGame.wrappedValue?.ID {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
                         .padding(1)
@@ -59,8 +59,8 @@ struct ActiveCorrespondenceGamesCarousel: View {
         }
         .padding(horizontal ? .horizontal : .vertical, selectionRingPadding / 2)
         .id(game.ID)
-        .onChange(of: currentGame) { _ in
-            self.renderedCurrentGame.send(game == currentGame)
+        .onChange(of: currentGame.wrappedValue) { _ in
+            self.renderedCurrentGame.send(game == currentGame.wrappedValue)
         }
         .contentShape(Rectangle())
         .hoverEffect(.lift)
@@ -130,13 +130,13 @@ struct ActiveCorrespondenceGamesCarousel: View {
         }
         .onReceive(renderedCurrentGameCollected) { rendered in
             if rendered.allSatisfy({ !$0 }) {
-                if scrollTarget != currentGame.ID {
-                    scrollTarget = currentGame.ID
+                if scrollTarget != currentGame.wrappedValue?.ID {
+                    scrollTarget = currentGame.wrappedValue?.ID
                 }
             }
         }
         .onAppear {
-            scrollTarget = currentGame.ID
+            scrollTarget = currentGame.wrappedValue?.ID
             self.renderedCurrentGameCollected = self.renderedCurrentGame.collect(.byTime(DispatchQueue.main, 1.0)).eraseToAnyPublisher()
         }
     }

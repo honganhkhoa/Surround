@@ -18,7 +18,7 @@ struct HomeView: View {
     
     @State var gameDetailCancellable: AnyCancellable?
     @State var showingGameDetail = false
-    @State var currentActiveOGSGameId = -1
+    @State var currentActiveGame: Game? = nil
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
@@ -52,10 +52,8 @@ struct HomeView: View {
     
     func showGameDetail(game: Game) {
         print("Opening game \(game)")
-        if let ogsID = game.ogsID {
-            self.currentActiveOGSGameId = ogsID
-            self.showingGameDetail = true
-        }
+        self.currentActiveGame = game
+        self.showingGameDetail = true
     }
     
     var activeGamesView: some View {
@@ -197,11 +195,10 @@ struct HomeView: View {
     }
         
     var body: some View {
-        let currentActiveGame = ogs.activeGames[currentActiveOGSGameId]
         if let currentActiveGame = currentActiveGame {
-            print("Reloading..., current active game #\(currentActiveGame) for id #\(currentActiveOGSGameId)")
+            print("Reloading..., current active game #\(currentActiveGame)")
         } else {
-            print("Reloading..., no current active game for id #\(currentActiveOGSGameId)")
+            print("Reloading..., no current active game")
         }
         print("Waiting to open game #\(activeOGSGameIdToOpen)")
         print("Showing game detail: \(showingGameDetail)")
@@ -215,7 +212,7 @@ struct HomeView: View {
                 .frame(maxWidth: 600)
             }
             NavigationLink(
-                destination: currentActiveGame == nil ? nil : GameDetailView(currentGame: currentActiveGame!),
+                destination: GameDetailView(currentGame: currentActiveGame),
                 isActive: $showingGameDetail) {
                 EmptyView()
             }
@@ -242,7 +239,7 @@ struct HomeView: View {
         .modifier(RootViewSwitchingMenu())
         .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
-                if ogsGameIdToOpen != currentActiveOGSGameId {
+                if ogsGameIdToOpen != currentActiveGame?.ogsID {
                     if showingGameDetail {
                         showingGameDetail = false
                         DispatchQueue.main.asyncAfter(
@@ -261,7 +258,7 @@ struct HomeView: View {
         }
         .onChange(of: showingGameDetail) { newValue in
             if !newValue {
-                currentActiveOGSGameId = -1
+                currentActiveGame = nil
             }
         }
     }
