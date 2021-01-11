@@ -14,6 +14,7 @@ struct SingleGameView: View {
     @ObservedObject var game: Game
     var reducedPlayerInfoVerticalPadding: Bool = false
     var goToNextGame: (() -> ())?
+    var horizontal = false
     
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -21,7 +22,7 @@ struct SingleGameView: View {
     @State var pendingPosition: BoardPosition? = nil
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
     @State var stoneRemovalOption = StoneRemovalOption.toggleGroup
-
+    
     var controlRow: some View {
         GameControlRow(
             game: game,
@@ -87,66 +88,89 @@ struct SingleGameView: View {
         }
     }
     
-    var regularBody: some View {
+    var regularVerticalBody: some View {
         GeometryReader { geometry -> AnyView in
-//            print("Geometry \(geometry.size)")
             let width = geometry.size.width
-            let height = geometry.size.height - 15 * 2
-            let boardSizeHorizontal = min(height, width - 300 - 15 * 3)
-            let boardSizeVertical = min(width - 15 * 2, height - 80 - 15 * 2 - 15 * 4)
-            var horizontal = true
-            var boardSizeLimit = boardSizeHorizontal
-            let playerInfoWidth = width - boardSizeHorizontal - 15 * 3
-            var playerIconsOffset: CGFloat = 25
-            if playerInfoWidth > 400 {
-                playerIconsOffset = -10
-            }
-            if boardSizeVertical > boardSizeHorizontal {
-                horizontal = false
-                boardSizeLimit = boardSizeVertical
-            }
-            if boardSizeLimit < 0 {
-                return AnyView(EmptyView())
-            }
-            return AnyView(erasing: ZStack {
-                if horizontal {
-                    HStack(alignment: .top, spacing: 15) {
-                        VStack(alignment: .trailing) {
-                            PlayersBannerView(
-                                game: game,
-                                topLeftPlayerColor: topLeftPlayerColor,
-                                playerIconSize: 80,
-                                playerIconsOffset: playerIconsOffset,
-                                showsPlayersName: true
-                            ).frame(minWidth: 300)
-                            Spacer().frame(maxHeight: 15)
-                            verticalControlRow
-                            Spacer()
-                            ChatLog(game: game)
-                        }
-                        boardView.frame(width: boardSizeLimit, height: boardSizeLimit)
-                    }
-                    .padding()
-                    .frame(height: boardSizeLimit + 15 * 2)
-                } else {
-                    VStack(alignment: .center, spacing: 0) {
+            let height = geometry.size.height
+            let chatHeight: CGFloat = 270
+            let boardSize = min(width - 15 * 2, height - chatHeight - 15 * 3)
+            return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    ChatLog(game: game)
+                        .frame(height: chatHeight)
+                    Spacer(minLength: 15)
+                    VStack {
                         PlayersBannerView(
                             game: game,
                             topLeftPlayerColor: topLeftPlayerColor,
                             playerIconSize: 80,
-                            playerIconsOffset: -80,
+                            playerIconsOffset: 25,
                             showsPlayersName: true
                         )
                         Spacer(minLength: 15).frame(maxHeight: 15)
                         controlRow
-                        Spacer(minLength: 15)
-                        boardView.frame(width: boardSizeLimit, height: boardSizeLimit)
-                        Spacer(minLength: 0)
-                    }
-                    .padding()
-                    .frame(maxWidth: boardSizeLimit + 15 * 2)
+                    }.frame(width: 350)
                 }
-            }.frame(width: width, height: height + 15 * 2))
+                Spacer(minLength: 15)
+                boardView.frame(width: boardSize, height: boardSize)
+                Spacer(minLength: 0)
+            }
+            .padding())
+        }
+    }
+    
+    var regularHorizontalBody: some View {
+        GeometryReader { geometry -> AnyView in
+//            print("Geometry \(geometry.safeAreaInsets)")
+            let width = geometry.size.width
+            let height = geometry.size.height
+            let minimumPlayerInfoWidth: CGFloat = 350
+            let minimumChatWidth: CGFloat = 250
+            let minimumPlayerInfoHeight: CGFloat = 80 + 15 * 2
+            let boardSizeInfoLeft = min(height - 15 * 2, width - minimumPlayerInfoWidth - 15 * 3)
+            let boardSizeInfoTop = min(height - 15 * 3 - minimumPlayerInfoHeight, width - 15 * 3 - minimumChatWidth)
+            let infoLeft = boardSizeInfoLeft > boardSizeInfoTop
+            let boardSize = infoLeft ? boardSizeInfoLeft : boardSizeInfoTop
+            var playerIconsOffset: CGFloat = 25
+            if infoLeft {
+            let horizontalPlayerInfoWidth = width - boardSize - 15 * 3
+                if horizontalPlayerInfoWidth > 600 {
+                    playerIconsOffset = -80
+                } else if horizontalPlayerInfoWidth > 400 {
+                    playerIconsOffset = -10
+                }
+            } else {
+                playerIconsOffset = -80
+            }
+            return AnyView(erasing: ZStack {
+                VStack(spacing: 15) {
+                    if !infoLeft {
+                        PlayersBannerView(
+                            game: game,
+                            topLeftPlayerColor: topLeftPlayerColor,
+                            playerIconSize: 80,
+                            playerIconsOffset: playerIconsOffset,
+                            showsPlayersName: true
+                        )
+                    }
+                    HStack(alignment: .top, spacing: 15) {
+                        VStack(alignment: .trailing, spacing: 15) {
+                            if infoLeft {
+                                PlayersBannerView(
+                                    game: game,
+                                    topLeftPlayerColor: topLeftPlayerColor,
+                                    playerIconSize: 80,
+                                    playerIconsOffset: playerIconsOffset,
+                                    showsPlayersName: true
+                                ).frame(minWidth: minimumPlayerInfoWidth)
+                            }
+                            controlRow
+                            ChatLog(game: game)
+                        }
+                        boardView.frame(width: boardSize, height: boardSize)
+                    }.frame(height: boardSize)
+                }.padding(15)
+            }.frame(width: width, height: height))
         }
     }
     
@@ -155,7 +179,11 @@ struct SingleGameView: View {
             if compact {
                 compactBody
             } else {
-                regularBody
+                if horizontal {
+                    regularHorizontalBody
+                } else {
+                    regularVerticalBody
+                }
             }
         }
         .onReceive(game.$currentPosition) { _ in
@@ -178,6 +206,7 @@ struct GameDetailView: View {
     @State var activeGameByOGSID: [Int: Game] = [:]
     
     @State var showSettings = false
+    @State var attachedKeyboardVisible = false
 
     var shouldShowActiveGamesCarousel: Bool {
 //        return true
@@ -245,15 +274,21 @@ struct GameDetailView: View {
     }
     
     var regularBody: some View {
-        VStack(spacing: 0) {
-            if shouldShowActiveGamesCarousel {
-                ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
-            }
-            SingleGameView(
-                compact: false,
-                game: currentGame,
-                goToNextGame: goToNextGame
-            )
+        GeometryReader { geometry -> AnyView in
+            let showsActiveGamesCarousel = !attachedKeyboardVisible && shouldShowActiveGamesCarousel
+            let horizontal = geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing + 100 > geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+            print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
+            return AnyView(erasing: VStack(spacing: 0) {
+                if showsActiveGamesCarousel {
+                    ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                }
+                SingleGameView(
+                    compact: false,
+                    game: currentGame,
+                    goToNextGame: goToNextGame,
+                    horizontal: horizontal
+                )
+            })
         }
     }
     
@@ -302,6 +337,7 @@ struct GameDetailView: View {
                 }
             }
         }
+        .navigationBarHidden(attachedKeyboardVisible)
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
         .onAppear {
@@ -329,6 +365,15 @@ struct GameDetailView: View {
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
             
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                let screenBounds = UIScreen.main.bounds
+                self.attachedKeyboardVisible = !keyboardFrame.isEmpty &&
+                    screenBounds.maxX == keyboardFrame.maxX &&
+                    screenBounds.maxY == keyboardFrame.maxY &&
+                    screenBounds.width == keyboardFrame.width
+            }
+        }
     }
 }
 
@@ -344,14 +389,16 @@ struct GameDetailView_Previews: PreviewProvider {
         }
         return NavigationView {
             GameDetailView(currentGame: games[0], activeGames: games)
+                .navigationBarHidden(true)
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .environmentObject(ogs)
-//        .previewLayout(.fixed(width: 750, height: 704))
-//        .previewLayout(.fixed(width: 1024, height: 768))
+        .previewLayout(.fixed(width: 750, height: 554))
+//        .previewLayout(.fixed(width: 1024, height: 568))
 //        .previewLayout(.fixed(width: 768, height: 1024))
 //        .previewLayout(.fixed(width: 375, height: 812))
 //        .previewLayout(.fixed(width: 568, height: 320))
-        .colorScheme(.dark)
+        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+//        .colorScheme(.dark)
     }
 }

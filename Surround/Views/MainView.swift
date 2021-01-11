@@ -20,7 +20,7 @@ struct MainView: View {
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
     @SceneStorage("publicOGSGameIdToOpen")
-    var publicOGSGameIdToOpen = -1
+    var publicOGSGameIdToOpen = -1 //27671778 //-1
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
