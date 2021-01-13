@@ -22,6 +22,17 @@ struct SingleGameView: View {
     @State var pendingPosition: BoardPosition? = nil
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
     @State var stoneRemovalOption = StoneRemovalOption.toggleGroup
+    var attachedKeyboardVisible = false
+    
+    @State var compactDisplayMode = CompactDisplayMode.playerInfo
+    var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
+    
+    @Namespace var animation
+    
+    enum CompactDisplayMode {
+        case playerInfo
+        case chat
+    }
     
     var controlRow: some View {
         GameControlRow(
@@ -71,22 +82,115 @@ struct SingleGameView: View {
         }
     }
 
+    var compactDisplayModePicker: some View {
+        Picker(selection: $compactDisplayMode.animation(), label: Text("Display mode")) {
+            Label("Player info", systemImage: "person.crop.square.fill.and.at.rectangle")
+                .labelStyle(IconOnlyLabelStyle())
+                .tag(CompactDisplayMode.playerInfo)
+            Label("Chat", systemImage: "message")
+                .labelStyle(IconOnlyLabelStyle())
+                .tag(CompactDisplayMode.chat)
+        }
+        .pickerStyle(SegmentedPickerStyle())
+        .fixedSize()
+        .padding(.horizontal, 15)
+        .padding(.vertical, 5)
+        .matchedGeometryEffect(id: "compactDisplayModePicker", in: animation)
+    }
+    
     var compactBody: some View {
-        VStack(alignment: .leading) {
-            PlayersBannerView(
-                game: game,
-                topLeftPlayerColor: topLeftPlayerColor,
-                reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
-                showsPlayersName: !game.isUserPlaying
-            )
-            Spacer(minLength: 10).frame(maxHeight: 15)
-            controlRow
-                .padding(.horizontal)
-            Spacer(minLength: 10)
-            boardView.frame(width: compactBoardSize, height: compactBoardSize)
+        VStack(alignment: .leading, spacing: 0) {
+            if compactDisplayMode == .playerInfo {
+                ZStack(alignment: .topTrailing) {
+                    PlayersBannerView(
+                        game: game,
+                        topLeftPlayerColor: topLeftPlayerColor,
+                        reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
+                        showsPlayersName: !game.isUserPlaying
+                    )
+                    compactDisplayModePicker
+                }
+            } else {
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: 10)
+                        HStack(spacing: 0) {
+                            Stone(color: topLeftPlayerColor, shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                            Spacer().frame(width: 5)
+                            InlineTimerView(
+                                timeControl: game.gameData?.timeControl,
+                                clock: game.clock,
+                                player: topLeftPlayerColor,
+                                pauseControl: game.pauseControl
+                            )
+                        }
+                        Spacer(minLength: 5)
+                        Divider()
+                        Spacer(minLength: 5)
+                        HStack(spacing: 0) {
+                            InlineTimerView(
+                                timeControl: game.gameData?.timeControl,
+                                clock: game.clock,
+                                player: topLeftPlayerColor.opponentColor(),
+                                pauseControl: game.pauseControl
+                            )
+                            Spacer().frame(width: 5)
+                            Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                        }
+                        Spacer().frame(width: 10)
+                        compactDisplayModePicker
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    ChatLog(game: game)
+                }
+            }
+            if compactDisplayMode == .playerInfo {
+                Spacer(minLength: 10).frame(maxHeight: 15)
+                controlRow
+                    .padding(.horizontal)
+                Spacer(minLength: 10)
+            }
+            if attachedKeyboardVisible {
+                HStack(alignment: .top) {
+                    boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        HStack {
+                            (Text(game.blackName)
+                                .font(.footnote).bold()
+                                + Text(" [\(game.blackFormattedRank)]").font(.caption))
+                                .minimumScaleFactor(0.5)
+
+                            Stone(color: .black, shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                        }
+                        Spacer().frame(height: 5)
+                        HStack {
+                            (Text(game.whiteName)
+                                .font(.footnote).bold()
+                                + Text(" [\(game.whiteFormattedRank)]").font(.caption))
+                                .minimumScaleFactor(0.5)
+                            Stone(color: .white, shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                        }
+                        Spacer().frame(height: 15)
+                        verticalControlRow
+                    }
+                    .padding()
+                }
+            } else {
+                boardView.frame(width: compactBoardSize, height: compactBoardSize)
+            }
             Spacer(minLength: 0)
         }
-    }
+        .onChange(of: compactDisplayMode) { newValue in
+            withAnimation {
+                shouldHideActiveGamesCarousel.wrappedValue = newValue == .chat
+            }
+        }
+}
     
     var regularVerticalBody: some View {
         GeometryReader { geometry -> AnyView in
@@ -207,6 +311,7 @@ struct GameDetailView: View {
     
     @State var showSettings = false
     @State var attachedKeyboardVisible = false
+    @State var shouldHideActiveGameCarousel = false
 
     var shouldShowActiveGamesCarousel: Bool {
 //        return true
@@ -260,7 +365,7 @@ struct GameDetailView: View {
             let spacing: CGFloat = 10.0
             let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
             let enoughRoomForCarousel = remainingHeight >= 140 || (remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 140)
-            let showsActiveGamesCarousel = shouldShowActiveGamesCarousel && enoughRoomForCarousel
+            let showsActiveGamesCarousel = !self.shouldHideActiveGameCarousel && shouldShowActiveGamesCarousel && enoughRoomForCarousel
             let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
 
             return AnyView(erasing: VStack(alignment: .leading) {
@@ -270,7 +375,9 @@ struct GameDetailView: View {
                         compactBoardSize: boardSize,
                         game: currentGame,
                         reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
-                        goToNextGame: goToNextGame
+                        goToNextGame: goToNextGame,
+                        attachedKeyboardVisible: self.attachedKeyboardVisible,
+                        shouldHideActiveGamesCarousel: self.$shouldHideActiveGameCarousel
                     )
                 }
                 if showsActiveGamesCarousel {
@@ -401,18 +508,21 @@ struct GameDetailView_Previews: PreviewProvider {
         for game in games {
             game.ogs = ogs
         }
-        return NavigationView {
-            GameDetailView(currentGame: games[0], activeGames: games)
-                .navigationBarHidden(true)
+
+        return Group {
+            NavigationView {
+                GameDetailView(currentGame: games[0], activeGames: games)
+            }
+            .previewDevice("iPhone 12 Pro")
+
+            GameDetailView(currentGame: games[0])
+                .previewLayout(.fixed(width: 750, height: 754))
+                .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+
+            GameDetailView(currentGame: games[0])
+                .previewLayout(.fixed(width: 750, height: 1024))
+                .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
         }
-        .navigationViewStyle(StackNavigationViewStyle())
         .environmentObject(ogs)
-        .previewLayout(.fixed(width: 750, height: 554))
-//        .previewLayout(.fixed(width: 1024, height: 568))
-//        .previewLayout(.fixed(width: 768, height: 1024))
-//        .previewLayout(.fixed(width: 375, height: 812))
-//        .previewLayout(.fixed(width: 568, height: 320))
-        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
-//        .colorScheme(.dark)
     }
 }
