@@ -34,7 +34,8 @@ struct ChatLine: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color(UIColor.systemGray4))
+                .background(Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4))
+                .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
                 .cornerRadius(10)
             }
             if case .leading = horizontalAlignment {

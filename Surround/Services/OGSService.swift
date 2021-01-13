@@ -76,6 +76,7 @@ class OGSService: ObservableObject {
     @Published private(set) public var activeGames = [Int: Game]()
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
+    @Published private(set) public var authenticated = false
     @Published private(set) public var sortedActiveCorrespondenceGamesOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveCorrespondenceGamesNotOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveCorrespondenceGames: [Game] = []
@@ -161,7 +162,6 @@ class OGSService: ObservableObject {
         }
         
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).receive(on: RunLoop.main).sink(receiveValue: { activeGamesValues in
-            print("SocketAnyEvent...")
             if let activeGames = activeGamesValues.last {
                 self.sortActiveGames(activeGames: activeGames.values)
             }
@@ -188,6 +188,7 @@ class OGSService: ObservableObject {
                         self.socketStatusString = "Connected."
                     case .disconnected:
                         self.socketStatusString = "Disconnected."
+                        self.authenticated = false
                     default:
                         break
                     }
@@ -198,6 +199,7 @@ class OGSService: ObservableObject {
         
         socket.on(clientEvent: .reconnect) { _, _ in
             DispatchQueue.main.async {
+                self.authenticated = false
                 self.socketStatusString = "Reconnecting..."
                 self._gamesToBeReconnected = Array(self.connectedGames.values)
             }
@@ -438,6 +440,8 @@ class OGSService: ObservableObject {
             "ui_class": uiconfig.user.uiClass ?? "",
             "username": uiconfig.user.username
         ])
+        
+        self.authenticated = true
     }
 
     func processOverview(overview: [String: Any]) {
@@ -452,7 +456,7 @@ class OGSService: ObservableObject {
                     } else {
                         if let newGame = self.createGame(fromShortGameData: gameData) {
                             newActiveGames[gameId] = newGame
-                            self.connect(to: newGame)
+                            self.connect(to: newGame, withChat: true)
                         }
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
@@ -670,6 +674,13 @@ class OGSService: ObservableObject {
             socket.once(clientEvent: .connect, callback: {_,_ in
                 self.connect(to: game, withChat: withChat)
             })
+            return
+        }
+        
+        guard self.authenticated else {
+            DispatchQueue.main.async {
+                self.connect(to: game, withChat: withChat)
+            }
             return
         }
 
@@ -1078,6 +1089,20 @@ class OGSService: ObservableObject {
             } else {
                 promise(.failure(OGSServiceError.notLoggedIn))
             }
+        }.eraseToAnyPublisher()
+    }
+    
+    func sendChat(in game: Game, channel: OGSChatChannel, body: String) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            if let gameId = game.ogsID {
+                self.socket.emit("game/chat", [
+                    "body": body,
+                    "game_id": gameId,
+                    "move_number": game.currentPosition.lastMoveNumber,
+                    "type": channel.rawValue
+                ])
+            }
+            promise(.success(()))
         }.eraseToAnyPublisher()
     }
 }
