@@ -34,8 +34,10 @@ struct ChatLine: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4))
-                .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
+                .background(
+                    Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4)
+                        .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
+                )                
                 .cornerRadius(10)
             }
             if case .leading = horizontalAlignment {
@@ -49,7 +51,7 @@ struct ChatLine_Previews: PreviewProvider {
     static var previews: some View {
         let game = TestData.EuropeanChampionshipWithChat
         return Group {
-            ChatLine(chatLine: game.chatLog[31])
+            ChatLine(chatLine: game.chatLog[36])
                 .previewLayout(.fixed(width: 300, height: 250))
             Group {
                 ChatLine(chatLine: game.chatLog[0])

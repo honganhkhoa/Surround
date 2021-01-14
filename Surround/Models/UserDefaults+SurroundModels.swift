@@ -100,6 +100,10 @@ extension SettingKey {
         return .init(name: "hapticsFeedback", defaultValue: true)
     }
     
+    static var showsBoardCoordinates: SettingKey<Bool> {
+        return .init(name: "showsBoardCoordinates", defaultValue: true)
+    }
+    
     static var autoSubmitForLiveGames: SettingKey<Bool> {
         return .init(name: "autoSubmitForLiveGames", defaultValue: false)
     }

@@ -12,6 +12,8 @@ struct ChatLog: View {
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
+    var hoveredPosition: Binding<BoardPosition?> = .constant(nil)
+    var hoveredVariation: Binding<Variation?> = .constant(nil)
     
     @State var atEndOfChat = false
 
@@ -34,12 +36,34 @@ struct ChatLog: View {
 //                                BoardView(boardPosition: game.positionByLastMoveNumber[chatLine.moveNumber]!)
 //                                    .frame(width: 80, height: 80)
                 }
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            hoveredPosition.wrappedValue = game.positionByLastMoveNumber[chatLine.moveNumber]
+                        }
+                        .onEnded { _ in
+                            hoveredPosition.wrappedValue = nil
+                        }
+                )
                 Spacer().frame(height: 2)
             }
             ChatLine(
                 chatLine: chatLine,
                 showUsername: !shouldMergeChat(at: index),
                 horizontalAlignment: ogs.user?.id == chatLine.user.id ? .trailing : .leading
+            )
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if let position = chatLine.variation?.position {
+                            hoveredPosition.wrappedValue = position
+                            hoveredVariation.wrappedValue = chatLine.variation
+                        }
+                    }
+                    .onEnded { _ in
+                        hoveredPosition.wrappedValue = nil
+                        hoveredVariation.wrappedValue = nil
+                    }
             )
             Spacer().frame(height: 2)
         }

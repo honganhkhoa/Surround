@@ -102,6 +102,7 @@ struct SettingsView: View {
 struct GameplaySettings: View {
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
+            Toggle("Board coordinates", isOn: Setting(.showsBoardCoordinates).binding)
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
             Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
             GroupBox(label: Text("Auto submiting moves")) {

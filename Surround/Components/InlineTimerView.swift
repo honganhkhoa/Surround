@@ -13,23 +13,32 @@ struct InlineByoYomiTimerView: View {
     var subFont: Font
     
     var body: some View {
-        return HStack(alignment: .firstTextBaseline) {
-            if thinkingTime.thinkingTime! > 0 {
+        if thinkingTime.thinkingTime! > 0 {
+            (
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont)
-                Text("(\(thinkingTime.periods!))")
+                +
+                Text(" (\(thinkingTime.periods!))")
                     .font(subFont)
-            } else {
-                Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
-                    .font(mainFont)
-                if thinkingTime.periodsLeft! > 1 {
-                    Text("(\(thinkingTime.periodsLeft!))")
+            ).minimumScaleFactor(0.5)
+        } else {
+            if thinkingTime.periodsLeft! > 1 {
+                (
+                    Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
+                        .font(mainFont)
+                    +
+                    Text(" (\(thinkingTime.periodsLeft!))")
                         .font(subFont)
-                } else {
-                    Text("SD")
+                ).minimumScaleFactor(0.5)
+            } else {
+                (
+                    Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
+                        .font(mainFont)
+                    +
+                    Text(" SD")
                         .font(subFont.bold())
                         .foregroundColor(Color.red)
-                }
+                ).minimumScaleFactor(0.5)
             }
         }
     }
@@ -43,6 +52,7 @@ struct InlineFischerTimerView: View {
     var body: some View {
         Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
             .font(mainFont)
+            .minimumScaleFactor(0.5)
     }
 }
 
@@ -55,9 +65,11 @@ struct InlineCanadianTimerView: View {
         if thinkingTime.thinkingTimeLeft! > 0 {
             Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                 .font(mainFont)
+                .minimumScaleFactor(0.5)
         } else {
             Text("\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
                 .font(mainFont)
+                .minimumScaleFactor(0.5)
         }
         
     }
@@ -71,6 +83,7 @@ struct InlineSimpleTimerView: View {
     var body: some View {
         Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
             .font(mainFont)
+            .minimumScaleFactor(0.5)
     }
 }
 
@@ -104,10 +117,12 @@ struct InlineTimerView: View {
                         Text(timeString(timeLeft: timeLeft))
                             .font(mainFont.bold())
                             .foregroundColor(Color(UIColor.systemIndigo))
+                            .minimumScaleFactor(0.5)
                     } else {
                         Text("Waiting...")
                             .font(mainFont.bold())
                             .foregroundColor(Color(UIColor.systemIndigo))
+                            .minimumScaleFactor(0.5)
                     }
                 }
             } else {
@@ -127,7 +142,7 @@ struct InlineTimerView: View {
                     Text("").font(mainFont)
                 }
                 if isPaused {
-                    Text(pausedReason).font(subFont.bold())
+                    Text(pausedReason).font(subFont.bold()).minimumScaleFactor(0.5)
                 }
             }
         })

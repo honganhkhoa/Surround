@@ -21,6 +21,7 @@ struct Goban: View {
     var geometry: GeometryProxy
     var width: Int
     var height: Int
+    var showsCoordinates = false
     var playable = false
     var stoneRemovable = false
     @Binding var highlightedRow: Int
@@ -47,8 +48,21 @@ struct Goban: View {
         let highlightColor = stoneRemovable
             ? UIColor.systemTeal
             : (isHoveredPointValid ?? false) ? UIColor.systemGreen : UIColor.systemRed
+        let coordinates = "ABCDEFGHIKLMNOPQRST".map { String($0) }
         return Group {
             ZStack {
+                if showsCoordinates {
+                    ForEach(0..<width) { col in
+                        Text("\(coordinates[col])").bold().minimumScaleFactor(0.2)
+                            .frame(width: size, height: size)
+                            .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
+                    }
+                    ForEach(0..<height) { row in
+                        Text("\(row + 1)").bold().minimumScaleFactor(0.2)
+                            .frame(width: size, height: size)
+                            .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
+                    }
+                }
                 Path { path in
                     for i in 0..<height {
                         path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
@@ -419,6 +433,7 @@ struct StoneRemovalOverlay: View {
 struct BoardView: View {
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
+    var showsCoordinate = false
     var playable = false
     var stoneRemovable = false
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
@@ -433,17 +448,16 @@ struct BoardView: View {
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
     var cornerRadius: CGFloat = 0.0
     
-    var body: some View {
-//        self.boardPosition.printPosition()
+    var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
             newPosition.wrappedValue! : boardPosition
-        return GeometryReader { geometry in
+        return GeometryReader { boardGeometry in
             ZStack(alignment: .center) {
-                Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
                 Goban(
-                    geometry: geometry,
+                    geometry: boardGeometry,
                     width: boardPosition.width,
                     height: boardPosition.height,
+                    showsCoordinates: showsCoordinate,
                     playable: playable,
                     stoneRemovable: stoneRemovable,
                     highlightedRow: $highlightedRow,
@@ -471,19 +485,37 @@ struct BoardView: View {
                         newMove.wrappedValue = nil
                     }
                 }
-                Stones(boardPosition: displayedPosition, variation: variation, geometry: geometry, isLastMovePending: newMove.wrappedValue != nil)
+                Stones(boardPosition: displayedPosition, variation: variation, geometry: boardGeometry, isLastMovePending: newMove.wrappedValue != nil)
                 if stoneRemovable {
                     StoneRemovalOverlay(
                         boardPosition: boardPosition,
                         stoneRemovalOption: stoneRemovalOption,
-                        geometry: geometry,
+                        geometry: boardGeometry,
                         highlightedRow: $highlightedRow,
                         highlightedColumn: $highlightedColumn,
                         stoneRemovalSelectedPoints: stoneRemovalSelectedPoints
                     )
                 }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
+        }
+    }
+    
+    var body: some View {
+        let width: CGFloat = CGFloat(boardPosition.width)
+        let height: CGFloat = CGFloat(boardPosition.height)
+        return GeometryReader { geometry in
+            ZStack(alignment: .center) {
+                Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
+                gobanAndStones
+                    .frame(
+                        width: showsCoordinate ? geometry.size.width * width / (width + 1) : geometry.size.width,
+                        height: showsCoordinate ? geometry.size.width * height / (height + 1) : geometry.size.height
+                    )
+                    .offset(
+                        x: showsCoordinate ? geometry.size.width / (width + 1) / 2 : 0,
+                        y: showsCoordinate ? geometry.size.height / (height + 1) / 2 : 0
+                    )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
         }
     }
 }
@@ -496,9 +528,9 @@ struct BoardView_Previews: PreviewProvider {
         let game3 = TestData.Resigned19x19HandicappedWithInitialState
 //        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         let game5 = TestData.EuropeanChampionshipWithChat
-        let chatLine = game5.chatLog[31]
+        let chatLine = game5.chatLog[36]
         return Group {
-            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation)
+            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation, showsCoordinate: true)
                 .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))

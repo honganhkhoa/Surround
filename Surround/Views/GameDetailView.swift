@@ -26,6 +26,10 @@ struct SingleGameView: View {
     
     @State var compactDisplayMode = CompactDisplayMode.playerInfo
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
+    @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
+
+    @State var hoveredPosition: BoardPosition? = nil
+    @State var hoveredVariation: Variation? = nil
     
     @Namespace var animation
     
@@ -58,16 +62,26 @@ struct SingleGameView: View {
     }
     
     var boardView: some View {
-        BoardView(
-            boardPosition: game.currentPosition,
-            playable: game.isUserTurn,
-            stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval,
-            stoneRemovalOption: stoneRemovalOption,
-            newMove: $pendingMove,
-            newPosition: $pendingPosition,
-            allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
-            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
-        )
+        ZStack {
+            BoardView(
+                boardPosition: game.currentPosition,
+                showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
+                playable: game.isUserTurn,
+                stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval,
+                stoneRemovalOption: stoneRemovalOption,
+                newMove: $pendingMove,
+                newPosition: $pendingPosition,
+                allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
+                stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
+            )
+            if let hoveredPosition = hoveredPosition {
+                BoardView(
+                    boardPosition: hoveredPosition,
+                    variation: hoveredVariation,
+                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible)
+                )
+            }
+        }
     }
     
     var userColor: StoneColor {
@@ -143,7 +157,7 @@ struct SingleGameView: View {
                         compactDisplayModePicker
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    ChatLog(game: game)
+                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
                 }
             }
             if compactDisplayMode == .playerInfo {
