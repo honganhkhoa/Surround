@@ -48,17 +48,21 @@ struct Goban: View {
         let highlightColor = stoneRemovable
             ? UIColor.systemTeal
             : (isHoveredPointValid ?? false) ? UIColor.systemGreen : UIColor.systemRed
-        let coordinates = "ABCDEFGHIKLMNOPQRST".map { String($0) }
+        let coordinates = "ABCDEFGHJKLMNOPQRST".map { String($0) }
         return Group {
             ZStack {
                 if showsCoordinates {
                     ForEach(0..<width) { col in
-                        Text("\(coordinates[col])").bold().minimumScaleFactor(0.2)
+                        Text("\(coordinates[col])").font(.system(size: size))
+                            .minimumScaleFactor(0.2)
+                            .foregroundColor(.black)
                             .frame(width: size, height: size)
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
                     ForEach(0..<height) { row in
-                        Text("\(row + 1)").bold().minimumScaleFactor(0.2)
+                        Text("\(row + 1)").font(.system(size: size))
+                            .minimumScaleFactor(0.2)
+                            .foregroundColor(.black)
                             .frame(width: size, height: size)
                             .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
                     }
@@ -152,7 +156,7 @@ struct VariationNumberings: View {
                     let labelSize = cellSize >= 14 ? cellSize / 1.5 : cellSize
                     return AnyView(
                         Text("\(label)")
-                            .font(.caption2)
+                            .font(.system(size: labelSize))
                             .bold()
                             .foregroundColor(stoneColor == .black ? .white : .black)
                             .minimumScaleFactor(0.2)

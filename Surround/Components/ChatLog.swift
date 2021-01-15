@@ -36,10 +36,15 @@ struct ChatLog: View {
 //                                BoardView(boardPosition: game.positionByLastMoveNumber[chatLine.moveNumber]!)
 //                                    .frame(width: 80, height: 80)
                 }
+                .onTapGesture {
+                    // https://stackoverflow.com/questions/57700396/adding-a-drag-gesture-in-swiftui-to-a-view-inside-a-scrollview-blocks-the-scroll#answer-60015111
+                }
                 .gesture(
-                    DragGesture(minimumDistance: 0)
+                    LongPressGesture(minimumDuration: 0.5).sequenced(before: DragGesture(minimumDistance: 0))
                         .onChanged { value in
-                            hoveredPosition.wrappedValue = game.positionByLastMoveNumber[chatLine.moveNumber]
+                            if case .second = value {
+                                hoveredPosition.wrappedValue = game.positionByLastMoveNumber[chatLine.moveNumber]
+                            }
                         }
                         .onEnded { _ in
                             hoveredPosition.wrappedValue = nil
@@ -52,12 +57,17 @@ struct ChatLog: View {
                 showUsername: !shouldMergeChat(at: index),
                 horizontalAlignment: ogs.user?.id == chatLine.user.id ? .trailing : .leading
             )
+            .onTapGesture {
+                // https://stackoverflow.com/questions/57700396/adding-a-drag-gesture-in-swiftui-to-a-view-inside-a-scrollview-blocks-the-scroll#answer-60015111
+            }
             .gesture(
-                DragGesture(minimumDistance: 0)
+                LongPressGesture(minimumDuration: 0.5).sequenced(before: DragGesture(minimumDistance: 0))
                     .onChanged { value in
                         if let position = chatLine.variation?.position {
-                            hoveredPosition.wrappedValue = position
-                            hoveredVariation.wrappedValue = chatLine.variation
+                            if case .second = value {
+                                hoveredPosition.wrappedValue = position
+                                hoveredVariation.wrappedValue = chatLine.variation
+                            }
                         }
                     }
                     .onEnded { _ in

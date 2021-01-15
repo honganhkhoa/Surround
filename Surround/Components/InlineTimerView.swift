@@ -94,6 +94,7 @@ struct InlineTimerView: View {
     var mainFont: Font?
     var subFont: Font?
     var pauseControl: OGSPauseControl?
+    var showsPauseReason = true
 
     var body: some View {
         guard let clock = clock, let timeControl = timeControl else {
@@ -142,7 +143,11 @@ struct InlineTimerView: View {
                     Text("").font(mainFont)
                 }
                 if isPaused {
-                    Text(pausedReason).font(subFont.bold()).minimumScaleFactor(0.5)
+                    if showsPauseReason {
+                        Text(pausedReason).font(subFont.bold()).minimumScaleFactor(0.5)
+                    } else {
+                        Image(systemName: "pause.fill")
+                    }
                 }
             }
         })

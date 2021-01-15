@@ -136,7 +136,8 @@ struct SingleGameView: View {
                                 timeControl: game.gameData?.timeControl,
                                 clock: game.clock,
                                 player: topLeftPlayerColor,
-                                pauseControl: game.pauseControl
+                                pauseControl: game.pauseControl,
+                                showsPauseReason: false
                             )
                         }
                         Spacer(minLength: 5)
@@ -147,7 +148,8 @@ struct SingleGameView: View {
                                 timeControl: game.gameData?.timeControl,
                                 clock: game.clock,
                                 player: topLeftPlayerColor.opponentColor(),
-                                pauseControl: game.pauseControl
+                                pauseControl: game.pauseControl,
+                                showsPauseReason: false
                             )
                             Spacer().frame(width: 5)
                             Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
@@ -214,7 +216,7 @@ struct SingleGameView: View {
             let boardSize = min(width - 15 * 2, height - chatHeight - 15 * 3)
             return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
                 HStack(alignment: .top, spacing: 0) {
-                    ChatLog(game: game)
+                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
                         .frame(height: chatHeight)
                     Spacer(minLength: 15)
                     VStack {
@@ -283,7 +285,7 @@ struct SingleGameView: View {
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
                             controlRow
-                            ChatLog(game: game)
+                            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
                         }
                         boardView.frame(width: boardSize, height: boardSize)
                     }.frame(height: boardSize)
