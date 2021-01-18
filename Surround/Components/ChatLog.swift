@@ -14,6 +14,7 @@ struct ChatLog: View {
     @EnvironmentObject var ogs: OGSService
     var hoveredPosition: Binding<BoardPosition?> = .constant(nil)
     var hoveredVariation: Binding<Variation?> = .constant(nil)
+    var hoveredCoordinates: Binding<[[Int]]> = .constant([])
     
     @State var atEndOfChat = false
 
@@ -69,10 +70,13 @@ struct ChatLog: View {
                                 hoveredVariation.wrappedValue = chatLine.variation
                             }
                         }
+                        var chatLine = chatLine
+                        hoveredCoordinates.wrappedValue = chatLine.coordinates
                     }
                     .onEnded { _ in
                         hoveredPosition.wrappedValue = nil
                         hoveredVariation.wrappedValue = nil
+                        hoveredCoordinates.wrappedValue = []
                     }
             )
             Spacer().frame(height: 2)

@@ -48,7 +48,7 @@ struct Goban: View {
         let highlightColor = stoneRemovable
             ? UIColor.systemTeal
             : (isHoveredPointValid ?? false) ? UIColor.systemGreen : UIColor.systemRed
-        let coordinates = "ABCDEFGHJKLMNOPQRST".map { String($0) }
+        let coordinates = "ABCDEFGHJKLMNOPQRSTUVWXYZ".map { String($0) }
         return Group {
             ZStack {
                 if showsCoordinates {
@@ -60,7 +60,7 @@ struct Goban: View {
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
                     ForEach(0..<height) { row in
-                        Text("\(row + 1)").font(.system(size: size))
+                        Text("\(height - row)").font(.system(size: size))
                             .minimumScaleFactor(0.2)
                             .foregroundColor(.black)
                             .frame(width: size, height: size)
@@ -434,6 +434,44 @@ struct StoneRemovalOverlay: View {
     }
 }
 
+struct MarkerOverlay: View {
+    @ObservedObject var boardPosition: BoardPosition
+    var geometry: GeometryProxy
+    var highlightCoordinates: [[Int]]
+
+    var body: some View {
+        let width = boardPosition.width
+        let height = boardPosition.height
+                
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
+        let highlightedCoordinatesPath = CGMutablePath()
+        let highlightWidth: CGFloat = size >= 20 ? 3 : (size > 10 ? 2 : 1)
+
+        for coordinate in highlightCoordinates {
+            let row = boardPosition.height - coordinate[0] - 1
+            let column = coordinate[1]
+
+            let highlightRectSize = size / 1.5
+            let highlightRectPadding = (size - highlightRectSize) / 2
+            let highlightRect = CGRect(
+                x: CGFloat(column) * size + highlightRectPadding,
+                y: CGFloat(row) * size + highlightRectPadding,
+                width: highlightRectSize,
+                height: highlightRectSize)
+            
+            highlightedCoordinatesPath.move(to: CGPoint(x: highlightRect.midX, y: highlightRect.minY))
+            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX - highlightRect.width * 0.433, y: highlightRect.maxY - highlightRect.height / 4))
+            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX + highlightRect.width * 0.433, y: highlightRect.maxY - highlightRect.height / 4))
+            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX, y: highlightRect.minY))
+        }
+        
+        return ZStack {
+            Path(highlightedCoordinatesPath)
+                .stroke(Color(.systemBlue), lineWidth: highlightWidth)
+        }.frame(width: size * CGFloat(width), height: size * CGFloat(height))
+    }
+}
+
 struct BoardView: View {
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
@@ -451,6 +489,7 @@ struct BoardView: View {
     @State var highlightedColumn = -1
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
     var cornerRadius: CGFloat = 0.0
+    var highlightCoordinates: [[Int]] = []
     
     var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
@@ -490,6 +529,7 @@ struct BoardView: View {
                     }
                 }
                 Stones(boardPosition: displayedPosition, variation: variation, geometry: boardGeometry, isLastMovePending: newMove.wrappedValue != nil)
+                MarkerOverlay(boardPosition: boardPosition, geometry: boardGeometry, highlightCoordinates: highlightCoordinates)
                 if stoneRemovable {
                     StoneRemovalOverlay(
                         boardPosition: boardPosition,
@@ -534,7 +574,7 @@ struct BoardView_Previews: PreviewProvider {
         let game5 = TestData.EuropeanChampionshipWithChat
         let chatLine = game5.chatLog[36]
         return Group {
-            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation, showsCoordinate: true)
+            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation, showsCoordinate: true, highlightCoordinates: [[2, 2]])
                 .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))

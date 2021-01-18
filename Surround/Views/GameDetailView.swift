@@ -30,6 +30,7 @@ struct SingleGameView: View {
 
     @State var hoveredPosition: BoardPosition? = nil
     @State var hoveredVariation: Variation? = nil
+    @State var hoveredCoordinates: [[Int]] = []
     
     @Namespace var animation
     
@@ -72,13 +73,15 @@ struct SingleGameView: View {
                 newMove: $pendingMove,
                 newPosition: $pendingPosition,
                 allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
-                stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
+                stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints,
+                highlightCoordinates: hoveredCoordinates
             )
             if let hoveredPosition = hoveredPosition {
                 BoardView(
                     boardPosition: hoveredPosition,
                     variation: hoveredVariation,
-                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible)
+                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
+                    highlightCoordinates: hoveredCoordinates
                 )
             }
         }
@@ -159,7 +162,7 @@ struct SingleGameView: View {
                         compactDisplayModePicker
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
+                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                 }
             }
             if compactDisplayMode == .playerInfo {
@@ -216,7 +219,7 @@ struct SingleGameView: View {
             let boardSize = min(width - 15 * 2, height - chatHeight - 15 * 3)
             return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
                 HStack(alignment: .top, spacing: 0) {
-                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
+                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                         .frame(height: chatHeight)
                     Spacer(minLength: 15)
                     VStack {
@@ -285,7 +288,7 @@ struct SingleGameView: View {
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
                             controlRow
-                            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation)
+                            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                         }
                         boardView.frame(width: boardSize, height: boardSize)
                     }.frame(height: boardSize)

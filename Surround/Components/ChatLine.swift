@@ -11,6 +11,21 @@ struct ChatLine: View {
     var chatLine: OGSChatLine
     var showUsername = true
     var horizontalAlignment: HorizontalAlignment = .leading
+
+    var chatBody: Text {
+        var result = Text("")
+        var index = chatLine.body.startIndex
+        var mutableSelf = self
+        for coordinateRange in mutableSelf.chatLine.coordinatesRanges {
+            let coordinateStartIndex = chatLine.body.index(chatLine.body.startIndex, offsetBy: coordinateRange.location)
+            let coordinateEndIndex = chatLine.body.index(coordinateStartIndex, offsetBy: coordinateRange.length)
+            result = result + Text(chatLine.body[index..<coordinateStartIndex])
+            result = result + Text(chatLine.body[coordinateStartIndex..<coordinateEndIndex]).bold().foregroundColor(Color(.systemIndigo))
+            index = coordinateEndIndex
+        }
+        result = result + Text(chatLine.body[index..<chatLine.body.endIndex])
+        return result
+    }
     
     var body: some View {
         HStack {
@@ -29,7 +44,7 @@ struct ChatLine: View {
                             .frame(width: 176, height: 176)
                             .padding(.top, 5)
                     }
-                    Text(chatLine.body)
+                    chatBody
                         .font(.callout)
                 }
                 .padding(.horizontal, 10)
@@ -37,7 +52,7 @@ struct ChatLine: View {
                 .background(
                     Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4)
                         .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
-                )                
+                )
                 .cornerRadius(10)
             }
             if case .leading = horizontalAlignment {
@@ -54,7 +69,7 @@ struct ChatLine_Previews: PreviewProvider {
             ChatLine(chatLine: game.chatLog[36])
                 .previewLayout(.fixed(width: 300, height: 250))
             Group {
-                ChatLine(chatLine: game.chatLog[0])
+                ChatLine(chatLine: game.chatLog[30])
                 ChatLine(chatLine: game.chatLog[11], horizontalAlignment: .trailing)
                     .colorScheme(.dark)
                 ChatLine(chatLine: game.chatLog[game.chatLog.count - 1])

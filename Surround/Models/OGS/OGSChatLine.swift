@@ -119,4 +119,33 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+
+    static var coordinatesRegex: NSRegularExpression {
+        let regex = try! NSRegularExpression(pattern: #"\b[abcdefghjklmnopqrstuvwxyz]([1-9]|1[0-9]|2[0-5])\b"#, options: [.caseInsensitive])
+        return regex
+    }
+    
+    lazy var coordinatesInBody: [NSTextCheckingResult] = {
+        OGSChatLine.coordinatesRegex.matches(
+            in: self.body,
+            options: [],
+            range: NSRange(location: 0, length: self.body.utf16.count)
+        )
+    }()
+    
+    lazy var coordinatesRanges: [NSRange] = {
+        self.coordinatesInBody.map { $0.range }
+    }()
+    
+    lazy var coordinates: [[Int]] = {
+        self.coordinatesRanges.map {
+            var startIndex = self.body.index(self.body.startIndex, offsetBy: $0.location)
+            let letter = self.body[startIndex].lowercased()
+            let endIndex = self.body.index(startIndex, offsetBy: $0.length)
+            startIndex = self.body.index(startIndex, offsetBy: 1)
+            let number = Int(self.body[startIndex..<endIndex])!
+            let column = Int(letter.first!.asciiValue! - "a".first!.asciiValue!)
+            return [number - 1, column > 8 ? column - 1 : column]
+        }
+    }()
 }
