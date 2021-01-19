@@ -52,15 +52,15 @@ struct Goban: View {
         return Group {
             ZStack {
                 if showsCoordinates {
-                    ForEach(0..<width) { col in
-                        Text("\(coordinates[col])").font(.system(size: size))
+                    ForEach(0..<width, id: \.self) { col in
+                        Text("\(coordinates[col])").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
                             .foregroundColor(.black)
                             .frame(width: size, height: size)
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
-                    ForEach(0..<height) { row in
-                        Text("\(height - row)").font(.system(size: size))
+                    ForEach(0..<height, id: \.self) { row in
+                        Text("\(height - row)").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
                             .foregroundColor(.black)
                             .frame(width: size, height: size)
@@ -568,7 +568,7 @@ struct BoardView_Previews: PreviewProvider {
     static var previews: some View {
         let game = TestData.Scored19x19Korean
         let boardPosition = game.currentPosition
-//        let game2 = TestData.Scored15x17
+        let game2 = TestData.Resigned9x9Japanese
         let game3 = TestData.Resigned19x19HandicappedWithInitialState
 //        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
         let game5 = TestData.EuropeanChampionshipWithChat
@@ -576,12 +576,12 @@ struct BoardView_Previews: PreviewProvider {
         return Group {
             BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation, showsCoordinate: true, highlightCoordinates: [[2, 2]])
                 .previewLayout(.fixed(width: 375, height: 375))
+            BoardView(boardPosition: game2.currentPosition, showsCoordinate: true)
+                .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 500, height: 500))
             BoardView(boardPosition: boardPosition)
                 .previewLayout(.fixed(width: 120, height: 120))
-//            BoardView(boardPosition: game2.currentPosition)
-//                .previewLayout(.fixed(width: 375, height: 375))
             BoardView(boardPosition: game3.currentPosition)
                 .previewLayout(.fixed(width: 80, height: 80))
 //            BoardView(boardPosition: game4.currentPosition)

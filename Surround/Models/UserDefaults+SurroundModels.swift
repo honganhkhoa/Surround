@@ -147,6 +147,10 @@ extension SettingKey {
     static var cachedOGSGames: SettingKey<[Int: Data]> {
         return .init(name: "cachedOGSGames", encoded: true, defaultValue: [Int: Data]())
     }
+    
+    static var lastSeenChatIdByOGSGameId: SettingKey<[Int: String]> {
+        return .init(name: "lastSeenChatIdByOGSGameId", encoded: true, defaultValue: [Int: String]())
+    }
 }
 
 @propertyWrapper

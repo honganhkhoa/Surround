@@ -97,6 +97,7 @@ struct ChatLog: View {
                                     if !self.atEndOfChat {
                                         DispatchQueue.main.async {
                                             self.atEndOfChat = true
+                                            game.markAllChatAsRead()
                                         }
                                     }
                                 } else {
@@ -116,11 +117,13 @@ struct ChatLog: View {
                         .padding(.bottom, 0)
                         .onAppear {
                             scrollView.scrollTo("scrollViewBottom")
+                            game.markAllChatAsRead()
                         }
                         .onReceive(game.$chatLog) { newChatLog in
                             if atEndOfChat {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")
+                                    game.markAllChatAsRead()
                                 }
                             }
                         }

@@ -100,18 +100,32 @@ struct SingleGameView: View {
     }
 
     var compactDisplayModePicker: some View {
-        Picker(selection: $compactDisplayMode.animation(), label: Text("Display mode")) {
-            Label("Player info", systemImage: "person.crop.square.fill.and.at.rectangle")
-                .labelStyle(IconOnlyLabelStyle())
-                .tag(CompactDisplayMode.playerInfo)
-            Label("Chat", systemImage: "message")
-                .labelStyle(IconOnlyLabelStyle())
-                .tag(CompactDisplayMode.chat)
+        ZStack(alignment: .topTrailing) {
+            Picker(selection: $compactDisplayMode.animation(), label: Text("Display mode")) {
+                Label("Player info", systemImage: "person.crop.square.fill.and.at.rectangle")
+                    .labelStyle(IconOnlyLabelStyle())
+                    .tag(CompactDisplayMode.playerInfo)
+                Label("Chat", systemImage: "message")
+                    .labelStyle(IconOnlyLabelStyle())
+                    .tag(CompactDisplayMode.chat)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .fixedSize()
+            .padding(.horizontal, 15)
+            .padding(.vertical, 5)
+            if game.chatUnreadCount > 0 {
+                ZStack {
+                    Circle().fill(Color(.systemRed))
+                    Text(game.chatUnreadCount > 9 ? "9+" : "\(game.chatUnreadCount)")
+                        .font(.caption2).bold()
+                        .minimumScaleFactor(0.2)
+                        .foregroundColor(.white)
+                        .frame(width: 15, height: 15)
+                }
+                .frame(width: 15, height: 15)
+                .offset(x: -18, y: 5)
+            }
         }
-        .pickerStyle(SegmentedPickerStyle())
-        .fixedSize()
-        .padding(.horizontal, 15)
-        .padding(.vertical, 5)
         .matchedGeometryEffect(id: "compactDisplayModePicker", in: animation)
     }
     
@@ -165,7 +179,7 @@ struct SingleGameView: View {
                     ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                 }
             }
-            if compactDisplayMode == .playerInfo {
+            if !attachedKeyboardVisible {
                 Spacer(minLength: 10).frame(maxHeight: 15)
                 controlRow
                     .padding(.horizontal)
@@ -526,6 +540,7 @@ struct GameDetailView_Previews: PreviewProvider {
         )
         for game in games {
             game.ogs = ogs
+            game.chatUnreadCount = 2
         }
 
         return Group {

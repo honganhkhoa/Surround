@@ -484,6 +484,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return isUserTurn && undoRequested == currentPosition.lastMoveNumber
     }
     
+    private var lastSeenChatId: String? = nil
+    private var lastSeenChatIndex: Int? = nil
+    @Published var chatUnreadCount: Int = 0
+
     func addChatLine(_ line: OGSChatLine) {
         var line = line
         if let variationData = line.variationData {
@@ -497,16 +501,46 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         if self.chatLog.count == 0 || self.chatLog.last!.timestamp <= line.timestamp {
             self.chatLog.append(line)
+            if line.id == lastSeenChatId {
+                lastSeenChatIndex = self.chatLog.count - 1
+            }
         } else {
             var i = self.chatLog.count - 1
             while (i >= 0 && self.chatLog[i].timestamp > line.timestamp) {
                 i -= 1
             }
             self.chatLog.insert(line, at: i + 1)
+            if line.id == lastSeenChatId {
+                lastSeenChatIndex = i + 1
+            }
+        }
+        
+        if let lastSeenChatIndex = lastSeenChatIndex {
+            chatUnreadCount = chatLog.count - lastSeenChatIndex - 1
+        } else {
+            chatUnreadCount = chatLog.count
         }
     }
     
     func resetChats() {
         self.chatLog.removeAll()
+        if let ogsId = self.ogsID {
+            lastSeenChatId = userDefaults[.lastSeenChatIdByOGSGameId]?[ogsId]
+        }
+    }
+    
+    func markAllChatAsRead() {
+        guard let lastChat = chatLog.last, let ogsId = self.ogsID else {
+            return
+        }
+        
+        chatUnreadCount = 0
+        lastSeenChatIndex = chatLog.count - 1
+        if lastSeenChatId != lastChat.id {
+            var lastSeenChatIdByOGSGameId = userDefaults[.lastSeenChatIdByOGSGameId] ?? [Int: String]()
+            lastSeenChatIdByOGSGameId[ogsId] = lastChat.id
+            userDefaults[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
+            lastSeenChatId = lastChat.id
+        }
     }
 }

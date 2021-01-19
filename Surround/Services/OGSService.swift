@@ -469,6 +469,21 @@ class OGSService: ObservableObject {
             }
             self.activeGames = newActiveGames
             self.sortActiveGames(activeGames: self.activeGames.values)
+            if let lastSeenChatIdByOGSGameId = userDefaults[.lastSeenChatIdByOGSGameId] {
+                var lastSeenChatIdByOGSGameId = lastSeenChatIdByOGSGameId
+                var toBeRemovedOGSIds = [Int]()
+                for ogsId in lastSeenChatIdByOGSGameId.keys {
+                    if newActiveGames[ogsId] == nil {
+                        toBeRemovedOGSIds.append(ogsId)
+                    }
+                }
+                for ogsId in toBeRemovedOGSIds {
+                    lastSeenChatIdByOGSGameId.removeValue(forKey: ogsId)
+                }
+                if toBeRemovedOGSIds.count > 0 {
+                    userDefaults[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
+                }
+            }
         }
         if let challenges = overview["challenges"] as? [[String: Any]] {
             let decoder = DictionaryDecoder()
