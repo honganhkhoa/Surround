@@ -31,9 +31,6 @@
 		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
-		BC042B5F24AB2EC60050B2D1 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5E24AB2EC60050B2D1 /* SocketIO */; };
-		BC042B6224AB2F1D0050B2D1 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */; };
-		BC042B6524AB2F970050B2D1 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B6424AB2F970050B2D1 /* Alamofire */; };
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
 		BC0F1C452525946100E3E66B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C442525946100E3E66B /* LoginView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
@@ -42,7 +39,7 @@
 		BC285B2F2557FAEB005378F9 /* UserNotificationsUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2E2557FAEB005378F9 /* UserNotificationsUI.framework */; };
 		BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC285B312557FAEB005378F9 /* NotificationViewController.swift */; };
 		BC285B352557FAEB005378F9 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC285B332557FAEB005378F9 /* MainInterface.storyboard */; };
-		BC285B392557FAEB005378F9 /* SurroundNotificationContent.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BC285B392557FAEB005378F9 /* SurroundNotificationContent.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BC285B4C2557FC78005378F9 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
 		BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
@@ -58,13 +55,10 @@
 		BC285B852557FD57005378F9 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
 		BC285B912557FD5C005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
-		BC285B982557FDD6005378F9 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC285B972557FDD6005378F9 /* SocketIO */; };
 		BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BC285BA42557FE8F005378F9 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
-		BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC025590B26005378F9 /* DictionaryCoding */; };
-		BC285BC825590B7F005378F9 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC285BC725590B7F005378F9 /* Alamofire */; };
 		BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */; };
 		BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
@@ -104,15 +98,24 @@
 		BC6493C125381002002B2200 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BC6493C625381006002B2200 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
-		BC6493D92538112F002B2200 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493D82538112F002B2200 /* Alamofire */; };
-		BC6493DB25381133002B2200 /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DA25381133002B2200 /* DictionaryCoding */; };
-		BC6493DD2538113A002B2200 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC6493DC2538113A002B2200 /* SocketIO */; };
 		BC6493EA253811EE002B2200 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BC9EE81125B6D0E00044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81025B6D0E00044EA2C /* SocketIO */; };
+		BC9EE82025B6D1130044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81F25B6D1130044EA2C /* DictionaryCoding */; };
+		BC9EE82F25B6D15D0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE82E25B6D15D0044EA2C /* Alamofire */; };
+		BC9EE83D25B6D2470044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE83C25B6D2470044EA2C /* SocketIO */; };
+		BC9EE83F25B6D24C0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE83E25B6D24C0044EA2C /* Alamofire */; };
+		BC9EE84125B6D2500044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84025B6D2500044EA2C /* DictionaryCoding */; };
+		BC9EE84325B6D2550044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84225B6D2550044EA2C /* SocketIO */; };
+		BC9EE84525B6D2590044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84425B6D2590044EA2C /* Alamofire */; };
+		BC9EE84725B6D25E0044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84625B6D25E0044EA2C /* DictionaryCoding */; };
+		BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86625B7ECEB0044EA2C /* Alamofire */; };
+		BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86825B7ECF00044EA2C /* DictionaryCoding */; };
+		BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86A25B7ECFB0044EA2C /* SocketIO */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -165,7 +168,7 @@
 		BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
-		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
 		BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
@@ -181,9 +184,6 @@
 		BCD214FF255A94A400F78E2A /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
 		BCD21500255A94A400F78E2A /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
-		BCD21510255A953000F78E2A /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BCD2150F255A953000F78E2A /* SocketIO */; };
-		BCD21512255A953400F78E2A /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BCD21511255A953400F78E2A /* Alamofire */; };
-		BCD21514255A953800F78E2A /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BCD21513255A953800F78E2A /* DictionaryCoding */; };
 		BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCD21522255A954E00F78E2A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
@@ -347,9 +347,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */,
-				BC042B6524AB2F970050B2D1 /* Alamofire in Frameworks */,
-				BC042B6224AB2F1D0050B2D1 /* DictionaryCoding in Frameworks */,
-				BC042B5F24AB2EC60050B2D1 /* SocketIO in Frameworks */,
+				BC9EE82F25B6D15D0044EA2C /* Alamofire in Frameworks */,
+				BC9EE81125B6D0E00044EA2C /* SocketIO in Frameworks */,
+				BC9EE82025B6D1130044EA2C /* DictionaryCoding in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -371,11 +371,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BC285BC825590B7F005378F9 /* Alamofire in Frameworks */,
 				BC285B2F2557FAEB005378F9 /* UserNotificationsUI.framework in Frameworks */,
+				BC9EE84525B6D2590044EA2C /* Alamofire in Frameworks */,
 				BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */,
-				BC285BC125590B26005378F9 /* DictionaryCoding in Frameworks */,
-				BC285B982557FDD6005378F9 /* SocketIO in Frameworks */,
+				BC9EE84725B6D25E0044EA2C /* DictionaryCoding in Frameworks */,
+				BC9EE84325B6D2550044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,11 +383,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BC6493D92538112F002B2200 /* Alamofire in Frameworks */,
 				BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */,
-				BC6493DB25381133002B2200 /* DictionaryCoding in Frameworks */,
-				BC6493DD2538113A002B2200 /* SocketIO in Frameworks */,
+				BC9EE83F25B6D24C0044EA2C /* Alamofire in Frameworks */,
 				BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */,
+				BC9EE84125B6D2500044EA2C /* DictionaryCoding in Frameworks */,
+				BC9EE83D25B6D2470044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -395,9 +395,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BCD21510255A953000F78E2A /* SocketIO in Frameworks */,
-				BCD21514255A953800F78E2A /* DictionaryCoding in Frameworks */,
-				BCD21512255A953400F78E2A /* Alamofire in Frameworks */,
+				BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */,
+				BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */,
+				BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -663,9 +663,9 @@
 			name = Surround;
 			packageProductDependencies = (
 				BC042B5B24AB2E360050B2D1 /* URLImage */,
-				BC042B5E24AB2EC60050B2D1 /* SocketIO */,
-				BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */,
-				BC042B6424AB2F970050B2D1 /* Alamofire */,
+				BC9EE81025B6D0E00044EA2C /* SocketIO */,
+				BC9EE81F25B6D1130044EA2C /* DictionaryCoding */,
+				BC9EE82E25B6D15D0044EA2C /* Alamofire */,
 			);
 			productName = Surround;
 			productReference = BC042AEF24AB2CF50050B2D1 /* Surround.app */;
@@ -721,9 +721,9 @@
 			);
 			name = SurroundNotificationContent;
 			packageProductDependencies = (
-				BC285B972557FDD6005378F9 /* SocketIO */,
-				BC285BC025590B26005378F9 /* DictionaryCoding */,
-				BC285BC725590B7F005378F9 /* Alamofire */,
+				BC9EE84225B6D2550044EA2C /* SocketIO */,
+				BC9EE84425B6D2590044EA2C /* Alamofire */,
+				BC9EE84625B6D25E0044EA2C /* DictionaryCoding */,
 			);
 			productName = SurroundNotificationContent;
 			productReference = BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */;
@@ -743,9 +743,9 @@
 			);
 			name = SurroundWidgetsExtension;
 			packageProductDependencies = (
-				BC6493D82538112F002B2200 /* Alamofire */,
-				BC6493DA25381133002B2200 /* DictionaryCoding */,
-				BC6493DC2538113A002B2200 /* SocketIO */,
+				BC9EE83C25B6D2470044EA2C /* SocketIO */,
+				BC9EE83E25B6D24C0044EA2C /* Alamofire */,
+				BC9EE84025B6D2500044EA2C /* DictionaryCoding */,
 			);
 			productName = SurroundWidgetsExtension;
 			productReference = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */;
@@ -765,9 +765,9 @@
 			);
 			name = SurroundNotificationService;
 			packageProductDependencies = (
-				BCD2150F255A953000F78E2A /* SocketIO */,
-				BCD21511255A953400F78E2A /* Alamofire */,
-				BCD21513255A953800F78E2A /* DictionaryCoding */,
+				BC9EE86625B7ECEB0044EA2C /* Alamofire */,
+				BC9EE86825B7ECF00044EA2C /* DictionaryCoding */,
+				BC9EE86A25B7ECFB0044EA2C /* SocketIO */,
 			);
 			productName = SurroundNotificationService;
 			productReference = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */;
@@ -815,9 +815,9 @@
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
 				BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */,
-				BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */,
-				BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */,
-				BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */,
+				BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */,
+				BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
 			productRefGroup = BC042AF024AB2CF50050B2D1 /* Products */;
 			projectDirPath = "";
@@ -1096,6 +1096,7 @@
 		};
 		BC285B382557FAEB005378F9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */;
 			targetProxy = BC285B372557FAEB005378F9 /* PBXContainerItemProxy */;
 		};
@@ -1106,6 +1107,7 @@
 		};
 		BCD214DC255A946D00F78E2A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = BCD214D5255A946D00F78E2A /* SurroundNotificationService */;
 			targetProxy = BCD214DB255A946D00F78E2A /* PBXContainerItemProxy */;
 		};
@@ -1264,6 +1266,7 @@
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1293,6 +1296,7 @@
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1401,6 +1405,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1424,6 +1429,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1450,6 +1456,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1476,6 +1483,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1499,6 +1507,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1522,6 +1531,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1604,7 +1614,7 @@
 				minimumVersion = 0.9.18;
 			};
 		};
-		BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */ = {
+		BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
 			requirement = {
@@ -1612,7 +1622,7 @@
 				minimumVersion = 15.2.0;
 			};
 		};
-		BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */ = {
+		BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/elegantchaos/DictionaryCoding";
 			requirement = {
@@ -1620,12 +1630,12 @@
 				minimumVersion = 1.0.9;
 			};
 		};
-		BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+		BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Alamofire/Alamofire";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.2.1;
+				minimumVersion = 5.4.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1636,65 +1646,65 @@
 			package = BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */;
 			productName = URLImage;
 		};
-		BC042B5E24AB2EC60050B2D1 /* SocketIO */ = {
+		BC9EE81025B6D0E00044EA2C /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
-		BC042B6124AB2F1D0050B2D1 /* DictionaryCoding */ = {
+		BC9EE81F25B6D1130044EA2C /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
 		};
-		BC042B6424AB2F970050B2D1 /* Alamofire */ = {
+		BC9EE82E25B6D15D0044EA2C /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
-		BC285B972557FDD6005378F9 /* SocketIO */ = {
+		BC9EE83C25B6D2470044EA2C /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
-		BC285BC025590B26005378F9 /* DictionaryCoding */ = {
+		BC9EE83E25B6D24C0044EA2C /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
-			productName = DictionaryCoding;
-		};
-		BC285BC725590B7F005378F9 /* Alamofire */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
-		BC6493D82538112F002B2200 /* Alamofire */ = {
+		BC9EE84025B6D2500044EA2C /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
-			productName = Alamofire;
-		};
-		BC6493DA25381133002B2200 /* DictionaryCoding */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
 		};
-		BC6493DC2538113A002B2200 /* SocketIO */ = {
+		BC9EE84225B6D2550044EA2C /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
+			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
-		BCD2150F255A953000F78E2A /* SocketIO */ = {
+		BC9EE84425B6D2590044EA2C /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B5D24AB2EC60050B2D1 /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
-		};
-		BCD21511255A953400F78E2A /* Alamofire */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC042B6324AB2F970050B2D1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
-		BCD21513255A953800F78E2A /* DictionaryCoding */ = {
+		BC9EE84625B6D25E0044EA2C /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BC042B6024AB2F1D0050B2D1 /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
+		};
+		BC9EE86625B7ECEB0044EA2C /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		BC9EE86825B7ECF00044EA2C /* DictionaryCoding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			productName = DictionaryCoding;
+		};
+		BC9EE86A25B7ECFB0044EA2C /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
+			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
