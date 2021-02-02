@@ -70,72 +70,92 @@ struct ChallengeCell: View {
                         }
                     }
                     Spacer()
+                    if challenge.challenged == nil {
+                        Button(action: {}) {
+                            Text("Accept")
+                        }
+                    }
                 }
                 Spacer().frame(height: 15)
             }
             if let game = challenge.game {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        Image(systemName: "squareshape.split.3x3")
-                        Text("\(game.width)×\(game.height) \(game.ranked ? "Ranked" : "Unranked")")
-                        Spacer()
-                        Text("Handicap: ").bold()
-                            .offset(x: 8)
-                        Text(game.handicap == -1 ? "Automatic" : "\(game.handicap)")
-                    }
-                    HStack {
-                        Image(systemName: "text.badge.checkmark")
-                        Text("Rules: ").bold()
-                        Text(game.rules.fullName)
-                            .offset(x: -8)
-                        if let komi = game.komi {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label{
+                        HStack {
+                            Text("\(game.width)×\(game.height) \(game.ranked ? "Ranked" : "Unranked")")
                             Spacer()
-                            Text("Komi: ").bold()
+                            Text("Handicap: ").bold()
                                 .offset(x: 8)
-                            Text(String(format: "%.1f", komi))
+                            Text(game.handicap == -1 ? "Automatic" : "\(game.handicap)")
                         }
+                    } icon: {
+                        Image(systemName: "squareshape.split.3x3")
+                    }
+                    Label {
+                        HStack {
+                            Text("Rules: ").bold() + Text(game.rules.fullName)
+                            if let komi = game.komi {
+                                Spacer()
+                                Text("Komi: ").bold()
+                                    .offset(x: 8)
+                                Text(String(format: "%.1f", komi))
+                            }
+                        }
+                    } icon: {
+                        Image(systemName: "text.badge.checkmark")
                     }
                     if let timeControl = game.timeControl {
-                        Label("\(timeControl.systemName): \(timeControl.shortDescription)", systemImage: "clock")
-                        if timeControl.pauseOnWeekends ?? false {
-                            HStack {
-                                Image(systemName: "clock").foregroundColor(.clear)
-                                Text("Pause on weekend")
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("\(timeControl.systemName): \(timeControl.shortDescription)")
+                                if timeControl.pauseOnWeekends ?? false {
+                                    Text("Pause on weekend")
+                                }
                             }
+                            
+                        } icon: {
+                            Image(systemName: "clock")
                         }
                     } else {
                         Label("No time limits", systemImage: "clock")
                     }
                     Label("Analysis \(game.disableAnalysis ? "disabled" : "enabled")", systemImage: "arrow.triangle.branch")
+                    if let minRank = game.minRank, let maxRank = game.maxRank {
+                        if minRank > -1000 && maxRank < 1000 {
+                            Label("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))", systemImage: "arrow.up.and.down.square")
+                        }
+                    }
                 }
                 .font(.subheadline)
             }
-            HStack {
-                Spacer()
-                if ogsRequestCancellable != nil {
-                    ProgressView().padding(10)
-                } else {
-                    if isUserTheChallenger {
-                        Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                            Text("Withdraw")
-                                .foregroundColor(.red)
-                        }
-                        .padding(10)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                        .hoverEffect(.highlight)
+            if challenge.challenged != nil {
+                HStack {
+                    Spacer()
+                    if ogsRequestCancellable != nil {
+                        ProgressView().padding(10)
                     } else {
-                        Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                            Text("Reject").foregroundColor(.red)
+                        if isUserTheChallenger {
+                            Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                Text("Withdraw")
+                                    .foregroundColor(.red)
+                            }
+                            .padding(10)
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                            .hoverEffect(.highlight)
+                        } else {
+                            Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                Text("Reject").foregroundColor(.red)
+                            }
+                            .padding(10)
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                            .hoverEffect(.highlight)
+                            Button(action: { self.acceptChallenge(challenge: challenge) }) {
+                                Text("Accept")
+                            }
+                            .padding(10)
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                            .hoverEffect(.highlight)
                         }
-                        .padding(10)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                        .hoverEffect(.highlight)
-                        Button(action: { self.acceptChallenge(challenge: challenge) }) {
-                            Text("Accept")
-                        }
-                        .padding(10)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                        .hoverEffect(.highlight)
                     }
                 }
             }
@@ -146,6 +166,8 @@ struct ChallengeCell: View {
 struct ChallengeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
+            ChallengeCell(challenge: OGSChallenge.sampleOpenChallenge)
+                .padding()
             ChallengeCell(challenge: OGSChallenge.sampleChallenge)
                 .padding()
         }

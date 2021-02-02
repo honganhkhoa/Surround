@@ -19,6 +19,7 @@ struct HomeView: View {
     @State var gameDetailCancellable: AnyCancellable?
     @State var showingGameDetail = false
     @State var currentActiveGame: Game? = nil
+    @State var showingNewGameView = false
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
@@ -68,6 +69,16 @@ struct HomeView: View {
                 if isLoading {
                     ProgressView()
                 } else {
+                    HStack {
+                        Button(action: { showingNewGameView = true }) {
+                            Label {
+                                Text("Create a new game").font(Font.body.bold())
+                            } icon: {
+                                Image(systemName: "plus.app.fill").font(Font.body.bold())
+                            }
+                        }.padding()
+                        Spacer()
+                    }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 320))], pinnedViews: [.sectionHeaders]) {
                         if ogs.challengesReceived.count > 0 {
                             Section(header: sectionHeader(title: "Challenges received")) {
@@ -236,6 +247,19 @@ struct HomeView: View {
                 .opacity(ogs.isLoggedIn ? 1 : 0)
             }
         }
+        .sheet(isPresented: self.$showingNewGameView) {
+            NavigationView {
+                NewGameView()
+                    .navigationTitle("New game")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { self.showingNewGameView = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+            }
+        }
         .modifier(RootViewSwitchingMenu())
         .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
@@ -266,7 +290,7 @@ struct HomeView: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
+        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
         return Group {
             NavigationView {
                 HomeView()

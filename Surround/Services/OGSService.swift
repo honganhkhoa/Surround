@@ -70,20 +70,22 @@ class OGSService: ObservableObject {
     var serverTimeOffset: Double {
         return drift - latency
     }
+
+    @Published var isLoggedIn: Bool = false
+    @Published var user: OGSUser? = nil
+    @Published private(set) public var authenticated = false
+
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
 
     @Published private(set) public var activeGames = [Int: Game]()
-    @Published var isLoggedIn: Bool = false
-    @Published var user: OGSUser? = nil
-    @Published private(set) public var authenticated = false
     @Published private(set) public var sortedActiveCorrespondenceGamesOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveCorrespondenceGamesNotOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveCorrespondenceGames: [Game] = []
     @Published private(set) public var liveGames: [Game] = []
-    
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
+    private var activeGamesSortingCancellable: AnyCancellable?
     
     @Published private(set) public var challengesReceived = [OGSChallenge]()
     @Published private(set) public var challengesSent = [OGSChallenge]()
@@ -92,7 +94,12 @@ class OGSService: ObservableObject {
     @Published private(set) public var socketStatus: SocketIOStatus = .connecting
     @Published private(set) public var socketStatusString = "Connecting..."
     
-    private var activeGamesSortingCancellable: AnyCancellable?
+    private var openChallengeById: [Int: OGSChallenge] = [:]
+    @Published private(set) public var eligibleOpenChallengeById: [Int: OGSChallenge] = [:]
+    
+    @Published private var cachedUserIds = Set<Int>()
+    @Published private(set) public var cachedUsersById = [Int: OGSUser]()
+    private var cachedUsersFetchingCancellable: AnyCancellable?
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -164,6 +171,15 @@ class OGSService: ObservableObject {
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).receive(on: RunLoop.main).sink(receiveValue: { activeGamesValues in
             if let activeGames = activeGamesValues.last {
                 self.sortActiveGames(activeGames: activeGames.values)
+                if let userId = self.user?.id {
+                    self.cachedUserIds.formUnion(activeGames.values.map { $0.blackId! == userId ? $0.whiteId! : $0.blackId! })
+                }
+            }
+        })
+        
+        cachedUsersFetchingCancellable = self.$cachedUserIds.collect(.byTime(DispatchQueue.main, 5.0)).receive(on: RunLoop.main).sink(receiveValue: { values in
+            if values.last != nil {
+                self.fetchCachedPlayersIfNecessary()
             }
         })
         
@@ -409,6 +425,10 @@ class OGSService: ObservableObject {
         }()
         if isLoggedIn {
             user = self.ogsUIConfig?.user
+            if let user = user {
+                self.cachedUserIds.insert(user.id)
+                self.cachedUsersById[user.id] = user
+            }
         } else {
             user = nil
         }
@@ -436,7 +456,7 @@ class OGSService: ObservableObject {
         socket.emit("chat/connect", [
             "auth": uiconfig.chatAuth ?? "",
             "player_id": uiconfig.user.id,
-            "ranking": uiconfig.user.ranking ?? 0,
+            "ranking": Int(uiconfig.user.ranking ?? 0.0),
             "ui_class": uiconfig.user.uiClass ?? "",
             "username": uiconfig.user.username
         ])
@@ -444,6 +464,53 @@ class OGSService: ObservableObject {
         self.authenticated = true
     }
 
+    func fetchPlayerInfo(userIds: Set<Int>) -> AnyPublisher<[OGSUser], Error> {
+        guard userIds.count > 0 else {
+            return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
+        }
+        return Future<[OGSUser], Error> { promise in
+            AF.request(
+                "\(self.ogsRoot)/termination-api/players",
+                parameters: ["ids": userIds.map { String($0) }.joined(separator: ".")]
+            ).validate().responseJSON { response in
+                switch response.result {
+                case .success:
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    if let usersData = response.value as? [[String: Any]] {
+                        do {
+                            try promise(.success(
+                                        usersData.map { try decoder.decode(OGSUser.self, from: $0) }
+                            ))
+                        } catch {
+                            promise(.failure(OGSServiceError.invalidJSON))
+                        }
+                    } else {
+                        promise(.failure(OGSServiceError.invalidJSON))
+                    }
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    private var playerInfoFetchingCancellable: AnyCancellable?
+    func fetchCachedPlayersIfNecessary() {
+        let userIdsToFetch = cachedUserIds.subtracting(Set(cachedUsersById.keys))
+        playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsToFetch).sink(
+            receiveCompletion: { _ in
+                self.playerInfoFetchingCancellable = nil
+            },
+            receiveValue: { users in
+                var cachedUsersById = self.cachedUsersById
+                for user in users {
+                    cachedUsersById[user.id] = user
+                }
+                self.cachedUsersById = cachedUsersById
+            })
+    }
+    
     func processOverview(overview: [String: Any]) {
         if let activeGames = overview["active_games"] as? [[String: Any]] {
             var newActiveGames = [Int:Game]()
@@ -1119,5 +1186,46 @@ class OGSService: ObservableObject {
             }
             promise(.success(()))
         }.eraseToAnyPublisher()
+    }
+    
+    func subscribeToOpenChallenges() {
+        guard socket.status == .connected else {
+            return
+        }
+        
+        guard let user = self.user else {
+            return
+        }
+        
+        self.socket.emit("seek_graph/connect", ["channel": "global"])
+        self.socket.on("seekgraph/global") { data, ack in
+            if let challenges = data[0] as? [[String: Any]] {
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                for challenge in challenges {
+                    if let challengeId = challenge["challenge_id"] as? Int {
+                        if challenge["delete"] as? Int == 1 {
+                            self.openChallengeById.removeValue(forKey: challengeId)
+                            self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
+                        } else {
+                            if let challenge = try? decoder.decode(OGSChallenge.self, from: challenge) {
+                                self.openChallengeById[challengeId] = challenge
+                                if challenge.isUserEligible(user: user) {
+                                    self.eligibleOpenChallengeById[challengeId] = challenge
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    func unsubscribeFromOpenChallenges() {
+        self.socket.emit("seek_graph/disconnect", ["channel": "global"])
+        self.socket.off("seekgraph/global")
+        
+        self.openChallengeById.removeAll()
+        self.eligibleOpenChallengeById.removeAll()
     }
 }

@@ -21,10 +21,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         didSet {
             if let data = gameData {
                 self.gameName = data.gameName
-                self.blackRank = data.players.black.rank
-                self.whiteRank = data.players.white.rank
-                self.blackId = data.players.black.id
-                self.whiteId = data.players.white.id
+                self.blackPlayer = data.players.black
+                self.whitePlayer = data.players.white
                 if let blackAcceptedRemovedStones = data.players.black.acceptedStones {
                     self.removedStonesAccepted[.black] = BoardPosition.points(fromPositionString: blackAcceptedRemovedStones)
                 }
@@ -81,10 +79,18 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     var width: Int
     var height: Int
+    var blackPlayer: OGSUser? {
+        didSet {
+            self.blackId = blackPlayer?.id
+        }
+    }
+    var whitePlayer: OGSUser? {
+        didSet {
+            self.whiteId = whitePlayer?.id
+        }
+    }
     var blackName: String
     var whiteName: String
-    @Published var blackRank: Double?
-    @Published var whiteRank: Double?
     @Published var blackId: Int?
     @Published var whiteId: Int?
     @Published var gameName: String?
@@ -95,10 +101,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     @Published var undoRequested: Int?
     var blackFormattedRank: String {
-        return formattedRankString(rank: blackRank, professional: gameData?.players.black.professional ?? false)
+        return blackPlayer?.formattedRank() ?? "?"
     }
     var whiteFormattedRank: String {
-        return formattedRankString(rank: whiteRank, professional: gameData?.players.white.professional ?? false)
+        return whitePlayer?.formattedRank() ?? "?"
     }
     var initialPosition: BoardPosition
     var ID: GameID
@@ -133,10 +139,33 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return currentPosition.lastMoveNumber < maxMovePlayed
     }
     
+    var playerCacheObservingCancellable: AnyCancellable?
+    weak var ogs: OGSService? {
+        didSet {
+            if let ogs = ogs {
+                if playerCacheObservingCancellable != nil {
+                    playerCacheObservingCancellable?.cancel()
+                }
+                playerCacheObservingCancellable = ogs.$cachedUsersById.collect(.byTime(DispatchQueue.main, 2.0)).sink(receiveValue: { values in
+                    if let cachedPlayersById = values.last, let blackId = self.blackId, let whiteId = self.whiteId {
+                        if cachedPlayersById[blackId] != nil && self.blackPlayer?.ratings == nil {
+                            self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: cachedPlayersById[blackId]!)
+                        }
+                        if cachedPlayersById[whiteId] != nil && self.whitePlayer?.ratings == nil {
+                            self.whitePlayer = OGSUser.mergeUserInfoFromCache(user: self.whitePlayer, cachedUser: cachedPlayersById[whiteId]!)
+                        }
+                    }
+                })
+            } else {
+                playerCacheObservingCancellable?.cancel()
+                playerCacheObservingCancellable = nil
+            }
+        }
+    }
+    
     var autoScoringDone: Bool?
     var autoScoringCancellable: AnyCancellable?
     var toggleRemovedStoneCancellable: AnyCancellable?
-    weak var ogs: OGSService?
     @Published var gamePhase: OGSGamePhase? {
         didSet {
             if gamePhase == .stoneRemoval {

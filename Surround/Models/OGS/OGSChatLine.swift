@@ -51,13 +51,14 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
         var moveNumber: Int
         var playerId: Int
         var professional: Bool
-        var ranking: Int
+        var ranking: Double
+        var ratings: OGSRating?
         var uiClass: String
         var username: String
         var variation: OGSChatLineVariation?
         
         enum CodingKeys: String, CodingKey {
-            case body, chatId, date, moveNumber, playerId, professional, ranking, uiClass, username
+            case body, chatId, date, moveNumber, playerId, professional, ranking, ratings, uiClass, username
         }
         
         init(from decoder: Decoder) throws {
@@ -73,7 +74,8 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
             moveNumber = try container.decode(Int.self, forKey: .moveNumber)
             playerId = try container.decode(Int.self, forKey: .playerId)
             professional = try container.decode(Bool.self, forKey: .professional)
-            ranking = Int(try container.decode(Double.self, forKey: .ranking))
+            ranking = try container.decode(Double.self, forKey: .ranking)
+            ratings = try container.decodeIfPresent(OGSRating.self, forKey: .ratings)
             uiClass = try container.decode(String.self, forKey: .uiClass)
             username = try container.decode(String.self, forKey: .username)
         }
@@ -107,7 +109,8 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
             id: codingData.line.playerId,
             ranking: codingData.line.ranking,
             uiClass: codingData.line.uiClass,
-            professional: codingData.line.professional
+            professional: codingData.line.professional,
+            ratings: codingData.line.ratings
         )
         variationData = codingData.line.variation
     }

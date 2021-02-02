@@ -25,11 +25,44 @@ struct OGSChallenge: Decodable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        id = try container.decode(Int.self, forKey: .id)
-        challenger = try container.decode(OGSUser.self, forKey: .challenger)
-        challenged = try container.decode(OGSUser.self, forKey: .challenged)
-        challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
-        game = try container.decode(OGSChallengeGameDetail.self, forKey: .game)
+        if container.contains(.challenged) {
+            // Direct challenge
+            id = try container.decode(Int.self, forKey: .id)
+            challenger = try container.decode(OGSUser.self, forKey: .challenger)
+            challenged = try container.decode(OGSUser.self, forKey: .challenged)
+            challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
+            game = try container.decode(OGSChallengeGameDetail.self, forKey: .game)
+        } else {
+            // Custom game
+            let singleKeyContainer = try decoder.singleValueContainer()
+            game = try singleKeyContainer.decode(OGSChallengeGameDetail.self)
+            id = game!.challengeId!
+            challenger = OGSUser(
+                username: game!.username!,
+                id: game!.userId!,
+                rank: game!.userRank!
+            )
+        }
+    }
+    
+    func isUserEligible(user: OGSUser) -> Bool {
+        if user.id == self.challenger?.id {
+            return false
+        }
+
+        let userRank = user.rank()        
+        if let minRank = game?.minRank, let maxRank = game?.maxRank {
+            if userRank < Double(minRank) || userRank > Double(maxRank) {
+                return false
+            }
+        }
+        if let challengerRank = challenger?.rank {
+            if game?.ranked == true && abs(challengerRank - Double(userRank)) > 9 {
+                return false
+            }
+        }
+        
+        return true
     }
 }
 
@@ -45,6 +78,14 @@ struct OGSChallengeGameDetail: Decodable {
     var rules: OGSRule
     var timeControl: TimeControl?
     
+    // Custom game
+    var challengeId: Int?
+    var userId: Int?
+    var username: String?
+    var userRank: Double?
+    var minRank: Int?
+    var maxRank: Int?
+    
     enum CodingKeys: String, CodingKey {
         case width
         case height
@@ -55,6 +96,15 @@ struct OGSChallengeGameDetail: Decodable {
         case name
         case rules
         case timeControlParameters
+        
+        // Custom games
+        case gameId
+        case userId
+        case username
+        case maxRank
+        case minRank
+        case challengeId
+        case rank
     }
     
     init(from decoder: Decoder) throws {
@@ -79,6 +129,14 @@ struct OGSChallengeGameDetail: Decodable {
         } else {
             timeControl = try container.decodeIfPresent(TimeControl.self, forKey: .timeControlParameters)
         }
+        
+        // Custom game
+        challengeId = try container.decodeIfPresent(Int.self, forKey: .challengeId)
+        userId = try container.decodeIfPresent(Int.self, forKey: .userId)
+        username = try container.decodeIfPresent(String.self, forKey: .username)
+        userRank = try container.decodeIfPresent(Double.self, forKey: .rank)
+        minRank = try container.decodeIfPresent(Int.self, forKey: .minRank)
+        maxRank = try container.decodeIfPresent(Int.self, forKey: .maxRank)
     }
 }
 
@@ -174,6 +232,43 @@ extension OGSChallenge {
               "group": null,
               "challenger_color": "black",
               "aga_rated": false
+            }
+        """#
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try! decoder.decode(OGSChallenge.self, from: data.data(using: .utf8)!)
+    }
+    static var sampleOpenChallenge: OGSChallenge {
+        let data = #"""
+            {
+              "challenge_id": 16255024,
+              "user_id": 442873,
+              "username": "#albatros",
+              "rank": 21.304892343947607,
+              "pro": 0,
+              "min_rank": 5,
+              "max_rank": 36,
+              "game_id": 30344070,
+              "name": "Friendly Match",
+              "ranked": true,
+              "handicap": 0,
+              "komi": null,
+              "rules": "japanese",
+              "width": 19,
+              "height": 19,
+              "challenger_color": "black",
+              "disable_analysis": false,
+              "time_control": "byoyomi",
+              "time_control_parameters": {
+                "system": "byoyomi",
+                "speed": "live",
+                "main_time": 900,
+                "period_time": 15,
+                "periods": 1,
+                "pause_on_weekends": false,
+                "time_control": "byoyomi"
+              },
+              "time_per_move": 25
             }
         """#
         let decoder = JSONDecoder()
