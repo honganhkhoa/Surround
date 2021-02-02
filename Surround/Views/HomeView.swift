@@ -19,7 +19,9 @@ struct HomeView: View {
     @State var gameDetailCancellable: AnyCancellable?
     @State var showingGameDetail = false
     @State var currentActiveGame: Game? = nil
-    @State var showingNewGameView = false
+    
+    @SceneStorage("showingNewGameView")
+    var showingNewGameView = false
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
@@ -251,6 +253,7 @@ struct HomeView: View {
             NavigationView {
                 NewGameView()
                     .navigationTitle("New game")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(action: { self.showingNewGameView = false }) {
@@ -259,6 +262,7 @@ struct HomeView: View {
                         }
                     }
             }
+            .environmentObject(ogs)
         }
         .modifier(RootViewSwitchingMenu())
         .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in

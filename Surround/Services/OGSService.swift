@@ -172,7 +172,15 @@ class OGSService: ObservableObject {
             if let activeGames = activeGamesValues.last {
                 self.sortActiveGames(activeGames: activeGames.values)
                 if let userId = self.user?.id {
-                    self.cachedUserIds.formUnion(activeGames.values.map { $0.blackId! == userId ? $0.whiteId! : $0.blackId! })
+                    for game in activeGames.values {
+                        if let blackId = game.blackId, let whiteId = game.whiteId {
+                            if blackId == userId {
+                                self.cachedUserIds.insert(whiteId)
+                            } else if whiteId == userId {
+                                self.cachedUserIds.insert(blackId)
+                            }
+                        }
+                    }
                 }
             }
         })
@@ -1150,9 +1158,12 @@ class OGSService: ObservableObject {
     
     func acceptChallenge(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
         return Future<Int, Error> { promise in
+            let url = challenge.challenged == nil ?
+                "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/accept" :
+                "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)/accept"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
                 AF.request(
-                    "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)/accept",
+                    url,
                     method: .post,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
                 ).validate().responseJSON { response in

@@ -21,10 +21,54 @@ struct NewGameView: View {
         case direct
     }
     
+    @State var eligibleOpenChallenges = [OGSChallenge]()
+    
+    var customChallengesMatchingAutomatchCondition: [OGSChallenge] {
+        return Array(ogs.eligibleOpenChallengeById.values.filter { challenge in
+            if let width = challenge.game?.width, let height = challenge.game?.height {
+                if !boardSizes.contains(width) || !boardSizes.contains(height) {
+                    return false
+                }
+            }
+            
+            if let challengeSpeed = challenge.game?.timeControl?.speed {
+                switch challengeSpeed {
+                case .correspondence:
+                    return timeControlSpeed == .correspondence
+                case .live:
+                    return timeControlSpeed == .live && !blitz
+                case .blitz:
+                    return timeControlSpeed == .live && blitz
+                }
+            }
+            
+            return true
+        })
+    }
+    
+    var quickMatchOpenChallenges: some View {
+        let challenges = customChallengesMatchingAutomatchCondition
+        return VStack(alignment: .leading) {
+            if challenges.count > 0 {
+                Text("Alternatively, there \(challenges.count == 1 ? "is" : "are") \(challenges.count) open custom \(challenges.count == 1 ? "game" : "games") matching your preference that you can accept to start a game immediately.")
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                ForEach(challenges, id: \.id) { challenge in
+                    ChallengeCell(challenge: challenge)
+                        .padding()
+                        .background(Color(UIColor.systemBackground).shadow(radius: 2))
+                }
+            }
+        }
+    }
+
     var quickMatchForm: some View {
         VStack(alignment: .leading) {
             Text("Automatically match you with another player who is also looking for a game.")
                 .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             GroupBox(label: Text("Board size" + (boardSizes.count == 0 ? " ⚠️" : ""))) {
                 HStack {
                     ForEach([9, 13, 19], id: \.self) { size in
@@ -54,8 +98,7 @@ struct NewGameView: View {
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
-            }
+            }.fixedSize(horizontal: false, vertical: true)
             GroupBox(label: Text("Game speed")) {
                 Picker(selection: $timeControlSpeed.animation(), label: Text("Game speed")) {
                     Text("Live").tag(TimeControlSpeed.live)
@@ -71,11 +114,13 @@ struct NewGameView: View {
                     })
                     Text("Live games generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in Blitz mode.")
                         .font(.subheadline)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else if timeControlSpeed == .correspondence {
                     Text("Correspondence games are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time.")
                         .font(.subheadline)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -88,6 +133,15 @@ struct NewGameView: View {
             .padding(.horizontal, 15)
             .background(Color.accentColor.opacity(boardSizes.count == 0 ? 0.8 : 1))
             .cornerRadius(10)
+
+            quickMatchOpenChallenges
+        }
+        .onReceive(ogs.$eligibleOpenChallengeById) { eligibleOpenChallengesById in
+            self.eligibleOpenChallenges = Array(
+                eligibleOpenChallengesById.values.sorted(
+                    by: { ($0.challenger?.username ?? "") < ($1.challenger?.username ?? "") }
+                )
+            )
         }
     }
     
@@ -95,6 +149,8 @@ struct NewGameView: View {
         VStack(alignment: .leading) {
             Text("Create a game precisely as you want and display it publicly for anyone with an eligible rank to accept.")
                 .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
     
@@ -102,9 +158,11 @@ struct NewGameView: View {
         VStack(alignment: .leading) {
             Text("Challenge a friend (or a specific player) directly.")
                 .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
-    
+        
     var body: some View {
         ScrollView {
             VStack {
@@ -119,16 +177,6 @@ struct NewGameView: View {
                     customForm
                 } else if newGameOption == .direct {
                     directForm
-                }
-                
-                if ogs.eligibleOpenChallengeById.count > 1 {
-                    Text("Alternatively, there are \(ogs.eligibleOpenChallengeById.count) open challenges that you can accept to start a game immediately.")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(Array(ogs.eligibleOpenChallengeById.values), id: \.id) { challenge in
-                        ChallengeCell(challenge: challenge)
-                            .padding()
-                            .background(Color(UIColor.systemBackground).shadow(radius: 2))
-                    }
                 }
             }.padding()
         }

@@ -16,6 +16,8 @@ struct ChallengeCell: View {
     
     @SceneStorage("activeOGSGameIdToOpen")
     var activeOGSGameIdToOpen = -1
+    @SceneStorage("showingNewGameView")
+    var showingNewGameView = false
 
     func withdrawOrDeclineChallenge(challenge: OGSChallenge) {
         self.ogsRequestCancellable = ogs.withdrawOrDeclineChallenge(challenge: challenge)
@@ -28,13 +30,19 @@ struct ChallengeCell: View {
     func acceptChallenge(challenge: OGSChallenge) {
         self.ogsRequestCancellable = ogs.acceptChallenge(challenge: challenge)
             .zip(ogs.$challengesReceived.setFailureType(to: Error.self))
-            .sink(receiveCompletion: { _ in
+            .sink(receiveCompletion: { completion in
+                print(completion)
                 self.ogsRequestCancellable = nil
             }, receiveValue: { value in
                 let newGameId = value.0
-                activeOGSGameIdToOpen = newGameId
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
+                withAnimation {
+                    activeOGSGameIdToOpen = newGameId
+                    if challenge.challenged == nil {
+                        showingNewGameView = false
+                    }
+                }
             })
     }
     
@@ -71,8 +79,12 @@ struct ChallengeCell: View {
                     }
                     Spacer()
                     if challenge.challenged == nil {
-                        Button(action: {}) {
-                            Text("Accept")
+                        if ogsRequestCancellable != nil {
+                            ProgressView()
+                        } else {
+                            Button(action: { acceptChallenge(challenge: challenge) }) {
+                                Text("Accept")
+                            }
                         }
                     }
                 }

@@ -19,6 +19,7 @@ enum TimeControlSystem {
 enum TimeControlSpeed: String, Codable {
     case live
     case correspondence
+    case blitz
 }
 
 @dynamicMemberLookup
@@ -101,6 +102,23 @@ struct TimeControl: Codable {
             return "Simple"
         case .None:
             return "None"
+        }
+    }
+    
+    var averageSecondsPerMove: Double {
+        switch system {
+        case .Fischer(let initialTime, let timeIncrement, _):
+            return Double(initialTime) / 90.0 + Double(timeIncrement)
+        case .ByoYomi(let mainTime, _, let periodTime):
+            return Double(mainTime) / 90.0 + Double(periodTime)
+        case .Simple(let perMove):
+            return Double(perMove)
+        case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
+            return Double(mainTime) / 90.0 + Double(periodTime) / Double(stonesPerPeriod)
+        case .Absolute(let totalTime):
+            return Double(totalTime) / 90.0
+        case .None:
+            return 0
         }
     }
 
