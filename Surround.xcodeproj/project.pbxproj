@@ -104,6 +104,7 @@
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */; };
 		BC9EE81125B6D0E00044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81025B6D0E00044EA2C /* SocketIO */; };
 		BC9EE82025B6D1130044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81F25B6D1130044EA2C /* DictionaryCoding */; };
 		BC9EE82F25B6D15D0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE82E25B6D15D0044EA2C /* Alamofire */; };
@@ -309,6 +310,7 @@
 		BC649413253DA44C002B2200 /* SurroundNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundNotificationService.swift; sourceTree = "<group>"; };
 		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		BC7407DA25493B71001D5581 /* SurroundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundService.swift; sourceTree = "<group>"; };
+		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -505,6 +507,7 @@
 				BC0F1C442525946100E3E66B /* LoginView.swift */,
 				BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */,
 				BCE913D025B9398D00065061 /* NewGameView.swift */,
+				BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -954,6 +957,7 @@
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
+				BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,

@@ -123,7 +123,7 @@ class OGSService: ObservableObject {
                         }
                     }
                 }
-            } else if game.gameData?.timeControl.speed == .live {
+            } else if game.gameData?.timeControl.speed == .live || game.gameData?.timeControl.speed == .blitz {
                 liveGames.append(game)
             }
         }

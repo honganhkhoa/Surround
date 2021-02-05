@@ -313,7 +313,7 @@ struct GameControlRow: View {
             if let newPendingMove = newPendingMove {
                 if let timeControl = game.gameData?.timeControl {
                     var shouldAutoSubmitMove = timeControl.speed == .correspondence && autoSubmitForCorrespondenceGames
-                    shouldAutoSubmitMove = shouldAutoSubmitMove || (timeControl.speed == .live && autoSubmitForLiveGames)
+                    shouldAutoSubmitMove = shouldAutoSubmitMove || ((timeControl.speed == .live || timeControl.speed == .blitz) && autoSubmitForLiveGames)
                     if shouldAutoSubmitMove {
                         self.submitMove(move: newPendingMove)
                     }

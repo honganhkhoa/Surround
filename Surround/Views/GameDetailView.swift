@@ -494,7 +494,7 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
         .onAppear {
-            if currentGame.gameData?.timeControl.speed == .live {
+            if currentGame.gameData?.timeControl.speed == .live || currentGame.gameData?.timeControl.speed == .blitz {
                 UIApplication.shared.isIdleTimerDisabled = true
             }
             if let ogsId = currentGame.ogsID {
