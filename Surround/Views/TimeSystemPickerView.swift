@@ -40,6 +40,14 @@ private let timeSteps = [
     86400 * 28
 ]
 
+private let stepIndex: [Int: Int] = {
+    var result = [Int: Int]()
+    for index in timeSteps.indices {
+        result[timeSteps[index]] = index
+    }
+    return result
+}()
+
 struct TimeStepper<Label>: View where Label: View {
     var value: Binding<Int?>
     var range: ClosedRange<Int>
@@ -54,7 +62,7 @@ struct TimeStepper<Label>: View where Label: View {
                     set: {
                         if wrappedValue == 0 && $0 > wrappedValue {
                             value.wrappedValue = range.lowerBound
-                        } else if let index = timeSteps.firstIndex(of: wrappedValue) {
+                        } else if let index = stepIndex[wrappedValue] {
                             if $0 < wrappedValue {
                                 if wrappedValue == range.lowerBound && canBeZero {
                                     value.wrappedValue = 0
@@ -177,7 +185,7 @@ struct TimeControlAdjustmentSteppers: View {
         VStack(alignment: .leading) {
             switch timeControl.system {
             case .ByoYomi:
-                timeStepper(keyPath: \.mainTime, label: "Main time")
+                timeStepper(keyPath: \.mainTime, canBeZero: true, label: "Main time")
                 if let periods = timeControl.periods {
                     Stepper(value: Binding(get: { periods }, set: { timeControl.periods = $0 }), in: 1...300) {
                         Text("Periods: ").bold() + Text("\(periods)")
@@ -189,7 +197,7 @@ struct TimeControlAdjustmentSteppers: View {
                 timeStepper(keyPath: \.timeIncrement, label: "Time increment")
                 timeStepper(keyPath: \.maxTime, label: "Max time")
             case .Canadian:
-                timeStepper(keyPath: \.mainTime, label: "Main time")
+                timeStepper(keyPath: \.mainTime, canBeZero: true, label: "Main time")
                 timeStepper(keyPath: \.periodTime, label: "Time per period")
                 if let stonePerPeriod = timeControl.stonesPerPeriod {
                     Stepper(
