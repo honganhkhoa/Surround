@@ -53,7 +53,7 @@ enum OGSGamePhase: String, Decodable {
     case finished
 }
 
-enum OGSRule: String, Decodable {
+enum OGSRule: String, Codable, CaseIterable, Hashable {
     case chinese
     case aga
     case japanese
@@ -75,6 +75,23 @@ enum OGSRule: String, Decodable {
             return "Ing SST"
         case .nz:
             return "New Zealand"
+        }
+    }
+    
+    var defaultKomi: Double {
+        switch self {
+        case .chinese:
+            return 7.5
+        case .aga:
+            return 7.5
+        case .japanese:
+            return 6.5
+        case .korean:
+            return 6.5
+        case .ing:
+            return 8
+        case .nz:
+            return 7
         }
     }
 }

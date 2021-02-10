@@ -48,13 +48,14 @@ struct ChallengeCell: View {
     
     var body: some View {
         let isUserTheChallenger = challenge.challenger?.id == ogs.user?.id
-        let opponent = isUserTheChallenger ? challenge.challenged : challenge.challenger
+        let headerPlayer = challenge.id == 0 ? challenge.challenger :
+            (isUserTheChallenger ? challenge.challenged : challenge.challenger)
         let opponentStoneColor = isUserTheChallenger ? challenge.challengerColor : challenge.challengerColor?.opponentColor() ?? nil
         
         return VStack {
-            if let opponent = opponent {
+            if let headerPlayer = headerPlayer {
                 HStack(alignment: .top) {
-                    if let iconURL = opponent.iconURL(ofSize: 64) {
+                    if let iconURL = headerPlayer.iconURL(ofSize: 64) {
                         ZStack(alignment: .bottomTrailing) {
                             URLImage(iconURL)
                                 .frame(width: 64, height: 64)
@@ -67,18 +68,16 @@ struct ChallengeCell: View {
                         }
                     }
                     VStack(alignment: .leading) {
-                        if let gameName = challenge.game?.name {
-                            Text(gameName)
-                                .font(.title3)
-                                .bold()
-                        }
+                        Text(challenge.game.name)
+                            .font(.title3)
+                            .bold()
                         HStack {
-                            Text(opponent.username)
-                            Text("[\(opponent.formattedRank)]")
+                            Text(headerPlayer.username)
+                            Text("[\(headerPlayer.formattedRank)]")
                         }
                     }
                     Spacer()
-                    if challenge.challenged == nil {
+                    if challenge.challenged == nil && challenge.id != 0 {
                         if ogsRequestCancellable != nil {
                             ProgressView()
                         } else {
@@ -106,11 +105,11 @@ struct ChallengeCell: View {
                     Label {
                         HStack {
                             Text("Rules: ").bold() + Text(game.rules.fullName)
-                            if let komi = game.komi {
+                            if game.komi != nil && game.komi != game.rules.defaultKomi {
                                 Spacer()
                                 Text("Komi: ").bold()
                                     .offset(x: 8)
-                                Text(String(format: "%.1f", komi))
+                                Text(String(format: "%.1f", game.komi!))
                             }
                         }
                     } icon: {
@@ -120,7 +119,7 @@ struct ChallengeCell: View {
                         Label {
                             VStack(alignment: .leading) {
                                 Text("\(timeControl.systemName): \(timeControl.shortDescription)")
-                                if timeControl.pauseOnWeekends ?? false {
+                                if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
                                     Text("Pause on weekend")
                                 }
                             }

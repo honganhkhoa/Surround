@@ -223,7 +223,7 @@ struct SingleGameView: View {
                 shouldHideActiveGamesCarousel.wrappedValue = newValue == .chat
             }
         }
-}
+    }
     
     var regularVerticalBody: some View {
         GeometryReader { geometry -> AnyView in

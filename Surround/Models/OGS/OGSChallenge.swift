@@ -7,12 +7,12 @@
 
 import Foundation
 
-struct OGSChallenge: Decodable, Identifiable {
+struct OGSChallenge: Codable, Identifiable {
     var id: Int
     var challenger: OGSUser?
     var challenged: OGSUser?
     var challengerColor: StoneColor?
-    var game: OGSChallengeGameDetail?
+    var game: OGSChallengeGameDetail
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -20,6 +20,11 @@ struct OGSChallenge: Decodable, Identifiable {
         case challenged
         case challengerColor
         case game
+        
+        // Encode only
+        case maxRanking
+        case minRanking
+        case initialized
     }
     
     init(from decoder: Decoder) throws {
@@ -36,28 +41,49 @@ struct OGSChallenge: Decodable, Identifiable {
             // Custom game
             let singleKeyContainer = try decoder.singleValueContainer()
             game = try singleKeyContainer.decode(OGSChallengeGameDetail.self)
-            id = game!.challengeId!
+            id = game.challengeId!
             challenger = OGSUser(
-                username: game!.username!,
-                id: game!.userId!,
-                rank: game!.userRank!
+                username: game.username!,
+                id: game.userId!,
+                rank: game.userRank!
             )
         }
     }
     
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
+        if let maxRank = game.maxRank, let minRank = game.minRank {
+            try container.encode(maxRank, forKey: .maxRanking)
+            try container.encode(minRank, forKey: .minRanking)
+        } else {
+            try container.encode(1000, forKey: .maxRanking)
+            try container.encode(-1000, forKey: .minRanking)
+        }
+        try container.encode(false, forKey: .initialized)
+    }
+       
+    init(id: Int, challenger: OGSUser? = nil, challenged: OGSUser? = nil, challengerColor: StoneColor? = nil, game: OGSChallengeGameDetail) {
+        self.id = id
+        self.challenger = challenger
+        self.challenged = challenged
+        self.challengerColor = challengerColor
+        self.game = game
+    }
+
     func isUserEligible(user: OGSUser) -> Bool {
         if user.id == self.challenger?.id {
             return false
         }
 
         let userRank = user.rank()        
-        if let minRank = game?.minRank, let maxRank = game?.maxRank {
+        if let minRank = game.minRank, let maxRank = game.maxRank {
             if userRank < Double(minRank) || userRank > Double(maxRank) {
                 return false
             }
         }
         if let challengerRank = challenger?.rank {
-            if game?.ranked == true && abs(challengerRank - Double(userRank)) > 9 {
+            if game.ranked == true && abs(challengerRank - Double(userRank)) > 9 {
                 return false
             }
         }
@@ -66,17 +92,41 @@ struct OGSChallenge: Decodable, Identifiable {
     }
 }
 
-struct OGSChallengeGameDetail: Decodable {
+struct OGSChallengeGameDetail: Codable {
+    init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, challengerColor: StoneColor? = nil, challengeId: Int? = nil, userId: Int? = nil, username: String? = nil, userRank: Double? = nil, minRank: Int? = nil, maxRank: Int? = nil) {
+        self.width = width
+        self.height = height
+        self.ranked = ranked
+        self.isPrivate = isPrivate
+        self.komi = komi
+        self.handicap = handicap
+        self.disableAnalysis = disableAnalysis
+        self.name = name
+        self.rules = rules
+        self.timeControl = timeControl
+        self.challengerColor = challengerColor
+        self.challengeId = challengeId
+        self.userId = userId
+        self.username = username
+        self.userRank = userRank
+        self.minRank = minRank
+        self.maxRank = maxRank
+    }
+    
     var width: Int
     var height: Int
     
     var ranked: Bool
+    var isPrivate: Bool = false
     var komi: Double?
     var handicap: Int
     var disableAnalysis: Bool
     var name: String
     var rules: OGSRule
-    var timeControl: TimeControl?
+    var timeControl: TimeControl
+
+    // Encode only
+    var challengerColor: StoneColor?
     
     // Custom game
     var challengeId: Int?
@@ -96,6 +146,14 @@ struct OGSChallengeGameDetail: Decodable {
         case name
         case rules
         case timeControlParameters
+        
+        // Encode only
+        case initialState
+        case komiAuto
+        case challengerColor
+        case isPrivate = "private"
+        case timeControl
+        case pauseOnWeekends
         
         // Custom games
         case gameId
@@ -127,7 +185,7 @@ struct OGSChallengeGameDetail: Decodable {
             jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
             timeControl = try jsonDecoder.decode(TimeControl.self, from: timeControlParameters.data(using: String.Encoding.utf8)!)
         } else {
-            timeControl = try container.decodeIfPresent(TimeControl.self, forKey: .timeControlParameters)
+            timeControl = try container.decode(TimeControl.self, forKey: .timeControlParameters)
         }
         
         // Custom game
@@ -137,6 +195,29 @@ struct OGSChallengeGameDetail: Decodable {
         userRank = try container.decodeIfPresent(Double.self, forKey: .rank)
         minRank = try container.decodeIfPresent(Int.self, forKey: .minRank)
         maxRank = try container.decodeIfPresent(Int.self, forKey: .maxRank)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
+        try container.encode(disableAnalysis, forKey: .disableAnalysis)
+        try container.encode(String(handicap), forKey: .handicap)
+        try container.encode(height, forKey: .height)
+        try container.encode(width, forKey: .width)
+        try container.encodeNil(forKey: .initialState)
+        if komi == rules.defaultKomi || komi == nil {
+            try container.encodeNil(forKey: .komi)
+            try container.encode("automatic", forKey: .komiAuto)
+        } else if let komi = komi {
+            try container.encode(komi, forKey: .komi)
+            try container.encode("custom", forKey: .komiAuto)
+        }
+        try container.encode(name, forKey: .name)
+        try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encode(rules, forKey: .rules)
+        try container.encode(timeControl.timeControl, forKey: .timeControl)
+        try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
+        try container.encode(timeControl, forKey: .timeControlParameters)
     }
 }
 

@@ -224,8 +224,8 @@ enum TimeControlSpeed: String, Codable {
 }
 
 @dynamicMemberLookup
-struct TimeControl: Codable {
-    struct TimeControlCodingData: Codable {
+struct TimeControl: Codable, Equatable {
+    struct TimeControlCodingData: Codable, Equatable {
         var timeControl: String
         var initialTime: Int?
         var timeIncrement: Int?
@@ -251,6 +251,15 @@ struct TimeControl: Codable {
         self.codingData = codingData
     }
     
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(codingData)
+    }
+
+    static func == (lhs: TimeControl, rhs: TimeControl) -> Bool {
+        return lhs.codingData == rhs.codingData
+    }
+
     subscript<T>(dynamicMember keyPath: WritableKeyPath<TimeControlCodingData, T>) -> T {
         get { self.codingData[keyPath: keyPath] }
         set { self.codingData[keyPath: keyPath] = newValue }

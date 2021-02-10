@@ -44,7 +44,7 @@ class OGSService: ObservableObject {
             return result
         }
     }
-    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = [], publicGames: [Game] = []) -> OGSService {
+    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = [], publicGames: [Game] = [], friends: [OGSUser] = []) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
         ogs.isLoggedIn = user != nil
@@ -54,6 +54,8 @@ class OGSService: ObservableObject {
         }
         ogs.sortActiveGames(activeGames: ogs.activeGames.values)
         ogs.sortedPublicGames = publicGames
+        
+        ogs.friends = friends
 
         return ogs
     }
@@ -100,6 +102,8 @@ class OGSService: ObservableObject {
     @Published private var cachedUserIds = Set<Int>()
     @Published private(set) public var cachedUsersById = [Int: OGSUser]()
     private var cachedUsersFetchingCancellable: AnyCancellable?
+    
+    @Published private(set) public var friends = [OGSUser]()
     
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -587,6 +591,8 @@ class OGSService: ObservableObject {
         guard isLoggedIn else {
             return
         }
+        
+        self.fetchFriends()
         
         isLoadingOverview = true
         overviewLoadingCancellable = SurroundService.shared.getOGSOverview(allowsCache: allowsCache).catch { error in
@@ -1238,5 +1244,49 @@ class OGSService: ObservableObject {
         
         self.openChallengeById.removeAll()
         self.eligibleOpenChallengeById.removeAll()
+    }
+    
+    func fetchFriends() {
+        AF.request("\(self.ogsRoot)/api/v1/ui/friends").validate().responseJSON { response in
+            if case .success(let data) = response.result {
+                if let friends = (data as? [String: Any] ?? [:])["friends"] as? [[String: Any]] {
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    var result = [OGSUser]()
+                    for friend in friends {
+                        if let user = try? decoder.decode(OGSUser.self, from: friend) {
+                            result.append(user)
+                        }
+                    }
+                    self.friends = result
+                }
+            }
+        }
+    }
+    
+    func searchByUsername(keyword: String) -> AnyPublisher<[OGSUser], Error> {
+        return Future<[OGSUser], Error> { promise in
+            AF.request("\(self.ogsRoot)/api/v1/ui/omniSearch", parameters: ["q": keyword])
+                .validate().responseJSON { response in
+                    switch response.result {
+                    case .success(let data):
+                        if let players = (data as? [String: Any] ?? [:])["players"] as? [[String: Any]] {
+                            let decoder = DictionaryDecoder()
+                            decoder.keyDecodingStrategy = .convertFromSnakeCase
+                            var result = [OGSUser]()
+                            for player in players {
+                                if let user = try? decoder.decode(OGSUser.self, from: player) {
+                                    result.append(user)
+                                }
+                            }
+                            promise(.success(result))
+                        } else {
+                            promise(.failure(OGSServiceError.invalidJSON))
+                        }
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
+                }
+        }.eraseToAnyPublisher()
     }
 }

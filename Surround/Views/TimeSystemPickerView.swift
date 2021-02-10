@@ -227,6 +227,7 @@ struct TimeSystemPickerView: View {
     var correspondenceTimeControl: Binding<TimeControl>
     @Binding var timeControlSpeed: TimeControlSpeed
     @Binding var isBlitz: Bool
+    @Binding var pauseOnWeekend: Bool
 
     var finalTimeControlSpeed: TimeControlSpeed {
         if timeControlSpeed == .correspondence {
@@ -264,10 +265,15 @@ struct TimeSystemPickerView: View {
                 if timeControlSpeed == .live {
                     Spacer().frame(height: 10)
                     Toggle(isOn: $isBlitz) {
-                        Text("Blitz")
+                        Text("Blitz").font(.subheadline)
+                    }.padding(.horizontal)
+                } else if timeControlSpeed == .correspondence {
+                    Spacer().frame(height: 10)
+                    Toggle(isOn: $pauseOnWeekend) {
+                        Text("Pause on weekend").font(.subheadline)
                     }.padding(.horizontal)
                 }
-                Spacer().frame(height: 10)
+                Spacer().frame(height: 20)
                 Divider()
                 ForEach(defaultOptions.indices, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 0) {
@@ -303,6 +309,8 @@ struct TimeSystemPickerView: View {
                 }
             }.padding(.vertical)
         }
+        .navigationBarTitle("Advanced time settings")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -319,9 +327,9 @@ struct TimeSystemPickerView_Previews: PreviewProvider {
                     liveTimeControl: .constant(liveTimeControl),
                     correspondenceTimeControl: .constant(correspondenceTimeControl),
                     timeControlSpeed: .constant(.live),
-                    isBlitz: .constant(false)
+                    isBlitz: .constant(false),
+                    pauseOnWeekend: .constant(true)
                 )
-                .navigationBarTitleDisplayMode(.inline)
             }
         }
     }
