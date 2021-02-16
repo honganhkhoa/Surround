@@ -65,8 +65,10 @@ struct UserSelectionView: View {
     @State var searchRequestByKeyword = [String: AnyCancellable]()
     
     func selectUser(_ user: OGSUser) {
-        self.user.wrappedValue = user
-        self.isPresented.wrappedValue = false
+        if user.id != ogs.user?.id {
+            self.user.wrappedValue = user
+            self.isPresented.wrappedValue = false
+        }
     }
     
     func userRow(_ user: OGSUser) -> some View {

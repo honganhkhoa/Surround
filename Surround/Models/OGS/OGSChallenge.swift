@@ -25,6 +25,7 @@ struct OGSChallenge: Codable, Identifiable {
         case maxRanking
         case minRanking
         case initialized
+        case agaRanked
     }
     
     init(from decoder: Decoder) throws {
@@ -61,6 +62,8 @@ struct OGSChallenge: Codable, Identifiable {
             try container.encode(-1000, forKey: .minRanking)
         }
         try container.encode(false, forKey: .initialized)
+        try container.encode(game, forKey: .game)
+        try container.encode(false, forKey: .agaRanked)
     }
        
     init(id: Int, challenger: OGSUser? = nil, challenged: OGSUser? = nil, challengerColor: StoneColor? = nil, game: OGSChallengeGameDetail) {
@@ -171,6 +174,7 @@ struct OGSChallengeGameDetail: Codable {
         width = try container.decode(Int.self, forKey: .width)
         height = try container.decode(Int.self, forKey: .height)
         ranked = try container.decode(Bool.self, forKey: .ranked)
+        isPrivate = (try? container.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? false
         if let komiString = try? container.decodeIfPresent(String.self, forKey: .komi) {
             komi = Double(komiString)!
         } else {
@@ -214,6 +218,7 @@ struct OGSChallengeGameDetail: Codable {
         }
         try container.encode(name, forKey: .name)
         try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encode(ranked, forKey: .ranked)
         try container.encode(rules, forKey: .rules)
         try container.encode(timeControl.timeControl, forKey: .timeControl)
         try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
@@ -287,6 +292,7 @@ extension OGSChallenge {
                 "height": 9,
                 "rules": "nz",
                 "ranked": false,
+                "private": true,
                 "handicap": -1,
                 "komi": "6.50",
                 "time_control": "fischer",

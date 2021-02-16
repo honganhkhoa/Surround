@@ -7,6 +7,7 @@
 
 import SwiftUI
 import URLImage
+import Combine
 
 struct MainActionButton: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -65,8 +66,7 @@ struct QuickMatchForm: View {
             if challenges.count > 0 {
                 Text("Alternatively, there \(challenges.count == 1 ? "is" : "are") \(challenges.count) open custom \(challenges.count == 1 ? "game" : "games") matching your preferences that you can accept to start a game immediately.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
+                    .leadingAlignedInScrollView()
                 ForEach(challenges, id: \.id) { challenge in
                     ChallengeCell(challenge: challenge)
                         .padding()
@@ -122,13 +122,11 @@ struct QuickMatchForm: View {
                         })
                         (Text("Live games").bold() + Text(" generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in ") + Text("Blitz").bold() + Text(" mode."))
                             .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .leadingAlignedInScrollView()
                     } else if timeControlSpeed == .correspondence {
                         (Text("Correspondence games").bold() + Text(" are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time."))
                             .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .leadingAlignedInScrollView()
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -260,8 +258,7 @@ struct CustomGameForm: View {
             if isOpen {
                 Text("Create and show a challenge publicly, then wait for other players to accept.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
                 Divider()
                 Toggle(isOn: $rankRestricted.animation()) {
                     Text("Restrict opponent rank")
@@ -280,8 +277,7 @@ struct CustomGameForm: View {
             } else {
                 Text("Send a challenge directly to a friend (or a specific player) so they can accept to start a game.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
                 Spacer().frame(height: 10)
                 Divider()
                 NavigationLink(destination: UserSelectionView(user: $opponent, isPresented: $selectingOpponent), isActive: $selectingOpponent) {
@@ -321,15 +317,13 @@ struct CustomGameForm: View {
                 if handicap == -1 {
                     Text("Automatically determine the number of handicap stones based on your and your opponent's rank.")
                         .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .leadingAlignedInScrollView()
                 }
             }
             Divider()
             Toggle(isOn: $automaticColor) {
                 Text("Automatically assign stone colors").font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             }
             if !automaticColor {
                 HStack {
@@ -342,8 +336,7 @@ struct CustomGameForm: View {
             } else {
                 (Text("Automatic").bold() + Text(" setting will either assign white to the stronger player, follow your opponent's preference, or just assign randomly."))
                     .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             }
         }
         .onChange(of: maxRank) { newValue in
@@ -415,8 +408,7 @@ struct CustomGameForm: View {
             if isRanked {
                 (Text("Custom").bold() + Text(" board sizes are not available in ") + Text("ranked").bold() + Text(" games."))
                     .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -447,15 +439,13 @@ struct CustomGameForm: View {
             Divider()
             (Text("\(finalTimeControl.systemName): ").bold() + finalTimeControl.system.descriptionText)
                 .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .leadingAlignedInScrollView()
             Spacer().frame(height: 10)
             if finalTimeControl.system != finalTimeControlSpeed.defaultTimeOptions[0] {
                 Button(action: revertToStandardTimeSetting) {
                     Text("Revert to standard time setting.")
                         .font(.subheadline).bold()
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .leadingAlignedInScrollView()
                 }
             }
             Spacer().frame(height: 10)
@@ -470,8 +460,7 @@ struct CustomGameForm: View {
             ) {
                 (Text("Advanced time settings ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             }
         }
     }
@@ -496,14 +485,12 @@ struct CustomGameForm: View {
             }
             (Text(komi == rulesSet.defaultKomi ? "Standard" : "Custom").bold() + Text(" komi: ") + Text(String(format: "%.1f", komi)).bold())
                 .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .leadingAlignedInScrollView()
             Spacer().frame(height: 10)
             NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
                 (Text("Advanced rules settings ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             }
         }
         .onChange(of: rulesSet) { newValue in
@@ -522,8 +509,7 @@ struct CustomGameForm: View {
             .disabled(isRanked)
             (Text("Disable the ") + Text("ranked").bold() + Text(" option above if you don't want the result to count towards your rating. ") + Text("Ranked").bold() + Text(" games cannot be ") + Text("private").bold() + Text(" and have fewer customizing options."))
                 .font(.caption)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .leadingAlignedInScrollView()
         }
         .onChange(of: isRanked) { newValue in
             if newValue {
@@ -555,8 +541,7 @@ struct CustomGameForm: View {
                 Button(action: { isEditingGameName = true }) {
                     (Text("Game name: ") + Text(gameName).bold())
                         .font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .leadingAlignedInScrollView()
                 }
             }
             Toggle(isOn: $analysisDisabled) {
@@ -564,8 +549,7 @@ struct CustomGameForm: View {
             }
             (Text("Analysis mode").bold() + Text(" is currently not available in the app yet. If you or your opponent use the web version during the match, ") + Text("analysis mode").bold() + Text(" is like a separate board where you can test out variations during the game."))
                 .font(.caption)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .leadingAlignedInScrollView()
         }
     }
 
@@ -573,6 +557,40 @@ struct CustomGameForm: View {
         challenge.game.timeControl = finalTimeControl
         if challenge.game.timeControl.speed == .correspondence {
             challenge.game.timeControl.pauseOnWeekends = pauseOnWeekend
+        }
+    }
+    
+    var createButtonDisabled: Bool {
+        return !isOpen && opponent == nil
+    }
+    
+    @State var challengeCreatingCancellable: AnyCancellable?
+    
+    var actionButton: some View {
+        VStack(alignment: .leading) {
+            if self.challengeCreatingCancellable != nil {
+                Spacer().frame(height: 15)
+                ProgressView()
+            } else {
+                MainActionButton(label: "Create challenge", disabled: createButtonDisabled, action: createChallenge)
+                if !isOpen && opponent == nil {
+                    Text("You need to choose an opponent or make the challenge open.")
+                        .font(.caption)
+                        .leadingAlignedInScrollView()
+                }
+            }
+            Spacer().frame(height: 15)
+        }
+    }
+    
+    func createChallenge() {
+        if !isOpen {
+            if let opponent = opponent {
+                self.challengeCreatingCancellable = ogs.sendChallenge(user: opponent, challenge: challenge).sink(
+                    receiveCompletion: { _ in
+                        self.challengeCreatingCancellable = nil
+                    }, receiveValue: {})
+            }
         }
     }
     
@@ -586,8 +604,7 @@ struct CustomGameForm: View {
                     gameSpeedOptions
                     rulesOptions
                     otherOptions
-                    MainActionButton(label: "Create challenge", disabled: false, action: {})
-                    Spacer().frame(height: 15)
+                    actionButton
                     Text("Preview")
                         .font(.title3).bold()
                         .fixedSize(horizontal: false, vertical: true)
@@ -596,7 +613,7 @@ struct CustomGameForm: View {
                         .padding()
                         .background(
                             Color(
-                                colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray6
+                                colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
                             ).shadow(radius: 2)
                         )
                 }
@@ -665,18 +682,15 @@ struct NewGameView: View {
             case .quickMatch:
                 Text("Automatically match you with another player who is also looking for a game.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             case .custom:
                 Text("Create a game precisely as you want.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
             case .openChallenges:
                 Text("Open challenges that you can accept to start a game immediately.")
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .leadingAlignedInScrollView()
 
             }
         }
@@ -729,7 +743,8 @@ struct NewGameView_Previews: PreviewProvider {
             .environmentObject(OGSService.previewInstance(user: OGSUser(
                 username: "HongAnhKhoa",
                 id: 314459,
-                ranking: 27
+                ranking: 27,
+                icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
             )))
         }
     }

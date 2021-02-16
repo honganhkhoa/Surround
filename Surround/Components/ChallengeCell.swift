@@ -60,20 +60,27 @@ struct ChallengeCell: View {
                             URLImage(iconURL)
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
-                            if let opponentStoneColor = opponentStoneColor {
-                                Stone(color: opponentStoneColor, shadowRadius: 1)
-                                    .frame(width: 20, height: 20)
-                                    .offset(x: 10, y: 10)
-                            }
+                            Stone(color: opponentStoneColor, shadowRadius: 1)
+                                .frame(width: 20, height: 20)
+                                .offset(x: 10, y: 10)
                         }
                     }
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(challenge.game.name)
                             .font(.title3)
                             .bold()
                         HStack {
-                            Text(headerPlayer.username)
-                            Text("[\(headerPlayer.formattedRank)]")
+                            if headerPlayer.icon == nil {
+                                Stone(color: opponentStoneColor, shadowRadius: 1)
+                                    .frame(width: 20, height: 20)
+                            }
+                            Text(headerPlayer.username) +
+                            Text(" [\(headerPlayer.formattedRank)]")
+                        }
+                        if challenge.game.isPrivate {
+                            Text("Private")
+                                .italic()
+                                .font(.subheadline)
                         }
                     }
                     Spacer()
@@ -83,6 +90,7 @@ struct ChallengeCell: View {
                         } else {
                             Button(action: { acceptChallenge(challenge: challenge) }) {
                                 Text("Accept")
+                                    .bold()
                             }
                         }
                     }
@@ -97,7 +105,7 @@ struct ChallengeCell: View {
                             Spacer()
                             Text("Handicap: ").bold()
                                 .offset(x: 8)
-                            Text(game.handicap == -1 ? "Automatic" : "\(game.handicap)")
+                            Text(game.handicap == -1 ? "Auto" : "\(game.handicap)")
                         }
                     } icon: {
                         Image(systemName: "squareshape.split.3x3")
@@ -148,6 +156,7 @@ struct ChallengeCell: View {
                         if isUserTheChallenger {
                             Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
                                 Text("Withdraw")
+                                    .bold()
                                     .foregroundColor(.red)
                             }
                             .padding(10)
@@ -155,13 +164,16 @@ struct ChallengeCell: View {
                             .hoverEffect(.highlight)
                         } else {
                             Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                                Text("Reject").foregroundColor(.red)
+                                Text("Reject")
+                                    .bold()
+                                    .foregroundColor(.red)
                             }
                             .padding(10)
                             .contentShape(RoundedRectangle(cornerRadius: 10))
                             .hoverEffect(.highlight)
                             Button(action: { self.acceptChallenge(challenge: challenge) }) {
                                 Text("Accept")
+                                    .bold()
                             }
                             .padding(10)
                             .contentShape(RoundedRectangle(cornerRadius: 10))
@@ -177,10 +189,20 @@ struct ChallengeCell: View {
 struct ChallengeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            ChallengeCell(challenge: OGSChallenge.sampleOpenChallenge)
-                .padding()
-            ChallengeCell(challenge: OGSChallenge.sampleChallenge)
-                .padding()
+            VStack {
+                ChallengeCell(challenge: OGSChallenge.sampleOpenChallenge)
+                    .padding()
+                    .background(Color(UIColor.systemBackground).shadow(radius: 2))
+            }
+            .padding()
+            VStack {
+                ChallengeCell(challenge: OGSChallenge.sampleChallenge)
+                    .padding()
+                    .background(Color(UIColor.systemGray5).shadow(radius: 2))
+            }
+            .padding()
+            .background(Color(UIColor.systemBackground))
+            .colorScheme(.dark)
         }
         .previewLayout(.fixed(width: 320, height: 300))
         .environmentObject(

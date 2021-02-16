@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct Stone: View {
-    var color: StoneColor
+    var color: StoneColor?
     var shadowRadius: CGFloat = 0.0
     
     var body: some View {
@@ -38,6 +38,21 @@ struct Stone: View {
                         }
                         Circle().stroke(Color.gray, lineWidth: 0.5)
                     }
+                case .none:
+                    ZStack {
+                        if shadowRadius > 0 {
+                            Path(path).fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.black, Color.white]
+                                    ),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                        }
+                        Text("?").font(Font.system(size: size / 1.5).bold()).foregroundColor(Color.white)
+                        Circle().stroke(Color.gray, lineWidth: 0.5)
+                    }
                 }
             }.aspectRatio(1, contentMode: .fit)
             )
@@ -54,6 +69,9 @@ struct Stone_Previews: PreviewProvider {
             Stone(color: .white, shadowRadius: 2)
                 .frame(width: 25, height: 25)
                 .previewLayout(.fixed(width: 100, height: 50))
+            Stone(color: nil, shadowRadius: 2)
+                .frame(width: 25, height: 25)
+                .previewLayout(.fixed(width: 100, height: 50))
             ZStack {
                 Rectangle().fill(Color(UIColor.systemGray5))
                 Stone(color: .black, shadowRadius: 2)
@@ -68,6 +86,12 @@ struct Stone_Previews: PreviewProvider {
             }
             .previewLayout(.fixed(width: 100, height: 50))
             .colorScheme(.dark)
+            Stone(color: .black)
+                .frame(width: 25, height: 25)
+                .previewLayout(.fixed(width: 100, height: 50))
+            Stone(color: .white)
+                .frame(width: 25, height: 25)
+                .previewLayout(.fixed(width: 100, height: 50))
         }
     }
 }

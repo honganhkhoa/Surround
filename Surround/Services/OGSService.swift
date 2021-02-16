@@ -1289,4 +1289,24 @@ class OGSService: ObservableObject {
                 }
         }.eraseToAnyPublisher()
     }
+    
+    func sendChallenge(user: OGSUser, challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    "\(self.ogsRoot)/api/v1/players/\(user.id)/challenge",
+                    method: .post,
+                    parameters: challenge,
+                    encoder: JSONParameterEncoder(encoder: encoder),
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
+                ).validate().responseJSON { response in
+                    print(response.result)
+                }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
+            }
+        }.eraseToAnyPublisher()
+    }
 }
