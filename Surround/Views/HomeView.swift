@@ -74,7 +74,7 @@ struct HomeView: View {
                     HStack {
                         Button(action: { showingNewGameView = true }) {
                             Label {
-                                Text("Create a new game").font(Font.body.bold())
+                                Text("New game").font(Font.body.bold())
                             } icon: {
                                 Image(systemName: "plus.app.fill").font(Font.body.bold())
                             }

@@ -13,6 +13,11 @@ struct OGSChallenge: Codable, Identifiable {
     var challenged: OGSUser?
     var challengerColor: StoneColor?
     var game: OGSChallengeGameDetail
+
+    var hasHandicap: Bool { game.handicap > 0 }
+    var useCustomKomi: Bool { game.komi != nil && game.komi != game.rules.defaultKomi }
+    var unusualBoardSize: Bool { game.width != game.height || ![9, 13, 19].contains(game.width) }
+    var isUnusual: Bool { hasHandicap || useCustomKomi || game.timeControl.system.isUnusual || unusualBoardSize }
     
     enum CodingKeys: String, CodingKey {
         case id

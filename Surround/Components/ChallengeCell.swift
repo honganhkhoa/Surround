@@ -97,6 +97,28 @@ struct ChallengeCell: View {
                 }
                 Spacer().frame(height: 15)
             }
+            if challenge.isUnusual {
+                HStack {
+                    VStack(alignment: .leading) {
+                        if challenge.useCustomKomi {
+                            Label("Custom komi: \(String(format: "%.1f", challenge.game.komi!))", systemImage: "exclamationmark.triangle.fill")
+                        }
+                        if challenge.hasHandicap {
+                            Label("Has handicap: \(challenge.game.handicap)", systemImage: "exclamationmark.triangle.fill")
+                        }
+                        if challenge.game.timeControl.system.isUnusual {
+                            Label("Unusual time settings", systemImage: "exclamationmark.triangle.fill")
+                        }
+                        if challenge.unusualBoardSize {
+                            Label("Unusual board size: \(challenge.game.width)×\(challenge.game.height)", systemImage: "exclamationmark.triangle.fill")
+                        }
+                        Spacer().frame(height: 10)
+                    }
+                    .font(Font.subheadline.bold())
+                    .foregroundColor(Color(.systemOrange))
+                    Spacer()
+                }
+            }
             if let game = challenge.game {
                 VStack(alignment: .leading, spacing: 3) {
                     Label{

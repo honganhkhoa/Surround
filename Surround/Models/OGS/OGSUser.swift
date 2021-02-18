@@ -71,10 +71,28 @@ struct OGSUser : Codable {
     var icon: String?
     var supporter: Bool?
     var ratings: OGSRating?
+    var iconUrl: String?
     
     // In-game
     var acceptedStones: String?
     var acceptedStrickSekiMode: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case username
+        case id
+        case ranking
+        case rank
+        case uiClass
+        case isTournamentModerator
+        case canCreateTournaments
+        case country
+        case professional
+        case provisional
+        case icon
+        case supporter
+        case ratings
+        case iconUrl = "icon-url"
+    }
     
     var formattedRank: String {
         return self.formattedRank()
@@ -92,7 +110,7 @@ struct OGSUser : Codable {
     }
     
     func iconURL(ofSize size: Int) -> URL? {
-        guard let icon = self.icon else {
+        guard let icon = self.icon ?? self.iconUrl else {
             return nil
         }
         
@@ -153,6 +171,10 @@ struct OGSUser : Codable {
         
         if user.icon == nil && cachedUser.icon != nil {
             user.icon = cachedUser.icon
+        }
+        
+        if user.icon == nil && cachedUser.iconUrl != nil {
+            user.icon = cachedUser.iconUrl
         }
         
         return user

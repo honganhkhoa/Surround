@@ -480,6 +480,7 @@ class OGSService: ObservableObject {
         guard userIds.count > 0 else {
             return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
         }
+        print("Fetching player info: \(userIds)")
         return Future<[OGSUser], Error> { promise in
             AF.request(
                 "\(self.ogsRoot)/termination-api/players",
@@ -1205,6 +1206,8 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    var playerCacheObservingCancellable: AnyCancellable?
+    
     func subscribeToOpenChallenges() {
         guard socket.status == .connected else {
             return
@@ -1225,12 +1228,34 @@ class OGSService: ObservableObject {
                             self.openChallengeById.removeValue(forKey: challengeId)
                             self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
                         } else {
-                            if let challenge = try? decoder.decode(OGSChallenge.self, from: challenge) {
+                            if var challenge = try? decoder.decode(OGSChallenge.self, from: challenge) {
+                                if let challengerId = challenge.challenger?.id {
+                                    if self.cachedUsersById[challengerId] != nil {
+                                        challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
+                                    }
+                                }
                                 self.openChallengeById[challengeId] = challenge
                                 if challenge.isUserEligible(user: user) {
                                     self.eligibleOpenChallengeById[challengeId] = challenge
+                                    if let challengerId = challenge.challenger?.id {
+                                        self.cachedUserIds.insert(challengerId)
+                                    }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+        
+        playerCacheObservingCancellable = self.$cachedUsersById.collect(.byTime(DispatchQueue.main, 0.2)).sink { values in
+            if let cachedUsersById = values.last {
+                for (id, challenge) in self.eligibleOpenChallengeById {
+                    if let challengerId = challenge.challenger?.id {
+                        if cachedUsersById[challengerId] != nil {
+                            var challenge = challenge
+                            challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: cachedUsersById[challengerId]!)
+                            self.eligibleOpenChallengeById[id] = challenge
                         }
                     }
                 }
@@ -1244,6 +1269,9 @@ class OGSService: ObservableObject {
         
         self.openChallengeById.removeAll()
         self.eligibleOpenChallengeById.removeAll()
+        
+        playerCacheObservingCancellable?.cancel()
+        playerCacheObservingCancellable = nil
     }
     
     func fetchFriends() {

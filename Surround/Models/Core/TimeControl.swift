@@ -91,9 +91,9 @@ enum TimeControlSystem: Equatable {
         case .Simple(let perMove):
             return "\(durationString(seconds: perMove))/move"
         case .ByoYomi(let mainTime, let periods, let periodTime):
-            return "\(durationString(seconds: mainTime)) + \(periods) × \(durationString(seconds: periodTime))"
+            return "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(periods)×\(durationString(seconds: periodTime))"
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
-            return "\(durationString(seconds: mainTime)) + \(durationString(seconds: periodTime))/\(stonesPerPeriod)"
+            return "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(durationString(seconds: periodTime))/\(stonesPerPeriod)"
         case .Absolute(let totalTime):
             return durationString(seconds: totalTime)
         case .None:
@@ -183,6 +183,26 @@ enum TimeControlSystem: Equatable {
             return TimeControl(codingData: TimeControl.TimeControlCodingData(
                 timeControl: "none"
             ))
+        }
+    }
+
+    static let QuestionableSecondsPerMove = 4
+    static let QuestionableAbsoluteTime = 900
+    
+    var isUnusual: Bool {
+        switch self {
+        case .Fischer(let initialTime, let timeIncrement, _):
+            return !(initialTime > TimeControlSystem.QuestionableAbsoluteTime || timeIncrement > TimeControlSystem.QuestionableSecondsPerMove)
+        case .Simple(let perMove):
+            return perMove < TimeControlSystem.QuestionableSecondsPerMove
+        case .ByoYomi(let mainTime, _, let periodTime):
+            return !(mainTime > TimeControlSystem.QuestionableAbsoluteTime || periodTime > TimeControlSystem.QuestionableSecondsPerMove)
+        case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
+            return !(mainTime > TimeControlSystem.QuestionableAbsoluteTime || periodTime / stonesPerPeriod > TimeControlSystem.QuestionableSecondsPerMove)
+        case .Absolute(let totalTime):
+            return totalTime <= TimeControlSystem.QuestionableAbsoluteTime
+        case .None:
+            return false
         }
     }
 }

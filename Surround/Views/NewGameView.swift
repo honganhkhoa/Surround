@@ -37,6 +37,18 @@ struct QuickMatchForm: View {
     
     @EnvironmentObject var ogs: OGSService
 
+    var finalTimeControlSpeed: TimeControlSpeed {
+        if timeControlSpeed == .correspondence {
+            return .correspondence
+        } else {
+            if blitz {
+                return .blitz
+            } else {
+                return timeControlSpeed
+            }
+        }
+    }
+
     var customChallengesMatchingAutomatchCondition: [OGSChallenge] {
         return Array(ogs.eligibleOpenChallengeById.values.filter { challenge in
             let width = challenge.game.width
@@ -79,7 +91,10 @@ struct QuickMatchForm: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                GroupBox(label: Text("Board size" + (boardSizes.count == 0 ? " ⚠️" : ""))) {
+                GroupBox(label: Text("Board size" + (boardSizes.count == 0 ? " ⚠️" : ": \([9, 13, 19].filter { boardSizes.contains($0) }.map { "\($0)×\($0)" }.joined(separator: ", "))"))) {
+                    Text("You can select multiple options.")
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
                     HStack {
                         ForEach([9, 13, 19], id: \.self) { size in
                             VStack {
@@ -109,7 +124,7 @@ struct QuickMatchForm: View {
                         }
                     }
                 }.fixedSize(horizontal: false, vertical: true)
-                GroupBox(label: Text("Game speed")) {
+                GroupBox(label: Text("Game speed: \(finalTimeControlSpeed.rawValue)")) {
                     Picker(selection: $timeControlSpeed.animation(), label: Text("Game speed")) {
                         Text("Live").tag(TimeControlSpeed.live)
                         Text("Correspondence").tag(TimeControlSpeed.correspondence)
@@ -614,7 +629,9 @@ struct CustomGameForm: View {
                         .background(
                             Color(
                                 colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                            ).shadow(radius: 2)
+                            )
+                            .cornerRadius(8)
+                            .shadow(radius: 2)
                         )
                 }
                 .padding()
@@ -632,6 +649,10 @@ struct CustomGameForm: View {
         .onChange(of: handicap) { challenge.game.handicap = $0 }
         .onChange(of: automaticColor) {
             challenge.challengerColor = $0 ? nil : yourColor
+            challenge.game.challengerColor = challenge.challengerColor
+        }
+        .onChange(of: yourColor) {
+            challenge.challengerColor = $0
             challenge.game.challengerColor = challenge.challengerColor
         }
         .onChange(of: boardWidth) { challenge.game.width = $0 }
@@ -654,6 +675,77 @@ struct CustomGameForm: View {
     }
 }
 
+struct OpenChallengesForm: View {
+    @EnvironmentObject var ogs: OGSService
+    @Environment(\.colorScheme) private var colorScheme
+    var eligibleOpenChallenges: [OGSChallenge]
+    
+    func sectionHeader(title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(Font.title3.bold())
+            Spacer()
+        }
+        .padding([.vertical], 5)
+        .padding([.horizontal])
+        .frame(maxWidth: .infinity)
+        .background(Color(UIColor.systemGray3).shadow(radius: 2))
+    }
+
+    var body: some View {
+        var liveGameChallenges = [OGSChallenge]()
+        var correspondenceGameChallenges = [OGSChallenge]()
+        for challenge in eligibleOpenChallenges {
+            if challenge.game.timeControl.speed == .correspondence {
+                correspondenceGameChallenges.append(challenge)
+            } else {
+                liveGameChallenges.append(challenge)
+            }
+        }
+        
+        return ScrollView {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                if liveGameChallenges.count > 0 {
+                    Section(header: sectionHeader(title: "Live games")) {
+                        Spacer().frame(height: 10)
+                        ForEach(liveGameChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                    )
+                                    .shadow(radius: 2)
+                                )
+                                .padding(.vertical, 5)
+                                .padding(.horizontal)
+                        }
+                        Spacer().frame(height: 10)
+                    }
+                }
+                if correspondenceGameChallenges.count > 0 {
+                    Section(header: sectionHeader(title: "Correspondence games")) {
+                        Spacer().frame(height: 10)
+                        ForEach(correspondenceGameChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                    )
+                                    .shadow(radius: 2)
+                                )
+                                .padding(.vertical, 5)
+                                .padding(.horizontal)
+                        }
+                        Spacer().frame(height: 10)
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct NewGameView: View {
     @State var newGameOption: NewGameOption = .quickMatch
     @State var eligibleOpenChallenges = [OGSChallenge]()
@@ -665,22 +757,18 @@ struct NewGameView: View {
         case openChallenges
     }
     
-    var openChallengesForm: some View {
-        VStack(alignment: .leading) {
-        }
-    }
-    
     var newGameOptionsPicker: some View {
-        VStack() {
+        let eligibleOpenChallengesCount = ogs.eligibleOpenChallengeById.count
+        return VStack() {
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {
                 Text("Quick match").tag(NewGameOption.quickMatch)
+                Text("Waiting (\(eligibleOpenChallengesCount))").tag(NewGameOption.openChallenges)
                 Text("Custom").tag(NewGameOption.custom)
-                Text("Waiting (\(ogs.eligibleOpenChallengeById.count))").tag(NewGameOption.openChallenges)
             }
             .pickerStyle(SegmentedPickerStyle())
             switch newGameOption {
             case .quickMatch:
-                Text("Automatically match you with another player who is also looking for a game.")
+                Text("Select the board size(s) and time settings you want to play, then the system will automatically match you with another player with similar ranking who is also looking for a game.")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             case .custom:
@@ -688,7 +776,7 @@ struct NewGameView: View {
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             case .openChallenges:
-                Text("Open challenges that you can accept to start a game immediately.")
+                Text("There are \(eligibleOpenChallengesCount == 0 ? "no" : "\(eligibleOpenChallengesCount)") open challenge\(eligibleOpenChallengesCount != 1 ? "s" : "") that you can accept to start a game immediately.")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
 
@@ -707,7 +795,7 @@ struct NewGameView: View {
                 } else if newGameOption == .custom {
                     CustomGameForm()
                 } else if newGameOption == .openChallenges {
-                    openChallengesForm
+                    OpenChallengesForm(eligibleOpenChallenges: self.eligibleOpenChallenges)
                 }
             }
             newGameOptionsPicker.background(Color(.systemGray6).shadow(radius: 2))
@@ -735,11 +823,11 @@ struct NewGameView_Previews: PreviewProvider {
 
         return Group {
             NavigationView {
-                NewGameView(newGameOption: .custom)
+                NewGameView(newGameOption: .quickMatch)
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
-//            .colorScheme(.dark)
+            .colorScheme(.dark)
             .environmentObject(OGSService.previewInstance(user: OGSUser(
                 username: "HongAnhKhoa",
                 id: 314459,
