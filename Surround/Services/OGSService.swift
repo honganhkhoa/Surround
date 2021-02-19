@@ -1264,6 +1264,10 @@ class OGSService: ObservableObject {
     }
     
     func unsubscribeFromOpenChallenges() {
+        guard socket.status == .connected else {
+            return
+        }
+
         self.socket.emit("seek_graph/disconnect", ["channel": "global"])
         self.socket.off("seekgraph/global")
         
@@ -1318,13 +1322,17 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func sendChallenge(user: OGSUser, challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+    func sendChallenge(opponent: OGSUser?, challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
+            var url = "\(self.ogsRoot)/api/v1/challenges"
+            if let opponentId = opponent?.id {
+                url = "\(self.ogsRoot)/api/v1/players/\(opponentId)/challenge"
+            }
             if let csrfToken = self.ogsUIConfig?.csrfToken {
                 AF.request(
-                    "\(self.ogsRoot)/api/v1/players/\(user.id)/challenge",
+                    url,
                     method: .post,
                     parameters: challenge,
                     encoder: JSONParameterEncoder(encoder: encoder),

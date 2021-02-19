@@ -71,8 +71,8 @@ struct HomeView: View {
                 if isLoading {
                     ProgressView()
                 } else {
-                    HStack {
-                        Button(action: { showingNewGameView = true }) {
+                    Button(action: { showingNewGameView = true }) {
+                        HStack {
                             Label {
                                 Text("New game").font(Font.body.bold())
                             } icon: {
