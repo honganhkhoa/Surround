@@ -34,7 +34,7 @@ struct QuickMatchForm: View {
     @State var timeControlSpeed: TimeControlSpeed = .live
     @State var blitz = false
     var eligibleOpenChallenges = [OGSChallenge]()
-    
+
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
 
@@ -614,7 +614,9 @@ struct CustomGameForm: View {
                 self.challengeCreatingCancellable = ogs.sendChallenge(opponent: opponent, challenge: challenge).sink(
                     receiveCompletion: { _ in
                         self.challengeCreatingCancellable = nil
-                    }, receiveValue: {})
+                    }, receiveValue: { challenge in
+                        print(challenge)
+                    })
             }
         }
     }
@@ -752,9 +754,10 @@ struct OpenChallengesForm: View {
 }
 
 struct NewGameView: View {
+    @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
     @State var newGameOption: NewGameOption = .quickMatch
     @State var eligibleOpenChallenges = [OGSChallenge]()
-    @EnvironmentObject var ogs: OGSService
 
     enum NewGameOption {
         case quickMatch
@@ -795,6 +798,12 @@ struct NewGameView: View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 newGameOptionsPicker.opacity(0)
+//                Button(action: {
+//                    nav.home.ogsIdToOpen = ogs.activeGames.values.first!.ogsID!
+//                    nav.home.showingNewGameView = false
+//                }) {
+//                    Text("Test")
+//                }
                 if newGameOption == .quickMatch {
                     QuickMatchForm(eligibleOpenChallenges: self.eligibleOpenChallenges)
                 } else if newGameOption == .custom {

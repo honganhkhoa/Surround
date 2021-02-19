@@ -1144,9 +1144,12 @@ class OGSService: ObservableObject {
     
     func withdrawOrDeclineChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
+            let url = challenge.challenged == nil ?
+                "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)" :
+                "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
                 AF.request(
-                    "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)",
+                    url,
                     method: .delete,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
                 ).validate().response { response in
@@ -1322,8 +1325,8 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func sendChallenge(opponent: OGSUser?, challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
-        return Future<Void, Error> { promise in
+    func sendChallenge(opponent: OGSUser?, challenge: OGSChallenge) -> AnyPublisher<OGSChallenge, Error> {
+        return Future<OGSChallenge, Error> { promise in
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
             var url = "\(self.ogsRoot)/api/v1/challenges"
@@ -1338,6 +1341,23 @@ class OGSService: ObservableObject {
                     encoder: JSONParameterEncoder(encoder: encoder),
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
                 ).validate().responseJSON { response in
+                    switch response.result {
+                    case .success(let data):
+                        if let result = data as? [String: Any] {
+                            if result["status"] as? String == "ok" {
+                                if let challengeId = result["challenge"] as? Int, let gameId = result["game"] as? Int {
+                                    var challenge = challenge
+                                    challenge.id = challengeId
+                                    challenge.game.id = gameId
+                                    promise(.success(challenge))
+                                    return
+                                }
+                            }
+                        }
+                        promise(.failure(OGSServiceError.invalidJSON))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
                     print(response.result)
                 }
             } else {

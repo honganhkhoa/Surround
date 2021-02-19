@@ -144,6 +144,8 @@ struct OGSChallengeGameDetail: Codable {
     var minRank: Int?
     var maxRank: Int?
     
+    var id: Int?
+    
     enum CodingKeys: String, CodingKey {
         case width
         case height
@@ -199,6 +201,7 @@ struct OGSChallengeGameDetail: Codable {
         
         // Custom game
         challengeId = try container.decodeIfPresent(Int.self, forKey: .challengeId)
+        id = try container.decodeIfPresent(Int.self, forKey: .gameId)
         userId = try container.decodeIfPresent(Int.self, forKey: .userId)
         username = try container.decodeIfPresent(String.self, forKey: .username)
         userRank = try container.decodeIfPresent(Double.self, forKey: .rank)

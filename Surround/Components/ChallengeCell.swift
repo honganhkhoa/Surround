@@ -11,14 +11,10 @@ import Combine
 
 struct ChallengeCell: View {
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
     var challenge: OGSChallenge
     @State var ogsRequestCancellable: AnyCancellable?
     
-    @SceneStorage("activeOGSGameIdToOpen")
-    var activeOGSGameIdToOpen = -1
-    @SceneStorage("showingNewGameView")
-    var showingNewGameView = false
-
     func withdrawOrDeclineChallenge(challenge: OGSChallenge) {
         self.ogsRequestCancellable = ogs.withdrawOrDeclineChallenge(challenge: challenge)
             .zip(ogs.$challengesSent.setFailureType(to: Error.self))
@@ -38,9 +34,9 @@ struct ChallengeCell: View {
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
                 withAnimation {
-                    activeOGSGameIdToOpen = newGameId
+                    nav.home.ogsIdToOpen = newGameId
                     if challenge.challenged == nil {
-                        showingNewGameView = false
+                        nav.home.showingNewGameView = false
                     }
                 }
             })

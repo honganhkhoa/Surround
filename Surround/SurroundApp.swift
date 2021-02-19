@@ -19,15 +19,8 @@ struct SurroundApp: App {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    // Disable portrait orientation at launch on iPad to work around a SwiftUI's split view bug.
-    var allowsPortrait = false
-    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        DispatchQueue.main.async {
-            self.allowsPortrait = true
-        }
-
         if userDefaults[.notificationEnabled] == true {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
                 UNUserNotificationCenter.current().delegate = self
@@ -35,18 +28,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         }
 
         return true
-    }
-    
-    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            return .portrait
-        } else {
-            if allowsPortrait {
-                return .all
-            } else {
-                return .landscape
-            }
-        }
     }
     
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

@@ -11,11 +11,8 @@ import Combine
 struct PublicGamesList: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
-    @State var gameToShowDetail: Game? = nil
-    @State var showDetail = false
+    @EnvironmentObject var nav: NavigationService
     
-    @SceneStorage("publicOGSGameIdToOpen")
-    var publicOGSGameIdToOpen = -1 //27671778 //-1
     @State var gameDetailCancellable: AnyCancellable?
     
     var body: some View {
@@ -25,14 +22,18 @@ struct PublicGamesList: View {
                     ForEach(ogs.sortedPublicGames) { game in
                         GameCell(game: game)
                             .onTapGesture {
-                                self.gameToShowDetail = game
-                                self.showDetail = true
+                                nav.publicGames.activeGame = game
                             }
                             .padding()
                     }
                 }
                 .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
-                NavigationLink(destination: gameToShowDetail == nil ? nil : GameDetailView(currentGame: gameToShowDetail!), isActive: $showDetail) {
+                NavigationLink(
+                    destination: GameDetailView(currentGame: nav.publicGames.activeGame),
+                    isActive: Binding(
+                        get: { nav.publicGames.activeGame != nil },
+                        set: { if !$0 { nav.publicGames.activeGame = nil } }
+                    )) {
                     EmptyView()
                 }
             }
@@ -40,15 +41,14 @@ struct PublicGamesList: View {
         .onAppear {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()
-            if publicOGSGameIdToOpen != -1 {
-                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: publicOGSGameIdToOpen).sink(
+            if nav.publicGames.ogsIdToOpen != -1 {
+                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: nav.publicGames.ogsIdToOpen).sink(
                     receiveCompletion: { _ in
-                        self.publicOGSGameIdToOpen = -1
+                        nav.publicGames.ogsIdToOpen = -1
                     },
                     receiveValue: { game in
-                        if gameToShowDetail == nil {
-                            gameToShowDetail = game
-                            self.showDetail = true
+                        if nav.publicGames.activeGame == nil {
+                            nav.publicGames.activeGame = game
                         }
                     })
             }

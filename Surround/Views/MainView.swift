@@ -14,16 +14,13 @@ struct MainView: View {
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
-    @SceneStorage("currentRootView") var currentView: RootView = .home
     @State var navigationCurrentView: RootView? = .home
     
-    @SceneStorage("activeOGSGameIdToOpen")
-    var activeOGSGameIdToOpen = -1
-    @SceneStorage("publicOGSGameIdToOpen")
-    var publicOGSGameIdToOpen = -1 //27671778 //-1
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
+
+    @EnvironmentObject var nav: NavigationService
     
     func onAppActive(newLaunch: Bool) {
         WidgetCenter.shared.getCurrentConfigurations { result in
@@ -44,7 +41,7 @@ struct MainView: View {
                 }
                 ogs.loadOverview()
             }
-            if currentView == .publicGames {
+            if nav.main.rootView == .publicGames {
                 ogs.fetchPublicGames()
             }
         })
@@ -53,19 +50,19 @@ struct MainView: View {
     
     func navigateTo(appURL: URL) {
         if let rootViewName = appURL.host, let rootView = RootView(rawValue: rootViewName) {
-            currentView = rootView
+            nav.main.rootView = rootView
             navigationCurrentView = rootView
             switch rootView {
             case .home:
                 if appURL.pathComponents.count > 1 {
                     if let ogsGameId = Int(appURL.pathComponents[1]) {
-                        activeOGSGameIdToOpen = ogsGameId
+                        nav.home.ogsIdToOpen = ogsGameId
                     }
                 }
             case .publicGames:
                 if appURL.pathComponents.count > 1 {
                     if let ogsGameId = Int(appURL.pathComponents[1]) {
-                        publicOGSGameIdToOpen = ogsGameId
+                        nav.publicGames.ogsIdToOpen = ogsGameId
                     }
                 }
             default:
@@ -90,7 +87,7 @@ struct MainView: View {
         return ZStack(alignment: .top) {
             NavigationView {
                 if compactSizeClass {
-                    currentView.view
+                    nav.main.rootView.view
                 } else {
                     List(selection: $navigationCurrentView) {
                         RootView.home.navigationLink(currentView: $navigationCurrentView)
@@ -102,9 +99,7 @@ struct MainView: View {
                     }
                     .listStyle(SidebarListStyle())
                     .navigationTitle("Surround")
-                    if let navigationCurrentView = navigationCurrentView {
-                        navigationCurrentView.view
-                    }
+                    nav.main.rootView.view
                 }
             }
             if ogs.isLoggedIn {
@@ -129,7 +124,7 @@ struct MainView: View {
                 .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
             }
         }
-        .onChange(of: currentView) { newView in
+        .onChange(of: nav.main.rootView) { newView in
             DispatchQueue.main.async {
                 withAnimation {
                     navigationCurrentView = newView

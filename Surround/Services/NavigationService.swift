@@ -9,8 +9,38 @@ import Foundation
 import SwiftUI
 import Combine
 
-class NavigationService {
-    static let shared = NavigationService()
+struct MainViewParameters {
+    var rootView: RootView = .home
+}
+
+struct HomeViewParameters {
+    var activeGame: Game?
+    var ogsIdToOpen = -1
+    var showingNewGameView = false
+}
+
+struct PublicGamesViewParameter {
+    var activeGame: Game?
+    var ogsIdToOpen = -1
+}
+
+class NavigationService: ObservableObject {
+    static var shared = NavigationService()
+    static var instances = [String: NavigationService]()
+    
+    @Published var home = HomeViewParameters()
+    @Published var main = MainViewParameters()
+    @Published var publicGames = PublicGamesViewParameter()
+
+    static func instance(forSceneWithID sceneID: String) -> NavigationService {
+        if let result = instances[sceneID] {
+            return result
+        } else {
+            let result = NavigationService()
+            instances[sceneID] = result
+            return result
+        }
+    }
     
     static func appURL(rootView: RootView, game: Game? = nil, ogsGameId: Int? = nil) -> URL? {
         var urlString = "surround://\(rootView)"

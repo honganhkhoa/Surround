@@ -15,16 +15,9 @@ struct HomeView: View {
     #endif
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
     
     @State var gameDetailCancellable: AnyCancellable?
-    @State var showingGameDetail = false
-    @State var currentActiveGame: Game? = nil
-    
-    @SceneStorage("showingNewGameView")
-    var showingNewGameView = false
-    
-    @SceneStorage("activeOGSGameIdToOpen")
-    var activeOGSGameIdToOpen = -1
     
     @AppStorage(SettingKey<Any>.homeViewDisplayMode.name, store: userDefaults)
     var displayMode: GameCell.CellDisplayMode = .full
@@ -55,8 +48,7 @@ struct HomeView: View {
     
     func showGameDetail(game: Game) {
         print("Opening game \(game)")
-        self.currentActiveGame = game
-        self.showingGameDetail = true
+        nav.home.activeGame = game
     }
     
     var activeGamesView: some View {
@@ -71,7 +63,7 @@ struct HomeView: View {
                 if isLoading {
                     ProgressView()
                 } else {
-                    Button(action: { showingNewGameView = true }) {
+                    Button(action: { nav.home.showingNewGameView = true }) {
                         HStack {
                             Label {
                                 Text("New game").font(Font.body.bold())
@@ -157,17 +149,17 @@ struct HomeView: View {
     }
     
     func openRequestedActiveGameIfReady() {
-        print("Checking game #\(activeOGSGameIdToOpen)")
-        if !showingGameDetail && activeOGSGameIdToOpen != -1 && gameDetailCancellable == nil {
-            print("Continue checking game #\(activeOGSGameIdToOpen)")
-            if let game = ogs.activeGames[activeOGSGameIdToOpen] {
+        print("Checking game #\(nav.home.ogsIdToOpen)")
+        if nav.home.activeGame == nil && nav.home.ogsIdToOpen != -1 && gameDetailCancellable == nil {
+            print("Continue checking game #\(nav.home.ogsIdToOpen)")
+            if let game = ogs.activeGames[nav.home.ogsIdToOpen] {
                 if game.gameData != nil {
                     self.showGameDetail(game: game)
-                    activeOGSGameIdToOpen = -1
+                    nav.home.ogsIdToOpen = -1
                     self.gameDetailCancellable?.cancel()
                     self.gameDetailCancellable = nil
                 } else {
-                    print("Waiting for game data of #\(activeOGSGameIdToOpen)")
+                    print("Waiting for game data of #\(nav.home.ogsIdToOpen)")
                     self.gameDetailCancellable = game.$gameData.sink(receiveValue: { newGameData in
                         if newGameData != nil {
                             DispatchQueue.main.async {
@@ -181,22 +173,22 @@ struct HomeView: View {
                 return
             }
 
-            if let cachedGameData = userDefaults[.cachedOGSGames]?[activeOGSGameIdToOpen] {
+            if let cachedGameData = userDefaults[.cachedOGSGames]?[nav.home.ogsIdToOpen] {
                 if let ogsGame = try? JSONSerialization.jsonObject(with: cachedGameData) as? [String: Any] {
                     let decoder = DictionaryDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     if let ogsGame = try? decoder.decode(OGSGame.self, from: ogsGame) {
                         let game = Game(ogsGame: ogsGame)
                         self.showGameDetail(game: game)
-                        activeOGSGameIdToOpen = -1
+                        nav.home.ogsIdToOpen = -1
                         return
                     }
                 }
             }
 
-            print("Waiting for #\(activeOGSGameIdToOpen) to become active")
+            print("Waiting for #\(nav.home.ogsIdToOpen) to become active")
             self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { newActiveGames in
-                if newActiveGames[activeOGSGameIdToOpen] != nil {
+                if newActiveGames[nav.home.ogsIdToOpen] != nil {
                     DispatchQueue.main.async {
                         self.gameDetailCancellable?.cancel()
                         self.gameDetailCancellable = nil
@@ -208,13 +200,13 @@ struct HomeView: View {
     }
         
     var body: some View {
-        if let currentActiveGame = currentActiveGame {
+        if let currentActiveGame = nav.home.activeGame {
             print("Reloading..., current active game #\(currentActiveGame)")
         } else {
             print("Reloading..., no current active game")
         }
-        print("Waiting to open game #\(activeOGSGameIdToOpen)")
-        print("Showing game detail: \(showingGameDetail)")
+        print("Waiting to open game #\(nav.home.ogsIdToOpen)")
+        print("Showing game detail: \(nav.home.activeGame != nil)")
         return VStack {
             if ogs.isLoggedIn {
                 activeGamesView
@@ -225,13 +217,16 @@ struct HomeView: View {
                 .frame(maxWidth: 600)
             }
             NavigationLink(
-                destination: GameDetailView(currentGame: currentActiveGame),
-                isActive: $showingGameDetail) {
+                destination: GameDetailView(currentGame: nav.home.activeGame),
+                isActive: Binding(
+                    get: { nav.home.activeGame != nil },
+                    set: { if !$0 { nav.home.activeGame = nil } }
+                )) {
                 EmptyView()
             }
         }
         .onAppear {
-            if activeOGSGameIdToOpen != -1 {
+            if nav.home.ogsIdToOpen != -1 {
                 DispatchQueue.main.async {
                     openRequestedActiveGameIfReady()
                 }
@@ -249,27 +244,28 @@ struct HomeView: View {
                 .opacity(ogs.isLoggedIn ? 1 : 0)
             }
         }
-        .sheet(isPresented: self.$showingNewGameView) {
+        .sheet(isPresented: $nav.home.showingNewGameView) {
             NavigationView {
                 NewGameView()
                     .navigationTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button(action: { self.showingNewGameView = false }) {
+                            Button(action: { nav.home.showingNewGameView = false }) {
                                 Text("Cancel")
                             }
                         }
                     }
             }
             .environmentObject(ogs)
+            .environmentObject(nav)
         }
         .modifier(RootViewSwitchingMenu())
-        .onChange(of: activeOGSGameIdToOpen) { ogsGameIdToOpen in
+        .onChange(of: nav.home.ogsIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
-                if ogsGameIdToOpen != currentActiveGame?.ogsID {
-                    if showingGameDetail {
-                        showingGameDetail = false
+                if ogsGameIdToOpen != nav.home.activeGame?.ogsID {
+                    if nav.home.activeGame != nil {
+                        nav.home.activeGame = nil
                         DispatchQueue.main.asyncAfter(
                             deadline: DispatchTime.now().advanced(by: .seconds(1)),
                             execute: {
@@ -282,11 +278,6 @@ struct HomeView: View {
                         }
                     }
                 }
-            }
-        }
-        .onChange(of: showingGameDetail) { newValue in
-            if !newValue {
-                currentActiveGame = nil
             }
         }
     }
