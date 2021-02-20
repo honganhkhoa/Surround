@@ -12,7 +12,7 @@ struct ByoYomiTimerView: View {
     
     var body: some View {
         VStack(alignment: .trailing) {
-            if thinkingTime.thinkingTime! > 0 {
+            if thinkingTime.thinkingTimeLeft! > 0 {
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(Font.subheadline.monospacedDigit())
                 Text("+ \(thinkingTime.periods!)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")

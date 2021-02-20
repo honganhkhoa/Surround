@@ -349,7 +349,7 @@ struct GameDetailView: View {
     var shouldShowActiveGamesCarousel: Bool {
 //        return true
         if let currentGame = currentGame {
-            return currentGame.isUserPlaying && activeGames.count > 1 && currentGame.gameData?.timeControl.speed == .correspondence
+            return currentGame.isUserPlaying && activeGames.count > 1
         } else {
             return false
         }
@@ -366,10 +366,21 @@ struct GameDetailView: View {
     
     func updateActiveGameList() {
         self.activeGames = []
-        for game in ogs.sortedActiveCorrespondenceGames {
-            self.activeGames.append(game)
-            if let ogsID = game.ogsID {
-                self.activeGameByOGSID[ogsID] = game
+        if let gameSpeed = currentGame?.gameData?.timeControl.speed {
+            if gameSpeed == .correspondence {
+                for game in ogs.sortedActiveCorrespondenceGames {
+                    self.activeGames.append(game)
+                    if let ogsID = game.ogsID {
+                        self.activeGameByOGSID[ogsID] = game
+                    }
+                }
+            } else if gameSpeed == .live || gameSpeed == .blitz {
+                for game in ogs.liveGames {
+                    self.activeGames.append(game)
+                    if let ogsID = game.ogsID {
+                        self.activeGameByOGSID[ogsID] = game
+                    }
+                }
             }
         }
     }
@@ -414,7 +425,7 @@ struct GameDetailView: View {
                     )
                 }
                 if showsActiveGamesCarousel {
-                    ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
             })
         }
@@ -427,7 +438,7 @@ struct GameDetailView: View {
             print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
             return AnyView(erasing: VStack(spacing: 0) {
                 if showsActiveGamesCarousel {
-                    ActiveCorrespondenceGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
                 if let currentGame = currentGame {
                     SingleGameView(
@@ -497,11 +508,7 @@ struct GameDetailView: View {
             if currentGame.gameData?.timeControl.speed == .live || currentGame.gameData?.timeControl.speed == .blitz {
                 UIApplication.shared.isIdleTimerDisabled = true
             }
-            if let ogsId = currentGame.ogsID {
-                if ogs.activeGames[ogsId] != nil {
-                    updateActiveGameList()
-                }
-            }
+            updateActiveGameList()
             DispatchQueue.main.async {
                 self.updateDetailOfCurrentGameIfNecessary()
             }
@@ -518,6 +525,9 @@ struct GameDetailView: View {
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
 
+        }
+        .onReceive(ogs.$liveGames) { liveGames in
+            
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {

@@ -205,13 +205,16 @@ struct GameControlRow: View {
                         Button(action: { acceptRemovedStones() }) {
                             Text("Accept")
                         }
-                    } else if game.isUserPlaying && game.gameData?.timeControl.speed == .correspondence {
-                        if let goToNextGame = goToNextGame {
-                            if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count > 0 {
+                    } else if game.isUserPlaying {
+                        if let goToNextGame = goToNextGame, let gameSpeed = game.gameData?.timeControl.speed {
+                            let gamesWaiting = gameSpeed == .correspondence ?
+                                ogs.sortedActiveCorrespondenceGames.count :
+                                ogs.liveGames.filter { ogs.isOnUserTurn(game: $0) }.count
+                            if gamesWaiting > 0 {
                                 Button(action: goToNextGame) {
                                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                                         Text("Next")
-                                        Text("(\(ogs.sortedActiveCorrespondenceGamesOnUserTurn.count))")
+                                        Text("(\(gamesWaiting))")
                                             .font(Font.caption2.bold())
                                     }
                                 }

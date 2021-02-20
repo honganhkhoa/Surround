@@ -11,6 +11,7 @@ import Combine
 
 struct MainViewParameters {
     var rootView: RootView = .home
+    var gameInModal: Game?
 }
 
 struct HomeViewParameters {

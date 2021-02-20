@@ -84,18 +84,22 @@ struct MainView: View {
         #if os(iOS)
         compactSizeClass = horizontalSizeClass == .compact
         #endif
+        let navigationCurrentView = Binding<RootView?>(
+            get: { nav.main.rootView },
+            set: { if let rootView = $0 { nav.main.rootView = rootView } }
+        )
         return ZStack(alignment: .top) {
             NavigationView {
                 if compactSizeClass {
                     nav.main.rootView.view
                 } else {
-                    List(selection: $navigationCurrentView) {
-                        RootView.home.navigationLink(currentView: $navigationCurrentView)
-                        RootView.publicGames.navigationLink(currentView: $navigationCurrentView)
+                    List(selection: navigationCurrentView) {
+                        RootView.home.navigationLink(currentView: navigationCurrentView)
+                        RootView.publicGames.navigationLink(currentView: navigationCurrentView)
                         Divider()
-                        RootView.settings.navigationLink(currentView: $navigationCurrentView)
+                        RootView.settings.navigationLink(currentView: navigationCurrentView)
                         Divider()
-                        RootView.browser.navigationLink(currentView: $navigationCurrentView)
+                        RootView.browser.navigationLink(currentView: navigationCurrentView)
                     }
                     .listStyle(SidebarListStyle())
                     .navigationTitle("Surround")
@@ -103,32 +107,7 @@ struct MainView: View {
                 }
             }
             if ogs.isLoggedIn {
-                ZStack {
-                    HStack(spacing: 5) {
-                        Group {
-                            if ogs.socketStatus == .connecting {
-                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                EmptyView()
-                            }
-                        }
-                        Text(ogs.socketStatusString).bold().foregroundColor(.white)
-                    }
-                    .animation(.easeInOut, value: ogs.socketStatusString)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(.systemIndigo))
-                .cornerRadius(10)
-                .opacity(ogs.socketStatus == .connected ? 0 : 1)
-                .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
-            }
-        }
-        .onChange(of: nav.main.rootView) { newView in
-            DispatchQueue.main.async {
-                withAnimation {
-                    navigationCurrentView = newView
-                }
+                NotificationPopup()
             }
         }
         .onChange(of: scenePhase) { phase in
@@ -155,12 +134,37 @@ struct MainView: View {
         .onOpenURL { url in
             navigateTo(appURL: url)
         }
+        .fullScreenCover(isPresented: Binding(
+                            get: { nav.main.gameInModal != nil },
+                            set: { if !$0 { nav.main.gameInModal = nil } })
+        ) {
+            NavigationView {
+                GameDetailView(currentGame: nav.main.gameInModal)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { nav.main.gameInModal = nil }) {
+                                Text("Close")
+                            }
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+            }
+        }
     }
 }
 
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
-        MainView()
-            .environmentObject(OGSService.previewInstance())
+        Group {
+            MainView()
+                .environmentObject(OGSService.previewInstance(
+                    user: OGSUser(username: "kata-bot", id: 592684),
+                    activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
+                ))
+            MainView()
+                .environmentObject(OGSService.previewInstance())
+        }
+        .environmentObject(NavigationService.shared)
     }
 }

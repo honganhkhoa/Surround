@@ -13,7 +13,7 @@ struct InlineByoYomiTimerView: View {
     var subFont: Font
     
     var body: some View {
-        if thinkingTime.thinkingTime! > 0 {
+        if thinkingTime.thinkingTimeLeft! > 0 {
             (
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont)

@@ -8,7 +8,7 @@
 import SwiftUI
 import Combine
 
-struct ActiveCorrespondenceGamesCarousel: View {
+struct ActiveGamesCarousel: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
     var currentGame: Binding<Game?>
@@ -146,9 +146,9 @@ struct ActiveGamesCarousel_Previews: PreviewProvider {
     static var previews: some View {
         let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
         return Group {
-            ActiveCorrespondenceGamesCarousel(currentGame: .constant(games[0]), activeGames: games)
+            ActiveGamesCarousel(currentGame: .constant(games[0]), activeGames: games)
                 .previewLayout(.fixed(width: 350, height: 150))
-            ActiveCorrespondenceGamesCarousel(currentGame: .constant(games[0]), activeGames: games, horizontal: false)
+            ActiveGamesCarousel(currentGame: .constant(games[0]), activeGames: games, horizontal: false)
                 .previewLayout(.fixed(width: 150, height: 350))
         }
         .environmentObject(

@@ -44,7 +44,7 @@ class OGSService: ObservableObject {
             return result
         }
     }
-    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = [], publicGames: [Game] = [], friends: [OGSUser] = []) -> OGSService {
+    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = [], publicGames: [Game] = [], friends: [OGSUser] = [], socketStatus: SocketIOStatus = .connected) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
         ogs.isLoggedIn = user != nil
@@ -56,6 +56,8 @@ class OGSService: ObservableObject {
         ogs.sortedPublicGames = publicGames
         
         ogs.friends = friends
+
+        ogs.socketStatus = socketStatus
 
         return ogs
     }
@@ -104,28 +106,17 @@ class OGSService: ObservableObject {
     private var cachedUsersFetchingCancellable: AnyCancellable?
     
     @Published private(set) public var friends = [OGSUser]()
-    
+        
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
         var gamesOnOpponentTurn: [Game] = []
         var liveGames: [Game] = []
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
-                if game.gamePhase == .stoneRemoval {
-                    let userColor: StoneColor = self.user?.id == game.blackId ? .black : .white
-                    if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
-                        gamesOnUserTurn.append(game)
-                    } else {
-                        gamesOnOpponentTurn.append(game)
-                    }
-                } else if game.gamePhase != .finished {
-                    if let clock = game.clock {
-                        if clock.currentPlayerId == self.user?.id {
-                            gamesOnUserTurn.append(game)
-                        } else {
-                            gamesOnOpponentTurn.append(game)
-                        }
-                    }
+                if isOnUserTurn(game: game) {
+                    gamesOnUserTurn.append(game)
+                } else {
+                    gamesOnOpponentTurn.append(game)
                 }
             } else if game.gameData?.timeControl.speed == .live || game.gameData?.timeControl.speed == .blitz {
                 liveGames.append(game)
@@ -1364,5 +1355,25 @@ class OGSService: ObservableObject {
                 promise(.failure(OGSServiceError.notLoggedIn))
             }
         }.eraseToAnyPublisher()
+    }
+
+    func isOnUserTurn(game: Game) -> Bool {
+        if game.gamePhase == .stoneRemoval {
+            let userColor: StoneColor = self.user?.id == game.blackId ? .black : .white
+            if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
+                return true
+            } else {
+                return false
+            }
+        } else if game.gamePhase != .finished {
+            if let clock = game.clock {
+                if clock.currentPlayerId == self.user?.id {
+                    return true
+                } else {
+                    return false
+                }
+            }
+        }
+        return false
     }
 }

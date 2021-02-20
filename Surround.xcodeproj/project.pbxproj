@@ -66,7 +66,7 @@
 		BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC39EE3825DBC23C00562C68 /* TextUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC39EE3725DBC23C00562C68 /* TextUtilities.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
-		BC4658AE2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */; };
+		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
 		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
 		BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */; };
@@ -172,6 +172,7 @@
 		BCB98D2A256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
+		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
 		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
 		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
@@ -295,7 +296,7 @@
 		BC39EE3725DBC23C00562C68 /* TextUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtilities.swift; sourceTree = "<group>"; };
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
-		BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveCorrespondenceGamesCarousel.swift; sourceTree = "<group>"; };
+		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
 		BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "LaunchScreen~iPad.storyboard"; sourceTree = "<group>"; };
 		BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -345,6 +346,7 @@
 		BCB98D1C256D185500B1F8FD /* game-27671778.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-27671778.json"; sourceTree = "<group>"; };
 		BCB98D27256D18C400B1F8FD /* game-25076729.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25076729.json"; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
+		BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPopup.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -505,7 +507,7 @@
 		BC042B2924AB2DD00050B2D1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				BC4658AD2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift */,
+				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
@@ -579,6 +581,7 @@
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
+				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -953,7 +956,7 @@
 			files = (
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
-				BC4658AE2508927D00859316 /* ActiveCorrespondenceGamesCarousel.swift in Sources */,
+				BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */,
 				BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */,
 				BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */,
 				BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */,
@@ -996,6 +999,7 @@
 				BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */,
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
+				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
 			);
