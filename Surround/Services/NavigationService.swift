@@ -127,10 +127,10 @@ enum RootView: String {
 }
 
 struct RootViewSwitchingMenu: ViewModifier {
-    @SceneStorage("currentRootView") var currentView: RootView = .home
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    @EnvironmentObject var nav: NavigationService
 
     func body(content: Content) -> some View {
         var compactSizeClass = false
@@ -142,18 +142,18 @@ struct RootViewSwitchingMenu: ViewModifier {
             ToolbarItem(placement: .navigationBarLeading) {
                 Menu {
                     Section {
-                        RootView.home.menuButton(currentView: $currentView)
-                        RootView.publicGames.menuButton(currentView: $currentView)
+                        RootView.home.menuButton(currentView: $nav.main.rootView)
+                        RootView.publicGames.menuButton(currentView: $nav.main.rootView)
                     }
                     Section {
-                        RootView.settings.menuButton(currentView: $currentView)
+                        RootView.settings.menuButton(currentView: $nav.main.rootView)
                     }
                     Section {
-                        RootView.browser.menuButton(currentView: $currentView)
+                        RootView.browser.menuButton(currentView:$nav.main.rootView)
                     }
                 }
                 label: {
-                    Label("Navigation", systemImage: currentView.systemImage)
+                    Label("Navigation", systemImage: nav.main.rootView.systemImage)
                         .font(.title2)
                         .padding(10)
                         .offset(x: -8)
