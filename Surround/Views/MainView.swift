@@ -14,7 +14,6 @@ struct MainView: View {
     #endif
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
-    @State var navigationCurrentView: RootView? = .home
     
     @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @State var widgetInfos = [WidgetInfo]()
@@ -45,13 +44,11 @@ struct MainView: View {
                 ogs.fetchPublicGames()
             }
         })
-
     }
     
     func navigateTo(appURL: URL) {
         if let rootViewName = appURL.host, let rootView = RootView(rawValue: rootViewName) {
             nav.main.rootView = rootView
-            navigationCurrentView = rootView
             switch rootView {
             case .home:
                 if appURL.pathComponents.count > 1 {

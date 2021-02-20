@@ -119,10 +119,25 @@ enum RootView: String {
     }
 
     func navigationLink(currentView: Binding<RootView?>) -> some View {
-        NavigationLink(
-            destination: self.view,
-            tag: self,
-            selection: currentView) {self.label}
+        Button(action: { currentView.wrappedValue = self }) {
+            if currentView.wrappedValue == self {
+                HStack {
+                    self.label
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+                .font(Font.body.bold())
+            } else {
+                self.label
+            }
+        }
+
+        // Using the NavigationLink like below (seen in many SwiftUI examples) breaks so many things on iPad
+        // (One example: https://stackoverflow.com/questions/62761404/create-a-swiftui-sidebar).
+//        NavigationLink(
+//            destination: self.view,
+//            tag: self,
+//            selection: currentView) {self.label}
     }
     #endif
 }

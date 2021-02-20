@@ -17,7 +17,7 @@ struct OGSBrowserView: View {
     
     var body: some View {
         OGSBrowserWebView(isLoading: $isLoading, title: $title)
-            .navigationBarTitleDisplayMode(.inline)
+//            .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
             .navigationBarItems(
                 trailing: isLoading ? AnyView(ProgressView()) : AnyView(EmptyView()))
             .navigationTitle(title ?? "")

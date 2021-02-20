@@ -279,6 +279,9 @@ struct SingleGameView: View {
             } else {
                 playerIconsOffset = -80
             }
+            if boardSize <= 0 {
+                return AnyView(EmptyView())
+            }
             return AnyView(erasing: ZStack {
                 VStack(spacing: 15) {
                     if !infoLeft {
