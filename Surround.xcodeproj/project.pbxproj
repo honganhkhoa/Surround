@@ -507,7 +507,6 @@
 		BC042B2924AB2DD00050B2D1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
@@ -520,7 +519,6 @@
 				BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */,
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
-				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -582,6 +580,8 @@
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
+				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
+				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";

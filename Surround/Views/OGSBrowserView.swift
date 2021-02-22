@@ -14,12 +14,17 @@ import Combine
 struct OGSBrowserView: View {
     @State var title: String?
     @State var isLoading: Bool = true
+    @State var webView: WKWebView?
     
     var body: some View {
-        OGSBrowserWebView(isLoading: $isLoading, title: $title)
+        OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView)
 //            .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
             .navigationBarItems(
-                trailing: isLoading ? AnyView(ProgressView()) : AnyView(EmptyView()))
+                trailing: isLoading ?
+                    AnyView(ProgressView()) :
+                    AnyView(Button(action: { webView?.reload() }) {
+                        Image(systemName: "arrow.clockwise")
+                    }))
             .navigationTitle(title ?? "")
             .modifier(RootViewSwitchingMenu())
     }
@@ -30,6 +35,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
     @EnvironmentObject var ogs: OGSService
     @Binding var isLoading: Bool
     @Binding var title: String?
+    @Binding var webView: WKWebView?
     
     func makeCoordinator() -> Coordinator {
         return Coordinator(self)
@@ -44,17 +50,6 @@ struct OGSBrowserWebView: UIViewRepresentable {
         let webView = WKWebView(frame: CGRect.zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
 
-        var request = URLRequest(url: ogsURL)
-        
-        if ogs.ogsUIConfig != nil {
-            if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies {
-                for cookie in cookies {
-                    webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
-                }
-                request.url = URL(string: "\(OGSService.ogsRoot)/overview")
-            }
-        }
-        
         context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new], changeHandler: { _, change in
             if let newValue = change.newValue {
                 if isLoading != newValue {
@@ -73,9 +68,52 @@ struct OGSBrowserWebView: UIViewRepresentable {
                 }
             }
         })
-                
-        webView.load(request)
+
+        var request = URLRequest(url: ogsURL)
+        
+        if ogs.ogsUIConfig != nil {
+            if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies {
+                context.coordinator.cookiesToSet = cookies
+                for cookie in cookies {
+                    webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
+                }
+                request.url = URL(string: "\(OGSService.ogsRoot)/overview")
+            }
+        }
+                        
+        if context.coordinator.cookiesToSet.count == 0 {
+            context.coordinator.initialRequestLoaded = true
+            webView.load(request)
+        }
+        DispatchQueue.main.async {
+            self.webView = webView
+            loadInitialRequestIfReadyAndNeeded(request: request, coordinator: context.coordinator)
+        }
         return webView
+    }
+    
+    func loadInitialRequestIfReadyAndNeeded(request: URLRequest, coordinator: Coordinator) {
+        if coordinator.initialRequestLoaded {
+            return
+        }
+        webView?.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+            var matchCount = 0
+            for cookie in cookies {
+                for cookieToSet in coordinator.cookiesToSet {
+                    if cookie.name == cookieToSet.name && cookie.value == cookieToSet.value {
+                        matchCount += 1
+                    }
+                }
+            }
+            if matchCount == coordinator.cookiesToSet.count {
+                coordinator.initialRequestLoaded = true
+                webView?.load(request)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
+                    loadInitialRequestIfReadyAndNeeded(request: request, coordinator: coordinator)
+                }
+            }
+        }
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
@@ -87,7 +125,9 @@ struct OGSBrowserWebView: UIViewRepresentable {
         var loginCancellable: AnyCancellable?
         var loadingObservation: NSKeyValueObservation?
         var titleObservation: NSKeyValueObservation?
-
+        var cookiesToSet: [HTTPCookie] = []
+        var initialRequestLoaded = false
+        
         init(_ parent: OGSBrowserWebView) {
             self.parent = parent
         }
