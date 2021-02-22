@@ -74,6 +74,7 @@ struct PublicGamesList_Previews: PreviewProvider {
                 ]
             )
         )
+        .environmentObject(NavigationService.shared)
         .colorScheme(.dark)
     }
 }

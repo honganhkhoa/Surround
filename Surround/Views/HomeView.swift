@@ -303,6 +303,7 @@ struct HomeView_Previews: PreviewProvider {
             }
             .navigationViewStyle(StackNavigationViewStyle())
         }
+        .environmentObject(NavigationService.shared)
 //        .colorScheme(.dark)
     }
 }

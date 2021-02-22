@@ -130,5 +130,6 @@ struct SettingsView_Previews: PreviewProvider {
                 )
             )
         )
+        .environmentObject(NavigationService.shared)
     }
 }

@@ -166,9 +166,3 @@ struct OGSBrowserWebView: UIViewRepresentable {
         }
     }
 }
-
-struct BrowserView_Previews: PreviewProvider {
-    static var previews: some View {
-        OGSBrowserView()
-    }
-}
