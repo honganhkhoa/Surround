@@ -42,21 +42,19 @@ struct ChallengeCell: View {
             })
     }
     
-    var body: some View {
+    var playerInfos: some View {
         let isUserTheChallenger = challenge.challenger?.id == ogs.user?.id
-        let headerPlayer = challenge.id == 0 ? challenge.challenger :
-            (isUserTheChallenger ? challenge.challenged : challenge.challenger)
-        let opponentStoneColor = isUserTheChallenger ? challenge.challengerColor : challenge.challengerColor?.opponentColor() ?? nil
+        let challengerStoneColor = challenge.challengerColor
         
         return VStack {
-            if let headerPlayer = headerPlayer {
+            if let challenger = challenge.challenger {
                 HStack(alignment: .top) {
-                    if let iconURL = headerPlayer.iconURL(ofSize: 64) {
+                    if let iconURL = challenger.iconURL(ofSize: 64) {
                         ZStack(alignment: .bottomTrailing) {
                             URLImage(iconURL)
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
-                            Stone(color: opponentStoneColor, shadowRadius: 1)
+                            Stone(color: challengerStoneColor, shadowRadius: 1)
                                 .frame(width: 20, height: 20)
                                 .offset(x: 10, y: 10)
                         }
@@ -66,12 +64,12 @@ struct ChallengeCell: View {
                             .font(.title3)
                             .bold()
                         HStack {
-                            if headerPlayer.icon == nil {
-                                Stone(color: opponentStoneColor, shadowRadius: 1)
+                            if challenger.icon == nil {
+                                Stone(color: challengerStoneColor, shadowRadius: 1)
                                     .frame(width: 20, height: 20)
                             }
-                            Text(headerPlayer.username) +
-                            Text(" [\(headerPlayer.formattedRank)]")
+                            Text(challenger.username) +
+                            Text(" [\(challenger.formattedRank)]")
                         }
                         if challenge.game.isPrivate {
                             Text("Private")
@@ -80,19 +78,79 @@ struct ChallengeCell: View {
                         }
                     }
                     Spacer()
-                    if challenge.challenged == nil && challenge.id != 0 {
-                        if ogsRequestCancellable != nil {
-                            ProgressView()
-                        } else {
-                            Button(action: { acceptChallenge(challenge: challenge) }) {
-                                Text("Accept")
-                                    .bold()
+                    if challenge.id != 0 {
+                        if isUserTheChallenger {
+                            if ogsRequestCancellable != nil {
+                                ProgressView()
+                            } else {
+                                Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                    Text("Withdraw")
+                                        .bold()
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        } else if challenge.challenged == nil {
+                            if ogsRequestCancellable != nil {
+                                ProgressView()
+                            } else {
+                                Button(action: { acceptChallenge(challenge: challenge) }) {
+                                    Text("Accept")
+                                        .bold()
+                                }
                             }
                         }
                     }
                 }
                 Spacer().frame(height: 15)
             }
+            if let challenged = challenge.challenged {
+                HStack(alignment: .top) {
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text(challenged.username) +
+                        Text(" [\(challenged.formattedRank)]")
+                        if challenged.id == ogs.user?.id {
+                            HStack {
+                                Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                    Text("Reject")
+                                        .bold()
+                                        .foregroundColor(.red)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .contentShape(RoundedRectangle(cornerRadius: 10))
+                                .hoverEffect(.highlight)
+                                Button(action: { self.acceptChallenge(challenge: challenge) }) {
+                                    Text("Accept")
+                                        .bold()
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .contentShape(RoundedRectangle(cornerRadius: 10))
+                                .hoverEffect(.highlight)
+                            }.offset(x: 10)
+                        }
+                    }
+                    if let iconURL = challenged.iconURL(ofSize: 64) {
+                        ZStack(alignment: .bottomLeading) {
+                            URLImage(iconURL)
+                                .frame(width: 64, height: 64)
+                                .background(Color.gray)
+                            Stone(color: challengerStoneColor?.opponentColor(), shadowRadius: 1)
+                                .frame(width: 20, height: 20)
+                                .offset(x: -10, y: 10)
+                        }
+                    }
+                }
+                Spacer().frame(height: 15)
+            }
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            playerInfos
+            Divider()
             if challenge.isUnusual {
                 HStack {
                     VStack(alignment: .leading) {
@@ -165,41 +223,6 @@ struct ChallengeCell: View {
                 }
                 .font(.subheadline)
             }
-            if challenge.challenged != nil {
-                HStack {
-                    Spacer()
-                    if ogsRequestCancellable != nil {
-                        ProgressView().padding(10)
-                    } else {
-                        if isUserTheChallenger {
-                            Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                                Text("Withdraw")
-                                    .bold()
-                                    .foregroundColor(.red)
-                            }
-                            .padding(10)
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .hoverEffect(.highlight)
-                        } else {
-                            Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                                Text("Reject")
-                                    .bold()
-                                    .foregroundColor(.red)
-                            }
-                            .padding(10)
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .hoverEffect(.highlight)
-                            Button(action: { self.acceptChallenge(challenge: challenge) }) {
-                                Text("Accept")
-                                    .bold()
-                            }
-                            .padding(10)
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .hoverEffect(.highlight)
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -222,7 +245,7 @@ struct ChallengeView_Previews: PreviewProvider {
             .background(Color(UIColor.systemBackground))
             .colorScheme(.dark)
         }
-        .previewLayout(.fixed(width: 320, height: 300))
+        .previewLayout(.fixed(width: 320, height: 380))
         .environmentObject(
             OGSService.previewInstance(
                 user: OGSUser(

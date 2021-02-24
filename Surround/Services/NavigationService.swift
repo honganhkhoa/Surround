@@ -12,6 +12,7 @@ import Combine
 struct MainViewParameters {
     var rootView: RootView = .home
     var gameInModal: Game?
+    var showWaitingGames = false
 }
 
 struct HomeViewParameters {
@@ -60,6 +61,17 @@ class NavigationService: ObservableObject {
         }
     }
     #endif
+    
+    func goToActiveGame(game: Game) {
+        if self.main.rootView == .home && self.home.showingNewGameView {
+            self.home.showingNewGameView = false
+        }
+        if self.main.rootView == .home && self.home.activeGame == nil {
+            self.home.activeGame = game
+            return
+        }
+        self.main.gameInModal = game
+    }
 }
 
 enum RootView: String {

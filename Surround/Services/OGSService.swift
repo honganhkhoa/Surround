@@ -44,7 +44,15 @@ class OGSService: ObservableObject {
             return result
         }
     }
-    static func previewInstance(user: OGSUser? = nil, activeGames: [Game] = [], publicGames: [Game] = [], friends: [OGSUser] = [], socketStatus: SocketIOStatus = .connected) -> OGSService {
+    static func previewInstance(
+        user: OGSUser? = nil,
+        activeGames: [Game] = [],
+        publicGames: [Game] = [],
+        friends: [OGSUser] = [],
+        socketStatus: SocketIOStatus = .connected,
+        eligibleOpenChallenges: [OGSChallenge] = [],
+        openChallengesSent: [OGSChallenge] = []
+    ) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
         ogs.isLoggedIn = user != nil
@@ -58,7 +66,14 @@ class OGSService: ObservableObject {
         ogs.friends = friends
 
         ogs.socketStatus = socketStatus
-
+        
+        for challenge in eligibleOpenChallenges {
+            ogs.eligibleOpenChallengeById[challenge.id] = challenge
+        }
+        for challenge in openChallengesSent {
+            ogs.openChallengeSentById[challenge.id] = challenge
+        }
+        
         return ogs
     }
 
@@ -93,6 +108,16 @@ class OGSService: ObservableObject {
     
     @Published private(set) public var challengesReceived = [OGSChallenge]()
     @Published private(set) public var challengesSent = [OGSChallenge]()
+    @Published private(set) public var openChallengeSentById = [Int: OGSChallenge]()
+    var waitingGames: Int {
+        return challengesSent.count + openChallengeSentById.count
+    }
+    var waitingLiveGames: Int {
+        return (challengesSent + openChallengeSentById.values).filter {
+            $0.game.timeControl.speed != .correspondence
+        }.count
+    }
+
     @Published private(set) public var isLoadingOverview = true
     
     @Published private(set) public var socketStatus: SocketIOStatus = .connecting
@@ -106,7 +131,7 @@ class OGSService: ObservableObject {
     private var cachedUsersFetchingCancellable: AnyCancellable?
     
     @Published private(set) public var friends = [OGSUser]()
-        
+
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
         var gamesOnOpponentTurn: [Game] = []
@@ -1211,21 +1236,34 @@ class OGSService: ObservableObject {
             return
         }
         
+        if openChallengesUnsubscribeCancellable != nil {
+            openChallengesUnsubscribeCancellable?.cancel()
+            openChallengesUnsubscribeCancellable = nil
+        }
+        
         self.socket.emit("seek_graph/connect", ["channel": "global"])
         self.socket.on("seekgraph/global") { data, ack in
             if let challenges = data[0] as? [[String: Any]] {
                 let decoder = DictionaryDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
-                for challenge in challenges {
-                    if let challengeId = challenge["challenge_id"] as? Int {
-                        if challenge["delete"] as? Int == 1 {
+                for challengeData in challenges {
+                    if let challengeId = challengeData["challenge_id"] as? Int {
+                        if challengeData["delete"] as? Int == 1 {
+                            if let challenge = self.openChallengeById[challengeId] {
+                                if challenge.challenger?.id == self.user?.id {
+                                    self.openChallengeSentById.removeValue(forKey: challengeId)
+                                }
+                            }
                             self.openChallengeById.removeValue(forKey: challengeId)
                             self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
                         } else {
-                            if var challenge = try? decoder.decode(OGSChallenge.self, from: challenge) {
+                            if var challenge = try? decoder.decode(OGSChallenge.self, from: challengeData) {
                                 if let challengerId = challenge.challenger?.id {
                                     if self.cachedUsersById[challengerId] != nil {
                                         challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
+                                    }
+                                    if challengerId == self.user?.id {
+                                        self.openChallengeSentById[challenge.id] = challenge
                                     }
                                 }
                                 self.openChallengeById[challengeId] = challenge
@@ -1257,8 +1295,21 @@ class OGSService: ObservableObject {
         }
     }
     
-    func unsubscribeFromOpenChallenges() {
+    var openChallengesUnsubscribeCancellable: AnyCancellable?
+    func unsubscribeFromOpenChallengesWhenDone() {
         guard socket.status == .connected else {
+            openChallengesUnsubscribeCancellable = nil
+            return
+        }
+        
+        guard openChallengeSentById.count == 0 else {
+            if openChallengesUnsubscribeCancellable == nil {
+                openChallengesUnsubscribeCancellable = self.$openChallengeSentById.collect(.byTime(DispatchQueue.global(), 1.0)).sink { _ in
+                    DispatchQueue.main.async {
+                        self.unsubscribeFromOpenChallengesWhenDone()
+                    }
+                }
+            }
             return
         }
 
@@ -1270,6 +1321,9 @@ class OGSService: ObservableObject {
         
         playerCacheObservingCancellable?.cancel()
         playerCacheObservingCancellable = nil
+        
+        openChallengesUnsubscribeCancellable?.cancel()
+        openChallengesUnsubscribeCancellable = nil
     }
     
     func fetchFriends() {
@@ -1316,6 +1370,30 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    var sendingKeepAliveSignal = false
+    func sendKeepAliveSignalForOpenLiveChallenges() {
+        guard sendingKeepAliveSignal else {
+            return
+        }
+        
+        guard socket.status == .connected else {
+            return
+        }
+        
+        let challenges = openChallengeSentById.values.filter { $0.game.timeControl.speed != .correspondence }
+        guard challenges.count > 0 else {
+            sendingKeepAliveSignal = false
+            return
+        }
+        
+        for challenge in challenges {
+            socket.emit("challenge/keepalive", ["challenge_id": challenge.id, "game_id": challenge.game.id])
+        }
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
+            self.sendKeepAliveSignalForOpenLiveChallenges()
+        }
+    }
+    
     func sendChallenge(opponent: OGSUser?, challenge: OGSChallenge) -> AnyPublisher<OGSChallenge, Error> {
         return Future<OGSChallenge, Error> { promise in
             let encoder = JSONEncoder()
@@ -1341,6 +1419,12 @@ class OGSService: ObservableObject {
                                     challenge.id = challengeId
                                     challenge.game.id = gameId
                                     promise(.success(challenge))
+                                    if opponent == nil && !self.sendingKeepAliveSignal {
+                                        self.sendingKeepAliveSignal = true
+                                        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
+                                            self.sendKeepAliveSignalForOpenLiveChallenges()
+                                        }
+                                    }
                                     return
                                 }
                             }

@@ -526,11 +526,15 @@ struct GameDetailView: View {
                 }
             }
         }
-        .onReceive(ogs.$sortedActiveCorrespondenceGames) { sortedActiveGames in
-
+        .onReceive(ogs.$sortedActiveCorrespondenceGames) { _ in
+            DispatchQueue.main.async {
+                updateActiveGameList()
+            }
         }
-        .onReceive(ogs.$liveGames) { liveGames in
-            
+        .onReceive(ogs.$liveGames) { _ in
+            DispatchQueue.main.async {
+                updateActiveGameList()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {

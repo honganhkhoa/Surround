@@ -31,6 +31,7 @@
 		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
+		BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */; };
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
 		BC0F1C452525946100E3E66B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C442525946100E3E66B /* LoginView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
@@ -280,6 +281,7 @@
 		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
+		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BC0F1C442525946100E3E66B /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
@@ -519,6 +521,7 @@
 				BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */,
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
+				BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1002,6 +1005,7 @@
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
+				BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

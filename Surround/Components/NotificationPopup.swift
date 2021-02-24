@@ -43,34 +43,50 @@ struct NotificationPopup: View {
     
     func goToLiveGames() {
         if let game = ogs.liveGames.first {
-            if nav.main.rootView == .home && nav.home.activeGame == nil {
-                nav.home.activeGame = game
-                return
-            }
-            nav.main.gameInModal = game
+            nav.goToActiveGame(game: game)
         }
     }
 
-    @ViewBuilder
     var liveGamesPopup: some View {
-        if ogs.socketStatus == .connected && ogs.liveGames.count > 0 && !viewingLiveGames {
-            Button(action: goToLiveGames) {
-                VStack {
-                    Text("Live games in progress...").bold().foregroundColor(.white)
-                    Text("Tap to go to games").font(.subheadline).foregroundColor(.white)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(.systemIndigo))
-                .cornerRadius(10)
+        Button(action: goToLiveGames) {
+            VStack {
+                Text("Live game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
+                Text("Tap to go to game\(ogs.liveGames.count == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color(.systemIndigo))
+            .cornerRadius(10)
+        }
+    }
+    
+    var waitingGamesPopup: some View {
+        Button(action: { nav.main.showWaitingGames = true }) {
+            HStack(spacing: 0) {
+                VStack {
+                    Text("Waiting for opponent").bold().foregroundColor(.white)
+                    Text("\(ogs.waitingLiveGames) live game\(ogs.waitingLiveGames == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
+                }
+                Spacer().frame(width: 10)
+                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color(.systemIndigo))
+            .cornerRadius(10)
         }
     }
     
     var body: some View {
         ZStack {
+            if ogs.socketStatus == .connected {
+                if ogs.liveGames.filter { $0.gameData?.outcome == nil }.count > 0 && !viewingLiveGames {
+                    liveGamesPopup
+                } else if ogs.waitingLiveGames > 0 {
+                    waitingGamesPopup
+                }
+            }
             connectionPopup
-            liveGamesPopup
         }
     }
 }
@@ -78,6 +94,14 @@ struct NotificationPopup: View {
 struct NotificationPopup_Previews: PreviewProvider {
     static var previews: some View {
         Group {
+            ZStack(alignment: .top) {
+                Color(.systemBackground)
+                NotificationPopup()
+            }
+            .environmentObject(OGSService.previewInstance(
+                user: OGSUser(username: "#albatros", id: 442873),
+                openChallengesSent: [OGSChallenge.sampleOpenChallenge]
+            ))
             ZStack(alignment: .top) {
                 Color(.systemBackground)
                 NotificationPopup()

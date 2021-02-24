@@ -148,6 +148,20 @@ struct MainView: View {
                     .environmentObject(nav)
             }
         }
+        .sheet(isPresented: $nav.main.showWaitingGames) {
+            NavigationView {
+                WaitingGamesView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { nav.main.showWaitingGames = false }) {
+                                Text("Close")
+                            }
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+            }
+        }
     }
 }
 

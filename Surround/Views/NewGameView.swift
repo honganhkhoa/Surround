@@ -168,6 +168,7 @@ struct QuickMatchForm: View {
 
 struct CustomGameForm: View {
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
     
     @State var challenge: OGSChallenge = {
@@ -235,7 +236,7 @@ struct CustomGameForm: View {
     @State var opponent: OGSUser?
     @State var selectingOpponent = false
     
-    @State var handicap = -1
+    @State var handicap = 0
     @State var automaticColor = true
     @State var yourColor = StoneColor.black
     
@@ -331,21 +332,21 @@ struct CustomGameForm: View {
                         Spacer()
                     }
                 }
-                Stepper(value: $handicap, in: -1...(isRanked ? 9 : 36)) {
-                    (Text("Handicap: ").bold() + Text(
-                        handicap == -1 ? "Automatic" :
-                        handicap == 0 ? "None" :
-                        handicap == 1 ? "1 Stone" : "\(handicap) Stones"
-                    ))
-                    .font(.subheadline)
-                }
-                if handicap == -1 {
-                    Text("Automatically determine the number of handicap stones based on your and your opponent's rank.")
-                        .font(.caption)
-                        .leadingAlignedInScrollView()
-                }
             }
             Divider()
+            Stepper(value: $handicap, in: -1...(isRanked ? 9 : 36)) {
+                (Text("Handicap: ").bold() + Text(
+                    handicap == -1 ? "Automatic" :
+                    handicap == 0 ? "None" :
+                    handicap == 1 ? "1 Stone" : "\(handicap) Stones"
+                ))
+                .font(.subheadline)
+            }
+            if handicap == -1 {
+                (Text("Automatic").bold() + Text(" setting will determine the number of handicap stones based on your and your opponent's rank."))
+                    .font(.caption)
+                    .leadingAlignedInScrollView()
+            }
             Toggle(isOn: $automaticColor) {
                 Text("Automatically assign stone colors").font(.subheadline)
                     .leadingAlignedInScrollView()
@@ -359,7 +360,7 @@ struct CustomGameForm: View {
                     }.pickerStyle(SegmentedPickerStyle())
                 }
             } else {
-                (Text("Automatic").bold() + Text(" setting will either assign white to the stronger player, follow your opponent's preference, or just assign randomly."))
+                (Text("Automatic").bold() + Text(" setting will either assign white to the stronger player, or just assign randomly."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
@@ -609,15 +610,13 @@ struct CustomGameForm: View {
     }
     
     func createChallenge() {
-        if !isOpen {
-            if let opponent = opponent {
-                self.challengeCreatingCancellable = ogs.sendChallenge(opponent: opponent, challenge: challenge).sink(
-                    receiveCompletion: { _ in
-                        self.challengeCreatingCancellable = nil
-                    }, receiveValue: { challenge in
-                        print(challenge)
-                    })
-            }
+        if isOpen || opponent != nil {
+            self.challengeCreatingCancellable = ogs.sendChallenge(opponent: opponent, challenge: challenge).sink(
+                receiveCompletion: { _ in
+                    self.challengeCreatingCancellable = nil
+                }, receiveValue: { challenge in
+                    nav.home.showingNewGameView = false
+                })
         }
     }
     
@@ -678,6 +677,8 @@ struct CustomGameForm: View {
         .onChange(of: rulesSet) { challenge.game.rules = $0 }
         .onChange(of: komi) { challenge.game.komi = $0 }
         .onChange(of: analysisDisabled) { challenge.game.disableAnalysis = $0 }
+        .onChange(of: opponent) { challenge.challenged = $0 }
+        .onChange(of: isOpen) { if $0 { challenge.challenged = nil } else { challenge.challenged = opponent } }
         .onAppear {
             challenge.challenger = ogs.user
             if isRanked {
@@ -767,13 +768,32 @@ struct NewGameView: View {
     
     var newGameOptionsPicker: some View {
         let eligibleOpenChallengesCount = ogs.eligibleOpenChallengeById.count
-        return VStack() {
+        return VStack(spacing: 0) {
+            if ogs.waitingGames > 0 {
+                NavigationLink(destination: WaitingGamesView()) {
+                    HStack {
+                        (Text("Waiting for opponent: \(ogs.waitingGames) game\(ogs.waitingGames == 1 ? "" : "s") ") + Text(Image(systemName: "chevron.forward")))
+                            .font(.subheadline)
+                            .bold()
+                            .leadingAlignedInScrollView()
+                            .foregroundColor(.white)
+                        Spacer()
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                }
+                .background(Color(.systemIndigo))
+                .padding(.horizontal, -18)
+            }
+            Spacer().frame(height: 10)
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {
                 Text("Quick match").tag(NewGameOption.quickMatch)
                 Text("Waiting (\(eligibleOpenChallengesCount))").tag(NewGameOption.openChallenges)
                 Text("Custom").tag(NewGameOption.custom)
             }
             .pickerStyle(SegmentedPickerStyle())
+            Spacer().frame(height: 10)
             switch newGameOption {
             case .quickMatch:
                 Text("Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player.")
@@ -784,26 +804,19 @@ struct NewGameView: View {
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             case .openChallenges:
-                Text("There are \(eligibleOpenChallengesCount == 0 ? "no" : "\(eligibleOpenChallengesCount)") open challenge\(eligibleOpenChallengesCount != 1 ? "s" : "") that you can accept to start a game immediately.")
+                Text("There \(eligibleOpenChallengesCount != 1 ? "are" : "is") \(eligibleOpenChallengesCount == 0 ? "no" : "\(eligibleOpenChallengesCount)") open challenge\(eligibleOpenChallengesCount != 1 ? "s" : "") that you can accept to start a game immediately.")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
-
             }
+            Spacer().frame(height: 10)
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
     }
     
     var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 newGameOptionsPicker.opacity(0)
-//                Button(action: {
-//                    nav.home.ogsIdToOpen = ogs.activeGames.values.first!.ogsID!
-//                    nav.home.showingNewGameView = false
-//                }) {
-//                    Text("Test")
-//                }
                 if newGameOption == .quickMatch {
                     QuickMatchForm(eligibleOpenChallenges: self.eligibleOpenChallenges)
                 } else if newGameOption == .custom {
@@ -818,7 +831,7 @@ struct NewGameView: View {
             ogs.subscribeToOpenChallenges()
         }
         .onDisappear {
-            ogs.unsubscribeFromOpenChallenges()
+            ogs.unsubscribeFromOpenChallengesWhenDone()
         }
         .onReceive(ogs.$eligibleOpenChallengeById) { eligibleOpenChallengesById in
             withAnimation {
@@ -834,20 +847,34 @@ struct NewGameView: View {
 
 struct NewGameView_Previews: PreviewProvider {
     static var previews: some View {
-
         return Group {
             NavigationView {
-                NewGameView(newGameOption: .openChallenges, eligibleOpenChallenges: [OGSChallenge.sampleChallenge, OGSChallenge.sampleOpenChallenge])
+                NewGameView(newGameOption: .quickMatch)
+                    .navigationBarTitle("New game")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            NavigationView {
+                NewGameView(newGameOption: .custom)
+                    .navigationBarTitle("New game")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            NavigationView {
+                NewGameView(newGameOption: .openChallenges)
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
             .colorScheme(.dark)
-            .environmentObject(OGSService.previewInstance(user: OGSUser(
-                username: "HongAnhKhoa",
-                id: 314459,
-                ranking: 27,
-                icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-            )))
         }
+        .environmentObject(
+            OGSService.previewInstance(
+                user: OGSUser(
+                    username: "HongAnhKhoa",
+                    id: 314459,
+                    ranking: 27,
+                    icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
+                ), 
+                eligibleOpenChallenges: [OGSChallenge.sampleOpenChallenge],
+                openChallengesSent: [OGSChallenge.sampleOpenChallenge]
+            ))
     }
 }

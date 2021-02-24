@@ -52,7 +52,7 @@ struct HomeView: View {
     }
     
     var activeGamesView: some View {
-        let noItem = ogs.challengesSent.count +
+        let noItem = 
             ogs.challengesReceived.count +
             ogs.liveGames.count +
             ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
@@ -73,21 +73,10 @@ struct HomeView: View {
                         }.padding()
                         Spacer()
                     }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320))], pinnedViews: [.sectionHeaders]) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
                         if ogs.challengesReceived.count > 0 {
                             Section(header: sectionHeader(title: "Challenges received")) {
                                 ForEach(ogs.challengesReceived) { challenge in
-                                    ChallengeCell(challenge: challenge)
-                                        .padding()
-                                        .background(Color(UIColor.systemBackground).shadow(radius: 2))
-                                        .padding(.vertical, 5)
-                                        .padding(.horizontal)
-                                }
-                            }
-                        }
-                        if ogs.challengesSent.count > 0 {
-                            Section(header: sectionHeader(title: "Challenges sent")) {
-                                ForEach(ogs.challengesSent) { challenge in
                                     ChallengeCell(challenge: challenge)
                                         .padding()
                                         .background(Color(UIColor.systemBackground).shadow(radius: 2))
