@@ -32,6 +32,10 @@
 		BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */ = {isa = PBXBuildFile; productRef = BC042B5B24AB2E360050B2D1 /* URLImage */; };
 		BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */; };
+		BC08721525E791A3006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
+		BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
+		BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
+		BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
 		BC0F1C452525946100E3E66B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C442525946100E3E66B /* LoginView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
@@ -282,6 +286,7 @@
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
+		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BC0F1C442525946100E3E66B /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
@@ -554,6 +559,7 @@
 				BC042B3924AB2DD00050B2D1 /* OGSClock.swift */,
 				BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */,
 				BC361AB5256246B4000C47F4 /* OGSChatLine.swift */,
+				BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -992,6 +998,7 @@
 				BC92008225CE5BF600C14433 /* UserSelectionView.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
+				BC08721525E791A3006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
 				BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */,
 				BC39EE3825DBC23C00562C68 /* TextUtilities.swift in Sources */,
@@ -1030,6 +1037,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */,
+				BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC285B5D2557FCAC005378F9 /* OGSUser.swift in Sources */,
 				BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */,
 				BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */,
@@ -1060,6 +1068,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */,
+				BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */,
 				BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */,
 				BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */,
@@ -1094,6 +1103,7 @@
 				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,
 				BCB98CC2256D144100B1F8FD /* TestData.swift in Sources */,
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
+				BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
 				BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */,
 				BCD214F4255A948E00F78E2A /* OGSUIConfig.swift in Sources */,

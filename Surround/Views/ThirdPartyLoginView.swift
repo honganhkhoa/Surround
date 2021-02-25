@@ -81,16 +81,18 @@ struct ThirdPartyLoginWebView: UIViewRepresentable {
                     let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
                     cookieStore.getAllCookies { cookies in
                         for cookie in cookies {
-                            if ogs.isOGSDomain(cookie: cookie) && cookie.name == "csrftoken" {
-                                self.loginCancellable = ogs.thirdPartyLogin(cookieStore: cookieStore)
-                                    .sink(receiveCompletion: { completion in
-                                        if case .failure(let error) = completion {
-                                            print(error)
-                                        }
-                                    }, receiveValue: { ogsUIConfig in
-                                        ogs.loadOverview()
-                                        print(ogsUIConfig)
-                                    })
+                            if ogs.isOGSDomain(cookie: cookie) {
+                                if cookie.name == "sessionid" {
+                                    self.loginCancellable = ogs.thirdPartyLogin(cookieStore: cookieStore)
+                                        .sink(receiveCompletion: { completion in
+                                            if case .failure(let error) = completion {
+                                                print(error)
+                                            }
+                                        }, receiveValue: { ogsUIConfig in
+                                            ogs.loadOverview()
+                                            print(ogsUIConfig)
+                                        })
+                                }
                             }
                         }
                     }

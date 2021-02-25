@@ -36,6 +36,7 @@ struct QuickMatchForm: View {
     var eligibleOpenChallenges = [OGSChallenge]()
 
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
 
     var finalTimeControlSpeed: TimeControlSpeed {
@@ -156,7 +157,11 @@ struct QuickMatchForm: View {
                 }
                 .frame(maxWidth: .infinity)
                 MainActionButton(label: "Find a game", disabled: boardSizes.count == 0, action: {
-                    
+                    ogs.findAutomatch(entry: OGSAutomatchEntry(
+                        sizeOptions: self.boardSizes,
+                        timeControlSpeed: self.finalTimeControlSpeed
+                    ))
+                    nav.home.showingNewGameView = false
                 })
 
                 quickMatchOpenChallenges
@@ -179,7 +184,7 @@ struct CustomGameForm: View {
                 height: 19,
                 ranked: true,
                 isPrivate: false,
-                handicap: -1,
+                handicap: 0,
                 disableAnalysis: false,
                 name: "Friendly Match",
                 rules: .japanese,
@@ -370,11 +375,6 @@ struct CustomGameForm: View {
         }
         .onChange(of: minRank) { newValue in
             maxRank = max(maxRank, newValue)
-        }
-        .onChange(of: isOpen) { newValue in
-            if newValue {
-                handicap = -1
-            }
         }
     }
     

@@ -41,6 +41,10 @@ struct NotificationPopup: View {
         return false
     }
     
+    var viewingHomeView: Bool {
+        return nav.main.rootView == .home && nav.home.activeGame == nil
+    }
+    
     func goToLiveGames() {
         if let game = ogs.liveGames.first {
             nav.goToActiveGame(game: game)
@@ -82,7 +86,7 @@ struct NotificationPopup: View {
             if ogs.socketStatus == .connected {
                 if ogs.liveGames.filter { $0.gameData?.outcome == nil }.count > 0 && !viewingLiveGames {
                     liveGamesPopup
-                } else if ogs.waitingLiveGames > 0 {
+                } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                     waitingGamesPopup
                 }
             }

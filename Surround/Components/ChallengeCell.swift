@@ -61,8 +61,7 @@ struct ChallengeCell: View {
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         Text(challenge.game.name)
-                            .font(.title3)
-                            .bold()
+                            .font(.headline)
                         HStack {
                             if challenger.icon == nil {
                                 Stone(color: challengerStoneColor, shadowRadius: 1)

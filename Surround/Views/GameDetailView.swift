@@ -368,9 +368,12 @@ struct GameDetailView: View {
     }
     
     func updateActiveGameList() {
-        self.activeGames = []
         if let gameSpeed = currentGame?.gameData?.timeControl.speed {
             if gameSpeed == .correspondence {
+                if Set(self.activeGames.map { $0.ogsID }) == Set(ogs.sortedActiveCorrespondenceGames.map { $0.ogsID }) {
+                    return
+                }
+                self.activeGames = []
                 for game in ogs.sortedActiveCorrespondenceGames {
                     self.activeGames.append(game)
                     if let ogsID = game.ogsID {
@@ -378,6 +381,10 @@ struct GameDetailView: View {
                     }
                 }
             } else if gameSpeed == .live || gameSpeed == .blitz {
+                if Set(self.activeGames.map { $0.ogsID }) == Set(ogs.liveGames.map { $0.ogsID }) {
+                    return
+                }
+                self.activeGames = []
                 for game in ogs.liveGames {
                     self.activeGames.append(game)
                     if let ogsID = game.ogsID {

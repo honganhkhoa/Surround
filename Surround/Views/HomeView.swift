@@ -63,6 +63,22 @@ struct HomeView: View {
                 if isLoading {
                     ProgressView()
                 } else {
+                    if ogs.waitingGames > 0 {
+                        Button(action: { nav.main.showWaitingGames = true }) {
+                            HStack {
+                                Text("Waiting for opponent: \(ogs.waitingGames) game\(ogs.waitingGames == 1 ? "" : "s") ")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                Spacer().frame(width: 10)
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemIndigo))
+                        }
+                    }
                     Button(action: { nav.home.showingNewGameView = true }) {
                         HStack {
                             Label {
@@ -245,9 +261,9 @@ struct HomeView: View {
                             }
                         }
                     }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
             }
-            .environmentObject(ogs)
-            .environmentObject(nav)
         }
         .modifier(RootViewSwitchingMenu())
         .onChange(of: nav.home.ogsIdToOpen) { ogsGameIdToOpen in
@@ -281,7 +297,9 @@ struct HomeView_Previews: PreviewProvider {
                     .environmentObject(
                         OGSService.previewInstance(
                             user: OGSUser(username: "kata-bot", id: 592684),
-                            activeGames: games
+                            activeGames: games,
+                            openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+                            automatchEntries: [OGSAutomatchEntry.sampleEntry]
                         )
                     )
             }

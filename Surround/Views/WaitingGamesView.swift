@@ -7,6 +7,32 @@
 
 import SwiftUI
 
+struct AutomatchEntryCell: View {
+    @EnvironmentObject var ogs: OGSService
+    
+    var entry: OGSAutomatchEntry
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Quick match request")
+                    .font(.headline)
+                Spacer()
+                Button(action: { ogs.cancelAutomatch(entry: entry) }) {
+                    Text("Withdraw")
+                        .bold()
+                        .foregroundColor(.red)
+                }
+            }
+            Divider()
+            Label(
+                entry.sizeOptions.sorted().map { "\($0)×\($0)" }.joined(separator: ", "),
+                systemImage: "squareshape.split.3x3"
+            ).font(.subheadline)
+        }
+    }
+}
+
 struct WaitingGamesView: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -42,27 +68,61 @@ struct WaitingGamesView: View {
     }
 
     var body: some View {
-        ScrollView {
+        let liveAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }
+        let correspondenceAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed == .correspondence }
+        return ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
-                if self.liveChallenges.count > 0 {
+                if self.liveChallenges.count + liveAutomatchEntries.count > 0 {
                     Section(header: sectionHeader(title: "Live games")) {
-                        Group {
-                            ForEach(self.liveChallenges) { challenge in
-                                ChallengeCell(challenge: challenge)
-                                    .padding()
-                                    .background(
-                                        Color(
-                                            colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                        )
-                                        .shadow(radius: 2)
+                        ForEach(liveAutomatchEntries, id: \.uuid) { entry in
+                            AutomatchEntryCell(entry: entry)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
                                     )
-                            }
+                                    .shadow(radius: 2)
+                                )
+                        }
+                        ForEach(self.liveChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                    )
+                                    .shadow(radius: 2)
+                                )
                         }
                     }
                 }
-                if self.correspondenceChallenges.count > 0 {
+                if self.correspondenceChallenges.count + correspondenceAutomatchEntries.count > 0 {
                     Section(header: sectionHeader(title: "Correspondence games")) {
+                        ForEach(correspondenceAutomatchEntries, id: \.uuid) { entry in
+                            AutomatchEntryCell(entry: entry)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                    )
+                                    .shadow(radius: 2)
+                                )
+                        }
                         ForEach(self.correspondenceChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(
+                                    Color(
+                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                    )
+                                    .shadow(radius: 2)
+                                )
+                        }
+                    }
+                }
+                if ogs.challengesReceived.count > 0 {
+                    Section(header: sectionHeader(title: "Challenges received")) {
+                        ForEach(ogs.challengesReceived) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
                                 .background(
@@ -106,7 +166,8 @@ struct WaitingGamesView_Previews: PreviewProvider {
                 username: "#albatros",
                 id: 442873
             ),
-            openChallengesSent: [OGSChallenge.sampleOpenChallenge]
+            openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+            automatchEntries: [OGSAutomatchEntry.sampleEntry]
         ))
     }
 }

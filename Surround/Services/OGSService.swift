@@ -51,7 +51,8 @@ class OGSService: ObservableObject {
         friends: [OGSUser] = [],
         socketStatus: SocketIOStatus = .connected,
         eligibleOpenChallenges: [OGSChallenge] = [],
-        openChallengesSent: [OGSChallenge] = []
+        openChallengesSent: [OGSChallenge] = [],
+        automatchEntries: [OGSAutomatchEntry] = []
     ) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
@@ -73,11 +74,15 @@ class OGSService: ObservableObject {
         for challenge in openChallengesSent {
             ogs.openChallengeSentById[challenge.id] = challenge
         }
+        for automatchEntry in automatchEntries {
+            ogs.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+        }
         
         return ogs
     }
 
     static let ogsRoot = "https://online-go.com"
+//    static let ogsRoot = "https://beta.online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
     private let socketManager: SocketManager
@@ -109,13 +114,14 @@ class OGSService: ObservableObject {
     @Published private(set) public var challengesReceived = [OGSChallenge]()
     @Published private(set) public var challengesSent = [OGSChallenge]()
     @Published private(set) public var openChallengeSentById = [Int: OGSChallenge]()
+    @Published private(set) public var autoMatchEntryById = [String: OGSAutomatchEntry]()
     var waitingGames: Int {
-        return challengesSent.count + openChallengeSentById.count
+        return challengesSent.count + openChallengeSentById.count + autoMatchEntryById.count
     }
     var waitingLiveGames: Int {
         return (challengesSent + openChallengeSentById.values).filter {
             $0.game.timeControl.speed != .correspondence
-        }.count
+        }.count + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
     }
 
     @Published private(set) public var isLoadingOverview = true
@@ -298,6 +304,25 @@ class OGSService: ObservableObject {
                             self.loadOverview()
                         }
                     }
+                }
+            }
+        }
+        
+        socket.on("automatch/entry") { data, ack in
+            DispatchQueue.main.async {
+                if let data = data[0] as? [String: Any] {
+                    if let automatchEntry = OGSAutomatchEntry(data) {
+                        self.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                    }
+                }
+            }
+            
+        }
+        
+        socket.on("automatch/cancel") { data, ack in
+            DispatchQueue.main.async {
+                if let uuid = (data[0] as? [String: Any] ?? [:])["uuid"] as? String {
+                    self.autoMatchEntryById.removeValue(forKey: uuid)
                 }
             }
         }
@@ -488,6 +513,7 @@ class OGSService: ObservableObject {
             "ui_class": uiconfig.user.uiClass ?? "",
             "username": uiconfig.user.username
         ])
+        socket.emit("automatch/list")
         
         self.authenticated = true
     }
@@ -1459,5 +1485,21 @@ class OGSService: ObservableObject {
             }
         }
         return false
+    }
+    
+    func findAutomatch(entry: OGSAutomatchEntry) {
+        guard socket.status == .connected else {
+            return
+        }
+        
+        socket.emit("automatch/find_match", entry.jsonObject)
+    }
+    
+    func cancelAutomatch(entry: OGSAutomatchEntry) {
+        guard socket.status == .connected else {
+            return
+        }
+        
+        socket.emit("automatch/cancel", entry.uuid)
     }
 }
