@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct OGSAutomatchEntry {
+struct OGSAutomatchEntry: Codable {
     var sizeOptions: Set<Int>
     var timeControlSpeed: TimeControlSpeed
     var uuid: String
@@ -17,7 +17,7 @@ struct OGSAutomatchEntry {
         self.timeControlSpeed = timeControlSpeed
         self.uuid = UUID().uuidString.lowercased()
     }
-
+    
     init?(_ jsonObject: [String: Any]) {
         if let sizeSpeedOptions = jsonObject["size_speed_options"] as? [[String: String]] {
             sizeOptions = Set<Int>()

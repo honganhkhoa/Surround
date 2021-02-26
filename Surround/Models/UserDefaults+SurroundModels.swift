@@ -151,6 +151,10 @@ extension SettingKey {
     static var lastSeenChatIdByOGSGameId: SettingKey<[Int: String]> {
         return .init(name: "lastSeenChatIdByOGSGameId", encoded: true, defaultValue: [Int: String]())
     }
+    
+    static var lastAutomatchEntry: SettingKey<OGSAutomatchEntry> {
+        return .init(name: "lastAutomatchEntry", encoded: true)
+    }
 }
 
 @propertyWrapper

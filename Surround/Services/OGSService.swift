@@ -326,6 +326,14 @@ class OGSService: ObservableObject {
                 }
             }
         }
+
+        socket.on("automatch/start") { data, ack in
+            DispatchQueue.main.async {
+                if let uuid = (data[0] as? [String: Any] ?? [:])["uuid"] as? String {
+                    self.autoMatchEntryById.removeValue(forKey: uuid)
+                }
+            }
+        }
     }
     
     var ogsUIConfig: OGSUIConfig? {
@@ -513,6 +521,7 @@ class OGSService: ObservableObject {
             "ui_class": uiconfig.user.uiClass ?? "",
             "username": uiconfig.user.username
         ])
+        self.autoMatchEntryById.removeAll()
         socket.emit("automatch/list")
         
         self.authenticated = true

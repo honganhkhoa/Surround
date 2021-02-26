@@ -109,19 +109,15 @@ struct QuickMatchForm: View {
                     HStack {
                         ForEach([9, 13, 19], id: \.self) { size in
                             VStack {
+                                Toggle(isOn: Binding(
+                                        get: { boardSizes.contains(size) },
+                                        set: { if $0 { boardSizes.insert(size) } else { boardSizes.remove(size) } })) {
+                                }
                                 BoardView(boardPosition: BoardPosition(width: size, height: size))
                                     .aspectRatio(1, contentMode: .fill)
-                                HStack {
-                                    if boardSizes.contains(size) {
-                                        Image(systemName: "checkmark.square.fill")
-                                            .font(Font.footnote.bold())
-                                    }
-                                    Text("\(size)×\(size)")
-                                        .font(Font.footnote.bold())
-                                }
-                                .padding(5)
-                                .background(boardSizes.contains(size) ? Color(.systemBackground) : Color.clear)
-                                .cornerRadius(5)
+                                    .opacity(boardSizes.contains(size) ? 1 : 0.2)
+                                Text("\(size)×\(size)")
+                                    .font(Font.footnote.bold())
                             }
                             .onTapGesture {
                                 withAnimation {
@@ -157,16 +153,25 @@ struct QuickMatchForm: View {
                 }
                 .frame(maxWidth: .infinity)
                 MainActionButton(label: "Find a game", disabled: boardSizes.count == 0, action: {
-                    ogs.findAutomatch(entry: OGSAutomatchEntry(
+                    let automatchEntry = OGSAutomatchEntry(
                         sizeOptions: self.boardSizes,
                         timeControlSpeed: self.finalTimeControlSpeed
-                    ))
+                    )
+                    userDefaults[.lastAutomatchEntry] = automatchEntry
+                    ogs.findAutomatch(entry: automatchEntry)
                     nav.home.showingNewGameView = false
                 })
 
                 quickMatchOpenChallenges
             }
             .padding()
+        }
+        .onAppear {
+            if let lastAutomatchEntry = userDefaults[.lastAutomatchEntry] {
+                boardSizes = lastAutomatchEntry.sizeOptions
+                timeControlSpeed = lastAutomatchEntry.timeControlSpeed == .correspondence ? .correspondence : .live
+                blitz = lastAutomatchEntry.timeControlSpeed == .blitz
+            }
         }
     }
 }
@@ -386,48 +391,36 @@ struct CustomGameForm: View {
             }
             .pickerStyle(SegmentedPickerStyle())
             .disabled(isRanked)
-            if standardBoardSize {
-                HStack {
-                    ForEach([9, 13, 19], id: \.self) { size in
-                        VStack {
-                            BoardView(boardPosition: BoardPosition(width: size, height: size))
-                                .aspectRatio(1, contentMode: .fill)
-                            HStack {
-                                if boardWidth == size && boardHeight == size {
-                                    Image(systemName: "checkmark.square.fill")
-                                        .font(Font.footnote.bold())
-                                }
-                                Text("\(size)×\(size)")
-                                    .font(Font.footnote.bold())
+            HStack(alignment: .top) {
+                BoardView(boardPosition: BoardPosition(width: boardWidth, height: boardHeight))
+                    .aspectRatio(1, contentMode: .fill)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Width").font(.subheadline).bold()
+                    Stepper(
+                        value: Binding(
+                            get: { standardBoardSize ? ([9, 13, 19].firstIndex(of: boardWidth) ?? 2) : boardWidth },
+                            set: {
+                                boardWidth = (standardBoardSize ? [9, 13, 19][$0] : $0)
+                                if standardBoardSize { boardHeight = boardWidth }
                             }
-                            .padding(5)
-                            .background(boardWidth == size && boardHeight == size ? Color(.systemBackground) : Color.clear)
-                            .cornerRadius(5)
-                        }
-                        .onTapGesture {
-                            withAnimation {
-                                self.boardWidth = size
-                                self.boardHeight = size
-                            }
-                        }
+                        ),
+                        in: standardBoardSize ? 0...2 : 1...25, step: 1) {
+                        Text("\(boardWidth)")
                     }
-                }
-            } else {
-                HStack {
-                    BoardView(boardPosition: BoardPosition(width: boardWidth, height: boardHeight))
-                        .aspectRatio(1, contentMode: .fill)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Width").font(.subheadline).bold()
-                        Stepper(value: $boardWidth, in: 1...25, step: 1) {
-                            Text("\(boardWidth)")
-                        }
-                        Spacer().frame(height: 10)
-                        Divider()
-                        Spacer().frame(height: 10)
-                        Text("Height").font(.subheadline).bold()
-                        Stepper(value: $boardHeight, in: 1...25, step: 1) {
-                            Text("\(boardHeight)")
-                        }
+                    Spacer().frame(height: 10)
+                    Divider()
+                    Spacer().frame(height: 10)
+                    Text("Height").font(.subheadline).bold()
+                    Stepper(
+                        value: Binding(
+                            get: { standardBoardSize ? ([9, 13, 19].firstIndex(of: boardHeight) ?? 2) : boardHeight },
+                            set: {
+                                boardHeight = (standardBoardSize ? [9, 13, 19][$0] : $0)
+                                if standardBoardSize { boardWidth = boardHeight }
+                            }
+                        ),
+                        in: standardBoardSize ? 0...2 : 1...25, step: 1) {
+                        Text("\(boardHeight)")
                     }
                 }
             }
@@ -853,6 +846,7 @@ struct NewGameView_Previews: PreviewProvider {
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
+            .colorScheme(.dark)
             NavigationView {
                 NewGameView(newGameOption: .custom)
                     .navigationBarTitle("New game")
