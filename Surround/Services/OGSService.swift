@@ -170,8 +170,11 @@ class OGSService: ObservableObject {
     }
     
     private init(forPreview: Bool = false) {
-        socketManager = SocketManager(socketURL: URL(string: ogsRoot)!, config: [
-            .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(1), .reconnectWaitMax(10)
+        let socketURL = URL(string: ogsRoot)!
+        socketManager = SocketManager(socketURL: socketURL, config: [
+            .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(1), .reconnectWaitMax(10),
+            .extraHeaders(["Host": socketURL.host!]),
+            .connectParams(["EIO": 3])
         ])
         socket = socketManager.defaultSocket
         

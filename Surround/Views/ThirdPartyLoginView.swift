@@ -43,6 +43,12 @@ struct ThirdPartyLoginWebView: UIViewRepresentable {
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
         
         let webview = WKWebView(frame: CGRect.zero, configuration: configuration)
+
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // https://stackoverflow.com/questions/40591090/403-error-thats-an-error-error-disallowed-useragent
+            // Google does not allow OAuth in iPhone's WKWebView, so we use Safari's user agent here
+            webview.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
+        }
         webview.navigationDelegate = context.coordinator
         context.coordinator.isLoadingObservation = webview.observe(\.isLoading, options: [.new]) { _, change in
             if let newValue = change.newValue {
