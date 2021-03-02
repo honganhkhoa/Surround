@@ -334,6 +334,7 @@ struct CustomGameForm: View {
                                 Text(opponent.username).bold()
                                 Text("[\(opponent.formattedRank)]").font(.subheadline)
                             }
+                            .foregroundColor(opponent.uiColor)
                         } else {
                             (Text("Select your opponent ") + Text(Image(systemName: "chevron.forward")))
                                 .font(.subheadline)

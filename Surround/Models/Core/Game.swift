@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import DictionaryCoding
 
 enum GameID: Hashable {
     case OGS(Int)
@@ -21,8 +22,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         didSet {
             if let data = gameData {
                 self.gameName = data.gameName
-                self.blackPlayer = data.players.black
-                self.whitePlayer = data.players.white
+                self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: data.players.black)
+                self.whitePlayer = OGSUser.mergeUserInfoFromCache(user: self.whitePlayer, cachedUser: data.players.white)
                 if let blackAcceptedRemovedStones = data.players.black.acceptedStones {
                     self.removedStonesAccepted[.black] = BoardPosition.points(fromPositionString: blackAcceptedRemovedStones)
                 }
@@ -114,7 +115,20 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         return nil
     }
-    @Published var ogsRawData: [String: Any]?
+    @Published var ogsRawData: [String: Any]? {
+        didSet {
+            if let players = (ogsRawData ?? [:])["players"] as? [String: Any] {
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                if let black = players["black"] as? [String: Any], let blackPlayer = try? decoder.decode(OGSUser.self, from: black) {
+                    self.blackPlayer = blackPlayer
+                }
+                if let white = players["white"] as? [String: Any], let whitePlayer = try? decoder.decode(OGSUser.self, from: white) {
+                    self.whitePlayer = whitePlayer
+                }
+            }
+        }
+    }
     @Published var clock: OGSClock?
     @Published var pauseControl: OGSPauseControl?
     var canBeCancelled: Bool {

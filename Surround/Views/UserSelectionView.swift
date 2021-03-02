@@ -84,12 +84,12 @@ struct UserSelectionView: View {
                     Text(user.username).bold()
                     Text("[\(user.formattedRank)]").font(.subheadline)
                 }
+                .foregroundColor(user.uiColor)
                 Spacer()
                 if user.id == self.user.wrappedValue?.id {
                     Image(systemName: "checkmark")
                 }
             }
-            .foregroundColor(Color(.label))
             .padding()
         }
     }

@@ -210,11 +210,12 @@ class OGSService: ObservableObject {
                             }
                         }
                     }
+                    self.fetchCachedPlayersIfNecessary()
                 }
             }
         })
         
-        cachedUsersFetchingCancellable = self.$cachedUserIds.collect(.byTime(DispatchQueue.main, 5.0)).receive(on: RunLoop.main).sink(receiveValue: { values in
+        cachedUsersFetchingCancellable = self.$cachedUserIds.collect(.byTime(DispatchQueue.main, 3.0)).receive(on: RunLoop.main).sink(receiveValue: { values in
             if values.last != nil {
                 self.fetchCachedPlayersIfNecessary()
             }
@@ -546,9 +547,8 @@ class OGSService: ObservableObject {
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     if let usersData = response.value as? [[String: Any]] {
                         do {
-                            try promise(.success(
-                                        usersData.map { try decoder.decode(OGSUser.self, from: $0) }
-                            ))
+                            let users = try usersData.map { try decoder.decode(OGSUser.self, from: $0) }
+                            promise(.success(users))
                         } catch {
                             promise(.failure(OGSServiceError.invalidJSON))
                         }
@@ -564,8 +564,14 @@ class OGSService: ObservableObject {
     
     private var playerInfoFetchingCancellable: AnyCancellable?
     func fetchCachedPlayersIfNecessary() {
+        guard playerInfoFetchingCancellable == nil else {
+            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
+                self.fetchCachedPlayersIfNecessary()
+            }
+            return
+        }
         let userIdsToFetch = cachedUserIds.subtracting(Set(cachedUsersById.keys))
-        playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsToFetch).sink(
+        playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsToFetch).receive(on: RunLoop.main).sink(
             receiveCompletion: { _ in
                 self.playerInfoFetchingCancellable = nil
             },
@@ -1136,6 +1142,13 @@ class OGSService: ObservableObject {
                         }
                     }
                     self.sortedPublicGames = newPublicGames
+                    for game in newPublicGames {
+                        if let blackPlayer = game.blackPlayer, let whitePlayer = game.whitePlayer {
+                            self.cachedUserIds.insert(blackPlayer.id)
+                            self.cachedUserIds.insert(whitePlayer.id)
+                        }
+                    }
+                    self.fetchCachedPlayersIfNecessary()
                     // Disconnect outdated games
                     for connectedGame in self.connectedGames.values {
                         if let gameId = connectedGame.ogsID {

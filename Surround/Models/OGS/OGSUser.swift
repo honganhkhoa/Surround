@@ -105,6 +105,8 @@ struct OGSUser : Codable, Equatable {
             return .green
         } else if uiClass?.contains("supporter") == true {
             return .orange
+        } else if uiClass?.contains("bot") == true {
+            return .gray
         }
         return .blue
     }
@@ -169,12 +171,16 @@ struct OGSUser : Codable, Equatable {
             user.ratings = cachedUser.ratings
         }
         
-        if user.icon == nil && cachedUser.icon != nil {
+        if user.icon?.count ?? 0 == 0 && cachedUser.icon?.count ?? 0 > 0 {
             user.icon = cachedUser.icon
         }
         
-        if user.icon == nil && cachedUser.iconUrl != nil {
+        if user.icon?.count ?? 0 == 0 && cachedUser.iconUrl?.count ?? 0 > 0 {
             user.icon = cachedUser.iconUrl
+        }
+        
+        if user.uiClass?.count ?? 0 == 0 && cachedUser.uiClass?.count ?? 0 > 0 {
+            user.uiClass = cachedUser.uiClass
         }
         
         return user

@@ -30,6 +30,7 @@ struct PlayersBannerView: View {
 
     func playerIcon(color: StoneColor) -> some View {
         let icon = game.playerIcon(for: color, size: Int(playerIconSize))
+        let player = color == .black ? game.blackPlayer : game.whitePlayer
         return VStack {
             ZStack(alignment: .bottomTrailing) {
                 Group {
@@ -41,6 +42,7 @@ struct PlayersBannerView: View {
                 }
                 .background(Color.gray)
                 .frame(width: playerIconSize, height: playerIconSize)
+                .border(player?.uiColor ?? .black, width: 1)
                 .shadow(radius: 2)
                 Stone(color: color, shadowRadius: 1)
                     .frame(width: 20, height: 20)
@@ -49,13 +51,13 @@ struct PlayersBannerView: View {
         }
     }
     
+    @ViewBuilder
     func playerName(color: StoneColor) -> some View {
-        let playerName = color == .black ? game.blackName : game.whiteName
-        let playerRank = color == .black ? game.blackFormattedRank : game.whiteFormattedRank
-        
-        return HStack {
-            Text(playerName).font(Font.body.bold())
-            Text("[\(playerRank)]").font(Font.caption.bold())
+        if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+            (Text(player.username).font(Font.body.bold()) +
+            Text(" [\(player.formattedRank)]").font(Font.caption.bold()))
+        } else {
+            EmptyView()
         }
     }
 

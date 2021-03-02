@@ -32,11 +32,10 @@ struct PlayerInfoLine: View {
                                 .background(Color(UIColor.systemTeal).cornerRadius(5))
                                 .offset(x: -3)
                         } else {
-                            HStack {
-                                Text(color == .black ? game.blackName : game.whiteName)
-                                    .bold().lineLimit(1).font(.subheadline)
-                                Text("[\(color == .black ? game.blackFormattedRank : game.whiteFormattedRank)]")
-                                    .bold().lineLimit(1).font(.caption)
+                            if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+                                (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
+                                    .bold().lineLimit(1)
+                                    .foregroundColor(player.uiColor)
                             }
                         }
                     }
@@ -56,11 +55,10 @@ struct PlayerInfoLine: View {
                                 .background(Color(UIColor.systemTeal).cornerRadius(5))
                                 .offset(x: -3)
                         } else {
-                            HStack {
-                                Text(color == .black ? game.blackName : game.whiteName)
-                                    .bold().lineLimit(1).font(.subheadline)
-                                Text("[\(color == .black ? game.blackFormattedRank : game.whiteFormattedRank)]")
-                                    .bold().lineLimit(1).font(.caption)
+                            if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+                                (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
+                                    .bold().lineLimit(1)
+                                    .foregroundColor(player.uiColor)
                             }
                         }
                     }
