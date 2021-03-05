@@ -131,7 +131,7 @@
 		BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86625B7ECEB0044EA2C /* Alamofire */; };
 		BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86825B7ECF00044EA2C /* DictionaryCoding */; };
 		BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86A25B7ECFB0044EA2C /* SocketIO */; };
-		BCA0C72225F0DF5C0077DD28 /* PrivateMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */; };
+		BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -205,6 +205,7 @@
 		BCD21522255A954E00F78E2A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 		BCE913D125B9398D00065061 /* NewGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE913D025B9398D00065061 /* NewGameView.swift */; };
+		BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -335,7 +336,7 @@
 		BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutofocusTextField.swift; sourceTree = "<group>"; };
 		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
 		BC92008125CE5BE400C14433 /* UserSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSelectionView.swift; sourceTree = "<group>"; };
-		BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageView.swift; sourceTree = "<group>"; };
+		BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageNotificationView.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -369,6 +370,7 @@
 		BCD2150E255A952300F78E2A /* SurroundNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationService.entitlements; sourceTree = "<group>"; };
 		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 		BCE913D025B9398D00065061 /* NewGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameView.swift; sourceTree = "<group>"; };
+		BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessagesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -536,6 +538,7 @@
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
 				BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */,
+				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -602,7 +605,7 @@
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
-				BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */,
+				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -987,11 +990,12 @@
 				BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */,
 				BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */,
 				BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */,
+				BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */,
 				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
 				BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */,
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
-				BCA0C72225F0DF5C0077DD28 /* PrivateMessageView.swift in Sources */,
+				BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,

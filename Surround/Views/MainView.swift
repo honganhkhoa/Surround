@@ -93,6 +93,9 @@ struct MainView: View {
                     List(selection: navigationCurrentView) {
                         RootView.home.navigationLink(currentView: navigationCurrentView)
                         RootView.publicGames.navigationLink(currentView: navigationCurrentView)
+                        if ogs.privateMessagesActivePeerIds.count > 0 {
+                            RootView.privateMessages.navigationLink(currentView: navigationCurrentView)
+                        }
                         Divider()
                         RootView.settings.navigationLink(currentView: navigationCurrentView)
                         Divider()

@@ -77,6 +77,7 @@ class NavigationService: ObservableObject {
 enum RootView: String {
     case home
     case publicGames
+    case privateMessages
     case settings
     case browser
     
@@ -86,6 +87,8 @@ enum RootView: String {
             return "house"
         case .publicGames:
             return "person.2"
+        case .privateMessages:
+            return "message"
         case .settings:
             return "gearshape.2"
         case .browser:
@@ -99,6 +102,8 @@ enum RootView: String {
             return "Home"
         case .publicGames:
             return "Public games"
+        case .privateMessages:
+            return "Private messages"
         case .settings:
             return "Settings"
         case .browser:
@@ -117,16 +122,19 @@ enum RootView: String {
     }
 
     #if MAIN_APP
+    @ViewBuilder
     var view: some View {
         switch self {
         case .home:
-            return AnyView(HomeView())
+            HomeView()
         case .publicGames:
-            return AnyView(PublicGamesList())
+            PublicGamesList()
+        case .privateMessages:
+            PrivateMessagesView()
         case .settings:
-            return AnyView(SettingsView())
+            SettingsView()
         case .browser:
-            return AnyView(OGSBrowserView())
+            OGSBrowserView()
         }
     }
 
@@ -159,6 +167,7 @@ struct RootViewSwitchingMenu: ViewModifier {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @EnvironmentObject var nav: NavigationService
+    @EnvironmentObject var ogs: OGSService
 
     func body(content: Content) -> some View {
         var compactSizeClass = false
@@ -172,6 +181,9 @@ struct RootViewSwitchingMenu: ViewModifier {
                     Section {
                         RootView.home.menuButton(currentView: $nav.main.rootView)
                         RootView.publicGames.menuButton(currentView: $nav.main.rootView)
+                        if ogs.privateMessagesActivePeerIds.count > 0 {
+                            RootView.privateMessages.menuButton(currentView: $nav.main.rootView)
+                        }
                     }
                     Section {
                         RootView.settings.menuButton(currentView: $nav.main.rootView)

@@ -116,7 +116,8 @@ struct GameplaySettings: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
+        NavigationService.shared.main.rootView = .settings
+        return NavigationView {
             SettingsView()
         }
         .navigationViewStyle(StackNavigationViewStyle())

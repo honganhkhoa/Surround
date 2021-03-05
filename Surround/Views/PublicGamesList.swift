@@ -60,7 +60,8 @@ struct PublicGamesList: View {
 
 struct PublicGamesList_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
+        NavigationService.shared.main.rootView = .publicGames
+        return NavigationView {
             PublicGamesList()
         }
         .navigationViewStyle(StackNavigationViewStyle())

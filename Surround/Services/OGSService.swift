@@ -142,9 +142,9 @@ class OGSService: ObservableObject {
     
     @Published private(set) public var friends = [OGSUser]()
     
-    @Published private(set) public var privateMessagesByUserId = [Int: [OGSPrivateMessage]]()
+    @Published private(set) public var privateMessagesByPeerId = [Int: [OGSPrivateMessage]]()
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
-    @Published private(set) public var privateMessagesActiveUserIds = Set<Int>()
+    @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
 
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -1556,28 +1556,34 @@ class OGSService: ObservableObject {
         socket.emit("automatch/cancel", entry.uuid)
     }
     
-    private var _receivedMessagesKeysByUserId = [Int: Set<String>]()
+    private var _receivedMessagesKeysByPeerId = [Int: Set<String>]()
+    private var _privateMessagesUIDByPeerId = [Int: [Int]]()
     func handlePrivateMessage(_ message: OGSPrivateMessage) {
         let otherPlayerId = message.from.id == self.user?.id ? message.to.id : message.from.id
         
-        if _receivedMessagesKeysByUserId[otherPlayerId] == nil {
-            _receivedMessagesKeysByUserId[otherPlayerId] = Set<String>()
-            privateMessagesByUserId[otherPlayerId] = [OGSPrivateMessage]()
-            privateMessagesActiveUserIds.insert(otherPlayerId)
+        if _receivedMessagesKeysByPeerId[otherPlayerId] == nil {
+            _receivedMessagesKeysByPeerId[otherPlayerId] = Set<String>()
+            privateMessagesByPeerId[otherPlayerId] = [OGSPrivateMessage]()
+            _privateMessagesUIDByPeerId[otherPlayerId] = [Int.random(in: 0..<100000), 0]
+            privateMessagesActivePeerIds.insert(otherPlayerId)
             cachedUserIds.insert(otherPlayerId)
             socket.emit("chat/pm/load", otherPlayerId)
         }
         
-        guard _receivedMessagesKeysByUserId[otherPlayerId]?.contains(message.messageKey) == false else {
+        guard _receivedMessagesKeysByPeerId[otherPlayerId]?.contains(message.messageKey) == false else {
             return
         }
         
-        _receivedMessagesKeysByUserId[otherPlayerId]?.insert(message.messageKey)
-        privateMessagesByUserId[otherPlayerId]?.append(message)
+        _receivedMessagesKeysByPeerId[otherPlayerId]?.insert(message.messageKey)
+        privateMessagesByPeerId[otherPlayerId]?.append(message)
         
-        privateMessagesUnreadCount = privateMessagesByUserId.keys.filter { userId in
-            if let lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[userId] {
-                if let lastInThread = privateMessagesByUserId[userId]?.last {
+        _calculatePrivateMessageUnreadCount()
+    }
+    
+    private func _calculatePrivateMessageUnreadCount() {
+        privateMessagesUnreadCount = privateMessagesByPeerId.keys.filter { peerId in
+            if let lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peerId] {
+                if let lastInThread = privateMessagesByPeerId[peerId]?.last {
                     return lastInThread.content.timestamp > lastSeen
                 } else {
                     return false
@@ -1586,5 +1592,44 @@ class OGSService: ObservableObject {
                 return true
             }
         }.count
+    }
+    
+    func sendPrivateMessage(to peer: OGSUser, message: String) -> AnyPublisher<OGSPrivateMessage, Error> {
+        if _privateMessagesUIDByPeerId[peer.id] == nil {
+            _privateMessagesUIDByPeerId[peer.id] = [Int.random(in: 0..<100000), 0]
+        }
+
+        return Future<OGSPrivateMessage, Error> { promise in
+            var uid = self._privateMessagesUIDByPeerId[peer.id]!
+            uid[1] += 1
+            self._privateMessagesUIDByPeerId[peer.id] = uid
+            self.socket.emitWithAck("chat/pm", [
+                "player_id": peer.id,
+                "username": peer.username,
+                "uid": "\(String(uid[0], radix: 36)).\(uid[1])",
+                "message": message
+            ]).timingOut(after: 3) { data in
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                if let messageData = data[0] as? [String: Any] {
+                    if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
+                        self.handlePrivateMessage(message)
+                        promise(.success(message))
+                        return
+                    }
+                }
+                promise(.failure(OGSServiceError.invalidJSON))
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func markPrivateMessageThreadAsRead(peerId: Int) {
+        if let lastMessage = privateMessagesByPeerId[peerId]?.last {
+            if var lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId] {
+                lastSeen[peerId] = lastMessage.content.timestamp
+                userDefaults[.lastSeenPrivateMessageByOGSUserId] = lastSeen
+                _calculatePrivateMessageUnreadCount()
+            }
+        }
     }
 }

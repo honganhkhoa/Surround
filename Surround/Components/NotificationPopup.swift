@@ -94,7 +94,7 @@ struct NotificationPopup: View {
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                             waitingGamesPopup
                         }
-                        if ogs.privateMessagesActiveUserIds.count > 0 {
+                        if (ogs.privateMessagesUnreadCount > 0 || showingPrivateChatView) && nav.main.rootView != .privateMessages {
                             Button(action: { showingPrivateChatView.toggle() }) {
                                 ZStack(alignment: .topTrailing) {
                                     Text(Image(systemName: "message.fill"))
@@ -119,14 +119,19 @@ struct NotificationPopup: View {
                         }
                     }
                     if showingPrivateChatView {
-                        PrivateMessageView()
-                            .frame(maxWidth: 540)
-                            .background(
-                                Color(colorScheme == .dark ? .systemGray6 : .systemBackground)
-                                    .shadow(radius: 2)
-                            )
-                            .padding(.horizontal)
-                            .padding(.bottom)
+                        ZStack {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { self.showingPrivateChatView = false }
+                            PrivateMessageNotificationView()
+                                .frame(maxWidth: 540)
+                                .background(
+                                    Color(colorScheme == .dark ? .systemGray6 : .systemBackground)
+                                        .shadow(radius: 2)
+                                )
+                                .padding(.horizontal)
+                                .padding(.bottom)
+                        }
                     }
                 }
             }

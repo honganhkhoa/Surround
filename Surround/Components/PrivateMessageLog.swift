@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct PrivateMessageLine: View {
     @EnvironmentObject var ogs: OGSService
@@ -51,12 +52,31 @@ struct PrivateMessageLine: View {
 }
 
 struct PrivateMessageLog: View {
-    var messages: [OGSPrivateMessage]
+    @EnvironmentObject var ogs: OGSService
+    var peer: OGSUser
     
+    var messages: [OGSPrivateMessage] {
+        ogs.privateMessagesByPeerId[peer.id] ?? []
+    }
+
     @State var atEndOfChat = false
     @State var shouldScrollToEndAfterKeyboardChange = false
+    @State var newChat = ""
+    @State var chatSendingCancellable: AnyCancellable?
+    
+    func sendMessage() {
+        if newChat.count > 0 {
+            chatSendingCancellable = ogs.sendPrivateMessage(to: peer, message: newChat).sink(
+                receiveCompletion: { _ in
+                    self.chatSendingCancellable = nil
+                },
+                receiveValue: { _ in }
+            )
+            newChat = ""
+        }
+    }
 
-    var body: some View {
+    var messagesScrollView: some View {
         GeometryReader { scrollViewGeometry in
             ScrollView {
                 ScrollViewReader { scrollView in
@@ -73,6 +93,7 @@ struct PrivateMessageLog: View {
                                 if !self.atEndOfChat {
                                     DispatchQueue.main.async {
                                         self.atEndOfChat = true
+                                        ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
                                     }
                                 }
                             } else {
@@ -87,6 +108,7 @@ struct PrivateMessageLog: View {
                     }
                     .onAppear {
                         scrollView.scrollTo("scrollViewBottom")
+                        ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
                     }
                     .onChange(of: messages) { _ in
                         if atEndOfChat {
@@ -108,11 +130,30 @@ struct PrivateMessageLog: View {
             }.coordinateSpace(name: "scrollView")
         }
     }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            messagesScrollView
+            Divider()
+            HStack {
+                TextField("Aa", text: $newChat, onCommit: sendMessage)
+                if self.chatSendingCancellable == nil {
+                    Button(action: sendMessage) {
+                        Image(systemName: "arrow.up.circle.fill")
+                    }.disabled(newChat.count == 0)
+                } else {
+                    ProgressView()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+    }
 }
 
 struct PrivateMessageLog_Previews: PreviewProvider {
     static var previews: some View {
-        PrivateMessageLog(messages: OGSPrivateMessage.sampleData)
+        PrivateMessageLog(peer: OGSPrivateMessage.sampleData.first!.from)
             .previewLayout(.fixed(width: 300, height: 400))
             .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hakhoa", id: 765826)))
     }
