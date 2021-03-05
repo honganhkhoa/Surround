@@ -70,6 +70,11 @@
 		BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC39EE3825DBC23C00562C68 /* TextUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC39EE3725DBC23C00562C68 /* TextUtilities.swift */; };
+		BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
+		BC3CD7D425EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
+		BC3CD7D525EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
+		BC3CD7D625EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
+		BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
 		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
@@ -126,6 +131,7 @@
 		BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86625B7ECEB0044EA2C /* Alamofire */; };
 		BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86825B7ECF00044EA2C /* DictionaryCoding */; };
 		BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86A25B7ECFB0044EA2C /* SocketIO */; };
+		BCA0C72225F0DF5C0077DD28 /* PrivateMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -302,6 +308,8 @@
 		BC361AB5256246B4000C47F4 /* OGSChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatLine.swift; sourceTree = "<group>"; };
 		BC39EE3725DBC23C00562C68 /* TextUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtilities.swift; sourceTree = "<group>"; };
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPrivateMessage.swift; sourceTree = "<group>"; };
+		BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageLog.swift; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
@@ -327,6 +335,7 @@
 		BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutofocusTextField.swift; sourceTree = "<group>"; };
 		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
 		BC92008125CE5BE400C14433 /* UserSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSelectionView.swift; sourceTree = "<group>"; };
+		BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageView.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
@@ -560,6 +569,7 @@
 				BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */,
 				BC361AB5256246B4000C47F4 /* OGSChatLine.swift */,
 				BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */,
+				BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -591,6 +601,8 @@
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
+				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
+				BCA0C72125F0DF5C0077DD28 /* PrivateMessageView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -979,10 +991,12 @@
 				BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */,
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
+				BCA0C72225F0DF5C0077DD28 /* PrivateMessageView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
 				BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */,
+				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,
@@ -994,6 +1008,7 @@
 				BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */,
 				BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
+				BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
 				BC92008225CE5BF600C14433 /* UserSelectionView.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
@@ -1060,6 +1075,7 @@
 				BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */,
 				BC285B5A2557FCAC005378F9 /* OGSClock.swift in Sources */,
 				BC285B4C2557FC78005378F9 /* BoardView.swift in Sources */,
+				BC3CD7D525EE479900C931EB /* OGSPrivateMessage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1091,6 +1107,7 @@
 				BC649428253FF942002B2200 /* NavigationService.swift in Sources */,
 				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
 				BC285B912557FD5C005378F9 /* SurroundService.swift in Sources */,
+				BC3CD7D425EE479900C931EB /* OGSPrivateMessage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1115,6 +1132,7 @@
 				BC5EEC32259D878100675761 /* Variation.swift in Sources */,
 				BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */,
 				BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */,
+				BC3CD7D625EE479900C931EB /* OGSPrivateMessage.swift in Sources */,
 				BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */,
 				BCD214F3255A948E00F78E2A /* Game.swift in Sources */,
 				BCD214F5255A948E00F78E2A /* OGSGame.swift in Sources */,
@@ -1653,7 +1671,7 @@
 			repositoryURL = "https://github.com/dmytro-anokhin/url-image";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.18;
+				minimumVersion = 2.0.0;
 			};
 		};
 		BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */ = {

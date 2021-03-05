@@ -78,6 +78,10 @@ class OGSService: ObservableObject {
             ogs.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
         }
         
+        for message in OGSPrivateMessage.sampleData {
+            ogs.handlePrivateMessage(message)
+        }
+        
         return ogs
     }
 
@@ -137,6 +141,10 @@ class OGSService: ObservableObject {
     private var cachedUsersFetchingCancellable: AnyCancellable?
     
     @Published private(set) public var friends = [OGSUser]()
+    
+    @Published private(set) public var privateMessagesByUserId = [Int: [OGSPrivateMessage]]()
+    @Published private(set) public var privateMessagesUnreadCount: Int = 0
+    @Published private(set) public var privateMessagesActiveUserIds = Set<Int>()
 
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -338,6 +346,18 @@ class OGSService: ObservableObject {
                 }
             }
         }
+        
+        socket.on("private-message") { data, ack in
+            DispatchQueue.main.async {
+                if let messageData = data[0] as? [String: Any] {
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
+                        self.handlePrivateMessage(message)
+                    }
+                }
+            }
+        }
     }
     
     var ogsUIConfig: OGSUIConfig? {
@@ -419,6 +439,14 @@ class OGSService: ObservableObject {
     func logout() {
         self.ogsUIConfig = nil
         SurroundService.shared.unregisterDevice()
+        
+        userDefaults.reset(.latestOGSOverview)
+        userDefaults.reset(.latestOGSOverviewTime)
+        userDefaults.reset(.latestOGSOverviewOutdated)
+        userDefaults.reset(.cachedOGSGames)
+        userDefaults.reset(.lastSeenChatIdByOGSGameId)
+        userDefaults.reset(.lastAutomatchEntry)
+        userDefaults.reset(.lastSeenPrivateMessageByOGSUserId)
     }
     
     func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
@@ -1526,5 +1554,37 @@ class OGSService: ObservableObject {
         }
         
         socket.emit("automatch/cancel", entry.uuid)
+    }
+    
+    private var _receivedMessagesKeysByUserId = [Int: Set<String>]()
+    func handlePrivateMessage(_ message: OGSPrivateMessage) {
+        let otherPlayerId = message.from.id == self.user?.id ? message.to.id : message.from.id
+        
+        if _receivedMessagesKeysByUserId[otherPlayerId] == nil {
+            _receivedMessagesKeysByUserId[otherPlayerId] = Set<String>()
+            privateMessagesByUserId[otherPlayerId] = [OGSPrivateMessage]()
+            privateMessagesActiveUserIds.insert(otherPlayerId)
+            cachedUserIds.insert(otherPlayerId)
+            socket.emit("chat/pm/load", otherPlayerId)
+        }
+        
+        guard _receivedMessagesKeysByUserId[otherPlayerId]?.contains(message.messageKey) == false else {
+            return
+        }
+        
+        _receivedMessagesKeysByUserId[otherPlayerId]?.insert(message.messageKey)
+        privateMessagesByUserId[otherPlayerId]?.append(message)
+        
+        privateMessagesUnreadCount = privateMessagesByUserId.keys.filter { userId in
+            if let lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[userId] {
+                if let lastInThread = privateMessagesByUserId[userId]?.last {
+                    return lastInThread.content.timestamp > lastSeen
+                } else {
+                    return false
+                }
+            } else {
+                return true
+            }
+        }.count
     }
 }

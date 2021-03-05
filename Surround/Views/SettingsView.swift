@@ -27,7 +27,7 @@ struct SettingsView: View {
                 GroupBox(label: Text("Online-go.com Account")) {
                     HStack(alignment: .top) {
                         if let url = user.iconURL(ofSize: 64) {
-                            URLImage(url)
+                            URLImage(url: url) { $0.resizable() }
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
                                 .cornerRadius(10)

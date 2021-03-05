@@ -67,6 +67,14 @@ extension UserDefaults {
         self[.latestOGSOverviewTime] = Date()
         self[.latestOGSOverviewOutdated] = false
     }
+    
+    func reset<T>(_ setting: SettingKey<T>) where T: Codable {
+        if setting._defaultValue != nil {
+            self[setting] = setting._defaultValue
+        } else {
+            self[setting] = nil
+        }
+    }
 }
 
 extension SettingKey {
@@ -155,6 +163,12 @@ extension SettingKey {
     static var lastAutomatchEntry: SettingKey<OGSAutomatchEntry> {
         return .init(name: "lastAutomatchEntry", encoded: true)
     }
+    
+    static var lastSeenPrivateMessageByOGSUserId: SettingKey<[Int: Double]> {
+        return .init(name: "lastSeenPrivateMessageByOGSUserId", encoded: true, defaultValue: [Int: Double]())
+    }
+    
+    // Reminder: When adding a key, check if it needs to be reset on logout.
 }
 
 @propertyWrapper

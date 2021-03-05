@@ -10,6 +10,9 @@ import SwiftUI
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State var showingPrivateChatView = false
     
     var connectionPopup: some View {
         ZStack {
@@ -54,12 +57,12 @@ struct NotificationPopup: View {
     var liveGamesPopup: some View {
         Button(action: goToLiveGames) {
             VStack {
-                Text("Live game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
+                Text("Game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
                 Text("Tap to go to game\(ogs.liveGames.count == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color(.systemIndigo))
+            .background(Color(.systemTeal))
             .cornerRadius(10)
         }
     }
@@ -68,7 +71,7 @@ struct NotificationPopup: View {
         Button(action: { nav.main.showWaitingGames = true }) {
             HStack(spacing: 0) {
                 VStack {
-                    Text("Waiting for opponent").bold().foregroundColor(.white)
+                    Text("Waiting...").bold().foregroundColor(.white)
                     Text("\(ogs.waitingLiveGames) live game\(ogs.waitingLiveGames == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
                 }
                 Spacer().frame(width: 10)
@@ -82,12 +85,49 @@ struct NotificationPopup: View {
     }
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             if ogs.socketStatus == .connected {
-                if ogs.liveGames.filter { $0.gameData?.outcome == nil }.count > 0 && !viewingLiveGames {
-                    liveGamesPopup
-                } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
-                    waitingGamesPopup
+                VStack {
+                    HStack {
+                        if ogs.liveGames.filter { $0.gameData?.outcome == nil }.count > 0 && !viewingLiveGames {
+                            liveGamesPopup
+                        } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
+                            waitingGamesPopup
+                        }
+                        if ogs.privateMessagesActiveUserIds.count > 0 {
+                            Button(action: { showingPrivateChatView.toggle() }) {
+                                ZStack(alignment: .topTrailing) {
+                                    Text(Image(systemName: "message.fill"))
+                                    if ogs.privateMessagesUnreadCount > 0 {
+                                        ZStack {
+                                            Circle().fill(Color.red)
+                                            Text("\(ogs.privateMessagesUnreadCount)")
+                                                .font(.caption2).bold()
+                                                .minimumScaleFactor(0.2)
+                                                .foregroundColor(.white)
+                                                .frame(width: 15, height: 15)
+                                        }
+                                        .frame(width: 15, height: 15)
+                                        .offset(x: 6, y: -6)
+                                    }
+                                }
+                                .padding()
+                                .foregroundColor(.white)
+                                .background(Color.orange)
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                    if showingPrivateChatView {
+                        PrivateMessageView()
+                            .frame(maxWidth: 540)
+                            .background(
+                                Color(colorScheme == .dark ? .systemGray6 : .systemBackground)
+                                    .shadow(radius: 2)
+                            )
+                            .padding(.horizontal)
+                            .padding(.bottom)
+                    }
                 }
             }
             connectionPopup
@@ -97,21 +137,34 @@ struct NotificationPopup: View {
 
 struct NotificationPopup_Previews: PreviewProvider {
     static var previews: some View {
-        Group {
+        let nav = NavigationService.shared
+        nav.main.rootView = .publicGames
+        return Group {
             ZStack(alignment: .top) {
-                Color(.systemBackground)
-                NotificationPopup()
+                NavigationView {
+                    Text("View")
+                        .navigationTitle("View")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarItems(leading: Text("Back"))
+                }.navigationViewStyle(StackNavigationViewStyle())
+                NotificationPopup(showingPrivateChatView: true)
             }
             .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "#albatros", id: 442873),
+                user: OGSUser(username: "hakhoa", id: 765826),
                 openChallengesSent: [OGSChallenge.sampleOpenChallenge]
             ))
+            .colorScheme(.dark)
             ZStack(alignment: .top) {
-                Color(.systemBackground)
-                NotificationPopup()
+                NavigationView {
+                    Text("View")
+                        .navigationTitle("View")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarItems(leading: Text("Back"))
+                }.navigationViewStyle(StackNavigationViewStyle())
+                NotificationPopup(showingPrivateChatView: true)
             }
             .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "kata-bot", id: 592684),
+                user: OGSUser(username: "hakhoa", id: 765826),
                 activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
             ))
             ZStack(alignment: .top) {
@@ -120,6 +173,6 @@ struct NotificationPopup_Previews: PreviewProvider {
             }
             .environmentObject(OGSService.previewInstance(socketStatus: .connecting))
         }
-        .environmentObject(NavigationService.shared)
+        .environmentObject(nav)
     }
 }

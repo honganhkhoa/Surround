@@ -35,7 +35,7 @@ struct PlayersBannerView: View {
             ZStack(alignment: .bottomTrailing) {
                 Group {
                     if icon != nil {
-                        URLImage(URL(string: icon!)!)
+                        URLImage(url: URL(string: icon!)!) { $0.resizable() }
                     } else {
                         Color.gray
                     }

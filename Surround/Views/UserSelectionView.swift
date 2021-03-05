@@ -75,7 +75,7 @@ struct UserSelectionView: View {
         Button(action: { self.selectUser(user) }) {
             HStack {
                 if let iconURL = user.iconURL(ofSize: 64) {
-                    URLImage(iconURL)
+                    URLImage(url: iconURL) { $0.resizable() }
                         .frame(width: 64, height: 64)
                         .background(Color.gray)
                         .cornerRadius(10)

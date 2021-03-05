@@ -17,6 +17,7 @@ struct ChatLog: View {
     var hoveredCoordinates: Binding<[[Int]]> = .constant([])
     
     @State var atEndOfChat = false
+    @State var shouldScrollToEndAfterKeyboardChange = false
 
     func shouldMergeChat(at index: Int) -> Bool {
         return index > 0 && game.chatLog[index].moveNumber == game.chatLog[index - 1].moveNumber && game.chatLog[index].user.id == game.chatLog[index - 1].user.id
@@ -125,6 +126,17 @@ struct ChatLog: View {
                                     scrollView.scrollTo("scrollViewBottom")
                                     game.markAllChatAsRead()
                                 }
+                            }
+                        }
+                        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { _ in
+                            self.shouldScrollToEndAfterKeyboardChange = self.atEndOfChat
+                        }
+                        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                            if self.shouldScrollToEndAfterKeyboardChange {
+                                DispatchQueue.main.async {
+                                    scrollView.scrollTo("scrollViewBottom")
+                                    self.shouldScrollToEndAfterKeyboardChange = false
+                                }                                
                             }
                         }
                     }

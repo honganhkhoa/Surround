@@ -51,7 +51,7 @@ struct ChallengeCell: View {
                 HStack(alignment: .top) {
                     if let iconURL = challenger.iconURL(ofSize: 64) {
                         ZStack(alignment: .bottomTrailing) {
-                            URLImage(iconURL)
+                            URLImage(url: iconURL) { $0.resizable() }
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
                             Stone(color: challengerStoneColor, shadowRadius: 1)
@@ -132,7 +132,7 @@ struct ChallengeCell: View {
                     }
                     if let iconURL = challenged.iconURL(ofSize: 64) {
                         ZStack(alignment: .bottomLeading) {
-                            URLImage(iconURL)
+                            URLImage(url: iconURL) { $0.resizable() }
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
                             Stone(color: challengerStoneColor?.opponentColor(), shadowRadius: 1)

@@ -319,7 +319,7 @@ struct CustomGameForm: View {
                 NavigationLink(destination: UserSelectionView(user: $opponent, isPresented: $selectingOpponent), isActive: $selectingOpponent) {
                     HStack {
                         if let opponent = opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
-                            URLImage(opponentIconURL)
+                            URLImage(url: opponentIconURL) { $0.resizable() }
                                 .frame(width: 64, height: 64)
                                 .background(Color.gray)
                                 .cornerRadius(10)
