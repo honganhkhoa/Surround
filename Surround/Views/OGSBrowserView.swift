@@ -15,9 +15,10 @@ struct OGSBrowserView: View {
     @State var title: String?
     @State var isLoading: Bool = true
     @State var webView: WKWebView?
+    var initialURL: URL
     
     var body: some View {
-        OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView)
+        OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL)
 //            .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
             .navigationBarItems(
                 trailing: isLoading ?
@@ -36,6 +37,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
     @Binding var isLoading: Bool
     @Binding var title: String?
     @Binding var webView: WKWebView?
+    var initialURL: URL
     
     func makeCoordinator() -> Coordinator {
         return Coordinator(self)
@@ -77,7 +79,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
                 for cookie in cookies {
                     webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
                 }
-                request.url = URL(string: "\(OGSService.ogsRoot)/overview")
+                request.url = initialURL
             }
         }
                         

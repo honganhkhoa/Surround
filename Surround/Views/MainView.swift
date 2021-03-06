@@ -100,6 +100,7 @@ struct MainView: View {
                         RootView.settings.navigationLink(currentView: navigationCurrentView)
                         Divider()
                         RootView.browser.navigationLink(currentView: navigationCurrentView)
+                        RootView.forums.navigationLink(currentView: navigationCurrentView)
                     }
                     .listStyle(SidebarListStyle())
                     .navigationTitle("Surround")

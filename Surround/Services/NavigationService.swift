@@ -80,6 +80,7 @@ enum RootView: String {
     case privateMessages
     case settings
     case browser
+    case forums
     
     var systemImage: String {
         switch self {
@@ -93,6 +94,8 @@ enum RootView: String {
             return "gearshape.2"
         case .browser:
             return "safari"
+        case .forums:
+            return "bubble.left.and.bubble.right"
         }
     }
     
@@ -108,6 +111,8 @@ enum RootView: String {
             return "Settings"
         case .browser:
             return "Web version"
+        case .forums:
+            return "Forums"
         }
     }
     
@@ -115,13 +120,19 @@ enum RootView: String {
         Label(self.title, systemImage: self.systemImage)
     }
     
+    #if MAIN_APP
     func menuButton(currentView: Binding<RootView>) -> some View {
-        Button(action: { currentView.wrappedValue = self }) {
+        Button(action: {
+            if self == .forums {
+                UIApplication.shared.open(URL(string: "https://forums.online-go.com/")!)
+            } else {
+                currentView.wrappedValue = self
+            }
+        }) {
             self.label
         }
     }
 
-    #if MAIN_APP
     @ViewBuilder
     var view: some View {
         switch self {
@@ -134,12 +145,20 @@ enum RootView: String {
         case .settings:
             SettingsView()
         case .browser:
-            OGSBrowserView()
+            OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/overview")!)
+        case .forums:
+            OGSBrowserView(initialURL: URL(string: "https://forums.online-go.com/")!)
         }
     }
 
     func navigationLink(currentView: Binding<RootView?>) -> some View {
-        Button(action: { currentView.wrappedValue = self }) {
+        Button(action: {
+            if self == .forums {
+                UIApplication.shared.open(URL(string: "https://forums.online-go.com/")!)
+            } else {
+                currentView.wrappedValue = self
+            }
+        }) {
             if currentView.wrappedValue == self {
                 HStack {
                     self.label
@@ -162,6 +181,7 @@ enum RootView: String {
     #endif
 }
 
+#if MAIN_APP
 struct RootViewSwitchingMenu: ViewModifier {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -190,6 +210,7 @@ struct RootViewSwitchingMenu: ViewModifier {
                     }
                     Section {
                         RootView.browser.menuButton(currentView:$nav.main.rootView)
+                        RootView.forums.menuButton(currentView: $nav.main.rootView)
                     }
                 }
                 label: {
@@ -205,3 +226,4 @@ struct RootViewSwitchingMenu: ViewModifier {
         }
     }
 }
+#endif
