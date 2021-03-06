@@ -76,11 +76,30 @@ struct PrivateMessageNotificationView: View {
             .background(Color(.systemGray4))
             if selectedPeerId != -1, let peer = user(id: selectedPeerId) {
                 Divider()
+                if ogs.superchatPeerIds.contains(selectedPeerId) {
+                    Text("⚠️ OGS Moderator's official message. Please respond.")
+                        .font(.subheadline).bold()
+                        .leadingAlignedInScrollView()
+                        .padding(.horizontal)
+                        .padding(.vertical, 5)
+                        .foregroundColor(.white)
+                        .background(Color.purple)
+                    Divider()
+                }
                 PrivateMessageLog(peer: peer)
             }
         }
         .onAppear {
-            selectedPeerId = ogs.privateMessagesActivePeerIds.sorted().first ?? -1
+            selectedPeerId = ogs.superchatPeerIds.first ?? sortedPeers.first?.id ?? -1
+        }
+        .onChange(of: ogs.superchatPeerIds) { superchatPeerIds in
+            if superchatPeerIds.count > 0, let firstPeerId = superchatPeerIds.first {
+                if !superchatPeerIds.contains(selectedPeerId) {
+                    DispatchQueue.main.async {
+                        self.selectedPeerId = firstPeerId
+                    }
+                }
+            }
         }
     }
 }

@@ -41,7 +41,7 @@ struct NotificationPopup: View {
             }
         }
         
-        return false
+        return nav.main.modalLiveGame != nil
     }
     
     var viewingHomeView: Bool {
@@ -84,8 +84,45 @@ struct NotificationPopup: View {
         }
     }
     
+    var shouldShowMessageNotificationIcon: Bool {
+        if ogs.superchatPeerIds.count > 0 {
+            return true
+        }
+        
+        if showingPrivateChatView {
+            return true
+        }
+        
+        if nav.main.rootView == .privateMessages {
+            return false
+        }
+        
+        return ogs.privateMessagesUnreadCount > 0
+    }
+    
+    func closeChatWindow() {
+        guard ogs.superchatPeerIds.count == 0 else {
+            return
+        }
+        
+        self.showingPrivateChatView = false
+    }
+    
+    func toggleChatWindow() {
+        if showingPrivateChatView {
+            closeChatWindow()
+        } else {
+            showingPrivateChatView = true
+        }
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
+            if showingPrivateChatView {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { closeChatWindow() }
+            }
             if ogs.socketStatus == .connected {
                 VStack {
                     HStack {
@@ -94,8 +131,8 @@ struct NotificationPopup: View {
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                             waitingGamesPopup
                         }
-                        if (ogs.privateMessagesUnreadCount > 0 || showingPrivateChatView) && nav.main.rootView != .privateMessages {
-                            Button(action: { showingPrivateChatView.toggle() }) {
+                        if shouldShowMessageNotificationIcon {
+                            Button(action: toggleChatWindow) {
                                 ZStack(alignment: .topTrailing) {
                                     Text(Image(systemName: "message.fill"))
                                     if ogs.privateMessagesUnreadCount > 0 {
@@ -120,9 +157,6 @@ struct NotificationPopup: View {
                     }
                     if showingPrivateChatView {
                         ZStack {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture { self.showingPrivateChatView = false }
                             PrivateMessageNotificationView()
                                 .frame(maxWidth: 540)
                                 .background(
@@ -136,6 +170,13 @@ struct NotificationPopup: View {
                 }
             }
             connectionPopup
+        }
+        .onChange(of: ogs.superchatPeerIds) { superchatPeerIds in
+            if superchatPeerIds.count > 0 {
+                DispatchQueue.main.async {
+                    self.showingPrivateChatView = true
+                }
+            }
         }
     }
 }

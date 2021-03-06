@@ -106,6 +106,7 @@ struct PrivateMessageLog: View {
                             return AnyView(EmptyView())
                         }.frame(width: 10, height: 1).id("scrollViewBottom")
                     }
+                    .padding(.vertical, 5)
                     .onAppear {
                         scrollView.scrollTo("scrollViewBottom")
                         ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
@@ -154,7 +155,7 @@ struct PrivateMessageLog: View {
 struct PrivateMessageLog_Previews: PreviewProvider {
     static var previews: some View {
         PrivateMessageLog(peer: OGSPrivateMessage.sampleData.first!.from)
-            .previewLayout(.fixed(width: 300, height: 400))
+            .previewLayout(.fixed(width: 300, height: 600))
             .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hakhoa", id: 765826)))
     }
 }

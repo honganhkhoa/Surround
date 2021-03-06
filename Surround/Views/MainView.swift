@@ -109,6 +109,44 @@ struct MainView: View {
             if ogs.isLoggedIn {
                 NotificationPopup()
             }
+            EmptyView()
+                .fullScreenCover(isPresented: Binding(
+                                    get: { nav.main.modalLiveGame != nil },
+                                    set: { if !$0 { nav.main.modalLiveGame = nil } })
+                ) {
+                    ZStack(alignment: .top) {
+                        NavigationView {
+                            GameDetailView(currentGame: nav.main.modalLiveGame)
+                                .toolbar {
+                                    ToolbarItem(placement: .cancellationAction) {
+                                        Button(action: { nav.main.modalLiveGame = nil }) {
+                                            Text("Close")
+                                        }
+                                    }
+                                }
+                        }
+                        if ogs.isLoggedIn {
+                            NotificationPopup()
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+                }
+            EmptyView()
+                .sheet(isPresented: $nav.main.showWaitingGames) {
+                    NavigationView {
+                        WaitingGamesView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button(action: { nav.main.showWaitingGames = false }) {
+                                        Text("Close")
+                                    }
+                                }
+                            }
+                            .environmentObject(ogs)
+                            .environmentObject(nav)
+                    }
+                }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
@@ -133,37 +171,6 @@ struct MainView: View {
         }
         .onOpenURL { url in
             navigateTo(appURL: url)
-        }
-        .fullScreenCover(isPresented: Binding(
-                            get: { nav.main.gameInModal != nil },
-                            set: { if !$0 { nav.main.gameInModal = nil } })
-        ) {
-            NavigationView {
-                GameDetailView(currentGame: nav.main.gameInModal)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(action: { nav.main.gameInModal = nil }) {
-                                Text("Close")
-                            }
-                        }
-                    }
-                    .environmentObject(ogs)
-                    .environmentObject(nav)
-            }
-        }
-        .sheet(isPresented: $nav.main.showWaitingGames) {
-            NavigationView {
-                WaitingGamesView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(action: { nav.main.showWaitingGames = false }) {
-                                Text("Close")
-                            }
-                        }
-                    }
-                    .environmentObject(ogs)
-                    .environmentObject(nav)
-            }
         }
     }
 }

@@ -11,7 +11,7 @@ import Combine
 
 struct MainViewParameters {
     var rootView: RootView = .home
-    var gameInModal: Game?
+    var modalLiveGame: Game?
     var showWaitingGames = false
 }
 
@@ -70,7 +70,7 @@ class NavigationService: ObservableObject {
             self.home.activeGame = game
             return
         }
-        self.main.gameInModal = game
+        self.main.modalLiveGame = game
     }
 }
 

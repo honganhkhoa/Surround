@@ -81,6 +81,7 @@ class OGSService: ObservableObject {
         for message in OGSPrivateMessage.sampleData {
             ogs.handlePrivateMessage(message)
         }
+//        ogs.superchatPeerIds.insert(OGSPrivateMessage.sampleData.first!.from.id)
         
         return ogs
     }
@@ -145,6 +146,7 @@ class OGSService: ObservableObject {
     @Published private(set) public var privateMessagesByPeerId = [Int: [OGSPrivateMessage]]()
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
     @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
+    @Published private(set) public var superchatPeerIds = Set<Int>()
 
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -230,7 +232,19 @@ class OGSService: ObservableObject {
         })
         
         self.checkLoginStatus()
+        
+//        self._testSuperChat()
     }
+    
+//    private func _testSuperChat() {
+//        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
+//            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
+//            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
+//                self.superchatPeerIds.removeAll()
+//                self._testSuperChat()
+//            }
+//        }
+//    }
     
     private var _gamesToBeReconnected: [Game] = []
     
@@ -355,6 +369,14 @@ class OGSService: ObservableObject {
                     if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
                         self.handlePrivateMessage(message)
                     }
+                }
+            }
+        }
+        
+        socket.on("private-superchat") { data, ack in
+            DispatchQueue.main.async {
+                if let superchatConfig = data[0] as? [String: Any] {
+                    self.handleSuperchat(config: superchatConfig)
                 }
             }
         }
@@ -1561,15 +1583,8 @@ class OGSService: ObservableObject {
     func handlePrivateMessage(_ message: OGSPrivateMessage) {
         let otherPlayerId = message.from.id == self.user?.id ? message.to.id : message.from.id
         
-        if _receivedMessagesKeysByPeerId[otherPlayerId] == nil {
-            _receivedMessagesKeysByPeerId[otherPlayerId] = Set<String>()
-            privateMessagesByPeerId[otherPlayerId] = [OGSPrivateMessage]()
-            _privateMessagesUIDByPeerId[otherPlayerId] = [Int.random(in: 0..<100000), 0]
-            privateMessagesActivePeerIds.insert(otherPlayerId)
-            cachedUserIds.insert(otherPlayerId)
-            socket.emit("chat/pm/load", otherPlayerId)
-        }
-        
+        setUpNewPeerIfNecessary(peerId: otherPlayerId)
+                
         guard _receivedMessagesKeysByPeerId[otherPlayerId]?.contains(message.messageKey) == false else {
             return
         }
@@ -1580,6 +1595,28 @@ class OGSService: ObservableObject {
         _calculatePrivateMessageUnreadCount()
     }
     
+    func setUpNewPeerIfNecessary(peerId: Int) {
+        if _receivedMessagesKeysByPeerId[peerId] == nil {
+            _receivedMessagesKeysByPeerId[peerId] = Set<String>()
+            privateMessagesByPeerId[peerId] = [OGSPrivateMessage]()
+            _privateMessagesUIDByPeerId[peerId] = [Int.random(in: 0..<100000), 0]
+            privateMessagesActivePeerIds.insert(peerId)
+            cachedUserIds.insert(peerId)
+            socket.emit("chat/pm/load", peerId)
+        }
+    }
+    
+    func handleSuperchat(config: [String: Any]) {
+        if let moderatorId = config["moderator_id"] as? Int, let enabled = config["enable"] as? Bool {
+            setUpNewPeerIfNecessary(peerId: moderatorId)
+            if enabled {
+                superchatPeerIds.insert(moderatorId)
+            } else {
+                superchatPeerIds.remove(moderatorId)
+            }
+        }
+    }
+
     private func _calculatePrivateMessageUnreadCount() {
         privateMessagesUnreadCount = privateMessagesByPeerId.keys.filter { peerId in
             if let lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peerId] {

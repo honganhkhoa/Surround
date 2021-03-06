@@ -38,31 +38,35 @@ struct PrivateMessagesView: View {
     }
 
     var body: some View {
-        List(data, id: \.peer.id) { peer, lastMessage in
-            NavigationLink(destination:
-                            PrivateMessageLog(peer: peer)
-                            .navigationBarTitle(peer.username)
-                            .navigationBarTitleDisplayMode(.inline)
-            ) {
-                HStack {
-                    if let iconURL = peer.iconURL(ofSize: 64) {
-                        URLImage(url: iconURL) { $0.resizable() }
-                            .frame(width: 48, height: 48)
-                    } else {
-                        Text("\(String(peer.username.first!))")
-                            .font(.system(size: 32)).bold()
-                            .frame(width: 48, height: 48)
-                            .background(Color.gray)
-                    }
-                    if let hasUnread = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0 < lastMessage.content.timestamp {
-                        VStack(alignment: .leading) {
-                            Text(peer.username)
-                                .foregroundColor(peer.uiColor)
-                                .font(hasUnread ? Font.body.bold() : .body)
-                            Text(lastMessage.content.message)
-                                .font(hasUnread ? Font.subheadline.bold() : .subheadline)
-                                .foregroundColor(Color(.secondaryLabel))
-                                .lineLimit(1)
+        List {
+            Section(footer: Text("Private messages are only stored for a few days, so please make sure to save any important information somewhere else.").font(.caption)) {
+                ForEach(data, id: \.peer.id) { peer, lastMessage in
+                    NavigationLink(destination:
+                                    PrivateMessageLog(peer: peer)
+                                    .navigationBarTitle(peer.username)
+                                    .navigationBarTitleDisplayMode(.inline)
+                    ) {
+                        HStack {
+                            if let iconURL = peer.iconURL(ofSize: 64) {
+                                URLImage(url: iconURL) { $0.resizable() }
+                                    .frame(width: 48, height: 48)
+                            } else {
+                                Text("\(String(peer.username.first!))")
+                                    .font(.system(size: 32)).bold()
+                                    .frame(width: 48, height: 48)
+                                    .background(Color.gray)
+                            }
+                            if let hasUnread = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0 < lastMessage.content.timestamp {
+                                VStack(alignment: .leading) {
+                                    Text(peer.username)
+                                        .foregroundColor(peer.uiColor)
+                                        .font(hasUnread ? Font.body.bold() : .body)
+                                    Text(lastMessage.content.message)
+                                        .font(hasUnread ? Font.subheadline.bold() : .subheadline)
+                                        .foregroundColor(Color(.secondaryLabel))
+                                        .lineLimit(1)
+                                }
+                            }
                         }
                     }
                 }
