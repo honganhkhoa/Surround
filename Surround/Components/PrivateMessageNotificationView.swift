@@ -12,6 +12,7 @@ import Combine
 struct PrivateMessageNotificationView: View {
     @EnvironmentObject var ogs: OGSService
     @State var selectedPeerId = -1
+    @Namespace var selectingPeer
     
     func user(id userId: Int) -> OGSUser? {
         if let user = ogs.cachedUsersById[userId] {
@@ -41,33 +42,51 @@ struct PrivateMessageNotificationView: View {
         })
         return result
     }
+    
+    func selectPeer(id: Int) {
+        guard ogs.superchatPeerIds.count == 0 || ogs.superchatPeerIds.contains(id) else {
+            return
+        }
+        withAnimation {
+            selectedPeerId = id
+        }
+    }
         
     var body: some View {
         VStack(spacing: 0) {
             ScrollView([.horizontal]) {
-                HStack(spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     ForEach(sortedPeers, id: \.id) { peer in
-                        VStack(spacing: 0) {
-                            ZStack {
-                                if let iconURL = peer.iconURL(ofSize: 64) {
-                                    URLImage(url: iconURL) { image in
-                                        image.resizable()
+                        Button(action: { selectPeer(id: peer.id) }) {
+                            VStack(spacing: 0) {
+                                ZStack {
+                                    if peer.id == selectedPeerId {
+                                        RoundedRectangle(cornerRadius: 3)
+                                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [3]))
+                                            .frame(width: 58, height: 58)
+                                            .matchedGeometryEffect(id: "selectionIndicator", in: selectingPeer)
                                     }
-                                    .frame(width: 48, height: 48)
-                                } else {
-                                    Text("\(String(peer.username.first!))")
-                                        .font(.system(size: 32)).bold()
+                                    if let iconURL = peer.iconURL(ofSize: 64) {
+                                        URLImage(url: iconURL) { image in
+                                            image.resizable()
+                                        }
                                         .frame(width: 48, height: 48)
-                                        .background(Color.gray)
+                                        .padding(5)
+                                    } else {
+                                        Text("\(String(peer.username.first!))")
+                                            .font(.system(size: 32)).bold()
+                                            .frame(width: 48, height: 48)
+                                            .background(Color.gray)
+                                            .padding(5)
+                                    }
                                 }
+                                Text(peer.username)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .foregroundColor(peer.uiColor)
+                                    .frame(width: 90)
                             }
-                            .border(Color.blue, width: peer.id == selectedPeerId ? 2 : 0)
-                            .padding(5)
-                            Text(peer.username)
-                                .font(peer.id == selectedPeerId ? Font.subheadline.bold() : .subheadline)
-                                .minimumScaleFactor(0.4)
-                                .foregroundColor(peer.uiColor)
-                                .frame(maxWidth: 100)
                         }
                     }
                 }.padding(.vertical, 5)
@@ -96,7 +115,9 @@ struct PrivateMessageNotificationView: View {
             if superchatPeerIds.count > 0, let firstPeerId = superchatPeerIds.first {
                 if !superchatPeerIds.contains(selectedPeerId) {
                     DispatchQueue.main.async {
-                        self.selectedPeerId = firstPeerId
+                        withAnimation {
+                            self.selectedPeerId = firstPeerId
+                        }
                     }
                 }
             }

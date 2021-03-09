@@ -119,7 +119,8 @@ struct NotificationPopup: View {
     var body: some View {
         ZStack(alignment: .top) {
             if showingPrivateChatView {
-                Color.clear
+                Color.white
+                    .opacity(0.01)
                     .contentShape(Rectangle())
                     .onTapGesture { closeChatWindow() }
             }

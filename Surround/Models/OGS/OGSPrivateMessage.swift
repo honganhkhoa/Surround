@@ -62,6 +62,7 @@ extension OGSPrivateMessage {
             {"to":{"id":765826,"username":"hakhoa"},"message":{"i":"142l.1","m":"...","t":1614679401},"from":{"country":"un","id":314459,"professional":false,"ratings":{"overall":{"volatility":0.059900000000000002,"deviation":64.5381,"rating":1863.1097}},"username":"HongAnhKhoa","ui_class":"supporter","ranking":29}}
             {"to":{"id":765826,"username":"hakhoa"},"message":{"i":"142l.2","m":":)","t":1614680257},"from":{"country":"un","id":314459,"professional":false,"ratings":{"overall":{"volatility":0.059900000000000002,"deviation":64.5381,"rating":1863.1097}},"username":"HongAnhKhoa","ui_class":"supporter","ranking":29}}
             {"to":{"id":765826,"username":"hakhoa"},"message":{"i":"1ux1.1","m":"The quick brown fox jumps over the lazy dog...","t":1614748606},"from":{"country":"un","id":314459,"professional":false,"ratings":{"overall":{"volatility":0.059900000000000002,"deviation":64.5381,"rating":1863.1097}},"username":"HongAnhKhoa","ui_class":"supporter","ranking":29}}
+            {"from":{"id":955348,"username":"khoahong","ranking":24,"ratings":{"version":5,"overall":{"rating":1500,"deviation":350,"volatility":0.06}},"country":"un","professional":false,"ui_class":"provisional"},"to":{"id":765826,"username":"hakhoa"},"message":{"i":"1gfu.1","t":1615195451,"m":"hey :)"}}
         """#
         var result = [OGSPrivateMessage]()
         let decoder = JSONDecoder()
