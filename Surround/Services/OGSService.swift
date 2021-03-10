@@ -623,7 +623,9 @@ class OGSService: ObservableObject {
         let userIdsToFetch = cachedUserIds.subtracting(Set(cachedUsersById.keys))
         playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsToFetch).receive(on: RunLoop.main).sink(
             receiveCompletion: { _ in
-                self.playerInfoFetchingCancellable = nil
+                DispatchQueue.main.async {
+                    self.playerInfoFetchingCancellable = nil
+                }
             },
             receiveValue: { users in
                 var cachedUsersById = self.cachedUsersById
@@ -1069,6 +1071,13 @@ class OGSService: ObservableObject {
                 whiteName: white["username"] as? String ?? "",
                 gameId: .OGS(gameId)
             )
+            let decoder = DictionaryDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            if let blackPlayer = try? decoder.decode(OGSUser.self, from: black),
+               let whitePlayer = try? decoder.decode(OGSUser.self, from: white) {
+                game.blackPlayer = blackPlayer
+                game.whitePlayer = whitePlayer
+            }
             game.ogs = self
             return game
         }
@@ -1193,9 +1202,9 @@ class OGSService: ObservableObject {
                     }
                     self.sortedPublicGames = newPublicGames
                     for game in newPublicGames {
-                        if let blackPlayer = game.blackPlayer, let whitePlayer = game.whitePlayer {
-                            self.cachedUserIds.insert(blackPlayer.id)
-                            self.cachedUserIds.insert(whitePlayer.id)
+                        if let blackId = game.blackId, let whiteId = game.whiteId {
+                            self.cachedUserIds.insert(blackId)
+                            self.cachedUserIds.insert(whiteId)
                         }
                     }
                     self.fetchCachedPlayersIfNecessary()

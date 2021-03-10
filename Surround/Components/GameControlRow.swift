@@ -339,6 +339,11 @@ struct GameControlRow_Previews: PreviewProvider {
         return Group {
             GameControlRow(game: games[2])
                 .previewLayout(.fixed(width: 320, height: 60))
+            HStack {
+                Spacer()
+                GameControlRow(game: games[2], horizontal: false)
+            }
+            .previewLayout(.fixed(width: 320, height: 120))
         }
         .environmentObject(ogs)
     }

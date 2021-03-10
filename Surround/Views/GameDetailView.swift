@@ -269,8 +269,8 @@ struct SingleGameView: View {
             let infoLeft = boardSizeInfoLeft > boardSizeInfoTop
             let boardSize = infoLeft ? boardSizeInfoLeft : boardSizeInfoTop
             var playerIconsOffset: CGFloat = 25
-            if infoLeft {
             let horizontalPlayerInfoWidth = width - boardSize - 15 * 3
+            if infoLeft {
                 if horizontalPlayerInfoWidth > 600 {
                     playerIconsOffset = -80
                 } else if horizontalPlayerInfoWidth > 400 {
@@ -304,7 +304,12 @@ struct SingleGameView: View {
                                     showsPlayersName: true
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            controlRow
+                            if horizontalPlayerInfoWidth < 350 {
+                                verticalControlRow
+                                    .padding(.bottom, -15)
+                            } else {
+                                controlRow
+                            }
                             ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                         }
                         boardView.frame(width: boardSize, height: boardSize)

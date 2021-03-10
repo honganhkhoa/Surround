@@ -80,12 +80,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     var width: Int
     var height: Int
-    var blackPlayer: OGSUser? {
+    @Published var blackPlayer: OGSUser? {
         didSet {
             self.blackId = blackPlayer?.id
         }
     }
-    var whitePlayer: OGSUser? {
+    @Published var whitePlayer: OGSUser? {
         didSet {
             self.whiteId = whitePlayer?.id
         }
@@ -162,10 +162,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 }
                 playerCacheObservingCancellable = ogs.$cachedUsersById.collect(.byTime(DispatchQueue.main, 2.0)).sink(receiveValue: { values in
                     if let cachedPlayersById = values.last, let blackId = self.blackId, let whiteId = self.whiteId {
-                        if cachedPlayersById[blackId] != nil && self.blackPlayer?.ratings == nil {
+                        if cachedPlayersById[blackId] != nil {
                             self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: cachedPlayersById[blackId]!)
                         }
-                        if cachedPlayersById[whiteId] != nil && self.whitePlayer?.ratings == nil {
+                        if cachedPlayersById[whiteId] != nil {
                             self.whitePlayer = OGSUser.mergeUserInfoFromCache(user: self.whitePlayer, cachedUser: cachedPlayersById[whiteId]!)
                         }
                     }
@@ -486,6 +486,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     if case .pass = currentPosition.lastMove {
                         return "Opponent passed"
                     } else {
+                        let time = ogs?.user?.id == blackId ? clock?.blackTime : clock?.whiteTime
+                        if let timeLeft = time?.timeLeft, timeLeft <= 10 {
+                            return "Your move (\(String(format: "%02d", Int(timeLeft))))"
+                        }
                         return "Your move"
                     }
                 } else {

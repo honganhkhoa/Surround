@@ -279,19 +279,14 @@ struct PlayersBannerView: View {
             if let clock = clock {
                 if voiceCountdown && game.isUserTurn {
                     let time = ogs.user?.id == game.blackId ? clock.blackTime : clock.whiteTime
-                    var timeLeft = time.thinkingTimeLeft ?? .infinity
-                    if timeLeft.isZero || timeLeft.isInfinite {
-                        timeLeft = time.blockTimeLeft ?? .infinity
-                    }
-                    if timeLeft.isZero || timeLeft.isInfinite {
-                        timeLeft = time.periodTimeLeft ?? .infinity
-                    }
-                    if timeLeft <= 10 {
-                        let utteranceString = "\(Int(timeLeft))"
-                        if utteranceString != lastUtterance {
-                            lastUtterance = utteranceString
-                            let utterance = AVSpeechUtterance(string: utteranceString)
-                            self.speechSynthesizer?.speak(utterance)
+                    if let timeLeft = time.timeLeft {
+                        if timeLeft <= 10 {
+                            let utteranceString = "\(Int(timeLeft))"
+                            if utteranceString != lastUtterance {
+                                lastUtterance = utteranceString
+                                let utterance = AVSpeechUtterance(string: utteranceString)
+                                self.speechSynthesizer?.speak(utterance)
+                            }
                         }
                     }
                 }
