@@ -52,6 +52,7 @@ class OGSService: ObservableObject {
         socketStatus: SocketIOStatus = .connected,
         eligibleOpenChallenges: [OGSChallenge] = [],
         openChallengesSent: [OGSChallenge] = [],
+        challengesReceived: [OGSChallenge] = [],
         automatchEntries: [OGSAutomatchEntry] = []
     ) -> OGSService {
         let ogs = OGSService(forPreview: true)
@@ -77,6 +78,7 @@ class OGSService: ObservableObject {
         for automatchEntry in automatchEntries {
             ogs.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
         }
+        ogs.challengesReceived = challengesReceived
         
         for message in OGSPrivateMessage.sampleData {
             ogs.handlePrivateMessage(message)

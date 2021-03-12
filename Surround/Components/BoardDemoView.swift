@@ -84,7 +84,6 @@ struct BoardDemoView: View {
                         .frame(width: 20, height: 20)
                 }
             }
-            .padding(.horizontal)
             HStack {
                 (Text(game.currentPosition.nextToMove == .black ? "Black" : "White") + Text(" to move"))
                     .font(.title2).bold()
@@ -99,7 +98,7 @@ struct BoardDemoView: View {
                     }
                 }
             }
-            .padding()
+            .padding(.vertical, 10)
             BoardView(
                 boardPosition: game.currentPosition,
                 showsCoordinate: showsBoardCoordinates,
@@ -109,6 +108,10 @@ struct BoardDemoView: View {
             )
             .aspectRatio(1, contentMode: .fit)
             .layoutPriority(1)
+            Spacer().frame(height: 10)
+            Text("Tap and drag to place a stone. Drag outside of the board to cancel.")
+                .font(.caption)
+                .leadingAlignedInScrollView()
         }
         .onAppear {
             self.initializeSpeechSynthesizerIfNecessary()

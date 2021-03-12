@@ -33,10 +33,12 @@ struct ChallengeCell: View {
                 let newGameId = value.0
                 self.ogsRequestCancellable?.cancel()
                 self.ogsRequestCancellable = nil
-                withAnimation {
-                    nav.home.ogsIdToOpen = newGameId
-                    if challenge.challenged == nil {
-                        nav.home.showingNewGameView = false
+                if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
+                    withAnimation {
+                        nav.home.ogsIdToOpen = newGameId
+                        if challenge.challenged == nil {
+                            nav.home.showingNewGameView = false
+                        }
                     }
                 }
             })

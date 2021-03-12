@@ -646,8 +646,17 @@ struct CustomGameForm: View {
         .onChange(of: isRanked) { challenge.game.ranked = $0 }
         .onChange(of: isPrivate) { challenge.game.isPrivate = $0 }
         .onChange(of: rankRestricted) {
-            challenge.game.maxRank = $0 ? maxRank : 1000
-            challenge.game.minRank = $0 ? minRank : -1000
+            challenge.game.maxRank = $0 && isOpen ? maxRank : 1000
+            challenge.game.minRank = $0 && isOpen ? minRank : -1000
+        }
+        .onChange(of: isOpen) {
+            challenge.game.maxRank = $0 && rankRestricted ? maxRank : 1000
+            challenge.game.minRank = $0 && rankRestricted ? minRank : -1000
+            if $0 {
+                challenge.challenged = nil
+            } else {
+                challenge.challenged = opponent
+            }
         }
         .onChange(of: maxRank) { challenge.game.maxRank = $0 }
         .onChange(of: minRank) { challenge.game.minRank = $0 }
@@ -672,7 +681,6 @@ struct CustomGameForm: View {
         .onChange(of: komi) { challenge.game.komi = $0 }
         .onChange(of: analysisDisabled) { challenge.game.disableAnalysis = $0 }
         .onChange(of: opponent) { challenge.challenged = $0 }
-        .onChange(of: isOpen) { if $0 { challenge.challenged = nil } else { challenge.challenged = opponent } }
         .onAppear {
             challenge.challenger = ogs.user
             if isRanked {

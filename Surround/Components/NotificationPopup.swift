@@ -57,7 +57,7 @@ struct NotificationPopup: View {
     var liveGamesPopup: some View {
         Button(action: goToLiveGames) {
             VStack {
-                Text("Game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
+                Text("Live game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
                 Text("Tap to go to game\(ogs.liveGames.count == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
             }
             .padding(.horizontal, 10)
@@ -76,6 +76,26 @@ struct NotificationPopup: View {
                 }
                 Spacer().frame(width: 10)
                 ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color(.systemIndigo))
+            .cornerRadius(10)
+        }
+    }
+    
+    var shouldShowChallengeReceivedPopup: Bool {
+        guard !viewingHomeView && !viewingLiveGames else {
+            return false
+        }
+        return ogs.challengesReceived.count > 0
+    }
+    
+    var challengeReceivedPopup: some View {
+        Button(action: { nav.main.showWaitingGames = true }) {
+            VStack {
+                Text("Challenge received!").bold().foregroundColor(.white)
+                Text("Tap to view").font(.subheadline).foregroundColor(.white)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -131,6 +151,8 @@ struct NotificationPopup: View {
                             liveGamesPopup
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                             waitingGamesPopup
+                        } else if shouldShowChallengeReceivedPopup {
+                            challengeReceivedPopup
                         }
                         if shouldShowMessageNotificationIcon {
                             Button(action: toggleChatWindow) {
@@ -201,6 +223,7 @@ struct NotificationPopup_Previews: PreviewProvider {
                 openChallengesSent: [OGSChallenge.sampleOpenChallenge]
             ))
             .colorScheme(.dark)
+
             ZStack(alignment: .top) {
                 NavigationView {
                     Text("View")
@@ -214,6 +237,21 @@ struct NotificationPopup_Previews: PreviewProvider {
                 user: OGSUser(username: "hakhoa", id: 765826),
                 activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
             ))
+
+            ZStack(alignment: .top) {
+                NavigationView {
+                    Text("View")
+                        .navigationTitle("View")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .navigationBarItems(leading: Text("Back"))
+                }.navigationViewStyle(StackNavigationViewStyle())
+                NotificationPopup()
+            }
+            .environmentObject(OGSService.previewInstance(
+                user: OGSUser(username: "hakhoa", id: 765826),
+                challengesReceived: [OGSChallenge.sampleChallenge]
+            ))
+
             ZStack(alignment: .top) {
                 Color(.systemBackground)
                 NotificationPopup()
