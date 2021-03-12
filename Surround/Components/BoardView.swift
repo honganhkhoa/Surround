@@ -8,8 +8,10 @@
 import SwiftUI
 
 func stoneSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
+    let size = min(geometry.size.width, geometry.size.height)
     return CGFloat(
-        floor(min(geometry.size.width, geometry.size.height) / CGFloat(boardSize)))
+        floor(size / CGFloat(boardSize) * UIScreen.main.nativeScale) / UIScreen.main.nativeScale
+    )
 }
 
 enum StoneRemovalOption: Int {

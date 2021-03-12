@@ -11,14 +11,7 @@ import URLImage
 struct SettingsView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var sgs: SurroundService
-    
-    @State var username: String = ""
-    @State var password: String = ""
-    
-    @State var isShowingFacebookLogin = false
-    @State var isShowingGoogleLogin = false
-    @State var isShowingTwitterLogin = false
-    
+        
     @State var notificationEnabled = Setting(.notificationEnabled).wrappedValue
     
     var accountSettings: some View {
@@ -56,7 +49,10 @@ struct SettingsView: View {
     }
     
     var notificationSettings: some View {
-        return GroupBox(label: Toggle("Notifications", isOn: $notificationEnabled)) {
+        return GroupBox(label: Toggle(isOn: $notificationEnabled) {
+            Text("Correspondence games notifications")
+                .leadingAlignedInScrollView()
+        }) {
             GroupBox(label: Text("Send a notification on...")) {
                 Toggle("My turn", isOn: Setting(.notificationOnUserTurn).binding)
                 Toggle("Time running low", isOn: Setting(.notificationOnTimeRunningOut).binding)
@@ -89,7 +85,7 @@ struct SettingsView: View {
         ScrollView {
             VStack {
                 accountSettings
-                GameplaySettings()
+                GameplaySettings(withDemoOption: true)
                 notificationSettings
             }
             .frame(maxWidth: 600)
@@ -100,14 +96,29 @@ struct SettingsView: View {
 }
 
 struct GameplaySettings: View {
+    var withDemoOption = false
+    @State var showDemoBoard = false
+    
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
             Toggle("Board coordinates", isOn: Setting(.showsBoardCoordinates).binding)
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
             Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
+            (Text("Voice countdown will not play when your device is in ") + Text("Silent").bold() + Text(" mode."))
+                .font(.caption)
+                .leadingAlignedInScrollView()
             GroupBox(label: Text("Auto submiting moves")) {
                 Toggle("Live games", isOn: Setting(.autoSubmitForLiveGames).binding)
                 Toggle("Correspondence games", isOn: Setting(.autoSubmitForCorrespondenceGames).binding)
+            }
+            if withDemoOption {
+                Button(action: { showDemoBoard.toggle() }) {
+                    Text(showDemoBoard ? "Hide demo board" : "Try it out").bold()
+                        .leadingAlignedInScrollView()
+                }
+                if showDemoBoard {
+                    BoardDemoView()
+                }
             }
         }
         .padding(.horizontal)

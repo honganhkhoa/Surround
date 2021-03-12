@@ -112,40 +112,44 @@ struct PlayersBannerView: View {
         }
     }
     
+    @ViewBuilder
+    var stoneRemovalExpiration: some View {
+        if let stoneRemovalTimeLeft = game.clock?.timeUntilExpiration {
+            Text(timeString(timeLeft: stoneRemovalTimeLeft))
+                .font(Font.footnote.bold())
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    
+    @ViewBuilder
+    func stoneRemovalStatus(color: StoneColor, leftSide: Bool) -> some View {
+        if let removedStonesAccepted = game.removedStonesAccepted[color], removedStonesAccepted == game.currentPosition.removedStones {
+            Image(systemName: "checkmark.circle.fill")
+                .font(Font.title3)
+                .foregroundColor(Color(UIColor.systemGreen))
+        } else {
+            HStack {
+                if leftSide {
+                    Image(systemName: "hourglass")
+                        .font(Font.title3)
+                } else {
+                    Spacer()
+                }
+                stoneRemovalExpiration
+                if !leftSide {
+                    Image(systemName: "hourglass")
+                        .font(Font.title3)
+                } else {
+                    Spacer()
+                }
+            }.frame(maxWidth: .infinity)
+        }
+    }
+    
     func scoreColumn(color: StoneColor, leftSide: Bool) -> some View {
         let scores = game.currentPosition.gameScores ?? game.gameData?.score
         let score = color == .black ? scores?.black : scores?.white
         
-        let stoneRemovalStatus = { () -> AnyView in
-            if let removedStonesAccepted = game.removedStonesAccepted[color] {
-                if removedStonesAccepted == game.currentPosition.removedStones {
-                    return AnyView(erasing: Image(systemName: "checkmark.circle.fill")
-                        .font(Font.title3)
-                        .foregroundColor(Color(UIColor.systemGreen))
-                    )
-                }
-            }
-            let stoneRemovalExpiration = { () -> AnyView in
-                if let stoneRemovalTimeLeft = game.clock?.timeUntilExpiration {
-                    return AnyView(
-                        erasing: Text(timeString(timeLeft: stoneRemovalTimeLeft)).font(Font.footnote.bold())
-                    )
-                } else {
-                    return AnyView(erasing: EmptyView())
-                }
-            }()
-            return AnyView(erasing: HStack {
-                if !leftSide {
-                    stoneRemovalExpiration
-                }
-                Image(systemName: "hourglass")
-                    .font(Font.title3)
-                if leftSide {
-                    stoneRemovalExpiration
-                }
-            })
-        }()
-
         return VStack(alignment: leftSide ? .leading : .trailing) {
             if showsPlayersName && !shouldShowNamesOutOfColumn {
                 playerName(color: color)
@@ -153,7 +157,7 @@ struct PlayersBannerView: View {
             if let score = score, let gameData = game.gameData {
                 HStack {
                     if !leftSide && game.gamePhase == .stoneRemoval {
-                        stoneRemovalStatus
+                        stoneRemovalStatus(color: color, leftSide: leftSide)
                     }
                     VStack(alignment: .trailing) {
                         Group {
@@ -191,9 +195,10 @@ struct PlayersBannerView: View {
                         Text("Total").font(Font.footnote.bold())
                     }
                     if leftSide && game.gamePhase == .stoneRemoval {
-                        stoneRemovalStatus
+                        stoneRemovalStatus(color: color, leftSide: leftSide)
                     }
-                }.padding([leftSide ? .leading : .trailing], 15)
+                }
+                .padding([leftSide ? .leading : .trailing], 15)
             }
         }
     }
@@ -306,12 +311,14 @@ struct PlayersBannerView: View {
 
 struct PlayersBannerView_Previews: PreviewProvider {
     static var previews: some View {
+        let game3 = TestData.Scored19x19Korean
+        game3.gamePhase = .stoneRemoval
         return Group {
             PlayersBannerView(game: TestData.Ongoing19x19wBot1)
                 .previewLayout(.fixed(width: 320, height: 200))
             PlayersBannerView(game: TestData.Ongoing19x19wBot1, showsPlayersName: true)
                 .previewLayout(.fixed(width: 320, height: 200))
-            PlayersBannerView(game: TestData.Scored19x19Korean, playerIconSize: 96, showsPlayersName: true)
+            PlayersBannerView(game: game3, playerIconSize: 96, showsPlayersName: true)
                 .previewLayout(.fixed(width: 500, height: 300))
                 .colorScheme(.dark)
         }

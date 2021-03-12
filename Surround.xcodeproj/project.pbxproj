@@ -115,6 +115,7 @@
 		BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
 		BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */; };
 		BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */; };
@@ -332,6 +333,7 @@
 		BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		BC649413253DA44C002B2200 /* SurroundNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundNotificationService.swift; sourceTree = "<group>"; };
 		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
+		BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardDemoView.swift; sourceTree = "<group>"; };
 		BC7407DA25493B71001D5581 /* SurroundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundService.swift; sourceTree = "<group>"; };
 		BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutofocusTextField.swift; sourceTree = "<group>"; };
 		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
@@ -606,6 +608,7 @@
 				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
+				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -996,6 +999,7 @@
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
 				BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */,
+				BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
