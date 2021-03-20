@@ -13,6 +13,7 @@ struct SettingsView: View {
     @EnvironmentObject var sgs: SurroundService
         
     @State var notificationEnabled = Setting(.notificationEnabled).wrappedValue
+    @State var showSupporterView = false
     
     var accountSettings: some View {
         Group {
@@ -48,11 +49,38 @@ struct SettingsView: View {
         }
     }
     
+    var canToggleNotifications: Bool {
+        if notificationEnabled {
+            return true
+        }
+        
+        if sgs.supporterProductId != nil {
+            return true
+        }
+        
+        if let user = ogs.user {
+            if user.isOGSSupporter || user.isOGSAdmin || user.isOGSModerator {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
     var notificationSettings: some View {
-        return GroupBox(label: Toggle(isOn: $notificationEnabled) {
-            Text("Correspondence games notifications")
-                .leadingAlignedInScrollView()
-        }) {
+        return GroupBox(
+            label: Toggle(isOn: $notificationEnabled) {
+                Text("Correspondence games notifications")
+                    .leadingAlignedInScrollView()
+            }.disabled(!canToggleNotifications)
+        ) {
+            if !canToggleNotifications {
+                Button(action: { showSupporterView = true }) {
+                    (Text("Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. ").foregroundColor(Color(.label)) + Text("Learn more...").bold())
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                }
+            }
             GroupBox(label: Text("Send a notification on...")) {
                 Toggle("My turn", isOn: Setting(.notificationOnUserTurn).binding)
                 Toggle("Time running low", isOn: Setting(.notificationOnTimeRunningOut).binding)
@@ -78,6 +106,20 @@ struct SettingsView: View {
                     print("Notifications permission granted: \(granted)")
                 }
             }
+        }
+        .sheet(isPresented: $showSupporterView) {
+            NavigationView {
+                SupporterView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { showSupporterView = false }) {
+                                Text("Close")
+                            }
+                        }
+                    }
+            }
+            .environmentObject(sgs)
+            .environmentObject(ogs)
         }
     }
     
@@ -128,6 +170,7 @@ struct GameplaySettings: View {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationService.shared.main.rootView = .settings
+        userDefaults[.supporterProductId] = nil
         return NavigationView {
             SettingsView()
         }
@@ -143,5 +186,6 @@ struct SettingsView_Previews: PreviewProvider {
             )
         )
         .environmentObject(NavigationService.shared)
+        .environmentObject(SurroundService.shared)
     }
 }

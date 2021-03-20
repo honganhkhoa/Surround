@@ -98,6 +98,18 @@ struct OGSUser : Codable, Equatable {
         return self.formattedRank()
     }
     
+    var isOGSSupporter: Bool {
+        return uiClass?.contains("supporter") == true
+    }
+    
+    var isOGSModerator: Bool {
+        return uiClass?.contains("moderator") == true
+    }
+    
+    var isOGSAdmin: Bool {
+        return uiClass?.contains("admin") == true
+    }
+    
     var uiColor: Color {
         if uiClass?.contains("moderator") == true {
             return .purple

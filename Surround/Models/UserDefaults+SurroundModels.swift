@@ -168,6 +168,18 @@ extension SettingKey {
         return .init(name: "lastSeenPrivateMessageByOGSUserId", encoded: true, defaultValue: [Int: Double]())
     }
     
+    static var supporterProductId: SettingKey<String> {
+        return .init(name: "supporterProductId")
+    }
+    
+    static var lastSentReceiptData: SettingKey<String> {
+        return .init(name: "lastSentReceiptData")
+    }
+    
+    static var supporterProductExpiryDate: SettingKey<Date> {
+        return .init(name: "supporterProductExpiryDate")
+    }
+    
     // Reminder: When adding a key, check if it needs to be reset on logout.
 }
 

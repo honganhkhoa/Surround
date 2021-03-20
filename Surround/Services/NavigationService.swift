@@ -79,6 +79,7 @@ enum RootView: String {
     case publicGames
     case privateMessages
     case settings
+    case about
     case browser
     case forums
     
@@ -92,6 +93,8 @@ enum RootView: String {
             return "message"
         case .settings:
             return "gearshape.2"
+        case .about:
+            return "info.circle"
         case .browser:
             return "safari"
         case .forums:
@@ -109,6 +112,8 @@ enum RootView: String {
             return "Private messages"
         case .settings:
             return "Settings"
+        case .about:
+            return "About & Support"
         case .browser:
             return "Web version"
         case .forums:
@@ -144,6 +149,8 @@ enum RootView: String {
             PrivateMessagesView()
         case .settings:
             SettingsView()
+        case .about:
+            AboutView()
         case .browser:
             OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/overview")!)
         case .forums:
@@ -207,6 +214,7 @@ struct RootViewSwitchingMenu: ViewModifier {
                     }
                     Section {
                         RootView.settings.menuButton(currentView: $nav.main.rootView)
+                        RootView.about.menuButton(currentView: $nav.main.rootView)
                     }
                     Section {
                         RootView.browser.menuButton(currentView:$nav.main.rootView)

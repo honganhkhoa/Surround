@@ -98,6 +98,7 @@ struct MainView: View {
                         }
                         Divider()
                         RootView.settings.navigationLink(currentView: navigationCurrentView)
+                        RootView.about.navigationLink(currentView: navigationCurrentView)
                         Divider()
                         RootView.browser.navigationLink(currentView: navigationCurrentView)
                         RootView.forums.navigationLink(currentView: navigationCurrentView)
