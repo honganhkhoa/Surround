@@ -89,6 +89,7 @@ struct MainView: View {
             NavigationView {
                 if compactSizeClass {
                     nav.main.rootView.view
+                        .modifier(RootViewSwitchingMenu())
                 } else {
                     List(selection: navigationCurrentView) {
                         RootView.home.navigationLink(currentView: navigationCurrentView)

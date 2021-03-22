@@ -23,8 +23,6 @@ struct SupporterView: View {
                     Text("Become a Supporter to support the ongoing development of this app and gain access to some additional features.")
                         .leadingAlignedInScrollView()
                     Spacer().frame(height: 10)
-                    Text("Currently, the only additional feature for Supporters is push notifications for correspondence games, which I cannot provide for free due to ongoing server cost to support it.")
-                        .leadingAlignedInScrollView()
                     Image("SurroundNotification")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -35,7 +33,11 @@ struct SupporterView: View {
                 }
                 Spacer().frame(height: 10)
                 if sgs.supporterProducts.count > 0 {
-                    Text("All Supporter tiers have access to the same features, so feel free to pick whichever you see fit:")
+                    Text("All Supporter tiers includes:")
+                        .leadingAlignedInScrollView()
+                    Text("• Push notifications for correspondence games (optional)")
+                        .leadingAlignedInScrollView()
+                    Text("• Support for Surround's ongoing development")
                         .leadingAlignedInScrollView()
                     Divider()
                     ForEach(sgs.supporterProducts, id: \.productIdentifier) { product -> AnyView in
@@ -49,7 +51,7 @@ struct SupporterView: View {
                             }) {
                                 VStack {
                                     HStack {
-                                        Text("\(price) monthly").bold()
+                                        Text("Supporter Tier \(String(product.productIdentifier.last!)): \(price) monthly").bold()
                                         Spacer()
                                         if sgs.processingProductIds.contains(product.productIdentifier) {
                                             ProgressView()
@@ -72,6 +74,17 @@ struct SupporterView: View {
                                 .bold()
                                 .foregroundColor(.orange)
                         }
+                        Divider()
+                    }
+                    Group {
+                        Spacer().frame(height: 15)
+                        Text("If you choose to purchase a Surround App Supporter subscription, payment will be charged to your Apple ID account at the confirmation of purchase. The subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase.")
+                            .font(.caption)
+                            .leadingAlignedInScrollView()
+                        Spacer().frame(height: 8)
+                        Text("All purchases are final. I cannot issue refunds for purchases charged to your Apple ID.")
+                            .font(.caption)
+                            .leadingAlignedInScrollView()
                     }
                 } else if sgs.fetchingProducts {
                     ProgressView()

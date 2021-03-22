@@ -54,7 +54,6 @@ struct PublicGamesList: View {
             }
         }
         .navigationBarTitle(Text("Public live games"))
-        .modifier(RootViewSwitchingMenu())
     }
 }
 
@@ -63,6 +62,7 @@ struct PublicGamesList_Previews: PreviewProvider {
         NavigationService.shared.main.rootView = .publicGames
         return NavigationView {
             PublicGamesList()
+                .modifier(RootViewSwitchingMenu())
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .environmentObject(

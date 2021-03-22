@@ -17,6 +17,7 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
+    @State var showRegisterWebView = false
     @State var gameDetailCancellable: AnyCancellable?
     
     @AppStorage(SettingKey<Any>.homeViewDisplayMode.name, store: userDefaults)
@@ -218,6 +219,14 @@ struct HomeView: View {
             } else {
                 ScrollView {
                     LoginView()
+                    GroupBox {
+                        Button(action: { showRegisterWebView = true }) {
+                            HStack {
+                                Text("New to Online-go.com? Register here.")
+                                Spacer()
+                            }
+                        }
+                    }.padding(.horizontal)
                 }
                 .frame(maxWidth: 600)
             }
@@ -227,6 +236,12 @@ struct HomeView: View {
                     get: { nav.home.activeGame != nil },
                     set: { if !$0 { nav.home.activeGame = nil } }
                 )) {
+                EmptyView()
+            }
+            NavigationLink(
+                destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!),
+                isActive: $showRegisterWebView
+            ) {
                 EmptyView()
             }
         }
@@ -265,7 +280,6 @@ struct HomeView: View {
                     .environmentObject(nav)
             }
         }
-        .modifier(RootViewSwitchingMenu())
         .onChange(of: nav.home.ogsIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
                 if ogsGameIdToOpen != nav.home.activeGame?.ogsID {
@@ -294,6 +308,7 @@ struct HomeView_Previews: PreviewProvider {
         return Group {
             NavigationView {
                 HomeView()
+                    .modifier(RootViewSwitchingMenu())
                     .environmentObject(
                         OGSService.previewInstance(
                             user: OGSUser(username: "kata-bot", id: 592684),
@@ -306,6 +321,7 @@ struct HomeView_Previews: PreviewProvider {
             .navigationViewStyle(StackNavigationViewStyle())
             NavigationView {
                 HomeView()
+                    .modifier(RootViewSwitchingMenu())
                     .environmentObject(OGSService.previewInstance())
             }
             .navigationViewStyle(StackNavigationViewStyle())

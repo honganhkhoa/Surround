@@ -133,7 +133,6 @@ struct SettingsView: View {
             .frame(maxWidth: 600)
         }
         .navigationTitle("Settings")
-        .modifier(RootViewSwitchingMenu())
     }
 }
 
@@ -173,6 +172,7 @@ struct SettingsView_Previews: PreviewProvider {
         userDefaults[.supporterProductId] = nil
         return NavigationView {
             SettingsView()
+                .modifier(RootViewSwitchingMenu())
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .environmentObject(

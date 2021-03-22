@@ -73,7 +73,6 @@ struct PrivateMessagesView: View {
             }
         }
         .navigationBarTitle("Private messages")
-        .modifier(RootViewSwitchingMenu())
     }
 }
 
@@ -82,6 +81,7 @@ struct PrivateMessagesView_Previews: PreviewProvider {
         NavigationService.shared.main.rootView = .privateMessages
         return NavigationView {
             PrivateMessagesView()
+                .modifier(RootViewSwitchingMenu())
                 .environmentObject(OGSService.previewInstance(
                     user: OGSUser(username: "hakhoa", id: 765826)
                 ))

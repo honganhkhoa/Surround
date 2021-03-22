@@ -110,6 +110,22 @@ struct AboutView: View {
                             }
                         }
                         Divider()
+                        NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "https://files.honganhkhoa.com/SurroundTerms.html")!).navigationBarTitleDisplayMode(.inline)) {
+                            HStack {
+                                Text("Terms of Use").bold()
+                                Spacer()
+                                Image(systemName: "chevron.forward")
+                            }
+                        }
+                        Divider()
+                        NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "https://files.honganhkhoa.com/SurroundPrivacyPolicy.html")!).navigationBarTitleDisplayMode(.inline)) {
+                            HStack {
+                                Text("Privacy Policy").bold()
+                                Spacer()
+                                Image(systemName: "chevron.forward")
+                            }
+                        }
+                        Divider()
                         Link(destination: URL(string: "mailto:khoahong@hey.com")!) {
                             HStack {
                                 Text("Contact").bold()
@@ -124,7 +140,6 @@ struct AboutView: View {
             .padding()
         }
         .navigationTitle("About")
-        .modifier(RootViewSwitchingMenu())
     }
 }
 
@@ -137,6 +152,7 @@ struct AboutView_Previews: PreviewProvider {
             }
             NavigationView {
                 AboutView()
+                    .modifier(RootViewSwitchingMenu())
             }
         }
         .environmentObject(OGSService.previewInstance(user: OGSUser(username: "user", id: 0)))

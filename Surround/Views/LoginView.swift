@@ -88,14 +88,6 @@ struct LoginView: View {
                     }
                 }
             }
-            GroupBox {
-                Link(destination: URL(string: "\(OGSService.ogsRoot)/register")!) {
-                    HStack {
-                        Text("New to Online-go.com? Register here.")
-                        Spacer()
-                    }
-                }
-            }
         }
         .padding(.horizontal)
         .onChange(of: ogs.isLoggedIn) { isLoggedIn in

@@ -27,7 +27,6 @@ struct OGSBrowserView: View {
                         Image(systemName: "arrow.clockwise")
                     }))
             .navigationTitle(title ?? "")
-            .modifier(RootViewSwitchingMenu())
     }
 }
 
@@ -47,8 +46,6 @@ struct OGSBrowserWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
 
-        let ogsURL = URL(string: OGSService.ogsRoot)!
-        
         let webView = WKWebView(frame: CGRect.zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
 
@@ -71,7 +68,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
             }
         })
 
-        var request = URLRequest(url: ogsURL)
+        var request = URLRequest(url: initialURL)
         
         if ogs.ogsUIConfig != nil {
             if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies {
@@ -79,7 +76,10 @@ struct OGSBrowserWebView: UIViewRepresentable {
                 for cookie in cookies {
                     webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
                 }
-                request.url = initialURL
+            }
+        } else {
+            if ogs.isOGSDomain(url: initialURL) && initialURL.pathComponents.last! == "overview" {
+                request.url = URL(string: OGSService.ogsRoot)
             }
         }
                         
