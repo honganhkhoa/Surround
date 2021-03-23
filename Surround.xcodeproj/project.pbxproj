@@ -116,6 +116,7 @@
 		BC649427253FF941002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC649428253FF942002B2200 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */; };
+		BC6E33F4260C388F008A59F7 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6E33F3260C388F008A59F7 /* WelcomeView.swift */; };
 		BC70594D25FEFAD500AC4DE9 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC70594C25FEFAD500AC4DE9 /* StoreKit.framework */; };
 		BC70596225FF00F400AC4DE9 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596125FF00F400AC4DE9 /* AboutView.swift */; };
 		BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596925FF209300AC4DE9 /* SupporterView.swift */; };
@@ -337,6 +338,7 @@
 		BC649413253DA44C002B2200 /* SurroundNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundNotificationService.swift; sourceTree = "<group>"; };
 		BC649426253FF940002B2200 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardDemoView.swift; sourceTree = "<group>"; };
+		BC6E33F3260C388F008A59F7 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		BC70594C25FEFAD500AC4DE9 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		BC70596125FF00F400AC4DE9 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		BC70596925FF209300AC4DE9 /* SupporterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupporterView.swift; sourceTree = "<group>"; };
@@ -550,6 +552,7 @@
 				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
 				BC70596125FF00F400AC4DE9 /* AboutView.swift */,
 				BC70596925FF209300AC4DE9 /* SupporterView.swift */,
+				BC6E33F3260C388F008A59F7 /* WelcomeView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1034,6 +1037,7 @@
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
 				BC08721525E791A3006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
+				BC6E33F4260C388F008A59F7 /* WelcomeView.swift in Sources */,
 				BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */,
 				BC39EE3825DBC23C00562C68 /* TextUtilities.swift in Sources */,
 				BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */,
@@ -1331,7 +1335,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1361,7 +1365,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1472,7 +1476,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -1496,7 +1500,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -1522,7 +1526,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1549,7 +1553,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1574,7 +1578,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
@@ -1598,7 +1602,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2021032201;
+				CURRENT_PROJECT_VERSION = 2021032501;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.1;

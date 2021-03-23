@@ -44,7 +44,14 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal)
             } else {
-                LoginView()
+                GroupBox(label: Text("Online-go.com Account")) {
+                    NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!)) {
+                        Text("Sign in to your Account")
+                            .leadingAlignedInScrollView()
+                            .padding(.vertical, 8)
+                    }
+                }
+                .padding(.horizontal)
             }
         }
     }
@@ -170,21 +177,29 @@ struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationService.shared.main.rootView = .settings
         userDefaults[.supporterProductId] = nil
-        return NavigationView {
-            SettingsView()
-                .modifier(RootViewSwitchingMenu())
+        return Group {
+            NavigationView {
+                SettingsView()
+                    .modifier(RootViewSwitchingMenu())
+            }
+            .environmentObject(OGSService.previewInstance())
+            .colorScheme(.dark)
+            NavigationView {
+                SettingsView()
+                    .modifier(RootViewSwitchingMenu())
+                    .environmentObject(
+                        OGSService.previewInstance(
+                            user: OGSUser(
+                                username: "kata-bot",
+                                id: 592684,
+                                ranking: 27,
+                                icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
+                            )
+                        )
+                    )
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
-        .environmentObject(
-            OGSService.previewInstance(
-                user: OGSUser(
-                    username: "kata-bot",
-                    id: 592684,
-                    ranking: 27,
-                    icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-                )
-            )
-        )
         .environmentObject(NavigationService.shared)
         .environmentObject(SurroundService.shared)
     }

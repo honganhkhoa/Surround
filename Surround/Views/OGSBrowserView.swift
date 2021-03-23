@@ -47,6 +47,11 @@ struct OGSBrowserWebView: UIViewRepresentable {
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
 
         let webView = WKWebView(frame: CGRect.zero, configuration: configuration)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // https://stackoverflow.com/questions/40591090/403-error-thats-an-error-error-disallowed-useragent
+            // Google does not allow OAuth in iPhone's WKWebView, so we use Safari's user agent here
+            webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
+        }
         webView.navigationDelegate = context.coordinator
 
         context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new], changeHandler: { _, change in
@@ -143,7 +148,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
             let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
             cookieStore.getAllCookies { cookies in
                 for cookie in cookies {
-                    if ogs.isOGSDomain(cookie: cookie) && cookie.name == "csrftoken" {
+                    if ogs.isOGSDomain(cookie: cookie) && cookie.name == "sessionid" {
                         self.loginCancellable = ogs.thirdPartyLogin(cookieStore: cookieStore)
                             .sink(receiveCompletion: { completion in
                                 if case .failure(let error) = completion {

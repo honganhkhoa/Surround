@@ -72,6 +72,7 @@ struct OGSUser : Codable, Equatable {
     var supporter: Bool?
     var ratings: OGSRating?
     var iconUrl: String?
+    var anonymous: Bool?
     
     // In-game
     var acceptedStones: String?
@@ -92,6 +93,7 @@ struct OGSUser : Codable, Equatable {
         case supporter
         case ratings
         case iconUrl = "icon-url"
+        case anonymous
     }
     
     var formattedRank: String {

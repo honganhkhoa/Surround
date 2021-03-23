@@ -19,7 +19,7 @@ struct ThanksView: View {
                     }
                     Divider()
                     Link(destination: URL(string: "https://github.com/acristescu/OnlineGo")!) {
-                        (Text("MrAlex").bold() + Text(", for creating the ").foregroundColor(Color(.label)) + Text("Online GO").bold() + Text(" Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label)))
+                        (Text("Alexandru Cristescu").bold() + Text(", for creating the ").foregroundColor(Color(.label)) + Text("Online GO").bold() + Text(" Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label)))
                             .leadingAlignedInScrollView()
                     }
                     Divider()
@@ -49,6 +49,9 @@ struct ThanksView: View {
                     }
                     Link(destination: URL(string: "https://github.com/dmytro-anokhin/url-image")!) {
                         Text("• URLImage").leadingAlignedInScrollView()
+                    }
+                    Link(destination: URL(string: "https://github.com/online-go/score-estimator")!) {
+                        Text("• OGS's score-estimator").leadingAlignedInScrollView()
                     }
                 }
             }

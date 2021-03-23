@@ -382,6 +382,15 @@ class OGSService: ObservableObject {
                 }
             }
         }
+        
+        socket.on("gamelist-count") { data, ack in
+            DispatchQueue.main.async {
+                if let gamesCount = data[0] as? [String: Int?] {
+                    self.sitewiseLiveGamesCount = gamesCount[TimeControlSpeed.live.rawValue, default: nil]
+                    self.sitewiseCorrespondenceGamesCount = gamesCount[TimeControlSpeed.correspondence.rawValue, default: nil]
+                }
+            }
+        }
     }
     
     var ogsUIConfig: OGSUIConfig? {
@@ -486,7 +495,9 @@ class OGSService: ObservableObject {
                 }
             }
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
-            self.ogsUIConfig = config
+            if config.user.anonymous == false {
+                self.ogsUIConfig = config
+            }
             return config
         }).eraseToAnyPublisher()
     }
@@ -888,13 +899,6 @@ class OGSService: ObservableObject {
             return
         }
         
-        guard self.authenticated else {
-            DispatchQueue.main.async {
-                self.connect(to: game, withChat: withChat)
-            }
-            return
-        }
-
         connectedWithChat[ogsID] = withChat
         connectedGames[ogsID] = game
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])
@@ -1182,8 +1186,8 @@ class OGSService: ObservableObject {
         }
     }
     
-    func fetchPublicGames() {
-        self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": 0, "limit": 30]).timingOut(after: 3) { data in
+    func fetchPublicGames(from: Int = 0, limit: Int = 30) {
+        self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": from, "limit": limit]).timingOut(after: 3) { data in
             if data.count > 0 {
                 if let publicGamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {
                     var newPublicGames: [Game] = []
@@ -1679,5 +1683,29 @@ class OGSService: ObservableObject {
                 _calculatePrivateMessageUnreadCount()
             }
         }
+    }
+    
+    @Published private(set) public var sitewiseLiveGamesCount: Int?
+    @Published private(set) public var sitewiseCorrespondenceGamesCount: Int?
+    
+    func subscribeToGameCount() {
+        guard socket.status == .connected else {
+            socket.once(clientEvent: .connect) { _, _ in
+                self.subscribeToGameCount()
+            }
+            return
+        }
+        
+        socket.emit("gamelist/count/subscribe", "")
+    }
+    
+    func unsubscribeFromGameCount() {
+        guard socket.status == .connected else {
+            return
+        }
+        
+        socket.emit("gamelist/count/unsubscribe", "")
+        sitewiseLiveGamesCount = nil
+        sitewiseCorrespondenceGamesCount = nil
     }
 }

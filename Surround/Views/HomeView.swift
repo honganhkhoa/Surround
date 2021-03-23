@@ -217,18 +217,7 @@ struct HomeView: View {
             if ogs.isLoggedIn {
                 activeGamesView
             } else {
-                ScrollView {
-                    LoginView()
-                    GroupBox {
-                        Button(action: { showRegisterWebView = true }) {
-                            HStack {
-                                Text("New to Online-go.com? Register here.")
-                                Spacer()
-                            }
-                        }
-                    }.padding(.horizontal)
-                }
-                .frame(maxWidth: 600)
+                WelcomeView()
             }
             NavigationLink(
                 destination: GameDetailView(currentGame: nav.home.activeGame),
@@ -252,7 +241,7 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationTitle(ogs.isLoggedIn ? "Active games" : "Sign in to OGS")
+        .navigationTitle(ogs.isLoggedIn ? "Active games" : "Welcome")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Picker(selection: $displayMode.animation(), label: Text("Display mode")) {

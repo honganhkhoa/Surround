@@ -38,7 +38,7 @@ struct LoginView: View {
     
     var body: some View {
         VStack {
-            GroupBox(label: Text("Sign in to your Online-go.com account")) {
+            GroupBox(label: Text("Sign in to your Online-go.com (OGS) account:").leadingAlignedInScrollView()) {
                 TextField("Username", text: $username)
                     .autocapitalization(.none)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -65,27 +65,21 @@ struct LoginView: View {
                     }
                 }
             }
-            GroupBox {
+            GroupBox(label: Text("If your OGS account was linked to a social account:").leadingAlignedInScrollView()) {
                 NavigationLink(destination: ThirdPartyLoginView(type: .facebook), isActive: $isShowingFacebookLogin) {
-                    HStack {
-                        Text("Sign in with Facebook")
-                            .padding(.vertical, 5)
-                        Spacer()
-                    }
+                    Text("Sign in to OGS with Facebook")
+                        .leadingAlignedInScrollView()
+                        .padding(.vertical, 5)
                 }
                 NavigationLink(destination: ThirdPartyLoginView(type: .google), isActive: $isShowingGoogleLogin) {
-                    HStack {
-                        Text("Sign in with Google")
-                            .padding(.vertical, 5)
-                        Spacer()
-                    }
+                    Text("Sign in to OGS with Google")
+                        .leadingAlignedInScrollView()
+                        .padding(.vertical, 5)
                 }
                 NavigationLink(destination: ThirdPartyLoginView(type: .twitter), isActive: $isShowingTwitterLogin) {
-                    HStack {
-                        Text("Sign in with Twitter")
-                            .padding(.vertical, 5)
-                        Spacer()
-                    }
+                    Text("Sign in to OGS with Twitter")
+                        .leadingAlignedInScrollView()
+                        .padding(.vertical, 5)
                 }
             }
         }
@@ -108,7 +102,7 @@ struct LoginView_Previews: PreviewProvider {
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .previewLayout(.fixed(width: 500, height: 500))
+        .previewLayout(.fixed(width: 300, height: 500))
         .environmentObject(OGSService.previewInstance())
     }
 }
