@@ -899,6 +899,14 @@ class OGSService: ObservableObject {
             return
         }
         
+        guard !(game.isUserPlaying && withChat && !self.authenticated) else {
+            // If user is one of the players, wait until the socket is authenticated to prevent them from seeing Malkovich log.
+            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
+                self.connect(to: game, withChat: withChat)
+            }
+            return
+        }
+        
         connectedWithChat[ogsID] = withChat
         connectedGames[ogsID] = game
         self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])

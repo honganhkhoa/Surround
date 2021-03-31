@@ -21,7 +21,7 @@ struct WelcomeView: View {
                     .leadingAlignedInScrollView()
                 Text("To start playing:")
                     .leadingAlignedInScrollView()
-                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!)) {
+                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!).navigationBarTitleDisplayMode(.inline)) {
                     Text("Sign in to your OGS account")
                         .foregroundColor(.white)
                         .bold()
@@ -31,7 +31,7 @@ struct WelcomeView: View {
                         .padding(.horizontal)
                 }
                 Text("or")
-                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!)) {
+                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!).navigationBarTitleDisplayMode(.inline)) {
                     Text("Register an OGS account")
                         .foregroundColor(.white)
                         .bold()
