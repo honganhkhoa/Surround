@@ -29,7 +29,12 @@ struct OGSChatLineVariation: Decodable {
         
         fromMoveNumber = try container.decode(Int.self, forKey: .from)
         let moveString = try container.decode(String.self, forKey: .moves)
-        moves = Move.fromMoveString(moveString: moveString)
+        // TODO: This is a quick fix for an arithmetic overflow crash that cannot be caught, will handle this case properly when implementing support for board markers.
+        if !moveString.contains("!") {
+            moves = Move.fromMoveString(moveString: moveString)
+        } else {
+            moves = []
+        }
         name = try container.decode(String.self, forKey: .name)
     }
 }
