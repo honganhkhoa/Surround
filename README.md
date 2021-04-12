@@ -1,6 +1,13 @@
+<h1 align="center">
+  <img src="https://files.honganhkhoa.com/surround/appicon.png" width="120" height="120" style="border-radius:20px;"><br />
+  <a href="https://apps.apple.com/app/id1535010544"><img src="https://files.honganhkhoa.com/surround/appstore.png" height="60"></a>
+</h1>
+
 # Surround
 
 This repository contains the client code for Surround, an iOS app to play Go online on the [Online-Go.com](https://online-go.com) server (Online Go Server - OGS). The app aims to provide the best OGS experience on iOS devices.
+
+![Surround App Screenshots](https://files.honganhkhoa.com/surround/screenshots.png)
 
 ---
 
@@ -22,6 +29,7 @@ Currently I don't have plan to work on the macOS part. If you want to use this p
 # Contact
 - Send me a message on either [OGS](https://online-go.com/player/314459/) or the [OGS Forums](https://forums.online-go.com/u/honganhkhoa/summary).
 - [OGS Forums thread for Surround](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437).
+- Send me an email: khoahong@hey.com
 
 # License
 This project is released under the BSD 3-Clause license. See [LICENSE](LICENSE) for details.
