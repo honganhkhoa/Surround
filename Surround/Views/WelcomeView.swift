@@ -10,9 +10,7 @@ import Combine
 
 struct WelcomeView: View {
     @EnvironmentObject var ogs: OGSService
-    @State var timerCancellable: AnyCancellable?
     @State var publicGames = [Game]()
-    @State var publicGamesFrom = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -71,18 +69,12 @@ struct WelcomeView: View {
         .onAppear {
             ogs.ensureConnect {
                 ogs.subscribeToGameCount()
-                ogs.fetchPublicGames(from: publicGamesFrom, limit: 10)
-                publicGamesFrom = 15 - publicGamesFrom
-                timerCancellable = Timer.publish(every: 20, on: .main, in: .common).autoconnect().sink { _ in
-                    ogs.fetchPublicGames(from: publicGamesFrom, limit: 10)
-                    publicGamesFrom = 15 - publicGamesFrom
-                }
+                ogs.cyclePublicGames()
             }
         }
         .onDisappear {
             ogs.unsubscribeFromGameCount()
-            timerCancellable?.cancel()
-            timerCancellable = nil
+            ogs.cancelPublicGamesCycling()
         }
         .onChange(of: ogs.sortedPublicGames) { games in
             if self.publicGames.count > 0 {

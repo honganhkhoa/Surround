@@ -665,7 +665,7 @@ class OGSService: ObservableObject {
                         }
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
-                        if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
+                        if let ogsGame = try? decoder.decode(OGSGame.self, from: OGSGame.preprocessedGameData(gameData: gameData)) {
                             newActiveGames[gameId]?.gameData = ogsGame
                             newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
                         }
@@ -763,7 +763,7 @@ class OGSService: ObservableObject {
                             let decoder = DictionaryDecoder()
                             decoder.keyDecodingStrategy = .convertFromSnakeCase
                             do {
-                                let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
+                                let ogsGame = try decoder.decode(OGSGame.self, from: OGSGame.preprocessedGameData(gameData: gameData))
                                 if let game = self.connectedGames[ogsGame.gameId] {
                                     game.ogsRawData = data
                                     promise(.success(game))
@@ -920,7 +920,8 @@ class OGSService: ObservableObject {
                     let decoder = DictionaryDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     do {
-                        let ogsGame = try decoder.decode(OGSGame.self, from: gamedata[0] as? [String: Any] ?? [:])
+                        let gameData = OGSGame.preprocessedGameData(gameData: gamedata[0] as? [String: Any] ?? [:])
+                        let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
                         connectedGame.gameData = ogsGame
                     } catch {
                         print(gameId, error)
@@ -931,14 +932,16 @@ class OGSService: ObservableObject {
         self.socket.on("game/\(ogsID)/move") { movedata, ack in
             DispatchQueue.main.async {
                 if let movedata = movedata[0] as? [String: Any] {
-                    if let move = movedata["move"] as? [Int], let gameId = movedata["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
-                        do {
-                            try connectedGame.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
-                        } catch {
-                            print(gameId, movedata, error)
-                        }
-                        if let _ = self.activeGames[gameId] {
-                            userDefaults[.latestOGSOverviewOutdated] = true
+                    if let move = movedata["move"] as? [Any], let gameId = movedata["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
+                        if let column = move[0] as? Int, let row = move[1] as? Int {
+                            do {
+                                try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
+                            } catch {
+                                print(gameId, movedata, error)
+                            }
+                            if let _ = self.activeGames[gameId] {
+                                userDefaults[.latestOGSOverviewOutdated] = true
+                            }
                         }
                     }
                 }
@@ -1233,6 +1236,25 @@ class OGSService: ObservableObject {
                 }
             }
         }
+    }
+    
+    var publicGamesCyclingCancellable: AnyCancellable?
+    var publicGamesCyclingFrom = 0
+    func cyclePublicGames() {
+        if publicGamesCyclingCancellable == nil {
+            self.fetchPublicGames(from: publicGamesCyclingFrom, limit: 10)
+            publicGamesCyclingFrom = 15 - publicGamesCyclingFrom
+            publicGamesCyclingCancellable = Timer.publish(every: 20, on: .main, in: .common).autoconnect().sink { _ in
+                self.fetchPublicGames(from: self.publicGamesCyclingFrom, limit: 10)
+                self.publicGamesCyclingFrom = 15 - self.publicGamesCyclingFrom
+            }
+        }
+    }
+    
+    func cancelPublicGamesCycling() {
+        self.publicGamesCyclingCancellable?.cancel()
+        self.publicGamesCyclingCancellable = nil
+        self.publicGamesCyclingFrom = 0
     }
     
     func isOGSDomain(url: URL) -> Bool {

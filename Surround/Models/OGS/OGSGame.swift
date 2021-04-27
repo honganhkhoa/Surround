@@ -156,4 +156,20 @@ struct OGSGame: Decodable {
     
     var tournamentId: Int?
     var ladderId: Int?
+    
+    static func preprocessedGameData(gameData: [String: Any]) -> [String: Any] {
+        // Quick fix for a recent change on OGS server
+        // https://forums.online-go.com/t/online-go-app-for-android/34438/607
+        var result = gameData
+        var newMoves = [[Int]]()
+        if let moves = result["moves"] as? [[Any]] {
+            for move in moves {
+                if let column = move[0] as? Int, let row = move[1] as? Int {
+                    newMoves.append([column, row])
+                }
+            }
+        }
+        result["moves"] = newMoves
+        return result
+    }
 }
