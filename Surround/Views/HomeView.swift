@@ -233,6 +233,11 @@ struct HomeView: View {
             ) {
                 EmptyView()
             }
+            // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
+            // https://developer.apple.com/forums/thread/677333#672042022
+            NavigationLink(destination: EmptyView()) {
+                EmptyView()
+            }
         }
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {
