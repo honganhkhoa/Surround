@@ -61,7 +61,7 @@ class Provider: TimelineProvider {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         for gameData in activeGamesData {
             if let jsonData = gameData["json"] as? [String: Any] {
-                if let ogsGame = try? decoder.decode(OGSGame.self, from: jsonData) {
+                if let ogsGame = try? decoder.decode(OGSGame.self, from: OGSGame.preprocessedGameData(gameData: jsonData)) {
                     let game = Game(ogsGame: ogsGame)
                     result.append(game)
                 }
