@@ -70,16 +70,23 @@ struct Goban: View {
                     }
                 }
                 Path { path in
-                    for i in 0..<height {
+                    for i in 1..<height-1 {
                         path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
                         path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
                     }
-                    for i in 0..<width {
+                    for i in 1..<width-1 {
                         path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
                         path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
                 }
-                .stroke(Color.black, lineWidth: size < 10 ? 0.5 : 1)
+                .stroke(Color.black, lineWidth: size < 10 ? 1 / UIScreen.main.nativeScale : 0.5)
+                Path { path in
+                    path.move(to: CGPoint(x: size / 2, y: size / 2))
+                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
+                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                    path.addLine(to: CGPoint(x: size / 2, y: (CGFloat(height) - 0.5) * size))
+                    path.closeSubpath()
+                }.stroke(Color.black, lineWidth: size < 10 ? 0.5 : 1)
                 if starPoints.count > 0 {
                     Path { path in
                         for starPoint in starPoints {
