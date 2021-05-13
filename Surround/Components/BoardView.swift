@@ -104,7 +104,7 @@ struct Goban: View {
                         path.move(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: size / 2))
                         path.addLine(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
-                    .stroke(Color(highlightColor), lineWidth: 2)
+                    .stroke(Color(highlightColor), lineWidth: 1)
                 }
             }
         }

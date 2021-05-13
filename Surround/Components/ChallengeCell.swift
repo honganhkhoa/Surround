@@ -179,6 +179,9 @@ struct ChallengeCell: View {
                     Label{
                         HStack {
                             Text("\(game.width)×\(game.height) \(game.ranked ? "Ranked" : "Unranked")")
+                                .leadingAlignedInScrollView()
+                                .minimumScaleFactor(0.7)
+                                .lineLimit(1)
                             Spacer()
                             Text("Handicap: ").bold()
                                 .offset(x: 8)
@@ -189,7 +192,10 @@ struct ChallengeCell: View {
                     }
                     Label {
                         HStack {
-                            Text("Rules: ").bold() + Text(game.rules.fullName)
+                            (Text("Rules: ").bold() + Text(game.rules.fullName))
+                                .leadingAlignedInScrollView()
+                                .minimumScaleFactor(0.7)
+                                .lineLimit(1)
                             if game.komi != nil && game.komi != game.rules.defaultKomi {
                                 Spacer()
                                 Text("Komi: ").bold()
@@ -204,6 +210,7 @@ struct ChallengeCell: View {
                         Label {
                             VStack(alignment: .leading) {
                                 Text("\(timeControl.systemName): \(timeControl.shortDescription)")
+                                    .leadingAlignedInScrollView()
                                 if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
                                     Text("Pause on weekend")
                                 }
