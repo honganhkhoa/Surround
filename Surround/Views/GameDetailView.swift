@@ -15,6 +15,7 @@ struct SingleGameView: View {
     var reducedPlayerInfoVerticalPadding: Bool = false
     var goToNextGame: (() -> ())?
     var horizontal = false
+    @Binding var zenMode: Bool
     
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -129,56 +130,61 @@ struct SingleGameView: View {
         .matchedGeometryEffect(id: "compactDisplayModePicker", in: animation)
     }
     
-    var compactBody: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if compactDisplayMode == .playerInfo {
-                ZStack(alignment: .topTrailing) {
-                    PlayersBannerView(
-                        game: game,
-                        topLeftPlayerColor: topLeftPlayerColor,
-                        reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
-                        showsPlayersName: !game.isUserPlaying
-                    )
+    @ViewBuilder
+    var compactPlayerInfoOrChat: some View {
+        if compactDisplayMode == .playerInfo {
+            ZStack(alignment: .topTrailing) {
+                PlayersBannerView(
+                    game: game,
+                    topLeftPlayerColor: topLeftPlayerColor,
+                    reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
+                    showsPlayersName: !game.isUserPlaying
+                )
+                compactDisplayModePicker
+            }
+        } else {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Spacer().frame(width: 10)
+                    HStack(spacing: 0) {
+                        Stone(color: topLeftPlayerColor, shadowRadius: 2)
+                            .frame(width: 20, height: 20)
+                        Spacer().frame(width: 5)
+                        InlineTimerView(
+                            timeControl: game.gameData?.timeControl,
+                            clock: game.clock,
+                            player: topLeftPlayerColor,
+                            pauseControl: game.pauseControl,
+                            showsPauseReason: false
+                        )
+                    }
+                    Spacer(minLength: 5)
+                    Divider()
+                    Spacer(minLength: 5)
+                    HStack(spacing: 0) {
+                        InlineTimerView(
+                            timeControl: game.gameData?.timeControl,
+                            clock: game.clock,
+                            player: topLeftPlayerColor.opponentColor(),
+                            pauseControl: game.pauseControl,
+                            showsPauseReason: false
+                        )
+                        Spacer().frame(width: 5)
+                        Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
+                            .frame(width: 20, height: 20)
+                    }
+                    Spacer().frame(width: 10)
                     compactDisplayModePicker
                 }
-            } else {
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
-                        Spacer().frame(width: 10)
-                        HStack(spacing: 0) {
-                            Stone(color: topLeftPlayerColor, shadowRadius: 2)
-                                .frame(width: 20, height: 20)
-                            Spacer().frame(width: 5)
-                            InlineTimerView(
-                                timeControl: game.gameData?.timeControl,
-                                clock: game.clock,
-                                player: topLeftPlayerColor,
-                                pauseControl: game.pauseControl,
-                                showsPauseReason: false
-                            )
-                        }
-                        Spacer(minLength: 5)
-                        Divider()
-                        Spacer(minLength: 5)
-                        HStack(spacing: 0) {
-                            InlineTimerView(
-                                timeControl: game.gameData?.timeControl,
-                                clock: game.clock,
-                                player: topLeftPlayerColor.opponentColor(),
-                                pauseControl: game.pauseControl,
-                                showsPauseReason: false
-                            )
-                            Spacer().frame(width: 5)
-                            Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
-                                .frame(width: 20, height: 20)
-                        }
-                        Spacer().frame(width: 10)
-                        compactDisplayModePicker
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
-                }
+                .fixedSize(horizontal: false, vertical: true)
+                ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
             }
+        }
+    }
+    
+    var compactBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            compactPlayerInfoOrChat
             if !attachedKeyboardVisible {
                 Spacer(minLength: 10).frame(maxHeight: 15)
                 controlRow
@@ -319,15 +325,132 @@ struct SingleGameView: View {
         }
     }
     
+    func zenModeTimerBackground(playerColor: StoneColor) -> Color {
+        if colorScheme == .dark {
+            return playerColor == .black ? Color(.systemGray6) : Color(.systemGray4)
+        } else {
+            return playerColor == .black ? Color(.systemGray2) : Color(.systemGray5)
+        }
+    }
+    
+    func zenModeTimer(playerColor: StoneColor, horizontal: Bool = true) -> some View {
+        let captures = game.currentPosition.captures[playerColor] ?? 0
+        let topLeft = playerColor == topLeftPlayerColor
+        let hasTimeControl = game.gameData?.timeControl.system != .None
+        let timer = TimerView(
+            timeControl: game.gameData?.timeControl,
+            clock: game.clock,
+            player: playerColor,
+            mainFont: compact ? Font.body : Font.title3,
+            subFont: compact ? Font.subheadline : Font.body)
+        return ZStack(alignment: topLeft ? .topLeading : .bottomTrailing) {
+            if horizontal {
+                HStack {
+                    if hasTimeControl && topLeft {
+                        timer
+                        Divider()
+                    }
+                    Text("\(captures) capture\(captures == 1 ? "" : "s")")
+                    if hasTimeControl && !topLeft {
+                        Divider()
+                        timer
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 25)
+                .padding(.vertical, 10)
+            } else {
+                VStack(alignment: .trailing) {
+                    if hasTimeControl {
+                        timer
+                        Divider()
+                    }
+                    Text("\(captures) capture\(captures == 1 ? "" : "s")")
+                }
+                .fixedSize(horizontal: /*@START_MENU_TOKEN@*/true/*@END_MENU_TOKEN@*/, vertical: false)
+                .padding(.horizontal, 25)
+                .padding(.vertical, 10)
+            }
+            Stone(color: playerColor, shadowRadius: 2)
+                .frame(width: 20, height: 20)
+                .offset(x: topLeft ? -10 : 10, y: topLeft ? -10 : 10)
+        }
+        .background(zenModeTimerBackground(playerColor: playerColor).shadow(radius: 2))
+    }
+    
+    var zenModeBody: some View {
+        ZStack(alignment: .topTrailing) {
+            GeometryReader { geometry in
+                if geometry.size.height > geometry.size.width - 200 {
+                    VStack(spacing: 0) {
+                        Spacer()
+                        HStack {
+                            zenModeTimer(playerColor: topLeftPlayerColor)
+                                .padding(.leading, 15)
+                            Spacer()
+                        }
+                        Spacer()
+                        boardView
+                            .padding(compact ? 0 : 15)
+                            .aspectRatio(1, contentMode: .fit)
+                        if compact {
+                            controlRow.padding()
+                        }
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            if !compact {
+                                verticalControlRow.padding()
+                            }
+                            zenModeTimer(playerColor: topLeftPlayerColor.opponentColor())
+                                .padding(.trailing, 15)
+                        }
+                        Spacer()
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        Spacer()
+                        VStack {
+                            zenModeTimer(playerColor: topLeftPlayerColor, horizontal: false)
+                                .padding(.top, 15)
+                            Spacer()
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            boardView.padding(15).aspectRatio(1, contentMode: .fit)
+                            verticalControlRow.padding(.horizontal)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Spacer()
+                            zenModeTimer(playerColor: topLeftPlayerColor.opponentColor(), horizontal: false)
+                                .padding(.bottom, 15)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+            Button(action: { withAnimation { zenMode = false } }) {
+                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                    .labelStyle(IconOnlyLabelStyle())
+            }
+            .padding()
+        }
+    }
+    
     var body: some View {
         Group {
-            if compact {
-                compactBody
+            if zenMode {
+                zenModeBody
             } else {
-                if horizontal {
-                    regularHorizontalBody
+                if compact {
+                    compactBody
                 } else {
-                    regularVerticalBody
+                    if horizontal {
+                        regularHorizontalBody
+                    } else {
+                        regularVerticalBody
+                    }
                 }
             }
         }
@@ -345,6 +468,7 @@ struct GameDetailView: View {
     #endif
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject var nav: NavigationService
 
     @State var currentGame: Game?
     @State var activeGames: [Game] = []
@@ -352,10 +476,13 @@ struct GameDetailView: View {
     
     @State var showSettings = false
     @State var attachedKeyboardVisible = false
-    @State var shouldHideActiveGameCarousel = false
-
+    @State var needsToHideActiveGameCarousel = false
+    @State var zenMode = false
+    
     var shouldShowActiveGamesCarousel: Bool {
-//        return true
+        guard !zenMode else {
+            return false
+        }
         if let currentGame = currentGame {
             return currentGame.isUserPlaying && activeGames.count > 1
         } else {
@@ -424,8 +551,8 @@ struct GameDetailView: View {
             let spacing: CGFloat = 10.0
             let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
             let enoughRoomForCarousel = remainingHeight >= 140 || (remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 140)
-            let showsActiveGamesCarousel = !self.shouldHideActiveGameCarousel && shouldShowActiveGamesCarousel && enoughRoomForCarousel
-            let reducedPlayerInfoVerticalPadding = (showsActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
+            let canShowActiveGamesCarousel = !self.needsToHideActiveGameCarousel && shouldShowActiveGamesCarousel && enoughRoomForCarousel
+            let reducedPlayerInfoVerticalPadding = (canShowActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
 
             return AnyView(erasing: VStack(alignment: .leading) {
                 if let currentGame = currentGame {
@@ -435,12 +562,13 @@ struct GameDetailView: View {
                         game: currentGame,
                         reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
                         goToNextGame: goToNextGame,
+                        zenMode: $zenMode,
                         attachedKeyboardVisible: self.attachedKeyboardVisible,
-                        shouldHideActiveGamesCarousel: self.$shouldHideActiveGameCarousel
+                        shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
                     )
                 }
-                if showsActiveGamesCarousel {
-                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
+                if canShowActiveGamesCarousel {
+                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames, showsToggleButton: true)
                 }
             })
         }
@@ -460,7 +588,8 @@ struct GameDetailView: View {
                         compact: false,
                         game: currentGame,
                         goToNextGame: goToNextGame,
-                        horizontal: horizontal
+                        horizontal: horizontal,
+                        zenMode: $zenMode
                     )
                 }
             })
@@ -481,7 +610,7 @@ struct GameDetailView: View {
         let opponent = userColor == .black ? players.white : players.black
         let opponentRank = userColor == .black ? currentGame.whiteFormattedRank : currentGame.blackFormattedRank
 
-        return AnyView(Group {
+        let result = Group {
             if compactLayout {
                 compactBody
             } else {
@@ -493,13 +622,6 @@ struct GameDetailView: View {
                 Color(UIColor.systemGray5).edgesIgnoringSafeArea(.bottom) :
                 Color.white.edgesIgnoringSafeArea(.bottom)
         )
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { self.showSettings = true }) {
-                    Label("Options", systemImage: "gearshape.2")
-                }
-            }
-        }
         .sheet(isPresented: self.$showSettings) {
             NavigationView {
                 VStack {
@@ -516,7 +638,7 @@ struct GameDetailView: View {
                 }
             }
         }
-        .navigationBarHidden(attachedKeyboardVisible)
+        .navigationBarHidden(attachedKeyboardVisible || zenMode)
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
         .onAppear {
@@ -556,7 +678,50 @@ struct GameDetailView: View {
                     screenBounds.maxY == keyboardFrame.maxY &&
                     screenBounds.width == keyboardFrame.width
             }
-        })
+        }
+        
+        if compactLayout {
+            return AnyView(
+                result.toolbar {
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                        HStack {
+                            Button(action: { withAnimation { zenMode = true } }) {
+                                Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
+                            }
+                            Button(action: { self.showSettings = true }) {
+                                Label("Options", systemImage: "gearshape.2")
+                            }
+                        }
+                    }
+                }
+            )
+        } else {
+            return AnyView(
+                result.toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            withAnimation {
+                                Setting(.showsActiveGamesCarousel).binding.wrappedValue.toggle()
+                            }
+                        }) {
+                            Label("Toggle thumbnails", systemImage: "rectangle.topthird.inset")
+                                .labelStyle(IconOnlyLabelStyle())
+                        }
+                        .disabled(!shouldShowActiveGamesCarousel)
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { withAnimation { zenMode = true } }) {
+                            Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { self.showSettings = true }) {
+                            Label("Options", systemImage: "gearshape.2")
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -574,12 +739,18 @@ struct GameDetailView_Previews: PreviewProvider {
 
         return Group {
             NavigationView {
+                GameDetailView(currentGame: games[0], activeGames: games, zenMode: true)
+            }
+            .previewDevice("iPhone 12 Pro")
+//            .colorScheme(.dark)
+
+            NavigationView {
                 GameDetailView(currentGame: games[0], activeGames: games)
             }
             .previewDevice("iPhone 12 Pro")
 
-            GameDetailView(currentGame: games[0])
-                .previewLayout(.fixed(width: 750, height: 754))
+            GameDetailView(currentGame: games[0], zenMode: true)
+                .previewLayout(.fixed(width: 960, height: 754))
                 .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
 
             GameDetailView(currentGame: games[0])
@@ -587,5 +758,6 @@ struct GameDetailView_Previews: PreviewProvider {
                 .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
         }
         .environmentObject(ogs)
+        .environmentObject(NavigationService.shared)
     }
 }

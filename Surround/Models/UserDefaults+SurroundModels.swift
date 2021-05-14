@@ -112,6 +112,10 @@ extension SettingKey {
         return .init(name: "showsBoardCoordinates", defaultValue: true)
     }
     
+    static var showsActiveGamesCarousel: SettingKey<Bool> {
+        return .init(name: "showsActiveGamesCarousel", defaultValue: true)
+    }
+    
     static var autoSubmitForLiveGames: SettingKey<Bool> {
         return .init(name: "autoSubmitForLiveGames", defaultValue: false)
     }

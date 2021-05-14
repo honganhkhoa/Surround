@@ -9,23 +9,25 @@ import SwiftUI
 
 struct ByoYomiTimerView: View {
     var thinkingTime: ThinkingTime
+    var mainFont: Font
+    var subFont: Font
     
     var body: some View {
         VStack(alignment: .trailing) {
             if thinkingTime.thinkingTimeLeft! > 0 {
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-                    .font(Font.subheadline.monospacedDigit())
+                    .font(mainFont.monospacedDigit())
                 Text("+ \(thinkingTime.periods!)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
-                    .font(Font.caption.monospacedDigit())
+                    .font(subFont.monospacedDigit())
             } else {
                 Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
-                    .font(Font.subheadline.monospacedDigit())
+                    .font(mainFont.monospacedDigit())
                 if thinkingTime.periodsLeft! > 1 {
                     Text("+ \(thinkingTime.periodsLeft! - 1)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
-                        .font(Font.caption.monospacedDigit())
+                        .font(subFont.monospacedDigit())
                 } else {
                     Text("SD")
-                        .font(Font.caption.bold())
+                        .font(subFont.bold())
                         .foregroundColor(Color.red)
                 }
             }
@@ -36,13 +38,15 @@ struct ByoYomiTimerView: View {
 struct FischerTimerView: View {
     var thinkingTime: ThinkingTime
     var timeIncrement: Int
+    var mainFont: Font
+    var subFont: Font
     
     var body: some View {
         VStack(alignment: .trailing) {
             Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-                .font(Font.subheadline.monospacedDigit())
+                .font(mainFont.monospacedDigit())
             Text("+ \(timeString(timeLeft: timeIncrement))")
-                .font(Font.caption.monospacedDigit())
+                .font(subFont.monospacedDigit())
         }
     }
 }
@@ -51,28 +55,31 @@ struct CanadianTimerView: View {
     var thinkingTime: ThinkingTime
     var periodTime: Int
     var stonesPerPeriod: Int
+    var mainFont: Font
+    var subFont: Font
     
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
             VStack(alignment: .trailing) {
                 Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-                    .font(Font.subheadline.monospacedDigit())
+                    .font(mainFont.monospacedDigit())
                 Text("+ \(timeString(timeLeft: periodTime))/\(stonesPerPeriod)")
-                    .font(Font.caption.monospacedDigit())
+                    .font(subFont.monospacedDigit())
             }
         } else {
             Text("\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
-                .font(Font.subheadline.monospacedDigit())
+                .font(mainFont.monospacedDigit())
         }
     }
 }
 
 struct SimpleTimerView: View {
     var thinkingTime: ThinkingTime
+    var mainFont: Font
     
     var body: some View {
         Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
-            .font(Font.subheadline.monospacedDigit())
+            .font(mainFont.monospacedDigit())
     }
 }
 
@@ -80,44 +87,42 @@ struct TimerView: View {
     var timeControl: TimeControl?
     var clock: OGSClock?
     var player: StoneColor
+    var mainFont = Font.subheadline
+    var subFont = Font.caption
     
     var body: some View {
-        guard let clock = clock,
-              let timeControl = timeControl else {
-            return AnyView(EmptyView())
-        }
-        
-        if !clock.started {
-            if let timeLeft = clock.timeUntilExpiration {
-                if clock.currentPlayer == player {
-                    return AnyView(
-                        erasing: Text(timeString(timeLeft: timeLeft))
-                            .font(Font.subheadline.monospacedDigit().bold())
-                    )
+        if let clock = clock, let timeControl = timeControl {
+            if !clock.started {
+                if let timeLeft = clock.timeUntilExpiration {
+                    if clock.currentPlayer == player {
+                        Text(timeString(timeLeft: timeLeft))
+                            .font(mainFont.monospacedDigit().bold())
+                    } else {
+                        Text("Waiting...")
+                            .font(mainFont.monospacedDigit().bold())
+                    }
+                }
+            } else {
+                if let thinkingTime = (player == .black ? self.clock?.blackTime : self.clock?.whiteTime) {
+                    switch timeControl.system {
+                    case .ByoYomi:
+                        ByoYomiTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
+                    case .Fischer(_, let timeIncrement, _):
+                        FischerTimerView(thinkingTime: thinkingTime, timeIncrement: timeIncrement, mainFont: mainFont, subFont: subFont)
+                    case .Canadian(_, let periodTime, let stonesPerPeriod):
+                        CanadianTimerView(thinkingTime: thinkingTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod, mainFont: mainFont, subFont: subFont)
+                    case .Simple, .Absolute:
+                        SimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont)
+                    default:
+                        EmptyView()
+                    }
                 } else {
-                    return AnyView(
-                        erasing: Text("Waiting...")
-                            .font(Font.subheadline.monospacedDigit().bold())
-                    )
+                    EmptyView()
                 }
             }
         } else {
-            let thinkingTime = (player == .black ? clock.blackTime : clock.whiteTime)
-
-            switch timeControl.system {
-            case .ByoYomi:
-                return AnyView(ByoYomiTimerView(thinkingTime: thinkingTime))
-            case .Fischer(_, let timeIncrement, _):
-                return AnyView(FischerTimerView(thinkingTime: thinkingTime, timeIncrement: timeIncrement))
-            case .Canadian(_, let periodTime, let stonesPerPeriod):
-                return AnyView(CanadianTimerView(thinkingTime: thinkingTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod))
-            case .Simple, .Absolute:
-                return AnyView(SimpleTimerView(thinkingTime: thinkingTime))
-            default:
-                return AnyView(EmptyView())
-            }
+            EmptyView()
         }
-        return AnyView(EmptyView())
     }
 }
 
