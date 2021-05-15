@@ -16,17 +16,32 @@ struct OGSBrowserView: View {
     @State var isLoading: Bool = true
     @State var webView: WKWebView?
     var initialURL: URL
-    
+    @State var url: URL?
+    var showsURLBar = false
+
     var body: some View {
-        OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL)
-//            .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
-            .navigationBarItems(
-                trailing: isLoading ?
-                    AnyView(ProgressView()) :
-                    AnyView(Button(action: { webView?.reload() }) {
-                        Image(systemName: "arrow.clockwise")
-                    }))
-            .navigationTitle(title ?? "")
+        VStack(alignment: .leading, spacing: 0) {
+            if showsURLBar {
+                Text((url ?? initialURL)?.absoluteString ?? "")
+                    .foregroundColor(Color(.secondaryLabel))
+                    .frame(maxWidth: .infinity)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color(.systemGray3).cornerRadius(5))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 5)
+            }
+            OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL, url: $url)
+        }
+//        .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
+        .navigationBarItems(
+            trailing: isLoading ?
+                AnyView(ProgressView()) :
+                AnyView(Button(action: { webView?.reload() }) {
+                    Image(systemName: "arrow.clockwise")
+                }))
+        .navigationTitle(title ?? "")
     }
 }
 
@@ -37,7 +52,8 @@ struct OGSBrowserWebView: UIViewRepresentable {
     @Binding var title: String?
     @Binding var webView: WKWebView?
     var initialURL: URL
-    
+    @Binding var url: URL?
+
     func makeCoordinator() -> Coordinator {
         return Coordinator(self)
     }
@@ -68,6 +84,15 @@ struct OGSBrowserWebView: UIViewRepresentable {
                 if newTitle != title {
                     DispatchQueue.main.async {
                         title = newTitle
+                    }
+                }
+            }
+        })
+        context.coordinator.urlObservation = webView.observe(\.url, options: [.new], changeHandler: { _, change in
+            if let newURL = change.newValue {
+                if newURL != url {
+                    DispatchQueue.main.async {
+                        url = newURL
                     }
                 }
             }
@@ -132,6 +157,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
         var loginCancellable: AnyCancellable?
         var loadingObservation: NSKeyValueObservation?
         var titleObservation: NSKeyValueObservation?
+        var urlObservation: NSKeyValueObservation?
         var cookiesToSet: [HTTPCookie] = []
         var initialRequestLoaded = false
         

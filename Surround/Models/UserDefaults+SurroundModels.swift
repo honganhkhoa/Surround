@@ -109,7 +109,7 @@ extension SettingKey {
     }
     
     static var showsBoardCoordinates: SettingKey<Bool> {
-        return .init(name: "showsBoardCoordinates", defaultValue: true)
+        return .init(name: "showsBoardCoordinates", defaultValue: false)
     }
     
     static var showsActiveGamesCarousel: SettingKey<Bool> {

@@ -19,7 +19,7 @@ struct WelcomeView: View {
                     .leadingAlignedInScrollView()
                 Text("To start playing:")
                     .leadingAlignedInScrollView()
-                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!).navigationBarTitleDisplayMode(.inline)) {
+                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!, showsURLBar: true).navigationBarTitleDisplayMode(.inline)) {
                     Text("Sign in to your OGS account")
                         .foregroundColor(.white)
                         .bold()
@@ -29,7 +29,7 @@ struct WelcomeView: View {
                         .padding(.horizontal)
                 }
                 Text("or")
-                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!).navigationBarTitleDisplayMode(.inline)) {
+                NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!, showsURLBar: true).navigationBarTitleDisplayMode(.inline)) {
                     Text("Register an OGS account")
                         .foregroundColor(.white)
                         .bold()
@@ -93,9 +93,16 @@ struct WelcomeView: View {
 
 struct WelcomeView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
-            WelcomeView()
-                .navigationTitle("Welcome")
+        Group {
+            NavigationView {
+                WelcomeView()
+                    .navigationTitle("Welcome")
+            }
+            NavigationView {
+                WelcomeView()
+                    .navigationTitle("Welcome")
+            }
+            .previewDevice("iPhone SE (1st generation)")
         }
         .environmentObject(
             OGSService.previewInstance(

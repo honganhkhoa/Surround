@@ -45,7 +45,7 @@ struct SettingsView: View {
                 .padding(.horizontal)
             } else {
                 GroupBox(label: Text("Online-go.com Account")) {
-                    NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!)) {
+                    NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!, showsURLBar: true).navigationBarTitleDisplayMode(.inline)) {
                         Text("Sign in to your Account")
                             .leadingAlignedInScrollView()
                             .padding(.vertical, 8)
