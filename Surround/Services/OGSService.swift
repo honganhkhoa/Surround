@@ -186,7 +186,7 @@ class OGSService: ObservableObject {
         socketManager = SocketManager(socketURL: socketURL, config: [
             .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(1), .reconnectWaitMax(10),
             .extraHeaders(["Host": socketURL.host!]),
-            .connectParams(["EIO": 3])
+            .version(.three)
         ])
         socket = socketManager.defaultSocket
         
