@@ -1,3 +1,5 @@
+[![CI](https://github.com/honganhkhoa/Surround/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/honganhkhoa/Surround/actions/workflows/main.yml)
+
 <h1 align="center">
   <img src="https://files.honganhkhoa.com/surround/appicon.png" width="120" height="120" style="border-radius:20px;"><br />
   <a href="https://apps.apple.com/app/id1535010544"><img src="https://files.honganhkhoa.com/surround/appstore.png" height="60"></a>
