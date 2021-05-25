@@ -76,6 +76,12 @@
 		BC3CD7D625EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
 		BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
+		BC463AF1265B70E300D40D3A /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF0265B70E300D40D3A /* SocketIO */; };
+		BC463AF3265B70E300D40D3A /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF2265B70E300D40D3A /* DictionaryCoding */; };
+		BC463AF5265B70E300D40D3A /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF4265B70E300D40D3A /* Alamofire */; };
+		BC463AF6265B70FA00D40D3A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
+		BC463AF7265B710E00D40D3A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */; };
 		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
 		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
@@ -346,6 +352,7 @@
 		BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPrivateMessage.swift; sourceTree = "<group>"; };
 		BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageLog.swift; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
+		BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardPositionTests.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
 		BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "LaunchScreen~iPad.storyboard"; sourceTree = "<group>"; };
@@ -430,6 +437,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC463AF5265B70E300D40D3A /* Alamofire in Frameworks */,
+				BC463AF3265B70E300D40D3A /* DictionaryCoding in Frameworks */,
+				BC463AF1265B70E300D40D3A /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -551,6 +561,7 @@
 				BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */,
 				BC042B0624AB2CFA0050B2D1 /* Info.plist */,
 				BC8CE87E2657B1B100E4BE1A /* GameTests.swift */,
+				BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -777,6 +788,11 @@
 				BC042B0224AB2CFA0050B2D1 /* PBXTargetDependency */,
 			);
 			name = SurroundTests;
+			packageProductDependencies = (
+				BC463AF0265B70E300D40D3A /* SocketIO */,
+				BC463AF2265B70E300D40D3A /* DictionaryCoding */,
+				BC463AF4265B70E300D40D3A /* Alamofire */,
+			);
 			productName = SurroundTests;
 			productReference = BC042B0024AB2CFA0050B2D1 /* SurroundTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -879,7 +895,6 @@
 					};
 					BC042AFF24AB2CFA0050B2D1 = {
 						CreatedOnToolsVersion = 12.0;
-						TestTargetID = BC042AEE24AB2CF40050B2D1;
 					};
 					BC042B0A24AB2CFA0050B2D1 = {
 						CreatedOnToolsVersion = 12.0;
@@ -1110,6 +1125,8 @@
 				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
 				BC8CE88D2657B33200E4BE1A /* OGSService.swift in Sources */,
 				BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */,
+				BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */,
+				BC463AF7265B710E00D40D3A /* Goban.cc in Sources */,
 				BC8CE8882657B2E100E4BE1A /* Game.swift in Sources */,
 				BC8CE88C2657B2E100E4BE1A /* OGSUser.swift in Sources */,
 				BC8CE88B2657B2E100E4BE1A /* OGSChatLine.swift in Sources */,
@@ -1120,6 +1137,7 @@
 				BC8CE8822657B2E100E4BE1A /* OGSPrivateMessage.swift in Sources */,
 				BC8CE88A2657B2E100E4BE1A /* OGSChallenge.swift in Sources */,
 				BC8CE8902657B34200E4BE1A /* SurroundService.swift in Sources */,
+				BC463AF6265B70FA00D40D3A /* se_wrapper.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1451,7 +1469,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
@@ -1465,7 +1482,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surround.app/Surround";
 			};
 			name = Debug;
 		};
@@ -1473,7 +1489,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
@@ -1487,7 +1502,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surround.app/Surround";
 			};
 			name = Release;
 		};
@@ -1791,6 +1805,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */;
 			productName = URLImage;
+		};
+		BC463AF0265B70E300D40D3A /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
+			productName = SocketIO;
+		};
+		BC463AF2265B70E300D40D3A /* DictionaryCoding */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
+			productName = DictionaryCoding;
+		};
+		BC463AF4265B70E300D40D3A /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
 		};
 		BC9EE81025B6D0E00044EA2C /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -30,7 +30,7 @@ class GameTests: XCTestCase {
         XCTAssertEqual(game.positionByLastMoveNumber[3]?.nextToMove, .black)
         XCTAssertEqual(game.positionByLastMoveNumber[8]?.nextToMove, .white)
         
-        GameTests.assertPositionEqual(position: game.currentPosition, positionStrings: [
+        BoardPositionTests.assertPositionEqual(position: game.currentPosition, visualStrings: [
             "-------------------",
             "-------------------",
             "------b-----b------",
@@ -54,7 +54,7 @@ class GameTests: XCTestCase {
     }
     
     static func sampleGame(ogsId: Int) -> Game {
-        let fileURL = Bundle.main.url(forResource: "game-\(ogsId)", withExtension: "json")!
+        let fileURL = Bundle(for: GameTests.self).url(forResource: "game-\(ogsId)", withExtension: "json")!
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let ogsGame = try! decoder.decode(OGSGame.self, from: Data(contentsOf: fileURL))
@@ -71,28 +71,5 @@ class GameTests: XCTestCase {
             }
         }
         return game
-    }
-    
-    static func assertPositionEqual(position: BoardPosition, positionStrings: [String]) {
-        for row in 0..<position.height {
-            for column in 0..<position.width {
-                let state = position[row, column]
-                let positionRow = positionStrings[row]
-                let char = positionRow[positionRow.index(positionRow.startIndex, offsetBy: column)]
-                switch state {
-                case .empty:
-                    if char != "-" {
-                        XCTFail("Row \(row) column \(column) is empty, expected to be \(char)")
-                    }
-                case .hasStone(let color):
-                    if color == .black && char != "b" {
-                        XCTFail("Row \(row) column \(column) is black, expected to be \(char)")
-                    }
-                    if color == .white && char != "w" {
-                        XCTFail("Row \(row) column \(column) is white, expected to be \(char)")
-                    }
-                }
-            }
-        }
     }
 }
