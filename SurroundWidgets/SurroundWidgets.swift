@@ -196,6 +196,8 @@ struct CorrespondenceGamesWidgetView : View {
             return 2
         case .systemLarge:
             return 4
+        case .systemExtraLarge:
+            return 4
         @unknown default:
             return 1
         }

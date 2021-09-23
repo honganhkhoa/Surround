@@ -31,37 +31,28 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     self.removedStonesAccepted[.white] = BoardPosition.points(fromPositionString:  whiteAcceptedRemovedStones)
                 }
                 
-                var position = initialPosition
                 do {
-                    var firstNonHandicapMoveIndex = 0
-                    var initialPositionStones = 0
                     if data.initialState.white.count > 0 || data.initialState.black.count > 0 {
                         for point in BoardPosition.points(fromPositionString: data.initialState.black) {
-                            position.putStone(row: point[0], column: point[1], color: .black)
-                            initialPositionStones += 1
+                            initialPosition.putStone(row: point[0], column: point[1], color: .black)
                         }
                         for point in BoardPosition.points(fromPositionString: data.initialState.white) {
-                            position.putStone(row: point[0], column: point[1], color: .white)
-                            initialPositionStones += 1
+                            initialPosition.putStone(row: point[0], column: point[1], color: .white)
                         }
-                        position.nextToMove = data.initialPlayer
+                        initialPosition.nextToMove = data.initialPlayer
                     }
-                    if data.handicap > 0 && data.freeHandicapPlacement {
-                        firstNonHandicapMoveIndex = min(data.handicap, data.moves.count)
-                        for handicapMove in data.moves[..<firstNonHandicapMoveIndex] {
-                            position = try position.makeHandicapPlacement(move: .placeStone(handicapMove[1], handicapMove[0]))
-                            self.positionByLastMoveNumber[position.lastMoveNumber] = position
-                        }
-                        position.nextToMove = firstNonHandicapMoveIndex == data.handicap ? data.initialPlayer.opponentColor() : data.initialPlayer
+                    if !initialPosition.hasTheSamePosition(with: moveTree.initialPosition) {
+                        moveTree = MoveTree(position: initialPosition)
+                        currentPosition = initialPosition
+                    } else {
+                        currentPosition = moveTree.initialPosition
                     }
-                    for move in data.moves[firstNonHandicapMoveIndex...] {
-                        position = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]), allowsSelfCapture: data.allowSelfCapture)
-                        self.positionByLastMoveNumber[position.lastMoveNumber] = position
+                    for move in data.moves {
+                        try self.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
                     }
                 } catch {
                     print(error)
                 }
-                currentPosition = position
                 if let removedStones = gameData?.removed {
                     currentPosition.removedStones = BoardPosition.points(fromPositionString: removedStones)
                 }
@@ -98,6 +89,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var currentPosition: BoardPosition {
         didSet {
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
+            if self.moveTree.positionsByLastMoveNumber[self.moveTree.largestLastMoveNumber]?.first! !== currentPosition {
+                print("zzz")
+            }
         }
     }
     @Published var undoRequested: Int?
@@ -107,6 +101,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var whiteFormattedRank: String {
         return whitePlayer?.formattedRank() ?? "?"
     }
+    @Published var moveTree: MoveTree
     var initialPosition: BoardPosition
     var ID: GameID
     var ogsURL: URL? {
@@ -254,6 +249,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.initialPosition = BoardPosition(width: width, height: height)
         self.positionByLastMoveNumber[self.initialPosition.lastMoveNumber] = self.initialPosition
         self.currentPosition = self.initialPosition
+        self.moveTree = MoveTree(position: self.initialPosition)
         self._postInit()
     }
     
@@ -268,6 +264,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         self.initialPosition = BoardPosition(width: width, height: height)
         self.positionByLastMoveNumber[self.initialPosition.lastMoveNumber] = self.initialPosition
         self.currentPosition = self.initialPosition
+        self.moveTree = MoveTree(position: self.initialPosition)
         self.gameData = ogsGame
         self.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, pauseControl: self.pauseControl)
         self._postInit()
@@ -277,17 +274,33 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
 
     }
     
-    func makeMove(move: Move) throws {
+    @discardableResult
+    func makeMove(move: Move, fromAnalyticsPosition: BoardPosition? = nil) throws -> BoardPosition {
+        let fromPosition = fromAnalyticsPosition ?? self.currentPosition
+        var newPosition: BoardPosition? = nil
         if let handicap = gameData?.handicap {
             if gameData?.freeHandicapPlacement ?? false {
-                if currentPosition.lastMoveNumber < handicap - 1 {
-                    self.currentPosition = try currentPosition.makeHandicapPlacement(move: move)
-                    return
+                if fromPosition.lastMoveNumber < handicap - 1 {
+                    newPosition = try fromPosition.makeHandicapPlacement(move: move)
                 }
             }
         }
-        self.currentPosition = try currentPosition.makeMove(move: move, allowsSelfCapture: gameData?.allowSelfCapture ?? false)
-        self.undoRequested = nil
+        if newPosition == nil {
+            newPosition = try fromPosition.makeMove(move: move, allowsSelfCapture: gameData?.allowSelfCapture ?? false)
+        }
+        if let newPosition = newPosition {
+            if fromPosition === currentPosition && fromAnalyticsPosition == nil {
+                let registeredPosition = self.moveTree.register(newPosition: newPosition, fromPosition: self.currentPosition, mainBranch: true)
+                self.currentPosition = registeredPosition
+                self.undoRequested = nil
+                return registeredPosition
+            }
+            if fromPosition === fromAnalyticsPosition {
+                return self.moveTree.register(newPosition: newPosition, fromPosition: fromPosition, mainBranch: false)
+            }
+        }
+        
+        return newPosition!
     }
     
     func undoMove(numbered moveNumber: Int) {

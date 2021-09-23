@@ -64,6 +64,11 @@
 		BC285BA42557FE8F005378F9 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC3037F52692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
+		BC3037F62692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
+		BC3037F72692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
+		BC3037F82692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
+		BC3037F92692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
 		BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */; };
 		BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
@@ -82,6 +87,20 @@
 		BC463AF6265B70FA00D40D3A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BC463AF7265B710E00D40D3A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */; };
+		BC463AFB2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */; };
+		BC463AFC2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */; };
+		BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
+		BC463AFF26624B6100D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
+		BC463B0126624D3500D40D3A /* puzzle-2630.json in Resources */ = {isa = PBXBuildFile; fileRef = BC463B0026624D3500D40D3A /* puzzle-2630.json */; };
+		BC463B0226624D3500D40D3A /* puzzle-2630.json in Resources */ = {isa = PBXBuildFile; fileRef = BC463B0026624D3500D40D3A /* puzzle-2630.json */; };
+		BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463B0326624D5D00D40D3A /* PuzzleTests.swift */; };
+		BC463B052662515800D40D3A /* OGSMoveTreeNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */; };
+		BC463B062662515800D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
+		BC463B072662515800D40D3A /* OGSMoveTreeNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */; };
+		BC463B082662515800D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
+		BC463B092662515900D40D3A /* OGSMoveTreeNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */; };
+		BC463B0A2662515900D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
+		BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463B0C266353D700D40D3A /* SingleGameView.swift */; };
 		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
 		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
@@ -97,6 +116,7 @@
 		BC5EEC2B259D851B00675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
 		BC5EEC32259D878100675761 /* Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC28259D851B00675761 /* Variation.swift */; };
 		BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5EEC5D25A41D7900675761 /* ChatLog.swift */; };
+		BC62A89C2664A6F500BF5F78 /* AnalyzeTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */; };
 		BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937925380A9F002B2200 /* WidgetKit.framework */; };
 		BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937B25380A9F002B2200 /* SwiftUI.framework */; };
 		BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC64937E25380A9F002B2200 /* SurroundWidgets.swift */; };
@@ -345,6 +365,7 @@
 		BC285B342557FAEB005378F9 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/MainInterface.storyboard; sourceTree = "<group>"; };
 		BC285B362557FAEB005378F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationContent.entitlements; sourceTree = "<group>"; };
+		BC3037F42692D03300181570 /* MoveTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveTree.swift; sourceTree = "<group>"; };
 		BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayersBannerView.swift; sourceTree = "<group>"; };
 		BC361AB5256246B4000C47F4 /* OGSChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatLine.swift; sourceTree = "<group>"; };
 		BC39EE3725DBC23C00562C68 /* TextUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtilities.swift; sourceTree = "<group>"; };
@@ -353,6 +374,11 @@
 		BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageLog.swift; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardPositionTests.swift; sourceTree = "<group>"; };
+		BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSMoveTreeNode.swift; sourceTree = "<group>"; };
+		BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPuzzle.swift; sourceTree = "<group>"; };
+		BC463B0026624D3500D40D3A /* puzzle-2630.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "puzzle-2630.json"; sourceTree = "<group>"; };
+		BC463B0326624D5D00D40D3A /* PuzzleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuzzleTests.swift; sourceTree = "<group>"; };
+		BC463B0C266353D700D40D3A /* SingleGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleGameView.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
 		BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "LaunchScreen~iPad.storyboard"; sourceTree = "<group>"; };
@@ -363,6 +389,7 @@
 		BC5EEBF6259C42EC00675761 /* ChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatLine.swift; sourceTree = "<group>"; };
 		BC5EEC28259D851B00675761 /* Variation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Variation.swift; sourceTree = "<group>"; };
 		BC5EEC5D25A41D7900675761 /* ChatLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatLog.swift; sourceTree = "<group>"; };
+		BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeTreeView.swift; sourceTree = "<group>"; };
 		BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC64937925380A9F002B2200 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		BC64937B25380A9F002B2200 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -550,6 +577,7 @@
 				BCB98CCF256D15B500B1F8FD /* game-23871959.json */,
 				BCB98CB5256D130100B1F8FD /* game-18759438.json */,
 				BCB98CAA256D129F00B1F8FD /* chat-27671778.json */,
+				BC463B0026624D3500D40D3A /* puzzle-2630.json */,
 				BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
@@ -562,6 +590,7 @@
 				BC042B0624AB2CFA0050B2D1 /* Info.plist */,
 				BC8CE87E2657B1B100E4BE1A /* GameTests.swift */,
 				BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */,
+				BC463B0326624D5D00D40D3A /* PuzzleTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -578,7 +607,7 @@
 		BC042B2924AB2DD00050B2D1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
+				BC463B0B266353B400D40D3A /* GameDetail */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
 				BC55D2D524B81E90003E20E7 /* HomeView.swift */,
@@ -629,6 +658,8 @@
 				BC361AB5256246B4000C47F4 /* OGSChatLine.swift */,
 				BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */,
 				BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */,
+				BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */,
+				BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -640,6 +671,7 @@
 				BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */,
 				BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */,
 				BC5EEC28259D851B00675761 /* Variation.swift */,
+				BC3037F42692D03300181570 /* MoveTree.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -649,7 +681,6 @@
 			children = (
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
-				BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */,
 				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
 				BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */,
 				BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */,
@@ -658,7 +689,6 @@
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
-				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
@@ -689,6 +719,18 @@
 				BC285B362557FAEB005378F9 /* Info.plist */,
 			);
 			path = SurroundNotificationContent;
+			sourceTree = "<group>";
+		};
+		BC463B0B266353B400D40D3A /* GameDetail */ = {
+			isa = PBXGroup;
+			children = (
+				BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */,
+				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
+				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
+				BC463B0C266353D700D40D3A /* SingleGameView.swift */,
+				BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */,
+			);
+			path = GameDetail;
 			sourceTree = "<group>";
 		};
 		BC64937825380A9F002B2200 /* Frameworks */ = {
@@ -955,6 +997,7 @@
 				BCB98D07256D16F600B1F8FD /* game-27053412.json in Resources */,
 				BCB98CF1256D168200B1F8FD /* game-26268404.json in Resources */,
 				BCB98D1D256D185500B1F8FD /* game-27671778.json in Resources */,
+				BC463B0126624D3500D40D3A /* puzzle-2630.json in Resources */,
 				BCB98CDB256D15F200B1F8FD /* game-25291907.json in Resources */,
 				BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */,
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
@@ -973,6 +1016,7 @@
 				BC8CE8952657B35900E4BE1A /* game-26269354.json in Resources */,
 				BC8CE8922657B35900E4BE1A /* game-18759438.json in Resources */,
 				BC8CE8932657B35900E4BE1A /* game-25291907.json in Resources */,
+				BC463B0226624D3500D40D3A /* puzzle-2630.json in Resources */,
 				BC8CE8912657B35900E4BE1A /* game-27053412.json in Resources */,
 				BC8CE8962657B35900E4BE1A /* game-25758368.json in Resources */,
 				BC8CE8982657B35900E4BE1A /* game-25076729.json in Resources */,
@@ -1052,6 +1096,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
+				BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
 				BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */,
 				BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */,
@@ -1078,6 +1123,7 @@
 				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
+				BC463AFB2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */,
 				BC5EEBF7259C42EC00675761 /* ChatLine.swift in Sources */,
@@ -1096,7 +1142,9 @@
 				BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */,
 				BC6E33F4260C388F008A59F7 /* WelcomeView.swift in Sources */,
 				BC649414253DA44C002B2200 /* SurroundNotificationService.swift in Sources */,
+				BC3037F52692D03300181570 /* MoveTree.swift in Sources */,
 				BC39EE3825DBC23C00562C68 /* TextUtilities.swift in Sources */,
+				BC62A89C2664A6F500BF5F78 /* AnalyzeTreeView.swift in Sources */,
 				BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */,
 				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,
 				BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */,
@@ -1107,6 +1155,7 @@
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
+				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */,
 				BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */,
 			);
@@ -1117,12 +1166,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
+				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,
 				BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */,
 				BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */,
 				BC8CE88F2657B33200E4BE1A /* UserDefaults+SurroundModels.swift in Sources */,
 				BC8CE8832657B2E100E4BE1A /* Variation.swift in Sources */,
 				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
+				BC3037F62692D03300181570 /* MoveTree.swift in Sources */,
 				BC8CE88D2657B33200E4BE1A /* OGSService.swift in Sources */,
 				BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */,
 				BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */,
@@ -1132,10 +1183,12 @@
 				BC8CE88B2657B2E100E4BE1A /* OGSChatLine.swift in Sources */,
 				BC8CE8862657B2E100E4BE1A /* BoardPosition.swift in Sources */,
 				BC8CE8872657B2E100E4BE1A /* OGSUIConfig.swift in Sources */,
+				BC463AFC2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC8CE8812657B2E100E4BE1A /* OGSAutomatchEntry.swift in Sources */,
 				BC8CE8892657B2E100E4BE1A /* OGSClock.swift in Sources */,
 				BC8CE8822657B2E100E4BE1A /* OGSPrivateMessage.swift in Sources */,
 				BC8CE88A2657B2E100E4BE1A /* OGSChallenge.swift in Sources */,
+				BC463AFF26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC8CE8902657B34200E4BE1A /* SurroundService.swift in Sources */,
 				BC463AF6265B70FA00D40D3A /* se_wrapper.cpp in Sources */,
 			);
@@ -1165,8 +1218,11 @@
 				BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */,
 				BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */,
 				BC285BA42557FE8F005378F9 /* Goban.cc in Sources */,
+				BC3037F82692D03300181570 /* MoveTree.swift in Sources */,
+				BC463B072662515800D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC285B852557FD57005378F9 /* OGSService.swift in Sources */,
 				BC285B6B2557FCBA005378F9 /* UserDefaults+SurroundModels.swift in Sources */,
+				BC463B082662515800D40D3A /* OGSPuzzle.swift in Sources */,
 				BCB98CC1256D144000B1F8FD /* TestData.swift in Sources */,
 				BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */,
 				BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */,
@@ -1197,8 +1253,11 @@
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
 				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
 				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
+				BC3037F72692D03300181570 /* MoveTree.swift in Sources */,
+				BC463B052662515800D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */,
 				BC6493C625381006002B2200 /* Goban.cc in Sources */,
+				BC463B062662515800D40D3A /* OGSPuzzle.swift in Sources */,
 				BCB98CC0256D143F00B1F8FD /* TestData.swift in Sources */,
 				BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */,
 				BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */,
@@ -1224,6 +1283,8 @@
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
 				BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
+				BC463B0A2662515900D40D3A /* OGSPuzzle.swift in Sources */,
+				BC3037F92692D03300181570 /* MoveTree.swift in Sources */,
 				BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */,
 				BCD214F4255A948E00F78E2A /* OGSUIConfig.swift in Sources */,
 				BCD214FF255A94A400F78E2A /* SurroundService.swift in Sources */,
@@ -1231,6 +1292,7 @@
 				BCD21522255A954E00F78E2A /* Goban.cc in Sources */,
 				BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */,
 				BCD214FD255A94A400F78E2A /* NavigationService.swift in Sources */,
+				BC463B092662515900D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC5EEC32259D878100675761 /* Variation.swift in Sources */,
 				BC361ABF256CC184000C47F4 /* OGSChatLine.swift in Sources */,
 				BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */,

@@ -28,7 +28,7 @@ enum StoneColor: String, Codable {
     }
 }
 
-enum Move: Equatable {
+enum Move: Equatable, Hashable {
     case placeStone(Int, Int)
     case pass
     
@@ -112,6 +112,7 @@ class BoardPosition: ObservableObject {
     var nextToMove: StoneColor
     var previousPosition: BoardPosition?
     var lastMove: Move?
+    var lastMoveColor: StoneColor?
     var captures: [StoneColor: Int] = [.black: 0, .white: 0]
     @Published var removedStones: Set<[Int]>?
     @Published var gameScores: GameScores?
@@ -129,11 +130,13 @@ class BoardPosition: ObservableObject {
         self.width = previousPosition.width
         self.height = previousPosition.height
         self.lastMove = lastMove
-        self.previousPosition = previousPosition
+        self.lastMoveColor = previousPosition.nextToMove
         self.nextToMove = previousPosition.nextToMove.opponentColor()
         self.board = previousPosition.board
         self.captures = previousPosition.captures
         self.lastMoveNumber = previousPosition.lastMoveNumber + 1
+
+        self.previousPosition = previousPosition
     }
     
     subscript(row: Int, column: Int) -> PointState {

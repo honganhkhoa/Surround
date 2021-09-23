@@ -21,7 +21,7 @@ struct Stone: View {
                     if shadowRadius > 0 {
                         ZStack {
                             Path(path).fill(Color.black).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                            Path(path).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
                                 .clipShape(Circle())
                         }
                     } else {
@@ -31,7 +31,7 @@ struct Stone: View {
                     ZStack {
                         if shadowRadius > 0 {
                             Path(path).fill(Color(red: 0.75, green: 0.75, blue: 0.75)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            Path(path).fill(Color(UIColor.clear)).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                            Path(path).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
                                 .clipShape(Circle())
                         } else {
                             Circle().fill(Color.white)

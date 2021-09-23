@@ -44,7 +44,7 @@ struct Variation {
                 break
             }
         }
-        self.init(position: currentPosition, basePosition: basePosition, moves: moves)
+        self.init(position: position, basePosition: basePosition, moves: moves)
     }
     
     init(basePosition: BoardPosition, moves: [Move]) {

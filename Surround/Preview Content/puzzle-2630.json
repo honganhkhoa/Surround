@@ -1,0 +1,206 @@
+{
+  "id": 2630,
+  "order": 99999999.0,
+  "owner": {
+    "id": 64817,
+    "username": "mark5000",
+    "country": "us",
+    "icon": "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/46508ca360252abb82ce15bc4ce86112-32.png",
+    "ratings": {
+      "version": 5,
+      "overall": {
+        "rating": 2343.8747326385505,
+        "deviation": 73.33017419250861,
+        "volatility": 0.06027959328487002
+      }
+    },
+    "ranking": 34.63616060105822,
+    "professional": false,
+    "ui_class": "moderator"
+  },
+  "name": "Exercise 003 - solution",
+  "created": "2015-06-18T00:24:34.412793-04:00",
+  "modified": "2021-05-28T06:17:43.420129-04:00",
+  "puzzle": {
+    "mode": "puzzle",
+    "name": "Exercise 003 - solution",
+    "puzzle_type": "life_and_death",
+    "width": 19,
+    "height": 19,
+    "initial_state": {
+      "white": "msmrmqlpkpjpiphpgqgrgs",
+      "black": "jqirhriqkqkrlr"
+    },
+    "puzzle_opponent_move_mode": "automatic",
+    "puzzle_player_move_mode": "fixed",
+    "puzzle_rank": "7",
+    "puzzle_description": "This exercise is about miai. \"Miai\" is having two different options so that if your opponent takes one, you can take the other. When you have two points in miai, it's not necessary to play there anymore.\n\nHere, C is the only way to live. This makes A and B miai. Play on to see it.",
+    "puzzle_collection": "242",
+    "initial_player": "black",
+    "move_tree": {
+      "x": -1,
+      "y": -1,
+      "marks": [
+        {
+          "x": 7,
+          "y": 18,
+          "marks": {
+            "letter": "A"
+          }
+        },
+        {
+          "x": 9,
+          "y": 18,
+          "marks": {
+            "letter": "C"
+          }
+        },
+        {
+          "x": 11,
+          "y": 18,
+          "marks": {
+            "letter": "B"
+          }
+        }
+      ],
+      "branches": [
+        {
+          "x": 9,
+          "y": 18,
+          "marks": [
+            {
+              "x": 7,
+              "y": 18,
+              "marks": {
+                "letter": "A"
+              }
+            },
+            {
+              "x": 11,
+              "y": 18,
+              "marks": {
+                "letter": "B"
+              }
+            }
+          ],
+          "branches": [
+            {
+              "x": 7,
+              "y": 18,
+              "marks": [
+                {
+                  "x": 7,
+                  "y": 18,
+                  "marks": {
+                    "letter": "A"
+                  }
+                },
+                {
+                  "x": 11,
+                  "y": 18,
+                  "marks": {
+                    "letter": "B"
+                  }
+                }
+              ],
+              "text": "A and B are miai. If White plays at A, as here, Black lives with B. If White had played at B instead, Black would have played at A. In either case Black is able to make two eyes, so we say the two points are miai.",
+              "branches": [
+                {
+                  "x": 11,
+                  "y": 18,
+                  "text": "Black makes two eyes and cannot be captured.",
+                  "correct_answer": true
+                }
+              ],
+              "correct_answer": true
+            },
+            {
+              "x": 11,
+              "y": 18,
+              "marks": [
+                {
+                  "x": 7,
+                  "y": 18,
+                  "marks": {
+                    "letter": "A"
+                  }
+                },
+                {
+                  "x": 11,
+                  "y": 18,
+                  "marks": {
+                    "letter": "B"
+                  }
+                }
+              ],
+              "text": "A and B are miai. If White plays at B, as here, Black lives with A. If White had played at A instead, Black would have played at B. In either case Black is able to make two eyes, so we say the two points are miai.",
+              "branches": [
+                {
+                  "x": 7,
+                  "y": 18,
+                  "text": "Black makes two eyes and cannot be captured.",
+                  "correct_answer": true
+                }
+              ],
+              "correct_answer": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "private": false,
+  "width": 19,
+  "height": 19,
+  "type": "life_and_death",
+  "has_solution": false,
+  "rating": 4.7566462167689165,
+  "rating_count": 489,
+  "rank": 7,
+  "collection": {
+    "id": 242,
+    "owner": {
+      "id": 64817,
+      "username": "mark5000",
+      "country": "us",
+      "icon": "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/46508ca360252abb82ce15bc4ce86112-32.png",
+      "ratings": {
+        "version": 5,
+        "overall": {
+          "rating": 2343.8747326385505,
+          "deviation": 73.33017419250861,
+          "volatility": 0.06027959328487002
+        }
+      },
+      "ranking": 34.63616060105822,
+      "professional": false,
+      "ui_class": "moderator"
+    },
+    "name": "Exercises for Beginners",
+    "created": "2015-06-17T23:50:00.350378-04:00",
+    "private": false,
+    "price": "0.00",
+    "starting_puzzle": {
+      "id": 2625,
+      "initial_state": {
+        "white": "arbrcrdreres",
+        "black": "aqbpdpeqfqfrhrbs"
+      },
+      "width": 19,
+      "height": 19
+    },
+    "rating": 4.663801139306059,
+    "rating_count": 19310,
+    "puzzle_count": 107,
+    "min_rank": 5,
+    "max_rank": 21,
+    "view_count": 5960427,
+    "solved_count": 2225930,
+    "attempt_count": 4572155,
+    "color_transform_enabled": true,
+    "position_transform_enabled": true
+  },
+  "view_count": 174164,
+  "solved_count": 63595,
+  "attempt_count": 33513
+}
