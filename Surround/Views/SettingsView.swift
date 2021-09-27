@@ -102,7 +102,7 @@ struct SettingsView: View {
             userDefaults[.notificationEnabled] = enabled
             sgs.setPushEnabled(enabled: enabled)
             if enabled {
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { (granted, error) in
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { (granted, error) in
                     if let error = error {
                         print(error)
                     } else if granted {

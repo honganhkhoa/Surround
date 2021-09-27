@@ -179,6 +179,10 @@ class OGSService: ObservableObject {
         self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOpponentTurn.sorted(by: thinkingTimeLeftIncreasing)
         self.sortedActiveCorrespondenceGames = self.sortedActiveCorrespondenceGamesOnUserTurn + self.sortedActiveCorrespondenceGamesNotOnUserTurn
         self.liveGames = liveGames
+        
+        #if MAIN_APP
+        UIApplication.shared.applicationIconBadgeNumber = self.sortedActiveCorrespondenceGamesOnUserTurn.count
+        #endif
     }
     
     private init(forPreview: Bool = false) {
