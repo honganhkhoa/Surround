@@ -29,7 +29,6 @@ class MoveTree: ObservableObject {
     
     func removeData(forPosition position: BoardPosition) {
         let identifier = ObjectIdentifier(position)
-        indexByBoardPosition.removeValue(forKey: identifier)
         levelByBoardPosition.removeValue(forKey: identifier)
         if let nextPositions = nextPositionsByPosition[identifier] {
             for nextPosition in nextPositions {
@@ -37,6 +36,21 @@ class MoveTree: ObservableObject {
             }
         }
         nextPositionsByPosition.removeValue(forKey: identifier)
+        if let index = indexByBoardPosition[identifier] {
+            positionsByLastMoveNumber[position.lastMoveNumber]?.remove(at: index)
+            if let positions = positionsByLastMoveNumber[position.lastMoveNumber] {
+                if positions.count == 0 {
+                    positionsByLastMoveNumber.removeValue(forKey: position.lastMoveNumber)
+                } else {
+                    for (index, position) in positions.enumerated() {
+                        if let position = position {
+                            indexByBoardPosition[ObjectIdentifier(position)] = index
+                        }
+                    }
+                }
+            }
+        }
+        indexByBoardPosition.removeValue(forKey: identifier)
     }
     
     func register(newPosition: BoardPosition, fromPosition: BoardPosition, mainBranch: Bool) -> BoardPosition {

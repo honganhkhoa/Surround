@@ -89,7 +89,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var currentPosition: BoardPosition {
         didSet {
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
-            if self.moveTree.positionsByLastMoveNumber[self.moveTree.largestLastMoveNumber]?.first! !== currentPosition {
+            if self.moveTree.positionsByLastMoveNumber[currentPosition.lastMoveNumber]?.first! !== currentPosition {
                 print("zzz")
             }
         }
@@ -305,8 +305,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     
     func undoMove(numbered moveNumber: Int) {
         var position = currentPosition
+        var nextPosition: BoardPosition? = nil
         while position.previousPosition != nil && position.lastMoveNumber >= moveNumber {
+            nextPosition = position
             position = position.previousPosition!
+        }
+        if let nextPosition = nextPosition {
+            moveTree.removeData(forPosition: nextPosition)
         }
         currentPosition = position
         self.undoRequested = nil
