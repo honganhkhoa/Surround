@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFAudio
 
 struct SingleGameView: View {
     var compact: Bool
@@ -27,6 +28,7 @@ struct SingleGameView: View {
     @State var compactDisplayMode = DisplayMode.playerInfo
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
+    @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
 
     @State var hoveredPosition: BoardPosition? = nil
     @State var hoveredVariation: Variation? = nil
@@ -36,6 +38,8 @@ struct SingleGameView: View {
     
     @State var analyticsPendingMove: Move? = nil
     @State var analyticsPendingPosition: BoardPosition? = nil
+    
+    @State var stonePlacingPlayer: AVAudioPlayer? = nil
     
     @Namespace var animation
     
@@ -490,10 +494,33 @@ struct SingleGameView: View {
                 }
             }
         }
-        .onReceive(game.$currentPosition) { _ in
+        .onReceive(game.$currentPosition) { [game] newPosition in
             self.pendingMove = nil
             self.pendingPosition = nil
             self.stoneRemovalSelectedPoints.removeAll()
+            
+            if soundOnStonePlacement {
+                if self.stonePlacingPlayer == nil {
+                    if let audioData = NSDataAsset(name: "stonePlacing")?.data {
+                        self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
+                    }
+                }
+                if let stonePlacingPlayer = stonePlacingPlayer {
+                    if newPosition.previousPosition?.hasTheSamePosition(with: game.currentPosition) ?? false {
+                        stonePlacingPlayer.play()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            if self.soundOnStonePlacement {
+                if let audioData = NSDataAsset(name: "stonePlacing")?.data {
+                    self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
+                }
+            }
+        }
+        .onDisappear {
+            self.stonePlacingPlayer = nil
         }
     }
 }

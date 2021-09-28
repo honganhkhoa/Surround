@@ -41,15 +41,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         }
                         initialPosition.nextToMove = data.initialPlayer
                     }
-                    if !initialPosition.hasTheSamePosition(with: moveTree.initialPosition) {
-                        moveTree = MoveTree(position: initialPosition)
-                        currentPosition = initialPosition
+                    var position = initialPosition
+                    if !position.hasTheSamePosition(with: moveTree.initialPosition) {
+                        moveTree = MoveTree(position: position)
                     } else {
-                        currentPosition = moveTree.initialPosition
+                        position = moveTree.initialPosition
                     }
+                    self.positionByLastMoveNumber[position.lastMoveNumber] = position
                     for move in data.moves {
-                        try self.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
+                        var newPosition = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
+                        newPosition = moveTree.register(newPosition: newPosition, fromPosition: position, mainBranch: true)
+                        self.positionByLastMoveNumber[newPosition.lastMoveNumber] = newPosition
+                        
+                        position = newPosition
                     }
+                    currentPosition = position
                 } catch {
                     print(error)
                 }
@@ -312,6 +318,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         if let nextPosition = nextPosition {
             moveTree.removeData(forPosition: nextPosition)
+            var nextMoveNumber = nextPosition.lastMoveNumber
+            while positionByLastMoveNumber.removeValue(forKey: nextMoveNumber) != nil {
+                nextMoveNumber += 1
+            }
         }
         currentPosition = position
         self.undoRequested = nil

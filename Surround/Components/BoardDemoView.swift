@@ -21,13 +21,20 @@ struct BoardDemoView: View {
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.voiceCountdown) var voiceCountdown: Bool
+    @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
     @State var speechSynthesizer: AVSpeechSynthesizer?
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
+    @State var stonePlacingPlayer: AVAudioPlayer?
 
-    func initializeSpeechSynthesizerIfNecessary() {
+    func initializePlayersIfNecessary() {
         if voiceCountdown && self.speechSynthesizer == nil {
             self.speechSynthesizer = AVSpeechSynthesizer()
+        }
+        if soundOnStonePlacement && self.stonePlacingPlayer == nil {
+            if let audioData = NSDataAsset(name: "stonePlacing")?.data {
+                self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
+            }
         }
     }
     
@@ -55,6 +62,9 @@ struct BoardDemoView: View {
                     clock.lastMoveTime = Date().timeIntervalSince1970 * 1000
                     clock.currentPlayer = game.currentPosition.nextToMove
                     game.clock = clock
+                }
+                if let stonePlacingPlayer = stonePlacingPlayer, soundOnStonePlacement {
+                    stonePlacingPlayer.play()
                 }
             } catch {}
             pendingMove = nil
@@ -114,7 +124,7 @@ struct BoardDemoView: View {
                 .leadingAlignedInScrollView()
         }
         .onAppear {
-            self.initializeSpeechSynthesizerIfNecessary()
+            self.initializePlayersIfNecessary()
             self.game.clock = OGSClock(
                 blackTime: ThinkingTime(thinkingTime: Double(timeControl.mainTime!), thinkingTimeLeft: Double(timeControl.mainTime!), periods: timeControl.periods, periodTime: Double(timeControl.periodTime!)),
                 whiteTime: ThinkingTime(thinkingTime: Double(timeControl.mainTime!), thinkingTimeLeft: Double(timeControl.mainTime!), periods: timeControl.periods, periodTime: Double(timeControl.periodTime!)),
@@ -158,7 +168,7 @@ struct BoardDemoView: View {
             }
         }
         .onChange(of: voiceCountdown) { _ in
-            self.initializeSpeechSynthesizerIfNecessary()
+            self.initializePlayersIfNecessary()
         }
     }
 }

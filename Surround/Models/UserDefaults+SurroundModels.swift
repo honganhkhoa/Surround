@@ -128,6 +128,10 @@ extension SettingKey {
         return .init(name: "voiceCountdown", defaultValue: false)
     }
     
+    static var soundOnStonePlacement: SettingKey<Bool> {
+        return .init(name: "soundOnStonePlacement", defaultValue: false)
+    }
+    
     static var notificationEnabled: SettingKey<Bool> {
         return .init(name: "notification.enabled", defaultValue: false)
     }

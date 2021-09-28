@@ -151,8 +151,9 @@ struct GameplaySettings: View {
         GroupBox(label: Text("Gameplay")) {
             Toggle("Board coordinates", isOn: Setting(.showsBoardCoordinates).binding)
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
+            Toggle("Stone sounds", isOn: Setting(.soundOnStonePlacement).binding)
             Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
-            (Text("Voice countdown will not play when your device is in ") + Text("Silent").bold() + Text(" mode."))
+            (Text("Note: Sounds and voice countdown will not play when your device is in ") + Text("Silent").bold() + Text(" mode."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
             GroupBox(label: Text("Auto submiting moves")) {
