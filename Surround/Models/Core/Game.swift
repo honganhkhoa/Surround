@@ -48,12 +48,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         position = moveTree.initialPosition
                     }
                     self.positionByLastMoveNumber[position.lastMoveNumber] = position
-                    for move in data.moves {
-                        var newPosition = try position.makeMove(move: move[0] == -1 ? .pass : .placeStone(move[1], move[0]))
-                        newPosition = moveTree.register(newPosition: newPosition, fromPosition: position, mainBranch: true)
-                        self.positionByLastMoveNumber[newPosition.lastMoveNumber] = newPosition
+                    for moveCoordinates in data.moves {
+                        let move: Move = moveCoordinates[0] == -1 ? .pass : .placeStone(moveCoordinates[1], moveCoordinates[0])
+                        var newPosition: BoardPosition? = nil
+                        if let handicap = gameData?.handicap, gameData?.freeHandicapPlacement ?? false {
+                            if position.lastMoveNumber < handicap - 1 {
+                                newPosition = try position.makeHandicapPlacement(move: move)
+                            }
+                        }
+                        if newPosition == nil {
+                            newPosition = try position.makeMove(move: move)
+                        }
+                        newPosition = moveTree.register(newPosition: newPosition!, fromPosition: position, mainBranch: true)
+                        self.positionByLastMoveNumber[newPosition!.lastMoveNumber] = newPosition
                         
-                        position = newPosition
+                        position = newPosition!
                     }
                     currentPosition = position
                 } catch {
