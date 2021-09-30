@@ -34,6 +34,12 @@ struct SettingKey<Value> {
     }
 }
 
+// Cannot make this confirms to `ObservableObject` when testing because if will not compile...,
+// so we include two implementation here
+//
+// Related: https://stackoverflow.com/questions/56169303/redundant-conformance-to-protocol-in-unit-test-only
+//
+#if !TESTING
 extension UserDefaults: ObservableObject {
     subscript<T>(key: SettingKey<T>) -> T? where T: Codable {
         get {
@@ -77,6 +83,50 @@ extension UserDefaults: ObservableObject {
         }
     }
 }
+#else
+extension UserDefaults {
+    subscript<T>(key: SettingKey<T>) -> T? where T: Codable {
+        get {
+            if !key.encoded {
+                return value(forKey: key.name) as? T ?? key._defaultValue
+            } else {
+                if let result = data(forKey: key.name) {
+                    return try? JSONDecoder().decode(T.self, from: result)
+                } else {
+                    return key._defaultValue
+                }
+            }
+        }
+        set {
+            if newValue == nil {
+                removeObject(forKey: key.name)
+            } else {
+                if !key.encoded {
+                    setValue(newValue, forKey: key.name)
+                } else {
+                    if let json = try? JSONEncoder().encode(newValue) {
+                        setValue(json, forKey: key.name)
+                    }
+                }
+            }
+        }
+    }
+    
+    func updateLatestOGSOverview(overviewData: Data) {
+        self[.latestOGSOverview] = overviewData
+        self[.latestOGSOverviewTime] = Date()
+        self[.latestOGSOverviewOutdated] = false
+    }
+    
+    func reset<T>(_ setting: SettingKey<T>) where T: Codable {
+        if setting._defaultValue != nil {
+            self[setting] = setting._defaultValue
+        } else {
+            self[setting] = nil
+        }
+    }
+}
+#endif
 
 extension SettingKey {
     static var ogsUIConfig: SettingKey<OGSUIConfig> {
