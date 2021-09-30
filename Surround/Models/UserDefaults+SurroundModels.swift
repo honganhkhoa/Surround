@@ -34,7 +34,7 @@ struct SettingKey<Value> {
     }
 }
 
-extension UserDefaults {
+extension UserDefaults: ObservableObject {
     subscript<T>(key: SettingKey<T>) -> T? where T: Codable {
         get {
             if !key.encoded {
@@ -59,6 +59,7 @@ extension UserDefaults {
                     }
                 }
             }
+            self.objectWillChange.send()
         }
     }
     

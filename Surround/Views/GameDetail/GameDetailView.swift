@@ -25,6 +25,8 @@ struct GameDetailView: View {
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
     
+    @ObservedObject var settings = userDefaults
+
     var shouldShowActiveGamesCarousel: Bool {
         guard !zenMode else {
             return false
