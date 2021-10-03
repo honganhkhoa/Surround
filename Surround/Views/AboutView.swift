@@ -95,7 +95,7 @@ struct AboutView: View {
                         .leadingAlignedInScrollView()
                     Group {
                         Divider()
-                        if ogs.isLoggedIn && SKPaymentQueue.canMakePayments() {
+                        if SKPaymentQueue.canMakePayments() {
                             NavigationLink(destination: SupporterView()) {
                                 HStack {
                                     Text("Support Surround").bold()

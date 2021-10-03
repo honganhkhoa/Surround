@@ -201,7 +201,7 @@ struct SingleGameView: View {
     var chatLog: some View {
         VStack(spacing: 0) {
             compactClockHeader
-            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
+            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates).zIndex(-1)
         }
     }
 
@@ -228,36 +228,42 @@ struct SingleGameView: View {
                     .padding(.horizontal)
                 Spacer(minLength: 10)
             }
-            if attachedKeyboardVisible {
-                HStack(alignment: .top) {
-                    boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        HStack {
-                            (Text(game.blackName)
-                                .font(.footnote).bold()
-                                + Text(" [\(game.blackFormattedRank)]").font(.caption))
-                                .minimumScaleFactor(0.5)
-
-                            Stone(color: .black, shadowRadius: 2)
-                                .frame(width: 20, height: 20)
-                        }
-                        Spacer().frame(height: 5)
-                        HStack {
-                            (Text(game.whiteName)
-                                .font(.footnote).bold()
-                                + Text(" [\(game.whiteFormattedRank)]").font(.caption))
-                                .minimumScaleFactor(0.5)
-                            Stone(color: .white, shadowRadius: 2)
-                                .frame(width: 20, height: 20)
-                        }
-                        Spacer().frame(height: 15)
-                        verticalControlRow
-                    }
-                    .padding()
-                }
+            if attachedKeyboardVisible && UIScreen.main.bounds.size.height < 600 {
+                EmptyView()
             } else {
-                boardView.frame(width: compactBoardSize, height: compactBoardSize)
+                if attachedKeyboardVisible {
+                    HStack(alignment: .top) {
+                        boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
+                        Spacer(minLength: 0)
+                        VStack(alignment: .trailing, spacing: 0) {
+                            HStack {
+                                (Text(game.blackName)
+                                    .font(.footnote).bold()
+                                    + Text(" [\(game.blackFormattedRank)]").font(.caption))
+                                    .minimumScaleFactor(0.5)
+
+                                Stone(color: .black, shadowRadius: 2)
+                                    .frame(width: 20, height: 20)
+                            }
+                            Spacer().frame(height: 5)
+                            HStack {
+                                (Text(game.whiteName)
+                                    .font(.footnote).bold()
+                                    + Text(" [\(game.whiteFormattedRank)]").font(.caption))
+                                    .minimumScaleFactor(0.5)
+                                Stone(color: .white, shadowRadius: 2)
+                                    .frame(width: 20, height: 20)
+                            }
+                            Spacer().frame(height: 15)
+                            verticalControlRow
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding([.leading, .trailing])
+                        .padding(.top, 5)
+                    }
+                } else {
+                    boardView.frame(width: compactBoardSize, height: compactBoardSize)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -470,11 +476,13 @@ struct SingleGameView: View {
                     }
                 }
             }
-            Button(action: { withAnimation { zenMode = false } }) {
-                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
-                    .labelStyle(IconOnlyLabelStyle())
+            if !compact {
+                Button(action: { withAnimation { zenMode = false } }) {
+                    Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                        .labelStyle(IconOnlyLabelStyle())
+                }
+                .padding()
             }
-            .padding()
         }
     }
     

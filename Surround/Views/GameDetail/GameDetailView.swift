@@ -157,7 +157,7 @@ struct GameDetailView: View {
         let players = currentGame.gameData!.players
         let opponent = userColor == .black ? players.white : players.black
         let opponentRank = userColor == .black ? currentGame.whiteFormattedRank : currentGame.blackFormattedRank
-        let navigationBarHidden = /*attachedKeyboardVisible ||*/ zenMode
+        let navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
         
         let result = Group {
             if compactLayout {
@@ -247,9 +247,13 @@ struct GameDetailView: View {
                                     Label("Options", systemImage: "gearshape.2")
                                 }
                             }
+                        } else if zenMode {
+                            Button(action: { withAnimation { zenMode = false } }) {
+                                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                            }
                         }
                     }
-                }
+                }.ignoresSafeArea(edges: navigationBarHidden ? [.top] : [])
             )
         } else {
             return AnyView(
