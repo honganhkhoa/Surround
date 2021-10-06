@@ -26,6 +26,7 @@ struct SingleGameView: View {
     var attachedKeyboardVisible = false
     
     @State var compactDisplayMode = DisplayMode.playerInfo
+    var regularDisplayAnalyzeMode = false
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
@@ -81,12 +82,12 @@ struct SingleGameView: View {
                     showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
                     highlightCoordinates: hoveredCoordinates
                 )
-            } else if let analyticsPosition = analyticsPosition, compactDisplayMode == .analyze {
+            } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || regularDisplayAnalyzeMode) {
                 BoardView(
                     boardPosition: analyticsPosition,
                     variation: game.moveTree.variation(to: analyticsPosition),
                     showsCoordinate: showsBoardCoordinates,
-                    playable: true,
+                    playable: game.analysisAvailable,
                     newMove: $analyticsPendingMove,
                     newPosition: $analyticsPendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false
@@ -132,8 +133,12 @@ struct SingleGameView: View {
     var compactDisplayModePicker: some View {
         ZStack(alignment: .topTrailing) {
             Picker(selection: $compactDisplayMode.animation(), label: Text("Display mode")) {
-                if !game.isUserPlaying || !(game.gameData?.disableAnalysis ?? false) {
+                if game.analysisAvailable {
                     Label("Analyze mode", systemImage: "arrow.triangle.branch")
+                        .labelStyle(IconOnlyLabelStyle())
+                        .tag(DisplayMode.analyze)
+                } else {
+                    Label("Playback mode", systemImage: "arrow.left.and.right")
                         .labelStyle(IconOnlyLabelStyle())
                         .tag(DisplayMode.analyze)
                 }
@@ -296,8 +301,10 @@ struct SingleGameView: View {
                             playerIconsOffset: 25,
                             showsPlayersName: true
                         )
-                        Spacer(minLength: 15).frame(maxHeight: 15)
-                        controlRow
+                        if !regularDisplayAnalyzeMode {
+                            Spacer(minLength: 15).frame(maxHeight: 15)
+                            controlRow
+                        }
                     }.frame(width: 350)
                 }
                 Spacer(minLength: 15)
@@ -356,11 +363,13 @@ struct SingleGameView: View {
                                     showsPlayersName: true
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            if horizontalPlayerInfoWidth < 350 {
-                                verticalControlRow
-                                    .padding(.bottom, -15)
-                            } else {
-                                controlRow
+                            if !regularDisplayAnalyzeMode {
+                                if horizontalPlayerInfoWidth < 350 {
+                                    verticalControlRow
+                                        .padding(.bottom, -15)
+                                } else {
+                                    controlRow
+                                }
                             }
                             ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
                         }
@@ -494,10 +503,16 @@ struct SingleGameView: View {
                 if compact {
                     compactBody
                 } else {
-                    if horizontal {
-                        regularHorizontalBody
-                    } else {
-                        regularVerticalBody
+                    VStack(spacing: 0) {
+                        if horizontal {
+                            regularHorizontalBody
+                        } else {
+                            regularVerticalBody
+                        }
+                        if regularDisplayAnalyzeMode && !attachedKeyboardVisible {
+                            AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
+                                .frame(maxHeight: UIScreen.main.bounds.size.height / 3.7)
+                        }
                     }
                 }
             }
@@ -529,6 +544,11 @@ struct SingleGameView: View {
         }
         .onDisappear {
             self.stonePlacingPlayer = nil
+        }
+        .onChange(of: regularDisplayAnalyzeMode) { newValue in
+            if newValue {
+                analyticsPosition = game.currentPosition
+            }
         }
     }
 }

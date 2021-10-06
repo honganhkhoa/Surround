@@ -24,7 +24,8 @@ struct GameDetailView: View {
     @State var attachedKeyboardVisible = false
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
-    
+    @State var regularDisplayAnalyzeMode = false
+
     @ObservedObject var settings = userDefaults
 
     var shouldShowActiveGamesCarousel: Bool {
@@ -128,7 +129,7 @@ struct GameDetailView: View {
             let horizontal = geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing + 100 > geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
             return AnyView(erasing: VStack(spacing: 0) {
-                if showsActiveGamesCarousel {
+                if showsActiveGamesCarousel && !regularDisplayAnalyzeMode {
                     ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
                 if let currentGame = currentGame {
@@ -137,7 +138,9 @@ struct GameDetailView: View {
                         game: currentGame,
                         goToNextGame: goToNextGame,
                         horizontal: horizontal,
-                        zenMode: $zenMode
+                        zenMode: $zenMode,
+                        attachedKeyboardVisible: self.attachedKeyboardVisible,
+                        regularDisplayAnalyzeMode: self.regularDisplayAnalyzeMode
                     )
                 }
             })
@@ -259,9 +262,25 @@ struct GameDetailView: View {
             return AnyView(
                 result.toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { withAnimation { regularDisplayAnalyzeMode.toggle() } }) {
+                            if currentGame.analysisAvailable {
+                                Label("Toggle analyze mode", systemImage: "arrow.triangle.branch")
+                                    .labelStyle(IconOnlyLabelStyle())
+                            } else {
+                                Label("Toggle playback mode", systemImage: "arrow.left.and.right")
+                                    .labelStyle(IconOnlyLabelStyle())
+                            }
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
                             withAnimation {
-                                Setting(.showsActiveGamesCarousel).binding.wrappedValue.toggle()
+                                if regularDisplayAnalyzeMode {
+                                    regularDisplayAnalyzeMode.toggle()
+                                    Setting(.showsActiveGamesCarousel).binding.wrappedValue = true
+                                } else {
+                                    Setting(.showsActiveGamesCarousel).binding.wrappedValue.toggle()
+                                }
                             }
                         }) {
                             Label("Toggle thumbnails", systemImage: "rectangle.topthird.inset")
@@ -273,6 +292,7 @@ struct GameDetailView: View {
                         Button(action: { withAnimation { zenMode = true } }) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
+                        .disabled(regularDisplayAnalyzeMode)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { self.showSettings = true }) {

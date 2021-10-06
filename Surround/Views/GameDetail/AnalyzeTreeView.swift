@@ -62,14 +62,65 @@ struct AnalyzeTreeSlice: View {
 
 struct BackgroundSlice: View {
     @Environment(\.colorScheme) private var colorScheme
+    var height: CGFloat
+    var game: Game
     var lastMoveNumber: Int
+    @Binding var selectedPosition: BoardPosition?
     
+    var shouldShowBoardThumbnail: Bool {
+        if height < 180 {
+            return false
+        }
+        var highestLevel = 0
+        if let lastPosition = game.moveTree.positionsByLastMoveNumber[lastMoveNumber - 1]?.last, let position = lastPosition {
+            highestLevel = max(highestLevel, game.moveTree.levelByBoardPosition[ObjectIdentifier(position)] ?? 0)
+        }
+        if let lastPosition = game.moveTree.positionsByLastMoveNumber[lastMoveNumber]?.last, let position = lastPosition {
+            highestLevel = max(highestLevel, game.moveTree.levelByBoardPosition[ObjectIdentifier(position)] ?? 0)
+        }
+        if let lastPosition = game.moveTree.positionsByLastMoveNumber[lastMoveNumber + 1]?.last, let position = lastPosition {
+            highestLevel = max(highestLevel, game.moveTree.levelByBoardPosition[ObjectIdentifier(position)] ?? 0)
+        }
+        if CGFloat(highestLevel * 40 + 60 + 120) > height {
+            return false
+        }
+        return true
+    }
+    
+    var shouldShowAxis: Bool {
+        return lastMoveNumber > 0 && lastMoveNumber % 5 == 0
+    }
+    
+    var centerX: CGFloat {
+        return shouldShowBoardThumbnail ? 55 : 15
+    }
+
     var body: some View {
-        if lastMoveNumber > 0 && lastMoveNumber % 5 == 0 {
-            Path { path in
-                path.move(to: CGPoint(x: 15, y: 30))
-                path.addLine(to: CGPoint(x: 15, y: 800))
-            }.stroke(Color(colorScheme == .dark ? .systemGray6 : .systemGray4))
+        if shouldShowAxis {
+            ZStack(alignment: .bottom) {
+                Path { path in
+                    path.move(to: CGPoint(x: 15, y: 30))
+                    path.addLine(to: CGPoint(x: 15, y: 800))
+                }.stroke(Color(colorScheme == .dark ? .systemGray6 : .systemGray4))
+                if shouldShowBoardThumbnail {
+                    if let position = game.positionByLastMoveNumber[lastMoveNumber] {
+                        ZStack {
+                            if selectedPosition?.hasTheSamePosition(with: position) ?? false {
+                                Color(.systemTeal)
+                                    .cornerRadius(3)
+                                    .frame(width: 110, height: 110)
+                            }
+                            BoardView(boardPosition: position)
+                                .frame(width: 104, height: 104)
+                        }
+                        .frame(width: 110, height: 110)
+                        .position(x: 15, y: height - 60)
+                        .onTapGesture {
+                            self.selectedPosition = position
+                        }
+                    }
+                }
+            }.frame(width: 30)
         }
     }
 }
@@ -88,7 +139,12 @@ struct AnalyzeTreeView: View {
                             LazyHStack(alignment: .top) {
                                 ForEach(Array(self.game.moveTree.moveNumberRange), id: \.self) { lastMoveNumber in
                                     ZStack {
-                                        BackgroundSlice(lastMoveNumber: lastMoveNumber)
+                                        BackgroundSlice(
+                                            height: geometry.size.height,
+                                            game: game,
+                                            lastMoveNumber: lastMoveNumber,
+                                            selectedPosition: self.$selectedPosition
+                                        )
                                         VStack(spacing: 0) {
                                             Spacer().frame(height: 5)
                                             if lastMoveNumber % 5 == 0 {
@@ -112,13 +168,17 @@ struct AnalyzeTreeView: View {
                             .onChange(of: self.selectedPosition?.lastMoveNumber) { newLastMoveNumber in
                                 DispatchQueue.main.async {
                                     withAnimation {
-                                        horizontalScrollView.scrollTo(newLastMoveNumber, anchor: .center)
+                                        horizontalScrollView.scrollTo(newLastMoveNumber)
                                     }
                                 }
                             }
                             .onAppear {
                                 if let lastMoveNumber = self.selectedPosition?.lastMoveNumber {
-                                    horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
+                                    if lastMoveNumber == self.game.moveTree.largestLastMoveNumber {
+                                        horizontalScrollView.scrollTo(lastMoveNumber)
+                                    } else {
+                                        horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
+                                    }
                                 }
                             }
                         }

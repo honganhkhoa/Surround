@@ -162,6 +162,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         return currentPosition.lastMoveNumber < maxMovePlayed
     }
+    var analysisAvailable: Bool {
+        return !isUserPlaying || !(gameData?.disableAnalysis ?? false)
+    }
     
     var playerCacheObservingCancellable: AnyCancellable?
     weak var ogs: OGSService? {
