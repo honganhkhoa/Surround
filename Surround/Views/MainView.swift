@@ -109,47 +109,45 @@ struct MainView: View {
                     nav.main.rootView.view
                 }
             }
-            if ogs.isLoggedIn {
-                NotificationPopup()
-            }
-            EmptyView()
-                .fullScreenCover(isPresented: Binding(
-                                    get: { nav.main.modalLiveGame != nil },
-                                    set: { if !$0 { nav.main.modalLiveGame = nil } })
-                ) {
-                    ZStack(alignment: .top) {
-                        NavigationView {
-                            GameDetailView(currentGame: nav.main.modalLiveGame)
-                                .toolbar {
-                                    ToolbarItem(placement: .cancellationAction) {
-                                        Button(action: { nav.main.modalLiveGame = nil }) {
-                                            Text("Close")
-                                        }
-                                    }
-                                }
-                        }
-                        if ogs.isLoggedIn {
-                            NotificationPopup()
-                        }
-                    }
-                    .environmentObject(ogs)
-                    .environmentObject(nav)
-                }
-            EmptyView()
-                .sheet(isPresented: $nav.main.showWaitingGames) {
+            .fullScreenCover(isPresented: Binding(
+                                get: { nav.main.modalLiveGame != nil },
+                                set: { if !$0 { nav.main.modalLiveGame = nil } })
+            ) {
+                ZStack(alignment: .top) {
                     NavigationView {
-                        WaitingGamesView()
+                        GameDetailView(currentGame: nav.main.modalLiveGame)
                             .toolbar {
                                 ToolbarItem(placement: .cancellationAction) {
-                                    Button(action: { nav.main.showWaitingGames = false }) {
+                                    Button(action: { nav.main.modalLiveGame = nil }) {
                                         Text("Close")
                                     }
                                 }
                             }
-                            .environmentObject(ogs)
-                            .environmentObject(nav)
+                    }
+                    if ogs.isLoggedIn {
+                        NotificationPopup()
                     }
                 }
+                .environmentObject(ogs)
+                .environmentObject(nav)
+            }
+            .sheet(isPresented: $nav.main.showWaitingGames) {
+                NavigationView {
+                    WaitingGamesView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(action: { nav.main.showWaitingGames = false }) {
+                                    Text("Close")
+                                }
+                            }
+                        }
+                        .environmentObject(ogs)
+                        .environmentObject(nav)
+                }
+            }
+            if ogs.isLoggedIn {
+                NotificationPopup()
+            }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
