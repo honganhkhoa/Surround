@@ -195,7 +195,13 @@ extension OGSClock: Decodable {
                     thinkingTime.thinkingTimeLeft = 0
                     thinkingTime.blockTimeLeft = timeLeft
                 }
-            case .Simple, .Absolute, .Fischer(_, _, _):
+            case .Simple(let perMove):
+                if paused {
+                    thinkingTime.thinkingTimeLeft = Double(perMove) - secondsElapsed
+                } else {
+                    thinkingTime.thinkingTimeLeft = timeUntilExpiration
+                }
+            case .Absolute, .Fischer(_, _, _):
                 if paused {
                     thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsElapsed
                 } else {
