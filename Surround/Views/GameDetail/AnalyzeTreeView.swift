@@ -163,6 +163,8 @@ struct AnalyzeTreeView: View {
                                     .zIndex(-Double(lastMoveNumber))
                                     .id(lastMoveNumber)
                                 }
+                                Spacer().frame(width: 60)
+                                EmptyView().id("endOfAnalyzeTree")
                             }
                             .padding(.horizontal, 10)
                             .onChange(of: self.selectedPosition?.lastMoveNumber) { newLastMoveNumber in
@@ -175,10 +177,12 @@ struct AnalyzeTreeView: View {
                             .onAppear {
                                 if let lastMoveNumber = self.selectedPosition?.lastMoveNumber {
                                     if lastMoveNumber == self.game.moveTree.largestLastMoveNumber {
-                                        horizontalScrollView.scrollTo(lastMoveNumber)
+                                        horizontalScrollView.scrollTo("endOfAnalyzeTree")
                                     } else {
                                         horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
                                     }
+                                } else {
+                                    horizontalScrollView.scrollTo("endOfAnalyzeTree")
                                 }
                             }
                         }

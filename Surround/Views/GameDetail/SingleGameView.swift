@@ -26,7 +26,7 @@ struct SingleGameView: View {
     var attachedKeyboardVisible = false
     
     @State var compactDisplayMode = DisplayMode.playerInfo
-    var regularDisplayAnalyzeMode = false
+    var analyzeMode: Binding<Bool> = .constant(false)
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
@@ -82,7 +82,7 @@ struct SingleGameView: View {
                     showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
                     highlightCoordinates: hoveredCoordinates
                 )
-            } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || regularDisplayAnalyzeMode) {
+            } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || analyzeMode.wrappedValue) {
                 BoardView(
                     boardPosition: analyticsPosition,
                     variation: game.moveTree.variation(to: analyticsPosition),
@@ -279,6 +279,7 @@ struct SingleGameView: View {
                     analyticsPosition = game.currentPosition
                 }
             }
+            analyzeMode.wrappedValue = newValue == .analyze
         }
     }
     
@@ -301,7 +302,7 @@ struct SingleGameView: View {
                             playerIconsOffset: 25,
                             showsPlayersName: true
                         )
-                        if !regularDisplayAnalyzeMode {
+                        if !analyzeMode.wrappedValue {
                             Spacer(minLength: 15).frame(maxHeight: 15)
                             controlRow
                         }
@@ -363,7 +364,7 @@ struct SingleGameView: View {
                                     showsPlayersName: true
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            if !regularDisplayAnalyzeMode {
+                            if !analyzeMode.wrappedValue {
                                 if horizontalPlayerInfoWidth < 350 {
                                     verticalControlRow
                                         .padding(.bottom, -15)
@@ -509,7 +510,7 @@ struct SingleGameView: View {
                         } else {
                             regularVerticalBody
                         }
-                        if regularDisplayAnalyzeMode && !attachedKeyboardVisible {
+                        if analyzeMode.wrappedValue && !attachedKeyboardVisible {
                             AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
                                 .frame(maxHeight: UIScreen.main.bounds.size.height / 3.7)
                         }
@@ -521,6 +522,10 @@ struct SingleGameView: View {
             self.pendingMove = nil
             self.pendingPosition = nil
             self.stoneRemovalSelectedPoints.removeAll()
+            
+            if game.currentPosition === analyticsPosition {
+                analyticsPosition = newPosition
+            }
             
             if soundOnStonePlacement {
                 if self.stonePlacingPlayer == nil {
@@ -545,7 +550,7 @@ struct SingleGameView: View {
         .onDisappear {
             self.stonePlacingPlayer = nil
         }
-        .onChange(of: regularDisplayAnalyzeMode) { newValue in
+        .onChange(of: analyzeMode.wrappedValue) { newValue in
             if newValue {
                 analyticsPosition = game.currentPosition
             }

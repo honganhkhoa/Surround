@@ -24,7 +24,7 @@ struct GameDetailView: View {
     @State var attachedKeyboardVisible = false
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
-    @State var regularDisplayAnalyzeMode = false
+    @State var analyzeMode = false
 
     @ObservedObject var settings = userDefaults
 
@@ -113,6 +113,7 @@ struct GameDetailView: View {
                         goToNextGame: goToNextGame,
                         zenMode: $zenMode,
                         attachedKeyboardVisible: self.attachedKeyboardVisible,
+                        analyzeMode: self.$analyzeMode,
                         shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
                     )
                 }
@@ -129,7 +130,7 @@ struct GameDetailView: View {
             let horizontal = geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing + 100 > geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
             return AnyView(erasing: VStack(spacing: 0) {
-                if showsActiveGamesCarousel && !regularDisplayAnalyzeMode {
+                if showsActiveGamesCarousel && !analyzeMode {
                     ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
                 }
                 if let currentGame = currentGame {
@@ -140,7 +141,7 @@ struct GameDetailView: View {
                         horizontal: horizontal,
                         zenMode: $zenMode,
                         attachedKeyboardVisible: self.attachedKeyboardVisible,
-                        regularDisplayAnalyzeMode: self.regularDisplayAnalyzeMode
+                        analyzeMode: self.$analyzeMode
                     )
                 }
             })
@@ -243,8 +244,10 @@ struct GameDetailView: View {
                     ToolbarItemGroup(placement: .navigationBarTrailing) {
                         if !navigationBarHidden {
                             HStack {
-                                Button(action: { withAnimation { zenMode = true } }) {
-                                    Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
+                                if !analyzeMode {
+                                    Button(action: { withAnimation { zenMode = true } }) {
+                                        Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
+                                    }
                                 }
                                 Button(action: { self.showSettings = true }) {
                                     Label("Options", systemImage: "gearshape.2")
@@ -262,7 +265,7 @@ struct GameDetailView: View {
             return AnyView(
                 result.toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { withAnimation { regularDisplayAnalyzeMode.toggle() } }) {
+                        Button(action: { withAnimation { analyzeMode.toggle() } }) {
                             if currentGame.analysisAvailable {
                                 Label("Toggle analyze mode", systemImage: "arrow.triangle.branch")
                                     .labelStyle(IconOnlyLabelStyle())
@@ -275,8 +278,8 @@ struct GameDetailView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
                             withAnimation {
-                                if regularDisplayAnalyzeMode {
-                                    regularDisplayAnalyzeMode.toggle()
+                                if analyzeMode {
+                                    analyzeMode.toggle()
                                     Setting(.showsActiveGamesCarousel).binding.wrappedValue = true
                                 } else {
                                     Setting(.showsActiveGamesCarousel).binding.wrappedValue.toggle()
@@ -292,7 +295,7 @@ struct GameDetailView: View {
                         Button(action: { withAnimation { zenMode = true } }) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
-                        .disabled(regularDisplayAnalyzeMode)
+                        .disabled(analyzeMode)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { self.showSettings = true }) {
