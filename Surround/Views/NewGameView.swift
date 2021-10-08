@@ -567,7 +567,7 @@ struct CustomGameForm: View {
             Toggle(isOn: $analysisDisabled) {
                 Text("Disable analysis").font(.subheadline)
             }
-            (Text("Analysis mode").bold() + Text(" is currently not available in the app yet. If you or your opponent use the web version during the match, ") + Text("analysis mode").bold() + Text(" is like a separate board where you can test out variations during the game."))
+            (Text("Analysis mode").bold() + Text(" allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }
