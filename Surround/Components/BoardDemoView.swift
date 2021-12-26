@@ -54,13 +54,13 @@ struct BoardDemoView: View {
             do {
                 try game.makeMove(move: move)
                 if var clock = game.clock {
-                    if clock.currentPlayer == .black {
+                    if clock.currentPlayerColor == .black {
                         updateTimeAfterMove(time: &clock.blackTime)
                     } else {
                         updateTimeAfterMove(time: &clock.whiteTime)
                     }
                     clock.lastMoveTime = Date().timeIntervalSince1970 * 1000
-                    clock.currentPlayer = game.currentPosition.nextToMove
+                    clock.currentPlayerColor = game.currentPosition.nextToMove
                     game.clock = clock
                 }
                 if let stonePlacingPlayer = stonePlacingPlayer, soundOnStonePlacement {
@@ -128,14 +128,14 @@ struct BoardDemoView: View {
             self.game.clock = OGSClock(
                 blackTime: ThinkingTime(thinkingTime: Double(timeControl.mainTime!), thinkingTimeLeft: Double(timeControl.mainTime!), periods: timeControl.periods, periodTime: Double(timeControl.periodTime!)),
                 whiteTime: ThinkingTime(thinkingTime: Double(timeControl.mainTime!), thinkingTimeLeft: Double(timeControl.mainTime!), periods: timeControl.periods, periodTime: Double(timeControl.periodTime!)),
-                currentPlayer: .black,
+                currentPlayerColor: .black,
                 lastMoveTime: Date().timeIntervalSince1970 * 1000,
                 currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
             )
             self.game.clock?.calculateTimeLeft(with: timeControl.system, pauseControl: nil)
             timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { _ in
                 self.game.clock?.calculateTimeLeft(with: timeControl.system, pauseControl: nil)
-                if voiceCountdown, let time = game.clock?.currentPlayer == .black ? game.clock?.blackTime : game.clock?.whiteTime {
+                if voiceCountdown, let time = game.clock?.currentPlayerColor == .black ? game.clock?.blackTime : game.clock?.whiteTime {
                     if let timeLeft = time.timeLeft {
                         if timeLeft <= 10 {
                             let utteranceString = "\(Int(timeLeft))"

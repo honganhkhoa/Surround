@@ -40,7 +40,7 @@ struct OGSPauseDetail: Decodable {
 struct OGSClock {
     var blackTime: ThinkingTime
     var whiteTime: ThinkingTime
-    var currentPlayer: StoneColor
+    var currentPlayerColor: StoneColor
     var lastMoveTime: Double
     var pausedTime: Double?
     var started: Bool = true
@@ -81,10 +81,10 @@ extension OGSClock: Decodable {
         blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
         whitePlayerId = try container.decode(Int.self, forKey: .whitePlayerId)
         currentPlayerId = try container.decode(Int.self, forKey: .currentPlayer)
-        currentPlayer = currentPlayerId == blackPlayerId ? .black : .white
+        currentPlayerColor = currentPlayerId == blackPlayerId ? .black : .white
 
         if let blackThinkingTime = try? container.decode(Double.self, forKey: .blackTime) {
-            if currentPlayer == .black {
+            if currentPlayerColor == .black {
                 blackTime = ThinkingTime(
                     thinkingTime: timeUntilExpiration,
                     thinkingTimeLeft: timeUntilExpiration
@@ -106,7 +106,7 @@ extension OGSClock: Decodable {
         }
 
         if let whiteThinkingTime = try? container.decode(Double.self, forKey: .whiteTime) {
-            if currentPlayer == .white {
+            if currentPlayerColor == .white {
                 whiteTime = ThinkingTime(
                     thinkingTime: timeUntilExpiration,
                     thinkingTimeLeft: timeUntilExpiration
@@ -162,11 +162,11 @@ extension OGSClock: Decodable {
         
         // logic from GobanCore.ts -> GobanCore -> setGameClock -> make_player_clock
         let paused = pauseControl?.isPaused() ?? false
-        let since = paused ? max(pausedTime!, lastMoveTime) : now
+        let since = (paused && pausedTime != nil) ? max(pausedTime!, lastMoveTime) : now
         let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
 
         if secondsElapsed > 0 {
-            var thinkingTime = currentPlayer == .black ? blackTime : whiteTime
+            var thinkingTime = currentPlayerColor == .black ? blackTime : whiteTime
             switch system {
             case .ByoYomi(_, _, let periodTime):
                 var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
@@ -211,7 +211,7 @@ extension OGSClock: Decodable {
                 break
             }
             
-            if currentPlayer == .black {
+            if currentPlayerColor == .black {
                 self.blackTime = thinkingTime
             } else {
                 self.whiteTime = thinkingTime

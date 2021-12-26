@@ -467,7 +467,46 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         guard let user = ogs?.user else {
             return false
         }
-        return user.id == self.blackId || user.id == self.whiteId
+        if gameData?.rengo ?? false, let rengoTeams = gameData?.rengoTeams {
+            let players = rengoTeams.black + rengoTeams.white
+            for player in players {
+                if user.id == player.id {
+                    return true
+                }
+            }
+            return false
+        } else {
+            return user.id == self.blackId || user.id == self.whiteId
+        }
+    }
+    
+    var userStoneColor: StoneColor? {
+        guard let user = ogs?.user else {
+            return nil
+        }
+        if !isUserPlaying {
+            return nil
+        }
+        if gameData?.rengo ?? false, let rengoTeams = gameData?.rengoTeams {
+            for player in rengoTeams.black {
+                if user.id == player.id {
+                    return .black
+                }
+            }
+            for player in rengoTeams.white {
+                if user.id == player.id {
+                    return .white
+                }
+            }
+        } else {
+            if user.id == self.blackId {
+                return .black
+            }
+            if user.id == self.whiteId {
+                return .white
+            }
+        }
+        return nil
     }
     
     var isUserTurn: Bool {
@@ -483,8 +522,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             return false
         }
         
-        return (self.clock?.currentPlayer == .black && user.id == self.blackId) ||
-            (self.clock?.currentPlayer == .white && user.id == self.whiteId)
+        return self.clock?.currentPlayerId == user.id
     }
     
     var status: String {
@@ -526,17 +564,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     if case .pass = currentPosition.lastMove {
                         return "Opponent passed"
                     } else {
-                        let time = ogs?.user?.id == blackId ? clock?.blackTime : clock?.whiteTime
+                        let time = userStoneColor == .black ? clock?.blackTime : clock?.whiteTime
                         if let timeLeft = time?.timeLeft, timeLeft <= 10 {
                             return "Your move (\(String(format: "%02d", Int(timeLeft))))"
                         }
                         return "Your move"
                     }
                 } else {
-                    return "Waiting for opponent"
+                    if userStoneColor == clock?.currentPlayerColor {
+                        return "Waiting for teammate"
+                    } else {
+                        return "Waiting for opponent"
+                    }
                 }
             } else {
-                if let currentPlayer = clock?.currentPlayer {
+                if let currentPlayer = clock?.currentPlayerColor {
                     return "\(currentPlayer == .black ? "Black" : "White") to move"
                 } else {
                     return ""

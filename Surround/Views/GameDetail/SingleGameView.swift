@@ -187,14 +187,14 @@ struct SingleGameView: View {
     var compactClockHeader: some View {
         HStack(spacing: 0) {
             Spacer().frame(width: 10)
-            if let currentPlayer = game.clock?.currentPlayer {
+            if let currentPlayerColor = game.clock?.currentPlayerColor {
                 HStack(spacing: 5) {
-                    Stone(color: currentPlayer, shadowRadius: 2)
+                    Stone(color: currentPlayerColor, shadowRadius: 2)
                         .frame(width: 20, height: 20)
                     InlineTimerView(
                         timeControl: game.gameData?.timeControl,
                         clock: game.clock,
-                        player: currentPlayer,
+                        player: currentPlayerColor,
                         pauseControl: game.pauseControl,
                         showsPauseReason: true
                     )

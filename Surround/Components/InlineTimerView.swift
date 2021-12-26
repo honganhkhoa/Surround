@@ -112,7 +112,7 @@ struct InlineTimerView: View {
         return AnyView(HStack(alignment: .firstTextBaseline) {
             if !clock.started {
                 if let timeLeft = clock.timeUntilExpiration {
-                    if clock.currentPlayer == player {
+                    if clock.currentPlayerColor == player {
                         Image(systemName: "hourglass")
                             .foregroundColor(Color(UIColor.systemIndigo))
                         Text(timeString(timeLeft: timeLeft))
@@ -127,7 +127,7 @@ struct InlineTimerView: View {
                     }
                 }
             } else {
-                if clock.currentPlayer == player && !isPaused {
+                if clock.currentPlayerColor == player && !isPaused {
                     Image(systemName: "hourglass")
                 }
                 switch timeControl.system {
@@ -160,7 +160,7 @@ struct InlineTimerView_Previews: PreviewProvider {
         let clock1 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
-            currentPlayer: .black,
+            currentPlayerColor: .black,
             lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
             currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
         )
@@ -169,7 +169,7 @@ struct InlineTimerView_Previews: PreviewProvider {
         let clock2 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
-            currentPlayer: .black,
+            currentPlayerColor: .black,
             lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
             currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
         )

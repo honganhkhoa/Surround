@@ -107,6 +107,11 @@ struct OGSGame: Decodable {
         var white: OGSUser
     }
     
+    struct RengoTeams: Codable {
+        var black: [OGSUser]
+        var white: [OGSUser]
+    }
+    
     var allowKo: Bool
     var allowSelfCapture: Bool
     var allowSuperko: Bool
@@ -156,6 +161,9 @@ struct OGSGame: Decodable {
     
     var tournamentId: Int?
     var ladderId: Int?
+    
+    var rengo: Bool?
+    var rengoTeams: RengoTeams?
     
     static func preprocessedGameData(gameData: [String: Any]) -> [String: Any] {
         // Quick fix for a recent change on OGS server

@@ -94,7 +94,7 @@ struct TimerView: View {
         if let clock = clock, let timeControl = timeControl {
             if !clock.started {
                 if let timeLeft = clock.timeUntilExpiration {
-                    if clock.currentPlayer == player {
+                    if clock.currentPlayerColor == player {
                         Text(timeString(timeLeft: timeLeft))
                             .font(mainFont.monospacedDigit().bold())
                     } else {
@@ -132,7 +132,7 @@ struct TimerView_Previews: PreviewProvider {
         let clock1 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
             whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
-            currentPlayer: .black,
+            currentPlayerColor: .black,
             lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
             currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
         )
@@ -141,7 +141,7 @@ struct TimerView_Previews: PreviewProvider {
         let clock2 = OGSClock(
             blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
             whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
-            currentPlayer: .black,
+            currentPlayerColor: .black,
             lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
             currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
         )
