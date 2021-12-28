@@ -232,6 +232,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var chatLog = [OGSChatLine]()
     var positionByLastMoveNumber = [Int: BoardPosition]()
     
+    var rengo: Bool { gameData?.rengo ?? false }
+    
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
             return "Game #\(id)"
@@ -245,14 +247,31 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return nil
     }
     
-    func playerIcon(for player: StoneColor, size: Int) -> String? {
-        guard let icon = ((self.ogsRawData ?? [:]) as NSDictionary).value(forKeyPath: player == .black ? "players.black.icon" : "players.white.icon") as? String else {
+    func playerIcon(for stoneColor: StoneColor, size: Int) -> String? {
+        let iconFromGameData = stoneColor == .black ? gameData?.players.black.iconUrl : gameData?.players.white.iconUrl
+        
+        guard let icon = iconFromGameData ?? ((self.ogsRawData ?? [:]) as NSDictionary).value(forKeyPath: stoneColor == .black ? "players.black.icon" : "players.white.icon") as? String else {
             return nil
         }
         
+        return Game.iconURL(from: icon, withSize: size)
+    }
+    
+    func rengoTeamOrderedFromNextToMove(with stoneColor: StoneColor) -> [OGSUser] {
+        if let rengoTeam = gameData?.rengoTeams?[stoneColor] {
+            if let nextPlayerId = clock?.nextPlayerId(with: stoneColor) {
+                if let nextPlayerIndex = rengoTeam.firstIndex(where: { $0.id == nextPlayerId }) {
+                    return Array(rengoTeam.suffix(from: nextPlayerIndex) + rengoTeam.prefix(upTo: nextPlayerIndex))
+                }
+            }
+        }
+        return []
+    }
+    
+    static func iconURL(from urlString: String, withSize size: Int) -> String {
         let regex1 = try! NSRegularExpression(pattern: "-[0-9]+.png")
         let regex2 = try! NSRegularExpression(pattern: "s=[0-9]+")
-        var result = icon
+        var result = urlString
         result = regex1.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "-\(size).png")
         result = regex2.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "s=\(size)")
         return result

@@ -34,8 +34,11 @@ class TestData {
     static var EuropeanChampionshipWithChat: Game { sampleGame(ogsId: 27671778) }
     // surround://publicGames/27671778
     
-    static func sampleGame(ogsId: Int) -> Game {
-        let fileURL = Bundle.main.url(forResource: "game-\(ogsId)", withExtension: "json")!
+    static var Rengo2v2: Game { sampleGame(ogsId: 11289, beta: true) }
+    static var Rengo3v1: Game { sampleGame(ogsId: 11359, beta: true) }
+    
+    static func sampleGame(ogsId: Int, beta: Bool = false) -> Game {
+        let fileURL = Bundle.main.url(forResource: "game-\(beta ? "beta-" : "")\(ogsId)", withExtension: "json")!
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let ogsGame = try! decoder.decode(OGSGame.self, from: Data(contentsOf: fileURL))

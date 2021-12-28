@@ -28,14 +28,18 @@ struct PlayersBannerView: View {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
     }
 
-    func playerIcon(color: StoneColor) -> some View {
+    func singlePlayerIcon(color: StoneColor) -> some View {
         let icon = game.playerIcon(for: color, size: Int(playerIconSize))
         let player = color == .black ? game.blackPlayer : game.whitePlayer
         return VStack {
             ZStack(alignment: .bottomTrailing) {
                 Group {
-                    if icon != nil {
-                        URLImage(url: URL(string: icon!)!) { $0.resizable() }
+                    if let icon = icon {
+                        AsyncImage(url: URL(string: icon)!) {
+                            $0.resizable()
+                        } placeholder: {
+                            Color.gray
+                        }
                     } else {
                         Color.gray
                     }
@@ -48,6 +52,68 @@ struct PlayersBannerView: View {
                     .frame(width: 20, height: 20)
                     .offset(x: 10, y: 10)
             }
+        }
+    }
+    
+    func rengoTeamIcon(color: StoneColor) -> some View {
+        let players = game.rengoTeamOrderedFromNextToMove(with: color)
+        return ZStack(alignment: .topTrailing) {
+            if players.count > 2 {
+                Text("+\(players.count - 2)")
+                    .font(.caption.bold().monospacedDigit())
+                    .padding(.horizontal, 3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(.black, lineWidth: 0.5)
+                            .shadow(radius: 2)
+                    )
+                    .background(Color.gray.cornerRadius(5).shadow(radius: 2))
+            }
+            ZStack {
+                if players.count > 1 {
+                    Group {
+                        if let icon = players[1].iconURL(ofSize: Int(playerIconSize)) {
+                            AsyncImage(url: icon) { $0.resizable() } placeholder: { Color.gray }
+                        }
+                    }
+                    .frame(width: playerIconSize * 0.6, height: playerIconSize * 0.6)
+                    .border(players[0].uiColor, width: 1)
+                    .offset(x: -playerIconSize * 0.2, y: -playerIconSize * 0.2)
+                    .shadow(radius: 2)
+                    .id(players[1].id)
+                }
+                Group {
+                    if let icon = players[0].iconURL(ofSize: Int(playerIconSize)) {
+                        AsyncImage(url: icon) {
+                            $0.resizable()
+                        } placeholder: {
+                            Color.gray
+                        }
+                    } else {
+                        Color.gray
+                    }
+                }
+                .background(Color.gray)
+                .frame(width: playerIconSize * 0.7, height: playerIconSize * 0.7)
+                .border(players[0].uiColor, width: 1)
+                .offset(x: playerIconSize * 0.15, y: playerIconSize * 0.15)
+                .shadow(radius: 2)
+                .id(players[0].id)
+            }
+            .frame(width: playerIconSize, height: playerIconSize)
+            Stone(color: color, shadowRadius: 1)
+                .frame(width: 20, height: 20)
+                .offset(x: 10, y: playerIconSize - 10)
+
+        }
+    }
+    
+    @ViewBuilder
+    func playerIcon(color: StoneColor) -> some View {
+        if !game.rengo || game.gameData?.rengoTeams?[color].count == 1 {
+            singlePlayerIcon(color: color)
+        } else {
+            rengoTeamIcon(color: color)
         }
     }
     
@@ -71,7 +137,7 @@ struct PlayersBannerView: View {
                 return AnyView(
                     erasing: Text(pauseReason ?? "").font(Font.footnote.bold())
                 )
-            } else if game.clock?.currentPlayerId == playerId {
+            } else if game.clock?.currentPlayerColor == color {
                 return AnyView(erasing: Image(systemName: "hourglass"))
             }
             return AnyView(EmptyView())
@@ -314,13 +380,17 @@ struct PlayersBannerView_Previews: PreviewProvider {
         let game3 = TestData.Scored19x19Korean
         game3.gamePhase = .stoneRemoval
         return Group {
-            PlayersBannerView(game: TestData.Ongoing19x19wBot1)
+            PlayersBannerView(game: TestData.Rengo2v2)
                 .previewLayout(.fixed(width: 320, height: 200))
-            PlayersBannerView(game: TestData.Ongoing19x19wBot1, showsPlayersName: true)
+            PlayersBannerView(game: TestData.Rengo3v1, showsPlayersName: true)
                 .previewLayout(.fixed(width: 320, height: 200))
-            PlayersBannerView(game: game3, playerIconSize: 96, showsPlayersName: true)
-                .previewLayout(.fixed(width: 500, height: 300))
-                .colorScheme(.dark)
+//            PlayersBannerView(game: TestData.Ongoing19x19wBot1)
+//                .previewLayout(.fixed(width: 320, height: 200))
+//            PlayersBannerView(game: TestData.Ongoing19x19wBot1, showsPlayersName: true)
+//                .previewLayout(.fixed(width: 320, height: 200))
+//            PlayersBannerView(game: game3, playerIconSize: 96, showsPlayersName: true)
+//                .previewLayout(.fixed(width: 500, height: 300))
+//                .colorScheme(.dark)
         }
     }
 }

@@ -54,6 +54,15 @@ struct OGSClock {
     var blackTimeUntilAutoResign: TimeInterval?
     var whiteTimeUntilAutoResign: TimeInterval?
     var autoResignTime = [StoneColor: Double]()
+
+    func nextPlayerId(with color: StoneColor) -> Int {
+        switch color {
+        case .black:
+            return blackPlayerId
+        case .white:
+            return whitePlayerId
+        }
+    }
 }
 
 extension OGSClock: Decodable {
@@ -69,7 +78,7 @@ extension OGSClock: Decodable {
         case pause
         case expiration
     }
-    
+        
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: OGSClock.CodingKeys.self)
 

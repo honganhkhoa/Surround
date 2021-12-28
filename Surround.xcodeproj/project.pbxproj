@@ -64,6 +64,7 @@
 		BC285BA42557FE8F005378F9 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649413253DA44C002B2200 /* SurroundNotificationService.swift */; };
 		BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		BC28A918277ACDDD007A417E /* game-beta-11359.json in Resources */ = {isa = PBXBuildFile; fileRef = BC28A917277ACDDD007A417E /* game-beta-11359.json */; };
 		BC3037F52692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
 		BC3037F62692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
 		BC3037F72692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
@@ -262,6 +263,7 @@
 		BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCD21522255A954E00F78E2A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */ = {isa = PBXBuildFile; fileRef = BCDD9B4927797CB20072229C /* game-beta-11289.json */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 		BCE913D125B9398D00065061 /* NewGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE913D025B9398D00065061 /* NewGameView.swift */; };
 		BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */; };
@@ -365,6 +367,7 @@
 		BC285B342557FAEB005378F9 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/MainInterface.storyboard; sourceTree = "<group>"; };
 		BC285B362557FAEB005378F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationContent.entitlements; sourceTree = "<group>"; };
+		BC28A917277ACDDD007A417E /* game-beta-11359.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-beta-11359.json"; sourceTree = "<group>"; };
 		BC3037F42692D03300181570 /* MoveTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveTree.swift; sourceTree = "<group>"; };
 		BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayersBannerView.swift; sourceTree = "<group>"; };
 		BC361AB5256246B4000C47F4 /* OGSChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatLine.swift; sourceTree = "<group>"; };
@@ -442,6 +445,7 @@
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BCD2150E255A952300F78E2A /* SurroundNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationService.entitlements; sourceTree = "<group>"; };
+		BCDD9B4927797CB20072229C /* game-beta-11289.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-beta-11289.json"; sourceTree = "<group>"; };
 		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 		BCE913D025B9398D00065061 /* NewGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameView.swift; sourceTree = "<group>"; };
 		BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessagesView.swift; sourceTree = "<group>"; };
@@ -566,6 +570,8 @@
 		BC042AF824AB2CFA0050B2D1 /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
+				BC28A917277ACDDD007A417E /* game-beta-11359.json */,
+				BCDD9B4927797CB20072229C /* game-beta-11289.json */,
 				BCB98D27256D18C400B1F8FD /* game-25076729.json */,
 				BCB98D1C256D185500B1F8FD /* game-27671778.json */,
 				BCB98D11256D17D600B1F8FD /* game-25758368.json */,
@@ -1000,9 +1006,11 @@
 				BC463B0126624D3500D40D3A /* puzzle-2630.json in Resources */,
 				BCB98CDB256D15F200B1F8FD /* game-25291907.json in Resources */,
 				BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */,
+				BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */,
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
 				BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */,
 				BCB98CFC256D16B800B1F8FD /* game-26269354.json in Resources */,
+				BC28A918277ACDDD007A417E /* game-beta-11359.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1400,7 +1408,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1456,7 +1464,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -1481,7 +1489,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1511,7 +1519,7 @@
 				ENABLE_PREVIEWS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1534,7 +1542,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1555,7 +1563,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1617,7 +1625,7 @@
 				CURRENT_PROJECT_VERSION = 2021122601;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1641,7 +1649,7 @@
 				CURRENT_PROJECT_VERSION = 2021122601;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1668,7 +1676,7 @@
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1696,7 +1704,7 @@
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1721,7 +1729,7 @@
 				CURRENT_PROJECT_VERSION = 2021122601;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1745,7 +1753,7 @@
 				CURRENT_PROJECT_VERSION = 2021122601;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

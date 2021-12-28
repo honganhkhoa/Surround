@@ -110,6 +110,15 @@ struct OGSGame: Decodable {
     struct RengoTeams: Codable {
         var black: [OGSUser]
         var white: [OGSUser]
+        
+        subscript(color: StoneColor) -> [OGSUser] {
+            switch color {
+            case .black:
+                return self.black
+            case .white:
+                return self.white
+            }
+        }
     }
     
     var allowKo: Bool

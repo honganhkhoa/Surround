@@ -121,7 +121,7 @@ struct SingleGameView: View {
     }
     
     var userColor: StoneColor {
-        return ogs.user?.id == game.blackId ? .black : .white
+        return game.userStoneColor ?? .white
     }
     
     var topLeftPlayerColor: StoneColor {

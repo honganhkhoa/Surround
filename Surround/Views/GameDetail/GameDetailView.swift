@@ -157,12 +157,23 @@ struct GameDetailView: View {
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
         #endif
-        let userColor: StoneColor = currentGame.blackId == ogs.user?.id ? .black : .white
+        let userColor: StoneColor = currentGame.userStoneColor ?? .white
         let players = currentGame.gameData!.players
         let opponent = userColor == .black ? players.white : players.black
         let opponentRank = userColor == .black ? currentGame.whiteFormattedRank : currentGame.blackFormattedRank
         var navigationBarHidden = attachedKeyboardVisible || zenMode
         var iOS15 = false
+        var title = currentGame.gameName
+        if currentGame.isUserPlaying {
+            title = "vs \(opponent.username) [\(opponentRank)]"
+            if currentGame.rengo {
+                if let opponentTeam = currentGame.gameData?.rengoTeams?[userColor.opponentColor()] {
+                    if opponentTeam.count > 1 {
+                        title = title! + " +\(opponentTeam.count - 1)"
+                    }
+                }
+            }
+        }
         if #available(iOS 15, *) {
             iOS15 = true
             navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
@@ -199,7 +210,7 @@ struct GameDetailView: View {
         .navigationTitle(
             navigationBarHidden
             ? "" :
-                (currentGame.isUserPlaying ? "vs \(opponent.username) [\(opponentRank)]" : currentGame.gameName ?? "")
+                (title ?? "")
         )
         .navigationBarHidden(navigationBarHidden)
         .navigationBarBackButtonHidden(navigationBarHidden)
