@@ -150,7 +150,7 @@ extension SettingKey {
     }
     
     #if MAIN_APP
-    static var homeViewDisplayMode: SettingKey<GameCell.CellDisplayMode> {
+    static var homeViewDisplayMode: SettingKey<String> {
         return .init(name: "homeViewDisplayMode")
     }
     #endif

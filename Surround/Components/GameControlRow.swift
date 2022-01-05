@@ -161,8 +161,8 @@ struct GameControlRow: View {
                             Label("Cancel game", systemImage: "xmark").foregroundColor(.red)
                         }
                     } else {
-                        Button(action: { self.showingResignAlert = true }) {
-                            Label("Resign", systemImage: "flag").foregroundColor(.red)
+                        Button(role: .destructive, action: { self.showingResignAlert = true }) {
+                            Label("Resign", systemImage: "flag")
                         }
                     }
                 }
