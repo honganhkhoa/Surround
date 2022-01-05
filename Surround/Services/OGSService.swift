@@ -669,7 +669,7 @@ class OGSService: ObservableObject {
                         }
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
-                        if let ogsGame = try? decoder.decode(OGSGame.self, from: OGSGame.preprocessedGameData(gameData: gameData)) {
+                        if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
                             newActiveGames[gameId]?.gameData = ogsGame
                             newActiveGames[gameId]?.clock?.calculateTimeLeft(with: ogsGame.timeControl.system, serverTimeOffset: self.serverTimeOffset, pauseControl: ogsGame.pauseControl)
                         }
@@ -767,7 +767,7 @@ class OGSService: ObservableObject {
                             let decoder = DictionaryDecoder()
                             decoder.keyDecodingStrategy = .convertFromSnakeCase
                             do {
-                                let ogsGame = try decoder.decode(OGSGame.self, from: OGSGame.preprocessedGameData(gameData: gameData))
+                                let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
                                 if let game = self.connectedGames[ogsGame.gameId] {
                                     game.ogsRawData = data
                                     promise(.success(game))
@@ -923,12 +923,10 @@ class OGSService: ObservableObject {
                 if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
                     let decoder = DictionaryDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    do {
-                        let gameData = OGSGame.preprocessedGameData(gameData: gamedata[0] as? [String: Any] ?? [:])
-                        let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
+                    if let gameData = gamedata[0] as? [String: Any], let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
                         connectedGame.gameData = ogsGame
-                    } catch {
-                        print(gameId, error)
+                    } else {
+                        print("Error parsing game", gamedata)
                     }
                 }
             }
@@ -937,12 +935,23 @@ class OGSService: ObservableObject {
             DispatchQueue.main.async {
                 if let movedata = movedata[0] as? [String: Any] {
                     if let move = movedata["move"] as? [Any], let gameId = movedata["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
+                        
                         if let column = move[0] as? Int, let row = move[1] as? Int {
+                                                        
                             do {
                                 try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
                             } catch {
                                 print(gameId, movedata, error)
                             }
+
+                            if let playerUpdate = move[4] as? [String: Any] {
+                                let decoder = DictionaryDecoder()
+                                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                                game.latestPlayerUpdate = try? decoder.decode(OGSMoveExtra.self, from: playerUpdate).playerUpdate
+                            } else {
+                                game.latestPlayerUpdate = nil
+                            }
+
                             if let _ = self.activeGames[gameId] {
                                 userDefaults[.latestOGSOverviewOutdated] = true
                             }

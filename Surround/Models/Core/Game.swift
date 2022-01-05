@@ -24,6 +24,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 self.gameName = data.gameName
                 self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: data.players.black)
                 self.whitePlayer = OGSUser.mergeUserInfoFromCache(user: self.whitePlayer, cachedUser: data.players.white)
+                
+                if let rengoTeams = gameData?.rengoTeams {
+                    for player in rengoTeams[.black] + rengoTeams[.white] {
+                        playerByOGSId[player.id] = player
+                    }
+                }
+                
                 if let blackAcceptedRemovedStones = data.players.black.acceptedStones {
                     self.removedStonesAccepted[.black] = BoardPosition.points(fromPositionString: blackAcceptedRemovedStones)
                 }
@@ -48,21 +55,21 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         position = moveTree.initialPosition
                     }
                     self.positionByLastMoveNumber[position.lastMoveNumber] = position
-                    for moveCoordinates in data.moves {
-                        let move: Move = moveCoordinates[0] == -1 ? .pass : .placeStone(moveCoordinates[1], moveCoordinates[0])
+                    for move in data.moves {
                         var newPosition: BoardPosition? = nil
                         if let handicap = gameData?.handicap, gameData?.freeHandicapPlacement ?? false {
                             if position.lastMoveNumber < handicap - 1 {
-                                newPosition = try position.makeHandicapPlacement(move: move)
+                                newPosition = try position.makeHandicapPlacement(move: move.move)
                             }
                         }
                         if newPosition == nil {
-                            newPosition = try position.makeMove(move: move)
+                            newPosition = try position.makeMove(move: move.move)
                         }
                         newPosition = moveTree.register(newPosition: newPosition!, fromPosition: position, mainBranch: true)
                         self.positionByLastMoveNumber[newPosition!.lastMoveNumber] = newPosition
                         
                         position = newPosition!
+                        latestPlayerUpdate = move.extra?.playerUpdate
                     }
                     currentPosition = position
                 } catch {
@@ -89,11 +96,17 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var blackPlayer: OGSUser? {
         didSet {
             self.blackId = blackPlayer?.id
+            if let player = blackPlayer {
+                playerByOGSId[player.id] = player
+            }
         }
     }
     @Published var whitePlayer: OGSUser? {
         didSet {
             self.whiteId = whitePlayer?.id
+            if let player = whitePlayer {
+                playerByOGSId[player.id] = player
+            }
         }
     }
     var blackName: String
@@ -233,6 +246,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var positionByLastMoveNumber = [Int: BoardPosition]()
     
     var rengo: Bool { gameData?.rengo ?? false }
+    var latestPlayerUpdate: OGSPlayerUpdate?
+    
+    var playerByOGSId: [Int: OGSUser] = [:]
     
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
@@ -258,6 +274,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func rengoTeamOrderedFromNextToMove(with stoneColor: StoneColor) -> [OGSUser] {
+        if let rengoTeamIds = self.latestPlayerUpdate?.rengoTeams[stoneColor] {
+            return rengoTeamIds.map { playerByOGSId[$0]! }
+        }
+        
         if let rengoTeam = gameData?.rengoTeams?[stoneColor] {
             if let nextPlayerId = clock?.nextPlayerId(with: stoneColor) {
                 if let nextPlayerIndex = rengoTeam.firstIndex(where: { $0.id == nextPlayerId }) {

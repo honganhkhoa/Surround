@@ -96,6 +96,65 @@ enum OGSRule: String, Codable, CaseIterable, Hashable {
     }
 }
 
+struct OGSPlayerUpdate: Codable {
+    struct PlayerUpdate: Codable {
+        var black: Int
+        var white: Int
+    }
+    struct RengoTeams: Codable {
+        var black: [Int]
+        var white: [Int]
+
+        subscript(color: StoneColor) -> [Int] {
+            switch color {
+            case .black:
+                return self.black
+            case .white:
+                return self.white
+            }
+        }
+    }
+    
+    var playerUpdate: PlayerUpdate?
+    var rengoTeams: RengoTeams
+}
+
+struct OGSMoveExtra: Codable {
+    var playedBy: Int?
+    var playerUpdate: OGSPlayerUpdate?
+}
+
+struct OGSMove: Decodable {
+    var column: Int
+    var row: Int
+    var timedelta: Int?
+    var edited: Bool?
+    var extra: OGSMoveExtra?
+    
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        self.column = try container.decode(Int.self)
+        self.row = try container.decode(Int.self)
+        if !container.isAtEnd {
+            self.timedelta = try container.decodeIfPresent(Int.self)
+        }
+        if !container.isAtEnd {
+            self.edited = try container.decodeIfPresent(Bool.self)
+        }
+        if !container.isAtEnd {
+            self.extra = try container.decodeIfPresent(OGSMoveExtra.self)
+        }
+    }
+    
+    var move: Move {
+        if column == -1 {
+            return .pass
+        } else {
+            return .placeStone(row, column)
+        }
+    }
+}
+
 struct OGSGame: Decodable {
     struct InitialState: Codable {
         var black: String
@@ -143,7 +202,7 @@ struct OGSGame: Decodable {
     var initialState: InitialState
     var komi: Double
 
-    var moves: [[Int]]
+    var moves: [OGSMove]
     var players: Players
     
     var timeControl: TimeControl
@@ -173,20 +232,4 @@ struct OGSGame: Decodable {
     
     var rengo: Bool?
     var rengoTeams: RengoTeams?
-    
-    static func preprocessedGameData(gameData: [String: Any]) -> [String: Any] {
-        // Quick fix for a recent change on OGS server
-        // https://forums.online-go.com/t/online-go-app-for-android/34438/607
-        var result = gameData
-        var newMoves = [[Int]]()
-        if let moves = result["moves"] as? [[Any]] {
-            for move in moves {
-                if let column = move[0] as? Int, let row = move[1] as? Int {
-                    newMoves.append([column, row])
-                }
-            }
-        }
-        result["moves"] = newMoves
-        return result
-    }
 }
