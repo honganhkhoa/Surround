@@ -1,6 +1,6 @@
 {
     "white_player_id": 1769,
-    "black_player_id": 1765,
+    "black_player_id": 1526,
     "group_ids":
     [],
     "game_id": 11359,
@@ -11,10 +11,10 @@
     {
         "black":
         {
-            "id": 1765,
+            "id": 1526,
             "country": "un",
-            "username": "hakhoa",
-            "icon-url": "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro",
+            "username": "honganhkhoa",
+            "icon-url": "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro",
             "ui_class": "provisional",
             "ratings":
             {
@@ -65,26 +65,6 @@
         "black":
         [
             {
-                "id": 1765,
-                "country": "un",
-                "username": "hakhoa",
-                "icon-url": "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro",
-                "ui_class": "provisional",
-                "ratings":
-                {
-                    "version": 5,
-                    "overall":
-                    {
-                        "rating": 1500,
-                        "deviation": 350,
-                        "volatility": 0.06
-                    }
-                },
-                "rating": 1500,
-                "ranking": 24.303382182144386,
-                "pro": 0
-            },
-            {
                 "id": 1526,
                 "country": "un",
                 "username": "honganhkhoa",
@@ -109,6 +89,26 @@
                 "country": "un",
                 "username": "hakhoa2",
                 "icon-url": "https://secure.gravatar.com/avatar/e8fd4a8a5bab2b3785d794ab51fef55c?s=32&d=retro",
+                "ui_class": "provisional",
+                "ratings":
+                {
+                    "version": 5,
+                    "overall":
+                    {
+                        "rating": 1500,
+                        "deviation": 350,
+                        "volatility": 0.06
+                    }
+                },
+                "rating": 1500,
+                "ranking": 24.303382182144386,
+                "pro": 0
+            },
+            {
+                "id": 1765,
+                "country": "un",
+                "username": "hakhoa",
+                "icon-url": "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro",
                 "ui_class": "provisional",
                 "ratings":
                 {
@@ -166,17 +166,148 @@
         [
             15,
             3,
-            30480
+            30480,
+            null,
+            {
+                "blur": 1257,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1526
+            }
         ],
         [
             3,
             15,
-            35463
+            35463,
+            null,
+            {
+                "blur": 1517,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1769
+            }
         ],
         [
             15,
             15,
-            48172
+            48172,
+            null,
+            {
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1767
+            }
+        ],
+        [
+            3,
+            3,
+            1734063,
+            null,
+            {
+                "blur": 1620120,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1769
+            }
+        ],
+        [
+            2,
+            5,
+            1492263,
+            null,
+            {
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1765
+            }
+        ],
+        [
+            5,
+            2,
+            11599,
+            null,
+            {
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1769
+            }
+        ],
+        [
+            1,
+            3,
+            169824928,
+            null,
+            {
+                "blur": 5194,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1526
+            }
+        ],
+        [
+            2,
+            2,
+            108058004,
+            null,
+            {
+                "blur": 54729,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1769
+            }
+        ],
+        [
+            2,
+            8,
+            761033,
+            null,
+            {
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1767
+            }
+        ],
+        [
+            13,
+            16,
+            100732,
+            null,
+            {
+                "blur": 5311,
+                "sgf_downloaded_by":
+                [],
+                "played_by": 1769
+            }
+        ],
+        [
+            16,
+            13,
+            423541794,
+            null,
+            {
+                "played_by": 1765,
+                "player_update":
+                {
+                    "players":
+                    {
+                        "black": 1526,
+                        "white": 1769
+                    },
+                    "rengo_teams":
+                    {
+                        "black":
+                        [
+                            1526,
+                            1767,
+                            1765
+                        ],
+                        "white":
+                        [
+                            1769
+                        ]
+                    }
+                }
+            }
         ]
     ],
     "allow_self_capture": false,
@@ -206,21 +337,111 @@
     {
         "game_id": 11359,
         "current_player": 1769,
-        "black_player_id": 1765,
+        "black_player_id": 1526,
         "white_player_id": 1769,
         "title": "Rengo test",
-        "last_move": 1640666521115,
-        "expiration": 1641012085652,
+        "last_move": 1641372045531,
+        "expiration": 1641953305669,
         "black_time":
         {
-            "thinking_time": 345551.828,
+            "thinking_time": 268331.73699999996,
             "skip_bonus": false
         },
         "white_time":
         {
-            "thinking_time": 345564.537,
+            "thinking_time": 581260.138,
             "skip_bonus": false
         },
-        "now": 1640666521116
+        "now": 1640995140206,
+        "paused_since": 1640995140206
+    },
+    "pause_control":
+    {},
+    "player_pool":
+    {
+        "1526":
+        {
+            "id": 1526,
+            "country": "un",
+            "username": "honganhkhoa",
+            "icon-url": "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro",
+            "ui_class": "provisional",
+            "ratings":
+            {
+                "version": 5,
+                "overall":
+                {
+                    "rating": 1500,
+                    "deviation": 350,
+                    "volatility": 0.06
+                }
+            },
+            "rating": 1500,
+            "ranking": 24.303382182144386,
+            "pro": 0
+        },
+        "1765":
+        {
+            "id": 1765,
+            "country": "un",
+            "username": "hakhoa",
+            "icon-url": "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro",
+            "ui_class": "provisional",
+            "ratings":
+            {
+                "version": 5,
+                "overall":
+                {
+                    "rating": 1500,
+                    "deviation": 350,
+                    "volatility": 0.06
+                }
+            },
+            "rating": 1500,
+            "ranking": 24.303382182144386,
+            "pro": 0
+        },
+        "1767":
+        {
+            "id": 1767,
+            "country": "un",
+            "username": "hakhoa2",
+            "icon-url": "https://secure.gravatar.com/avatar/e8fd4a8a5bab2b3785d794ab51fef55c?s=32&d=retro",
+            "ui_class": "provisional",
+            "ratings":
+            {
+                "version": 5,
+                "overall":
+                {
+                    "rating": 1500,
+                    "deviation": 350,
+                    "volatility": 0.06
+                }
+            },
+            "rating": 1500,
+            "ranking": 24.303382182144386,
+            "pro": 0
+        },
+        "1769":
+        {
+            "id": 1769,
+            "country": "un",
+            "username": "hakhoa4",
+            "icon-url": "https://secure.gravatar.com/avatar/7eb7eabbe9bd03c2fc99881d04da9cbd?s=32&d=retro",
+            "ui_class": "provisional",
+            "ratings":
+            {
+                "version": 5,
+                "overall":
+                {
+                    "rating": 1500,
+                    "deviation": 350,
+                    "volatility": 0.06
+                }
+            },
+            "rating": 1500,
+            "ranking": 24.303382182144386,
+            "pro": 0
+        }
     }
 }

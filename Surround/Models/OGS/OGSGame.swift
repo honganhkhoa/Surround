@@ -96,12 +96,12 @@ enum OGSRule: String, Codable, CaseIterable, Hashable {
     }
 }
 
-struct OGSPlayerUpdate: Codable {
-    struct PlayerUpdate: Codable {
+struct OGSPlayerUpdate: Codable, Equatable {
+    struct Players: Codable, Equatable {
         var black: Int
         var white: Int
     }
-    struct RengoTeams: Codable {
+    struct RengoTeams: Codable, Equatable {
         var black: [Int]
         var white: [Int]
 
@@ -115,7 +115,7 @@ struct OGSPlayerUpdate: Codable {
         }
     }
     
-    var playerUpdate: PlayerUpdate?
+    var players: Players?
     var rengoTeams: RengoTeams
 }
 

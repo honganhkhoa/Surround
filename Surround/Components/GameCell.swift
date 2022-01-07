@@ -17,7 +17,11 @@ struct PlayerInfoLine: View {
         guard let user = ogs.user else {
             return false
         }
-        return (color == .black && user.id == game.blackId) || (color == .white && user.id == game.whiteId)
+        if game.rengo {
+            return game.gameData?.rengoTeams?[color].firstIndex(where: { $0.id == user.id }) != nil
+        } else {
+            return (color == .black && user.id == game.blackId) || (color == .white && user.id == game.whiteId)
+        }
     }
     
     var body: some View {
@@ -39,6 +43,10 @@ struct PlayerInfoLine: View {
                             }
                         }
                     }
+                    if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
+                        (Text("+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
+                            .font(.subheadline)
+                    }
                     Spacer()
                     InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
                 }
@@ -48,18 +56,24 @@ struct PlayerInfoLine: View {
                 Stone(color: color, shadowRadius: 1).frame(width: 15, height: 15)
                     .offset(y: 2)
                 VStack(alignment: .leading) {
-                    Group {
-                        if isUser {
-                            Text("You").font(Font.subheadline.bold())
-                                .padding(.horizontal, 3)
-                                .background(Color(UIColor.systemTeal).cornerRadius(5))
-                                .offset(x: -3)
-                        } else {
-                            if let player = color == .black ? game.blackPlayer : game.whitePlayer {
-                                (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
-                                    .bold().lineLimit(1)
-                                    .foregroundColor(player.uiColor)
+                    HStack {
+                        Group {
+                            if isUser {
+                                Text("You").font(Font.subheadline.bold())
+                                    .padding(.horizontal, 3)
+                                    .background(Color(UIColor.systemTeal).cornerRadius(5))
+                                    .offset(x: -3)
+                            } else {
+                                if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+                                    (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
+                                        .bold().lineLimit(1)
+                                        .foregroundColor(player.uiColor)
+                                }
                             }
+                        }
+                        if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
+                            (Text("+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
+                                .font(.subheadline)
                         }
                     }
                     InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
@@ -141,16 +155,21 @@ struct GameCell_Previews: PreviewProvider {
         let game = TestData.Resigned19x19HandicappedWithInitialState
         return Group{
             List([game]) { _ in
-                GameCell(game: game)
-            }.listStyle(GroupedListStyle())
+                GameCell(game: TestData.Rengo3v1)
+            }
+            .listStyle(GroupedListStyle())
+            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526)))
             List([game]) { _ in
-                GameCell(game: game, displayMode: .compact)
-            }.listStyle(GroupedListStyle())
+                GameCell(game: TestData.Rengo2v2, displayMode: .compact)
+            }
+            .listStyle(GroupedListStyle())
+            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526)))
             List([game]) { _ in
-                GameCell(game: game)
-            }.listStyle(GroupedListStyle()).colorScheme(.dark)
+                GameCell(game: TestData.Resigned19x19HandicappedWithInitialState)
+            }
+            .listStyle(GroupedListStyle()).colorScheme(.dark)
+            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hhs214", id: 749506)))
         }
-        .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hhs214", id: 749506)))
         .previewLayout(.fixed(width: 375, height: 500))
     }
 }

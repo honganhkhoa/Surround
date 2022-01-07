@@ -135,7 +135,7 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                             }
                         }
-                        Section(header: sectionHeader(title: "Opponents' move")) {
+                        Section(header: sectionHeader(title: "Waiting for opponents/teammates")) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {

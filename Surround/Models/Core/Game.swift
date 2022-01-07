@@ -246,9 +246,19 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var positionByLastMoveNumber = [Int: BoardPosition]()
     
     var rengo: Bool { gameData?.rengo ?? false }
-    var latestPlayerUpdate: OGSPlayerUpdate?
+    var latestPlayerUpdate: OGSPlayerUpdate? {
+        didSet {
+            if let update = latestPlayerUpdate {
+                for color in [StoneColor.black, StoneColor.white] {
+                    orderedRengoTeam[color] = update.rengoTeams[color].map { playerByOGSId[$0]! }
+                }
+            }
+        }
+    }
     
     var playerByOGSId: [Int: OGSUser] = [:]
+    
+    @Published var orderedRengoTeam: [StoneColor: [OGSUser]] = [.black: [], .white: []]
     
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
@@ -273,20 +283,20 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return Game.iconURL(from: icon, withSize: size)
     }
     
-    func rengoTeamOrderedFromNextToMove(with stoneColor: StoneColor) -> [OGSUser] {
-        if let rengoTeamIds = self.latestPlayerUpdate?.rengoTeams[stoneColor] {
-            return rengoTeamIds.map { playerByOGSId[$0]! }
-        }
-        
-        if let rengoTeam = gameData?.rengoTeams?[stoneColor] {
-            if let nextPlayerId = clock?.nextPlayerId(with: stoneColor) {
-                if let nextPlayerIndex = rengoTeam.firstIndex(where: { $0.id == nextPlayerId }) {
-                    return Array(rengoTeam.suffix(from: nextPlayerIndex) + rengoTeam.prefix(upTo: nextPlayerIndex))
-                }
-            }
-        }
-        return []
-    }
+//    func rengoTeamOrderedFromNextToMove(with stoneColor: StoneColor) -> [OGSUser] {
+//        if let rengoTeamIds = self.latestPlayerUpdate?.rengoTeams[stoneColor] {
+//            return rengoTeamIds.map { playerByOGSId[$0]! }
+//        }
+//        
+//        if let rengoTeam = gameData?.rengoTeams?[stoneColor] {
+//            if let nextPlayerId = clock?.nextPlayerId(with: stoneColor) {
+//                if let nextPlayerIndex = rengoTeam.firstIndex(where: { $0.id == nextPlayerId }) {
+//                    return Array(rengoTeam.suffix(from: nextPlayerIndex) + rengoTeam.prefix(upTo: nextPlayerIndex))
+//                }
+//            }
+//        }
+//        return []
+//    }
     
     static func iconURL(from urlString: String, withSize size: Int) -> String {
         let regex1 = try! NSRegularExpression(pattern: "-[0-9]+.png")

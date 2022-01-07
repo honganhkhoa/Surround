@@ -26,6 +26,7 @@ struct SingleGameView: View {
     var attachedKeyboardVisible = false
     
     @State var compactDisplayMode = DisplayMode.playerInfo
+    @State var showCompactModeSwitcher = true
     var analyzeMode: Binding<Bool> = .constant(false)
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
@@ -177,9 +178,12 @@ struct SingleGameView: View {
                 game: game,
                 topLeftPlayerColor: topLeftPlayerColor,
                 reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
-                showsPlayersName: !game.isUserPlaying
+                showsPlayersName: !game.isUserPlaying,
+                showCompactModeSwitcher: $showCompactModeSwitcher
             )
-            compactDisplayModePicker
+            if showCompactModeSwitcher {
+                compactDisplayModePicker
+            }
         }
     }
     

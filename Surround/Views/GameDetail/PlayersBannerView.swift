@@ -23,6 +23,11 @@ struct PlayersBannerView: View {
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
     @Setting(.voiceCountdown) var voiceCountdown: Bool
+    @State var showsRengoTeamDetail = false
+    
+    @Namespace var avatars
+    
+    var showCompactModeSwitcher: Binding<Bool> = .constant(true)
     
     var shouldShowNamesOutOfColumn: Bool {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
@@ -48,6 +53,7 @@ struct PlayersBannerView: View {
                 .frame(width: playerIconSize, height: playerIconSize)
                 .border(player?.uiColor ?? .black, width: 1)
                 .shadow(radius: 2)
+                .matchedGeometryEffect(id: player?.id ?? 0, in: avatars)
                 Stone(color: color, shadowRadius: 1)
                     .frame(width: 20, height: 20)
                     .offset(x: 10, y: 10)
@@ -55,56 +61,56 @@ struct PlayersBannerView: View {
         }
     }
     
+    @ViewBuilder
     func rengoTeamIcon(color: StoneColor) -> some View {
-        let players = game.rengoTeamOrderedFromNextToMove(with: color)
-        return ZStack(alignment: .topTrailing) {
-            if players.count > 2 {
-                Text("+\(players.count - 2)")
-                    .font(.caption.bold().monospacedDigit())
-                    .padding(.horizontal, 3)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(.black, lineWidth: 0.5)
+        if let players = game.orderedRengoTeam[color], let originalRengoTeam = game.gameData?.rengoTeams?[color] {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    ForEach(originalRengoTeam, id: \.id) { player in
+                        if let index = players.firstIndex(where: { $0.id == player.id }) {
+                            Group {
+                                if let icon = player.iconURL(ofSize: Int(playerIconSize)) {
+                                    AsyncImage(url: icon) { $0.resizable() } placeholder: { Color.gray }
+                                }
+                            }
+                            .frame(
+                                width: playerIconSize * (index == 1 ? 0.6 : index == 0 ? 0.7 : 0.1),
+                                height: playerIconSize * (index == 1 ? 0.6 : index == 0 ? 0.7 : 0.1))
+                            .border(player.uiColor, width: 1)
+                            .offset(
+                                x: playerIconSize * (index == 1 ? -0.2 : index == 0 ? 0.15 : 0.4),
+                                y: playerIconSize * (index == 1 ? -0.2 : index == 0 ? 0.15 : -0.4)
+                            )
+                            .zIndex(-CGFloat(index))
                             .shadow(radius: 2)
-                    )
-                    .background(Color.gray.cornerRadius(5).shadow(radius: 2))
-            }
-            ZStack {
-                if players.count > 1 {
-                    Group {
-                        if let icon = players[1].iconURL(ofSize: Int(playerIconSize)) {
-                            AsyncImage(url: icon) { $0.resizable() } placeholder: { Color.gray }
+                            .id(player.id)
+                            .matchedGeometryEffect(id: player.id, in: avatars)
                         }
                     }
-                    .frame(width: playerIconSize * 0.6, height: playerIconSize * 0.6)
-                    .border(players[0].uiColor, width: 1)
-                    .offset(x: -playerIconSize * 0.2, y: -playerIconSize * 0.2)
-                    .shadow(radius: 2)
-                    .id(players[1].id)
                 }
-                Group {
-                    if let icon = players[0].iconURL(ofSize: Int(playerIconSize)) {
-                        AsyncImage(url: icon) {
-                            $0.resizable()
-                        } placeholder: {
-                            Color.gray
-                        }
-                    } else {
-                        Color.gray
-                    }
-                }
-                .background(Color.gray)
-                .frame(width: playerIconSize * 0.7, height: playerIconSize * 0.7)
-                .border(players[0].uiColor, width: 1)
-                .offset(x: playerIconSize * 0.15, y: playerIconSize * 0.15)
-                .shadow(radius: 2)
-                .id(players[0].id)
-            }
-            .frame(width: playerIconSize, height: playerIconSize)
-            Stone(color: color, shadowRadius: 1)
-                .frame(width: 20, height: 20)
-                .offset(x: 10, y: playerIconSize - 10)
+                .frame(width: playerIconSize, height: playerIconSize)
+                Stone(color: color, shadowRadius: 1)
+                    .frame(width: 20, height: 20)
+                    .offset(x: 10, y: playerIconSize - 10)
 
+                if players.count > 2 {
+                    Text("+\(players.count - 2)")
+                        .font(.caption.bold().monospacedDigit())
+                        .padding(.horizontal, 3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(.black, lineWidth: 0.5)
+                                .shadow(radius: 2)
+                        )
+                        .background(Color.gray.cornerRadius(5).shadow(radius: 2))
+                }
+            }
+            .onTapGesture {
+                self.showsRengoTeamDetail = true
+                self.showCompactModeSwitcher.wrappedValue = false
+            }
+        } else {
+            EmptyView()
         }
     }
     
@@ -278,11 +284,109 @@ struct PlayersBannerView: View {
             self.speechSynthesizer = AVSpeechSynthesizer()
         }
     }
+    
+    @ViewBuilder
+    func rengoPlayerDetails(for player: OGSUser, alignment: HorizontalAlignment = .leading) -> some View {
+        HStack {
+            if alignment == .trailing {
+                (Text(player.username).font(.subheadline.bold()) + Text(" [\(player.formattedRank)]").font(.caption))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
-    var body: some View {
-        let foregroundColor = game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
-        let playersNameOutsideOfColumn = showsPlayersName && shouldShowNamesOutOfColumn
-        return VStack(spacing: 0) {
+            }
+            Group {
+                if let iconURL = player.iconURL(ofSize: 40) {
+                    AsyncImage(url: iconURL) {
+                        $0.resizable()
+                    } placeholder: {
+                        Color.gray
+                    }
+                } else {
+                    Color.gray
+                }
+            }
+            .border(player.uiColor, width: 1)
+            .frame(width: 40, height: 40)
+            .shadow(radius: 2)
+            .matchedGeometryEffect(id: player.id, in: avatars)
+            if alignment != .trailing {
+                (Text(player.username).font(.subheadline.bold()) + Text(" [\(player.formattedRank)]").font(.caption))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var rengoTeamDetails: some View {
+        if let leftTeam = game.orderedRengoTeam[topLeftPlayerColor], let rightTeam = game.orderedRengoTeam[topLeftPlayerColor.opponentColor()] {
+            VStack(spacing: 0) {
+                Spacer().frame(height: verticalPadding)
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            (Text("\(leftTeam.count)×") + Text(Image(systemName: "person.fill")))
+                                .font(.subheadline)
+                            Stone(color: topLeftPlayerColor, shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                            InlineTimerView(
+                                timeControl: game.gameData?.timeControl,
+                                clock: game.clock,
+                                player: topLeftPlayerColor,
+                                mainFont: .subheadline,
+                                subFont: .footnote,
+                                pauseControl: game.pauseControl,
+                                showsPauseReason: true)
+                        }
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 5) {
+                                ForEach(leftTeam, id: \.id) { player in
+                                    rengoPlayerDetails(for: player)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing) {
+                        HStack {
+                            InlineTimerView(
+                                timeControl: game.gameData?.timeControl,
+                                clock: game.clock,
+                                player: topLeftPlayerColor.opponentColor(),
+                                mainFont: .subheadline,
+                                subFont: .footnote,
+                                pauseControl: game.pauseControl,
+                                showsPauseReason: true
+                            )
+                            Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
+                                .frame(width: 20, height: 20)
+                            (Text("\(rightTeam.count)×") + Text(Image(systemName: "person.fill")))
+                                .font(.subheadline)
+                        }
+                        ScrollView {
+                            VStack(alignment: .trailing, spacing: 5) {
+                                ForEach(rightTeam, id: \.id) { player in
+                                    rengoPlayerDetails(for: player, alignment: .trailing)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .onTapGesture {
+                self.showCompactModeSwitcher.wrappedValue = true
+                self.showsRengoTeamDetail = false
+            }
+        } else {
+            EmptyView()
+        }
+    }
+    
+    @ViewBuilder
+    var playersSummary: some View {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     playerIcon(color: topLeftPlayerColor)
@@ -322,7 +426,31 @@ struct PlayersBannerView: View {
             .offset(y: playerIconsOffset - (playersNameOutsideOfColumn ? 25 : 0))
             .padding(.bottom, playerIconsOffset - (playersNameOutsideOfColumn ? 25 : 0))
         }
-        .padding(.vertical, reducesVerticalPadding ? 12 : 15)
+    }
+    
+    var foregroundColor: UIColor {
+        return game.clock?.started ?? false ? UIColor.label : UIColor.systemIndigo
+    }
+    
+    var playersNameOutsideOfColumn: Bool {
+        showsPlayersName && shouldShowNamesOutOfColumn
+    }
+    
+    var verticalPadding: CGFloat {
+        reducesVerticalPadding ? 12 : 15
+    }
+
+    var body: some View {
+        Group {
+            if showsRengoTeamDetail {
+                rengoTeamDetails
+            } else {
+                playersSummary
+            }
+        }
+        .animation(.linear, value: game.orderedRengoTeam)
+        .animation(.linear, value: showsRengoTeamDetail)
+        .padding(.vertical, showsRengoTeamDetail ? 0 : verticalPadding)
         .padding(.horizontal)
         .background(
             LinearGradient(
@@ -380,8 +508,9 @@ struct PlayersBannerView_Previews: PreviewProvider {
         let game3 = TestData.Scored19x19Korean
         game3.gamePhase = .stoneRemoval
         return Group {
-            PlayersBannerView(game: TestData.Rengo2v2)
+            PlayersBannerView(game: TestData.Rengo2v2, showsRengoTeamDetail: false)
                 .previewLayout(.fixed(width: 320, height: 200))
+//                .colorScheme(.dark)
             PlayersBannerView(game: TestData.Rengo3v1, showsPlayersName: true)
                 .previewLayout(.fixed(width: 320, height: 200))
 //            PlayersBannerView(game: TestData.Ongoing19x19wBot1)
