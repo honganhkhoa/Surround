@@ -19,6 +19,10 @@ struct OGSChallenge: Codable, Identifiable {
     var unusualBoardSize: Bool { game.width != game.height || ![9, 13, 19].contains(game.width) }
     var isUnusual: Bool { hasHandicap || useCustomKomi || game.timeControl.system.isUnusual || unusualBoardSize }
     
+    var rengo: Bool {
+        return game.rengo ?? false
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case challenger
@@ -83,6 +87,10 @@ struct OGSChallenge: Codable, Identifiable {
         if user.id == self.challenger?.id {
             return false
         }
+        
+        if rengo, let participants = game.rengoParticipants, participants.firstIndex(of: user.id) != nil {
+            return false
+        }
 
         let userRank = user.rank()        
         if let minRank = game.minRank, let maxRank = game.maxRank {
@@ -100,8 +108,8 @@ struct OGSChallenge: Codable, Identifiable {
     }
 }
 
-struct OGSChallengeGameDetail: Codable {
-    init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, challengerColor: StoneColor? = nil, challengeId: Int? = nil, userId: Int? = nil, username: String? = nil, userRank: Double? = nil, minRank: Int? = nil, maxRank: Int? = nil) {
+struct OGSChallengeGameDetail: Codable, Equatable {
+    init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, challengerColor: StoneColor? = nil, challengeId: Int? = nil, userId: Int? = nil, username: String? = nil, userRank: Double? = nil, minRank: Int? = nil, maxRank: Int? = nil, rengo: Bool? = nil) {
         self.width = width
         self.height = height
         self.ranked = ranked
@@ -144,7 +152,21 @@ struct OGSChallengeGameDetail: Codable {
     var minRank: Int?
     var maxRank: Int?
     
+    // Rengo
+    var rengo: Bool?
+    var rengoBlackTeam: [Int]?
+    var rengoWhiteTeam: [Int]?
+    var rengoNominees: [Int]?
+    var rengoParticipants: [Int]?
+    
     var id: Int?
+    
+    var rengoReadyToStart: Bool {
+        guard rengo == true, let blackTeam = rengoBlackTeam, let whiteTeam = rengoWhiteTeam else {
+            return false
+        }
+        return blackTeam.count > 0 && whiteTeam.count > 0 && blackTeam.count + whiteTeam.count > 2
+    }
     
     enum CodingKeys: String, CodingKey {
         case width
@@ -173,6 +195,13 @@ struct OGSChallengeGameDetail: Codable {
         case minRank
         case challengeId
         case rank
+        
+        // Rengo
+        case rengo
+        case rengoBlackTeam
+        case rengoWhiteTeam
+        case rengoNominees
+        case rengoParticipants
     }
     
     init(from decoder: Decoder) throws {
@@ -207,6 +236,13 @@ struct OGSChallengeGameDetail: Codable {
         userRank = try container.decodeIfPresent(Double.self, forKey: .rank)
         minRank = try container.decodeIfPresent(Int.self, forKey: .minRank)
         maxRank = try container.decodeIfPresent(Int.self, forKey: .maxRank)
+        
+        // Rengo
+        rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
+        rengoBlackTeam = try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam)
+        rengoWhiteTeam = try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam)
+        rengoNominees = try container.decodeIfPresent([Int].self, forKey: .rengoNominees)
+        rengoParticipants = try container.decodeIfPresent([Int].self, forKey: .rengoParticipants)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -231,6 +267,7 @@ struct OGSChallengeGameDetail: Codable {
         try container.encode(timeControl.timeControl, forKey: .timeControl)
         try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
         try container.encode(timeControl, forKey: .timeControlParameters)
+        try container.encode(rengo, forKey: .rengo)
     }
 }
 
@@ -364,6 +401,55 @@ extension OGSChallenge {
                 "time_control": "byoyomi"
               },
               "time_per_move": 25
+            }
+        """#
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try! decoder.decode(OGSChallenge.self, from: data.data(using: .utf8)!)
+    }
+    static var sampleRengoChallenge: OGSChallenge {
+        let data = #"""
+            {
+              "challenge_id": 3366,
+              "user_id": 1769,
+              "username": "hakhoa4",
+              "rank": 24.303382182144386,
+              "pro": 0,
+              "min_rank": -1000,
+              "max_rank": 1000,
+              "game_id": 11454,
+              "name": "Rengo test",
+              "ranked": false,
+              "handicap": 0,
+              "komi": null,
+              "rules": "japanese",
+              "width": 19,
+              "height": 19,
+              "challenger_color": "automatic",
+              "disable_analysis": false,
+              "time_control": "fischer",
+              "time_control_parameters": {
+                "system": "fischer",
+                "speed": "correspondence",
+                "initial_time": 259200,
+                "time_increment": 86400,
+                "max_time": 604800,
+                "pause_on_weekends": true,
+                "time_control": "fischer"
+              },
+              "time_per_move": 89280,
+              "rengo": true,
+              "rengo_nominees": [
+                1526
+              ],
+              "rengo_black_team": [],
+              "rengo_white_team": [
+                1769
+              ],
+              "rengo_participants": [
+                1526,
+                1769
+              ]
             }
         """#
         let decoder = JSONDecoder()

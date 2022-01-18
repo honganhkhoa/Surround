@@ -38,7 +38,12 @@ struct MainView: View {
                         }
                     }
                 }
-                ogs.loadOverview()
+                ogs.loadOverview(allowsCache: false, finishCallback: {
+                    ogs.subscribeToSeekGraph()
+                    DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(5)), execute: {
+                        ogs.unsubscribeFromSeekGraphWhenDone()
+                    })
+                })
             }
             if nav.main.rootView == .publicGames {
                 ogs.fetchPublicGames()

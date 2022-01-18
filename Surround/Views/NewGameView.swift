@@ -777,6 +777,7 @@ struct NewGameView: View {
         let eligibleOpenChallengesCount = ogs.eligibleOpenChallengeById.count
         return VStack(spacing: 0) {
             if ogs.waitingGames > 0 {
+                Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
                     HStack {
                         (Text("Waiting for opponent: \(ogs.waitingGames) game\(ogs.waitingGames == 1 ? "" : "s") ") + Text(Image(systemName: "chevron.forward")))
@@ -791,6 +792,24 @@ struct NewGameView: View {
                     .padding(.vertical, 8)
                 }
                 .background(Color(.systemIndigo))
+                .padding(.horizontal, -18)
+            }
+            if ogs.pendingRengoGames > 0 {
+                Spacer().frame(height: 0.5)
+                NavigationLink(destination: WaitingGamesView()) {
+                    HStack {
+                        (Text("\(ogs.pendingRengoGames) pending Rengo game\(ogs.pendingRengoGames == 1 ? "" : "s") ") + Text(Image(systemName: "chevron.forward")))
+                            .font(.subheadline)
+                            .bold()
+                            .leadingAlignedInScrollView()
+                            .foregroundColor(.white)
+                        Spacer()
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                }
+                .background(Color(.systemPurple))
                 .padding(.horizontal, -18)
             }
             Spacer().frame(height: 10)
@@ -835,10 +854,10 @@ struct NewGameView: View {
             newGameOptionsPicker.background(Color(.systemGray6).shadow(radius: 2))
         }
         .onAppear {
-            ogs.subscribeToOpenChallenges()
+            ogs.subscribeToSeekGraph()
         }
         .onDisappear {
-            ogs.unsubscribeFromOpenChallengesWhenDone()
+            ogs.unsubscribeFromSeekGraphWhenDone()
         }
         .onReceive(ogs.$eligibleOpenChallengeById) { eligibleOpenChallengesById in
             withAnimation {

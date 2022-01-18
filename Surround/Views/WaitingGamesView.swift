@@ -67,56 +67,55 @@ struct WaitingGamesView: View {
         .padding(.horizontal, -15)
     }
 
+    var cardBackground: some View {
+        Color(
+            colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+        )
+        .shadow(radius: 2)
+    }
+    
     var body: some View {
         let liveAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }
         let correspondenceAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed == .correspondence }
+        let liveRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed != .correspondence }
+        let correspondenceRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed == .correspondence }
         return ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
-                if self.liveChallenges.count + liveAutomatchEntries.count > 0 {
+                if self.liveChallenges.count + liveAutomatchEntries.count + liveRengoChallenges.count > 0 {
                     Section(header: sectionHeader(title: "Live games")) {
+                        ForEach(liveRengoChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(cardBackground)
+                        }
                         ForEach(liveAutomatchEntries, id: \.uuid) { entry in
                             AutomatchEntryCell(entry: entry)
                                 .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                                .background(cardBackground)
                         }
                         ForEach(self.liveChallenges) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                                .background(cardBackground)
                         }
                     }
                 }
-                if self.correspondenceChallenges.count + correspondenceAutomatchEntries.count > 0 {
+                if self.correspondenceChallenges.count + correspondenceAutomatchEntries.count + correspondenceRengoChallenges.count > 0 {
                     Section(header: sectionHeader(title: "Correspondence games")) {
+                        ForEach(correspondenceRengoChallenges) { challenge in
+                            ChallengeCell(challenge: challenge)
+                                .padding()
+                                .background(cardBackground)
+                        }
                         ForEach(correspondenceAutomatchEntries, id: \.uuid) { entry in
                             AutomatchEntryCell(entry: entry)
                                 .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                                .background(cardBackground)
                         }
                         ForEach(self.correspondenceChallenges) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                                .background(cardBackground)
                         }
                     }
                 }
@@ -125,12 +124,7 @@ struct WaitingGamesView: View {
                         ForEach(ogs.challengesReceived) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                                .background(cardBackground)
                         }
                     }
                 }

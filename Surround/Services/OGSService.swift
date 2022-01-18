@@ -53,7 +53,8 @@ class OGSService: ObservableObject {
         eligibleOpenChallenges: [OGSChallenge] = [],
         openChallengesSent: [OGSChallenge] = [],
         challengesReceived: [OGSChallenge] = [],
-        automatchEntries: [OGSAutomatchEntry] = []
+        automatchEntries: [OGSAutomatchEntry] = [],
+        cachedUsers: [OGSUser] = []
     ) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
@@ -85,11 +86,18 @@ class OGSService: ObservableObject {
         }
 //        ogs.superchatPeerIds.insert(OGSPrivateMessage.sampleData.first!.from.id)
         
+        if let user = user {
+            ogs.cachedUsersById[user.id] = user
+        }
+        for user in cachedUsers {
+            ogs.cachedUsersById[user.id] = user
+        }
+        
         return ogs
     }
 
-    static let ogsRoot = "https://online-go.com"
-//    static let ogsRoot = "https://beta.online-go.com"
+//    static let ogsRoot = "https://online-go.com"
+    static let ogsRoot = "https://beta.online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
     private let socketManager: SocketManager
@@ -129,6 +137,13 @@ class OGSService: ObservableObject {
         return (challengesSent + openChallengeSentById.values).filter {
             $0.game.timeControl.speed != .correspondence
         }.count + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
+    }
+    
+    @Published private(set) public var hostingRengoChallengeById = [Int: OGSChallenge]()
+    @Published private(set) public var participatingRengoChallengeById = [Int: OGSChallenge]()
+    
+    var pendingRengoGames: Int {
+        return participatingRengoChallengeById.count
     }
 
     @Published private(set) public var isLoadingOverview = true
@@ -1370,6 +1385,76 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
+    func joinRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
+            AF.request(
+                url, method: .put
+            ).validate().response { response in
+                switch response.result {
+                case .success:
+                    promise(.success(()))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func leaveRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
+            AF.request(
+                url, method: .delete
+            ).validate().response { response in
+                switch response.result {
+                case .success:
+                    promise(.success(()))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func assignRengoTeam(challenge: OGSChallenge, player: OGSUser, color: StoneColor?) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { promise in
+            let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/team"
+            let assignParameter = color == .black ? "assign_black" : color == .white ? "assign_white" : "unassign"
+            AF.request(
+                url, method: .put,
+                parameters: [assignParameter: [player.id]],
+                encoder: JSONParameterEncoder()
+            ).validate().response { response in
+                switch response.result {
+                case .success:
+                    promise(.success(()))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
+    func startRengoGame(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
+        return Future<Int, Error> { promise in
+            let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/start"
+            AF.request(url, method: .post).validate().responseJSON { response in
+                switch response.result {
+                case .success:
+                    if let data = response.value as? [String: Any] {
+                        if let newGameId = data["game"] as? Int {
+                            promise(.success(newGameId))
+                        }
+                    }
+                    promise(.failure(OGSServiceError.invalidJSON))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+    
     func sendChat(in game: Game, channel: OGSChatChannel, body: String) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             if let gameId = game.ogsID {
@@ -1386,7 +1471,7 @@ class OGSService: ObservableObject {
     
     var playerCacheObservingCancellable: AnyCancellable?
     
-    func subscribeToOpenChallenges() {
+    func subscribeToSeekGraph() {
         guard socket.status == .connected else {
             return
         }
@@ -1395,9 +1480,9 @@ class OGSService: ObservableObject {
             return
         }
         
-        if openChallengesUnsubscribeCancellable != nil {
-            openChallengesUnsubscribeCancellable?.cancel()
-            openChallengesUnsubscribeCancellable = nil
+        if seekGraphUnsubscribeCancellable != nil {
+            seekGraphUnsubscribeCancellable?.cancel()
+            seekGraphUnsubscribeCancellable = nil
         }
         
         self.socket.emit("seek_graph/connect", ["channel": "global"])
@@ -1415,14 +1500,32 @@ class OGSService: ObservableObject {
                             }
                             self.openChallengeById.removeValue(forKey: challengeId)
                             self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
+                            self.hostingRengoChallengeById.removeValue(forKey: challengeId)
+                            self.participatingRengoChallengeById.removeValue(forKey: challengeId)
                         } else {
                             if var challenge = try? decoder.decode(OGSChallenge.self, from: challengeData) {
-                                if let challengerId = challenge.challenger?.id {
-                                    if self.cachedUsersById[challengerId] != nil {
-                                        challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
+                                if challenge.rengo {
+                                    if let userId = self.user?.id {
+                                        if let challengerId = challenge.challenger?.id, challengerId == userId {
+                                            self.hostingRengoChallengeById[challenge.id] = challenge
+                                        }
+                                        if let participants = challenge.game.rengoParticipants {
+                                            if participants.firstIndex(of: userId) != nil {
+                                                self.participatingRengoChallengeById[challenge.id] = challenge
+                                            } else {
+                                                self.participatingRengoChallengeById.removeValue(forKey: challenge.id)
+                                            }
+                                            self.cachedUserIds.formUnion(Set(participants))
+                                        }
                                     }
-                                    if challengerId == self.user?.id {
-                                        self.openChallengeSentById[challenge.id] = challenge
+                                } else {
+                                    if let challengerId = challenge.challenger?.id {
+                                        if self.cachedUsersById[challengerId] != nil {
+                                            challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
+                                        }
+                                        if challengerId == self.user?.id {
+                                            self.openChallengeSentById[challenge.id] = challenge
+                                        }
                                     }
                                 }
                                 self.openChallengeById[challengeId] = challenge
@@ -1431,6 +1534,11 @@ class OGSService: ObservableObject {
                                     if let challengerId = challenge.challenger?.id {
                                         self.cachedUserIds.insert(challengerId)
                                     }
+                                    if challenge.rengo, let participants = challenge.game.rengoParticipants {
+                                        self.cachedUserIds.formUnion(Set(participants))
+                                    }
+                                } else {
+                                    self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
                                 }
                             }
                         }
@@ -1454,18 +1562,18 @@ class OGSService: ObservableObject {
         }
     }
     
-    var openChallengesUnsubscribeCancellable: AnyCancellable?
-    func unsubscribeFromOpenChallengesWhenDone() {
+    var seekGraphUnsubscribeCancellable: AnyCancellable?
+    func unsubscribeFromSeekGraphWhenDone() {
         guard socket.status == .connected else {
-            openChallengesUnsubscribeCancellable = nil
+            seekGraphUnsubscribeCancellable = nil
             return
         }
         
-        guard openChallengeSentById.count == 0 else {
-            if openChallengesUnsubscribeCancellable == nil {
-                openChallengesUnsubscribeCancellable = self.$openChallengeSentById.collect(.byTime(DispatchQueue.global(), 1.0)).sink { _ in
+        guard openChallengeSentById.count + participatingRengoChallengeById.count == 0 else {
+            if seekGraphUnsubscribeCancellable == nil {
+                seekGraphUnsubscribeCancellable = self.$openChallengeSentById.combineLatest(self.$participatingRengoChallengeById).collect(.byTime(DispatchQueue.global(), 1.0)).sink { _ in
                     DispatchQueue.main.async {
-                        self.unsubscribeFromOpenChallengesWhenDone()
+                        self.unsubscribeFromSeekGraphWhenDone()
                     }
                 }
             }
@@ -1477,12 +1585,14 @@ class OGSService: ObservableObject {
         
         self.openChallengeById.removeAll()
         self.eligibleOpenChallengeById.removeAll()
+        self.participatingRengoChallengeById.removeAll()
+        self.hostingRengoChallengeById.removeAll()
         
         playerCacheObservingCancellable?.cancel()
         playerCacheObservingCancellable = nil
         
-        openChallengesUnsubscribeCancellable?.cancel()
-        openChallengesUnsubscribeCancellable = nil
+        seekGraphUnsubscribeCancellable?.cancel()
+        seekGraphUnsubscribeCancellable = nil
     }
     
     func fetchFriends() {

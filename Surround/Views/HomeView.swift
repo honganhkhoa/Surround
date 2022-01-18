@@ -85,6 +85,24 @@ struct HomeView: View {
                             .background(Color(.systemIndigo))
                         }
                     }
+                    if ogs.pendingRengoGames > 0 {
+                        Button(action: { nav.main.showWaitingGames = true }) {
+                            HStack {
+                                HStack {
+                                    Text("\(ogs.pendingRengoGames) pending Rengo game\(ogs.pendingRengoGames == 1 ? "" : "s") ")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                    Spacer().frame(width: 10)
+                                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    Spacer()
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemPurple))
+                            }
+                        }
+                    }
                     Button(action: { nav.home.showingNewGameView = true }) {
                         HStack {
                             Label {
