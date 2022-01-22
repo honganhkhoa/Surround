@@ -108,6 +108,7 @@ struct PrivateMessageLog: View {
                     }
                     .padding(.vertical, 5)
                     .onAppear {
+                        ogs.setUpNewPeerIfNecessary(peerId: peer.id)
                         scrollView.scrollTo("scrollViewBottom")
                         ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
                     }

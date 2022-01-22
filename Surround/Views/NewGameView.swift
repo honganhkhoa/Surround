@@ -55,7 +55,7 @@ struct QuickMatchForm: View {
         return Array(ogs.eligibleOpenChallengeById.values.filter { challenge in
             let width = challenge.game.width
             let height = challenge.game.height
-            if !boardSizes.contains(width) || !boardSizes.contains(height) {
+            if challenge.rengo || !boardSizes.contains(width) || !boardSizes.contains(height) {
                 return false
             }
             
@@ -699,6 +699,12 @@ struct OpenChallengesForm: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
     var eligibleOpenChallenges: [OGSChallenge]
+    @State var challengeType: ChallengeType = .standard
+    
+    enum ChallengeType {
+        case standard
+        case rengo
+    }
     
     func sectionHeader(title: String) -> some View {
         HStack {
@@ -716,20 +722,58 @@ struct OpenChallengesForm: View {
     var body: some View {
         var liveGameChallenges = [OGSChallenge]()
         var correspondenceGameChallenges = [OGSChallenge]()
+        var liveRengoChallenges = [OGSChallenge]()
+        var correspondenceRengoChallenges = [OGSChallenge]()
         for challenge in eligibleOpenChallenges {
-            if challenge.game.timeControl.speed == .correspondence {
-                correspondenceGameChallenges.append(challenge)
+            if challenge.rengo {
+                if challenge.game.timeControl.speed == .correspondence {
+                    correspondenceRengoChallenges.append(challenge)
+                } else {
+                    liveRengoChallenges.append(challenge)
+                }
             } else {
-                liveGameChallenges.append(challenge)
+                if challenge.game.timeControl.speed == .correspondence {
+                    correspondenceGameChallenges.append(challenge)
+                } else {
+                    liveGameChallenges.append(challenge)
+                }
             }
         }
+        let standardCount = liveGameChallenges.count + correspondenceGameChallenges.count
+        let rengoCount = liveRengoChallenges.count + correspondenceRengoChallenges.count
         
         return ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
-                if liveGameChallenges.count > 0 {
-                    Section(header: sectionHeader(title: "Live games")) {
-                        Group {
-                            ForEach(liveGameChallenges) { challenge in
+            VStack(spacing: 0) {
+                Spacer().frame(height: 10)
+                Picker("Challenge type", selection: $challengeType.animation()) {
+                    Text("Standard 1v1 (\(standardCount))").tag(ChallengeType.standard)
+                    Text("Rengo (\(rengoCount))").tag(ChallengeType.rengo)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+            }
+            
+            if challengeType == .standard {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
+                    if liveGameChallenges.count > 0 {
+                        Section(header: sectionHeader(title: "Live games")) {
+                            Group {
+                                ForEach(liveGameChallenges) { challenge in
+                                    ChallengeCell(challenge: challenge)
+                                        .padding()
+                                        .background(
+                                            Color(
+                                                colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                            )
+                                            .shadow(radius: 2)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                    if correspondenceGameChallenges.count > 0 {
+                        Section(header: sectionHeader(title: "Correspondence games")) {
+                            ForEach(correspondenceGameChallenges) { challenge in
                                 ChallengeCell(challenge: challenge)
                                     .padding()
                                     .background(
@@ -741,22 +785,47 @@ struct OpenChallengesForm: View {
                             }
                         }
                     }
-                }
-                if correspondenceGameChallenges.count > 0 {
-                    Section(header: sectionHeader(title: "Correspondence games")) {
-                        ForEach(correspondenceGameChallenges) { challenge in
-                            ChallengeCell(challenge: challenge)
-                                .padding()
-                                .background(
-                                    Color(
-                                        colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                    )
-                                    .shadow(radius: 2)
-                                )
+                }.padding(.horizontal)
+            } else if challengeType == .rengo {
+                VStack(spacing: 0) {
+                    Text("A **Rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn.")
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                    Spacer().frame(height: 10)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
+                        if liveRengoChallenges.count > 0 {
+                            Section(header: sectionHeader(title: "Live games")) {
+                                Group {
+                                    ForEach(liveRengoChallenges) { challenge in
+                                        ChallengeCell(challenge: challenge)
+                                            .padding()
+                                            .background(
+                                                Color(
+                                                    colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                                )
+                                                .shadow(radius: 2)
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                        if correspondenceRengoChallenges.count > 0 {
+                            Section(header: sectionHeader(title: "Correspondence games")) {
+                                ForEach(correspondenceRengoChallenges) { challenge in
+                                    ChallengeCell(challenge: challenge)
+                                        .padding()
+                                        .background(
+                                            Color(
+                                                colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                                            )
+                                            .shadow(radius: 2)
+                                        )
+                                }
+                            }
                         }
                     }
-                }
-            }.padding(.horizontal)
+                }.padding(.horizontal)
+            }
         }
     }
 }
@@ -774,7 +843,24 @@ struct NewGameView: View {
     }
     
     var newGameOptionsPicker: some View {
+        let eligibleRengoChallengesCount = ogs.eligibleOpenChallengeById.values.filter { $0.rengo }.count
         let eligibleOpenChallengesCount = ogs.eligibleOpenChallengeById.count
+        
+        var openChallengesSubheader = "There are currently no open challenges."
+        if eligibleOpenChallengesCount > 0 {
+            if eligibleOpenChallengesCount > eligibleRengoChallengesCount {
+                let standardCount = eligibleOpenChallengesCount - eligibleRengoChallengesCount
+                openChallengesSubheader = "There \(standardCount == 1 ? "is" : "are") \(standardCount) open challenge\(standardCount == 1 ? "" : "s") that you can accept to start a game immediately"
+                if eligibleRengoChallengesCount > 0 {
+                    openChallengesSubheader += ", and \(eligibleRengoChallengesCount) open Rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
+                } else {
+                    openChallengesSubheader += "."
+                }
+            } else {
+                openChallengesSubheader = "There \(eligibleRengoChallengesCount == 1 ? "is" : "are") \(eligibleRengoChallengesCount) open Rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
+            }
+        }
+        
         return VStack(spacing: 0) {
             if ogs.waitingGames > 0 {
                 Spacer().frame(height: 0.5)
@@ -830,7 +916,7 @@ struct NewGameView: View {
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             case .openChallenges:
-                Text("There \(eligibleOpenChallengesCount != 1 ? "are" : "is") \(eligibleOpenChallengesCount == 0 ? "no" : "\(eligibleOpenChallengesCount)") open challenge\(eligibleOpenChallengesCount != 1 ? "s" : "") that you can accept to start a game immediately.")
+                Text(openChallengesSubheader)
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             }
@@ -900,8 +986,18 @@ struct NewGameView_Previews: PreviewProvider {
                     ranking: 27,
                     icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
                 ), 
-                eligibleOpenChallenges: [OGSChallenge.sampleOpenChallenge],
-                openChallengesSent: [OGSChallenge.sampleOpenChallenge]
+                eligibleOpenChallenges: [OGSChallenge.sampleOpenChallenge, OGSChallenge.sampleRengoChallenge],
+                openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+                cachedUsers: [
+                    OGSUser(
+                        username: "hakhoa4", id: 1769,
+                        iconUrl: "https://secure.gravatar.com/avatar/7eb7eabbe9bd03c2fc99881d04da9cbd?s=32&d=retro"
+                    ),
+                    OGSUser(
+                        username: "honganhkhoa", id: 1526,
+                        iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
+                    )
+                ]
             ))
     }
 }

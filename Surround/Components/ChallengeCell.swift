@@ -70,25 +70,16 @@ struct RengoPlayerCard: View {
 struct RengoPlayersDetail: View {
     @EnvironmentObject var ogs: OGSService
     var challenge: OGSChallenge
-    @State var showRengoTip = false
     
     @Namespace var playerCards
 
     var body: some View {
         if let blackTeam = challenge.game.rengoBlackTeam, let whiteTeam = challenge.game.rengoWhiteTeam, let nominees = challenge.game.rengoNominees, let userId = ogs.user?.id {
             VStack(alignment: .leading, spacing: 0) {
-                Group {
-                    Label("[Rengo] \(challenge.game.name)", systemImage: "person.2.fill")
-                    .font(.body.bold())
-                    .foregroundColor(Color(.systemPurple))
-                    if showRengoTip {
-                        Spacer().frame(height: 5)
-                        Text("A **Rengo** game is played between two teams, one taking the Black stones and the other the White stones. Each player in a team must play in turn.")
-                            .font(.callout)
-                    }
-                    Spacer().frame(height: 10)
-                }
-                .onTapGesture { withAnimation { showRengoTip.toggle() } }
+                Label(challenge.game.name, systemImage: "person.2.fill")
+                .font(.body.bold())
+                .foregroundColor(Color(.systemPurple))
+                Spacer().frame(height: 10)
                 VStack(alignment: .leading, spacing: 5) {
                     HStack {
                         Stone(color: .black, shadowRadius: 2)
@@ -211,38 +202,58 @@ struct RengoActions: View {
     }
 
     var body: some View {
-        if let participants = challenge.game.rengoParticipants, let userId = ogs.user?.id {
-            HStack {
-                if ogsRequestCancellable != nil {
-                    ProgressView()
-                } else {
-                    if userId == challenge.challenger?.id {
-                        HStack {
-                            Button(role: .destructive, action: { cancelRengoChallenge() }) {
-                                Text("Cancel").bold()
-                            }
-                            Spacer()
-                            Button(action: { startRengoGame() }) {
-                                Text("Start").bold()
-                            }
-                            .disabled(!challenge.game.rengoReadyToStart)
-                        }
+        if let participants = challenge.game.rengoParticipants, let userId = ogs.user?.id, let host = challenge.challenger {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    if ogsRequestCancellable != nil {
+                        ProgressView()
                     } else {
-                        if participants.firstIndex(of: userId) == nil {
+                        if userId == host.id {
                             HStack {
-                                Spacer()
-                                Button(action: { joinRengoChallenge() }) {
-                                    Text("Join").bold()
+                                Button(role: .destructive, action: { cancelRengoChallenge() }) {
+                                    Text("Cancel").bold()
                                 }
+                                Spacer()
+                                Button(action: { startRengoGame() }) {
+                                    Text("Start").bold()
+                                }
+                                .disabled(!challenge.game.rengoReadyToStart)
                             }
                         } else {
-                            Button(role: .destructive, action: { leaveRengoChallenge() }) {
-                                Text("Leave").bold()
+                            if participants.firstIndex(of: userId) == nil {
+                                HStack {
+                                    Spacer()
+                                    Button(action: { joinRengoChallenge() }) {
+                                        Text("Join").bold()
+                                    }
+                                }
+                            } else {
+                                Button(role: .destructive, action: { leaveRengoChallenge() }) {
+                                    Text("Leave").bold()
+                                }
                             }
                         }
                     }
+                    Spacer()
                 }
-                Spacer()
+                if userId == host.id {
+                    Text("Tap on avatars to assign players into teams.")
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                } else if participants.firstIndex(of: userId) != nil {
+                    Text("Waiting for players to join and the organizer to start the game.")
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                    NavigationLink(
+                        destination: PrivateMessageLog(peer: host)
+                            .navigationBarTitle(host.username)
+                            .navigationBarTitleDisplayMode(.inline)
+                    ) {
+                        (Text("Message organizer") + Text(Image(systemName: "chevron.forward")))
+                            .font(.subheadline.bold())
+                            .leadingAlignedInScrollView()
+                    }
+                }
             }
         }
     }
@@ -491,8 +502,10 @@ struct ChallengeView_Previews: PreviewProvider {
             .environmentObject(
                 OGSService.previewInstance(
                     user: OGSUser(
-                        username: "hakhoa", id: 1765,
-                        iconUrl: "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro"
+                        username: "honganhkhoa", id: 1526,
+                        iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
+//                        username: "hakhoa", id: 1765,
+//                        iconUrl: "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro"
                     ),
                     cachedUsers: [
                         OGSUser(

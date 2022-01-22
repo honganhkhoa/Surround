@@ -41,7 +41,9 @@ struct MainView: View {
                 ogs.loadOverview(allowsCache: false, finishCallback: {
                     ogs.subscribeToSeekGraph()
                     DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(5)), execute: {
-                        ogs.unsubscribeFromSeekGraphWhenDone()
+                        if !nav.home.showingNewGameView {
+                            ogs.unsubscribeFromSeekGraphWhenDone()
+                        }
                     })
                 })
             }

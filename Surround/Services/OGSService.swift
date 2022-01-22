@@ -959,7 +959,7 @@ class OGSService: ObservableObject {
                                 print(gameId, movedata, error)
                             }
 
-                            if let playerUpdate = move[4] as? [String: Any] {
+                            if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
                                 let decoder = DictionaryDecoder()
                                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                                 game.latestPlayerUpdate = try? decoder.decode(OGSMoveExtra.self, from: playerUpdate).playerUpdate
@@ -1388,15 +1388,20 @@ class OGSService: ObservableObject {
     func joinRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
-            AF.request(
-                url, method: .put
-            ).validate().response { response in
-                switch response.result {
-                case .success:
-                    promise(.success(()))
-                case .failure(let error):
-                    promise(.failure(error))
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    url, method: .put,
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
+                ).validate().response { response in
+                    switch response.result {
+                    case .success:
+                        promise(.success(()))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
                 }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
             }
         }.eraseToAnyPublisher()
     }
@@ -1404,15 +1409,20 @@ class OGSService: ObservableObject {
     func leaveRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
-            AF.request(
-                url, method: .delete
-            ).validate().response { response in
-                switch response.result {
-                case .success:
-                    promise(.success(()))
-                case .failure(let error):
-                    promise(.failure(error))
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    url, method: .delete,
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
+                ).validate().response { response in
+                    switch response.result {
+                    case .success:
+                        promise(.success(()))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
                 }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
             }
         }.eraseToAnyPublisher()
     }
@@ -1421,17 +1431,22 @@ class OGSService: ObservableObject {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/team"
             let assignParameter = color == .black ? "assign_black" : color == .white ? "assign_white" : "unassign"
-            AF.request(
-                url, method: .put,
-                parameters: [assignParameter: [player.id]],
-                encoder: JSONParameterEncoder()
-            ).validate().response { response in
-                switch response.result {
-                case .success:
-                    promise(.success(()))
-                case .failure(let error):
-                    promise(.failure(error))
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    url, method: .put,
+                    parameters: [assignParameter: [player.id]],
+                    encoder: JSONParameterEncoder(),
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
+                ).validate().response { response in
+                    switch response.result {
+                    case .success:
+                        promise(.success(()))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
                 }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
             }
         }.eraseToAnyPublisher()
     }
@@ -1439,18 +1454,25 @@ class OGSService: ObservableObject {
     func startRengoGame(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
         return Future<Int, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/start"
-            AF.request(url, method: .post).validate().responseJSON { response in
-                switch response.result {
-                case .success:
-                    if let data = response.value as? [String: Any] {
-                        if let newGameId = data["game"] as? Int {
-                            promise(.success(newGameId))
+            if let csrfToken = self.ogsUIConfig?.csrfToken {
+                AF.request(
+                    url, method: .post,
+                    headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
+                ).validate().responseJSON { response in
+                    switch response.result {
+                    case .success:
+                        if let data = response.value as? [String: Any] {
+                            if let newGameId = data["game"] as? Int {
+                                promise(.success(newGameId))
+                            }
                         }
+                        promise(.failure(OGSServiceError.invalidJSON))
+                    case .failure(let error):
+                        promise(.failure(error))
                     }
-                    promise(.failure(OGSServiceError.invalidJSON))
-                case .failure(let error):
-                    promise(.failure(error))
                 }
+            } else {
+                promise(.failure(OGSServiceError.notLoggedIn))
             }
         }.eraseToAnyPublisher()
     }

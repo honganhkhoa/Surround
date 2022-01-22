@@ -130,11 +130,13 @@ struct OGSUser : Codable, Equatable {
             return nil
         }
         
+        let newSize = [8, 16, 32, 64, 96, 128].first(where: { $0 >= size }) ?? size
+        
         let regex1 = try! NSRegularExpression(pattern: "-[0-9]+.png")
         let regex2 = try! NSRegularExpression(pattern: "s=[0-9]+")
         var result = icon
-        result = regex1.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "-\(size).png")
-        result = regex2.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "s=\(size)")
+        result = regex1.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "-\(newSize).png")
+        result = regex2.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "s=\(newSize)")
         return URL(string: result)
     }
     
