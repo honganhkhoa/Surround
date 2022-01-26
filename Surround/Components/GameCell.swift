@@ -13,14 +13,14 @@ struct PlayerInfoLine: View {
     var displayMode: GameCell.CellDisplayMode
     @EnvironmentObject var ogs: OGSService
 
-    var isUser: Bool {
+    var isUserLine: Bool {
         guard let user = ogs.user else {
             return false
         }
         if game.rengo {
             return game.gameData?.rengoTeams?[color].firstIndex(where: { $0.id == user.id }) != nil
         } else {
-            return (color == .black && user.id == game.blackId) || (color == .white && user.id == game.whiteId)
+            return color == game.userStoneColor
         }
     }
     
@@ -30,13 +30,13 @@ struct PlayerInfoLine: View {
                 Stone(color: color, shadowRadius: 1).frame(width: 15, height: 15)
                 HStack(alignment: .firstTextBaseline) {
                     Group {
-                        if isUser {
+                        if isUserLine {
                             Text("You").font(Font.subheadline.bold())
                                 .padding(.horizontal, 3)
                                 .background(Color(UIColor.systemTeal).cornerRadius(5))
                                 .offset(x: -3)
                         } else {
-                            if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+                            if let player = game.currentPlayer(with: color) {
                                 (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
                                     .bold().lineLimit(1)
                                     .foregroundColor(player.uiColor)
@@ -58,13 +58,13 @@ struct PlayerInfoLine: View {
                 VStack(alignment: .leading) {
                     HStack {
                         Group {
-                            if isUser {
+                            if isUserLine {
                                 Text("You").font(Font.subheadline.bold())
                                     .padding(.horizontal, 3)
                                     .background(Color(UIColor.systemTeal).cornerRadius(5))
                                     .offset(x: -3)
                             } else {
-                                if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+                                if let player = game.currentPlayer(with: color) {
                                     (Text(player.username).font(.subheadline) + Text(" [\(player.formattedRank)]").font(.caption))
                                         .bold().lineLimit(1)
                                         .foregroundColor(player.uiColor)
@@ -106,14 +106,6 @@ struct GameCell: View {
         .padding()
         .background(Color.gray.opacity(0.9))
         .cornerRadius(5)
-    }
-    
-    var isUserInGame: Bool {
-        guard let user = ogs.user else {
-            return false
-        }
-        
-        return game.blackId == user.id || game.whiteId == user.id
     }
     
     var body: some View {

@@ -27,10 +27,6 @@ struct GameControlRow: View {
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
-    var userColor: StoneColor {
-        return ogs.user?.id == game.blackId ? .black : .white
-    }
-    
     func submitMove(move: Move) {
         self.ogsRequestCancellable = ogs.submitMove(move: move, forGame: game)
             .zip(game.$currentPosition.setFailureType(to: Error.self))
@@ -179,52 +175,56 @@ struct GameControlRow: View {
     var mainActionButton: some View {
         Group {
             if ogsRequestCancellable == nil {
-                let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
-                let userNeedsToAcceptStoneRemoval =
-                    game.isUserPlaying
-                    && game.gamePhase == .stoneRemoval
-                    && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
-                let isHandicapPlacement = (game.gameData?.freeHandicapPlacement ?? false) && (game.currentPosition.lastMoveNumber < (game.gameData?.handicap ?? 0))
-                Group {
-                    if game.currentPosition.estimatedScores != nil {
-                        Button(action: { clearEstimatedTerritory() }) {
-                            Text("Clear estimates")
-                                .minimumScaleFactor(0.7)
-                        }
-                    } else if isUserTurnToPlay {
-                        if let pendingMove = pendingMove.wrappedValue {
-                            Button(action: { submitMove(move: pendingMove)}) {
-                                Text("Submit move")
+                if let userColor = game.userStoneColor {
+                    let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
+                    let userNeedsToAcceptStoneRemoval =
+                        game.isUserPlaying
+                        && game.gamePhase == .stoneRemoval
+                        && game.removedStonesAccepted[userColor] != game.currentPosition.removedStones
+                    let isHandicapPlacement = (game.gameData?.freeHandicapPlacement ?? false) && (game.currentPosition.lastMoveNumber < (game.gameData?.handicap ?? 0))
+                    Group {
+                        if game.currentPosition.estimatedScores != nil {
+                            Button(action: { clearEstimatedTerritory() }) {
+                                Text("Clear estimates")
+                                    .minimumScaleFactor(0.7)
                             }
-                        } else if !isHandicapPlacement {
-                            Button(action: { self.showingPassAlert = true }) {
-                                Text("Pass")
+                        } else if isUserTurnToPlay {
+                            if let pendingMove = pendingMove.wrappedValue {
+                                Button(action: { submitMove(move: pendingMove)}) {
+                                    Text("Submit move")
+                                }
+                            } else if !isHandicapPlacement {
+                                Button(action: { self.showingPassAlert = true }) {
+                                    Text("Pass")
+                                }
                             }
-                        }
-                    } else if userNeedsToAcceptStoneRemoval {
-                        Button(action: { acceptRemovedStones() }) {
-                            Text("Accept")
-                        }
-                    } else if game.isUserPlaying {
-                        if let goToNextGame = goToNextGame, let gameSpeed = game.gameData?.timeControl.speed {
-                            let gamesWaiting = gameSpeed == .correspondence ?
-                                ogs.sortedActiveCorrespondenceGamesOnUserTurn.count :
-                                ogs.liveGames.filter { ogs.isOnUserTurn(game: $0) }.count
-                            if gamesWaiting > 0 {
-                                Button(action: goToNextGame) {
-                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                        Text("Next")
-                                        Text("(\(gamesWaiting))")
-                                            .font(Font.caption2.bold())
+                        } else if userNeedsToAcceptStoneRemoval {
+                            Button(action: { acceptRemovedStones() }) {
+                                Text("Accept")
+                            }
+                        } else if game.isUserPlaying {
+                            if let goToNextGame = goToNextGame, let gameSpeed = game.gameData?.timeControl.speed {
+                                let gamesWaiting = gameSpeed == .correspondence ?
+                                    ogs.sortedActiveCorrespondenceGamesOnUserTurn.count :
+                                    ogs.liveGames.filter { ogs.isOnUserTurn(game: $0) }.count
+                                if gamesWaiting > 0 {
+                                    Button(action: goToNextGame) {
+                                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                            Text("Next")
+                                            Text("(\(gamesWaiting))")
+                                                .font(Font.caption2.bold())
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    .padding(10)
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                    .hoverEffect(.highlight)
+                } else {
+                    EmptyView()
                 }
-                .padding(10)
-                .contentShape(RoundedRectangle(cornerRadius: 10))
-                .hoverEffect(.highlight)
             } else {
                 ProgressView().alignmentGuide(.firstTextBaseline, computeValue: { viewDimension in
                     viewDimension.height

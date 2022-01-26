@@ -698,7 +698,24 @@ struct CustomGameForm: View {
 struct OpenChallengesForm: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
-    var eligibleOpenChallenges: [OGSChallenge]
+    var eligibleOpenChallenges: [OGSChallenge] {
+        didSet {
+            var _challengeIds = [Int]()
+            var _rengoIds = [Int]()
+            for challenge in eligibleOpenChallenges {
+                if challenge.rengo {
+                    _rengoIds.append(challenge.id)
+                } else {
+                    _challengeIds.append(challenge.id)
+                }
+            }
+            challengeIds = _challengeIds
+            rengoIds = _rengoIds
+        }
+    }
+    
+    @State var challengeIds = [Int]()
+    @State var rengoIds = [Int]()
     @State var challengeType: ChallengeType = .standard
     
     enum ChallengeType {
@@ -767,6 +784,7 @@ struct OpenChallengesForm: View {
                                             )
                                             .shadow(radius: 2)
                                         )
+                                        .id(challenge.id)
                                 }
                             }
                         }
@@ -782,19 +800,22 @@ struct OpenChallengesForm: View {
                                         )
                                         .shadow(radius: 2)
                                     )
+                                    .id(challenge.id)
                             }
                         }
                     }
-                }.padding(.horizontal)
+                }
+                .padding(.horizontal)
+                .animation(.linear, value: self.challengeIds)
             } else if challengeType == .rengo {
                 VStack(spacing: 0) {
-                    Text("A **Rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn.")
+                    Text("A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn.")
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
                     Spacer().frame(height: 10)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
                         if liveRengoChallenges.count > 0 {
-                            Section(header: sectionHeader(title: "Live games")) {
+                            Section(header: sectionHeader(title: "Live rengo games")) {
                                 Group {
                                     ForEach(liveRengoChallenges) { challenge in
                                         ChallengeCell(challenge: challenge)
@@ -805,12 +826,13 @@ struct OpenChallengesForm: View {
                                                 )
                                                 .shadow(radius: 2)
                                             )
+                                            .id(challenge.id)
                                     }
                                 }
                             }
                         }
                         if correspondenceRengoChallenges.count > 0 {
-                            Section(header: sectionHeader(title: "Correspondence games")) {
+                            Section(header: sectionHeader(title: "Correspondence rengo games")) {
                                 ForEach(correspondenceRengoChallenges) { challenge in
                                     ChallengeCell(challenge: challenge)
                                         .padding()
@@ -820,11 +842,14 @@ struct OpenChallengesForm: View {
                                             )
                                             .shadow(radius: 2)
                                         )
+                                        .id(challenge.id)
                                 }
                             }
                         }
                     }
-                }.padding(.horizontal)
+                }
+                .padding(.horizontal)
+                .animation(.linear, value: self.rengoIds)
             }
         }
     }
@@ -852,12 +877,12 @@ struct NewGameView: View {
                 let standardCount = eligibleOpenChallengesCount - eligibleRengoChallengesCount
                 openChallengesSubheader = "There \(standardCount == 1 ? "is" : "are") \(standardCount) open challenge\(standardCount == 1 ? "" : "s") that you can accept to start a game immediately"
                 if eligibleRengoChallengesCount > 0 {
-                    openChallengesSubheader += ", and \(eligibleRengoChallengesCount) open Rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
+                    openChallengesSubheader += ", and \(eligibleRengoChallengesCount) open rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
                 } else {
                     openChallengesSubheader += "."
                 }
             } else {
-                openChallengesSubheader = "There \(eligibleRengoChallengesCount == 1 ? "is" : "are") \(eligibleRengoChallengesCount) open Rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
+                openChallengesSubheader = "There \(eligibleRengoChallengesCount == 1 ? "is" : "are") \(eligibleRengoChallengesCount) open rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
             }
         }
         
@@ -946,13 +971,11 @@ struct NewGameView: View {
             ogs.unsubscribeFromSeekGraphWhenDone()
         }
         .onReceive(ogs.$eligibleOpenChallengeById) { eligibleOpenChallengesById in
-            withAnimation {
-                self.eligibleOpenChallenges = Array(
-                    eligibleOpenChallengesById.values.sorted(
-                        by: { ($0.challenger?.username ?? "") < ($1.challenger?.username ?? "") }
-                    )
+            self.eligibleOpenChallenges = Array(
+                eligibleOpenChallengesById.values.sorted(
+                    by: { ($0.challenger?.username ?? "") < ($1.challenger?.username ?? "") }
                 )
-            }
+            )
         }
     }
 }

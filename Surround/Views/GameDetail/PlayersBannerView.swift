@@ -125,7 +125,15 @@ struct PlayersBannerView: View {
     
     @ViewBuilder
     func playerName(color: StoneColor) -> some View {
-        if let player = color == .black ? game.blackPlayer : game.whitePlayer {
+        if game.rengo {
+            if let player = game.orderedRengoTeam[color]?.first, let teamSize = game.orderedRengoTeam[color]?.count {
+                (Text(player.username).font(Font.body.bold()) +
+                 Text(" [\(player.formattedRank)]").font(Font.caption.bold()) +
+                 (teamSize <= 1 ? Text("") : (Text(" + \(teamSize - 1)×") + Text(Image(systemName: "person.fill")))))
+            } else {
+                EmptyView()
+            }
+        } else if let player = color == .black ? game.blackPlayer : game.whitePlayer {
             (Text(player.username).font(Font.body.bold()) +
             Text(" [\(player.formattedRank)]").font(Font.caption.bold()))
         } else {
@@ -135,7 +143,7 @@ struct PlayersBannerView: View {
 
     func playerInfoColumn(color: StoneColor, leftSide: Bool) -> some View {
         let captures = game.currentPosition.captures[color] ?? 0
-        let playerId = color == .black ? game.blackId : game.whiteId
+        let playerId = game.currentPlayer(with: color)?.id ?? -1
         let pauseReason = game.pauseControl?.pauseReason(playerId: playerId)
         let timeUntilAutoResign = color == .black ? game.clock?.blackTimeUntilAutoResign : game.clock?.whiteTimeUntilAutoResign
         let clockStatus = { () -> AnyView in
@@ -477,7 +485,7 @@ struct PlayersBannerView: View {
         .onReceive(game.$clock) { clock in
             if let clock = clock {
                 if voiceCountdown && game.isUserTurn {
-                    let time = ogs.user?.id == game.blackId ? clock.blackTime : clock.whiteTime
+                    let time = game.userStoneColor == .black ? clock.blackTime : clock.whiteTime
                     if let timeLeft = time.timeLeft {
                         if timeLeft <= 10 {
                             let utteranceString = "\(Int(timeLeft))"

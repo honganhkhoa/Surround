@@ -181,9 +181,9 @@ class OGSService: ObservableObject {
             }
         }
         let thinkingTimeLeftIncreasing: (Game, Game) -> Bool =  { game1, game2 in
-            if let clock1 = game1.clock, let clock2 = game2.clock {
-                let time1 = game1.blackId == self.user?.id ? clock1.blackTime : clock1.whiteTime
-                let time2 = game2.blackId == self.user?.id ? clock2.blackTime : clock2.whiteTime
+            if let clock1 = game1.clock, let clock2 = game2.clock, let user = self.user {
+                let time1 = game1.stoneColor(of: user) == .black ? clock1.blackTime : clock1.whiteTime
+                let time2 = game2.stoneColor(of: user) == .black ? clock2.blackTime : clock2.whiteTime
                 let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
                 let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
                 return timeLeft1 <= timeLeft2
@@ -231,18 +231,10 @@ class OGSService: ObservableObject {
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).receive(on: RunLoop.main).sink(receiveValue: { activeGamesValues in
             if let activeGames = activeGamesValues.last {
                 self.sortActiveGames(activeGames: activeGames.values)
-                if let userId = self.user?.id {
-                    for game in activeGames.values {
-                        if let blackId = game.blackId, let whiteId = game.whiteId {
-                            if blackId == userId {
-                                self.cachedUserIds.insert(whiteId)
-                            } else if whiteId == userId {
-                                self.cachedUserIds.insert(blackId)
-                            }
-                        }
-                    }
-                    self.fetchCachedPlayersIfNecessary()
+                for game in activeGames.values {
+                    self.cachedUserIds.formUnion(Set(game.playerByOGSId.keys))
                 }
+                self.fetchCachedPlayersIfNecessary()
             }
         })
         
@@ -1034,9 +1026,8 @@ class OGSService: ObservableObject {
             DispatchQueue.main.async {
                 if let removedStoneAcceptedData = data[0] as? [String: Any] {
                     if let connectedGame = self.connectedGames[ogsID] {
-                        if let playerId = removedStoneAcceptedData["player_id"] as? Int,
+                        if let playerId = removedStoneAcceptedData["player_id"] as? Int, let color = connectedGame.stoneColor(ofPlayerWithId: playerId),
                            let stones = removedStoneAcceptedData["stones"] as? String {
-                            let color: StoneColor = playerId == connectedGame.blackId ? .black : .white
                             connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
                         }
                     }
@@ -1247,10 +1238,7 @@ class OGSService: ObservableObject {
                     }
                     self.sortedPublicGames = newPublicGames
                     for game in newPublicGames {
-                        if let blackId = game.blackId, let whiteId = game.whiteId {
-                            self.cachedUserIds.insert(blackId)
-                            self.cachedUserIds.insert(whiteId)
-                        }
+                        self.cachedUserIds.formUnion(Set(game.playerByOGSId.keys))
                     }
                     self.fetchCachedPlayersIfNecessary()
                     // Disconnect outdated games
@@ -1734,11 +1722,12 @@ class OGSService: ObservableObject {
 
     func isOnUserTurn(game: Game) -> Bool {
         if game.gamePhase == .stoneRemoval {
-            let userColor: StoneColor = self.user?.id == game.blackId ? .black : .white
-            if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
-                return true
-            } else {
-                return false
+            if let userColor = game.userStoneColor {
+                if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
+                    return true
+                } else {
+                    return false
+                }
             }
         } else if game.gamePhase != .finished {
             if let clock = game.clock {

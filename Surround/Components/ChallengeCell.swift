@@ -54,7 +54,6 @@ struct RengoPlayerCard: View {
             } label: {
                 AsyncImage(url: player.iconURL(ofSize: 40)) { $0.resizable() } placeholder: { Color.gray }
                 .frame(width: 40, height: 40)
-                .shadow(radius: 2)
             }
             if playerAsssignCancellable == nil {
                 Text("[\(player.formattedRank)]")
@@ -100,7 +99,7 @@ struct RengoPlayersDetail: View {
                             }
                             Spacer()
                         }
-                    }
+                    }.padding(.trailing, -16)
                     HStack {
                         Stone(color: .white, shadowRadius: 2)
                             .frame(width: 15, height: 15)
@@ -120,7 +119,7 @@ struct RengoPlayersDetail: View {
                             }
                             Spacer()
                         }
-                    }
+                    }.padding(.trailing, -16)
                     if nominees.count > 0 || challenge.challenger?.id == userId {
                         HStack {
                             Stone(color: nil, shadowRadius: 2)
@@ -141,9 +140,12 @@ struct RengoPlayersDetail: View {
                                 }
                                 Spacer()
                             }
-                        }
+                        }.padding(.trailing, -16)
                     }
-                }.animation(.easeInOut, value: challenge.game)
+                }
+                .animation(.easeInOut, value: challenge.game.rengoWhiteTeam)
+                .animation(.easeInOut, value: challenge.game.rengoBlackTeam)
+                .animation(.easeInOut, value: challenge.game.rengoNominees)
             }
         }
     }

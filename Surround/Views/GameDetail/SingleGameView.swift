@@ -242,15 +242,15 @@ struct SingleGameView: View {
             if attachedKeyboardVisible && UIScreen.main.bounds.size.height < 600 {
                 EmptyView()
             } else {
-                if attachedKeyboardVisible {
+                if attachedKeyboardVisible, let blackPlayer = game.currentPlayer(with: .black), let whitePlayer = game.currentPlayer(with: .white) {
                     HStack(alignment: .top) {
                         boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
                         Spacer(minLength: 0)
                         VStack(alignment: .trailing, spacing: 0) {
                             HStack {
-                                (Text(game.blackName)
+                                (Text(blackPlayer.username)
                                     .font(.footnote).bold()
-                                    + Text(" [\(game.blackFormattedRank)]").font(.caption))
+                                 + Text(" [\(blackPlayer.formattedRank)]").font(.caption))
                                     .minimumScaleFactor(0.5)
 
                                 Stone(color: .black, shadowRadius: 2)
@@ -258,9 +258,9 @@ struct SingleGameView: View {
                             }
                             Spacer().frame(height: 5)
                             HStack {
-                                (Text(game.whiteName)
+                                (Text(whitePlayer.username)
                                     .font(.footnote).bold()
-                                    + Text(" [\(game.whiteFormattedRank)]").font(.caption))
+                                 + Text(" [\(whitePlayer.formattedRank)]").font(.caption))
                                     .minimumScaleFactor(0.5)
                                 Stone(color: .white, shadowRadius: 2)
                                     .frame(width: 20, height: 20)

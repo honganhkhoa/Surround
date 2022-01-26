@@ -98,6 +98,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             self.blackId = blackPlayer?.id
             if let player = blackPlayer {
                 playerByOGSId[player.id] = player
+                blackName = player.username
             }
         }
     }
@@ -106,6 +107,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             self.whiteId = whitePlayer?.id
             if let player = whitePlayer {
                 playerByOGSId[player.id] = player
+                whiteName = player.username
             }
         }
     }
@@ -123,12 +125,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
     }
     @Published var undoRequested: Int?
-    var blackFormattedRank: String {
-        return blackPlayer?.formattedRank() ?? "?"
-    }
-    var whiteFormattedRank: String {
-        return whitePlayer?.formattedRank() ?? "?"
-    }
+//    var blackFormattedRank: String {
+//        return blackPlayer?.formattedRank() ?? "?"
+//    }
+//    var whiteFormattedRank: String {
+//        return whitePlayer?.formattedRank() ?? "?"
+//    }
     @Published var moveTree: MoveTree
     var initialPosition: BoardPosition
     var ID: GameID
@@ -187,12 +189,16 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     playerCacheObservingCancellable?.cancel()
                 }
                 playerCacheObservingCancellable = ogs.$cachedUsersById.collect(.byTime(DispatchQueue.main, 2.0)).sink(receiveValue: { values in
-                    if let cachedPlayersById = values.last, let blackId = self.blackId, let whiteId = self.whiteId {
-                        if cachedPlayersById[blackId] != nil {
-                            self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: cachedPlayersById[blackId]!)
-                        }
-                        if cachedPlayersById[whiteId] != nil {
-                            self.whitePlayer = OGSUser.mergeUserInfoFromCache(user: self.whitePlayer, cachedUser: cachedPlayersById[whiteId]!)
+                    if let cachedPlayersById = values.last {
+                        for (playerId, player) in self.playerByOGSId {
+                            if let cachedPlayer = cachedPlayersById[playerId] {
+                                self.playerByOGSId[playerId] = OGSUser.mergeUserInfoFromCache(user: player, cachedUser: cachedPlayer)
+                                if playerId == self.blackPlayer?.id {
+                                    self.blackPlayer = self.playerByOGSId[playerId]
+                                } else if playerId == self.whitePlayer?.id {
+                                    self.whitePlayer = self.playerByOGSId[playerId]
+                                }
+                            }
                         }
                     }
                 })
@@ -258,7 +264,19 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     
     var playerByOGSId: [Int: OGSUser] = [:]
     
-    @Published var orderedRengoTeam: [StoneColor: [OGSUser]] = [.black: [], .white: []]
+    @Published var orderedRengoTeam: [StoneColor: [OGSUser]] = [:]
+    func currentPlayer(with color: StoneColor) -> OGSUser? {
+        if rengo {
+            return orderedRengoTeam[color]?.first
+        } else {
+            switch color {
+            case .black:
+                return blackPlayer
+            case .white:
+                return whitePlayer
+            }
+        }
+    }
     
     var debugDescription: String {
         if case .OGS(let id) = self.ID {
@@ -495,20 +513,18 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func setAutoResign(playerId: Int, time: Double) {
-        guard playerId == blackId || playerId == whiteId else {
+        guard let player = playerByOGSId[playerId], let playerColor = stoneColor(of: player) else {
             return
         }
         
-        let playerColor = playerId == blackId ? StoneColor.black : StoneColor.white
         self.clock?.autoResignTime[playerColor] = time
     }
     
     func clearAutoResign(playerId: Int) {
-        guard playerId == blackId || playerId == whiteId else {
+        guard let player = playerByOGSId[playerId], let playerColor = stoneColor(of: player) else {
             return
         }
         
-        let playerColor = playerId == blackId ? StoneColor.black : StoneColor.white
         self.clock?.autoResignTime.removeValue(forKey: playerColor)
     }
     
@@ -525,8 +541,42 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
             return false
         } else {
-            return user.id == self.blackId || user.id == self.whiteId
+            return user.id == self.blackPlayer?.id || user.id == self.whitePlayer?.id
         }
+    }
+    
+    func stoneColor(of player: OGSUser) -> StoneColor? {
+        if rengo {
+            if let blackTeam = orderedRengoTeam[.black] ?? gameData?.rengoTeams?[.black] {
+                for blackMember in blackTeam {
+                    if blackMember.id == player.id {
+                        return .black
+                    }
+                }
+            }
+            if let whiteTeam = orderedRengoTeam[.white] ?? gameData?.rengoTeams?[.white] {
+                for whiteMember in whiteTeam {
+                    if whiteMember.id == player.id {
+                        return .white
+                    }
+                }
+            }
+        } else {
+            if player.id == self.blackPlayer?.id {
+                return .black
+            } else if player.id == self.whitePlayer?.id {
+                return .white
+            }
+        }
+        return nil
+    }
+    
+    func stoneColor(ofPlayerWithId playerId: Int) -> StoneColor? {
+        if let player = playerByOGSId[playerId] {
+            return stoneColor(of: player)
+        }
+        
+        return nil
     }
     
     var userStoneColor: StoneColor? {
@@ -536,26 +586,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         if !isUserPlaying {
             return nil
         }
-        if gameData?.rengo ?? false, let rengoTeams = gameData?.rengoTeams {
-            for player in rengoTeams.black {
-                if user.id == player.id {
-                    return .black
-                }
-            }
-            for player in rengoTeams.white {
-                if user.id == player.id {
-                    return .white
-                }
-            }
-        } else {
-            if user.id == self.blackId {
-                return .black
-            }
-            if user.id == self.whiteId {
-                return .white
-            }
-        }
-        return nil
+        return stoneColor(of: user)
     }
     
     var isUserTurn: Bool {
@@ -576,7 +607,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     
     var status: String {
         if let outcome = gameData?.outcome {
-            if gameData?.winner == blackId {
+            if let winnerId = gameData?.winner, let winner = playerByOGSId[winnerId], let winnerColor = stoneColor(of: winner), winnerColor == .black {
                 return "Black wins by \(outcome)"
             } else {
                 return "White wins by \(outcome)"

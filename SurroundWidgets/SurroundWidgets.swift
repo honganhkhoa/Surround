@@ -77,8 +77,8 @@ class Provider: TimelineProvider {
                     return isGame1OnUserTurn
                 }
 
-                let time1 = game1.blackId == userId ? clock1.blackTime : clock1.whiteTime
-                let time2 = game2.blackId == userId ? clock2.blackTime : clock2.whiteTime
+                let time1 = game1.stoneColor(ofPlayerWithId: userId) == .black ? clock1.blackTime : clock1.whiteTime
+                let time2 = game2.stoneColor(ofPlayerWithId: userId) == .black ? clock2.blackTime : clock2.whiteTime
                 let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
                 let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
                 return timeLeft1 <= timeLeft2

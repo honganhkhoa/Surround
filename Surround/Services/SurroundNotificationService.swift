@@ -81,34 +81,34 @@ class SurroundNotificationService {
     }
     
     func scheduleNewMoveNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
-        let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
-//        print(oldGame.ogsID, oldGame.clock?.currentPlayerId, newGame.clock?.currentPlayerId)
-        if oldGame.clock?.currentPlayerId != newGame.clock?.currentPlayerId
-            && newGame.clock?.currentPlayerId == userId
-            && userId != nil {
-            self.scheduleNotification(
-                title: "Your turn",
-                message: "It is your turn in the game with \(opponentName).",
-                game: newGame,
-                setting: .notificationOnUserTurn
-            )
-            return true
+        if let userId = userId {
+            let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
+    //        print(oldGame.ogsID, oldGame.clock?.currentPlayerId, newGame.clock?.currentPlayerId)
+            if oldGame.clock?.currentPlayerId != newGame.clock?.currentPlayerId
+                && newGame.clock?.currentPlayerId == userId {
+                self.scheduleNotification(
+                    title: "Your turn",
+                    message: "It is your turn in the game with \(opponentName).",
+                    game: newGame,
+                    setting: .notificationOnUserTurn
+                )
+                return true
+            }
         }
         return false
     }
     
     func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
-        if let lastCheck = userDefaults[.latestOGSOverviewTime] {
+        if let lastCheck = userDefaults[.latestOGSOverviewTime], let userId = userId {
             if oldGame.clock?.currentPlayerId == userId
                 && newGame.clock?.currentPlayerId == userId
-                && userId != nil
                 && !(newGame.pauseControl?.isPaused() ?? false) {
-                let thinkingTime = userId == newGame.blackId ? newGame.clock?.blackTime : newGame.clock?.whiteTime
+                let thinkingTime = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.clock?.blackTime : newGame.clock?.whiteTime
                 if let timeLeft = thinkingTime?.timeLeft {
                     let lastTimeLeft = timeLeft + Date().timeIntervalSince(lastCheck)
                     let twelveHours = Double(12 * 3600)
                     let threeHours = Double(3 * 3600)
-                    let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
+                    let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
                         self.scheduleNotification(
                             title: "Time running out",
@@ -133,9 +133,9 @@ class SurroundNotificationService {
     }
     
     func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
-        if let outcome = newGame.gameData?.outcome {
+        if let outcome = newGame.gameData?.outcome, let userId = userId {
             if oldGame.gameData?.outcome == nil {
-                let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
+                let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
                 let result = newGame.gameData?.winner == userId ? "won" : "lost"
                 self.scheduleNotification(
                     title: "Game has ended",
@@ -180,14 +180,17 @@ class SurroundNotificationService {
     }
     
     func scheduleNewGameNotificationIfNecessary(newGame: Game) -> Bool {
-        let opponentName = userId == newGame.blackId ? newGame.whiteName : newGame.blackName
-        self.scheduleNotification(
-            title: "Game started",
-            message: "Your game with \(opponentName) has started.",
-            game: newGame,
-            setting: .notificationOnNewGame
-        )
-        return true
+        if let userId = userId {
+            let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
+            self.scheduleNotification(
+                title: "Game started",
+                message: "Your game with \(opponentName) has started.",
+                game: newGame,
+                setting: .notificationOnNewGame
+            )
+            return true
+        }
+        return false
     }
     
     func scheduleNotificationsIfNecessary(withOldOverviewData oldData: Data, newOverviewData newData: Data, completionHandler: ((Int) -> Void)? = nil) {
