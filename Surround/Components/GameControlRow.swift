@@ -121,9 +121,11 @@ struct GameControlRow: View {
                 }
                 if game.isUserPlaying {
                     if game.gamePhase == .play {
-                        Button(action: { ogs.requestUndo(game: game) }) {
-                            Label("Request undo", systemImage: "arrow.uturn.left")
-                        }.disabled(!game.undoable)
+                        if !game.rengo {
+                            Button(action: { ogs.requestUndo(game: game) }) {
+                                Label("Request undo", systemImage: "arrow.uturn.left")
+                            }.disabled(!game.undoable)
+                        }
                         if game.pauseControl?.userPauseDetail == nil {
                             Button(action: { ogs.pause(game: game) }) {
                                 Label("Pause game", systemImage: "pause")

@@ -668,6 +668,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     var undoable: Bool {
+        guard !rengo else {
+            return false
+        }
+        
         guard isUserPlaying else {
             return false
         }
