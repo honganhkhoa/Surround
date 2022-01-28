@@ -29,34 +29,41 @@ struct ChatLine: View {
     
     var body: some View {
         HStack {
-            if case .trailing = horizontalAlignment {
+            if chatLine.user.id == 0 && chatLine.user.username == "system" {
                 Spacer()
-            }
-            VStack(alignment: horizontalAlignment, spacing: 2) {
-                if showUsername {
-                    Text("\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
-                        .font(.caption2).bold()
-                        .foregroundColor(chatLine.user.uiColor)
+                Text(chatLine.body)
+                    .font(.callout.bold())
+                Spacer()
+            } else {
+                if case .trailing = horizontalAlignment {
+                    Spacer()
                 }
                 VStack(alignment: horizontalAlignment, spacing: 2) {
-                    if let variation = chatLine.variation {
-                        BoardView(boardPosition: variation.position, variation: variation)
-                            .frame(width: 176, height: 176)
-                            .padding(.top, 5)
+                    if showUsername {
+                        Text("\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
+                            .font(.caption2).bold()
+                            .foregroundColor(chatLine.user.uiColor)
                     }
-                    chatBody
-                        .font(.callout)
+                    VStack(alignment: horizontalAlignment, spacing: 2) {
+                        if let variation = chatLine.variation {
+                            BoardView(boardPosition: variation.position, variation: variation)
+                                .frame(width: 176, height: 176)
+                                .padding(.top, 5)
+                        }
+                        chatBody
+                            .font(.callout)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4)
+                            .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
+                    )
+                    .cornerRadius(10)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4)
-                        .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
-                )
-                .cornerRadius(10)
-            }
-            if case .leading = horizontalAlignment {
-                Spacer()
+                if case .leading = horizontalAlignment {
+                    Spacer()
+                }
             }
         }
     }

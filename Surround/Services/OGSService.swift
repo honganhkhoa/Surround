@@ -858,6 +858,7 @@ class OGSService: ObservableObject {
         self.socket.off("game/\(ogsID)/clear_auto_resign")
         self.socket.off("game/\(ogsID)/chat")
         self.socket.off("game/\(ogsID)/reset-chats")
+        self.socket.off("game/\(ogsID)/player_update")
     }
     
     func disconnect(from game: Game) {
@@ -1089,6 +1090,19 @@ class OGSService: ObservableObject {
             DispatchQueue.main.async {
                 if let connectedGame = self.connectedGames[ogsID] {
                     connectedGame.resetChats()
+                }
+            }
+        }
+        self.socket.on("game/\(ogsID)/player_update") { data, ack in
+            DispatchQueue.main.async {
+                if let connectedGame = self.connectedGames[ogsID] {
+                    if let update = data[0] as? [String: Any] {
+                        let decoder = DictionaryDecoder()
+                        decoder.keyDecodingStrategy = .convertFromSnakeCase
+                        if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
+                            connectedGame.latestPlayerUpdate = playerUpdate
+                        }
+                    }
                 }
             }
         }

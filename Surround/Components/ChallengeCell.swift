@@ -79,6 +79,11 @@ struct RengoPlayersDetail: View {
                 .font(.body.bold())
                 .foregroundColor(Color(.systemPurple))
                 Spacer().frame(height: 10)
+                if challenge.game.rengoCasualMode ?? false {
+                    (Text("**Casual**").font(.subheadline) + Text(" — players may drop mid-game").font(.caption))
+                        .leadingAlignedInScrollView()
+                    Spacer().frame(height: 10)
+                }
                 VStack(alignment: .leading, spacing: 5) {
                     HStack {
                         Stone(color: .black, shadowRadius: 2)
@@ -557,6 +562,6 @@ struct ChallengeView_Previews: PreviewProvider {
             )
             .colorScheme(.dark)
         }
-        .previewLayout(.fixed(width: 320, height: 380))
+        .previewLayout(.fixed(width: 320, height: 480))
     }
 }

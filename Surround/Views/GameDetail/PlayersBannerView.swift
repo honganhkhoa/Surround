@@ -116,7 +116,7 @@ struct PlayersBannerView: View {
     
     @ViewBuilder
     func playerIcon(color: StoneColor) -> some View {
-        if !game.rengo || game.gameData?.rengoTeams?[color].count == 1 {
+        if !game.rengo || game.orderedRengoTeam[color]?.count == 1 {
             singlePlayerIcon(color: color)
         } else {
             rengoTeamIcon(color: color)

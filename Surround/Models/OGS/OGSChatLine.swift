@@ -77,7 +77,15 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
             chatId = try container.decode(String.self, forKey: .chatId)
             date = try container.decode(Double.self, forKey: .date)
             moveNumber = try container.decode(Int.self, forKey: .moveNumber)
-            playerId = try container.decode(Int.self, forKey: .playerId)
+            if let playerIdString = try? container.decode(String.self, forKey: .playerId) {
+                if playerIdString == "0" {
+                    playerId = 0
+                } else {
+                    playerId = -1
+                }
+            } else {
+                playerId = try container.decode(Int.self, forKey: .playerId)
+            }
             professional = try container.decode(Bool.self, forKey: .professional)
             ranking = try container.decode(Double.self, forKey: .ranking)
             ratings = try container.decodeIfPresent(OGSRating.self, forKey: .ratings)

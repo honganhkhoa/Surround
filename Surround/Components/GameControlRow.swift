@@ -235,6 +235,18 @@ struct GameControlRow: View {
         }
     }
     
+    var droppingFromCasualRengo: Bool {
+        guard game.rengo, let casual = game.gameData?.rengoCasualMode, casual else {
+            return false
+        }
+        
+        guard let userStoneColor = game.userStoneColor, let userTeam = game.orderedRengoTeam[userStoneColor] else {
+            return false
+        }
+        
+        return userTeam.count > 1
+    }
+    
     var actionButtons: some View {
         HStack(spacing: 0) {
             mainActionButton
@@ -267,7 +279,7 @@ struct GameControlRow: View {
             Rectangle().frame(width: 0, height: 0)
                 .alert(isPresented: $showingResignAlert) {
                     Alert(
-                        title: Text("Are you sure you want to resign this game?"),
+                        title: Text(droppingFromCasualRengo ? "Are you sure you want to abandon your team?" : "Are you sure you want to resign this game?"),
                         message: nil,
                         primaryButton: .destructive(Text("Resign")) {
                             ogs.resign(game: game)

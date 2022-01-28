@@ -29,6 +29,22 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     for player in rengoTeams[.black] + rengoTeams[.white] {
                         playerByOGSId[player.id] = player
                     }
+                    
+                    if let players = gameData?.players {
+                        latestPlayerUpdate = OGSPlayerUpdate(
+                            players: OGSPlayerUpdate.Players(black: players.black.id, white: players.white.id),
+                            rengoTeams: OGSPlayerUpdate.RengoTeams(
+                                black: rengoTeams.black.map { $0.id },
+                                white: rengoTeams.white.map { $0.id }
+                            )
+                        )
+                    }
+                }
+                
+                if let playerPool = gameData?.playerPool {
+                    for player in playerPool.values {
+                        playerByOGSId[player.id] = player
+                    }
                 }
                 
                 if let blackAcceptedRemovedStones = data.players.black.acceptedStones {

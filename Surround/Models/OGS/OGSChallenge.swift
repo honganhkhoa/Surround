@@ -73,6 +73,9 @@ struct OGSChallenge: Codable, Identifiable {
         try container.encode(false, forKey: .initialized)
         try container.encode(game, forKey: .game)
         try container.encode(false, forKey: .agaRanked)
+
+        // This is used when creating challenges, so be careful when adding stuff...
+
     }
        
     init(id: Int, challenger: OGSUser? = nil, challenged: OGSUser? = nil, challengerColor: StoneColor? = nil, game: OGSChallengeGameDetail) {
@@ -154,6 +157,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
     
     // Rengo
     var rengo: Bool?
+    var rengoCasualMode: Bool?
     var rengoBlackTeam: [Int]?
     var rengoWhiteTeam: [Int]?
     var rengoNominees: [Int]?
@@ -198,6 +202,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         
         // Rengo
         case rengo
+        case rengoCasualMode
         case rengoBlackTeam
         case rengoWhiteTeam
         case rengoNominees
@@ -239,6 +244,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         
         // Rengo
         rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
+        rengoCasualMode = try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode)
         rengoBlackTeam = try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam)
         rengoWhiteTeam = try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam)
         rengoNominees = try container.decodeIfPresent([Int].self, forKey: .rengoNominees)
@@ -268,6 +274,10 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
         try container.encode(timeControl, forKey: .timeControlParameters)
         try container.encode(rengo ?? false, forKey: .rengo)
+        try container.encode(rengoCasualMode ?? false, forKey: .rengoCasualMode)
+        
+        // This is used when creating challenges, so be careful when adding stuff...
+        
     }
 }
 
@@ -429,16 +439,15 @@ extension OGSChallenge {
               "disable_analysis": false,
               "time_control": "fischer",
               "time_control_parameters": {
-                "system": "fischer",
+                "system": "simple",
                 "speed": "correspondence",
-                "initial_time": 259200,
-                "time_increment": 86400,
-                "max_time": 604800,
+                "per_move": 172800,
                 "pause_on_weekends": true,
-                "time_control": "fischer"
+                "time_control": "simple"
               },
-              "time_per_move": 89280,
+              "time_per_move": 172800,
               "rengo": true,
+              "rengo_casual_mode": true,
               "rengo_nominees": [
                 1526
               ],

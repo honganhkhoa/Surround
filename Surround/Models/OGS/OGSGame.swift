@@ -204,6 +204,7 @@ struct OGSGame: Decodable {
 
     var moves: [OGSMove]
     var players: Players
+    var playerPool: [Int: OGSUser]?
     
     var timeControl: TimeControl
     var clock: OGSClock
@@ -232,4 +233,5 @@ struct OGSGame: Decodable {
     
     var rengo: Bool?
     var rengoTeams: RengoTeams?
+    var rengoCasualMode: Bool?
 }
