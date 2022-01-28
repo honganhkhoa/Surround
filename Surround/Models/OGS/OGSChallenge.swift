@@ -267,7 +267,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         try container.encode(timeControl.timeControl, forKey: .timeControl)
         try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
         try container.encode(timeControl, forKey: .timeControlParameters)
-        try container.encode(rengo, forKey: .rengo)
+        try container.encode(rengo ?? false, forKey: .rengo)
     }
 }
 
