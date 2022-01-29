@@ -20,23 +20,21 @@ struct HomeView: View {
     @State var showRegisterWebView = false
     @State var gameDetailCancellable: AnyCancellable?
     
-    @State var displayMode: GameCell.CellDisplayMode = .full {
-        didSet {
-            userDefaults[.homeViewDisplayMode] = displayMode.rawValue
-        }
-    }
+    @State var displayMode: GameCell.CellDisplayMode
     
     init(previewGames: [Game] = []) {
         #if os(iOS)
         if let savedDisplayMode = userDefaults[.homeViewDisplayMode] {
-            displayMode = GameCell.CellDisplayMode(rawValue: savedDisplayMode) ?? .full
+            _displayMode = State(initialValue: GameCell.CellDisplayMode(rawValue: savedDisplayMode) ?? .full)
         } else {
             if UIScreen.main.traitCollection.horizontalSizeClass == .compact {
-                displayMode = .compact
+                _displayMode = State(initialValue: .compact)
             } else {
-                displayMode = .full
+                _displayMode = State(initialValue: .full)
             }
         }
+        #else
+        _displayMode = State(initialValue: .full)
         #endif
     }
 
@@ -315,6 +313,9 @@ struct HomeView: View {
                     }
                 }
             }
+        }
+        .onChange(of: displayMode) { newDisplayMode in
+            userDefaults[.homeViewDisplayMode] = newDisplayMode.rawValue
         }
     }
 }
