@@ -158,6 +158,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
     // Rengo
     var rengo: Bool?
     var rengoCasualMode: Bool?
+    var rengoAutoStart: Int?
     var rengoBlackTeam: [Int]?
     var rengoWhiteTeam: [Int]?
     var rengoNominees: [Int]?
@@ -203,6 +204,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         // Rengo
         case rengo
         case rengoCasualMode
+        case rengoAutoStart
         case rengoBlackTeam
         case rengoWhiteTeam
         case rengoNominees
@@ -245,6 +247,7 @@ struct OGSChallengeGameDetail: Codable, Equatable {
         // Rengo
         rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
         rengoCasualMode = try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode)
+        rengoAutoStart = try container.decodeIfPresent(Int.self, forKey: .rengoAutoStart)
         rengoBlackTeam = try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam)
         rengoWhiteTeam = try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam)
         rengoNominees = try container.decodeIfPresent([Int].self, forKey: .rengoNominees)
@@ -447,6 +450,7 @@ extension OGSChallenge {
               },
               "time_per_move": 172800,
               "rengo": true,
+              "rengo_auto_start": 4,
               "rengo_casual_mode": true,
               "rengo_nominees": [
                 1526

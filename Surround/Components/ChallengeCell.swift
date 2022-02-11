@@ -82,6 +82,12 @@ struct RengoPlayersDetail: View {
                 if challenge.game.rengoCasualMode ?? false {
                     (Text("**Casual**").font(.subheadline) + Text(" — players may drop mid-game").font(.caption))
                         .leadingAlignedInScrollView()
+                    if let autoStart = challenge.game.rengoAutoStart, autoStart > 0 {
+                        Spacer().frame(height: 5)
+                        Text("Game starts automatically when there are **\(autoStart)** players.")
+                            .font(.subheadline)
+                            .leadingAlignedInScrollView()
+                    }
                     Spacer().frame(height: 10)
                 }
                 VStack(alignment: .leading, spacing: 5) {
