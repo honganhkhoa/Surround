@@ -246,7 +246,24 @@ enum TimeControlSpeed: String, Codable {
 @dynamicMemberLookup
 struct TimeControl: Codable, Equatable {
     struct TimeControlCodingData: Codable, Equatable {
+        internal init(timeControl: String, system: String? = nil, initialTime: Int? = nil, timeIncrement: Int? = nil, maxTime: Int? = nil, mainTime: Int? = nil, periods: Int? = nil, periodTime: Int? = nil, perMove: Int? = nil, stonesPerPeriod: Int? = nil, totalTime: Int? = nil, speed: TimeControlSpeed? = nil, pauseOnWeekends: Bool? = nil) {
+            self.timeControl = timeControl
+            self.system = timeControl
+            self.initialTime = initialTime
+            self.timeIncrement = timeIncrement
+            self.maxTime = maxTime
+            self.mainTime = mainTime
+            self.periods = periods
+            self.periodTime = periodTime
+            self.perMove = perMove
+            self.stonesPerPeriod = stonesPerPeriod
+            self.totalTime = totalTime
+            self.speed = speed
+            self.pauseOnWeekends = pauseOnWeekends
+        }
+        
         var timeControl: String
+        var system: String?
         var initialTime: Int?
         var timeIncrement: Int?
         var maxTime: Int?
