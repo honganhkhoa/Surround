@@ -242,6 +242,10 @@
 		BCB98D29256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCB98D2A256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
 		BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98D27256D18C400B1F8FD /* game-25076729.json */; };
+		BCC3276027B66475005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
+		BCC3276127BB69B1005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
+		BCC3276227BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
+		BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
 		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
@@ -439,6 +443,7 @@
 		BCB98D11256D17D600B1F8FD /* game-25758368.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25758368.json"; sourceTree = "<group>"; };
 		BCB98D1C256D185500B1F8FD /* game-27671778.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-27671778.json"; sourceTree = "<group>"; };
 		BCB98D27256D18C400B1F8FD /* game-25076729.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-25076729.json"; sourceTree = "<group>"; };
+		BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatMessage.swift; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
 		BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPopup.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -666,6 +671,7 @@
 				BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */,
 				BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */,
 				BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */,
+				BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -1132,6 +1138,7 @@
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
 				BC463AFB2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
+				BCC3276027B66475005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */,
 				BC5EEBF7259C42EC00675761 /* ChatLine.swift in Sources */,
@@ -1224,6 +1231,7 @@
 				BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */,
 				BC5EEC2B259D851B00675761 /* Variation.swift in Sources */,
 				BC285B582557FCAC005378F9 /* OGSUIConfig.swift in Sources */,
+				BCC3276227BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */,
 				BC285BA42557FE8F005378F9 /* Goban.cc in Sources */,
 				BC3037F82692D03300181570 /* MoveTree.swift in Sources */,
@@ -1259,6 +1267,7 @@
 				BC6493A325380DCA002B2200 /* OGSPauseControl.swift in Sources */,
 				BC5EEC2A259D851B00675761 /* Variation.swift in Sources */,
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
+				BCC3276127BB69B1005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
 				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
 				BC3037F72692D03300181570 /* MoveTree.swift in Sources */,
@@ -1290,6 +1299,7 @@
 				BCB98CC2256D144100B1F8FD /* TestData.swift in Sources */,
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
 				BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
+				BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
 				BC463B0A2662515900D40D3A /* OGSPuzzle.swift in Sources */,
 				BC3037F92692D03300181570 /* MoveTree.swift in Sources */,
@@ -1483,7 +1493,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1494,7 +1504,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1513,7 +1523,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
@@ -1524,7 +1534,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1622,7 +1632,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -1631,7 +1641,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1646,7 +1656,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -1655,7 +1665,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1672,7 +1682,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1682,7 +1692,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1700,7 +1710,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
@@ -1710,7 +1720,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1726,7 +1736,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -1735,7 +1745,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1750,7 +1760,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2022012901;
+				CURRENT_PROJECT_VERSION = 2022021901;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -1759,7 +1769,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

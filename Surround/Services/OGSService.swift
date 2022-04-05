@@ -164,6 +164,14 @@ class OGSService: ObservableObject {
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
     @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
     @Published private(set) public var superchatPeerIds = Set<Int>()
+    
+    @Published private(set) public var chatMessagesByChannel = [String: [OGSChatMessage]]()
+    
+    var dictionaryDecoder: DictionaryDecoder = {
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }()
 
     private func sortActiveGames<T>(activeGames: T) where T: Sequence, T.Element == Game {
         var gamesOnUserTurn: [Game] = []
@@ -390,6 +398,16 @@ class OGSService: ObservableObject {
             DispatchQueue.main.async {
                 if let superchatConfig = data[0] as? [String: Any] {
                     self.handleSuperchat(config: superchatConfig)
+                }
+            }
+        }
+        
+        socket.on("chat-message") { data, ack in
+            DispatchQueue.main.async {
+                if let messageData = data[0] as? [String: Any] {
+                    if let message = try? self.dictionaryDecoder.decode(OGSChatMessage.self, from: messageData) {
+                        print(message)
+                    }
                 }
             }
         }
@@ -1861,6 +1879,25 @@ class OGSService: ObservableObject {
                 _calculatePrivateMessageUnreadCount()
             }
         }
+    }
+    
+    func joinChatChannel(_ channel: String) {
+        guard socket.status == .connected else {
+            socket.once(clientEvent: .connect) { _, _ in
+                self.joinChatChannel(channel)
+            }
+            return
+        }
+        
+        socket.emit("chat/join", ["channel": channel])
+    }
+    
+    func leaveChatChannel(_ channel: String) {
+        guard socket.status == .connected else {
+            return
+        }
+        
+        socket.emit("chat/part", ["channel": channel])
     }
     
     @Published private(set) public var sitewiseLiveGamesCount: Int?
