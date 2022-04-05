@@ -304,23 +304,23 @@ class OGSService: ObservableObject {
                 
         socket.on(clientEvent: .connect) { [self] _, _ in
             DispatchQueue.main.async {
-                pingCancellale = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
-                    socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": drift, "latency": latency])
+                self.pingCancellale = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
+                    self.socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": self.drift, "latency": self.latency])
                 }
                 self.authenticateSocketIfLoggedIn()
                 self.socket.emit("ui-pushes/subscribe", ["channel": "undefined"])
 
-                for game in _gamesToBeReconnected {
+                for game in self._gamesToBeReconnected {
                     if case .OGS(let ogsId) = game.ID {
-                        if connectedGames[ogsId] != nil {
-                            connectedGames[ogsId] = nil
-                            unsubscribeWebsocketEvent(forGameWithId: ogsId)
+                        if self.connectedGames[ogsId] != nil {
+                            self.connectedGames[ogsId] = nil
+                            self.unsubscribeWebsocketEvent(forGameWithId: ogsId)
                         }
-                        let withChat = connectedWithChat[ogsId] ?? false
+                        let withChat = self.connectedWithChat[ogsId] ?? false
                         self.connect(to: game, withChat: withChat)
                     }
                 }
-                _gamesToBeReconnected = []
+                self._gamesToBeReconnected = []
             }
         }
         
@@ -328,9 +328,9 @@ class OGSService: ObservableObject {
             DispatchQueue.main.async {
                 if let data = data[0] as? [String:Double] {
                     let now = Date().timeIntervalSince1970 * 1000
-                    latency = now - data["client"]!
-                    drift = (now - latency / 2) - data["server"]!
-                    print(drift, latency)
+                    self.latency = now - data["client"]!
+                    self.drift = (now - self.latency / 2) - data["server"]!
+                    print(self.drift, self.latency)
                 }
             }
         }
