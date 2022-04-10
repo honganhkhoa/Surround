@@ -623,7 +623,7 @@ class OGSService: ObservableObject {
         self.authenticated = true
     }
 
-    func fetchPlayerInfo(userIds: Set<Int>) -> AnyPublisher<[OGSUser], Error> {
+    func fetchPlayerInfo(userIds: [Int]) -> AnyPublisher<[OGSUser], Error> {
         guard userIds.count > 0 else {
             return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
         }
@@ -648,6 +648,8 @@ class OGSService: ObservableObject {
                         promise(.failure(OGSServiceError.invalidJSON))
                     }
                 case .failure(let error):
+                    print(error)
+                    print("xxx")
                     promise(.failure(error))
                 }
             }
@@ -662,11 +664,23 @@ class OGSService: ObservableObject {
             }
             return
         }
-        let userIdsToFetch = cachedUserIds.subtracting(Set(cachedUsersById.keys))
-        playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsToFetch).receive(on: RunLoop.main).sink(
+        let userIdsToFetch = Array(cachedUserIds.subtracting(Set(cachedUsersById.keys)))
+        self.performFetchCachedPlayers(withIds: userIdsToFetch)
+    }
+    
+    func performFetchCachedPlayers(withIds ids: [Int]) {
+        guard ids.count > 0 else {
+            return
+        }
+        let userIdsBatch = ids.count > 100 ? Array(ids[0..<100]) : ids
+        let remainingIds = Array(ids[userIdsBatch.count...])
+        playerInfoFetchingCancellable = self.fetchPlayerInfo(userIds: userIdsBatch).receive(on: RunLoop.main).sink(
             receiveCompletion: { _ in
                 DispatchQueue.main.async {
                     self.playerInfoFetchingCancellable = nil
+                    if remainingIds.count > 0 {
+                        self.performFetchCachedPlayers(withIds: remainingIds)
+                    }
                 }
             },
             receiveValue: { users in
@@ -675,6 +689,7 @@ class OGSService: ObservableObject {
                     cachedUsersById[user.id] = user
                 }
                 self.cachedUsersById = cachedUsersById
+                print("Cached users: ", cachedUsersById.keys)
             })
     }
     
@@ -1591,6 +1606,8 @@ class OGSService: ObservableObject {
         
         playerCacheObservingCancellable = self.$cachedUsersById.collect(.byTime(DispatchQueue.main, 0.2)).sink { values in
             if let cachedUsersById = values.last {
+                print("zzz")
+                print(cachedUsersById.keys)
                 for (id, challenge) in self.eligibleOpenChallengeById {
                     if let challengerId = challenge.challenger?.id {
                         if cachedUsersById[challengerId] != nil {
