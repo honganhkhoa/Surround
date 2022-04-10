@@ -103,6 +103,7 @@
 		BC463B0A2662515900D40D3A /* OGSPuzzle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */; };
 		BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC463B0C266353D700D40D3A /* SingleGameView.swift */; };
 		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
+		BC4ED4CF2802EEF1003A85A2 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
 		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
 		BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */; };
@@ -1186,6 +1187,7 @@
 				BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */,
 				BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */,
 				BC8CE8832657B2E100E4BE1A /* Variation.swift in Sources */,
+				BC4ED4CF2802EEF1003A85A2 /* OGSChatMessage.swift in Sources */,
 				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
 				BC3037F62692D03300181570 /* MoveTree.swift in Sources */,
 				BC8CE88D2657B33200E4BE1A /* OGSService.swift in Sources */,
