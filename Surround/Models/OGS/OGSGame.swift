@@ -127,7 +127,7 @@ struct OGSMoveExtra: Codable {
 struct OGSMove: Decodable {
     var column: Int
     var row: Int
-    var timedelta: Int?
+    var timedelta: Double?
     var edited: Bool?
     var extra: OGSMoveExtra?
     
@@ -136,7 +136,7 @@ struct OGSMove: Decodable {
         self.column = try container.decode(Int.self)
         self.row = try container.decode(Int.self)
         if !container.isAtEnd {
-            self.timedelta = try container.decodeIfPresent(Int.self)
+            self.timedelta = try container.decodeIfPresent(Double.self)
         }
         if !container.isAtEnd {
             self.edited = try container.decodeIfPresent(Bool.self)

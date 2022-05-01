@@ -24,9 +24,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         
         try? AVAudioSession.sharedInstance().setCategory(.ambient)
         
+        UNUserNotificationCenter.current().delegate = self
         if userDefaults[.notificationEnabled] == true {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-                UNUserNotificationCenter.current().delegate = self
+                if granted {
+                    DispatchQueue.main.async {
+                        application.registerForRemoteNotifications()
+                    }
+                }
             }
         }
 
