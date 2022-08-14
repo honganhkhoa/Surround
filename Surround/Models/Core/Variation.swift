@@ -47,10 +47,10 @@ struct Variation {
         self.init(position: position, basePosition: basePosition, moves: moves)
     }
     
-    init(basePosition: BoardPosition, moves: [Move]) {
+    init(basePosition: BoardPosition, moves: [Move]) throws {
         var position = basePosition
         for move in moves {
-            position = try! position.makeMove(move: move)
+            position = try position.makeMove(move: move)
         }
         self.init(position: position, basePosition: basePosition, moves: moves)
     }

@@ -721,11 +721,12 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         var line = line
         if let variationData = line.variationData {
             if let basePosition = self.positionByLastMoveNumber[variationData.fromMoveNumber] {
-                let variation = Variation(
+                if let variation = try? Variation(
                     basePosition: basePosition,
                     moves: variationData.moves
-                )
-                line.variation = variation
+                ) {
+                    line.variation = variation
+                }
             }
         }
         if self.chatLog.count == 0 || self.chatLog.last!.timestamp <= line.timestamp {
