@@ -248,7 +248,7 @@ struct TimeControl: Codable, Equatable {
     struct TimeControlCodingData: Codable, Equatable {
         internal init(timeControl: String, system: String? = nil, initialTime: Int? = nil, timeIncrement: Int? = nil, maxTime: Int? = nil, mainTime: Int? = nil, periods: Int? = nil, periodTime: Int? = nil, perMove: Int? = nil, stonesPerPeriod: Int? = nil, totalTime: Int? = nil, speed: TimeControlSpeed? = nil, pauseOnWeekends: Bool? = nil) {
             self.timeControl = timeControl
-            self.system = timeControl
+            self.system = system
             self.initialTime = initialTime
             self.timeIncrement = timeIncrement
             self.maxTime = maxTime
@@ -298,7 +298,16 @@ struct TimeControl: Codable, Equatable {
     }
 
     subscript<T>(dynamicMember keyPath: WritableKeyPath<TimeControlCodingData, T>) -> T {
-        get { self.codingData[keyPath: keyPath] }
+        get {
+            if keyPath == \.timeControl {
+                if let system = self.codingData.system, system != self.codingData.timeControl {
+                    if let timeControl = system as? T {
+                        return timeControl
+                    }
+                }
+            }
+            return self.codingData[keyPath: keyPath]
+        }
         set { self.codingData[keyPath: keyPath] = newValue }
     }
     
