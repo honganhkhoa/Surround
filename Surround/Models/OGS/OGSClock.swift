@@ -175,56 +175,60 @@ extension OGSClock: Decodable {
         let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
 
         if secondsElapsed > 0 {
-            var thinkingTime = currentPlayerColor == .black ? blackTime : whiteTime
+            var currentPlayerThinkingTime = currentPlayerColor == .black ? blackTime : whiteTime
+            var otherPlayerThinkingTime = currentPlayerColor == .black ? whiteTime : blackTime
             switch system {
             case .ByoYomi(_, _, let periodTime):
-                var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
+                var timeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
                 if timeLeft > 0 {
-                    thinkingTime.thinkingTimeLeft = timeLeft
+                    currentPlayerThinkingTime.thinkingTimeLeft = timeLeft
                 } else {
-                    thinkingTime.thinkingTimeLeft = 0
-                    thinkingTime.periodsLeft = thinkingTime.periods
+                    currentPlayerThinkingTime.thinkingTimeLeft = 0
+                    currentPlayerThinkingTime.periodsLeft = currentPlayerThinkingTime.periods
                     timeLeft += Double(periodTime)
-                    while timeLeft < 0 && thinkingTime.periodsLeft! > 0 {
+                    while timeLeft < 0 && currentPlayerThinkingTime.periodsLeft! > 0 {
                         timeLeft += Double(periodTime)
-                        thinkingTime.periodsLeft! -= 1
+                        currentPlayerThinkingTime.periodsLeft! -= 1
                     }
                     if timeLeft < 0 {
-                        thinkingTime.periodTimeLeft = 0
+                        currentPlayerThinkingTime.periodTimeLeft = 0
                     } else {
-                        thinkingTime.periodTimeLeft = timeLeft
+                        currentPlayerThinkingTime.periodTimeLeft = timeLeft
                     }
                 }
             case .Canadian(_, let periodTime, _):
-                var timeLeft = thinkingTime.thinkingTime! - secondsElapsed
+                var timeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
                 if timeLeft > 0 {
-                    thinkingTime.thinkingTimeLeft = timeLeft
+                    currentPlayerThinkingTime.thinkingTimeLeft = timeLeft
                 } else {
                     timeLeft += Double(periodTime)
-                    thinkingTime.thinkingTimeLeft = 0
-                    thinkingTime.blockTimeLeft = timeLeft
+                    currentPlayerThinkingTime.thinkingTimeLeft = 0
+                    currentPlayerThinkingTime.blockTimeLeft = timeLeft
                 }
             case .Simple(let perMove):
                 if paused {
-                    thinkingTime.thinkingTimeLeft = Double(perMove) - secondsElapsed
+                    currentPlayerThinkingTime.thinkingTimeLeft = Double(perMove) - secondsElapsed
                 } else {
-                    thinkingTime.thinkingTimeLeft = timeUntilExpiration
+                    currentPlayerThinkingTime.thinkingTimeLeft = timeUntilExpiration
                 }
+                otherPlayerThinkingTime.thinkingTimeLeft = Double(perMove)
             case .Absolute, .Fischer(_, _, _):
                 if paused {
-                    thinkingTime.thinkingTimeLeft = thinkingTime.thinkingTime! - secondsElapsed
+                    currentPlayerThinkingTime.thinkingTimeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
                 } else {
-                    thinkingTime.thinkingTimeLeft = timeUntilExpiration
+                    currentPlayerThinkingTime.thinkingTimeLeft = timeUntilExpiration
                 }
             default:
                 break
             }
             
             if currentPlayerColor == .black {
-                self.blackTime = thinkingTime
+                self.blackTime = currentPlayerThinkingTime
+                self.whiteTime = otherPlayerThinkingTime
             } else {
-                self.whiteTime = thinkingTime
+                self.whiteTime = currentPlayerThinkingTime
+                self.blackTime = otherPlayerThinkingTime
             }
-        }
+        }        
     }
 }
