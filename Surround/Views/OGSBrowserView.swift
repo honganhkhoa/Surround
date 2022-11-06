@@ -10,6 +10,37 @@ import UIKit
 import WebKit
 import Alamofire
 import Combine
+import SafariServices
+
+func updatedURL(of url: URL, withQuery query: [String: String]) -> URL {
+    if query.count == 0 {
+        return url
+    }
+    
+    let currentQueryItems = URLComponents(string: url.absoluteString)?.queryItems ?? []
+    var newQueryItems = [URLQueryItem]()
+    var query = query
+    for currentItem in currentQueryItems {
+        if let value = query[currentItem.name] {
+            newQueryItems.append(URLQueryItem(name: currentItem.name, value: value))
+            query.removeValue(forKey: currentItem.name)
+        } else {
+            newQueryItems.append(currentItem)
+        }
+    }
+    for (key, value) in query {
+        newQueryItems.append(URLQueryItem(name: key, value: value))
+    }
+    if var urlComponents = URLComponents(string: url.absoluteString) {
+        urlComponents.queryItems = newQueryItems
+        return urlComponents.url ?? url
+    }
+    return url
+}
+
+func firstParam(in url: URL, named name: String) -> String? {
+    return URLComponents(string: url.absoluteString)?.queryItems?.first(where: { $0.name == name })?.value ?? nil
+}
 
 struct OGSBrowserView: View {
     @State var title: String?
@@ -18,6 +49,12 @@ struct OGSBrowserView: View {
     var initialURL: URL
     @State var url: URL?
     var showsURLBar = false
+    @State var showsGoogleLogin = false
+    @State var googleLoginURL: URL? = nil
+    @State var requestedURL: URL? = nil
+    @State var hasError = false
+    @State var googleOAuthCode: String? = nil
+    @State var googleOAuthState: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,7 +69,7 @@ struct OGSBrowserView: View {
                     .padding(.horizontal, 5)
                     .padding(.vertical, 5)
             }
-            OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL, url: $url)
+            OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL, url: $url, showsGoogleLogin: $showsGoogleLogin, googleLoginURL: $googleLoginURL, googleOAuthState: $googleOAuthState, requestedURL: requestedURL)
         }
 //        .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
         .navigationBarItems(
@@ -42,6 +79,32 @@ struct OGSBrowserView: View {
                     Image(systemName: "arrow.clockwise")
                 }))
         .navigationTitle(title ?? "")
+        .sheet(isPresented: Binding(
+            // Using a simple `$showsGoogleLogin` here is not sufficient, as
+            // `googleLoginURL` will sometimes be nil if no-one is looking...
+            get: { showsGoogleLogin && googleLoginURL != nil },
+            set: { showsGoogleLogin = $0 })
+        ) {
+            SafariView(
+                url: googleLoginURL!,
+                googleOAuthCode: $googleOAuthCode
+            )
+        }
+        .onChange(of: url) { newURL in
+            if newURL?.absoluteString.hasPrefix("\(OGSService.ogsRoot)/login-error") ?? false {
+                requestedURL = initialURL
+            }
+        }
+        .onChange(of: googleOAuthCode) { newCode in
+            if let code = newCode {
+                showsGoogleLogin = false
+                if let state = googleOAuthState {
+                    if let oauthCompleteURL = URL(string: "\(OGSService.ogsRoot)/complete/google-oauth2/?scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile&authuser=0&prompt=none&state=\(state)&code=\(code)") {
+                        requestedURL = oauthCompleteURL
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -53,6 +116,11 @@ struct OGSBrowserWebView: UIViewRepresentable {
     @Binding var webView: WKWebView?
     var initialURL: URL
     @Binding var url: URL?
+    @Binding var showsGoogleLogin: Bool
+    @Binding var googleLoginURL: URL?
+    @Binding var googleOAuthState: String?
+    var requestedURL: URL?
+    @State var previousRequestedURL: URL? = nil
 
     func makeCoordinator() -> Coordinator {
         return Coordinator(self)
@@ -63,11 +131,6 @@ struct OGSBrowserWebView: UIViewRepresentable {
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
 
         let webView = WKWebView(frame: CGRect.zero, configuration: configuration)
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            // https://stackoverflow.com/questions/40591090/403-error-thats-an-error-error-disallowed-useragent
-            // Google does not allow OAuth in iPhone's WKWebView, so we use Safari's user agent here
-            webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
-        }
         webView.navigationDelegate = context.coordinator
 
         context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new], changeHandler: { _, change in
@@ -149,7 +212,14 @@ struct OGSBrowserWebView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        
+        if requestedURL?.absoluteString != previousRequestedURL?.absoluteString {
+            DispatchQueue.main.async {
+                previousRequestedURL = requestedURL
+                if let url = requestedURL {
+                    webView?.load(URLRequest(url: url))
+                }
+            }
+        }
     }
     
     class Coordinator: NSObject, WKNavigationDelegate {
@@ -195,6 +265,56 @@ struct OGSBrowserWebView: UIViewRepresentable {
                 if ogs.isOGSDomain(url: url) {
                     loginUsingWebviewCredentialsIfNecessary(webView)
                 }
+            }
+        }
+        
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            let url = navigationAction.request.url
+            print("---- url: " + (url?.absoluteString ?? ""))
+            if let url = url, url.host == "accounts.google.com" {
+                decisionHandler(.cancel)
+                parent.googleOAuthState = firstParam(in: url, named: "state")
+                parent.googleLoginURL = updatedURL(of: url, withQuery: ["state": "stray-request-from-surround-\(Date().timeIntervalSince1970)"])
+//                print("---- gg pre login url: " + url.absoluteString)
+//                print("---- gg login url: " + (parent.googleLoginURL?.absoluteString ?? "nil"))
+                parent.showsGoogleLogin = true
+            } else {
+                decisionHandler(.allow)
+            }
+        }
+    }
+}
+
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    @Binding var googleOAuthCode: String?
+
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: UIViewControllerRepresentableContext<SafariView>) -> SFSafariViewController {
+        print("----- sfvc initial: " + url.absoluteString)
+        let safariViewController = SFSafariViewController(url: url)
+        safariViewController.delegate = context.coordinator
+        return safariViewController
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
+        
+    }
+    
+    class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        var parent: SafariView
+        
+        init(parent: SafariView) {
+            self.parent = parent
+        }
+        
+        func safariViewController(_ controller: SFSafariViewController, initialLoadDidRedirectTo url: URL) {
+            print("----- sfvc: " + url.absoluteString)
+            if url.absoluteString.hasPrefix("\(OGSService.ogsRoot)/complete/google-oauth2") {
+                parent.googleOAuthCode = firstParam(in: url, named: "code")
             }
         }
     }
