@@ -405,7 +405,7 @@ struct CustomGameForm: View {
                                 if standardBoardSize { boardHeight = boardWidth }
                             }
                         ),
-                        in: standardBoardSize ? 0...2 : 1...25, step: 1) {
+                        in: standardBoardSize ? 0...2 : 2...25, step: 1) {
                         Text("\(boardWidth)")
                     }
                     Spacer().frame(height: 10)
@@ -420,7 +420,7 @@ struct CustomGameForm: View {
                                 if standardBoardSize { boardWidth = boardHeight }
                             }
                         ),
-                        in: standardBoardSize ? 0...2 : 1...25, step: 1) {
+                        in: standardBoardSize ? 0...2 : 2...25, step: 1) {
                         Text("\(boardHeight)")
                     }
                 }

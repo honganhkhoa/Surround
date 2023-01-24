@@ -248,7 +248,7 @@ struct TimeControl: Codable, Equatable {
     struct TimeControlCodingData: Codable, Equatable {
         internal init(timeControl: String, system: String? = nil, initialTime: Int? = nil, timeIncrement: Int? = nil, maxTime: Int? = nil, mainTime: Int? = nil, periods: Int? = nil, periodTime: Int? = nil, perMove: Int? = nil, stonesPerPeriod: Int? = nil, totalTime: Int? = nil, speed: TimeControlSpeed? = nil, pauseOnWeekends: Bool? = nil) {
             self.timeControl = timeControl
-            self.system = system
+            self.system = system ?? timeControl
             self.initialTime = initialTime
             self.timeIncrement = timeIncrement
             self.maxTime = maxTime
