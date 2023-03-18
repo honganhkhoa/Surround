@@ -1608,7 +1608,6 @@ class OGSService: ObservableObject {
         
         playerCacheObservingCancellable = self.$cachedUsersById.collect(.byTime(DispatchQueue.main, 0.2)).sink { values in
             if let cachedUsersById = values.last {
-                print("zzz")
                 print(cachedUsersById.keys)
                 for (id, challenge) in self.eligibleOpenChallengeById {
                     if let challengerId = challenge.challenger?.id {

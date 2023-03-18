@@ -135,9 +135,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var currentPosition: BoardPosition {
         didSet {
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
-            if self.moveTree.positionsByLastMoveNumber[currentPosition.lastMoveNumber]?.first! !== currentPosition {
-                print("zzz")
-            }
         }
     }
     @Published var undoRequested: Int?
