@@ -9,7 +9,6 @@ import Foundation
 import Combine
 import Alamofire
 import DictionaryCoding
-import SocketIO
 import WebKit
 import WidgetKit
 
@@ -49,7 +48,7 @@ class OGSService: ObservableObject {
         activeGames: [Game] = [],
         publicGames: [Game] = [],
         friends: [OGSUser] = [],
-        socketStatus: SocketIOStatus = .connected,
+        socketStatus: OGSWebsocketStatus = .authenticated,
         eligibleOpenChallenges: [OGSChallenge] = [],
         openChallengesSent: [OGSChallenge] = [],
         challengesReceived: [OGSChallenge] = [],
@@ -67,7 +66,6 @@ class OGSService: ObservableObject {
         ogs.sortedPublicGames = publicGames
         
         ogs.friends = friends
-
         ogs.socketStatus = socketStatus
         
         for challenge in eligibleOpenChallenges {
@@ -100,19 +98,22 @@ class OGSService: ObservableObject {
 //    static let ogsRoot = "https://beta.online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
-    private let socketManager: SocketManager
-    private let socket: SocketIOClient
+    private let ogsWebsocket: OGSWebsocket
     private var timerCancellable: AnyCancellable?
     private var pingCancellale: AnyCancellable?
-    private var drift = 0.0
-    private var latency = 0.0
+    private var drift : Double {
+        get { return ogsWebsocket.drift }
+    }
+    private var latency : Double {
+        get { return ogsWebsocket.latency }
+    }
     var serverTimeOffset: Double {
         return drift - latency
     }
 
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
-    @Published private(set) public var authenticated = false
+    @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected
 
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
@@ -147,9 +148,6 @@ class OGSService: ObservableObject {
     }
 
     @Published private(set) public var isLoadingOverview = true
-    
-    @Published private(set) public var socketStatus: SocketIOStatus = .connecting
-    @Published private(set) public var socketStatusString = "Connecting..."
     
     private var openChallengeById: [Int: OGSChallenge] = [:]
     @Published private(set) public var eligibleOpenChallengeById: [Int: OGSChallenge] = [:]
@@ -209,19 +207,17 @@ class OGSService: ObservableObject {
     }
     
     private init(forPreview: Bool = false) {
-        let socketURL = URL(string: ogsRoot)!
-        socketManager = SocketManager(socketURL: socketURL, config: [
-            .log(false), .compress, .secure(true), .forceWebsockets(true), .reconnects(true), .reconnectWait(1), .reconnectWaitMax(10),
-            .extraHeaders(["Host": socketURL.host!]),
-            .version(.three)
-        ])
-        socket = socketManager.defaultSocket
+        ogsWebsocket = OGSWebsocket()
+        ogsWebsocket.serverEventCallback = self.onWebsocketServerEvent(name:data:)
+        ogsWebsocket.onStatusChanged = {
+            DispatchQueue.main.async {
+                self.socketStatus = self.ogsWebsocket.status
+            }
+        }
         
         if forPreview {
             return
         }
-        
-        self.setUpSocketEventListeners()
         
         timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { [self] _ in
             for game in connectedGames.values {
@@ -257,6 +253,212 @@ class OGSService: ObservableObject {
 //        self._testSuperChat()
     }
     
+    private func onWebsocketServerEvent(name eventName: String, data: Any?) {
+        switch eventName {
+        case "surround/socketClosed":
+            self._gamesToBeReconnected = Array(self.connectedGames.values)
+        case "surround/socketOpened":
+            for game in self._gamesToBeReconnected {
+                if case .OGS(let ogsId) = game.ID {
+                    if self.connectedGames[ogsId] != nil {
+                        self.connectedGames[ogsId] = nil
+                    }
+                    let withChat = self.connectedWithChat[ogsId] ?? false
+                    self.connect(to: game, withChat: withChat)
+                }
+            }
+            self._gamesToBeReconnected = []
+        case "surround/socketAuthenticated":
+            self.autoMatchEntryById.removeAll()
+            ogsWebsocket.emit(command: "automatch/list")
+        case "net/pong":
+            if let data = data as? [String: Double] {
+                let now = Date().timeIntervalSince1970 * 1000
+                ogsWebsocket.latency = now - data["client"]!
+                ogsWebsocket.drift = (now - ogsWebsocket.latency / 2) - data["server"]!
+            }
+        case "active_game":
+            if let activeGameData = data as? [String: Any] {
+                updateActiveGames(withShortGameData: activeGameData)
+            }
+        case "ui-push":
+            if let data = data as? [String: Any] {
+                if let event = data["event"] as? String {
+                    if event == "challenge-list-updated" {
+                        self.loadOverview()
+                    }
+                }
+            }
+        case "automatch/entry":
+            if let data = data as? [String: Any] {
+                if let automatchEntry = OGSAutomatchEntry(data) {
+                    self.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                }
+            }
+        case "automatch/cancel":
+            if let uuid = (data as? [String: Any] ?? [:])["uuid"] as? String {
+                self.autoMatchEntryById.removeValue(forKey: uuid)
+            }
+        case "automatch/start":
+            if let uuid = (data as? [String: Any] ?? [:])["uuid"] as? String {
+                self.autoMatchEntryById.removeValue(forKey: uuid)
+            }
+        case "private-message":
+            if let messageData = data as? [String: Any] {
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
+                    self.handlePrivateMessage(message)
+                }
+            }
+        case "private-superchat":
+            if let superchatConfig = data as? [String: Any] {
+                self.handleSuperchat(config: superchatConfig)
+            }
+        case "chat-message":
+            if let messageData = data as? [String: Any] {
+                if let message = try? self.dictionaryDecoder.decode(OGSChatMessage.self, from: messageData) {
+                    print(message)
+                }
+            }
+        case "gamelist-count":
+            if let gamesCount = data as? [String: Int?] {
+                self.sitewiseLiveGamesCount = gamesCount[TimeControlSpeed.live.rawValue, default: nil]
+                self.sitewiseCorrespondenceGamesCount = gamesCount[TimeControlSpeed.correspondence.rawValue, default: nil]
+            }
+        case "seekgraph/global":
+            onSeekGraphEvent(data: data)
+        default:
+            if eventName.starts(with: "game/") {
+                let components = eventName.split(separator: "/")
+                if components.count == 3, let ogsGameId = Int(components[1]) {
+                    let gameEvent = String(components[2])
+                    self.onWebsocketServerGameEvent(ogsGameId: ogsGameId, eventName: gameEvent, data: data)
+                }
+            }
+            break
+        }
+    }
+    
+    private func onWebsocketServerGameEvent(ogsGameId: Int, eventName: String, data: Any?) {
+        guard let connectedGame = self.connectedGames[ogsGameId] else {
+            return
+        }
+        
+        switch eventName {
+        case "gamedata":
+            if let gameData = data as? [String: Any], let ogsGame = try? dictionaryDecoder.decode(OGSGame.self, from: gameData) {
+                connectedGame.gameData = ogsGame
+            } else {
+                print("Error parsing game: \(data ?? "")")
+            }
+        case "move":
+            if let movedata = data as? [String: Any] {
+                if let move = movedata["move"] as? [Any] {
+                    if let column = move[0] as? Int, let row = move[1] as? Int {
+                        do {
+                            try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
+                        } catch {
+                            print(ogsGameId, movedata, error)
+                        }
+                        if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
+                            connectedGame.latestPlayerUpdate = try? dictionaryDecoder.decode(OGSMoveExtra.self, from: playerUpdate).playerUpdate
+                        } else {
+                            connectedGame.latestPlayerUpdate = nil
+                        }
+
+                        if let _ = self.activeGames[ogsGameId] {
+                            userDefaults[.latestOGSOverviewOutdated] = true
+                        }
+                    }
+                }
+            }
+        case "clock":
+            if let clockdata = data as? [String: Any] {
+                do {
+                    connectedGame.clock = try dictionaryDecoder.decode(OGSClock.self, from: clockdata)
+                    if let pauseControl = connectedGame.clock?.pauseControl {
+                        connectedGame.pauseControl = pauseControl
+                    }
+                    if let timeControlSystem = connectedGame.gameData?.timeControl.system {
+                        connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.pauseControl)
+                    }
+                    if let _ = self.activeGames[ogsGameId] {
+                        // Trigger active games publisher to re-sort if necessary
+                        self.activeGames[ogsGameId] = connectedGame
+                    }
+                } catch {
+                    print(ogsGameId, error)
+                    print(clockdata)
+                }
+            }
+        case "undo_accepted":
+            if let moveNumber = data as? Int {
+                connectedGame.undoMove(numbered: moveNumber)
+            }
+        case "undo_requested":
+            if let moveNumber = data as? Int {
+                connectedGame.undoRequested = moveNumber
+            }
+        case "removed_stones":
+            if let removedStoneData = data as? [String: Any] {
+                if let removedString = removedStoneData["all_removed"] as? String {
+                    connectedGame.setRemovedStones(removedString: removedString)
+                }
+            }
+        case "removed_stones_accepted":
+            if let removedStoneAcceptedData = data as? [String: Any] {
+                if let playerId = removedStoneAcceptedData["player_id"] as? Int, let color = connectedGame.stoneColor(ofPlayerWithId: playerId),
+                   let stones = removedStoneAcceptedData["stones"] as? String {
+                    connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
+                }
+            }
+        case "phase":
+            if let phase = OGSGamePhase(rawValue: data as? String ?? "") {
+                connectedGame.gamePhase = phase
+                if let _ = self.activeGames[ogsGameId] {
+                    userDefaults[.latestOGSOverviewOutdated] = true
+                }
+            }
+        case "auto_resign":
+            if let autoResignData = data as? [String: Any] {
+                if let playerId = autoResignData["player_id"] as? Int, let expiration = autoResignData["expiration"] as? Double {
+                    connectedGame.setAutoResign(
+                        playerId: playerId,
+                        time: expiration // / 1000 + (serverTimeOffset)
+                        // serverTimeOffset = drift - latency
+                    )
+                }
+            }
+        case "clear_auto_resign":
+            if let clearAutoResignData = data as? [String: Any] {
+                if let playerId = clearAutoResignData["player_id"] as? Int {
+                    connectedGame.clearAutoResign(playerId: playerId)
+                }
+            }
+        case "chat":
+            if let chatData = data as? [String: Any] {
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                if let chatLine = try? decoder.decode(OGSChatLine.self, from: chatData) {
+                    connectedGame.addChatLine(chatLine)
+                }
+            }
+        case "reset-chats":
+            connectedGame.resetChats()
+        case "player_update":
+            if let update = data as? [String: Any] {
+                let decoder = DictionaryDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
+                    connectedGame.latestPlayerUpdate = playerUpdate
+                }
+            }
+        default:
+            break
+        }
+    }
+    
 //    private func _testSuperChat() {
 //        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
 //            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
@@ -268,159 +470,6 @@ class OGSService: ObservableObject {
 //    }
     
     private var _gamesToBeReconnected: [Game] = []
-    
-    private func setUpSocketEventListeners() {
-        socket.onAny { event in
-            if event.event != "active-bots" {
-                print(event)
-            }
-        }
-        
-        socket.on(clientEvent: .statusChange) { newStatus, _ in
-            DispatchQueue.main.async {
-                if let status = newStatus[0] as? SocketIOStatus {
-                    self.socketStatus = status
-                    switch status {
-                    case .connected:
-                        self.socketStatusString = "Connected."
-                    case .disconnected:
-                        self.socketStatusString = "Disconnected."
-                        self.authenticated = false
-                    default:
-                        break
-                    }
-                    print("Status changing to \(status)")
-                }
-            }
-        }
-        
-        socket.on(clientEvent: .reconnect) { _, _ in
-            DispatchQueue.main.async {
-                self.authenticated = false
-                self.socketStatusString = "Reconnecting..."
-                self._gamesToBeReconnected = Array(self.connectedGames.values)
-            }
-        }
-                
-        socket.on(clientEvent: .connect) { [self] _, _ in
-            DispatchQueue.main.async {
-                self.pingCancellale = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
-                    self.socket.emit("net/ping", ["client": Date().timeIntervalSince1970 * 1000, "drift": self.drift, "latency": self.latency])
-                }
-                self.authenticateSocketIfLoggedIn()
-                self.socket.emit("ui-pushes/subscribe", ["channel": "undefined"])
-
-                for game in self._gamesToBeReconnected {
-                    if case .OGS(let ogsId) = game.ID {
-                        if self.connectedGames[ogsId] != nil {
-                            self.connectedGames[ogsId] = nil
-                            self.unsubscribeWebsocketEvent(forGameWithId: ogsId)
-                        }
-                        let withChat = self.connectedWithChat[ogsId] ?? false
-                        self.connect(to: game, withChat: withChat)
-                    }
-                }
-                self._gamesToBeReconnected = []
-            }
-        }
-        
-        socket.on("net/pong") { [self] data, ack in
-            DispatchQueue.main.async {
-                if let data = data[0] as? [String:Double] {
-                    let now = Date().timeIntervalSince1970 * 1000
-                    self.latency = now - data["client"]!
-                    self.drift = (now - self.latency / 2) - data["server"]!
-                    print(self.drift, self.latency)
-                }
-            }
-        }
-        
-        socket.on("active_game") { gameData, ack in
-            DispatchQueue.main.async {
-                if let activeGameData = gameData[0] as? [String: Any] {
-                    self.updateActiveGames(withShortGameData: activeGameData)
-                }
-            }
-        }
-        
-        socket.on("ui-push") { data, ack in
-            DispatchQueue.main.async {
-                if let data = data[0] as? [String: Any] {
-                    if let event = data["event"] as? String {
-                        if event == "challenge-list-updated" {
-                            self.loadOverview()
-                        }
-                    }
-                }
-            }
-        }
-        
-        socket.on("automatch/entry") { data, ack in
-            DispatchQueue.main.async {
-                if let data = data[0] as? [String: Any] {
-                    if let automatchEntry = OGSAutomatchEntry(data) {
-                        self.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
-                    }
-                }
-            }
-            
-        }
-        
-        socket.on("automatch/cancel") { data, ack in
-            DispatchQueue.main.async {
-                if let uuid = (data[0] as? [String: Any] ?? [:])["uuid"] as? String {
-                    self.autoMatchEntryById.removeValue(forKey: uuid)
-                }
-            }
-        }
-
-        socket.on("automatch/start") { data, ack in
-            DispatchQueue.main.async {
-                if let uuid = (data[0] as? [String: Any] ?? [:])["uuid"] as? String {
-                    self.autoMatchEntryById.removeValue(forKey: uuid)
-                }
-            }
-        }
-        
-        socket.on("private-message") { data, ack in
-            DispatchQueue.main.async {
-                if let messageData = data[0] as? [String: Any] {
-                    let decoder = DictionaryDecoder()
-                    decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
-                        self.handlePrivateMessage(message)
-                    }
-                }
-            }
-        }
-        
-        socket.on("private-superchat") { data, ack in
-            DispatchQueue.main.async {
-                if let superchatConfig = data[0] as? [String: Any] {
-                    self.handleSuperchat(config: superchatConfig)
-                }
-            }
-        }
-        
-        socket.on("chat-message") { data, ack in
-            DispatchQueue.main.async {
-                if let messageData = data[0] as? [String: Any] {
-                    if let message = try? self.dictionaryDecoder.decode(OGSChatMessage.self, from: messageData) {
-                        print(message)
-                    }
-                }
-            }
-        }
-        
-        socket.on("gamelist-count") { data, ack in
-            DispatchQueue.main.async {
-                if let gamesCount = data[0] as? [String: Int?] {
-                    self.sitewiseLiveGamesCount = gamesCount[TimeControlSpeed.live.rawValue, default: nil]
-                    self.sitewiseCorrespondenceGamesCount = gamesCount[TimeControlSpeed.correspondence.rawValue, default: nil]
-                }
-            }
-        }
-    }
     
     var ogsUIConfig: OGSUIConfig? {
         get {
@@ -435,10 +484,7 @@ class OGSService: ObservableObject {
                     self.disconnect(from: game)
                 }
                 activeGames.removeAll()
-                self.socket.once(clientEvent: .disconnect) { _, _ in
-                    self.ensureConnect()
-                }
-                self.socket.disconnect()
+                ogsWebsocket.closeThenReconnect()
             } else {
                 self.updateSessionId()
             }
@@ -493,7 +539,7 @@ class OGSService: ObservableObject {
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
             self.ogsUIConfig = config
             self.loadOverview()
-            self.authenticateSocketIfLoggedIn()
+            self.ogsWebsocket.authenticateIfLoggedIn()
             return config
         }).eraseToAnyPublisher()
     }
@@ -591,38 +637,6 @@ class OGSService: ObservableObject {
         }
     }
     
-    func authenticateSocketIfLoggedIn() {
-        guard socket.status == .connected else {
-            return
-        }
-      
-        guard self.isLoggedIn, let uiconfig = self.ogsUIConfig else {
-            return
-        }
-        
-        socket.emit("notification/connect", [
-            "player_id": uiconfig.user.id,
-            "auth": uiconfig.notificationAuth ?? ""
-        ])
-        socket.emit("authenticate", [
-            "auth": uiconfig.chatAuth ?? "",
-            "jwt": uiconfig.userJwt ?? "",
-            "player_id": uiconfig.user.id,
-            "username": uiconfig.user.username
-        ])
-        socket.emit("chat/connect", [
-            "auth": uiconfig.chatAuth ?? "",
-            "player_id": uiconfig.user.id,
-            "ranking": Int(uiconfig.user.ranking ?? 0.0),
-            "ui_class": uiconfig.user.uiClass ?? "",
-            "username": uiconfig.user.username
-        ])
-        self.autoMatchEntryById.removeAll()
-        socket.emit("automatch/list")
-        
-        self.authenticated = true
-    }
-
     func fetchPlayerInfo(userIds: [Int]) -> AnyPublisher<[OGSUser], Error> {
         guard userIds.count > 0 else {
             return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
@@ -864,36 +878,14 @@ class OGSService: ObservableObject {
     }
         
     func ensureConnect(thenExecute callback: (() -> ())? = nil) {
-        if socket.status == .connected {
-            if let callback = callback {
-                callback()
-            }
-        } else {
-            if socket.status != .connecting {
-                socket.connect()
-            }
-            if let callback = callback {
-                socket.once(clientEvent: .connect, callback: { _, _ in
-                    callback()
-                })
-            }
+        guard let callback else {
+            return
         }
-    }
-    
-    func unsubscribeWebsocketEvent(forGameWithId ogsID: Int) {
-        self.socket.off("game/\(ogsID)/gamedata")
-        self.socket.off("game/\(ogsID)/move")
-        self.socket.off("game/\(ogsID)/clock")
-        self.socket.off("game/\(ogsID)/undo_accepted")
-        self.socket.off("game/\(ogsID)/undo_requested")
-        self.socket.off("game/\(ogsID)/removed_stones")
-        self.socket.off("game/\(ogsID)/removed_stones_accepted")
-        self.socket.off("game/\(ogsID)/phase")
-        self.socket.off("game/\(ogsID)/auto_resign")
-        self.socket.off("game/\(ogsID)/clear_auto_resign")
-        self.socket.off("game/\(ogsID)/chat")
-        self.socket.off("game/\(ogsID)/reset-chats")
-        self.socket.off("game/\(ogsID)/player_update")
+        if ogsWebsocket.opened {
+            callback()
+        } else {
+            ogsWebsocket.onConnectTasks.append(callback)
+        }
     }
     
     func disconnect(from game: Game) {
@@ -901,9 +893,8 @@ class OGSService: ObservableObject {
             return
         }
 
-        self.socket.emit("game/disconnect", ["game_id": ogsID])
+        self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": ogsID])
         self.disconnectChat(from: game)
-        unsubscribeWebsocketEvent(forGameWithId: ogsID)
         connectedGames[ogsID] = nil
         connectedWithChat[ogsID] = nil
     }
@@ -913,7 +904,7 @@ class OGSService: ObservableObject {
             return
         }
 
-        self.socket.emit("chat/part", ["channel": "game-\(ogsID)"])
+        self.ogsWebsocket.emit(command: "chat/part", data: ["channel": "game-\(ogsID)"])
     }
     
     func connectChat(in game: Game) {
@@ -921,7 +912,7 @@ class OGSService: ObservableObject {
             return
         }
         
-        self.socket.emit("chat/join", ["channel": "game-\(ogsID)"])
+        self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
     }
     
     func connect(to game: Game, withChat: Bool = false) {
@@ -932,21 +923,21 @@ class OGSService: ObservableObject {
         guard connectedGames[ogsID] == nil else {
             if connectedWithChat[ogsID] == false && withChat {
                 connectedWithChat[ogsID] = true
-                self.socket.emit("game/disconnect", ["game_id": ogsID])
-                self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": true])
-                self.socket.emit("chat/join", ["channel": "game-\(ogsID)"])
+                self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": ogsID])
+                self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": ogsID, "chat": true])
+                self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
             }
             return
         }
 
-        guard self.socket.status == .connected else {
-            socket.once(clientEvent: .connect, callback: {_,_ in
+        guard self.ogsWebsocket.opened else {
+            self.ogsWebsocket.onConnectTasks.append {
                 self.connect(to: game, withChat: withChat)
-            })
+            }
             return
         }
         
-        guard !(game.isUserPlaying && withChat && !self.authenticated) else {
+        guard !(game.isUserPlaying && withChat && !self.ogsWebsocket.authenticated) else {
             // If user is one of the players, wait until the socket is authenticated to prevent them from seeing Malkovich log.
             DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
                 self.connect(to: game, withChat: withChat)
@@ -956,190 +947,9 @@ class OGSService: ObservableObject {
         
         connectedWithChat[ogsID] = withChat
         connectedGames[ogsID] = game
-        self.socket.emit("game/connect", ["game_id": ogsID, "player_id": self.ogsUIConfig?.user.id ?? 0, "chat": withChat ? true : 0])
+        self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": ogsID, "chat": withChat ? true : 0])
         if withChat {
-            self.socket.emit("chat/join", ["channel": "game-\(ogsID)"])
-        }
-
-        self.socket.on("game/\(ogsID)/gamedata") { gamedata, ack in
-            DispatchQueue.main.async {
-                if let gameId = (gamedata[0] as? [String: Any] ?? [:])["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
-                    let decoder = DictionaryDecoder()
-                    decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    if let gameData = gamedata[0] as? [String: Any], let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
-                        connectedGame.gameData = ogsGame
-                    } else {
-                        print("Error parsing game", gamedata)
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/move") { movedata, ack in
-            DispatchQueue.main.async {
-                if let movedata = movedata[0] as? [String: Any] {
-                    if let move = movedata["move"] as? [Any], let gameId = movedata["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
-                        
-                        if let column = move[0] as? Int, let row = move[1] as? Int {
-                                                        
-                            do {
-                                try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
-                            } catch {
-                                print(gameId, movedata, error)
-                            }
-
-                            if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
-                                let decoder = DictionaryDecoder()
-                                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                                game.latestPlayerUpdate = try? decoder.decode(OGSMoveExtra.self, from: playerUpdate).playerUpdate
-                            } else {
-                                game.latestPlayerUpdate = nil
-                            }
-
-                            if let _ = self.activeGames[gameId] {
-                                userDefaults[.latestOGSOverviewOutdated] = true
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/clock") { clockdata, ack in
-            DispatchQueue.main.async {
-                if let clockdata = clockdata[0] as? [String: Any] {
-                    if let gameId = clockdata["game_id"] as? Int, let connectedGame = self.connectedGames[gameId] {
-                        let decoder = DictionaryDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        do {
-                            connectedGame.clock = try decoder.decode(OGSClock.self, from: clockdata)
-                            if let pauseControl = connectedGame.clock?.pauseControl {
-                                connectedGame.pauseControl = pauseControl
-                            }
-                            if let timeControlSystem = connectedGame.gameData?.timeControl.system {
-                                connectedGame.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: self.drift - self.latency, pauseControl: connectedGame.pauseControl)
-                            }
-                            if let _ = self.activeGames[gameId] {
-                                // Trigger active games publisher to re-sort if necessary
-                                self.activeGames[gameId] = connectedGame
-                            }
-                        } catch {
-                            print(gameId, error)
-                            print(clockdata)
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/undo_accepted") { undoData, ack in
-            DispatchQueue.main.async {
-                if let moveNumber = undoData[0] as? Int {
-                    if let connectedGame = self.connectedGames[ogsID] {
-                        connectedGame.undoMove(numbered: moveNumber)
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/undo_requested") { undoData, ack in
-            DispatchQueue.main.async {
-                if let moveNumber = undoData[0] as? Int {
-                    if let connectedGame = self.connectedGames[ogsID] {
-                        connectedGame.undoRequested = moveNumber
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/removed_stones") { removedStoneData, ack in
-            DispatchQueue.main.async {
-                if let removedStoneData = removedStoneData[0] as? [String: Any] {
-                    if let removedString = removedStoneData["all_removed"] as? String {
-                        if let connectedGame = self.connectedGames[ogsID] {
-                            connectedGame.setRemovedStones(removedString: removedString)
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/removed_stones_accepted") { data, ack in
-            DispatchQueue.main.async {
-                if let removedStoneAcceptedData = data[0] as? [String: Any] {
-                    if let connectedGame = self.connectedGames[ogsID] {
-                        if let playerId = removedStoneAcceptedData["player_id"] as? Int, let color = connectedGame.stoneColor(ofPlayerWithId: playerId),
-                           let stones = removedStoneAcceptedData["stones"] as? String {
-                            connectedGame.removedStonesAccepted[color] = BoardPosition.points(fromPositionString: stones)
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/phase") { data, ack in
-            DispatchQueue.main.async {
-                if let phase = OGSGamePhase(rawValue: data[0] as? String ?? "") {
-                    if let connectedGame = self.connectedGames[ogsID] {
-                        connectedGame.gamePhase = phase
-                    }
-                    if let _ = self.activeGames[ogsID] {
-                        userDefaults[.latestOGSOverviewOutdated] = true
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/auto_resign") { data, ack in
-            DispatchQueue.main.async {
-                if let autoResignData = data[0] as? [String: Any] {
-                    if let playerId = autoResignData["player_id"] as? Int, let expiration = autoResignData["expiration"] as? Double {
-                        if let connectedGame = self.connectedGames[ogsID] {
-                            connectedGame.setAutoResign(
-                                playerId: playerId,
-                                time: expiration // / 1000 + (serverTimeOffset)
-                                // serverTimeOffset = drift - latency
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/clear_auto_resign") { data, ack in
-            DispatchQueue.main.async {
-                if let clearAutoResignData = data[0] as? [String: Any] {
-                    if let playerId = clearAutoResignData["player_id"] as? Int {
-                        if let connectedGame = self.connectedGames[ogsID] {
-                            connectedGame.clearAutoResign(playerId: playerId)
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/chat") { data, ack in
-            DispatchQueue.main.async {
-                if let connectedGame = self.connectedGames[ogsID] {
-                    if let chatData = data[0] as? [String: Any] {
-                        let decoder = DictionaryDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        if let chatLine = try? decoder.decode(OGSChatLine.self, from: chatData) {
-                            connectedGame.addChatLine(chatLine)
-                        }
-                    }
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/reset-chats") { data, ack in
-            DispatchQueue.main.async {
-                if let connectedGame = self.connectedGames[ogsID] {
-                    connectedGame.resetChats()
-                }
-            }
-        }
-        self.socket.on("game/\(ogsID)/player_update") { data, ack in
-            DispatchQueue.main.async {
-                if let connectedGame = self.connectedGames[ogsID] {
-                    if let update = data[0] as? [String: Any] {
-                        let decoder = DictionaryDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
-                            connectedGame.latestPlayerUpdate = playerUpdate
-                        }
-                    }
-                }
-            }
+            self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
         }
     }
     
@@ -1170,14 +980,9 @@ class OGSService: ObservableObject {
     }
     
     func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
-        guard let ogsUIConfig = self.ogsUIConfig else {
-            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
-        }
-        
         return Future<Void, Error> { promise in
             if let gameId = game.gameData?.gameId {
-                let userId = ogsUIConfig.user.id
-                self.socket.emitWithAck("game/move", ["game_id": gameId, "player_id": userId, "move": move.toOGSString()]).timingOut(after: 3) { _ in
+                self.ogsWebsocket.emit(command: "game/move", data: ["game_id": gameId, "move": move.toOGSString()]) { _, _ in
                     promise(.success(()))
                 }
             }
@@ -1185,13 +990,8 @@ class OGSService: ObservableObject {
     }
     
     func toggleRemovedStones(stones: Set<[Int]>, forGame game: Game) -> AnyPublisher<Void, Error> {
-        guard let ogsUIConfig = self.ogsUIConfig else {
-            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
-        }
-
         return Future<Void, Error> { promise in
             if let gameId = game.gameData?.gameId {
-                let userId = ogsUIConfig.user.id
                 var toBeAdded = Set<[Int]>()
                 var toBeRemoved = Set<[Int]>()
                 for point in stones {
@@ -1202,10 +1002,10 @@ class OGSService: ObservableObject {
                     }
                 }
                 if toBeAdded.count > 0 {
-                    self.socket.emit("game/removed_stones/set", ["game_id": gameId, "player_id": userId, "removed": 0, "stones": BoardPosition.positionString(fromPoints: toBeAdded)])
+                    self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 0, "stones": BoardPosition.positionString(fromPoints: toBeAdded)])
                 }
                 if toBeRemoved.count > 0 {
-                    self.socket.emit("game/removed_stones/set", ["game_id": gameId, "player_id": userId, "removed": 1, "stones": BoardPosition.positionString(fromPoints: toBeRemoved)])
+                    self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 1, "stones": BoardPosition.positionString(fromPoints: toBeRemoved)])
                 }
                 promise(.success(()))
             }
@@ -1213,89 +1013,85 @@ class OGSService: ObservableObject {
     }
     
     func acceptRemovedStone(game: Game) {
-        if let ogsID = game.ogsID, let userId = self.user?.id {
-            self.socket.emit("game/removed_stones/accept", [
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/removed_stones/accept", data: [
                 "game_id": ogsID,
-                "player_id": userId,
-                "stones": BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? Set<[Int]>()),
-                "strick_seki_mode": false
+                "stones": BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? Set<[Int]>())
             ])
         }
     }
     
     func resumeGameFromStoneRemoval(game: Game) {
-        if let ogsID = game.ogsID, let userId = self.user?.id {
-            self.socket.emit("game/removed_stones/reject", ["game_id": ogsID, "player_id": userId])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/removed_stones/reject", data: ["game_id": ogsID])
         }
     }
     
     func requestUndo(game: Game) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/undo/request", ["game_id": ogsID, "player_id": user.id, "move_number": game.currentPosition.lastMoveNumber])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/undo/request", data: ["game_id": ogsID, "move_number": game.currentPosition.lastMoveNumber])
         }
     }
     
     func acceptUndo(game: Game, moveNumber: Int) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/undo/accept", ["game_id": ogsID, "player_id": user.id, "move_number": moveNumber])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/undo/accept", data: ["game_id": ogsID, "move_number": moveNumber])
         }
     }
     
     func resign(game: Game) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/resign", ["game_id": ogsID, "player_id": user.id])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/resign", data: ["game_id": ogsID])
         }
     }
 
     func cancel(game: Game) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/cancel", ["game_id": ogsID, "player_id": user.id])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/cancel", data: ["game_id": ogsID])
         }
     }
 
     func pause(game: Game) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/pause", ["game_id": ogsID, "player_id": user.id])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/pause", data: ["game_id": ogsID])
         }
     }
     
     func resume(game: Game) {
-        if let ogsID = game.ogsID, let user = self.user {
-            self.socket.emit("game/resume", ["game_id": ogsID, "player_id": user.id])
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/resume", data: ["game_id": ogsID])
         }
     }
     
     func fetchPublicGames(from: Int = 0, limit: Int = 30) {
-        self.socket.emitWithAck("gamelist/query", ["list": "live", "sort_by": "rank", "from": from, "limit": limit]).timingOut(after: 3) { data in
-            if data.count > 0 {
-                if let publicGamesData = (data[0] as? [String: Any] ?? [:])["results"] as? [[String: Any]] {
-                    var newPublicGames: [Game] = []
-                    var newPublicGameIds = Set<Int>()
-                    for publicGameData in publicGamesData {
-                        if let gameId = publicGameData["id"] as? Int {
-                            newPublicGameIds.insert(gameId)
-                            if let newGame = self.createGame(fromShortGameData: publicGameData) {
-                                if let connectedGame = self.connectedGames[gameId] {
-                                    newPublicGames.append(connectedGame)
-                                } else {
-                                    self.connect(to: newGame)
-                                    newPublicGames.append(newGame)
-                                }
-                                self.publicGames[gameId] = newPublicGames.last
+        self.ogsWebsocket.emit(command: "gamelist/query", data: ["list": "live", "sort_by": "rank", "from": from, "limit": limit]) { data, _ in
+            if let publicGamesData = (data as? [String: Any] ?? [:])["results"] as? [[String: Any]] {
+                var newPublicGames: [Game] = []
+                var newPublicGameIds = Set<Int>()
+                for publicGameData in publicGamesData {
+                    if let gameId = publicGameData["id"] as? Int {
+                        newPublicGameIds.insert(gameId)
+                        if let newGame = self.createGame(fromShortGameData: publicGameData) {
+                            if let connectedGame = self.connectedGames[gameId] {
+                                newPublicGames.append(connectedGame)
+                            } else {
+                                self.connect(to: newGame)
+                                newPublicGames.append(newGame)
                             }
+                            self.publicGames[gameId] = newPublicGames.last
                         }
                     }
-                    self.sortedPublicGames = newPublicGames
-                    for game in newPublicGames {
-                        self.cachedUserIds.formUnion(Set(game.playerByOGSId.keys))
-                    }
-                    self.fetchCachedPlayersIfNecessary()
-                    // Disconnect outdated games
-                    for connectedGame in self.connectedGames.values {
-                        if let gameId = connectedGame.ogsID {
-                            if !newPublicGameIds.contains(gameId) && self.activeGames[gameId] == nil {
-                                self.disconnect(from: connectedGame)
-                            }
+                }
+                self.sortedPublicGames = newPublicGames
+                for game in newPublicGames {
+                    self.cachedUserIds.formUnion(Set(game.playerByOGSId.keys))
+                }
+                self.fetchCachedPlayersIfNecessary()
+                // Disconnect outdated games
+                for connectedGame in self.connectedGames.values {
+                    if let gameId = connectedGame.ogsID {
+                        if !newPublicGameIds.contains(gameId) && self.activeGames[gameId] == nil {
+                            self.disconnect(from: connectedGame)
                         }
                     }
                 }
@@ -1350,7 +1146,7 @@ class OGSService: ObservableObject {
         .switchToLatest()
         .map { config in
             self.loadOverview()
-            self.authenticateSocketIfLoggedIn()
+            self.ogsWebsocket.authenticateIfLoggedIn()
             return config
         }
         .eraseToAnyPublisher()
@@ -1517,7 +1313,7 @@ class OGSService: ObservableObject {
     func sendChat(in game: Game, channel: OGSChatChannel, body: String) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             if let gameId = game.ogsID {
-                self.socket.emit("game/chat", [
+                self.ogsWebsocket.emit(command: "game/chat", data: [
                     "body": body,
                     "game_id": gameId,
                     "move_number": game.currentPosition.lastMoveNumber,
@@ -1531,11 +1327,7 @@ class OGSService: ObservableObject {
     var playerCacheObservingCancellable: AnyCancellable?
     
     func subscribeToSeekGraph() {
-        guard socket.status == .connected else {
-            return
-        }
-        
-        guard let user = self.user else {
+        guard ogsWebsocket.authenticated else {
             return
         }
         
@@ -1544,67 +1336,7 @@ class OGSService: ObservableObject {
             seekGraphUnsubscribeCancellable = nil
         }
         
-        self.socket.emit("seek_graph/connect", ["channel": "global"])
-        self.socket.on("seekgraph/global") { data, ack in
-            if let challenges = data[0] as? [[String: Any]] {
-                let decoder = DictionaryDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                for challengeData in challenges {
-                    if let challengeId = challengeData["challenge_id"] as? Int {
-                        if challengeData["delete"] as? Int == 1 {
-                            if let challenge = self.openChallengeById[challengeId] {
-                                if challenge.challenger?.id == self.user?.id {
-                                    self.openChallengeSentById.removeValue(forKey: challengeId)
-                                }
-                            }
-                            self.openChallengeById.removeValue(forKey: challengeId)
-                            self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
-                            self.hostingRengoChallengeById.removeValue(forKey: challengeId)
-                            self.participatingRengoChallengeById.removeValue(forKey: challengeId)
-                        } else {
-                            if var challenge = try? decoder.decode(OGSChallenge.self, from: challengeData) {
-                                if challenge.rengo {
-                                    if let userId = self.user?.id {
-                                        if let challengerId = challenge.challenger?.id, challengerId == userId {
-                                            self.hostingRengoChallengeById[challenge.id] = challenge
-                                        }
-                                        if let participants = challenge.game.rengoParticipants {
-                                            if participants.firstIndex(of: userId) != nil {
-                                                self.participatingRengoChallengeById[challenge.id] = challenge
-                                            } else {
-                                                self.participatingRengoChallengeById.removeValue(forKey: challenge.id)
-                                            }
-                                            self.cachedUserIds.formUnion(Set(participants))
-                                        }
-                                    }
-                                } else {
-                                    if let challengerId = challenge.challenger?.id {
-                                        if self.cachedUsersById[challengerId] != nil {
-                                            challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
-                                        }
-                                        if challengerId == self.user?.id {
-                                            self.openChallengeSentById[challenge.id] = challenge
-                                        }
-                                    }
-                                }
-                                self.openChallengeById[challengeId] = challenge
-                                if challenge.isUserEligible(user: user) {
-                                    self.eligibleOpenChallengeById[challengeId] = challenge
-                                    if let challengerId = challenge.challenger?.id {
-                                        self.cachedUserIds.insert(challengerId)
-                                    }
-                                    if challenge.rengo, let participants = challenge.game.rengoParticipants {
-                                        self.cachedUserIds.formUnion(Set(participants))
-                                    }
-                                } else {
-                                    self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        self.ogsWebsocket.emit(command: "seek_graph/connect", data: ["channel": "global"])
         
         playerCacheObservingCancellable = self.$cachedUsersById.collect(.byTime(DispatchQueue.main, 0.2)).sink { values in
             if let cachedUsersById = values.last {
@@ -1622,9 +1354,74 @@ class OGSService: ObservableObject {
         }
     }
     
+    func onSeekGraphEvent(data: Any?) {
+        guard let user = self.user else {
+            return
+        }
+
+        if let challenges = data as? [[String: Any]] {
+            let decoder = DictionaryDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            for challengeData in challenges {
+                if let challengeId = challengeData["challenge_id"] as? Int {
+                    if challengeData["delete"] as? Int == 1 {
+                        if let challenge = self.openChallengeById[challengeId] {
+                            if challenge.challenger?.id == self.user?.id {
+                                self.openChallengeSentById.removeValue(forKey: challengeId)
+                            }
+                        }
+                        self.openChallengeById.removeValue(forKey: challengeId)
+                        self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
+                        self.hostingRengoChallengeById.removeValue(forKey: challengeId)
+                        self.participatingRengoChallengeById.removeValue(forKey: challengeId)
+                    } else {
+                        if var challenge = try? decoder.decode(OGSChallenge.self, from: challengeData) {
+                            if challenge.rengo {
+                                if let userId = self.user?.id {
+                                    if let challengerId = challenge.challenger?.id, challengerId == userId {
+                                        self.hostingRengoChallengeById[challenge.id] = challenge
+                                    }
+                                    if let participants = challenge.game.rengoParticipants {
+                                        if participants.firstIndex(of: userId) != nil {
+                                            self.participatingRengoChallengeById[challenge.id] = challenge
+                                        } else {
+                                            self.participatingRengoChallengeById.removeValue(forKey: challenge.id)
+                                        }
+                                        self.cachedUserIds.formUnion(Set(participants))
+                                    }
+                                }
+                            } else {
+                                if let challengerId = challenge.challenger?.id {
+                                    if self.cachedUsersById[challengerId] != nil {
+                                        challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: self.cachedUsersById[challengerId]!)
+                                    }
+                                    if challengerId == self.user?.id {
+                                        self.openChallengeSentById[challenge.id] = challenge
+                                    }
+                                }
+                            }
+                            self.openChallengeById[challengeId] = challenge
+                            if challenge.isUserEligible(user: user) {
+                                self.eligibleOpenChallengeById[challengeId] = challenge
+                                if let challengerId = challenge.challenger?.id {
+                                    self.cachedUserIds.insert(challengerId)
+                                }
+                                if challenge.rengo, let participants = challenge.game.rengoParticipants {
+                                    self.cachedUserIds.formUnion(Set(participants))
+                                }
+                            } else {
+                                self.eligibleOpenChallengeById.removeValue(forKey: challengeId)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     var seekGraphUnsubscribeCancellable: AnyCancellable?
     func unsubscribeFromSeekGraphWhenDone() {
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             seekGraphUnsubscribeCancellable = nil
             return
         }
@@ -1640,8 +1437,7 @@ class OGSService: ObservableObject {
             return
         }
 
-        self.socket.emit("seek_graph/disconnect", ["channel": "global"])
-        self.socket.off("seekgraph/global")
+        self.ogsWebsocket.emit(command: "seek_graph/disconnect", data: ["channel": "global"])
         
         self.openChallengeById.removeAll()
         self.eligibleOpenChallengeById.removeAll()
@@ -1705,7 +1501,7 @@ class OGSService: ObservableObject {
             return
         }
         
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             return
         }
         
@@ -1716,7 +1512,7 @@ class OGSService: ObservableObject {
         }
         
         for challenge in challenges {
-            socket.emit("challenge/keepalive", ["challenge_id": challenge.id, "game_id": challenge.game.id])
+            ogsWebsocket.emit(command: "challenge/keepalive", data: ["challenge_id": challenge.id, "game_id": challenge.game.id])
         }
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
             self.sendKeepAliveSignalForOpenLiveChallenges()
@@ -1792,19 +1588,19 @@ class OGSService: ObservableObject {
     }
     
     func findAutomatch(entry: OGSAutomatchEntry) {
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             return
         }
         
-        socket.emit("automatch/find_match", entry.jsonObject)
+        ogsWebsocket.emit(command: "automatch/find_match", data: entry.jsonObject)
     }
     
     func cancelAutomatch(entry: OGSAutomatchEntry) {
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             return
         }
         
-        socket.emit("automatch/cancel", entry.uuid)
+        ogsWebsocket.emit(command: "automatch/cancel", data: entry.uuid)
     }
     
     private var _receivedMessagesKeysByPeerId = [Int: Set<String>]()
@@ -1831,7 +1627,7 @@ class OGSService: ObservableObject {
             _privateMessagesUIDByPeerId[peerId] = [Int.random(in: 0..<100000), 0]
             privateMessagesActivePeerIds.insert(peerId)
             cachedUserIds.insert(peerId)
-            socket.emit("chat/pm/load", peerId)
+            ogsWebsocket.emit(command: "chat/pm/load", data: ["player_id": peerId])
         }
     }
     
@@ -1869,16 +1665,14 @@ class OGSService: ObservableObject {
             var uid = self._privateMessagesUIDByPeerId[peer.id]!
             uid[1] += 1
             self._privateMessagesUIDByPeerId[peer.id] = uid
-            self.socket.emitWithAck("chat/pm", [
+            self.ogsWebsocket.emit(command: "chat/pm", data: [
                 "player_id": peer.id,
                 "username": peer.username,
                 "uid": "\(String(uid[0], radix: 36)).\(uid[1])",
                 "message": message
-            ]).timingOut(after: 3) { data in
-                let decoder = DictionaryDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                if let messageData = data[0] as? [String: Any] {
-                    if let message = try? decoder.decode(OGSPrivateMessage.self, from: messageData) {
+            ]) { data, _ in
+                if let messageData = data as? [String: Any] {
+                    if let message = try? self.dictionaryDecoder.decode(OGSPrivateMessage.self, from: messageData) {
                         self.handlePrivateMessage(message)
                         promise(.success(message))
                         return
@@ -1900,44 +1694,44 @@ class OGSService: ObservableObject {
     }
     
     func joinChatChannel(_ channel: String) {
-        guard socket.status == .connected else {
-            socket.once(clientEvent: .connect) { _, _ in
+        guard ogsWebsocket.opened else {
+            ogsWebsocket.onConnectTasks.append {
                 self.joinChatChannel(channel)
             }
             return
         }
         
-        socket.emit("chat/join", ["channel": channel])
+        ogsWebsocket.emit(command: "chat/join", data: ["channel": channel])
     }
     
     func leaveChatChannel(_ channel: String) {
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             return
         }
         
-        socket.emit("chat/part", ["channel": channel])
+        ogsWebsocket.emit(command: "chat/part", data: ["channel": channel])
     }
     
     @Published private(set) public var sitewiseLiveGamesCount: Int?
     @Published private(set) public var sitewiseCorrespondenceGamesCount: Int?
     
     func subscribeToGameCount() {
-        guard socket.status == .connected else {
-            socket.once(clientEvent: .connect) { _, _ in
+        guard ogsWebsocket.opened else {
+            ogsWebsocket.onConnectTasks.append {
                 self.subscribeToGameCount()
             }
             return
         }
         
-        socket.emit("gamelist/count/subscribe", "")
+        ogsWebsocket.emit(command: "gamelist/count/subscribe")
     }
     
     func unsubscribeFromGameCount() {
-        guard socket.status == .connected else {
+        guard ogsWebsocket.opened else {
             return
         }
         
-        socket.emit("gamelist/count/unsubscribe", "")
+        ogsWebsocket.emit(command: "gamelist/count/unsubscribe")
         sitewiseLiveGamesCount = nil
         sitewiseCorrespondenceGamesCount = nil
     }

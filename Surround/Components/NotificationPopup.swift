@@ -22,15 +22,15 @@ struct NotificationPopup: View {
                 } else {
                     EmptyView()
                 }
-                Text(ogs.socketStatusString).bold().foregroundColor(.white)
+                Text(ogs.socketStatus.rawValue).bold().foregroundColor(.white)
             }
-            .animation(.easeInOut, value: ogs.socketStatusString)
+            .animation(.easeInOut, value: ogs.socketStatus.rawValue)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Color(.systemIndigo))
         .cornerRadius(10)
-        .opacity(ogs.socketStatus == .connected ? 0 : 1)
+        .opacity(ogs.socketStatus == .authenticated || ogs.socketStatus == .connected ? 0 : 1)
         .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
     }
     

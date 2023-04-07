@@ -82,7 +82,6 @@
 		BC3CD7D625EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
 		BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
-		BC463AF1265B70E300D40D3A /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF0265B70E300D40D3A /* SocketIO */; };
 		BC463AF3265B70E300D40D3A /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF2265B70E300D40D3A /* DictionaryCoding */; };
 		BC463AF5265B70E300D40D3A /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF4265B70E300D40D3A /* Alamofire */; };
 		BC463AF6265B70FA00D40D3A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
@@ -180,20 +179,20 @@
 		BC8CE89B2657B35900E4BE1A /* game-26268404.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CF0256D168200B1F8FD /* game-26268404.json */; };
 		BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */; };
 		BC92008225CE5BF600C14433 /* UserSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC92008125CE5BE400C14433 /* UserSelectionView.swift */; };
-		BC9EE81125B6D0E00044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81025B6D0E00044EA2C /* SocketIO */; };
 		BC9EE82025B6D1130044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE81F25B6D1130044EA2C /* DictionaryCoding */; };
 		BC9EE82F25B6D15D0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE82E25B6D15D0044EA2C /* Alamofire */; };
-		BC9EE83D25B6D2470044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE83C25B6D2470044EA2C /* SocketIO */; };
 		BC9EE83F25B6D24C0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE83E25B6D24C0044EA2C /* Alamofire */; };
 		BC9EE84125B6D2500044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84025B6D2500044EA2C /* DictionaryCoding */; };
-		BC9EE84325B6D2550044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84225B6D2550044EA2C /* SocketIO */; };
 		BC9EE84525B6D2590044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84425B6D2590044EA2C /* Alamofire */; };
 		BC9EE84725B6D25E0044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE84625B6D25E0044EA2C /* DictionaryCoding */; };
 		BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86625B7ECEB0044EA2C /* Alamofire */; };
 		BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86825B7ECF00044EA2C /* DictionaryCoding */; };
-		BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = BC9EE86A25B7ECFB0044EA2C /* SocketIO */; };
 		BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */; };
 		BCA4904224E3FCC1002F4336 /* ThirdPartyLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */; };
+		BCACD3E229DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
+		BCACD3E329DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
+		BCACD3E429DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
+		BCACD3E529DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCB98CAB256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
@@ -420,6 +419,7 @@
 		BC92008125CE5BE400C14433 /* UserSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSelectionView.swift; sourceTree = "<group>"; };
 		BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageNotificationView.swift; sourceTree = "<group>"; };
 		BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLoginView.swift; sourceTree = "<group>"; };
+		BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocket.swift; sourceTree = "<group>"; };
 		BCAE412D24D1213100B5DB74 /* ThreadPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ThreadPool.h; sourceTree = "<group>"; };
 		BCAE412E24D1213100B5DB74 /* Point.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Point.h; sourceTree = "<group>"; };
 		BCAE412F24D1213100B5DB74 /* Vec.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Vec.h; sourceTree = "<group>"; };
@@ -465,7 +465,6 @@
 				BC042B5C24AB2E360050B2D1 /* URLImage in Frameworks */,
 				BC9EE82F25B6D15D0044EA2C /* Alamofire in Frameworks */,
 				BC70594D25FEFAD500AC4DE9 /* StoreKit.framework in Frameworks */,
-				BC9EE81125B6D0E00044EA2C /* SocketIO in Frameworks */,
 				BC9EE82025B6D1130044EA2C /* DictionaryCoding in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -476,7 +475,6 @@
 			files = (
 				BC463AF5265B70E300D40D3A /* Alamofire in Frameworks */,
 				BC463AF3265B70E300D40D3A /* DictionaryCoding in Frameworks */,
-				BC463AF1265B70E300D40D3A /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -495,7 +493,6 @@
 				BC9EE84525B6D2590044EA2C /* Alamofire in Frameworks */,
 				BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */,
 				BC9EE84725B6D25E0044EA2C /* DictionaryCoding in Frameworks */,
-				BC9EE84325B6D2550044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -507,7 +504,6 @@
 				BC9EE83F25B6D24C0044EA2C /* Alamofire in Frameworks */,
 				BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */,
 				BC9EE84125B6D2500044EA2C /* DictionaryCoding in Frameworks */,
-				BC9EE83D25B6D2470044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -517,7 +513,6 @@
 			files = (
 				BC9EE86925B7ECF00044EA2C /* DictionaryCoding in Frameworks */,
 				BC9EE86725B7ECEB0044EA2C /* Alamofire in Frameworks */,
-				BC9EE86B25B7ECFB0044EA2C /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -714,6 +709,7 @@
 			isa = PBXGroup;
 			children = (
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
+				BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
 				BC649413253DA44C002B2200 /* SurroundNotificationService.swift */,
 				BC649426253FF940002B2200 /* NavigationService.swift */,
@@ -821,7 +817,6 @@
 			name = Surround;
 			packageProductDependencies = (
 				BC042B5B24AB2E360050B2D1 /* URLImage */,
-				BC9EE81025B6D0E00044EA2C /* SocketIO */,
 				BC9EE81F25B6D1130044EA2C /* DictionaryCoding */,
 				BC9EE82E25B6D15D0044EA2C /* Alamofire */,
 			);
@@ -844,7 +839,6 @@
 			);
 			name = SurroundTests;
 			packageProductDependencies = (
-				BC463AF0265B70E300D40D3A /* SocketIO */,
 				BC463AF2265B70E300D40D3A /* DictionaryCoding */,
 				BC463AF4265B70E300D40D3A /* Alamofire */,
 			);
@@ -884,7 +878,6 @@
 			);
 			name = SurroundNotificationContent;
 			packageProductDependencies = (
-				BC9EE84225B6D2550044EA2C /* SocketIO */,
 				BC9EE84425B6D2590044EA2C /* Alamofire */,
 				BC9EE84625B6D25E0044EA2C /* DictionaryCoding */,
 			);
@@ -906,7 +899,6 @@
 			);
 			name = SurroundWidgetsExtension;
 			packageProductDependencies = (
-				BC9EE83C25B6D2470044EA2C /* SocketIO */,
 				BC9EE83E25B6D24C0044EA2C /* Alamofire */,
 				BC9EE84025B6D2500044EA2C /* DictionaryCoding */,
 			);
@@ -930,7 +922,6 @@
 			packageProductDependencies = (
 				BC9EE86625B7ECEB0044EA2C /* Alamofire */,
 				BC9EE86825B7ECF00044EA2C /* DictionaryCoding */,
-				BC9EE86A25B7ECFB0044EA2C /* SocketIO */,
 			);
 			productName = SurroundNotificationService;
 			productReference = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */;
@@ -977,7 +968,6 @@
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
 				BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */,
-				BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */,
 				BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */,
 				BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
@@ -1138,6 +1128,7 @@
 				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
+				BCACD3E229DEC06D00655D8B /* OGSWebsocket.swift in Sources */,
 				BC463AFB2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BCC3276027B66475005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */,
@@ -1226,6 +1217,7 @@
 				BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */,
 				BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC285B5D2557FCAC005378F9 /* OGSUser.swift in Sources */,
+				BCACD3E429DEC06D00655D8B /* OGSWebsocket.swift in Sources */,
 				BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */,
 				BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */,
 				BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */,
@@ -1262,6 +1254,7 @@
 				BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */,
 				BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC6493A525380DCA002B2200 /* OGSClock.swift in Sources */,
+				BCACD3E329DEC06D00655D8B /* OGSWebsocket.swift in Sources */,
 				BC6493A725380DCA002B2200 /* OGSChallenge.swift in Sources */,
 				BC6493A625380DCA002B2200 /* OGSUser.swift in Sources */,
 				BC649421253DAD89002B2200 /* SurroundNotificationService.swift in Sources */,
@@ -1308,6 +1301,7 @@
 				BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */,
 				BCD214F4255A948E00F78E2A /* OGSUIConfig.swift in Sources */,
 				BCD214FF255A94A400F78E2A /* SurroundService.swift in Sources */,
+				BCACD3E529DEC06D00655D8B /* OGSWebsocket.swift in Sources */,
 				BCD214F1255A948E00F78E2A /* UserDefaults+SurroundModels.swift in Sources */,
 				BCD21522255A954E00F78E2A /* Goban.cc in Sources */,
 				BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */,
@@ -1858,14 +1852,6 @@
 				minimumVersion = 2.0.0;
 			};
 		};
-		BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 16.0.0;
-			};
-		};
 		BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/elegantchaos/DictionaryCoding";
@@ -1890,11 +1876,6 @@
 			package = BC042B5A24AB2E360050B2D1 /* XCRemoteSwiftPackageReference "url-image" */;
 			productName = URLImage;
 		};
-		BC463AF0265B70E300D40D3A /* SocketIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
-		};
 		BC463AF2265B70E300D40D3A /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
@@ -1904,11 +1885,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
-		};
-		BC9EE81025B6D0E00044EA2C /* SocketIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
 		};
 		BC9EE81F25B6D1130044EA2C /* DictionaryCoding */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1920,11 +1896,6 @@
 			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
-		BC9EE83C25B6D2470044EA2C /* SocketIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
-		};
 		BC9EE83E25B6D24C0044EA2C /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BC9EE82D25B6D15D0044EA2C /* XCRemoteSwiftPackageReference "Alamofire" */;
@@ -1934,11 +1905,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
-		};
-		BC9EE84225B6D2550044EA2C /* SocketIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
 		};
 		BC9EE84425B6D2590044EA2C /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1959,11 +1925,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC9EE81E25B6D1130044EA2C /* XCRemoteSwiftPackageReference "DictionaryCoding" */;
 			productName = DictionaryCoding;
-		};
-		BC9EE86A25B7ECFB0044EA2C /* SocketIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BC9EE80F25B6D0E00044EA2C /* XCRemoteSwiftPackageReference "socket" */;
-			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

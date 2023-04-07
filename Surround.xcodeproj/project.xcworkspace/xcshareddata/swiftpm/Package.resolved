@@ -1,52 +1,32 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "Alamofire",
-        "repositoryURL": "https://github.com/Alamofire/Alamofire",
-        "state": {
-          "branch": null,
-          "revision": "eaf6e622dd41b07b251d8f01752eab31bc811493",
-          "version": "5.4.1"
-        }
-      },
-      {
-        "package": "DictionaryCoding",
-        "repositoryURL": "https://github.com/elegantchaos/DictionaryCoding",
-        "state": {
-          "branch": null,
-          "revision": "ae19e456bd550fed8f341e5bae4318333c53a5b4",
-          "version": "1.0.9"
-        }
-      },
-      {
-        "package": "SocketIO",
-        "repositoryURL": "https://github.com/socketio/socket.io-client-swift",
-        "state": {
-          "branch": null,
-          "revision": "af5ce97b755d964235348d96f6db5cbdcbe334a5",
-          "version": "16.0.1"
-        }
-      },
-      {
-        "package": "Starscream",
-        "repositoryURL": "https://github.com/daltoniam/Starscream",
-        "state": {
-          "branch": null,
-          "revision": "df8d82047f6654d8e4b655d1b1525c64e1059d21",
-          "version": "4.0.4"
-        }
-      },
-      {
-        "package": "URLImage",
-        "repositoryURL": "https://github.com/dmytro-anokhin/url-image",
-        "state": {
-          "branch": null,
-          "revision": "c1a906515b0a440927b96204b778058871b22f23",
-          "version": "2.2.3"
-        }
+  "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire",
+      "state" : {
+        "revision" : "eaf6e622dd41b07b251d8f01752eab31bc811493",
+        "version" : "5.4.1"
       }
-    ]
-  },
-  "version": 1
+    },
+    {
+      "identity" : "dictionarycoding",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/elegantchaos/DictionaryCoding",
+      "state" : {
+        "revision" : "ae19e456bd550fed8f341e5bae4318333c53a5b4",
+        "version" : "1.0.9"
+      }
+    },
+    {
+      "identity" : "url-image",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dmytro-anokhin/url-image",
+      "state" : {
+        "revision" : "c1a906515b0a440927b96204b778058871b22f23",
+        "version" : "2.2.3"
+      }
+    }
+  ],
+  "version" : 2
 }
