@@ -48,7 +48,7 @@ class OGSService: ObservableObject {
         activeGames: [Game] = [],
         publicGames: [Game] = [],
         friends: [OGSUser] = [],
-        socketStatus: OGSWebsocketStatus = .authenticated,
+        socketStatus: OGSWebsocketStatus = .connected,
         eligibleOpenChallenges: [OGSChallenge] = [],
         openChallengesSent: [OGSChallenge] = [],
         challengesReceived: [OGSChallenge] = [],
@@ -219,6 +219,8 @@ class OGSService: ObservableObject {
             return
         }
         
+        ogsWebsocket.connect()
+        
         timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { [self] _ in
             for game in connectedGames.values {
                 if game.gameData?.outcome == nil {
@@ -253,6 +255,16 @@ class OGSService: ObservableObject {
 //        self._testSuperChat()
     }
     
+//    private func _testSuperChat() {
+//        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
+//            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
+//            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
+//                self.superchatPeerIds.removeAll()
+//                self._testSuperChat()
+//            }
+//        }
+//    }
+//    
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
         switch eventName {
         case "surround/socketClosed":
@@ -459,16 +471,6 @@ class OGSService: ObservableObject {
         }
     }
     
-//    private func _testSuperChat() {
-//        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
-//            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
-//            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
-//                self.superchatPeerIds.removeAll()
-//                self._testSuperChat()
-//            }
-//        }
-//    }
-    
     private var _gamesToBeReconnected: [Game] = []
     
     var ogsUIConfig: OGSUIConfig? {
@@ -476,18 +478,17 @@ class OGSService: ObservableObject {
             return userDefaults[.ogsUIConfig]
         }
         set {
-            userDefaults[.ogsUIConfig] = newValue
-            if newValue == nil {
-                userDefaults[.ogsSessionId] = nil
+            if newValue?.userJwt != userDefaults[.ogsUIConfig]?.userJwt {
                 Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
                 for game in activeGames.values {
                     self.disconnect(from: game)
                 }
                 activeGames.removeAll()
                 ogsWebsocket.closeThenReconnect()
-            } else {
-                self.updateSessionId()
+                _gamesToBeReconnected = []
             }
+            userDefaults[.ogsUIConfig] = newValue
+            self.updateSessionId()
             checkLoginStatus()
             #if MAIN_APP
             if isLoggedIn && (userDefaults[.notificationEnabled] == true) {
@@ -539,7 +540,6 @@ class OGSService: ObservableObject {
         }.decode(type: OGSUIConfig.self, decoder: jsonDecoder).receive(on: RunLoop.main).map({ config in
             self.ogsUIConfig = config
             self.loadOverview()
-            self.ogsWebsocket.authenticateIfLoggedIn()
             return config
         }).eraseToAnyPublisher()
     }
@@ -1146,7 +1146,6 @@ class OGSService: ObservableObject {
         .switchToLatest()
         .map { config in
             self.loadOverview()
-            self.ogsWebsocket.authenticateIfLoggedIn()
             return config
         }
         .eraseToAnyPublisher()

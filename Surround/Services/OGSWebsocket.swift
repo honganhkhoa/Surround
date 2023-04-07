@@ -7,17 +7,20 @@
 
 import Foundation
 import Combine
+import Alamofire
 
 enum OGSWebsocketStatus: String {
     case disconnected
     case connecting
     case connected
     case reconnecting
-    case authenticated
 }
 
 class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     private var websocketTask: URLSessionWebSocketTask?
+    private var urlSession: URLSession?
+    private var websocketDelegateQueue: OperationQueue
+    private var websocketURL: URL
 
     private var latestCallbackId = 0
     private var callbackById: [Int: (Any?, [String: String]?) -> ()] = [:]
@@ -25,6 +28,8 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     public var serverEventCallback: ((String, Any?) -> ())?
     public var onConnectTasks: [() -> ()] = []
     public var onStatusChanged: (() -> ())?
+    
+    public var anonymousUIConfig: OGSUIConfig?
 
     private var pingCancellable: AnyCancellable?
     private(set) public var authenticated = false
@@ -43,38 +48,66 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     public var latency = 0.0
 
     override init() {
-        super.init()
-
         var urlComponents = URLComponents(url: URL(string: OGSService.ogsRoot)!, resolvingAgainstBaseURL: true)
         urlComponents?.scheme = "wss"
-        let websocketURL = urlComponents!.url!
-        
-        let websocketDelegateQueue = OperationQueue()
+        websocketURL = urlComponents!.url!
+
+        websocketDelegateQueue = OperationQueue()
         websocketDelegateQueue.maxConcurrentOperationCount = 1
-        let urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: websocketDelegateQueue)
-        websocketTask = urlSession.webSocketTask(with: websocketURL)
-        
-        websocketTask?.resume()
-        status = .connecting
+
+        super.init()
+
+        urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: websocketDelegateQueue)
+        websocketTask = urlSession?.webSocketTask(with: websocketURL)
     }
     
-    public func authenticateIfLoggedIn() {
-        guard let uiConfig = userDefaults[.ogsUIConfig], let jwt = uiConfig.userJwt else {
-            return
-        }
-        
-        emit(command: "authenticate", data: ["jwt": jwt])
-        emit(command: "automatch/list")
-        
-        DispatchQueue.main.async {
-            self.authenticated = true
-            self.status = .authenticated
-            if let callback = self.serverEventCallback {
-                callback("surround/socketAuthenticated", nil)
+    public func connect() {
+        status = .connecting
+        websocketTask?.resume()
+    }
+    
+    var anonymousSession: Session? = nil
+    public func authenticateWebsocket() {
+        let config = userDefaults[.ogsUIConfig] ?? self.anonymousUIConfig
+        if let config {
+            emit(command: "authenticate", data: ["jwt": config.userJwt])
+            if config.user.anonymous == false {
+                emit(command: "automatch/list")
+            }
+            DispatchQueue.main.async {
+                self.authenticated = true
+                if let callback = self.serverEventCallback {
+                    callback("surround/socketAuthenticated", nil)
+                }
+            }
+        } else {
+            if anonymousSession == nil {
+                self.anonymousSession = Session(configuration: .ephemeral)
+                self.anonymousSession?.request("\(OGSService.ogsRoot)/api/v1/ui/config").validate().responseData { response in
+                    switch response.result {
+                    case .success:
+                        if let result = response.value {
+                            let jsonDecoder = JSONDecoder()
+                            jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
+                            if let config = try? jsonDecoder.decode(OGSUIConfig.self, from: result) {
+                                self.anonymousUIConfig = config
+                                self.emit(command: "authenticate", data: ["jwt": config.userJwt])
+                                DispatchQueue.main.async {
+                                    self.authenticated = true
+                                    if let callback = self.serverEventCallback {
+                                        callback("surround/socketAuthenticated", nil)
+                                    }
+                                }
+                            }
+                        }
+                    case .failure(let error):
+                        print("[websocket] Error getting anonymous config: \(error)")
+                    }
+                }
             }
         }
     }
-
+    
     private func receiveFromWebsocket() {
         print("[websocket] Listening...")
         
@@ -82,6 +115,8 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
             switch result {
             case .failure(let error):
                 print("[websocket] Received error: \(error)")
+                self.closeThenReconnect()
+                
             case .success(let message):
                 switch message {
                 case .string(let text):
@@ -134,6 +169,7 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
             websocketTask?.send(URLSessionWebSocketTask.Message.string(message)) { error in
                 if let error {
                     print("[websocket] Sending failed: \(error)")
+                    self.closeThenReconnect()
                     if resultCallback != nil {
                         DispatchQueue.main.async { [self] in
                             callbackById.removeValue(forKey: latestCallbackId)
@@ -145,9 +181,24 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     }
     
     public func closeThenReconnect() {
+        guard status != .reconnecting else {
+            return
+        }
+
+        print("[websocket] Reconnecting...")        
         status = .reconnecting
+
+        DispatchQueue.main.async {
+            if let callback = self.serverEventCallback {
+                callback("surround/socketClosed", nil)
+            }
+        }
+        
         websocketTask?.cancel(with: .normalClosure, reason: nil)
         DispatchQueue.main.asyncAfter(deadline: .now().advanced(by: .seconds(1))) {
+            self.urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: self.websocketDelegateQueue)
+
+            self.websocketTask = self.urlSession?.webSocketTask(with: self.websocketURL)
             self.websocketTask?.resume()
         }
     }
@@ -157,11 +208,12 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
         opened = true
         print("[websocket] Opened")
         receiveFromWebsocket()
+
         DispatchQueue.main.async { [self] in
             pingCancellable = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
                 self.emit(command: "net/ping", data: ["client": Date().timeIntervalSince1970 * 1000, "drift": self.drift, "latency": self.latency])
             }
-            authenticateIfLoggedIn()
+            authenticateWebsocket()
             
             for task in onConnectTasks {
                 task()

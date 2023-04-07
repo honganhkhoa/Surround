@@ -17,20 +17,20 @@ struct NotificationPopup: View {
     var connectionPopup: some View {
         ZStack {
             HStack(spacing: 5) {
-                if ogs.socketStatus == .connecting {
+                if ogs.socketStatus == .connecting || ogs.socketStatus == .reconnecting {
                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
                     EmptyView()
                 }
-                Text(ogs.socketStatus.rawValue).bold().foregroundColor(.white)
+                Text(ogs.socketStatus.rawValue.capitalized).bold().foregroundColor(.white)
             }
-            .animation(.easeInOut, value: ogs.socketStatus.rawValue)
+            .animation(.easeInOut, value: ogs.socketStatus.rawValue.capitalized)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Color(.systemIndigo))
         .cornerRadius(10)
-        .opacity(ogs.socketStatus == .authenticated || ogs.socketStatus == .connected ? 0 : 1)
+        .opacity(ogs.socketStatus == .connected ? 0 : 1)
         .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
     }
     
