@@ -255,7 +255,7 @@ class OGSService: ObservableObject {
 //        self._testSuperChat()
     }
     
-//    private func _testSuperChat() {
+//    private func _testSuperChat() {   
 //        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
 //            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
 //            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
@@ -264,7 +264,7 @@ class OGSService: ObservableObject {
 //            }
 //        }
 //    }
-//    
+//
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
         switch eventName {
         case "surround/socketClosed":

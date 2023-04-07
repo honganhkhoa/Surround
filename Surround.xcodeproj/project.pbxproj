@@ -193,6 +193,7 @@
 		BCACD3E329DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
 		BCACD3E429DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
 		BCACD3E529DEC06D00655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
+		BCACD3E629E02DD300655D8B /* OGSWebsocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */; };
 		BCAE413824D1213100B5DB74 /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
 		BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCB98CAB256D129F00B1F8FD /* chat-27671778.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB98CAA256D129F00B1F8FD /* chat-27671778.json */; };
@@ -1185,6 +1186,7 @@
 				BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */,
 				BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */,
 				BC463AF7265B710E00D40D3A /* Goban.cc in Sources */,
+				BCACD3E629E02DD300655D8B /* OGSWebsocket.swift in Sources */,
 				BC8CE8882657B2E100E4BE1A /* Game.swift in Sources */,
 				BC8CE88C2657B2E100E4BE1A /* OGSUser.swift in Sources */,
 				BCFF01F42705813200B09B0B /* UserDefaults+SurroundModels.swift in Sources */,
