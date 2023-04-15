@@ -340,14 +340,13 @@ class OGSService: ObservableObject {
             }
         case "seekgraph/global":
             onSeekGraphEvent(data: data)
-        default:
-            if eventName.starts(with: "game/") {
-                let components = eventName.split(separator: "/")
-                if components.count == 3, let ogsGameId = Int(components[1]) {
-                    let gameEvent = String(components[2])
-                    self.onWebsocketServerGameEvent(ogsGameId: ogsGameId, eventName: gameEvent, data: data)
-                }
+        case _ where eventName.starts(with: "game/"):
+            let components = eventName.split(separator: "/")
+            if components.count == 3, let ogsGameId = Int(components[1]) {
+                let gameEvent = String(components[2])
+                self.onWebsocketServerGameEvent(ogsGameId: ogsGameId, eventName: gameEvent, data: data)
             }
+        default:
             break
         }
     }
@@ -1599,7 +1598,7 @@ class OGSService: ObservableObject {
             return
         }
         
-        ogsWebsocket.emit(command: "automatch/cancel", data: entry.uuid)
+        ogsWebsocket.emit(command: "automatch/cancel", data: ["uuid": entry.uuid])
     }
     
     private var _receivedMessagesKeysByPeerId = [Int: Set<String>]()

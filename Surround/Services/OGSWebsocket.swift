@@ -34,7 +34,7 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     private var pingCancellable: AnyCancellable?
     private(set) public var authenticated = false
     private(set) public var opened = false
-    private(set) public var status = OGSWebsocketStatus.disconnected {
+    private(set) public var status = OGSWebsocketStatus.connecting {
         didSet {
             if let callback = onStatusChanged {
                 callback()

@@ -605,7 +605,7 @@ struct CustomGameForm: View {
     
     func createChallenge() {
         if isOpen || opponent != nil {
-            self.challengeCreatingCancellable = ogs.sendChallenge(opponent: opponent, challenge: challenge).sink(
+            self.challengeCreatingCancellable = ogs.sendChallenge(opponent: isOpen ? nil : opponent, challenge: challenge).sink(
                 receiveCompletion: { _ in
                     self.challengeCreatingCancellable = nil
                 }, receiveValue: { challenge in
