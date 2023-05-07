@@ -208,7 +208,7 @@ struct GameDetailView: View {
             ? "" :
                 (title ?? "")
         )
-        .navigationBarHidden(navigationBarHidden)
+        .navigationBarHidden(navigationBarHidden && !compactLayout)
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -243,7 +243,7 @@ struct GameDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
                 let screenBounds = UIScreen.main.bounds
-                self.attachedKeyboardVisible = !keyboardFrame.isEmpty &&
+                self.attachedKeyboardVisible = !keyboardFrame.isEmpty && keyboardFrame.height > 100 &&
                     screenBounds.maxX == keyboardFrame.maxX &&
                     screenBounds.maxY == keyboardFrame.maxY &&
                     screenBounds.width == keyboardFrame.width
