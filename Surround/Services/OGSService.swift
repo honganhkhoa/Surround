@@ -134,12 +134,8 @@ class OGSService: ObservableObject {
     var waitingGames: Int {
         return challengesSent.count + openChallengeSentById.count + autoMatchEntryById.count
     }
-    var waitingLiveGames: Int {
-        return (challengesSent + openChallengeSentById.values).filter {
-            $0.game.timeControl.speed != .correspondence
-        }.count + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
-    }
-    
+    @Published private(set) public var waitingLiveGames: Int = 0
+    private var waitingLiveGamesCancellable: AnyCancellable?
     @Published private(set) public var hostingRengoChallengeById = [Int: OGSChallenge]()
     @Published private(set) public var participatingRengoChallengeById = [Int: OGSChallenge]()
     
@@ -248,6 +244,12 @@ class OGSService: ObservableObject {
             if values.last != nil {
                 self.fetchCachedPlayersIfNecessary()
             }
+        })
+        
+        waitingLiveGamesCancellable = Publishers.CombineLatest3($challengesSent, $openChallengeSentById, $autoMatchEntryById).receive(on: DispatchQueue.main).sink(receiveValue: { challengesSent, openChallengeSentById, autoMatchEntryById in
+            self.waitingLiveGames = (challengesSent + openChallengeSentById.values).filter {
+                $0.game.timeControl.speed != .correspondence
+            }.count + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
         })
         
         self.checkLoginStatus()

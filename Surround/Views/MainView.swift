@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WidgetKit
+import Combine
 
 struct MainView: View {
     #if os(iOS)
@@ -177,6 +178,9 @@ struct MainView: View {
                 }
             }
         }
+        .onReceive(Publishers.CombineLatest(ogs.$liveGames, ogs.$waitingLiveGames), perform: { liveGames, waitingLiveGames in
+            UIApplication.shared.isIdleTimerDisabled = !liveGames.isEmpty || waitingLiveGames > 0
+        })
         .onOpenURL { url in
             navigateTo(appURL: url)
         }

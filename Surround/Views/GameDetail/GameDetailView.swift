@@ -212,16 +212,10 @@ struct GameDetailView: View {
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if currentGame.gameData?.timeControl.speed == .live || currentGame.gameData?.timeControl.speed == .blitz {
-                UIApplication.shared.isIdleTimerDisabled = true
-            }
             updateActiveGameList()
             DispatchQueue.main.async {
                 self.updateDetailOfCurrentGameIfNecessary()
             }
-        }
-        .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: currentGame) { [currentGame] newGame in
             if newGame.ID != currentGame.ID {

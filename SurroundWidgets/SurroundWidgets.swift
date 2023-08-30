@@ -282,13 +282,11 @@ struct CorrespondenceGamesWidgetView : View {
             }
             HStack {
                 timer(game: game)
-                if let userId = userId {
-                    if let pauseReason = game.pauseControl?.pauseReason(playerId: userId) {
-                        Text(pauseReason)
-                            .font(Font.caption2.bold())
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+                if let pauseReason = game.pauseControl?.pauseReason(playerId: userId) {
+                    Text(pauseReason)
+                        .font(Font.caption2.bold())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }.frame(width: boardSize)
         }
