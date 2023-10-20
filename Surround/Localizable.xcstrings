@@ -468,10 +468,24 @@
 
     },
     "A game ends" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局終了"
+          }
+        }
+      }
     },
     "A game starts" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局開始"
+          }
+        }
+      }
     },
     "Aa" : {
 
@@ -609,7 +623,14 @@
 
     },
     "Auto submiting moves" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動着手"
+          }
+        }
+      }
     },
     "Automatic" : {
       "localizations" : {
@@ -664,7 +685,14 @@
       }
     },
     "Board coordinates" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座標表示"
+          }
+        }
+      }
     },
     "Board size" : {
       "localizations" : {
@@ -787,7 +815,14 @@
 
     },
     "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在、承知機能におけるサーバー・コストの為、サポーター限定です。"
+          }
+        }
+      }
     },
     "Custom" : {
       "localizations" : {
@@ -917,13 +952,27 @@
       }
     },
     "Gameplay" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "環境設定"
+          }
+        }
+      }
     },
     "Handicap: " : {
 
     },
     "Haptics" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バイブレーション"
+          }
+        }
+      }
     },
     "Has handicap: %lld" : {
 
@@ -970,7 +1019,14 @@
 
     },
     "Learn more..." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳しくは"
+          }
+        }
+      }
     },
     "Leave" : {
 
@@ -992,10 +1048,25 @@
 
     },
     "Live games" : {
-      "comment" : "Homeview"
+      "comment" : "Homeview",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ対局"
+          }
+        }
+      }
     },
     "Logout" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウト"
+          }
+        }
+      }
     },
     "Malkovich" : {
 
@@ -1022,7 +1093,14 @@
 
     },
     "My turn" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私の番"
+          }
+        }
+      }
     },
     "Navigation" : {
 
@@ -1083,7 +1161,14 @@
 
     },
     "Note: Sounds and voice countdown will not play when your device is in " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "※マナー・モードがONの時、石音や音声が出ません。"
+          }
+        }
+      }
     },
     "Online GO" : {
 
@@ -1376,7 +1461,14 @@
 
     },
     "Send a notification on..." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どんな時承知してほしい？"
+          }
+        }
+      }
     },
     "Settings" : {
       "comment" : "in navigation menu",
@@ -1500,7 +1592,14 @@
       "comment" : "Game"
     },
     "Stone sounds" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "石音"
+          }
+        }
+      }
     },
     "Stones" : {
 
@@ -1571,7 +1670,14 @@
 
     },
     "Time running low" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り時間が少ない"
+          }
+        }
+      }
     },
     "To " : {
 
@@ -1598,7 +1704,14 @@
 
     },
     "Try it out" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試してみる"
+          }
+        }
+      }
     },
     "Unassign" : {
 
@@ -1658,7 +1771,14 @@
 
     },
     "Voice countdown" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒読み音声"
+          }
+        }
+      }
     },
     "vs. Friend" : {
       "localizations" : {
@@ -1800,7 +1920,7 @@
 
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
