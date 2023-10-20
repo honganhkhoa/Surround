@@ -647,27 +647,31 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
         } else {
             if gamePhase == .stoneRemoval {
-                return "Stone Removal Phase"
+                return String(localized: "Stone Removal Phase", comment: "Game")
             }
             if undoRequested != nil {
-                return "Undo requested"
+                if isUserTurn{
+                    return String(localized: "Undo request", comment: "Game - when undo received")
+                } else {
+                    return String(localized: "Undo requested", comment: "Game - after undo requested")
+                }
             }
             if isUserPlaying {
                 if isUserTurn {
                     if case .pass = currentPosition.lastMove {
-                        return "Opponent passed"
+                        return String(localized: "Opponent passed", comment: "Game")
                     } else {
                         let time = userStoneColor == .black ? clock?.blackTime : clock?.whiteTime
                         if let timeLeft = time?.timeLeft, timeLeft <= 10 {
                             return "Your move (\(String(format: "%02d", Int(timeLeft))))"
                         }
-                        return "Your move"
+                        return String(localized: "Your move", comment: "Game")
                     }
                 } else {
                     if userStoneColor == clock?.currentPlayerColor {
-                        return "Waiting for teammate"
+                        return String(localized: "Waiting for teammate", comment: "Game")
                     } else {
-                        return "Waiting for opponent"
+                        return String(localized: "Waiting for opponent", comment: "Game")
                     }
                 }
             } else {

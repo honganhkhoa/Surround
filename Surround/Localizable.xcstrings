@@ -1,0 +1,1818 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    " — players may drop mid-game" : {
+
+    },
+    " (%@)" : {
+
+    },
+    " (%lld)" : {
+
+    },
+    " (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
+
+    },
+    " [%@]" : {
+
+    },
+    " + %@×" : {
+
+    },
+    " + %lld×" : {
+
+    },
+    " allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
+
+    },
+    " and " : {
+
+    },
+    " and have fewer customizing options." : {
+
+    },
+    " and increases by " : {
+
+    },
+    " Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
+
+    },
+    " are being played right now." : {
+
+    },
+    " are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
+
+    },
+    " board sizes are not available in " : {
+
+    },
+    " for every %@ move%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " for every %1$@ move%2$@."
+          }
+        }
+      }
+    },
+    " for every %lld move%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " for every %1$lld move%2$@."
+          }
+        }
+      }
+    },
+    " games cannot be " : {
+
+    },
+    " games." : {
+
+    },
+    " generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in " : {
+
+    },
+    " includes these open source components:" : {
+
+    },
+    " is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
+
+    },
+    " komi is not available in " : {
+
+    },
+    " komi: " : {
+
+    },
+    " main time, follows by " : {
+
+    },
+    " main time, follows by %@ period%@ of " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " main time, follows by %1$@ period%2$@ of "
+          }
+        }
+      }
+    },
+    " main time, follows by %lld period%@ of " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : " main time, follows by %1$lld period%2$@ of "
+          }
+        }
+      }
+    },
+    " mode." : {
+
+    },
+    " of total play time for each player." : {
+
+    },
+    " only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
+
+    },
+    " option above if you don't want the result to count towards your rating. " : {
+
+    },
+    " per move, up to a maximum of " : {
+
+    },
+    " per move." : {
+
+    },
+    " SD" : {
+
+    },
+    " setting will determine the number of handicap stones based on your and your opponent's rank." : {
+
+    },
+    " setting will either assign white to the stronger player, or just assign randomly." : {
+
+    },
+    " to move" : {
+
+    },
+    ", for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
+
+    },
+    ", for creating the " : {
+
+    },
+    ", for creating the app icon, and providing design advises for the app." : {
+
+    },
+    "?" : {
+
+    },
+    "." : {
+
+    },
+    "(%@)" : {
+
+    },
+    "(%lld)" : {
+
+    },
+    "[%@]" : {
+
+    },
+    "**Casual**" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@ " : {
+
+    },
+    "%@ - %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ - %2$@"
+          }
+        }
+      }
+    },
+    "%@ [%@]" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ [%2$@]"
+          }
+        }
+      }
+    },
+    "%@ ▾" : {
+
+    },
+    "%@ capture%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ capture%2$@"
+          }
+        }
+      }
+    },
+    "%@ correspondence games" : {
+
+    },
+    "%@ komi" : {
+
+    },
+    "%@ live game%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ live game%2$@"
+          }
+        }
+      }
+    },
+    "%@ live games" : {
+
+    },
+    "%@ pending Rengo game%@ " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ pending Rengo game%2$@ "
+          }
+        }
+      }
+    },
+    "%@ period%@ of " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ period%2$@ of "
+          }
+        }
+      }
+    },
+    "%@: " : {
+
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%@/%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@"
+          }
+        }
+      }
+    },
+    "%@/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$lld"
+          }
+        }
+      }
+    },
+    "%@×" : {
+
+    },
+    "%@×%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@×%2$@"
+          }
+        }
+      }
+    },
+    "%@×%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@×%2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld capture%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld capture%2$@"
+          }
+        }
+      }
+    },
+    "%lld correspondence games" : {
+
+    },
+    "%lld live game%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld live game%2$@"
+          }
+        }
+      }
+    },
+    "%lld live games" : {
+
+    },
+    "%lld pending Rengo game%@ " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld pending Rengo game%2$@ "
+          }
+        }
+      }
+    },
+    "%lld period%@ of " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld period%2$@ of "
+          }
+        }
+      }
+    },
+    "%lld Stones" : {
+
+    },
+    "%lld×" : {
+
+    },
+    "%lld×%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld×%2$lld"
+          }
+        }
+      }
+    },
+    "%lld×%lld %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld×%2$lld %3$@"
+          }
+        }
+      }
+    },
+    "• Alamofire" : {
+
+    },
+    "• DictionaryCoding" : {
+
+    },
+    "• OGS's score-estimator" : {
+
+    },
+    "• Push notifications for correspondence games (optional)" : {
+
+    },
+    "• Socket.IO-Client-Swift" : {
+
+    },
+    "• Support for Surround's ongoing development" : {
+
+    },
+    "• URLImage" : {
+
+    },
+    "+ %@" : {
+
+    },
+    "+ %@/%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "+ %1$@/%2$@"
+          }
+        }
+      }
+    },
+    "+ %@/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "+ %1$@/%2$lld"
+          }
+        }
+      }
+    },
+    "+ %@×" : {
+
+    },
+    "+ %@× %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "+ %1$@× %2$@"
+          }
+        }
+      }
+    },
+    "+ %lld×" : {
+
+    },
+    "+ %lld× %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "+ %1$lld× %2$@"
+          }
+        }
+      }
+    },
+    "+%@" : {
+
+    },
+    "+%lld" : {
+
+    },
+    "⚠️ OGS Moderator's official message. Please respond." : {
+
+    },
+    "1 Stone" : {
+
+    },
+    "9+" : {
+
+    },
+    "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
+
+    },
+    "A game ends" : {
+
+    },
+    "A game starts" : {
+
+    },
+    "Aa" : {
+
+    },
+    "About" : {
+
+    },
+    "About & Support" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundについてとサポート"
+          }
+        }
+      }
+    },
+    "Accept" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受ける"
+          }
+        }
+      }
+    },
+    "Accept undo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待ったを許す"
+          }
+        }
+      }
+    },
+    "Active games" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推進中対局"
+          }
+        }
+      }
+    },
+    "Advanced rules settings" : {
+
+    },
+    "Advanced rules settings " : {
+
+    },
+    "Advanced time settings" : {
+
+    },
+    "Advanced time settings " : {
+
+    },
+    "Alexandru Cristescu" : {
+
+    },
+    "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
+
+    },
+    "All Supporter tiers includes:" : {
+
+    },
+    "Alternatively, there %@ %@ open custom %@ matching your preferences that you can accept to start a game immediately." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Alternatively, there %1$@ %2$@ open custom %3$@ matching your preferences that you can accept to start a game immediately."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "それとも、あなたの設定に合った対局は%2$@ 局があります。受ければすぐ始められる。"
+          }
+        }
+      }
+    },
+    "Alternatively, there %@ %lld open custom %@ matching your preferences that you can accept to start a game immediately." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Alternatively, there %1$@ %2$lld open custom %3$@ matching your preferences that you can accept to start a game immediately."
+          }
+        }
+      }
+    },
+    "Analysis %@" : {
+
+    },
+    "Analysis mode" : {
+
+    },
+    "Analyze mode" : {
+
+    },
+    "Are you sure you want to abandon your team?" : {
+
+    },
+    "Are you sure you want to cancel this game?" : {
+
+    },
+    "Are you sure you want to pass?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスしてよろしいですか？"
+          }
+        }
+      }
+    },
+    "Are you sure you want to resign this game?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投了してよろしいですか？"
+          }
+        }
+      }
+    },
+    "Are you sure you want to resume the game?" : {
+
+    },
+    "Auto" : {
+
+    },
+    "Auto submiting moves" : {
+
+    },
+    "Automatic" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        }
+      }
+    },
+    "Automatically assign stone colors" : {
+
+    },
+    "B+" : {
+
+    },
+    "Back" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻る"
+          }
+        }
+      }
+    },
+    "Become a Supporter" : {
+
+    },
+    "Become a Supporter to support the ongoing development of this app and gain access to some additional features." : {
+
+    },
+    "Black" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒"
+          }
+        }
+      }
+    },
+    "Blitz" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブリッツ（早碁）"
+          }
+        }
+      }
+    },
+    "Board coordinates" : {
+
+    },
+    "Board size" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "碁盤の大きさ"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
+    },
+    "Cancel game" : {
+
+    },
+    "Cancel support" : {
+
+    },
+    "Captures" : {
+
+    },
+    "Challenge received!" : {
+
+    },
+    "Challenge type" : {
+
+    },
+    "Challenges received" : {
+      "comment" : "Homeview",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局要請"
+          }
+        }
+      }
+    },
+    "Chat" : {
+
+    },
+    "Chinese" : {
+
+    },
+    "Clear estimates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予測消し"
+          }
+        }
+      }
+    },
+    "Clock starts with " : {
+
+    },
+    "Close" : {
+
+    },
+    "Compact" : {
+
+    },
+    "Contact" : {
+
+    },
+    "Correspondence" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信"
+          }
+        }
+      }
+    },
+    "Correspondence games" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局"
+          }
+        }
+      }
+    },
+    "Correspondence games notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局承知"
+          }
+        }
+      }
+    },
+    "Create a game precisely as you want." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳しい設定で対局作成"
+          }
+        }
+      }
+    },
+    "Create and show a challenge publicly, then wait for other players to accept." : {
+
+    },
+    "Currently, " : {
+
+    },
+    "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. " : {
+
+    },
+    "Custom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カストマイズ"
+          }
+        }
+      }
+    },
+    "Custom komi: " : {
+
+    },
+    "Custom komi: %@" : {
+
+    },
+    "Disable analysis" : {
+
+    },
+    "Disable the " : {
+
+    },
+    "Disconnected" : {
+
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
+    },
+    "Display mode" : {
+
+    },
+    "Done" : {
+
+    },
+    "Error: Cannot load Supporter information at the moment." : {
+
+    },
+    "Estimate score" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "形勢予測"
+          }
+        }
+      }
+    },
+    "Everyone who participated in the beta testing, for helping me to improve the app with many feedbacks and bug reports." : {
+
+    },
+    "Exit Zen mode" : {
+
+    },
+    "Find a game" : {
+      "comment" : "New game view",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局を探す"
+          }
+        }
+      }
+    },
+    "Forums" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォーラム"
+          }
+        }
+      }
+    },
+    "Friends" : {
+
+    },
+    "From " : {
+
+    },
+    "Game name: " : {
+
+    },
+    "Game speed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局スピード"
+          }
+        }
+      }
+    },
+    "Game speed: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局スピード：%@"
+          }
+        }
+      }
+    },
+    "Game starts automatically when there are **%@** players." : {
+
+    },
+    "Game starts automatically when there are **%lld** players." : {
+
+    },
+    "Game type" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局タイプ"
+          }
+        }
+      }
+    },
+    "Gameplay" : {
+
+    },
+    "Handicap: " : {
+
+    },
+    "Haptics" : {
+
+    },
+    "Has handicap: %lld" : {
+
+    },
+    "Height" : {
+
+    },
+    "Hide demo board" : {
+
+    },
+    "Home" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム"
+          }
+        }
+      }
+    },
+    "If you choose to purchase a Surround App Supporter subscription, payment will be charged to your Apple ID account at the confirmation of purchase. The subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase." : {
+
+    },
+    "If your OGS account was linked to a social account:" : {
+
+    },
+    "Is open" : {
+
+    },
+    "Japanese" : {
+
+    },
+    "Join" : {
+
+    },
+    "Komi" : {
+
+    },
+    "Komi: " : {
+
+    },
+    "Large" : {
+
+    },
+    "Learn more..." : {
+
+    },
+    "Leave" : {
+
+    },
+    "Linh Pham" : {
+
+    },
+    "Live" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ（通常対局）"
+          }
+        }
+      }
+    },
+    "Live game%@ in progress..." : {
+
+    },
+    "Live games" : {
+      "comment" : "Homeview"
+    },
+    "Logout" : {
+
+    },
+    "Malkovich" : {
+
+    },
+    "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
+
+    },
+    "Message organizer" : {
+
+    },
+    "More actions" : {
+
+    },
+    "Move %@" : {
+
+    },
+    "Move %lld" : {
+
+    },
+    "Move to Black team" : {
+
+    },
+    "Move to White team" : {
+
+    },
+    "My turn" : {
+
+    },
+    "Navigation" : {
+
+    },
+    "New game" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局"
+          }
+        }
+      }
+    },
+    "New game option" : {
+
+    },
+    "Next" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次"
+          }
+        }
+      }
+    },
+    "No correspondence games on your opponents' turn" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の番になった通信対局なし"
+          }
+        }
+      }
+    },
+    "No correspondence games on your turn" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの番になった通信対局なし"
+          }
+        }
+      }
+    },
+    "No players found." : {
+
+    },
+    "No time limits." : {
+
+    },
+    "None" : {
+
+    },
+    "Note to yourself" : {
+
+    },
+    "Note: Sounds and voice countdown will not play when your device is in " : {
+
+    },
+    "Online GO" : {
+
+    },
+    "Online Go Server" : {
+
+    },
+    "Online-go.com Account" : {
+
+    },
+    "Open" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "誰でも"
+          }
+        }
+      }
+    },
+    "Open in browser" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザーで開く"
+          }
+        }
+      }
+    },
+    "Opponent" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対戦相手"
+          }
+        }
+      }
+    },
+    "Opponent passed" : {
+      "comment" : "Game",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手がパスした"
+          }
+        }
+      }
+    },
+    "Options" : {
+
+    },
+    "or" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "または"
+          }
+        }
+      }
+    },
+    "Others" : {
+
+    },
+    "Pass" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パス"
+          }
+        }
+      }
+    },
+    "Password" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワード"
+          }
+        }
+      }
+    },
+    "Pause game" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局一時停止"
+          }
+        }
+      }
+    },
+    "Pause on weekend" : {
+
+    },
+    "Periods: " : {
+
+    },
+    "Playback mode" : {
+
+    },
+    "Player info" : {
+
+    },
+    "Preview" : {
+
+    },
+    "Privacy Policy" : {
+
+    },
+    "private" : {
+
+    },
+    "Private" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "招待限定"
+          }
+        }
+      }
+    },
+    "Private messages" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートメッセージ"
+          }
+        }
+      }
+    },
+    "Private messages are only stored for a few days, so please make sure to save any important information somewhere else." : {
+
+    },
+    "Public games" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ対局"
+          }
+        }
+      }
+    },
+    "Public live games" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ対局"
+          }
+        }
+      }
+    },
+    "Quick match" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局探し"
+          }
+        }
+      }
+    },
+    "Quick match request" : {
+
+    },
+    "ranked" : {
+
+    },
+    "Ranked" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ランク戦"
+          }
+        }
+      }
+    },
+    "Register an OGS account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSアカウントを登録する"
+          }
+        }
+      }
+    },
+    "Reject" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "断る"
+          }
+        }
+      }
+    },
+    "Rengo (%@)" : {
+
+    },
+    "Rengo (%lld)" : {
+
+    },
+    "Request undo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待ったを要請"
+          }
+        }
+      }
+    },
+    "Resign" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投了"
+          }
+        }
+      }
+    },
+    "Restore" : {
+
+    },
+    "Restrict opponent rank" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ランク制限"
+          }
+        }
+      }
+    },
+    "Resume" : {
+
+    },
+    "Resume game" : {
+
+    },
+    "Revert to standard time setting." : {
+
+    },
+    "Rule set" : {
+
+    },
+    "Rules" : {
+
+    },
+    "Rules set: " : {
+
+    },
+    "Rules: " : {
+
+    },
+    "Say hi!" : {
+
+    },
+    "SD" : {
+
+    },
+    "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ご希望の碁盤の大きさと時間制限方式で、ランクが近い対戦相手をシステムに探してもらう。"
+          }
+        }
+      }
+    },
+    "Select your opponent " : {
+
+    },
+    "Send a challenge directly to a friend (or a specific player) so they can accept to start a game." : {
+
+    },
+    "Send a notification on..." : {
+
+    },
+    "Settings" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        }
+      }
+    },
+    "Sign in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロギン"
+          }
+        }
+      }
+    },
+    "Sign in to OGS with Facebook" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Facebookでログイン"
+          }
+        }
+      }
+    },
+    "Sign in to OGS with Google" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Googleでコグイン"
+          }
+        }
+      }
+    },
+    "Sign in to OGS with Twitter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twitterでコグイン"
+          }
+        }
+      }
+    },
+    "Sign in to your Account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウント"
+          }
+        }
+      }
+    },
+    "Sign in to your OGS account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSアカウントでログイン"
+          }
+        }
+      }
+    },
+    "Sign in to your Online-go.com (OGS) account:" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online-go.com (OGS) アカウントにロギン："
+          }
+        }
+      }
+    },
+    "Silent" : {
+
+    },
+    "Standard" : {
+
+    },
+    "Standard 1v1 (%@)" : {
+
+    },
+    "Standard 1v1 (%lld)" : {
+
+    },
+    "Standard board size" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通常のサイズ"
+          }
+        }
+      }
+    },
+    "Standard komi" : {
+
+    },
+    "Standard komi: " : {
+
+    },
+    "Start" : {
+
+    },
+    "Stone per period: " : {
+
+    },
+    "Stone removal option" : {
+
+    },
+    "Stone Removal Phase" : {
+      "comment" : "Game"
+    },
+    "Stone sounds" : {
+
+    },
+    "Stones" : {
+
+    },
+    "Submit" : {
+
+    },
+    "Submit move" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "着手決定"
+          }
+        }
+      }
+    },
+    "Support OGS" : {
+
+    },
+    "Support Surround" : {
+
+    },
+    "Supporter Tier %@: %@ monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Supporter Tier %1$@: %2$@ monthly"
+          }
+        }
+      }
+    },
+    "Surround" : {
+
+    },
+    "Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS)." : {
+
+    },
+    "Tap and drag to place a stone. Drag outside of the board to cancel." : {
+
+    },
+    "Tap on avatars to assign players into teams." : {
+
+    },
+    "Tap to go to game%@" : {
+
+    },
+    "Tap to view" : {
+
+    },
+    "Terms of Use" : {
+
+    },
+    "Territory" : {
+
+    },
+    "Thank you for being a Supporter!" : {
+
+    },
+    "Thanks to" : {
+
+    },
+    "The " : {
+
+    },
+    "The OGS Team" : {
+
+    },
+    "Time running low" : {
+
+    },
+    "To " : {
+
+    },
+    "To start playing:" : {
+
+    },
+    "Toggle analyze mode" : {
+
+    },
+    "Toggle group" : {
+
+    },
+    "Toggle playback mode" : {
+
+    },
+    "Toggle single point" : {
+
+    },
+    "Toggle thumbnails" : {
+
+    },
+    "Total" : {
+
+    },
+    "Try it out" : {
+
+    },
+    "Unassign" : {
+
+    },
+    "Undo request" : {
+      "comment" : "Game - when undo received",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待った要請"
+          }
+        }
+      }
+    },
+    "Undo requested" : {
+      "comment" : "Game - after undo requested",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待った要請済み"
+          }
+        }
+      }
+    },
+    "Unusual board size: %lld×%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unusual board size: %1$lld×%2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "極端のサイズ： %1$lld×%2$lld"
+          }
+        }
+      }
+    },
+    "Unusual time settings" : {
+
+    },
+    "Username" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザー名"
+          }
+        }
+      }
+    },
+    "View" : {
+
+    },
+    "Voice countdown" : {
+
+    },
+    "vs. Friend" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "友人と対戦"
+          }
+        }
+      }
+    },
+    "W+" : {
+
+    },
+    "Waiting" : {
+
+    },
+    "Waiting (%@)" : {
+
+    },
+    "Waiting (%lld)" : {
+
+    },
+    "Waiting for opponent" : {
+      "comment" : "Game",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手待ち"
+          }
+        }
+      }
+    },
+    "Waiting for opponent: %@ game%@ " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Waiting for opponent: %1$@ game%2$@ "
+          }
+        }
+      }
+    },
+    "Waiting for opponent: %lld game%@ " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Waiting for opponent: %1$lld game%2$@ "
+          }
+        }
+      }
+    },
+    "Waiting for opponents/teammates" : {
+      "comment" : "Homeview",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手・仲間の番"
+          }
+        }
+      }
+    },
+    "Waiting for players to join and the organizer to start the game." : {
+
+    },
+    "Waiting for teammate" : {
+      "comment" : "Game"
+    },
+    "Waiting games" : {
+
+    },
+    "Waiting..." : {
+
+    },
+    "Web version" : {
+      "comment" : "in navigation menu",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web版"
+          }
+        }
+      }
+    },
+    "Welcome" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ようこそ"
+          }
+        }
+      }
+    },
+    "White" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白"
+          }
+        }
+      }
+    },
+    "Width" : {
+
+    },
+    "Withdraw" : {
+
+    },
+    "You" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなた"
+          }
+        }
+      }
+    },
+    "You can select multiple options." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数選択可能。"
+          }
+        }
+      }
+    },
+    "You need to choose an opponent or make the challenge open." : {
+
+    },
+    "Your color" : {
+
+    },
+    "Your move" : {
+      "comment" : "Game\nHomeview",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの番"
+          }
+        }
+      }
+    },
+    "Zen mode" : {
+
+    }
+  },
+  "version" : "1.0"
+}
