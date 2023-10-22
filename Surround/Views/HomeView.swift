@@ -113,7 +113,7 @@ struct HomeView: View {
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
                         if ogs.challengesReceived.count > 0 {
-                            Section(header: sectionHeader(title: "Challenges received")) {
+                            Section(header: sectionHeader(title: String(localized: "Challenges received", comment: "Homeview"))) {
                                 ForEach(ogs.challengesReceived) { challenge in
                                     ChallengeCell(challenge: challenge)
                                         .padding()
@@ -124,7 +124,7 @@ struct HomeView: View {
                             }
                         }
                         if ogs.liveGames.count > 0 {
-                            Section(header: sectionHeader(title: "Live games")) {
+                            Section(header: sectionHeader(title: String(localized: "Live games", comment: "Homeview"))) {
                                 ForEach(ogs.liveGames) { game in
                                     GameCell(game: game, displayMode: displayMode)
                                     .onTapGesture {
@@ -135,7 +135,7 @@ struct HomeView: View {
                                 }
                             }
                         }
-                        Section(header: sectionHeader(title: "Your move")) {
+                        Section(header: sectionHeader(title: String(localized: "Your move", comment: "Homeview"))) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
@@ -151,7 +151,7 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                             }
                         }
-                        Section(header: sectionHeader(title: "Waiting for opponents/teammates")) {
+                        Section(header: sectionHeader(title: String(localized: "Waiting for opponents/teammates", comment: "Homeview"))) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
                                 GameCell(game: game, displayMode: displayMode)
                                 .onTapGesture {
@@ -267,7 +267,7 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationTitle(ogs.isLoggedIn ? "Active games" : "Welcome")
+        .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Picker(selection: $displayMode.animation(), label: Text("Display mode")) {

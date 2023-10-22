@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
 		BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */; };
 		BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
@@ -330,6 +331,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
+		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundApp.swift; sourceTree = "<group>"; };
 		BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewWrapper.swift; sourceTree = "<group>"; };
@@ -565,6 +568,7 @@
 				BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */,
 				BC042AFB24AB2CFA0050B2D1 /* Info.plist */,
 				BC042AF824AB2CFA0050B2D1 /* Preview Content */,
+				AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */,
 			);
 			path = Surround;
 			sourceTree = "<group>";
@@ -965,6 +969,7 @@
 			knownRegions = (
 				en,
 				Base,
+				ja,
 			);
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
@@ -1006,6 +1011,7 @@
 				BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */,
 				BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */,
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
+				AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */,
 				BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */,
 				BCB98CFC256D16B800B1F8FD /* game-26269354.json in Resources */,
 				BC28A918277ACDDD007A417E /* game-beta-11359.json in Resources */,
@@ -1358,6 +1364,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				BC285B342557FAEB005378F9 /* Base */,
+				AE535B9B2AE2274000B98D58 /* ja */,
 			);
 			name = MainInterface.storyboard;
 			sourceTree = "<group>";
@@ -1369,6 +1376,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -1422,6 +1430,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -1431,6 +1440,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -1477,6 +1487,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				VALIDATE_PRODUCT = YES;

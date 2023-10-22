@@ -152,7 +152,7 @@ struct QuickMatchForm: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                MainActionButton(label: "Find a game", disabled: boardSizes.count == 0, action: {
+                MainActionButton(label: String(localized: "Find a game", comment: "New game view"), disabled: boardSizes.count == 0, action: {
                     let automatchEntry = OGSAutomatchEntry(
                         sizeOptions: self.boardSizes,
                         timeControlSpeed: self.finalTimeControlSpeed

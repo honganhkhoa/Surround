@@ -105,19 +105,19 @@ enum RootView: String {
     var title: String {
         switch self {
         case .home:
-            return "Home"
+            return String(localized: "Home", comment: "in navigation menu")
         case .publicGames:
-            return "Public games"
+            return String(localized: "Public games", comment: "in navigation menu")
         case .privateMessages:
-            return "Private messages"
+            return String(localized: "Private messages", comment: "in navigation menu")
         case .settings:
-            return "Settings"
+            return String(localized: "Settings", comment: "in navigation menu")
         case .about:
-            return "About & Support"
+            return String(localized: "About & Support", comment: "in navigation menu")
         case .browser:
-            return "Web version"
+            return String(localized: "Web version", comment: "in navigation menu")
         case .forums:
-            return "Forums"
+            return String(localized: "Forums", comment: "in navigation menu")
         }
     }
     

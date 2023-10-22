@@ -82,7 +82,7 @@ struct WaitingGamesView: View {
         return ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
                 if self.liveChallenges.count + liveAutomatchEntries.count + liveRengoChallenges.count > 0 {
-                    Section(header: sectionHeader(title: "Live games")) {
+                    Section(header: sectionHeader(title: String(localized: "Live games"))) {
                         ForEach(liveRengoChallenges) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
@@ -101,7 +101,7 @@ struct WaitingGamesView: View {
                     }
                 }
                 if self.correspondenceChallenges.count + correspondenceAutomatchEntries.count + correspondenceRengoChallenges.count > 0 {
-                    Section(header: sectionHeader(title: "Correspondence games")) {
+                    Section(header: sectionHeader(title: String(localized: "Correspondence games"))) {
                         ForEach(correspondenceRengoChallenges) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
@@ -120,7 +120,7 @@ struct WaitingGamesView: View {
                     }
                 }
                 if ogs.challengesReceived.count > 0 {
-                    Section(header: sectionHeader(title: "Challenges received")) {
+                    Section(header: sectionHeader(title: String(localized: "Challenges received"))) {
                         ForEach(ogs.challengesReceived) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
