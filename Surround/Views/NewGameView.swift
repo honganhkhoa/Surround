@@ -142,11 +142,11 @@ struct QuickMatchForm: View {
                         Toggle(isOn: $blitz, label: {
                             Text("Blitz").font(.subheadline)
                         })
-                        (Text("Live games").bold() + Text(" generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in ") + Text("Blitz").bold() + Text(" mode."))
+                        (Text("**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode."))
                             .font(.subheadline)
                             .leadingAlignedInScrollView()
                     } else if timeControlSpeed == .correspondence {
-                        (Text("Correspondence games").bold() + Text(" are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time."))
+                        Text("**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time.")
                             .font(.subheadline)
                             .leadingAlignedInScrollView()
                     }
@@ -354,7 +354,7 @@ struct CustomGameForm: View {
                 .font(.subheadline)
             }
             if handicap == -1 {
-                (Text("Automatic").bold() + Text(" setting will determine the number of handicap stones based on your and your opponent's rank."))
+                (Text("**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
@@ -371,7 +371,7 @@ struct CustomGameForm: View {
                     }.pickerStyle(SegmentedPickerStyle())
                 }
             } else {
-                (Text("Automatic").bold() + Text(" setting will either assign white to the stronger player, or just assign randomly."))
+                (Text("**Automatic** setting will either assign white to the stronger player, or just assign randomly."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
@@ -426,7 +426,7 @@ struct CustomGameForm: View {
                 }
             }
             if isRanked {
-                (Text("Custom").bold() + Text(" board sizes are not available in ") + Text("ranked").bold() + Text(" games."))
+                (Text("**Custom** board sizes are not available in **ranked** games."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
@@ -527,7 +527,7 @@ struct CustomGameForm: View {
                 Text("Private").font(.subheadline)
             }
             .disabled(isRanked)
-            (Text("Disable the ") + Text("ranked").bold() + Text(" option above if you don't want the result to count towards your rating. ") + Text("Ranked").bold() + Text(" games cannot be ") + Text("private").bold() + Text(" and have fewer customizing options."))
+            (Text("Disable the **ranked** option above if you don't want the result to count towards your rating. **Ranked** games cannot be **private** and have fewer customizing options."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }
@@ -567,7 +567,7 @@ struct CustomGameForm: View {
             Toggle(isOn: $analysisDisabled) {
                 Text("Disable analysis").font(.subheadline)
             }
-            (Text("Analysis mode").bold() + Text(" allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out."))
+            (Text("**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }

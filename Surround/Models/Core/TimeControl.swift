@@ -104,25 +104,21 @@ enum TimeControlSystem: Equatable {
     var descriptionText: Text {
         switch self {
         case .Fischer(let initialTime, let timeIncrement, let maxTime):
-            return Text("Clock starts with ") + Text(durationString(seconds: initialTime, longFormat: true)).bold() +
-                Text(" and increases by ") + Text(durationString(seconds: timeIncrement, longFormat: true)).bold() +
-                Text(" per move, up to a maximum of ") + Text(durationString(seconds: maxTime, longFormat: true)).bold() + Text(".")
+            return Text("Clock starts with **\(durationString(seconds: initialTime, longFormat: true))** and increases by **\(durationString(seconds: timeIncrement, longFormat: true))** per move, up to a maximum of **\(durationString(seconds: maxTime, longFormat: true))**.")
         case .Simple(let perMove):
-            return Text(durationString(seconds: perMove, longFormat: true)).bold() + Text(" per move.")
+            return Text("**\(durationString(seconds: perMove, longFormat: true)) per move.")
         case .ByoYomi(let mainTime, let periods, let periodTime):
             if mainTime == 0 {
-                return Text("\(periods) period\(periods == 1 ? "" : "s") of ") + Text(durationString(seconds: periodTime, longFormat: true)).bold() + Text(".")
+                return Text("\(periods) period\(periods == 1 ? "" : "s") of **\(durationString(seconds: periodTime, longFormat: true))**.")
             }
-            return Text("Clock starts with ") + Text(durationString(seconds: mainTime, longFormat: true)).bold() +
-                Text(" main time, follows by \(periods) period\(periods == 1 ? "" : "s") of ") + Text(durationString(seconds: periodTime, longFormat: true)).bold() + Text(".")
+            return Text("Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by \(periods) period\(periods == 1 ? "" : "s") of **\(durationString(seconds: periodTime, longFormat: true))**.")
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
             if mainTime == 0 {
-                return Text(durationString(seconds: periodTime, longFormat: true)).bold() + Text(" for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
+                return Text("**\(durationString(seconds: periodTime, longFormat: true))** for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
             }
-            return Text("Clock starts with ") + Text(durationString(seconds: mainTime, longFormat: true)) +
-                Text(" main time, follows by ") + Text(durationString(seconds: periodTime, longFormat: true)).bold() + Text(" for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
+            return Text("Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by **\(durationString(seconds: periodTime, longFormat: true))** for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
         case .Absolute(let totalTime):
-            return Text(durationString(seconds: totalTime, longFormat: true)).bold() + Text(" of total play time for each player.")
+            return Text("**\(durationString(seconds: totalTime, longFormat: true))** of total play time for each player.")
         case .None:
             return Text("No time limits.")
         }

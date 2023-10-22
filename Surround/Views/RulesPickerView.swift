@@ -49,7 +49,7 @@ struct RulesPickerView: View {
                             }
                             Spacer().frame(height: 5)
                             if isRanked {
-                                (Text("Custom").bold() + Text(" komi is not available in ") + Text("ranked").bold() + Text(" games."))
+                                (Text("**Custom** komi is not available in **ranked** games."))
                                     .font(.caption)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .frame(maxWidth: .infinity, alignment: .leading)

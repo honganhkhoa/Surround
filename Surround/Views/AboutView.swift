@@ -13,36 +13,25 @@ struct ThanksView: View {
         ScrollView {
             VStack(spacing: 10) {
                 Group {
-                    Link(destination: URL(string: "https://online-go.com/docs/team")!) {
-                        (Text("The OGS Team").bold() + Text(", for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app.").foregroundColor(Color(.label)))
-                            .leadingAlignedInScrollView()
-                    }
+                    (Text("[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app.").foregroundColor(Color(.label)))
+                        .leadingAlignedInScrollView()
                     Divider()
-                    Link(destination: URL(string: "https://github.com/acristescu/OnlineGo")!) {
-                        (Text("Alexandru Cristescu").bold() + Text(", for creating the ").foregroundColor(Color(.label)) + Text("Online GO").bold() + Text(" Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label)))
-                            .leadingAlignedInScrollView()
-                    }
+                    (Text("[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label)))
+                        .leadingAlignedInScrollView()
                     Divider()
-                    Link(destination: URL(string: "https://linhpham.me")!) {
-                        (Text("Linh Pham").bold() + Text(", for creating the app icon, and providing design advises for the app.").foregroundColor(Color(.label)))
-                            .leadingAlignedInScrollView()
-                    }
+                    (Text("[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app.").foregroundColor(Color(.label)))
+                        .leadingAlignedInScrollView()
                     Divider()
-                    Link(destination: URL(string: "https://forums.online-go.com/t/surround-ios-client-for-ogs/34437")!) {
-                        Text("Everyone who participated in the beta testing, for helping me to improve the app with many feedbacks and bug reports.")
-                            .foregroundColor(Color(.label))
-                            .leadingAlignedInScrollView()
-                    }
+                    Text("Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports.")
+                        .foregroundColor(Color(.label))
+                        .leadingAlignedInScrollView()
                 }
                 Divider().padding(.vertical, 10)
                 Group {
-                    (Text("Surround").bold() + Text(" includes these open source components:"))
+                    (Text("**Surround** includes these open source components:"))
                         .leadingAlignedInScrollView()
                     Link(destination: URL(string: "https://github.com/Alamofire/Alamofire")!) {
                         Text("• Alamofire").leadingAlignedInScrollView()
-                    }
-                    Link(destination: URL(string: "https://github.com/socketio/socket.io-client-swift")!) {
-                        Text("• Socket.IO-Client-Swift").leadingAlignedInScrollView()
                     }
                     Link(destination: URL(string: "https://github.com/elegantchaos/DictionaryCoding")!) {
                         Text("• DictionaryCoding").leadingAlignedInScrollView()
@@ -73,7 +62,7 @@ struct AboutView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 40)
-                    (Text("The ") + Text("Online Go Server").bold() + Text(" (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players."))
+                    (Text("The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players."))
                         .leadingAlignedInScrollView()
                     Divider()
                     Link(destination: URL(string: "https://online-go.com/user/supporter")!) {
@@ -88,10 +77,10 @@ struct AboutView: View {
                 Group {
                     Image("Surround")
                         .cornerRadius(10)
-                    (Text("Surround").bold() + Text(" is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices."))
+                    (Text("**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices."))
                         .leadingAlignedInScrollView()
                     Spacer().frame(height: 10)
-                    (Text("Currently, ") + Text("Surround").bold() + Text(" only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app."))
+                    (Text("Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app."))
                         .leadingAlignedInScrollView()
                     Group {
                         Divider()

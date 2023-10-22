@@ -13,9 +13,6 @@
     " (%lld)" : {
 
     },
-    " (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
-
-    },
     " [%@]" : {
 
     },
@@ -25,131 +22,16 @@
     " + %lld×" : {
 
     },
-    " allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
-
-    },
-    " and " : {
-
-    },
-    " and have fewer customizing options." : {
-
-    },
-    " and increases by " : {
-
-    },
-    " Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
-
-    },
-    " are being played right now." : {
-
-    },
-    " are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
-
-    },
-    " board sizes are not available in " : {
-
-    },
-    " for every %@ move%@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : " for every %1$@ move%2$@."
-          }
-        }
-      }
-    },
-    " for every %lld move%@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : " for every %1$lld move%2$@."
-          }
-        }
-      }
-    },
-    " games cannot be " : {
-
-    },
-    " games." : {
-
-    },
-    " generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in " : {
-
-    },
-    " includes these open source components:" : {
-
-    },
-    " is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
-
-    },
-    " komi is not available in " : {
-
-    },
     " komi: " : {
 
     },
-    " main time, follows by " : {
-
-    },
-    " main time, follows by %@ period%@ of " : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : " main time, follows by %1$@ period%2$@ of "
-          }
-        }
-      }
-    },
-    " main time, follows by %lld period%@ of " : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : " main time, follows by %1$lld period%2$@ of "
-          }
-        }
-      }
-    },
     " mode." : {
-
-    },
-    " of total play time for each player." : {
-
-    },
-    " only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
-
-    },
-    " option above if you don't want the result to count towards your rating. " : {
-
-    },
-    " per move, up to a maximum of " : {
-
-    },
-    " per move." : {
 
     },
     " SD" : {
 
     },
-    " setting will determine the number of handicap stones based on your and your opponent's rank." : {
-
-    },
-    " setting will either assign white to the stronger player, or just assign randomly." : {
-
-    },
     " to move" : {
-
-    },
-    ", for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
-
-    },
-    ", for creating the " : {
-
-    },
-    ", for creating the app icon, and providing design advises for the app." : {
 
     },
     "?" : {
@@ -164,10 +46,72 @@
     "(%lld)" : {
 
     },
+    "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
+
+    },
+    "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app." : {
+
+    },
+    "[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
+
+    },
     "[%@]" : {
 
     },
+    "**%@ per move." : {
+
+    },
+    "**%@** for every %lld move%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "**%1$@** for every %2$lld move%3$@."
+          }
+        }
+      }
+    },
+    "**%@** of total play time for each player." : {
+
+    },
+    "**%lld correspondence games** and **%lld live games** are being played right now." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "**%1$lld correspondence games** and **%2$lld live games** are being played right now."
+          }
+        }
+      }
+    },
+    "**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
+
+    },
+    "**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank." : {
+
+    },
+    "**Automatic** setting will either assign white to the stronger player, or just assign randomly." : {
+
+    },
     "**Casual**" : {
+
+    },
+    "**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
+
+    },
+    "**Custom** board sizes are not available in **ranked** games." : {
+
+    },
+    "**Custom** komi is not available in **ranked** games." : {
+
+    },
+    "**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode." : {
+
+    },
+    "**Surround** includes these open source components:" : {
+
+    },
+    "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
 
     },
     "%@" : {
@@ -209,9 +153,6 @@
         }
       }
     },
-    "%@ correspondence games" : {
-
-    },
     "%@ komi" : {
 
     },
@@ -225,25 +166,12 @@
         }
       }
     },
-    "%@ live games" : {
-
-    },
     "%@ pending Rengo game%@ " : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ pending Rengo game%2$@ "
-          }
-        }
-      }
-    },
-    "%@ period%@ of " : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ period%2$@ of "
           }
         }
       }
@@ -317,9 +245,6 @@
         }
       }
     },
-    "%lld correspondence games" : {
-
-    },
     "%lld live game%@" : {
       "localizations" : {
         "en" : {
@@ -329,9 +254,6 @@
           }
         }
       }
-    },
-    "%lld live games" : {
-
     },
     "%lld pending Rengo game%@ " : {
       "localizations" : {
@@ -343,12 +265,12 @@
         }
       }
     },
-    "%lld period%@ of " : {
+    "%lld period%@ of **%@**." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld period%2$@ of "
+            "value" : "%1$lld period%2$@ of **%3$@**."
           }
         }
       }
@@ -389,9 +311,6 @@
 
     },
     "• Push notifications for correspondence games (optional)" : {
-
-    },
-    "• Socket.IO-Client-Swift" : {
 
     },
     "• Support for Surround's ongoing development" : {
@@ -501,6 +420,12 @@
             "state" : "translated",
             "value" : "Surroundについてとサポート"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giới thiệu & Hỗ trợ"
+          }
         }
       }
     },
@@ -531,6 +456,12 @@
             "state" : "translated",
             "value" : "進行中対局"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chơi"
+          }
         }
       }
     },
@@ -544,9 +475,6 @@
 
     },
     "Advanced time settings " : {
-
-    },
-    "Alexandru Cristescu" : {
 
     },
     "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
@@ -582,9 +510,6 @@
       }
     },
     "Analysis %@" : {
-
-    },
-    "Analysis mode" : {
 
     },
     "Analyze mode" : {
@@ -756,8 +681,35 @@
         }
       }
     },
-    "Clock starts with " : {
-
+    "Clock starts with **%@** and increases by **%@** per move, up to a maximum of **%@**." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clock starts with **%1$@** and increases by **%2$@** per move, up to a maximum of **%3$@**."
+          }
+        }
+      }
+    },
+    "Clock starts with **%@** main time, follows by **%@** for every %lld move%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every %3$lld move%4$@."
+          }
+        }
+      }
+    },
+    "Clock starts with **%@** main time, follows by %lld period%@ of **%@**." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clock starts with **%1$@** main time, follows by %2$lld period%3$@ of **%4$@**."
+          }
+        }
+      }
     },
     "Close" : {
 
@@ -811,7 +763,7 @@
     "Create and show a challenge publicly, then wait for other players to accept." : {
 
     },
-    "Currently, " : {
+    "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
 
     },
     "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. " : {
@@ -843,7 +795,7 @@
     "Disable analysis" : {
 
     },
-    "Disable the " : {
+    "Disable the **ranked** option above if you don't want the result to count towards your rating. **Ranked** games cannot be **private** and have fewer customizing options." : {
 
     },
     "Disconnected" : {
@@ -878,7 +830,7 @@
         }
       }
     },
-    "Everyone who participated in the beta testing, for helping me to improve the app with many feedbacks and bug reports." : {
+    "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports." : {
 
     },
     "Exit Zen mode" : {
@@ -902,6 +854,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "フォーラム"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diễn đàn"
           }
         }
       }
@@ -991,6 +949,12 @@
             "state" : "translated",
             "value" : "ホーム"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trang chủ"
+          }
         }
       }
     },
@@ -1031,9 +995,6 @@
     "Leave" : {
 
     },
-    "Linh Pham" : {
-
-    },
     "Live" : {
       "localizations" : {
         "ja" : {
@@ -1054,6 +1015,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライブ対局"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván trực tiếp"
           }
         }
       }
@@ -1111,6 +1078,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo ván mới"
           }
         }
       }
@@ -1170,12 +1143,6 @@
         }
       }
     },
-    "Online GO" : {
-
-    },
-    "Online Go Server" : {
-
-    },
     "Online-go.com Account" : {
 
     },
@@ -1229,6 +1196,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "または"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hoặc"
           }
         }
       }
@@ -1319,6 +1292,12 @@
             "state" : "translated",
             "value" : "ライブ対局"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem"
+          }
         }
       }
     },
@@ -1345,9 +1324,6 @@
     "Quick match request" : {
 
     },
-    "ranked" : {
-
-    },
     "Ranked" : {
       "localizations" : {
         "ja" : {
@@ -1364,6 +1340,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OGSアカウントを登録する"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đăng kí tài khoản OGS mới"
           }
         }
       }
@@ -1478,6 +1460,12 @@
             "state" : "translated",
             "value" : "設定"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt"
+          }
         }
       }
     },
@@ -1537,6 +1525,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OGSアカウントでログイン"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đăng nhập vào tài khoản OGS"
           }
         }
       }
@@ -1637,7 +1631,14 @@
 
     },
     "Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS)." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround là ứng dụng để chơi Cờ Vây trên mạng với những kì thủ khác trên website Onine-Go.com (Online Go Server - OGS)"
+          }
+        }
+      }
     },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
 
@@ -1663,10 +1664,7 @@
     "Thanks to" : {
 
     },
-    "The " : {
-
-    },
-    "The OGS Team" : {
+    "The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
 
     },
     "Time running low" : {
@@ -1683,7 +1681,14 @@
 
     },
     "To start playing:" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Để bắt đầu chơi:"
+          }
+        }
+      }
     },
     "Toggle analyze mode" : {
 
@@ -1841,6 +1846,12 @@
             "state" : "translated",
             "value" : "相手・仲間の番"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ đối thủ/đồng đội"
+          }
         }
       }
     },
@@ -1864,6 +1875,12 @@
             "state" : "translated",
             "value" : "Web版"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Web"
+          }
         }
       }
     },
@@ -1873,6 +1890,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ようこそ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xin chào"
           }
         }
       }
@@ -1920,12 +1943,18 @@
 
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなたの番"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lượt của bạn"
           }
         }
       }
