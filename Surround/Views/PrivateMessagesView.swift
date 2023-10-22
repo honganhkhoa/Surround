@@ -56,16 +56,15 @@ struct PrivateMessagesView: View {
                                     .frame(width: 48, height: 48)
                                     .background(Color.gray)
                             }
-                            if let hasUnread = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0 < lastMessage.content.timestamp {
-                                VStack(alignment: .leading) {
-                                    Text(peer.username)
-                                        .foregroundColor(peer.uiColor)
-                                        .font(hasUnread ? Font.body.bold() : .body)
-                                    Text(lastMessage.content.message)
-                                        .font(hasUnread ? Font.subheadline.bold() : .subheadline)
-                                        .foregroundColor(Color(.secondaryLabel))
-                                        .lineLimit(1)
-                                }
+                            let hasUnread = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0 < lastMessage.content.timestamp
+                            VStack(alignment: .leading) {
+                                Text(peer.username)
+                                    .foregroundColor(peer.uiColor)
+                                    .font(hasUnread ? Font.body.bold() : .body)
+                                Text(lastMessage.content.message)
+                                    .font(hasUnread ? Font.subheadline.bold() : .subheadline)
+                                    .foregroundColor(Color(.secondaryLabel))
+                                    .lineLimit(1)
                             }
                         }
                     }

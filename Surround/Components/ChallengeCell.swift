@@ -442,63 +442,59 @@ struct ChallengeCell: View {
                     Spacer()
                 }
             }
-            if let game = challenge.game {
-                VStack(alignment: .leading, spacing: 3) {
-                    Label{
-                        HStack {
-                            Text("\(game.width)×\(game.height) \(game.ranked ? "Ranked" : "Unranked")")
-                                .leadingAlignedInScrollView()
-                                .minimumScaleFactor(0.7)
-                                .lineLimit(1)
+            let game = challenge.game
+            VStack(alignment: .leading, spacing: 3) {
+                Label{
+                    HStack {
+                        Text("\(game.width)×\(game.height) \(game.ranked ? "Ranked" : "Unranked")")
+                            .leadingAlignedInScrollView()
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                        Spacer()
+                        Text("Handicap: ").bold()
+                            .offset(x: 8)
+                        Text(game.handicap == -1 ? "Auto" : "\(game.handicap)")
+                    }
+                } icon: {
+                    Image(systemName: "squareshape.split.3x3")
+                }
+                Label {
+                    HStack {
+                        (Text("Rules: ").bold() + Text(game.rules.fullName))
+                            .leadingAlignedInScrollView()
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                        if game.komi != nil && game.komi != game.rules.defaultKomi {
                             Spacer()
-                            Text("Handicap: ").bold()
+                            Text("Komi: ").bold()
                                 .offset(x: 8)
-                            Text(game.handicap == -1 ? "Auto" : "\(game.handicap)")
+                            Text(String(format: "%.1f", game.komi!))
                         }
-                    } icon: {
-                        Image(systemName: "squareshape.split.3x3")
                     }
-                    Label {
-                        HStack {
-                            (Text("Rules: ").bold() + Text(game.rules.fullName))
-                                .leadingAlignedInScrollView()
-                                .minimumScaleFactor(0.7)
-                                .lineLimit(1)
-                            if game.komi != nil && game.komi != game.rules.defaultKomi {
-                                Spacer()
-                                Text("Komi: ").bold()
-                                    .offset(x: 8)
-                                Text(String(format: "%.1f", game.komi!))
-                            }
+                } icon: {
+                    Image(systemName: "text.badge.checkmark")
+                }
+                let timeControl = game.timeControl
+                Label {
+                    VStack(alignment: .leading) {
+                        Text("\(timeControl.systemName): \(timeControl.shortDescription)")
+                            .leadingAlignedInScrollView()
+                        if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
+                            Text("Pause on weekend")
                         }
-                    } icon: {
-                        Image(systemName: "text.badge.checkmark")
                     }
-                    if let timeControl = game.timeControl {
-                        Label {
-                            VStack(alignment: .leading) {
-                                Text("\(timeControl.systemName): \(timeControl.shortDescription)")
-                                    .leadingAlignedInScrollView()
-                                if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
-                                    Text("Pause on weekend")
-                                }
-                            }
-                            
-                        } icon: {
-                            Image(systemName: "clock")
-                        }
-                    } else {
-                        Label("No time limits", systemImage: "clock")
-                    }
-                    Label("Analysis \(game.disableAnalysis ? "disabled" : "enabled")", systemImage: "arrow.triangle.branch")
-                    if let minRank = game.minRank, let maxRank = game.maxRank {
-                        if minRank > -1000 && maxRank < 1000 {
-                            Label("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))", systemImage: "arrow.up.and.down.square")
-                        }
+                    
+                } icon: {
+                    Image(systemName: "clock")
+                }
+                Label("Analysis \(game.disableAnalysis ? "disabled" : "enabled")", systemImage: "arrow.triangle.branch")
+                if let minRank = game.minRank, let maxRank = game.maxRank {
+                    if minRank > -1000 && maxRank < 1000 {
+                        Label("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))", systemImage: "arrow.up.and.down.square")
                     }
                 }
-                .font(.subheadline)
             }
+            .font(.subheadline)
         }
     }
 }

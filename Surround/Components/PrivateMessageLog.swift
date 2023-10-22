@@ -27,24 +27,23 @@ struct PrivateMessageLine: View {
                 }
             }
             HStack {
-                if let fromUser = ogs.user?.id == message.from.id {
-                    if fromUser {
-                        Spacer()
+                let fromUser = ogs.user?.id == message.from.id
+                if fromUser {
+                    Spacer()
+                }
+                VStack(alignment: fromUser ? .trailing : .leading, spacing: 2) {
+                    if lastMessage == nil || message.content.dateString != lastMessage?.content.dateString || message.from.id != lastMessage?.from.id {
+                        Text(message.from.username).font(.caption2).bold()
+                        .foregroundColor(message.from.uiColor)
                     }
-                    VStack(alignment: fromUser ? .trailing : .leading, spacing: 2) {
-                        if lastMessage == nil || message.content.dateString != lastMessage?.content.dateString || message.from.id != lastMessage?.from.id {
-                            Text(message.from.username).font(.caption2).bold()
-                            .foregroundColor(message.from.uiColor)
-                        }
-                        Text(message.content.message).font(.callout)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color(.systemGray4))
-                    .cornerRadius(10)
-                    if !fromUser {
-                        Spacer()
-                    }
+                    Text(message.content.message).font(.callout)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(.systemGray4))
+                .cornerRadius(10)
+                if !fromUser {
+                    Spacer()
                 }
             }.padding(.horizontal)
         }
