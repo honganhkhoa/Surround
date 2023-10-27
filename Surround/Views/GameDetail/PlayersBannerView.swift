@@ -176,7 +176,7 @@ struct PlayersBannerView: View {
                     } else {
                         TimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color)
                     }
-                    Text("\(captures) capture\(captures != 1 ? "s" : "")")
+                    Text("\(captures) captures", comment: "show captures in player banner view")
                         .font(Font.caption.monospacedDigit())
                     if let komi = game.gameData?.komi {
                         if color == .white && komi != 0 {
@@ -260,10 +260,10 @@ struct PlayersBannerView: View {
                     VStack(alignment: .leading) {
                         Group {
                             if gameData.scoreTerritory {
-                                Text("Territory")
+                                Text("Territory", comment: "In PlayersBannerView, label for territory count")
                             }
                             if gameData.scoreStones {
-                                Text("Stones")
+                                Text("Stones", comment: "")
                             }
                             if gameData.scorePrisoners {
                                 Text("Captures")
@@ -272,7 +272,7 @@ struct PlayersBannerView: View {
                                 Text("Komi")
                             }
                         }.font(Font.footnote)
-                        Text("Total").font(Font.footnote.bold())
+                        Text("Total", comment: "In PlayersBannerView, label for total points").font(Font.footnote.bold())
                     }
                     if leftSide && game.gamePhase == .stoneRemoval {
                         stoneRemovalStatus(color: color, leftSide: leftSide)

@@ -87,26 +87,26 @@ struct OGSPauseControl: Decodable {
         if let playerId = playerId {
             if let userPauseDetail = userPauseDetail {
                 if userPauseDetail.pausingPlayerId == playerId {
-                    return "Paused, \(userPauseDetail.pausesLeft!) left"
+                    return String(localized: "Paused, \(userPauseDetail.pausesLeft!) left", comment: "pause reason (pausing player is you)")
                 } else {
-                    return "Paused"
+                    return String(localized: "Paused", comment: "pause reason (pausing player is opponent)")
                 }
             }
             if vacationPlayerIds.contains(playerId) {
-                return "Vacation"
+                return String(localized: "Vacation", comment: "pause reason")
             }
         }
 
         if weekend ?? false {
-            return "Weekend"
+            return String(localized: "Weekend", comment: "pause reason")
         }
         
         if system ?? false {
-            return "System"
+            return String(localized: "System", comment: "pause reason")
         }
                 
         if stoneRemoval ?? false {
-            return "Stone removal"
+            return String(localized: "Stone removal", comment: "pause reason")
         }
         
         return "Paused"

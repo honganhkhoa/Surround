@@ -202,7 +202,7 @@ struct GameControlRow: View {
                             }
                         } else if userNeedsToAcceptStoneRemoval {
                             Button(action: { acceptRemovedStones() }) {
-                                Text("Accept")
+                                Text("Accept removed stones", comment: "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'")
                             }
                         } else if game.isUserPlaying {
                             if let goToNextGame = goToNextGame, let gameSpeed = game.gameData?.timeControl.speed {

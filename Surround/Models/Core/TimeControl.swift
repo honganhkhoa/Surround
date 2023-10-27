@@ -208,6 +208,14 @@ enum TimeControlSpeed: String, Codable {
     case correspondence
     case blitz
     
+    func localizedString() -> String {
+        switch self {
+        case .live: return String(localized: "live", comment: "TimeControlSpeed enum localization")
+        case .correspondence: return String(localized: "correspondence", comment: "TimeControlSpeed enum localization")
+        case .blitz: return String(localized: "blitz", comment: "TimeControlSpeed enum localization")
+        }
+    }
+    
     var defaultTimeOptions: [TimeControlSystem] {
         switch self {
         case .blitz:

@@ -95,7 +95,7 @@ struct BoardDemoView: View {
                 }
             }
             HStack {
-                (Text(game.currentPosition.nextToMove == .black ? "Black" : "White") + Text(" to move"))
+                (Text(game.currentPosition.nextToMove == .black ? "Black to move" : "White to move"))
                     .font(.title2).bold()
                 Spacer()
                 if simulatingRequest {

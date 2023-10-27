@@ -70,7 +70,7 @@ struct HomeView: View {
                     if ogs.waitingGames > 0 {
                         Button(action: { nav.main.showWaitingGames = true }) {
                             HStack {
-                                Text("Waiting for opponent: \(ogs.waitingGames) game\(ogs.waitingGames == 1 ? "" : "s") ")
+                                Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "HomeView - vary for plural")
                                     .font(.subheadline)
                                     .bold()
                                     .foregroundColor(.white)
@@ -87,7 +87,7 @@ struct HomeView: View {
                         Button(action: { nav.main.showWaitingGames = true }) {
                             HStack {
                                 HStack {
-                                    Text("\(ogs.pendingRengoGames) pending Rengo game\(ogs.pendingRengoGames == 1 ? "" : "s") ")
+                                    Text("\(ogs.pendingRengoGames) pending Rengo games ", comment: "HomeView - vary for plural")
                                         .font(.subheadline)
                                         .bold()
                                         .foregroundColor(.white)
