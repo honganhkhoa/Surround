@@ -23,15 +23,16 @@
 
     },
     " komi: " : {
-
-    },
-    " mode." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミ："
+          }
+        }
+      }
     },
     " SD" : {
-
-    },
-    " to move" : {
 
     },
     "?" : {
@@ -91,22 +92,64 @@
 
     },
     "**Automatic** setting will either assign white to the stronger player, or just assign randomly." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**自動色**にすると、ランクが高い方は白になります。両方は同じくらいのランクの場合、ランダムに色になります。"
+          }
+        }
+      }
     },
     "**Casual**" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "気軽に"
+          }
+        }
+      }
     },
     "**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局は、数日に続き、1 手につき 1 日ほどのスピードで、同時に、複数の対局もできます。"
+          }
+        }
+      }
     },
     "**Custom** board sizes are not available in **ranked** games." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ランク戦では、カスタマイズしたサイズを使えません。"
+          }
+        }
+      }
     },
     "**Custom** komi is not available in **ranked** games." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ランク戦では、カスタマイズしたコミを使えません。"
+          }
+        }
+      }
     },
     "**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**ライブ対局** ：普段1 手 30 秒前後で、**ブリッツ**の場合、1 手 10 秒前後。"
+          }
+        }
+      }
     },
     "**Surround** includes these open source components:" : {
 
@@ -143,25 +186,12 @@
     "%@ ▾" : {
 
     },
-    "%@ capture%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ capture%2$@"
-          }
-        }
-      }
-    },
     "%@ komi" : {
-
-    },
-    "%@ live game%@" : {
       "localizations" : {
-        "en" : {
+        "ja" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ live game%2$@"
+            "state" : "translated",
+            "value" : "%@目のコミ"
           }
         }
       }
@@ -222,35 +252,75 @@
         }
       }
     },
-    "%@×%@ %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@×%2$@ %3$@"
-          }
-        }
-      }
-    },
     "%lld" : {
 
     },
-    "%lld capture%@" : {
+    "%lld captures" : {
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld capture%2$@"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld capture"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld captures"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldアゲハマ"
+                }
+              }
+            }
           }
         }
       }
     },
-    "%lld live game%@" : {
+    "%lld live games" : {
+      "comment" : "NotificationPopup - vary for plural",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld live game%2$@"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld live game"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld live games"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "ライブ対局：%lld"
+                }
+              }
+            }
           }
         }
       }
@@ -261,6 +331,29 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld pending Rengo game%2$@ "
+          }
+        }
+      }
+    },
+    "%lld pending Rengo games " : {
+      "comment" : "HomeView - vary for plural",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pending Rengo game"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld pending Rengo games "
+                }
+              }
+            }
           }
         }
       }
@@ -276,7 +369,39 @@
       }
     },
     "%lld Stones" : {
-
+      "comment" : "NewGameView handicap selection - vary for plural",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Stone"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld Stones"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld子"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%lld×" : {
 
@@ -287,16 +412,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld×%2$lld"
-          }
-        }
-      }
-    },
-    "%lld×%lld %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld×%2$lld %3$@"
           }
         }
       }
@@ -375,10 +490,14 @@
 
     },
     "⚠️ OGS Moderator's official message. Please respond." : {
-
-    },
-    "1 Stone" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ OGS モデレーター公式メッセージ: ご返信下さい。"
+          }
+        }
+      }
     },
     "9+" : {
 
@@ -434,7 +553,24 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受ける"
+            "value" : "受諾する"
+          }
+        }
+      }
+    },
+    "Accept removed stones" : {
+      "comment" : "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意"
           }
         }
       }
@@ -483,28 +619,36 @@
     "All Supporter tiers includes:" : {
 
     },
-    "Alternatively, there %@ %@ open custom %@ matching your preferences that you can accept to start a game immediately." : {
+    "Alternatively, there are %lld open custom games matching your preferences that you can accept to start a game immediately." : {
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Alternatively, there %1$@ %2$@ open custom %3$@ matching your preferences that you can accept to start a game immediately."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternatively, there is %lld open custom game matching your preferences that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "Alternatively, there are %lld open custom games matching your preferences that you can accept to start a game immediately."
+                }
+              }
+            }
           }
         },
         "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "それとも、あなたの設定に合った対局は%2$@ 局があります。受ければすぐ始められる。"
-          }
-        }
-      }
-    },
-    "Alternatively, there %@ %lld open custom %@ matching your preferences that you can accept to start a game immediately." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Alternatively, there %1$@ %2$lld open custom %3$@ matching your preferences that you can accept to start a game immediately."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "それとも、あなたの設定に合った対局は%lld局があります。受ければすぐ始まります。"
+                }
+              }
+            }
           }
         }
       }
@@ -516,17 +660,31 @@
 
     },
     "Are you sure you want to abandon your team?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チームを見捨てていいのですか？"
+          }
+        }
+      }
     },
     "Are you sure you want to cancel this game?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この対局をキャンセルしますか？"
+          }
+        }
+      }
     },
     "Are you sure you want to pass?" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パスしてよろしいですか？"
+            "value" : "パスしますか？"
           }
         }
       }
@@ -536,28 +694,43 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "投了してよろしいですか？"
+            "value" : "投了しますか？"
           }
         }
       }
     },
     "Are you sure you want to resume the game?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この対局を再開しますか？"
+          }
+        }
+      }
     },
     "Auto" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        }
+      }
     },
     "Auto submiting moves" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動着手"
+            "value" : "シングタップ着手"
           }
         }
       }
     },
     "Automatic" : {
+      "comment" : "NewGameView handicap selection, automatic handicap",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -568,7 +741,14 @@
       }
     },
     "Automatically assign stone colors" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動色"
+          }
+        }
+      }
     },
     "B+" : {
 
@@ -584,7 +764,14 @@
       }
     },
     "Become a Supporter" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポーターに"
+          }
+        }
+      }
     },
     "Become a Supporter to support the ongoing development of this app and gain access to some additional features." : {
 
@@ -595,6 +782,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "黒"
+          }
+        }
+      }
+    },
+    "Black to move" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒番です"
+          }
+        }
+      }
+    },
+    "blitz" : {
+      "comment" : "TimeControlSpeed enum localization",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブリッツ"
           }
         }
       }
@@ -620,6 +828,7 @@
       }
     },
     "Board size" : {
+      "comment" : "New game view, board size selection section",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -640,16 +849,37 @@
       }
     },
     "Cancel game" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局をキャンセル"
+          }
+        }
+      }
     },
     "Cancel support" : {
 
     },
     "Captures" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アゲハマ"
+          }
+        }
+      }
     },
     "Challenge received!" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局要請を受けました"
+          }
+        }
+      }
     },
     "Challenge type" : {
 
@@ -666,7 +896,14 @@
       }
     },
     "Chat" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャット"
+          }
+        }
+      }
     },
     "Chinese" : {
 
@@ -715,10 +952,41 @@
 
     },
     "Compact" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンパクト"
+          }
+        }
+      }
+    },
+    "Connected" : {
 
+    },
+    "Connecting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接毒中"
+          }
+        }
+      }
     },
     "Contact" : {
 
+    },
+    "correspondence" : {
+      "comment" : "TimeControlSpeed enum localization",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信"
+          }
+        }
+      }
     },
     "Correspondence" : {
       "localizations" : {
@@ -761,7 +1029,14 @@
       }
     },
     "Create and show a challenge publicly, then wait for other players to accept." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局要請を公開作成、相手を待ち。"
+          }
+        }
+      }
     },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
 
@@ -787,19 +1062,47 @@
       }
     },
     "Custom komi: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズしたコミ："
+          }
+        }
+      }
     },
     "Custom komi: %@" : {
 
     },
     "Disable analysis" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局中検討モード禁止"
+          }
+        }
+      }
     },
     "Disable the **ranked** option above if you don't want the result to count towards your rating. **Ranked** games cannot be **private** and have fewer customizing options." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**ランク戦**をOFFにすると、対局者のランクは、結果に影響されません。**ランク戦**は、**非公開**にすることができず、カスタマイズができるオプションがが限られています。"
+          }
+        }
+      }
     },
     "Disconnected" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続切れ"
+          }
+        }
+      }
     },
     "Dismiss" : {
       "localizations" : {
@@ -871,7 +1174,14 @@
 
     },
     "Game name: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局名："
+          }
+        }
+      }
     },
     "Game speed" : {
       "localizations" : {
@@ -920,7 +1230,14 @@
       }
     },
     "Handicap: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置碁:"
+          }
+        }
+      }
     },
     "Haptics" : {
       "localizations" : {
@@ -933,13 +1250,27 @@
       }
     },
     "Has handicap: %lld" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置碁: %lld"
+          }
+        }
+      }
     },
     "Height" : {
 
     },
     "Hide demo board" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト用の碁盤を未表示"
+          }
+        }
+      }
     },
     "Home" : {
       "comment" : "in navigation menu",
@@ -974,13 +1305,34 @@
 
     },
     "Komi" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミ"
+          }
+        }
+      }
     },
     "Komi: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミ："
+          }
+        }
+      }
     },
     "Large" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "広い"
+          }
+        }
+      }
     },
     "Learn more..." : {
       "localizations" : {
@@ -995,6 +1347,17 @@
     "Leave" : {
 
     },
+    "live" : {
+      "comment" : "TimeControlSpeed enum localization",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ"
+          }
+        }
+      }
+    },
     "Live" : {
       "localizations" : {
         "ja" : {
@@ -1005,8 +1368,16 @@
         }
       }
     },
-    "Live game%@ in progress..." : {
-
+    "Live game in progress..." : {
+      "comment" : "In Popup. When only 1 game in progress.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行中のライブ対局"
+          }
+        }
+      }
     },
     "Live games" : {
       "comment" : "Homeview",
@@ -1025,6 +1396,17 @@
         }
       }
     },
+    "Live games in progress..." : {
+      "comment" : "In Popup. When multiple games are in progress.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行中のライブ対局"
+          }
+        }
+      }
+    },
     "Logout" : {
       "localizations" : {
         "ja" : {
@@ -1036,7 +1418,14 @@
       }
     },
     "Malkovich" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモ(対局相手に非公開)"
+          }
+        }
+      }
     },
     "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
 
@@ -1128,23 +1517,38 @@
 
     },
     "None" : {
-
-    },
-    "Note to yourself" : {
-
-    },
-    "Note: Sounds and voice countdown will not play when your device is in " : {
+      "comment" : "NewGameView handicap seletion, no handicap",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "※マナー・モードがONの時、石音や音声が出ません。"
+            "value" : "なし"
+          }
+        }
+      }
+    },
+    "Note to yourself" : {
+
+    },
+    "Note: Sounds and voice countdown will not play when your device is in **Silent** mode." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "※**マナー・モード**がONの時、石音や音声が出ません。"
           }
         }
       }
     },
     "Online-go.com Account" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online-Goアカウント"
+          }
+        }
+      }
     },
     "Open" : {
       "localizations" : {
@@ -1240,7 +1644,36 @@
       }
     },
     "Pause on weekend" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "週末に一時停止する"
+          }
+        }
+      }
+    },
+    "Paused" : {
+      "comment" : "pause reason (pausing player is opponent)",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一時停止中"
+          }
+        }
+      }
+    },
+    "Paused, %lld left" : {
+      "comment" : "pause reason (pausing player is you)",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一時停止中、後%lld回一時停可能"
+          }
+        }
+      }
     },
     "Periods: " : {
 
@@ -1252,20 +1685,34 @@
 
     },
     "Preview" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プリビュー"
+          }
+        }
+      }
     },
     "Privacy Policy" : {
 
     },
     "private" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非公開"
+          }
+        }
+      }
     },
     "Private" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "招待限定"
+            "value" : "非公開"
           }
         }
       }
@@ -1316,7 +1763,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対局探し"
+            "value" : "オートマッチ"
           }
         }
       }
@@ -1330,6 +1777,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ランク戦"
+          }
+        }
+      }
+    },
+    "Reconnecting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再接続中"
           }
         }
       }
@@ -1400,25 +1857,60 @@
       }
     },
     "Resume" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再開"
+          }
+        }
+      }
     },
     "Resume game" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局を再開"
+          }
+        }
+      }
     },
     "Revert to standard time setting." : {
 
     },
     "Rule set" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルール"
+          }
+        }
+      }
     },
     "Rules" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルール"
+          }
+        }
+      }
     },
     "Rules set: " : {
 
     },
     "Rules: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルール："
+          }
+        }
+      }
     },
     "Say hi!" : {
 
@@ -1431,7 +1923,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ご希望の碁盤の大きさと時間制限方式で、ランクが近い対戦相手をシステムに探してもらう。"
+            "value" : "ご希望の碁盤の大きさと時間制限方式で、ランクが近い対戦相手をシステムに探してもらえます。"
           }
         }
       }
@@ -1440,7 +1932,14 @@
 
     },
     "Send a challenge directly to a friend (or a specific player) so they can accept to start a game." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フリエンド（又は特定のプレーヤ）に対局要請を送る。"
+          }
+        }
+      }
     },
     "Send a notification on..." : {
       "localizations" : {
@@ -1474,7 +1973,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ロギン"
+            "value" : "ログイン"
           }
         }
       }
@@ -1545,9 +2044,6 @@
         }
       }
     },
-    "Silent" : {
-
-    },
     "Standard" : {
 
     },
@@ -1579,11 +2075,30 @@
     "Stone per period: " : {
 
     },
+    "Stone removal" : {
+      "comment" : "pause reason",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "死に石除去"
+          }
+        }
+      }
+    },
     "Stone removal option" : {
 
     },
     "Stone Removal Phase" : {
-      "comment" : "Game"
+      "comment" : "Game",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "死に石除去フェーズ"
+          }
+        }
+      }
     },
     "Stone sounds" : {
       "localizations" : {
@@ -1599,7 +2114,14 @@
 
     },
     "Submit" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信"
+          }
+        }
+      }
     },
     "Submit move" : {
       "localizations" : {
@@ -1640,23 +2162,75 @@
         }
       }
     },
+    "System" : {
+      "comment" : "pause reason",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム"
+          }
+        }
+      }
+    },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
 
     },
     "Tap on avatars to assign players into teams." : {
 
     },
-    "Tap to go to game%@" : {
-
+    "Tap to go to game" : {
+      "comment" : "Popup. When a single game is in progress.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップで表示"
+          }
+        }
+      }
+    },
+    "Tap to go to games" : {
+      "comment" : "Popup. When multiplpe games are in progress.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップでう表示"
+          }
+        }
+      }
     },
     "Tap to view" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップで表示"
+          }
+        }
+      }
     },
     "Terms of Use" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用条件"
+          }
+        }
+      }
     },
     "Territory" : {
-
+      "comment" : "In PlayersBannerView, label for territory count",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "陣地"
+          }
+        }
+      }
     },
     "Thank you for being a Supporter!" : {
 
@@ -1691,22 +2265,58 @@
       }
     },
     "Toggle analyze mode" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討モード切り替え"
+          }
+        }
+      }
     },
     "Toggle group" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グループ切り替え"
+          }
+        }
+      }
     },
     "Toggle playback mode" : {
 
     },
     "Toggle single point" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交点切り替え"
+          }
+        }
+      }
     },
     "Toggle thumbnails" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サムネイル切り替え"
+          }
+        }
+      }
     },
     "Total" : {
-
+      "comment" : "In PlayersBannerView, label for total points",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目"
+          }
+        }
+      }
     },
     "Try it out" : {
       "localizations" : {
@@ -1743,6 +2353,16 @@
         }
       }
     },
+    "Unranked" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非ランク戦"
+          }
+        }
+      }
+    },
     "Unusual board size: %lld×%lld" : {
       "localizations" : {
         "en" : {
@@ -1772,8 +2392,26 @@
         }
       }
     },
+    "Vacation" : {
+      "comment" : "pause reason",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "休暇"
+          }
+        }
+      }
+    },
     "View" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示"
+          }
+        }
+      }
     },
     "Voice countdown" : {
       "localizations" : {
@@ -1799,13 +2437,28 @@
 
     },
     "Waiting" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機中"
+          }
+        }
+      }
     },
     "Waiting (%@)" : {
 
     },
     "Waiting (%lld)" : {
-
+      "comment" : "NewGameView top Picker",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機中(%lld)"
+          }
+        }
+      }
     },
     "Waiting for opponent" : {
       "comment" : "Game",
@@ -1838,6 +2491,29 @@
         }
       }
     },
+    "Waiting for opponent: %lld games " : {
+      "comment" : "HomeView - vary for plural",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Waiting for opponent: %lld game"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "Waiting for opponent: %lld games "
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Waiting for opponents/teammates" : {
       "comment" : "Homeview",
       "localizations" : {
@@ -1865,7 +2541,14 @@
 
     },
     "Waiting..." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お待ちください..."
+          }
+        }
+      }
     },
     "Web version" : {
       "comment" : "in navigation menu",
@@ -1880,6 +2563,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Phiên bản Web"
+          }
+        }
+      }
+    },
+    "Weekend" : {
+      "comment" : "pause reason",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "週末"
           }
         }
       }
@@ -1910,11 +2604,28 @@
         }
       }
     },
+    "White to move" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白番です"
+          }
+        }
+      }
+    },
     "Width" : {
 
     },
     "Withdraw" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出する"
+          }
+        }
+      }
     },
     "You" : {
       "localizations" : {
@@ -1937,13 +2648,27 @@
       }
     },
     "You need to choose an opponent or make the challenge open." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非公開対局相手を選択して下さい。又は、対局要請を公開して下さい。"
+          }
+        }
+      }
     },
     "Your color" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの色"
+          }
+        }
+      }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1960,7 +2685,14 @@
       }
     },
     "Zen mode" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zenモード"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

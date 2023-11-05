@@ -24,7 +24,11 @@ struct NotificationPopup: View {
                 }
                 Text(ogs.socketStatus.rawValue.capitalized).bold().foregroundColor(.white)
             }
-            .animation(.easeInOut, value: ogs.socketStatus.rawValue.capitalized)
+            .animation(.easeInOut, value:
+                        ogs.socketStatus == .connecting ? String(localized: "Connecting") :
+                        ogs.socketStatus == .reconnecting ? String(localized: "Reconnecting") :
+                        ogs.socketStatus == .connected ? String(localized: "Connected") :
+                        ogs.socketStatus.rawValue.capitalized)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -57,8 +61,13 @@ struct NotificationPopup: View {
     var liveGamesPopup: some View {
         Button(action: goToLiveGames) {
             VStack {
-                Text("Live game\(ogs.liveGames.count == 1 ? "" : "s") in progress...").bold().foregroundColor(.white)
-                Text("Tap to go to game\(ogs.liveGames.count == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
+                if (ogs.liveGames.count == 1) {
+                    Text("Live game in progress...", comment: "In Popup. When only 1 game in progress.").bold().foregroundColor(.white)
+                    Text("Tap to go to game", comment: "Popup. When a single game is in progress.").font(.subheadline).foregroundColor(.white)
+                } else {
+                    Text("Live games in progress...", comment: "In Popup. When multiple games are in progress.").bold().foregroundColor(.white)
+                    Text("Tap to go to games", comment: "Popup. When multiplpe games are in progress.").font(.subheadline).foregroundColor(.white)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -72,7 +81,7 @@ struct NotificationPopup: View {
             HStack(spacing: 0) {
                 VStack {
                     Text("Waiting...").bold().foregroundColor(.white)
-                    Text("\(ogs.waitingLiveGames) live game\(ogs.waitingLiveGames == 1 ? "" : "s")").font(.subheadline).foregroundColor(.white)
+                    Text("\(ogs.waitingLiveGames) live games", comment: "NotificationPopup - vary for plural").font(.subheadline).foregroundColor(.white)
                 }
                 Spacer().frame(width: 10)
                 ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))

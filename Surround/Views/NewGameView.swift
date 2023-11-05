@@ -78,7 +78,7 @@ struct QuickMatchForm: View {
         let challenges = customChallengesMatchingAutomatchCondition
         return VStack(alignment: .leading, spacing: 0) {
             if challenges.count > 0 {
-                Text("Alternatively, there \(challenges.count == 1 ? "is" : "are") \(challenges.count) open custom \(challenges.count == 1 ? "game" : "games") matching your preferences that you can accept to start a game immediately.")
+                Text("Alternatively, there are \(challenges.count) open custom games matching your preferences that you can accept to start a game immediately.")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
                 Spacer().frame(height: 15)
@@ -102,7 +102,7 @@ struct QuickMatchForm: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                GroupBox(label: Text("Board size" + (boardSizes.count == 0 ? " ⚠️" : ": \([9, 13, 19].filter { boardSizes.contains($0) }.map { "\($0)×\($0)" }.joined(separator: ", "))"))) {
+                GroupBox(label: Text(String(localized: "Board size") + (boardSizes.count == 0 ? " ⚠️" : ": \([9, 13, 19].filter { boardSizes.contains($0) }.map { "\($0)×\($0)" }.joined(separator: ", "))"))) {
                     Text("You can select multiple options.")
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
@@ -131,7 +131,7 @@ struct QuickMatchForm: View {
                         }
                     }
                 }.fixedSize(horizontal: false, vertical: true)
-                GroupBox(label: Text("Game speed: \(finalTimeControlSpeed.rawValue)")) {
+                GroupBox(label: Text("Game speed: \(finalTimeControlSpeed.localizedString())")) {
                     Picker(selection: $timeControlSpeed.animation(), label: Text("Game speed")) {
                         Text("Live").tag(TimeControlSpeed.live)
                         Text("Correspondence").tag(TimeControlSpeed.correspondence)
@@ -347,9 +347,9 @@ struct CustomGameForm: View {
             Divider()
             Stepper(value: $handicap, in: -1...(isRanked ? 9 : 36)) {
                 (Text("Handicap: ").bold() + Text(
-                    handicap == -1 ? "Automatic" :
-                    handicap == 0 ? "None" :
-                    handicap == 1 ? "1 Stone" : "\(handicap) Stones"
+                    handicap == -1 ? String(localized: "Automatic", comment: "NewGameView handicap selection, automatic handicap") :
+                    handicap == 0 ? String(localized: "None", comment : "NewGameView handicap seletion, no handicap") :
+                    String(localized: "\(handicap) Stones", comment: "NewGameView handicap selection - vary for plural")
                 ))
                 .font(.subheadline)
             }
@@ -926,7 +926,7 @@ struct NewGameView: View {
             Spacer().frame(height: 10)
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {
                 Text("Quick match").tag(NewGameOption.quickMatch)
-                Text("Waiting (\(eligibleOpenChallengesCount))").tag(NewGameOption.openChallenges)
+                Text("Waiting (\(eligibleOpenChallengesCount))", comment: "NewGameView top Picker").tag(NewGameOption.openChallenges)
                 Text("Custom").tag(NewGameOption.custom)
             }
             .pickerStyle(SegmentedPickerStyle())

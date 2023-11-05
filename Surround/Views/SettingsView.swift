@@ -153,7 +153,7 @@ struct GameplaySettings: View {
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
             Toggle("Stone sounds", isOn: Setting(.soundOnStonePlacement).binding)
             Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
-            (Text("Note: Sounds and voice countdown will not play when your device is in ") + Text("Silent").bold() + Text(" mode."))
+            (Text("Note: Sounds and voice countdown will not play when your device is in **Silent** mode."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
             GroupBox(label: Text("Auto submiting moves")) {

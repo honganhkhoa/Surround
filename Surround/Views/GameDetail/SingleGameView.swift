@@ -412,7 +412,7 @@ struct SingleGameView: View {
                         timer
                         Divider()
                     }
-                    Text("\(captures) capture\(captures == 1 ? "" : "s")")
+                    Text("\(captures) captures", comment: "SingleGameView - vary for plural")
                     if hasTimeControl && !topLeft {
                         Divider()
                         timer
@@ -427,7 +427,7 @@ struct SingleGameView: View {
                         timer
                         Divider()
                     }
-                    Text("\(captures) capture\(captures == 1 ? "" : "s")")
+                    Text("\(captures) captures", comment: "SingleGameView - vary for plural")
                 }
                 .fixedSize(horizontal: /*@START_MENU_TOKEN@*/true/*@END_MENU_TOKEN@*/, vertical: false)
                 .padding(.horizontal, 25)
