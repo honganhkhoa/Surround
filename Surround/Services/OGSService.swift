@@ -1723,7 +1723,7 @@ class OGSService: ObservableObject {
             return
         }
         
-        ogsWebsocket.emit(command: "gamelist/count/subscribe")
+        ogsWebsocket.emit(command: "gamelist/count/subscribe", data: ["channel": ""])
     }
     
     func unsubscribeFromGameCount() {

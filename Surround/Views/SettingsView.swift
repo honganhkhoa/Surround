@@ -89,11 +89,11 @@ struct SettingsView: View {
                 }
             }
             GroupBox(label: Text("Send a notification on...")) {
-                Toggle("My turn", isOn: Setting(.notificationOnUserTurn).binding)
-                Toggle("Time running low", isOn: Setting(.notificationOnTimeRunningOut).binding)
+                Toggle(String(localized: "My turn", comment: "Correspondence games notification setting"), isOn: Setting(.notificationOnUserTurn).binding)
+                Toggle(String(localized: "Time running low", comment: "Correspondence games notification setting"), isOn: Setting(.notificationOnTimeRunningOut).binding)
 //                Toggle("Challenge received", isOn: Setting(.notificationOnChallengeReceived).binding)
-                Toggle("A game starts", isOn: Setting(.notificationOnNewGame).binding)
-                Toggle("A game ends", isOn: Setting(.notiticationOnGameEnd).binding)
+                Toggle(String(localized: "A game starts", comment: "Correspondence games notification setting"), isOn: Setting(.notificationOnNewGame).binding)
+                Toggle(String(localized: "A game ends", comment: "Correspondence games notification setting"), isOn: Setting(.notiticationOnGameEnd).binding)
             }
             .disabled(!notificationEnabled)
         }
@@ -162,8 +162,11 @@ struct GameplaySettings: View {
             }
             if withDemoOption {
                 Button(action: { showDemoBoard.toggle() }) {
-                    Text(showDemoBoard ? "Hide demo board" : "Try it out").bold()
-                        .leadingAlignedInScrollView()
+                    if showDemoBoard {
+                        Text("Hide demo board", comment: "Demo board in settings").bold().leadingAlignedInScrollView()
+                    } else {
+                        Text("Try it out", comment: "Demo board in settings").bold().leadingAlignedInScrollView()
+                    }
                 }
                 if showDemoBoard {
                     BoardDemoView()

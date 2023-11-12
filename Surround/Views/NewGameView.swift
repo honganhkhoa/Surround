@@ -871,18 +871,16 @@ struct NewGameView: View {
         let eligibleRengoChallengesCount = ogs.eligibleOpenChallengeById.values.filter { $0.rengo }.count
         let eligibleOpenChallengesCount = ogs.eligibleOpenChallengeById.count
         
-        var openChallengesSubheader = "There are currently no open challenges."
+        var openChallengesSubheader = String(localized: "There are currently no open challenges.")
         if eligibleOpenChallengesCount > 0 {
             if eligibleOpenChallengesCount > eligibleRengoChallengesCount {
                 let standardCount = eligibleOpenChallengesCount - eligibleRengoChallengesCount
-                openChallengesSubheader = "There \(standardCount == 1 ? "is" : "are") \(standardCount) open challenge\(standardCount == 1 ? "" : "s") that you can accept to start a game immediately"
+                openChallengesSubheader = String(localized: "There are \(standardCount) open challenges that you can accept to start a game immediately.")
                 if eligibleRengoChallengesCount > 0 {
-                    openChallengesSubheader += ", and \(eligibleRengoChallengesCount) open rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
-                } else {
-                    openChallengesSubheader += "."
+                    openChallengesSubheader = String(localized: "There are \(standardCount) open challenges that you can accept to start a game immediately, and \(eligibleRengoChallengesCount) open rengo game.")
                 }
             } else {
-                openChallengesSubheader = "There \(eligibleRengoChallengesCount == 1 ? "is" : "are") \(eligibleRengoChallengesCount) open rengo game\(eligibleRengoChallengesCount == 1 ? "" : "s")."
+                openChallengesSubheader = String(localized: "There are \(eligibleRengoChallengesCount) open rengo games.")
             }
         }
         
@@ -925,9 +923,9 @@ struct NewGameView: View {
             }
             Spacer().frame(height: 10)
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {
-                Text("Quick match").tag(NewGameOption.quickMatch)
+                Text("Quick match", comment: "NewGameView top Picker").tag(NewGameOption.quickMatch)
                 Text("Waiting (\(eligibleOpenChallengesCount))", comment: "NewGameView top Picker").tag(NewGameOption.openChallenges)
-                Text("Custom").tag(NewGameOption.custom)
+                Text("Custom", comment: "NewGameView top Picker").tag(NewGameOption.custom)
             }
             .pickerStyle(SegmentedPickerStyle())
             Spacer().frame(height: 10)

@@ -39,7 +39,7 @@ struct WelcomeView: View {
                         .padding(.horizontal)
                 }
                 if let liveGames = ogs.sitewiseLiveGamesCount, let correspondenceGames = ogs.sitewiseCorrespondenceGamesCount {
-                    (Text("**\(correspondenceGames) correspondence games** and **\(liveGames) live games** are being played right now."))
+                    (Text(.init(localized: "**\(correspondenceGames) correspondence games** and **\(liveGames) live games** are being played right now.")))
                         .leadingAlignedInScrollView()
                 }
             }

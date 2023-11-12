@@ -79,8 +79,50 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "**%1$lld correspondence games** and **%2$lld live games** are being played right now."
+            "state" : "translated",
+            "value" : "**%#@arg1@** and **%#@arg2@** are being played right now."
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg correspondence game"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg correspondence games"
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg live game"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg live games"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -118,6 +160,12 @@
             "state" : "translated",
             "value" : "通信対局は、数日に続き、1 手につき 1 日ほどのスピードで、同時に、複数の対局もできます。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi **ván trường kỳ** thường diễn ra trong thời gian nhiều ngày, thời gian trung bình cho mỗi nước khoảng 1 ngày. Mỗi người chơi thường sẽ chơi nhiều ván trường kỳ cùng lúc."
+          }
         }
       }
     },
@@ -147,6 +195,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**ライブ対局** ：普段1 手 30 秒前後で、**ブリッツ**の場合、1 手 10 秒前後。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thời gian cho mỗi **ván trực tiếp** thường khoảng 30 giây mỗi nước, hoặc 10 giây mỗi nước nếu chọn chế độ **cờ chớp**."
           }
         }
       }
@@ -256,7 +310,7 @@
 
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -506,21 +560,35 @@
 
     },
     "A game ends" : {
+      "comment" : "Correspondence games notification setting",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局終了"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một ván vừa kết thúc"
+          }
         }
       }
     },
     "A game starts" : {
+      "comment" : "Correspondence games notification setting",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局開始"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một ván mới bắt đầu"
           }
         }
       }
@@ -726,6 +794,12 @@
             "state" : "translated",
             "value" : "シングタップ着手"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gửi nước đi không cần xác nhận"
+          }
         }
       }
     },
@@ -804,6 +878,12 @@
             "state" : "translated",
             "value" : "ブリッツ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cờ chớp"
+          }
         }
       }
     },
@@ -814,6 +894,12 @@
             "state" : "translated",
             "value" : "ブリッツ（早碁）"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cờ chớp"
+          }
         }
       }
     },
@@ -823,6 +909,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "座標表示"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toạ độ trên bàn cờ"
           }
         }
       }
@@ -835,6 +927,12 @@
             "state" : "translated",
             "value" : "碁盤の大きさ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kích thước bàn cờ"
+          }
         }
       }
     },
@@ -844,6 +942,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "キャンセル"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ"
           }
         }
       }
@@ -985,6 +1089,12 @@
             "state" : "translated",
             "value" : "通信"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trường kỳ"
+          }
         }
       }
     },
@@ -994,6 +1104,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通信"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trường kỳ"
           }
         }
       }
@@ -1005,6 +1121,12 @@
             "state" : "translated",
             "value" : "通信対局"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván trường kỳ"
+          }
         }
       }
     },
@@ -1014,6 +1136,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通信対局承知"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhận thông báo về các ván trường kỳ"
           }
         }
       }
@@ -1047,6 +1175,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在、承知機能におけるサーバー・コストの為、サポーター限定です。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tại chức năng nhận thông báo chỉ dành cho những nhà tài trợ app, vì chức năng này cần chi phí để vận hành máy chủ. "
           }
         }
       }
@@ -1147,6 +1281,12 @@
             "state" : "translated",
             "value" : "対局を探す"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm đối thủ"
+          }
         }
       }
     },
@@ -1200,6 +1340,12 @@
             "state" : "translated",
             "value" : "対局スピード：%@"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ thời gian: %@"
+          }
         }
       }
     },
@@ -1246,6 +1392,12 @@
             "state" : "translated",
             "value" : "バイブレーション"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phản hồi rung (haptics)"
+          }
         }
       }
     },
@@ -1263,11 +1415,18 @@
 
     },
     "Hide demo board" : {
+      "comment" : "Demo board in settings",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "テスト用の碁盤を未表示"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ẩn bàn cờ minh hoạ"
           }
         }
       }
@@ -1341,6 +1500,12 @@
             "state" : "translated",
             "value" : "詳しくは"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm hiểu thêm..."
+          }
         }
       }
     },
@@ -1355,6 +1520,12 @@
             "state" : "translated",
             "value" : "ライブ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trực tiếp"
+          }
         }
       }
     },
@@ -1364,6 +1535,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライブ（通常対局）"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trực tiếp"
           }
         }
       }
@@ -1414,6 +1591,12 @@
             "state" : "translated",
             "value" : "ログアウト"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đăng xuất"
+          }
         }
       }
     },
@@ -1449,11 +1632,18 @@
 
     },
     "My turn" : {
+      "comment" : "Correspondence games notification setting",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "私の番"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến lượt của bạn"
           }
         }
       }
@@ -1497,6 +1687,12 @@
             "state" : "translated",
             "value" : "相手の番になった通信対局なし"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có ván trường kỳ nào ở lượt của đối thủ"
+          }
         }
       }
     },
@@ -1506,6 +1702,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなたの番になった通信対局なし"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có ván trường kỳ nào đang ở lượt của bạn"
           }
         }
       }
@@ -1537,6 +1739,12 @@
             "state" : "translated",
             "value" : "※**マナー・モード**がONの時、石音や音声が出ません。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ghi chú: khi thiết bị đang trong chế độ **im lặng** sẽ không phát tiếng quân cờ và tiếng đếm ngược."
+          }
         }
       }
     },
@@ -1546,6 +1754,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Online-Goアカウント"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài khoản Online-go.com"
           }
         }
       }
@@ -1759,11 +1973,18 @@
       }
     },
     "Quick match" : {
+      "comment" : "NewGameView top Picker",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "オートマッチ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm nhanh"
           }
         }
       }
@@ -1925,6 +2146,12 @@
             "state" : "translated",
             "value" : "ご希望の碁盤の大きさと時間制限方式で、ランクが近い対戦相手をシステムに探してもらえます。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn kích thước bàn cờ và chế độ thời gian bạn muốn chơi, sau đó hệ thống sẽ tự động tìm cho bạn một đối thủ ở đẳng cấp tương đương."
+          }
         }
       }
     },
@@ -1947,6 +2174,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "どんな時承知してほしい？"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhận thông báo khi..."
           }
         }
       }
@@ -2107,6 +2340,12 @@
             "state" : "translated",
             "value" : "石音"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiếng quân cờ"
+          }
         }
       }
     },
@@ -2241,12 +2480,136 @@
     "The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
 
     },
+    "There are %lld open challenges that you can accept to start a game immediately, and %lld open rengo game." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There %#@arg1@ that you can accept to start a game immediately, and %#@arg2@."
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "is %arg open challenge"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "are %arg open challenges"
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg open rengo game"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg open rengo games"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "There are %lld open challenges that you can accept to start a game immediately." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There is %lld open challenge that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "needs_review",
+                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "There are %lld open rengo games." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There is %lld open rengo game."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "There are %lld open rengo games."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "There are currently no open challenges." : {
+
+    },
     "Time running low" : {
+      "comment" : "Correspondence games notification setting",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "残り時間が少ない"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gần hết thời gian"
           }
         }
       }
@@ -2319,11 +2682,18 @@
       }
     },
     "Try it out" : {
+      "comment" : "Demo board in settings",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "試してみる"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng thử cài đặt"
           }
         }
       }
@@ -2420,6 +2790,12 @@
             "state" : "translated",
             "value" : "秒読み音声"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiếng đếm ngược thời gian"
+          }
         }
       }
     },
@@ -2456,6 +2832,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "待機中(%lld)"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ (%lld)"
           }
         }
       }
@@ -2644,6 +3026,12 @@
             "state" : "translated",
             "value" : "複数選択可能。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có thể chọn nhiều lựa chọn."
+          }
         }
       }
     },
@@ -2668,7 +3056,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
