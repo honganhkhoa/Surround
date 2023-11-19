@@ -676,7 +676,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 }
             } else {
                 if let currentPlayer = clock?.currentPlayerColor {
-                    return "\(currentPlayer == .black ? "Black" : "White") to move"
+                    return currentPlayer == .black ? String(localized: "Black to move") : String(localized: "White to move")
                 } else {
                     return ""
                 }
