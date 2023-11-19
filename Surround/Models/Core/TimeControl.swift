@@ -53,34 +53,34 @@ enum TimeControlSystem: Equatable {
     var name: String {
         switch self {
         case .Fischer:
-            return "Fischer"
+            return String(localized: "Fischer", comment: "TimeControl system name")
         case .ByoYomi:
-            return "Japanese Byo-Yomi"
+            return String(localized: "Japanese Byo-Yomi", comment: "TimeControl system name")
         case .Canadian:
-            return "Canadian Byo-Yomi"
+            return String(localized: "Canadian Byo-Yomi", comment: "TimeControl system name")
         case .Absolute:
-            return "Absolute"
+            return String(localized: "Absolute", comment: "TimeControl system name")
         case .Simple:
-            return "Simple"
+            return String(localized: "Simple", comment: "TimeControl system name")
         case .None:
-            return "None"
+            return String(localized: "None", comment: "TimeControl system name")
         }
     }
     
     var shortName: String {
         switch self {
         case .Fischer:
-            return "Fischer"
+            return String(localized: "Fischer")
         case .ByoYomi:
-            return "Byo-Yomi"
+            return String(localized: "Byo-Yomi", comment: "TimeControl system name - shorter")
         case .Canadian:
-            return "Canadian"
+            return String(localized: "Canadian", comment: "TimeControl system name - shorter")
         case .Absolute:
-            return "Absolute"
+            return String(localized: "Absolute", comment: "TimeControl system name - shorter")
         case .Simple:
-            return "Simple"
+            return String(localized: "Simple", comment: "TimeControl system name - shorter")
         case .None:
-            return "None"
+            return String(localized: "None", comment: "TimeControl system name - shorter")
         }
     }
     
@@ -89,7 +89,7 @@ enum TimeControlSystem: Equatable {
         case .Fischer(let initialTime, let timeIncrement, let maxTime):
             return "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement)) up to \(durationString(seconds: maxTime))"
         case .Simple(let perMove):
-            return "\(durationString(seconds: perMove))/move"
+            return String(localized: "\(durationString(seconds: perMove))/move", comment: "TimeControl - short description for simple system")
         case .ByoYomi(let mainTime, let periods, let periodTime):
             return "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(periods)×\(durationString(seconds: periodTime))"
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
@@ -97,7 +97,7 @@ enum TimeControlSystem: Equatable {
         case .Absolute(let totalTime):
             return durationString(seconds: totalTime)
         case .None:
-            return "No time limits"
+            return String(localized: "No time limits", comment: "TimeControl - short description for no system")
         }
     }
     

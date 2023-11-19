@@ -64,17 +64,17 @@ enum OGSRule: String, Codable, CaseIterable, Hashable {
     var fullName: String {
         switch self {
         case .chinese:
-            return "Chinese"
+            return String(localized: "Chinese", comment: "rules name")
         case .aga:
-            return "AGA"
+            return String(localized: "AGA", comment: "rules name")
         case .japanese:
-            return "Japanese"
+            return String(localized: "Japanese", comment: "rules name")
         case .korean:
-            return "Korean"
+            return String(localized: "Korean", comment: "rules name")
         case .ing:
-            return "Ing SST"
+            return String(localized: "Ing SST", comment: "rules name")
         case .nz:
-            return "New Zealand"
+            return String(localized: "New Zealand", comment: "rules name")
         }
     }
     

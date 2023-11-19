@@ -387,8 +387,8 @@ struct CustomGameForm: View {
     var boardSizeOptions: some View {
         GroupBox(label: Text("Board size")) {
             Picker(selection: $standardBoardSize.animation(), label: Text("Standard board size")) {
-                Text("Standard").tag(true)
-                Text("Custom").tag(false)
+                Text("Standard", comment: "refers to standard board sizes").tag(true)
+                Text("Custom", comment: "refers to custom board sizes").tag(false)
             }
             .pickerStyle(SegmentedPickerStyle())
             .disabled(isRanked)
@@ -478,7 +478,7 @@ struct CustomGameForm: View {
                     isBlitz: $isBlitz,
                     pauseOnWeekend: $pauseOnWeekend)
             ) {
-                (Text("Advanced time settings ") + Text(Image(systemName: "chevron.forward")))
+                (Text("Advanced time settings") + Text(" ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
                     .leadingAlignedInScrollView()
             }
@@ -508,7 +508,7 @@ struct CustomGameForm: View {
                 .leadingAlignedInScrollView()
             Spacer().frame(height: 10)
             NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
-                (Text("Advanced rules settings ") + Text(Image(systemName: "chevron.forward")))
+                (Text("Advanced rules settings") + Text(" ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
                     .leadingAlignedInScrollView()
             }
@@ -543,7 +543,7 @@ struct CustomGameForm: View {
     @State var isEditingGameName = false
     
     var otherOptions: some View {
-        GroupBox(label: Text("Others")) {
+        GroupBox(label: Text("Others", comment: "NewGameView, title for `Others` section")) {
             Spacer().frame(height: 10)
             if isEditingGameName {
                 AutofocusTextField(
@@ -764,7 +764,7 @@ struct OpenChallengesForm: View {
                 Spacer().frame(height: 10)
                 Picker("Challenge type", selection: $challengeType.animation()) {
                     Text("Standard 1v1 (\(standardCount))").tag(ChallengeType.standard)
-                    Text("Rengo (\(rengoCount))").tag(ChallengeType.rengo)
+                    Text("Rengo (\(rengoCount))", comment: "NewGameView  (rengoCount)").tag(ChallengeType.rengo)
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
@@ -889,7 +889,7 @@ struct NewGameView: View {
                 Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
                     HStack {
-                        (Text("Waiting for opponent: \(ogs.waitingGames) game\(ogs.waitingGames == 1 ? "" : "s") ") + Text(Image(systemName: "chevron.forward")))
+                        (Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "NewGameView - vary for plural") + Text(Image(systemName: "chevron.forward")))
                             .font(.subheadline)
                             .bold()
                             .leadingAlignedInScrollView()
