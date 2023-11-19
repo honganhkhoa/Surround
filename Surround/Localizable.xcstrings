@@ -2413,7 +2413,14 @@
       }
     },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップとドラッグで石を置けられます。碁盤外までドラッグすることで、キャンセルが出来ます。"
+          }
+        }
+      }
     },
     "Tap on avatars to assign players into teams." : {
 
@@ -3056,7 +3063,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
