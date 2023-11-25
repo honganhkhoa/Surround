@@ -4,6 +4,9 @@
     "" : {
 
     },
+    " " : {
+
+    },
     " — players may drop mid-game" : {
 
     },
@@ -293,6 +296,17 @@
         }
       }
     },
+    "%@/move" : {
+      "comment" : "TimeControl - short description for simple system",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一手%@"
+          }
+        }
+      }
+    },
     "%@×" : {
 
     },
@@ -310,7 +324,7 @@
 
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -340,6 +354,28 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld Dan" : {
+      "comment" : "formattedRank - dan - long format",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld段"
+          }
+        }
+      }
+    },
+    "%lld Kyu" : {
+      "comment" : "formattedRank - kyu - long format",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld級"
           }
         }
       }
@@ -466,6 +502,28 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld×%2$lld"
+          }
+        }
+      }
+    },
+    "%lldd" : {
+      "comment" : "formattedRank - dan - short format",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld段"
+          }
+        }
+      }
+    },
+    "%lldk" : {
+      "comment" : "formattedRank - kyu - short format",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld級"
           }
         }
       }
@@ -616,6 +674,17 @@
         }
       }
     },
+    "Absolute" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切れ負け"
+          }
+        }
+      }
+    },
     "Accept" : {
       "localizations" : {
         "ja" : {
@@ -670,16 +739,35 @@
       }
     },
     "Advanced rules settings" : {
-
-    },
-    "Advanced rules settings " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルールの詳細設定"
+          }
+        }
+      }
     },
     "Advanced time settings" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間の詳細設定"
+          }
+        }
+      }
     },
-    "Advanced time settings " : {
-
+    "AGA" : {
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AGA"
+          }
+        }
+      }
     },
     "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
 
@@ -721,8 +809,25 @@
         }
       }
     },
-    "Analysis %@" : {
-
+    "Analysis disabled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討モード禁止"
+          }
+        }
+      }
+    },
+    "Analysis enabled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局中に検討モード利用可能"
+          }
+        }
+      }
     },
     "Analyze mode" : {
 
@@ -936,6 +1041,39 @@
         }
       }
     },
+    "Byo-Yomi" : {
+      "comment" : "TimeControl system name - shorter",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒読み式"
+          }
+        }
+      }
+    },
+    "Canadian" : {
+      "comment" : "TimeControl system name - shorter",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カナダ式"
+          }
+        }
+      }
+    },
+    "Canadian Byo-Yomi" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒読み式（カナダ）"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "ja" : {
@@ -963,7 +1101,14 @@
       }
     },
     "Cancel support" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポートを辞める"
+          }
+        }
+      }
     },
     "Captures" : {
       "localizations" : {
@@ -1010,7 +1155,15 @@
       }
     },
     "Chinese" : {
-
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国"
+          }
+        }
+      }
     },
     "Clear estimates" : {
       "localizations" : {
@@ -1053,7 +1206,14 @@
       }
     },
     "Close" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
     },
     "Compact" : {
       "localizations" : {
@@ -1079,7 +1239,14 @@
       }
     },
     "Contact" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連絡先"
+          }
+        }
+      }
     },
     "correspondence" : {
       "comment" : "TimeControlSpeed enum localization",
@@ -1186,6 +1353,7 @@
       }
     },
     "Custom" : {
+      "comment" : "refers to custom board sizes",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1271,7 +1439,14 @@
 
     },
     "Exit Zen mode" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zenモードを切る"
+          }
+        }
+      }
     },
     "Find a game" : {
       "comment" : "New game view",
@@ -1286,6 +1461,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm đối thủ"
+          }
+        }
+      }
+    },
+    "Fischer" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィッシャー式"
           }
         }
       }
@@ -1308,7 +1494,14 @@
       }
     },
     "Friends" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "友人"
+          }
+        }
+      }
     },
     "From " : {
 
@@ -1412,7 +1605,14 @@
       }
     },
     "Height" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦"
+          }
+        }
+      }
     },
     "Hide demo board" : {
       "comment" : "Demo board in settings",
@@ -1454,14 +1654,62 @@
     "If your OGS account was linked to a social account:" : {
 
     },
+    "Ing SST" : {
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ing SST"
+          }
+        }
+      }
+    },
+    "Initial time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初期持ち時間"
+          }
+        }
+      }
+    },
     "Is open" : {
 
     },
     "Japanese" : {
-
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本"
+          }
+        }
+      }
+    },
+    "Japanese Byo-Yomi" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒読み式（日本）"
+          }
+        }
+      }
     },
     "Join" : {
-
+      "comment" : "joinRengoChallenge",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加"
+          }
+        }
+      }
     },
     "Komi" : {
       "localizations" : {
@@ -1479,6 +1727,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "コミ："
+          }
+        }
+      }
+    },
+    "Korean" : {
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "韓国"
           }
         }
       }
@@ -1510,7 +1769,15 @@
       }
     },
     "Leave" : {
-
+      "comment" : "leaveRengoChallenge",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やめる"
+          }
+        }
+      }
     },
     "live" : {
       "comment" : "TimeControlSpeed enum localization",
@@ -1600,6 +1867,16 @@
         }
       }
     },
+    "Main time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メイン持ち時間"
+          }
+        }
+      }
+    },
     "Malkovich" : {
       "localizations" : {
         "ja" : {
@@ -1612,6 +1889,16 @@
     },
     "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
 
+    },
+    "Max time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大時間"
+          }
+        }
+      }
     },
     "Message organizer" : {
 
@@ -1670,6 +1957,17 @@
     "New game option" : {
 
     },
+    "New Zealand" : {
+      "comment" : "rules name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ニュージーランド"
+          }
+        }
+      }
+    },
     "Next" : {
       "localizations" : {
         "ja" : {
@@ -1713,13 +2011,31 @@
       }
     },
     "No players found." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザーが見つかりません"
+          }
+        }
+      }
+    },
+    "No time limits" : {
+      "comment" : "TimeControl - short description for no system",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間制限なし"
+          }
+        }
+      }
     },
     "No time limits." : {
 
     },
     "None" : {
-      "comment" : "NewGameView handicap seletion, no handicap",
+      "comment" : "NewGameView handicap seletion, no handicap\nTimeControl system name",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1825,7 +2141,15 @@
       }
     },
     "Others" : {
-
+      "comment" : "NewGameView, title for `Others` section",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他"
+          }
+        }
+      }
     },
     "Pass" : {
       "localizations" : {
@@ -1890,13 +2214,27 @@
       }
     },
     "Periods: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回数："
+          }
+        }
+      }
     },
     "Playback mode" : {
 
     },
     "Player info" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局者情報"
+          }
+        }
+      }
     },
     "Preview" : {
       "localizations" : {
@@ -1909,7 +2247,14 @@
       }
     },
     "Privacy Policy" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人情報取扱について"
+          }
+        }
+      }
     },
     "private" : {
       "localizations" : {
@@ -2039,10 +2384,25 @@
       }
     },
     "Rengo (%@)" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁（%@）"
+          }
+        }
+      }
     },
     "Rengo (%lld)" : {
-
+      "comment" : "NewGameView  (rengoCount)",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁（%lld）"
+          }
+        }
+      }
     },
     "Request undo" : {
       "localizations" : {
@@ -2065,7 +2425,14 @@
       }
     },
     "Restore" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復元"
+          }
+        }
+      }
     },
     "Restrict opponent rank" : {
       "localizations" : {
@@ -2121,7 +2488,14 @@
       }
     },
     "Rules set: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方式："
+          }
+        }
+      }
     },
     "Rules: " : {
       "localizations" : {
@@ -2137,7 +2511,24 @@
 
     },
     "SD" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切れ負け"
+          }
+        }
+      }
+    },
+    "Search by user name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザー名で検索"
+          }
+        }
+      }
     },
     "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
       "localizations" : {
@@ -2156,7 +2547,14 @@
       }
     },
     "Select your opponent " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対戦相手を選ぶ"
+          }
+        }
+      }
     },
     "Send a challenge directly to a friend (or a specific player) so they can accept to start a game." : {
       "localizations" : {
@@ -2277,14 +2675,47 @@
         }
       }
     },
+    "Simple" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一手ごとの持ち時間"
+          }
+        }
+      }
+    },
     "Standard" : {
-
+      "comment" : "refers to standard board sizes",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "普通"
+          }
+        }
+      }
     },
     "Standard 1v1 (%@)" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "普通一対一(%lld)"
+          }
+        }
+      }
     },
     "Standard 1v1 (%lld)" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "普通一対一(%lld)"
+          }
+        }
+      }
     },
     "Standard board size" : {
       "localizations" : {
@@ -2306,7 +2737,14 @@
 
     },
     "Stone per period: " : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一回ごとの手数："
+          }
+        }
+      }
     },
     "Stone removal" : {
       "comment" : "pause reason",
@@ -2373,7 +2811,14 @@
       }
     },
     "Support OGS" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSをサポート"
+          }
+        }
+      }
     },
     "Support Surround" : {
 
@@ -2413,7 +2858,14 @@
       }
     },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップとドラッグで石を置けられます。碁盤外までドラッグすることで、キャンセルが出来ます。"
+          }
+        }
+      }
     },
     "Tap on avatars to assign players into teams." : {
 
@@ -2597,6 +3049,36 @@
     "There are currently no open challenges." : {
 
     },
+    "Time increment" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一回の増分"
+          }
+        }
+      }
+    },
+    "Time per move" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一手ごとの持ち時間"
+          }
+        }
+      }
+    },
+    "Time per period" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一回の考慮時間"
+          }
+        }
+      }
+    },
     "Time running low" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
@@ -2681,6 +3163,9 @@
         }
       }
     },
+    "Total time" : {
+
+    },
     "Try it out" : {
       "comment" : "Demo board in settings",
       "localizations" : {
@@ -2750,7 +3235,14 @@
       }
     },
     "Unusual time settings" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持ち時間が特殊な設定"
+          }
+        }
+      }
     },
     "Username" : {
       "localizations" : {
@@ -2853,28 +3345,8 @@
         }
       }
     },
-    "Waiting for opponent: %@ game%@ " : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Waiting for opponent: %1$@ game%2$@ "
-          }
-        }
-      }
-    },
-    "Waiting for opponent: %lld game%@ " : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Waiting for opponent: %1$lld game%2$@ "
-          }
-        }
-      }
-    },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -2889,6 +3361,18 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "Waiting for opponent: %lld games "
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "対局者が現れるのを待機中"
                 }
               }
             }
@@ -2917,7 +3401,15 @@
 
     },
     "Waiting for teammate" : {
-      "comment" : "Game"
+      "comment" : "Game",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仲間待ち"
+          }
+        }
+      }
     },
     "Waiting games" : {
 
@@ -2997,7 +3489,14 @@
       }
     },
     "Width" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "横"
+          }
+        }
+      }
     },
     "Withdraw" : {
       "localizations" : {
@@ -3056,7 +3555,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3068,6 +3567,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lượt của bạn"
+          }
+        }
+      }
+    },
+    "Your move (%@)" : {
+      "comment" : "Integer is for time left",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの番（%@）"
           }
         }
       }

@@ -140,7 +140,7 @@ struct UserSelectionView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            SearchBar(text: $searchText, placeholder: "Search by user name")
+            SearchBar(text: $searchText, placeholder: String(localized: "Search by user name"))
             
             if searchText.count == 0 {
                 if ogs.friends.count > 0 {

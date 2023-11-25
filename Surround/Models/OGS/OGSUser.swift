@@ -237,9 +237,17 @@ struct RankUtils {
             
             let boundedRank = max(minRank, min(ranking, maxRank))
             if boundedRank < 30 {
-                return "\(Int(ceil(30 - boundedRank)))\(longFormat ? " Kyu" : "k")"
+                if (longFormat) {
+                    return String(localized: "\(Int(ceil(30 - boundedRank))) Kyu", comment: "formattedRank - kyu - long format")
+                } else {
+                    return String(localized: "\(Int(ceil(30 - boundedRank)))k", comment: "formattedRank - kyu - short format")
+                }
             } else {
-                return "\(Int(floor(boundedRank - 29)))\(longFormat ? " Dan" : "d")"
+                if (longFormat) {
+                    return String(localized: "\(Int(floor(boundedRank - 29))) Dan", comment: "formattedRank - dan - long format")
+                } else {
+                    return String(localized: "\(Int(floor(boundedRank - 29)))d", comment: "formattedRank - dan - short format")
+                }
             }
         }
     }

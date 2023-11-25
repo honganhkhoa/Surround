@@ -663,7 +663,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     } else {
                         let time = userStoneColor == .black ? clock?.blackTime : clock?.whiteTime
                         if let timeLeft = time?.timeLeft, timeLeft <= 10 {
-                            return "Your move (\(String(format: "%02d", Int(timeLeft))))"
+                            return String(localized: "Your move (\(String(format: "%02d", Int(timeLeft))))", comment: "Integer is for time left")
                         }
                         return String(localized: "Your move", comment: "Game")
                     }
@@ -676,7 +676,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 }
             } else {
                 if let currentPlayer = clock?.currentPlayerColor {
-                    return "\(currentPlayer == .black ? "Black" : "White") to move"
+                    return currentPlayer == .black ? String(localized: "Black to move") : String(localized: "White to move")
                 } else {
                     return ""
                 }

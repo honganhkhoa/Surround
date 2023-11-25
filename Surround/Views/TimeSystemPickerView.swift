@@ -185,20 +185,20 @@ struct TimeControlAdjustmentSteppers: View {
         VStack(alignment: .leading) {
             switch timeControl.system {
             case .ByoYomi:
-                timeStepper(keyPath: \.mainTime, canBeZero: true, label: "Main time")
+                timeStepper(keyPath: \.mainTime, canBeZero: true, label: String(localized: "Main time"))
                 if let periods = timeControl.periods {
                     Stepper(value: Binding(get: { periods }, set: { timeControl.periods = $0 }), in: 1...300) {
                         Text("Periods: ").bold() + Text("\(periods)")
                     }
                 }
-                timeStepper(keyPath: \.periodTime, label: "Time per period")
+                timeStepper(keyPath: \.periodTime, label: String(localized: "Time per period"))
             case .Fischer:
-                timeStepper(keyPath: \.initialTime, label: "Initial time")
-                timeStepper(keyPath: \.timeIncrement, label: "Time increment")
-                timeStepper(keyPath: \.maxTime, label: "Max time")
+                timeStepper(keyPath: \.initialTime, label: String(localized: "Initial time"))
+                timeStepper(keyPath: \.timeIncrement, label: String(localized: "Time increment"))
+                timeStepper(keyPath: \.maxTime, label: String(localized: "Max time"))
             case .Canadian:
-                timeStepper(keyPath: \.mainTime, canBeZero: true, label: "Main time")
-                timeStepper(keyPath: \.periodTime, label: "Time per period")
+                timeStepper(keyPath: \.mainTime, canBeZero: true, label: String(localized: "Main time"))
+                timeStepper(keyPath: \.periodTime, label: String(localized: "Time per period"))
                 if let stonePerPeriod = timeControl.stonesPerPeriod {
                     Stepper(
                         value: Binding(
@@ -211,9 +211,9 @@ struct TimeControlAdjustmentSteppers: View {
                     }
                 }
             case .Simple:
-                timeStepper(keyPath: \.perMove, label: "Time per move")
+                timeStepper(keyPath: \.perMove, label: String(localized: "Time per move"))
             case .Absolute:
-                timeStepper(keyPath: \.totalTime, label: "Total time")
+                timeStepper(keyPath: \.totalTime, label: String(localized: "Total time"))
             case .None:
                 EmptyView()
             }

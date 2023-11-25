@@ -237,12 +237,12 @@ struct RengoActions: View {
                                 HStack {
                                     Spacer()
                                     Button(action: { joinRengoChallenge() }) {
-                                        Text("Join").bold()
+                                        Text("Join", comment: "joinRengoChallenge").bold()
                                     }
                                 }
                             } else {
                                 Button(role: .destructive, action: { leaveRengoChallenge() }) {
-                                    Text("Leave").bold()
+                                    Text("Leave", comment: "leaveRengoChallenge").bold()
                                 }
                             }
                         }
@@ -487,7 +487,11 @@ struct ChallengeCell: View {
                 } icon: {
                     Image(systemName: "clock")
                 }
-                Label("Analysis \(game.disableAnalysis ? "disabled" : "enabled")", systemImage: "arrow.triangle.branch")
+                if (game.disableAnalysis) {
+                    Label("Analysis disabled", systemImage: "arrow.triangle.branch")
+                } else {
+                    Label("Analysis enabled", systemImage: "arrow.triangle.branch")
+                }
                 if let minRank = game.minRank, let maxRank = game.maxRank {
                     if minRank > -1000 && maxRank < 1000 {
                         Label("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))", systemImage: "arrow.up.and.down.square")
