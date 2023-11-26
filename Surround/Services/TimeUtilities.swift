@@ -25,22 +25,21 @@ class TimeUtilities {
         secondsLeft -= minutesLeft * 60
         
         if daysLeft > 1 {
-            var result = "\(daysLeft) days"
+            let daysString = String(localized: "\(daysLeft) days left", comment: "Time left - more than 2 days left, days part")
+            let hoursString = String(localized: "\(hoursLeft)h left", comment: "Time left - more than 2 days left, hours part")
             if hoursLeft > 0 {
-                result += " \(hoursLeft)h"
+                return String(localized: "\(daysString) \(hoursString)", comment: "Time left on timer - more than 2 days")
+            } else {
+                return daysString
             }
-            if hoursLeft > 1 {
-                result += "s"
-            }
-            return result
         } else {
             if daysLeft == 1 {
-                return "\(hoursLeft + 24)h"
+                return String(localized: "\(hoursLeft + 24)h left", comment: "Time left - 1 day to 2 days.")
             } else {
                 if hoursLeft >= 1 {
-                    return String(format: "%dh %02dm", hoursLeft, minutesLeft)
+                    return String(localized: "\(hoursLeft)h \(minutesLeft, specifier: "%02d")m", comment: "Time left - 1 hour to 1 day.")
                 } else {
-                    return String(format: "%02d:%02d", minutesLeft, secondsLeft)
+                    return String(localized: "\(minutesLeft, specifier: "%02d"):\(secondsLeft, specifier: "%02d")", comment: "Time left - less than 1 hour.")
                 }
             }
         }

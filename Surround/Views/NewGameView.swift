@@ -345,19 +345,24 @@ struct CustomGameForm: View {
                 }
             }
             Divider()
-            Stepper(value: $handicap, in: -1...(isRanked ? 9 : 36)) {
-                (Text("Handicap: ").bold() + Text(
-                    handicap == -1 ? String(localized: "Automatic", comment: "NewGameView handicap selection, automatic handicap") :
-                    handicap == 0 ? String(localized: "None", comment : "NewGameView handicap seletion, no handicap") :
-                    String(localized: "\(handicap) Stones", comment: "NewGameView handicap selection - vary for plural")
-                ))
-                .font(.subheadline)
+            Toggle(isOn: Binding ( get: { handicap == -1 }, set: { handicap = ($0 ? -1 : 0) })) {
+                Text("Automatically decide handicap")
             }
-            if handicap == -1 {
+            if handicap > -1 {
+                Stepper(value: $handicap, in: 0...(isRanked ? 9 : 36)) {
+                    (Text("Handicap: ").bold() + Text(
+                        handicap == -1 ? String(localized: "Automatic", comment: "NewGameView handicap selection, automatic handicap") :
+                            handicap == 0 ? String(localized: "No handicap", comment : "NewGameView handicap seletion, no handicap") :
+                            String(localized: "\(handicap) Stones", comment: "NewGameView handicap selection - vary for plural")
+                    ))
+                    .font(.subheadline)
+                }
+            } else {
                 (Text("**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
+            Divider()
             Toggle(isOn: $automaticColor) {
                 Text("Automatically assign stone colors").font(.subheadline)
                     .leadingAlignedInScrollView()
@@ -598,7 +603,7 @@ struct CustomGameForm: View {
                 Spacer().frame(height: 15)
                 ProgressView()
             } else {
-                MainActionButton(label: "Create challenge", disabled: createButtonDisabled, action: createChallenge)
+                MainActionButton(label: String(localized: "Create challenge"), disabled: createButtonDisabled, action: createChallenge)
                 if !isOpen && opponent == nil {
                     Text("You need to choose an opponent or make the challenge open.")
                         .font(.caption)

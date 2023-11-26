@@ -203,10 +203,24 @@
       }
     },
     "**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Chế độ phân tích** cho phép bạn và đối thủ chơi thử các biến thể trên bàn cờ giữa ván đấu."
+          }
+        }
+      }
     },
     "**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi chọn **tự động**, hệ thống sẽ quyết định số quân chấp dựa trên chênh lệch cấp bậc giữa hai bên."
+          }
+        }
+      }
     },
     "**Automatic** setting will either assign white to the stronger player, or just assign randomly." : {
       "localizations" : {
@@ -356,6 +370,17 @@
         }
       }
     },
+    "%@ %@" : {
+      "comment" : "Time left on timer - more than 2 days",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
     "%@ %@ %@ %@ %@" : {
       "comment" : "Duration string",
       "localizations" : {
@@ -447,11 +472,22 @@
         }
       }
     },
+    "%02d:%02d" : {
+      "comment" : "Time left - less than 1 hour.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$02d:%2$02d"
+          }
+        }
+      }
+    },
     "%lld" : {
 
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -527,6 +563,23 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld days left" : {
+      "comment" : "Time left - more than 2 days left, days part",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ngày"
           }
         }
       }
@@ -747,6 +800,18 @@
               }
             }
           }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Quân"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -811,6 +876,52 @@
     },
     "%lldh" : {
       "comment" : "Duration - hours part, short format"
+    },
+    "%lldh %02dm" : {
+      "comment" : "Time left - 1 hour to 1 day.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lldh %2$02dm"
+          }
+        }
+      }
+    },
+    "%lldh left" : {
+      "comment" : "Time left - more than 2 days left, hours part",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldh"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldhs"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld giờ"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%lldk" : {
       "comment" : "formattedRank - kyu - short format",
@@ -1274,6 +1385,12 @@
             "state" : "translated",
             "value" : "自動"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động"
+          }
         }
       }
     },
@@ -1289,6 +1406,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tự động chọn màu quân"
+          }
+        }
+      }
+    },
+    "Automatically decide handicap" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động chọn số quân chấp"
           }
         }
       }
@@ -1790,6 +1917,16 @@
         }
       }
     },
+    "Create challenge" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo thách đấu"
+          }
+        }
+      }
+    },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
 
     },
@@ -2011,6 +2148,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局名："
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tên ván: "
           }
         }
       }
@@ -2597,6 +2740,29 @@
         }
       }
     },
+    "No handicap" : {
+      "comment" : "NewGameView handicap seletion, no handicap",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "なし"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không"
+          }
+        }
+      }
+    },
     "No players found." : {
       "localizations" : {
         "ja" : {
@@ -2648,17 +2814,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không giới hạn thời gian."
-          }
-        }
-      }
-    },
-    "None" : {
-      "comment" : "NewGameView handicap seletion, no handicap",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "なし"
           }
         }
       }
@@ -2777,6 +2932,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "その他"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khác"
           }
         }
       }
@@ -4099,7 +4260,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -4311,6 +4472,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "非公開対局相手を選択して下さい。又は、対局要請を公開して下さい。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn chưa chọn đối thủ."
           }
         }
       }
