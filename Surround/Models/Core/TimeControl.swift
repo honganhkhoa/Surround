@@ -10,7 +10,7 @@ import SwiftUI
 
 func durationString(seconds: Int, longFormat: Bool = false) -> String {
     if seconds == 0 {
-        return longFormat ? "None" : ""
+        return longFormat ? String(localized: "No duration", comment: "Long duration string for 0 seconds") : ""
     }
     
     var secondsLeft = seconds
@@ -22,24 +22,48 @@ func durationString(seconds: Int, longFormat: Bool = false) -> String {
     secondsLeft %= 3600
     let minutes = secondsLeft / 60
     secondsLeft %= 60
-    var result = ""
+    var weeksString = ""
+    var daysString = ""
+    var hoursString = ""
+    var minutesString = ""
+    var secondsString = ""
     if weeks > 0 {
-        result += "\(weeks)" + (longFormat ? " week\(weeks == 1 ? "" : "s")" : "w")
+        if longFormat {
+            weeksString = String(localized: "\(weeks) weeks", comment: "Duration - week parts, long format")
+        } else {
+            weeksString = String(localized: "\(weeks)w", comment: "Duration - week parts, short format")
+        }
     }
     if days > 0 {
-        result += " \(days)" + (longFormat ? " day\(days == 1 ? "" : "s")" : "d")
+        if longFormat {
+            daysString = String(localized: "\(days) days", comment: "Duration - day parts, long format")
+        } else {
+            daysString = String(localized: "\(days)d", comment: "Duration - week parts, short format")
+        }
     }
     if hours > 0 {
-        result += " \(hours)" + (longFormat ? " hour\(hours == 1 ? "" : "s")" : "h")
+        if longFormat {
+            hoursString = String(localized: "\(hours) hours", comment: "Duration - hours part, long format")
+        } else {
+            hoursString = String(localized: "\(hours)h", comment: "Duration - hours part, short format")
+        }
     }
     if minutes > 0 {
-        result += " \(minutes)" + (longFormat ? " minute\(minutes == 1 ? "" : "s")" : "m")
+        if longFormat {
+            minutesString = String(localized: "\(minutes) minutes", comment: "Duration - minutes part, long format")
+        } else {
+            minutesString = String(localized: "\(minutes)m", comment: "Duration - minutes part, short format")
+        }
     }
     if secondsLeft > 0 {
-        result += " \(secondsLeft)" + (longFormat ? " second\(secondsLeft == 1 ? "" : "s")" : "s")
+        if longFormat {
+            secondsString = String(localized: "\(secondsLeft) seconds", comment: "Duration - seconds part, long format")
+        } else {
+            secondsString = String(localized: "\(secondsLeft)s", comment: "Duration - seconds part, short format")
+        }
     }
 
-    return result.trimmingCharacters(in: .whitespaces)
+    return  String(localized: "\(weeksString) \(daysString) \(hoursString) \(minutesString) \(secondsString)", comment: "Duration string").trimmingCharacters(in: .whitespaces)
 }
 
 enum TimeControlSystem: Equatable {
@@ -63,7 +87,7 @@ enum TimeControlSystem: Equatable {
         case .Simple:
             return String(localized: "Simple", comment: "TimeControl system name")
         case .None:
-            return String(localized: "None", comment: "TimeControl system name")
+            return String(localized: "No time control", comment: "TimeControl system name")
         }
     }
     
@@ -80,7 +104,7 @@ enum TimeControlSystem: Equatable {
         case .Simple:
             return String(localized: "Simple", comment: "TimeControl system name - shorter")
         case .None:
-            return String(localized: "None", comment: "TimeControl system name - shorter")
+            return String(localized: "No control", comment: "TimeControl system name - shorter")
         }
     }
     
@@ -104,23 +128,23 @@ enum TimeControlSystem: Equatable {
     var descriptionText: Text {
         switch self {
         case .Fischer(let initialTime, let timeIncrement, let maxTime):
-            return Text("Clock starts with **\(durationString(seconds: initialTime, longFormat: true))** and increases by **\(durationString(seconds: timeIncrement, longFormat: true))** per move, up to a maximum of **\(durationString(seconds: maxTime, longFormat: true))**.")
+            return Text(.init(localized: "Clock starts with **\(durationString(seconds: initialTime, longFormat: true))** and increases by **\(durationString(seconds: timeIncrement, longFormat: true))** per move, up to a maximum of **\(durationString(seconds: maxTime, longFormat: true))**.", comment: "TimeControl - long description for fischer system"))
         case .Simple(let perMove):
-            return Text("**\(durationString(seconds: perMove, longFormat: true)) per move.")
+            return Text(.init(localized: "**\(durationString(seconds: perMove, longFormat: true))** per move.", comment: "TimeControl - long description for simple system"))
         case .ByoYomi(let mainTime, let periods, let periodTime):
             if mainTime == 0 {
-                return Text("\(periods) period\(periods == 1 ? "" : "s") of **\(durationString(seconds: periodTime, longFormat: true))**.")
+                return Text(.init(localized: "**\(periods) periods** of **\(durationString(seconds: periodTime, longFormat: true))**.", comment: "TimeControl - long description for Japanese byo-yomi system without main time"))
             }
-            return Text("Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by \(periods) period\(periods == 1 ? "" : "s") of **\(durationString(seconds: periodTime, longFormat: true))**.")
+            return Text(.init(localized: "Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by **\(periods) periods** of **\(durationString(seconds: periodTime, longFormat: true))**.", comment: "TimeControl - long description for Japanese byo-yomi system"))
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
             if mainTime == 0 {
-                return Text("**\(durationString(seconds: periodTime, longFormat: true))** for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
+                return Text(.init(localized: "**\(durationString(seconds: periodTime, longFormat: true))** for every **\(stonesPerPeriod) moves**.", comment: "TimeControl - long description for Canadian byo-yomi system without main time"))
             }
-            return Text("Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by **\(durationString(seconds: periodTime, longFormat: true))** for every \(stonesPerPeriod) move\(stonesPerPeriod == 1 ? "" : "s").")
+            return Text(.init(localized: "Clock starts with **\(durationString(seconds: mainTime, longFormat: true))** main time, follows by **\(durationString(seconds: periodTime, longFormat: true))** for every **\(stonesPerPeriod) moves**.", comment: "TimeControl - long description for Canadian byo-yomi system"))
         case .Absolute(let totalTime):
-            return Text("**\(durationString(seconds: totalTime, longFormat: true))** of total play time for each player.")
+            return Text(.init(localized: "**\(durationString(seconds: totalTime, longFormat: true))** of total play time for each player.", comment: "TimeControl - long description for absolute system"))
         case .None:
-            return Text("No time limits.")
+            return Text("No time limits.", comment: "TimeControl - long description for no system")
         }
     }
     

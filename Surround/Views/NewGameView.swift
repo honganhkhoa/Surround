@@ -387,8 +387,8 @@ struct CustomGameForm: View {
     var boardSizeOptions: some View {
         GroupBox(label: Text("Board size")) {
             Picker(selection: $standardBoardSize.animation(), label: Text("Standard board size")) {
-                Text("Standard", comment: "refers to standard board sizes").tag(true)
-                Text("Custom", comment: "refers to custom board sizes").tag(false)
+                Text("Standard size", comment: "refers to standard board sizes").tag(true)
+                Text("Custom size", comment: "refers to custom board sizes").tag(false)
             }
             .pickerStyle(SegmentedPickerStyle())
             .disabled(isRanked)
@@ -503,9 +503,15 @@ struct CustomGameForm: View {
                 }
                 Spacer()
             }
-            (Text(komi == rulesSet.defaultKomi ? "Standard" : "Custom").bold() + Text(" komi: ") + Text(String(format: "%.1f", komi)).bold())
-                .font(.subheadline)
-                .leadingAlignedInScrollView()
+            if komi == rulesSet.defaultKomi {
+                Text("**Standard** komi: **\(komi, specifier: "%.1f")**")
+                    .font(.subheadline)
+                    .leadingAlignedInScrollView()
+            } else {
+                Text("**Custom** komi: **\(komi, specifier: "%.1f")**")
+                    .font(.subheadline)
+                    .leadingAlignedInScrollView()
+            }
             Spacer().frame(height: 10)
             NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
                 (Text("Advanced rules settings") + Text(" ") + Text(Image(systemName: "chevron.forward")))

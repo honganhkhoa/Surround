@@ -32,7 +32,7 @@ struct RulesPickerView: View {
                         VStack(spacing: 0) {
                             Toggle(isOn: $standardKomi.animation()) {
                                 if standardKomi {
-                                    (Text("Standard komi: ") + Text(String(format: "%.1f", komi)).bold())
+                                    Text("Standard komi: **\(komi, specifier: "%.1f")**")
                                         .font(.subheadline)
                                 } else {
                                     Text("Standard komi")
@@ -43,7 +43,7 @@ struct RulesPickerView: View {
                             if !standardKomi {
                                 Spacer().frame(height: 10)
                                 Stepper(value: $komi, in: -36.5...36.5, step: 0.5) {
-                                    (Text("Custom komi: ") + Text(String(format: "%.1f", komi)).bold())
+                                    Text("Custom komi: **\(komi, specifier: "%.1f")**")
                                         .font(.subheadline)
                                 }
                             }

@@ -25,16 +25,6 @@
     " + %lld×" : {
 
     },
-    " komi: " : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コミ："
-          }
-        }
-      }
-    },
     " SD" : {
 
     },
@@ -62,21 +52,68 @@
     "[%@]" : {
 
     },
-    "**%@ per move." : {
-
-    },
-    "**%@** for every %lld move%@." : {
+    "**%@** for every **%lld moves**." : {
+      "comment" : "TimeControl - long description for Canadian byo-yomi system without main time",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "**%1$@** for every %2$lld move%3$@."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$@** for every **%2$lld move**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "**%1$@** for every **%2$lld moves**."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$@** cho mỗi **%2$lld** nước."
+                }
+              }
+            }
           }
         }
       }
     },
     "**%@** of total play time for each player." : {
-
+      "comment" : "TimeControl - long description for absolute system",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thời gian suy nghĩ **%@** cho mỗi bên."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tổng thời gian **%@** cho mỗi bên."
+          }
+        }
+      }
+    },
+    "**%@** per move." : {
+      "comment" : "TimeControl - long description for simple system",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%@** mỗi nước."
+          }
+        }
+      }
     },
     "**%lld correspondence games** and **%lld live games** are being played right now." : {
       "localizations" : {
@@ -130,6 +167,41 @@
         }
       }
     },
+    "**%lld periods** of **%@**." : {
+      "comment" : "TimeControl - long description for Japanese byo-yomi system without main time",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$lld period** of **%2$@**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "**%1$lld periods** of **%2$@**."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$lld chu kì** byo-yomi **%2$@**."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
 
     },
@@ -142,6 +214,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**自動色**にすると、ランクが高い方は白になります。両方は同じくらいのランクの場合、ランダムに色になります。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi chọn màu **tự động**, màu quân sẽ được chọn ngẫu nhiên, nhưng thông thường người chơi mạnh hơn sẽ cầm quân trắng."
           }
         }
       }
@@ -179,6 +257,12 @@
             "state" : "translated",
             "value" : "ランク戦では、カスタマイズしたサイズを使えません。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu **xếp hạng** chỉ có thể chọn kích thước bàn cờ **tiêu chuẩn**."
+          }
         }
       }
     },
@@ -189,8 +273,27 @@
             "state" : "translated",
             "value" : "ランク戦では、カスタマイズしたコミを使えません。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu **xếp hạng** chỉ được chọn komi **tiêu chuẩn**."
+          }
         }
       }
+    },
+    "**Custom** komi: **%.1f**" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi **tự chọn**: **%.1f**"
+          }
+        }
+      }
+    },
+    "**Custom** komi: **%lf**" : {
+
     },
     "**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode." : {
       "localizations" : {
@@ -207,6 +310,19 @@
           }
         }
       }
+    },
+    "**Standard** komi: **%.1f**" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi **tiêu chuẩn**: **%.1f**"
+          }
+        }
+      }
+    },
+    "**Standard** komi: **%lf**" : {
+
     },
     "**Surround** includes these open source components:" : {
 
@@ -236,6 +352,17 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ [%2$@]"
+          }
+        }
+      }
+    },
+    "%@ %@ %@ %@ %@" : {
+      "comment" : "Duration string",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
           }
         }
       }
@@ -324,7 +451,7 @@
 
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -365,6 +492,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld段"
+          }
+        }
+      }
+    },
+    "%lld days" : {
+      "comment" : "Duration - day parts, long format",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ngày"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld hours" : {
+      "comment" : "Duration - hours part, long format",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld hours"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld giờ"
+                }
+              }
+            }
           }
         }
       }
@@ -415,6 +612,41 @@
         }
       }
     },
+    "%lld minutes" : {
+      "comment" : "Duration - minutes part, long format",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minute"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld minutes"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld phút"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld pending Rengo game%@ " : {
       "localizations" : {
         "en" : {
@@ -448,12 +680,37 @@
         }
       }
     },
-    "%lld period%@ of **%@**." : {
+    "%lld seconds" : {
+      "comment" : "Duration - seconds part, long format",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld period%2$@ of **%3$@**."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld second"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld seconds"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld giây"
+                }
+              }
+            }
           }
         }
       }
@@ -493,6 +750,41 @@
         }
       }
     },
+    "%lld weeks" : {
+      "comment" : "Duration - week parts, long format",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld weeks"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tuần"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld×" : {
 
     },
@@ -507,7 +799,7 @@
       }
     },
     "%lldd" : {
-      "comment" : "formattedRank - dan - short format",
+      "comment" : "formattedRank - dan - short format\nDuration - week parts, short format",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -516,6 +808,9 @@
           }
         }
       }
+    },
+    "%lldh" : {
+      "comment" : "Duration - hours part, short format"
     },
     "%lldk" : {
       "comment" : "formattedRank - kyu - short format",
@@ -527,6 +822,15 @@
           }
         }
       }
+    },
+    "%lldm" : {
+      "comment" : "Duration - minutes part, short format"
+    },
+    "%llds" : {
+      "comment" : "Duration - seconds part, short format"
+    },
+    "%lldw" : {
+      "comment" : "Duration - week parts, short format"
     },
     "• Alamofire" : {
 
@@ -682,6 +986,12 @@
             "state" : "translated",
             "value" : "切れ負け"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuyệt đối"
+          }
         }
       }
     },
@@ -691,6 +1001,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "受諾する"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chấp nhận"
           }
         }
       }
@@ -745,6 +1061,12 @@
             "state" : "translated",
             "value" : "ルールの詳細設定"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn nâng cao"
+          }
         }
       }
     },
@@ -755,6 +1077,12 @@
             "state" : "translated",
             "value" : "時間の詳細設定"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn nâng cao"
+          }
         }
       }
     },
@@ -762,6 +1090,12 @@
       "comment" : "rules name",
       "localizations" : {
         "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AGA"
+          }
+        },
+        "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "AGA"
@@ -806,6 +1140,18 @@
               }
             }
           }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hoặc có %lld ván đang chờ bên dưới phù hợp với tuỳ chọn của bạn, có thể chấp nhận để bắt đầu ván ngay lập tức."
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -816,6 +1162,12 @@
             "state" : "translated",
             "value" : "検討モード禁止"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không được phân tích"
+          }
         }
       }
     },
@@ -825,6 +1177,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局中に検討モード利用可能"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được phép phân tích"
           }
         }
       }
@@ -926,6 +1284,12 @@
             "state" : "translated",
             "value" : "自動色"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động chọn màu quân"
+          }
         }
       }
     },
@@ -961,6 +1325,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "黒"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen"
           }
         }
       }
@@ -1060,6 +1430,12 @@
             "state" : "translated",
             "value" : "カナダ式"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada"
+          }
         }
       }
     },
@@ -1070,6 +1446,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "秒読み式（カナダ）"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Byo-Yomi Canada"
           }
         }
       }
@@ -1162,6 +1544,12 @@
             "state" : "translated",
             "value" : "中国"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trung Quốc"
+          }
         }
       }
     },
@@ -1176,31 +1564,88 @@
       }
     },
     "Clock starts with **%@** and increases by **%@** per move, up to a maximum of **%@**." : {
+      "comment" : "TimeControl - long description for fischer system",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Clock starts with **%1$@** and increases by **%2$@** per move, up to a maximum of **%3$@**."
           }
-        }
-      }
-    },
-    "Clock starts with **%@** main time, follows by **%@** for every %lld move%@." : {
-      "localizations" : {
-        "en" : {
+        },
+        "vi" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every %3$lld move%4$@."
+            "state" : "translated",
+            "value" : "Bắt đầu với **%1$@** và tăng thêm **%2$@** sau mỗi nước cho tới tối đa **%3$@**."
           }
         }
       }
     },
-    "Clock starts with **%@** main time, follows by %lld period%@ of **%@**." : {
+    "Clock starts with **%@** main time, follows by **%@** for every **%lld moves**." : {
+      "comment" : "TimeControl - long description for Canadian byo-yomi system",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Clock starts with **%1$@** main time, follows by %2$lld period%3$@ of **%4$@**."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld move**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld moves**."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thời gian suy nghĩ chính **%1$@**, sau đó **%2$@** cho mỗi **%3$lld nước**."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Clock starts with **%@** main time, follows by **%lld periods** of **%@**." : {
+      "comment" : "TimeControl - long description for Japanese byo-yomi system",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clock starts with **%1$@** main time, follows by **%2$lld period** of **%3$@**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clock starts with **%1$@** main time, follows by **%2$lld periods** of **%3$@**."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thời gian suy nghĩ chính **%1$@**, sau đó **%2$lld chu kì** byo-yomi **%3$@**."
+                }
+              }
+            }
           }
         }
       }
@@ -1320,6 +1765,12 @@
             "state" : "translated",
             "value" : "詳しい設定で対局作成"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo ván mới với tuỳ chọn chính xác theo ý của bạn"
+          }
         }
       }
     },
@@ -1329,6 +1780,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局要請を公開作成、相手を待ち。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo thách đấu công khai, rồi chờ những người chơi khác chấp nhận thách đấu."
           }
         }
       }
@@ -1353,22 +1810,22 @@
       }
     },
     "Custom" : {
-      "comment" : "refers to custom board sizes",
+      "comment" : "NewGameView top Picker",
       "localizations" : {
-        "ja" : {
+        "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カストマイズ"
+            "value" : "Tuỳ chọn"
           }
         }
       }
     },
-    "Custom komi: " : {
+    "Custom komi: **%.1f**" : {
       "localizations" : {
-        "ja" : {
+        "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カスタマイズしたコミ："
+            "value" : "Komi tự chọn: **%.1f**"
           }
         }
       }
@@ -1376,12 +1833,41 @@
     "Custom komi: %@" : {
 
     },
+    "Custom size" : {
+      "comment" : "refers to custom board sizes",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "カストマイズ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn"
+          }
+        }
+      }
+    },
     "Disable analysis" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局中検討モード禁止"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tắt chế độ phân tích"
           }
         }
       }
@@ -1392,6 +1878,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**ランク戦**をOFFにすると、対局者のランクは、結果に影響されません。**ランク戦**は、**非公開**にすることができず、カスタマイズができるオプションがが限られています。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi chọn **xếp hạng**, kết quả ván sẽ được dùng để tính xếp hạng của bạn, ván **xếp hạng** không được chọn chế độ **riêng tư** và sẽ có ít tuỳ chọn cấu hình hơn."
           }
         }
       }
@@ -1504,7 +1996,14 @@
       }
     },
     "From " : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Từ "
+          }
+        }
+      }
     },
     "Game name: " : {
       "localizations" : {
@@ -1522,6 +2021,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局スピード"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ thời gian"
           }
         }
       }
@@ -1555,6 +2060,12 @@
             "state" : "translated",
             "value" : "対局タイプ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thể loại ván"
+          }
         }
       }
     },
@@ -1574,6 +2085,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "置碁:"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chấp quân: "
           }
         }
       }
@@ -1610,6 +2127,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "縦"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiều cao"
           }
         }
       }
@@ -1662,6 +2185,12 @@
             "state" : "translated",
             "value" : "Ing SST"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ing SST"
+          }
         }
       }
     },
@@ -1686,6 +2215,12 @@
             "state" : "translated",
             "value" : "日本"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhật Bản"
+          }
         }
       }
     },
@@ -1696,6 +2231,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "秒読み式（日本）"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Byo-Yomi Nhật Bản"
           }
         }
       }
@@ -1738,6 +2279,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "韓国"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hàn Quốc"
           }
         }
       }
@@ -1965,6 +2512,12 @@
             "state" : "translated",
             "value" : "ニュージーランド"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Zealand"
+          }
         }
       }
     },
@@ -1974,6 +2527,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次"
+          }
+        }
+      }
+    },
+    "No control" : {
+      "comment" : "TimeControl system name - shorter",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không"
           }
         }
       }
@@ -2010,12 +2580,46 @@
         }
       }
     },
+    "No duration" : {
+      "comment" : "Long duration string for 0 seconds",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có"
+          }
+        }
+      }
+    },
     "No players found." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ユーザーが見つかりません"
+          }
+        }
+      }
+    },
+    "No time control" : {
+      "comment" : "TimeControl system name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không giới hạn"
           }
         }
       }
@@ -2028,14 +2632,28 @@
             "state" : "translated",
             "value" : "時間制限なし"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không giới hạn"
+          }
         }
       }
     },
     "No time limits." : {
-
+      "comment" : "TimeControl - long description for no system",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không giới hạn thời gian."
+          }
+        }
+      }
     },
     "None" : {
-      "comment" : "NewGameView handicap seletion, no handicap\nTimeControl system name",
+      "comment" : "NewGameView handicap seletion, no handicap",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2084,8 +2702,14 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "誰でも"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa quyết"
           }
         }
       }
@@ -2106,6 +2730,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対戦相手"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đối thủ"
           }
         }
       }
@@ -2187,6 +2817,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "週末に一時停止する"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạm dừng vào cuối tuần"
           }
         }
       }
@@ -2273,6 +2909,12 @@
             "state" : "translated",
             "value" : "非公開"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riêng tư"
+          }
         }
       }
     },
@@ -2343,6 +2985,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ランク戦"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xếp hạng"
           }
         }
       }
@@ -2441,6 +3089,12 @@
             "state" : "translated",
             "value" : "ランク制限"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giới hạn cấp bậc đối thủ"
+          }
         }
       }
     },
@@ -2474,6 +3128,12 @@
             "state" : "translated",
             "value" : "ルール"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ luật"
+          }
         }
       }
     },
@@ -2483,6 +3143,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ルール"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luật"
           }
         }
       }
@@ -2494,6 +3160,12 @@
             "state" : "translated",
             "value" : "方式："
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ luật: "
+          }
         }
       }
     },
@@ -2503,6 +3175,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ルール："
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luật: "
           }
         }
       }
@@ -2553,6 +3231,12 @@
             "state" : "translated",
             "value" : "対戦相手を選ぶ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn đối thủ"
+          }
         }
       }
     },
@@ -2562,6 +3246,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "フリエンド（又は特定のプレーヤ）に対局要請を送る。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo thách đấu tới một đối thủ xác định."
           }
         }
       }
@@ -2683,16 +3373,11 @@
             "state" : "translated",
             "value" : "一手ごとの持ち時間"
           }
-        }
-      }
-    },
-    "Standard" : {
-      "comment" : "refers to standard board sizes",
-      "localizations" : {
-        "ja" : {
+        },
+        "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "普通"
+            "value" : "Đơn giản"
           }
         }
       }
@@ -2728,10 +3413,47 @@
       }
     },
     "Standard komi" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi tiêu chuẩn"
+          }
+        }
+      }
     },
-    "Standard komi: " : {
-
+    "Standard komi: **%.1f**" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi tiêu chuẩn: **%.1f**"
+          }
+        }
+      }
+    },
+    "Standard size" : {
+      "comment" : "refers to standard board sizes",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "普通"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiêu chuẩn"
+          }
+        }
+      }
     },
     "Start" : {
 
@@ -2853,6 +3575,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "システム"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hệ thống"
           }
         }
       }
@@ -3097,7 +3825,14 @@
       }
     },
     "To " : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến "
+          }
+        }
+      }
     },
     "To start playing:" : {
       "localizations" : {
@@ -3215,6 +3950,12 @@
             "state" : "translated",
             "value" : "非ランク戦"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không xếp hạng"
+          }
         }
       }
     },
@@ -3262,6 +4003,12 @@
             "state" : "translated",
             "value" : "休暇"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kì nghỉ"
+          }
         }
       }
     },
@@ -3297,6 +4044,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "友人と対戦"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn đối thủ"
           }
         }
       }
@@ -3449,6 +4202,12 @@
             "state" : "translated",
             "value" : "週末"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuối tuần"
+          }
         }
       }
     },
@@ -3475,6 +4234,12 @@
             "state" : "translated",
             "value" : "白"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng"
+          }
         }
       }
     },
@@ -3494,6 +4259,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "横"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiều rộng"
           }
         }
       }
@@ -3551,11 +4322,17 @@
             "state" : "translated",
             "value" : "あなたの色"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Màu của bạn"
+          }
         }
       }
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
