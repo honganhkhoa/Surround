@@ -346,7 +346,7 @@ struct CustomGameForm: View {
             }
             Divider()
             Toggle(isOn: Binding ( get: { handicap == -1 }, set: { handicap = ($0 ? -1 : 0) })) {
-                Text("Automatically decide handicap")
+                Text("Automatically decide handicap").font(.subheadline)
             }
             if handicap > -1 {
                 Stepper(value: $handicap, in: 0...(isRanked ? 9 : 36)) {
@@ -784,7 +784,7 @@ struct OpenChallengesForm: View {
             if challengeType == .standard {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
                     if liveGameChallenges.count > 0 {
-                        Section(header: sectionHeader(title: "Live games")) {
+                        Section(header: sectionHeader(title: String(localized: "Live games"))) {
                             Group {
                                 ForEach(liveGameChallenges) { challenge in
                                     ChallengeCell(challenge: challenge)
@@ -801,7 +801,7 @@ struct OpenChallengesForm: View {
                         }
                     }
                     if correspondenceGameChallenges.count > 0 {
-                        Section(header: sectionHeader(title: "Correspondence games")) {
+                        Section(header: sectionHeader(title: String(localized: "Correspondence games"))) {
                             ForEach(correspondenceGameChallenges) { challenge in
                                 ChallengeCell(challenge: challenge)
                                     .padding()
@@ -826,7 +826,7 @@ struct OpenChallengesForm: View {
                     Spacer().frame(height: 10)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15, pinnedViews: [.sectionHeaders]) {
                         if liveRengoChallenges.count > 0 {
-                            Section(header: sectionHeader(title: "Live rengo games")) {
+                            Section(header: sectionHeader(title: String(localized: "Live rengo games"))) {
                                 Group {
                                     ForEach(liveRengoChallenges) { challenge in
                                         ChallengeCell(challenge: challenge)
@@ -843,7 +843,7 @@ struct OpenChallengesForm: View {
                             }
                         }
                         if correspondenceRengoChallenges.count > 0 {
-                            Section(header: sectionHeader(title: "Correspondence rengo games")) {
+                            Section(header: sectionHeader(title: String(localized: "Correspondence rengo games"))) {
                                 ForEach(correspondenceRengoChallenges) { challenge in
                                     ChallengeCell(challenge: challenge)
                                         .padding()
@@ -918,7 +918,7 @@ struct NewGameView: View {
                 Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
                     HStack {
-                        (Text("\(ogs.pendingRengoGames) pending Rengo game\(ogs.pendingRengoGames == 1 ? "" : "s") ") + Text(Image(systemName: "chevron.forward")))
+                        (Text("\(ogs.pendingRengoGames) pending Rengo games ") + Text(Image(systemName: "chevron.forward")))
                             .font(.subheadline)
                             .bold()
                             .leadingAlignedInScrollView()

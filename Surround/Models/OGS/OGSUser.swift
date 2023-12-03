@@ -223,13 +223,13 @@ struct RankUtils {
     static func formattedRank(_ ranking: Double, longFormat: Bool = false, professional: Bool = false) -> String {
         if professional {
             if ranking > 900 {
-                return "\(Int((ranking - 1000) - 36))p"
+                return String(localized: "\(Int((ranking - 1000) - 36))p", comment: "formattedRank - pro - short format")
             } else {
-                return "\(Int(ranking - 36))p"
+                return String(localized: "\(Int(ranking - 36))p", comment: "formattedRank - pro - short format")
             }
         } else {
             if ranking > 900 {
-                return "\(Int((ranking - 1000) - 36))p"
+                return String(localized: "\(Int((ranking - 1000) - 36))p", comment: "formattedRank - pro - short format")
             }
             if ranking < -900 {
                 return "?"
@@ -240,13 +240,13 @@ struct RankUtils {
                 if (longFormat) {
                     return String(localized: "\(Int(ceil(30 - boundedRank))) Kyu", comment: "formattedRank - kyu - long format")
                 } else {
-                    return String(localized: "\(Int(ceil(30 - boundedRank)))k", comment: "formattedRank - kyu - short format")
+                    return String(localized: "\(Int(ceil(30 - boundedRank)))kyu", comment: "formattedRank - kyu - short format")
                 }
             } else {
                 if (longFormat) {
                     return String(localized: "\(Int(floor(boundedRank - 29))) Dan", comment: "formattedRank - dan - long format")
                 } else {
-                    return String(localized: "\(Int(floor(boundedRank - 29)))d", comment: "formattedRank - dan - short format")
+                    return String(localized: "\(Int(floor(boundedRank - 29)))dan", comment: "formattedRank - dan - short format")
                 }
             }
         }

@@ -14,6 +14,15 @@ enum OGSWebsocketStatus: String {
     case connecting
     case connected
     case reconnecting
+    
+    var localizedString: String {
+        switch self {
+        case .disconnected: return String(localized: "Disconnected", comment: "Connection status")
+        case .connecting: return String(localized: "Connecting", comment: "Connection status")
+        case .connected: return String(localized: "Connected", comment: "Connection status")
+        case .reconnecting: return String(localized: "Reconnecting", comment: "Connection status")
+        }
+    }
 }
 
 class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {

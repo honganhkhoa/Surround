@@ -22,13 +22,9 @@ struct NotificationPopup: View {
                 } else {
                     EmptyView()
                 }
-                Text(ogs.socketStatus.rawValue.capitalized).bold().foregroundColor(.white)
+                Text(ogs.socketStatus.localizedString).bold().foregroundColor(.white)
             }
-            .animation(.easeInOut, value:
-                        ogs.socketStatus == .connecting ? String(localized: "Connecting") :
-                        ogs.socketStatus == .reconnecting ? String(localized: "Reconnecting") :
-                        ogs.socketStatus == .connected ? String(localized: "Connected") :
-                        ogs.socketStatus.rawValue.capitalized)
+            .animation(.easeInOut, value: ogs.socketStatus.localizedString)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -156,7 +152,7 @@ struct NotificationPopup: View {
             if ogs.socketStatus == .connected {
                 VStack {
                     HStack {
-                        if ogs.liveGames.filter { $0.gameData?.outcome == nil }.count > 0 && !viewingLiveGames {
+                        if ogs.liveGames.filter({ $0.gameData?.outcome == nil }).count > 0 && !viewingLiveGames {
                             liveGamesPopup
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                             waitingGamesPopup

@@ -111,13 +111,13 @@ enum TimeControlSystem: Equatable {
     var shortDescription: String {
         switch self {
         case .Fischer(let initialTime, let timeIncrement, let maxTime):
-            return "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement)) up to \(durationString(seconds: maxTime))"
+            return String(localized: "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement)) up to \(durationString(seconds: maxTime))", comment: "TimeControl - short description for fischer system")
         case .Simple(let perMove):
             return String(localized: "\(durationString(seconds: perMove))/move", comment: "TimeControl - short description for simple system")
         case .ByoYomi(let mainTime, let periods, let periodTime):
-            return "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(periods)×\(durationString(seconds: periodTime))"
+            return String(localized: "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(periods)×\(durationString(seconds: periodTime))", comment: "TimeControl - short description for byo-yomi system")
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
-            return "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(durationString(seconds: periodTime))/\(stonesPerPeriod)"
+            return String(localized: "\(durationString(seconds: mainTime))\(mainTime > 0 ? " + " : "")\(durationString(seconds: periodTime))/\(stonesPerPeriod)", comment: "TimeControl - short description for canadian system")
         case .Absolute(let totalTime):
             return durationString(seconds: totalTime)
         case .None:
