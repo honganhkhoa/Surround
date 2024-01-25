@@ -89,7 +89,7 @@ struct OGSPauseControl: Decodable {
                 if userPauseDetail.pausingPlayerId == playerId {
                     return String(localized: "Paused, \(userPauseDetail.pausesLeft!) left", comment: "pause reason (pausing player is you)")
                 } else {
-                    return String(localized: "Paused", comment: "pause reason (pausing player is opponent)")
+                    return String(localized: "Paused", comment: "pause reason")
                 }
             }
             if vacationPlayerIds.contains(playerId) {
@@ -109,6 +109,6 @@ struct OGSPauseControl: Decodable {
             return String(localized: "Stone removal", comment: "pause reason")
         }
         
-        return "Paused"
+        return String(localized: "Paused")
     }
 }

@@ -50,7 +50,7 @@ struct Stone: View {
                                 )
                             ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
                         }
-                        Text("?").font(Font.system(size: size / 1.5).bold()).foregroundColor(Color.white)
+                        Text(verbatim: "?").font(Font.system(size: size / 1.5).bold()).foregroundColor(Color.white)
                         Circle().stroke(Color.gray, lineWidth: 0.5)
                     }
                 }

@@ -331,8 +331,8 @@ struct CustomGameForm: View {
                         }
                         if let opponent = opponent {
                             VStack(alignment: .leading) {
-                                Text(opponent.username).bold()
-                                Text("[\(opponent.formattedRank)]").font(.subheadline)
+                                Text(verbatim: opponent.username).bold()
+                                Text(verbatim: "[\(opponent.formattedRank)]").font(.subheadline)
                             }
                             .foregroundColor(opponent.uiColor)
                         } else {
@@ -483,7 +483,7 @@ struct CustomGameForm: View {
                     isBlitz: $isBlitz,
                     pauseOnWeekend: $pauseOnWeekend)
             ) {
-                (Text("Advanced time settings") + Text(" ") + Text(Image(systemName: "chevron.forward")))
+                (Text("Advanced time settings") + Text(verbatim: " ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
                     .leadingAlignedInScrollView()
             }
@@ -519,7 +519,7 @@ struct CustomGameForm: View {
             }
             Spacer().frame(height: 10)
             NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
-                (Text("Advanced rules settings") + Text(" ") + Text(Image(systemName: "chevron.forward")))
+                (Text("Advanced rules settings") + Text(verbatim: " ") + Text(Image(systemName: "chevron.forward")))
                     .font(.subheadline).bold()
                     .leadingAlignedInScrollView()
             }

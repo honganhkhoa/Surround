@@ -15,15 +15,15 @@ struct ByoYomiTimerView: View {
     var body: some View {
         VStack(alignment: .trailing) {
             if thinkingTime.thinkingTimeLeft! > 0 {
-                Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+                Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont.monospacedDigit())
-                Text("+ \(thinkingTime.periods!)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
+                Text(verbatim: "+ \(thinkingTime.periods!)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
                     .font(subFont.monospacedDigit())
             } else {
-                Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
+                Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                     .font(mainFont.monospacedDigit())
                 if thinkingTime.periodsLeft! > 1 {
-                    Text("+ \(thinkingTime.periodsLeft! - 1)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
+                    Text(verbatim: "+ \(thinkingTime.periodsLeft! - 1)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
                         .font(subFont.monospacedDigit())
                 } else {
                     Text("SD")
@@ -43,9 +43,9 @@ struct FischerTimerView: View {
     
     var body: some View {
         VStack(alignment: .trailing) {
-            Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+            Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                 .font(mainFont.monospacedDigit())
-            Text("+ \(timeString(timeLeft: timeIncrement))")
+            Text(verbatim: "+ \(timeString(timeLeft: timeIncrement))")
                 .font(subFont.monospacedDigit())
         }
     }
@@ -61,13 +61,13 @@ struct CanadianTimerView: View {
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
             VStack(alignment: .trailing) {
-                Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+                Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont.monospacedDigit())
-                Text("+ \(timeString(timeLeft: periodTime))/\(stonesPerPeriod)")
+                Text(verbatim: "+ \(timeString(timeLeft: periodTime))/\(stonesPerPeriod)")
                     .font(subFont.monospacedDigit())
             }
         } else {
-            Text("\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
+            Text(verbatim: "\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
                 .font(mainFont.monospacedDigit())
         }
     }
@@ -78,7 +78,7 @@ struct SimpleTimerView: View {
     var mainFont: Font
     
     var body: some View {
-        Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+        Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
             .font(mainFont.monospacedDigit())
     }
 }

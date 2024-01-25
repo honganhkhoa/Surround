@@ -28,8 +28,8 @@ struct SettingsView: View {
                         }
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text(user.username)
-                                Text("[\(user.formattedRank)]")
+                                Text(verbatim: user.username)
+                                Text(verbatim: "[\(user.formattedRank)]")
                             }
                             .font(.title3)
                             Button(action: { ogs.logout() }) {

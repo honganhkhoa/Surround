@@ -17,31 +17,13 @@
         }
       }
     },
-    " (%@)" : {
-
-    },
-    " (%lld)" : {
-
-    },
     " [%@]" : {
-
-    },
-    " + %@×" : {
 
     },
     " + %lld×" : {
 
     },
     " SD" : {
-
-    },
-    "?" : {
-
-    },
-    "." : {
-
-    },
-    "(%@)" : {
 
     },
     "(%lld)" : {
@@ -1277,7 +1259,14 @@
 
     },
     "About" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giới thiệu"
+          }
+        }
+      }
     },
     "About & Support" : {
       "comment" : "in navigation menu",
@@ -1518,7 +1507,14 @@
       }
     },
     "Analyze mode" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ phân tích"
+          }
+        }
+      }
     },
     "Are you sure you want to abandon your team?" : {
       "localizations" : {
@@ -2385,6 +2381,12 @@
             "state" : "translated",
             "value" : "キャンセル"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua"
+          }
         }
       }
     },
@@ -2915,6 +2917,12 @@
             "state" : "translated",
             "value" : "進行中のライブ対局"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván trực tiếp đang chơi..."
+          }
         }
       }
     },
@@ -2942,6 +2950,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進行中のライブ対局"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván trực tiếp đang chơi..."
           }
         }
       }
@@ -3452,7 +3466,7 @@
       }
     },
     "Paused" : {
-      "comment" : "pause reason (pausing player is opponent)",
+      "comment" : "pause reason",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3520,6 +3534,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プリビュー"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem thử"
           }
         }
       }
@@ -4248,6 +4268,12 @@
             "state" : "translated",
             "value" : "送信"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xác nhận"
+          }
         }
       }
     },
@@ -4257,6 +4283,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "着手決定"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xác nhận"
           }
         }
       }
@@ -4335,6 +4367,12 @@
             "state" : "translated",
             "value" : "タップで表示"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm để vào ván"
+          }
         }
       }
     },
@@ -4345,6 +4383,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "タップでう表示"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm để vào ván"
           }
         }
       }
@@ -4932,7 +4976,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -5023,7 +5067,14 @@
       }
     },
     "Waiting games" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các ván đang chờ"
+          }
+        }
+      }
     },
     "Waiting..." : {
       "localizations" : {
@@ -5031,6 +5082,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お待ちください..."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ..."
           }
         }
       }
@@ -5140,6 +5197,12 @@
             "state" : "translated",
             "value" : "退出する"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ"
+          }
         }
       }
     },
@@ -5208,7 +5271,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

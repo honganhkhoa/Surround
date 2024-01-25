@@ -15,24 +15,24 @@ struct InlineByoYomiTimerView: View {
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
             (
-                Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+                Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont)
                 +
-                Text(" (\(thinkingTime.periods!))")
+                Text(verbatim: " (\(thinkingTime.periods!))")
                     .font(subFont)
             ).minimumScaleFactor(0.5)
         } else {
             if thinkingTime.periodsLeft! > 1 {
                 (
-                    Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
+                    Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                         .font(mainFont)
                     +
-                    Text(" (\(thinkingTime.periodsLeft!))")
+                    Text(verbatim: " (\(thinkingTime.periodsLeft!))")
                         .font(subFont)
                 ).minimumScaleFactor(0.5)
             } else {
                 (
-                    Text(timeString(timeLeft: thinkingTime.periodTimeLeft!))
+                    Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                         .font(mainFont)
                     +
                     Text(" SD")
@@ -50,7 +50,7 @@ struct InlineFischerTimerView: View {
     var subFont: Font
 
     var body: some View {
-        Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+        Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
             .font(mainFont)
             .minimumScaleFactor(0.5)
     }
@@ -63,11 +63,11 @@ struct InlineCanadianTimerView: View {
 
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
-            Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+            Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                 .font(mainFont)
                 .minimumScaleFactor(0.5)
         } else {
-            Text("\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
+            Text(verbatim: "\(timeString(timeLeft: thinkingTime.blockTimeLeft!))/\(thinkingTime.movesLeft!)")
                 .font(mainFont)
                 .minimumScaleFactor(0.5)
         }
@@ -81,7 +81,7 @@ struct InlineSimpleTimerView: View {
     var subFont: Font
 
     var body: some View {
-        Text(timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
+        Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
             .font(mainFont)
             .minimumScaleFactor(0.5)
     }

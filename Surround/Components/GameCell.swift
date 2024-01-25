@@ -44,7 +44,7 @@ struct PlayerInfoLine: View {
                         }
                     }
                     if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
-                        (Text("+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
+                        (Text(verbatim: "+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
                             .font(.subheadline)
                     }
                     Spacer()
@@ -72,7 +72,7 @@ struct PlayerInfoLine: View {
                             }
                         }
                         if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
-                            (Text("+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
+                            (Text(verbatim: "+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
                                 .font(.subheadline)
                         }
                     }

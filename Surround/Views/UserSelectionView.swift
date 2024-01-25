@@ -81,8 +81,8 @@ struct UserSelectionView: View {
                         .cornerRadius(10)
                 }
                 VStack(alignment: .leading) {
-                    Text(user.username).bold()
-                    Text("[\(user.formattedRank)]").font(.subheadline)
+                    Text(verbatim: user.username).bold()
+                    Text(verbatim: "[\(user.formattedRank)]").font(.subheadline)
                 }
                 .foregroundColor(user.uiColor)
                 Spacer()

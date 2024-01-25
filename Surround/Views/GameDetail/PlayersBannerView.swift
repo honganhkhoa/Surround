@@ -94,7 +94,7 @@ struct PlayersBannerView: View {
                     .offset(x: 10, y: playerIconSize - 10)
 
                 if players.count > 2 {
-                    Text("+\(players.count - 2)")
+                    Text(verbatim: "+\(players.count - 2)")
                         .font(.caption.bold().monospacedDigit())
                         .padding(.horizontal, 3)
                         .overlay(

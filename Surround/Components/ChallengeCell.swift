@@ -56,7 +56,7 @@ struct RengoPlayerCard: View {
                 .frame(width: 40, height: 40)
             }
             if playerAsssignCancellable == nil {
-                Text("[\(player.formattedRank)]")
+                Text(verbatim: "[\(player.formattedRank)]")
                     .font(.caption).bold()
                     .foregroundColor(player.uiColor)
             } else {
@@ -446,7 +446,7 @@ struct ChallengeCell: View {
             VStack(alignment: .leading, spacing: 3) {
                 Label{
                     HStack {
-                        (Text("\(game.width)×\(game.height)") + Text(" ") + Text(game.ranked ? "Ranked" : "Unranked"))
+                        (Text("\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
                             .leadingAlignedInScrollView()
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
