@@ -1,12 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
-    " " : {
-
-    },
     " — players may drop mid-game" : {
       "localizations" : {
         "vi" : {
@@ -17,29 +11,46 @@
         }
       }
     },
-    " [%@]" : {
-
-    },
-    " + %lld×" : {
-
-    },
     " SD" : {
-
-    },
-    "(%lld)" : {
-
+      "comment" : "Final byo-yomi period (Sudden Death)",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " SD"
+          }
+        }
+      }
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Alexandru Cristescu**](https://github.com/acristescu), tác giả của ứng dụng mã nguồn mở [**Sente**](https://github.com/acristescu/OnlineGo) cho Android. Trong quá trình phát triển Surround đã có tham khảo rất nhiều từ Sente."
+          }
+        }
+      }
     },
     "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Linh Pham**](https://linhpham.me), người thiết kế biểu tượng ứng dụng và hỗ trợ tư vấn thiết kế cho Surround."
+          }
+        }
+      }
     },
     "[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
-
-    },
-    "[%@]" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Đội ngũ OGS**](https://online-go.com/docs/team), những người tạo ra, duy trì website OGS, và hỗ trợ quá trình phát triển Surround."
+          }
+        }
+      }
     },
     "**%@** for every **%lld moves**." : {
       "comment" : "TimeControl - long description for Canadian byo-yomi system without main time",
@@ -384,39 +395,27 @@
       }
     },
     "**Surround** includes these open source components:" : {
-
-    },
-    "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
-
-    },
-    "%@" : {
-
-    },
-    "%@ " : {
-
-    },
-    "%@ - %@" : {
       "localizations" : {
-        "en" : {
+        "vi" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ - %2$@"
+            "state" : "translated",
+            "value" : "**Surround** có sử dụng những dự án mã nguồn mở sau:"
           }
         }
       }
     },
-    "%@ [%@]" : {
+    "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
       "localizations" : {
-        "en" : {
+        "vi" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ [%2$@]"
+            "state" : "translated",
+            "value" : "**Surround** là một ứng dụng iOS được phát triển với mục tiêu cung cấp trải nghiệm OGS tốt nhất."
           }
         }
       }
     },
     "%@ %@" : {
-      "comment" : "Time left on timer - more than 2 days",
+      "comment" : "Time left on timer - more than 2 days [days - hours]",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -427,7 +426,7 @@
       }
     },
     "%@ %@ %@ %@ %@" : {
-      "comment" : "Duration string",
+      "comment" : "Duration string [weeks days hours minutes seconds]",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -454,9 +453,6 @@
         }
       }
     },
-    "%@ ▾" : {
-
-    },
     "%@ komi" : {
       "localizations" : {
         "ja" : {
@@ -469,39 +465,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ komi"
-          }
-        }
-      }
-    },
-    "%@: " : {
-
-    },
-    "%@: %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@: %2$@"
-          }
-        }
-      }
-    },
-    "%@/%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@/%2$@"
-          }
-        }
-      }
-    },
-    "%@/%lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@/%2$lld"
           }
         }
       }
@@ -541,19 +504,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@%2$@%3$lld×%4$@"
-          }
-        }
-      }
-    },
-    "%@×" : {
-
-    },
-    "%@×%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@×%2$@"
           }
         }
       }
@@ -962,19 +912,6 @@
         }
       }
     },
-    "%lld×" : {
-
-    },
-    "%lld×%lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld×%2$lld"
-          }
-        }
-      }
-    },
     "%lldd" : {
       "comment" : "Duration - week parts, short format",
       "localizations" : {
@@ -1126,13 +1063,34 @@
       }
     },
     "• Alamofire" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Alamofire"
+          }
+        }
+      }
     },
     "• DictionaryCoding" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• DictionaryCoding"
+          }
+        }
+      }
     },
     "• OGS's score-estimator" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• OGS's score-estimator"
+          }
+        }
+      }
     },
     "• Push notifications for correspondence games (optional)" : {
 
@@ -1141,62 +1099,14 @@
 
     },
     "• URLImage" : {
-
-    },
-    "+ %@" : {
-
-    },
-    "+ %@/%@" : {
       "localizations" : {
-        "en" : {
+        "vi" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "+ %1$@/%2$@"
+            "state" : "translated",
+            "value" : "• URLImage"
           }
         }
       }
-    },
-    "+ %@/%lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "+ %1$@/%2$lld"
-          }
-        }
-      }
-    },
-    "+ %@×" : {
-
-    },
-    "+ %@× %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "+ %1$@× %2$@"
-          }
-        }
-      }
-    },
-    "+ %lld×" : {
-
-    },
-    "+ %lld× %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "+ %1$lld× %2$@"
-          }
-        }
-      }
-    },
-    "+%@" : {
-
-    },
-    "+%lld" : {
-
     },
     "⚠️ OGS Moderator's official message. Please respond." : {
       "localizations" : {
@@ -2132,6 +2042,12 @@
             "state" : "translated",
             "value" : "連絡先"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liên lạc"
+          }
         }
       }
     },
@@ -2253,7 +2169,14 @@
       }
     },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tại, **Surround** chỉ hỗ trợ một phần nhỏ trong toàn bộ các chức năng của OGS, các chức năng còn lại sẽ dần dần được bổ sung. Giống như OGS, hầu hết các chức năng trong Surround đều miễn phí, các bạn có thể tài trợ để hỗ trợ quá trình phát triển và duy trì ứng dụng."
+          }
+        }
+      }
     },
     "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. " : {
       "localizations" : {
@@ -2266,7 +2189,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hiện tại chức năng nhận thông báo chỉ dành cho những nhà tài trợ app, vì chức năng này cần chi phí để vận hành máy chủ. "
+            "value" : "Hiện tại chức năng nhận thông báo chỉ dành cho những nhà tài trợ ứng dụng, vì chức năng này cần chi phí để vận hành máy chủ. "
           }
         }
       }
@@ -3551,6 +3474,12 @@
             "state" : "translated",
             "value" : "個人情報取扱について"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chính sách riêng tư"
+          }
         }
       }
     },
@@ -4300,11 +4229,24 @@
             "state" : "translated",
             "value" : "OGSをサポート"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài trợ OGS"
+          }
         }
       }
     },
     "Support Surround" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài trợ Surround"
+          }
+        }
+      }
     },
     "Supporter Tier %@: %@ monthly" : {
       "localizations" : {
@@ -4410,6 +4352,12 @@
             "state" : "translated",
             "value" : "利用条件"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Điều khoản sử dụng"
+          }
         }
       }
     },
@@ -4425,13 +4373,34 @@
       }
     },
     "Thank you for being a Supporter!" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cám ơn bạn đã tài trợ!"
+          }
+        }
+      }
     },
     "Thanks to" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặc biệt cám ơn"
+          }
+        }
+      }
     },
     "The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Online Go Server** (OGS) là một website chơi Cờ Vây online nổi tiếng, có thể truy cập tại địa chỉ https://online-go.com. OGS có giao diện dễ sử dụng và một cộng đồng thân thiện."
+          }
+        }
+      }
     },
     "There are %lld open challenges that you can accept to start a game immediately, and %lld open rengo game." : {
       "localizations" : {

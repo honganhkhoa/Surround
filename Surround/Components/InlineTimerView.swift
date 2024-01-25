@@ -35,7 +35,7 @@ struct InlineByoYomiTimerView: View {
                     Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                         .font(mainFont)
                     +
-                    Text(" SD")
+                    Text(" SD", comment: "Final byo-yomi period (Sudden Death)")
                         .font(subFont.bold())
                         .foregroundColor(Color.red)
                 ).minimumScaleFactor(0.5)
@@ -140,7 +140,7 @@ struct InlineTimerView: View {
                 case .Simple, .Absolute:
                     InlineSimpleTimerView(thinkingTime: thinkingTime, mainFont: mainFont, subFont: subFont)
                 default:
-                    Text("").font(mainFont)
+                    Text(verbatim: "").font(mainFont)
                 }
                 if isPaused {
                     if showsPauseReason {

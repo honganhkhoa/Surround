@@ -28,7 +28,7 @@ class TimeUtilities {
             let daysString = String(localized: "\(daysLeft) days left", comment: "Time left - more than 2 days left, days part")
             let hoursString = String(localized: "\(hoursLeft)h left", comment: "Time left - more than 2 days left, hours part")
             if hoursLeft > 0 {
-                return String(localized: "\(daysString) \(hoursString)", comment: "Time left on timer - more than 2 days")
+                return String(localized: "\(daysString) \(hoursString)", comment: "Time left on timer - more than 2 days [days - hours]")
             } else {
                 return daysString
             }

@@ -97,7 +97,7 @@ struct GameControlRow: View {
                     }
                 }
                 label: {
-                    Text("\(game.status) ▾").font(Font.title2.bold())
+                    Text(verbatim: "\(game.status) ▾").font(Font.title2.bold())
                 }
             } else {
                 Text(game.status).font(Font.title2.bold())
@@ -213,7 +213,7 @@ struct GameControlRow: View {
                                     Button(action: goToNextGame) {
                                         HStack(alignment: .firstTextBaseline, spacing: 2) {
                                             Text("Next")
-                                            Text("(\(gamesWaiting))")
+                                            Text(verbatim: "(\(gamesWaiting))")
                                                 .font(Font.caption2.bold())
                                         }
                                     }

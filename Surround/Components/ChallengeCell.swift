@@ -26,7 +26,7 @@ struct RengoPlayerCard: View {
     var body: some View {
         HStack(spacing: 1) {
             Menu {
-                Text("\(player.username) [\(player.formattedRank)]")
+                Text(verbatim: "\(player.username) [\(player.formattedRank)]")
                 if let userId = ogs.user?.id, challenge.challenger?.id == userId {
                     Divider()
                     if color != .black {
@@ -94,7 +94,7 @@ struct RengoPlayersDetail: View {
                     HStack {
                         Stone(color: .black, shadowRadius: 2)
                             .frame(width: 15, height: 15)
-                        (Text("\(blackTeam.count)×") + Text(Image(systemName: "person.fill")))
+                        (Text(verbatim: "\(blackTeam.count)×") + Text(Image(systemName: "person.fill")))
                             .font(.subheadline)
                         Spacer()
                     }
@@ -114,7 +114,7 @@ struct RengoPlayersDetail: View {
                     HStack {
                         Stone(color: .white, shadowRadius: 2)
                             .frame(width: 15, height: 15)
-                        (Text("\(whiteTeam.count)×") + Text(Image(systemName: "person.fill")))
+                        (Text(verbatim: "\(whiteTeam.count)×") + Text(Image(systemName: "person.fill")))
                             .font(.subheadline)
                         Spacer()
                     }
@@ -135,7 +135,7 @@ struct RengoPlayersDetail: View {
                         HStack {
                             Stone(color: nil, shadowRadius: 2)
                                 .frame(width: 15, height: 15)
-                            (Text("\(nominees.count)×") + Text(Image(systemName: "person.fill")))
+                            (Text(verbatim: "\(nominees.count)×") + Text(Image(systemName: "person.fill")))
                                 .font(.subheadline)
                             Spacer()
                         }
@@ -332,8 +332,8 @@ struct ChallengeCell: View {
                                 Stone(color: challengerStoneColor, shadowRadius: 1)
                                     .frame(width: 20, height: 20)
                             }
-                            Text(challenger.username) +
-                            Text(" [\(challenger.formattedRank)]")
+                            Text(verbatim: challenger.username) +
+                            Text(verbatim: " [\(challenger.formattedRank)]")
                         }
                         if challenge.game.isPrivate {
                             Text("Private")
@@ -371,8 +371,8 @@ struct ChallengeCell: View {
                 HStack(alignment: .top) {
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text(challenged.username) +
-                        Text(" [\(challenged.formattedRank)]")
+                        Text(verbatim: challenged.username) +
+                        Text(verbatim: " [\(challenged.formattedRank)]")
                         if challenged.id == ogs.user?.id {
                             HStack {
                                 Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
@@ -446,14 +446,18 @@ struct ChallengeCell: View {
             VStack(alignment: .leading, spacing: 3) {
                 Label{
                     HStack {
-                        (Text("\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
+                        (Text(verbatim: "\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
                             .leadingAlignedInScrollView()
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
                         Spacer()
                         Text("Handicap: ").bold()
                             .offset(x: 8)
-                        Text(game.handicap == -1 ? "Auto" : "\(game.handicap)")
+                        if game.handicap == -1 {
+                            Text("Auto")
+                        } else {
+                            Text(verbatim: "\(game.handicap)")
+                        }
                     }
                 } icon: {
                     Image(systemName: "squareshape.split.3x3")
@@ -477,7 +481,7 @@ struct ChallengeCell: View {
                 let timeControl = game.timeControl
                 Label {
                     VStack(alignment: .leading) {
-                        Text("\(timeControl.systemName): \(timeControl.shortDescription)")
+                        Text(verbatim: "\(timeControl.systemName): \(timeControl.shortDescription)")
                             .leadingAlignedInScrollView()
                         if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
                             Text("Pause on weekend")
@@ -494,7 +498,7 @@ struct ChallengeCell: View {
                 }
                 if let minRank = game.minRank, let maxRank = game.maxRank {
                     if minRank > -1000 && maxRank < 1000 {
-                        Label("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))", systemImage: "arrow.up.and.down.square")
+                        Label(String("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))"), systemImage: "arrow.up.and.down.square")
                     }
                 }
             }

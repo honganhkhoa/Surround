@@ -148,9 +148,9 @@ struct AnalyzeTreeView: View {
                                         VStack(spacing: 0) {
                                             Spacer().frame(height: 5)
                                             if lastMoveNumber % 5 == 0 {
-                                                Text("\(lastMoveNumber)").font(.body.monospacedDigit()).bold()
+                                                Text(verbatim: "\(lastMoveNumber)").font(.body.monospacedDigit()).bold()
                                             } else {
-                                                Text("\(lastMoveNumber)").font(.body.monospacedDigit())
+                                                Text(verbatim: "\(lastMoveNumber)").font(.body.monospacedDigit())
                                                     .fontWeight(.light)
                                             }
                                             AnalyzeTreeSlice(

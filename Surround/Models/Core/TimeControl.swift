@@ -63,7 +63,7 @@ func durationString(seconds: Int, longFormat: Bool = false) -> String {
         }
     }
 
-    return  String(localized: "\(weeksString) \(daysString) \(hoursString) \(minutesString) \(secondsString)", comment: "Duration string").trimmingCharacters(in: .whitespaces)
+    return  String(localized: "\(weeksString) \(daysString) \(hoursString) \(minutesString) \(secondsString)", comment: "Duration string [weeks days hours minutes seconds]").trimmingCharacters(in: .whitespaces)
 }
 
 enum TimeControlSystem: Equatable {

@@ -73,7 +73,7 @@ struct PrivateMessageNotificationView: View {
                                         .frame(width: 48, height: 48)
                                         .padding(5)
                                     } else {
-                                        Text("\(String(peer.username.first!))")
+                                        Text(verbatim: "\(String(peer.username.first!))")
                                             .font(.system(size: 32)).bold()
                                             .frame(width: 48, height: 48)
                                             .background(Color.gray)

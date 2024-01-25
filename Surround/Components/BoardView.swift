@@ -55,14 +55,14 @@ struct Goban: View {
             ZStack {
                 if showsCoordinates {
                     ForEach(0..<width, id: \.self) { col in
-                        Text("\(coordinates[col])").font(.system(size: size > 30 ? size / 1.5 : size))
+                        Text(verbatim: "\(coordinates[col])").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
                             .foregroundColor(.black)
                             .frame(width: size, height: size)
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
                     ForEach(0..<height, id: \.self) { row in
-                        Text("\(height - row)").font(.system(size: size > 30 ? size / 1.5 : size))
+                        Text(verbatim: "\(height - row)").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
                             .foregroundColor(.black)
                             .frame(width: size, height: size)
@@ -164,7 +164,7 @@ struct VariationNumberings: View {
                     let stoneColor: StoneColor = variation.position[coordinate] == .hasStone(.black) ? .black : .white
                     let labelSize = cellSize >= 14 ? cellSize / 1.5 : cellSize
                     return AnyView(
-                        Text("\(label)")
+                        Text(verbatim: "\(label)")
                             .font(.system(size: labelSize))
                             .bold()
                             .foregroundColor(stoneColor == .black ? .white : .black)

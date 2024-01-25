@@ -248,9 +248,9 @@ struct SingleGameView: View {
                         Spacer(minLength: 0)
                         VStack(alignment: .trailing, spacing: 0) {
                             HStack {
-                                (Text(blackPlayer.username)
+                                (Text(verbatim: blackPlayer.username)
                                     .font(.footnote).bold()
-                                 + Text(" [\(blackPlayer.formattedRank)]").font(.caption))
+                                 + Text(verbatim: " [\(blackPlayer.formattedRank)]").font(.caption))
                                     .minimumScaleFactor(0.5)
 
                                 Stone(color: .black, shadowRadius: 2)
@@ -258,9 +258,9 @@ struct SingleGameView: View {
                             }
                             Spacer().frame(height: 5)
                             HStack {
-                                (Text(whitePlayer.username)
+                                (Text(verbatim: whitePlayer.username)
                                     .font(.footnote).bold()
-                                 + Text(" [\(whitePlayer.formattedRank)]").font(.caption))
+                                 + Text(verbatim: " [\(whitePlayer.formattedRank)]").font(.caption))
                                     .minimumScaleFactor(0.5)
                                 Stone(color: .white, shadowRadius: 2)
                                     .frame(width: 20, height: 20)

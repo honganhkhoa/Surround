@@ -166,7 +166,7 @@ struct NotificationPopup: View {
                                     if ogs.privateMessagesUnreadCount > 0 {
                                         ZStack {
                                             Circle().fill(Color.red)
-                                            Text("\(ogs.privateMessagesUnreadCount)")
+                                            Text(verbatim: "\(ogs.privateMessagesUnreadCount)")
                                                 .font(.caption2).bold()
                                                 .minimumScaleFactor(0.2)
                                                 .foregroundColor(.white)

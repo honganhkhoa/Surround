@@ -176,7 +176,7 @@ struct TimeControlAdjustmentSteppers: View {
             range: timeRanges[timeControlSpeed]![keyPath]!,
             canBeZero: canBeZero
         ) {
-            Text("\(label): ").bold() +
+            Text(verbatim: "\(label): ").bold() +
                 Text(durationString(seconds: timeControl.codingData[keyPath: keyPath]!, longFormat: true))
         }
     }
@@ -188,7 +188,7 @@ struct TimeControlAdjustmentSteppers: View {
                 timeStepper(keyPath: \.mainTime, canBeZero: true, label: String(localized: "Main time"))
                 if let periods = timeControl.periods {
                     Stepper(value: Binding(get: { periods }, set: { timeControl.periods = $0 }), in: 1...300) {
-                        Text("Periods: ").bold() + Text("\(periods)")
+                        Text("Periods: ").bold() + Text(verbatim: "\(periods)")
                     }
                 }
                 timeStepper(keyPath: \.periodTime, label: String(localized: "Time per period"))
@@ -207,7 +207,7 @@ struct TimeControlAdjustmentSteppers: View {
                         ),
                         in: 1...50
                     ) {
-                        Text("Stone per period: ").bold() + Text("\(stonePerPeriod)")
+                        Text("Stone per period: ").bold() + Text(verbatim: "\(stonePerPeriod)")
                     }
                 }
             case .Simple:

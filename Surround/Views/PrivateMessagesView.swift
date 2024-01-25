@@ -51,7 +51,7 @@ struct PrivateMessagesView: View {
                                 URLImage(url: iconURL) { $0.resizable() }
                                     .frame(width: 48, height: 48)
                             } else {
-                                Text("\(String(peer.username.first!))")
+                                Text(verbatim: "\(String(peer.username.first!))")
                                     .font(.system(size: 32)).bold()
                                     .frame(width: 48, height: 48)
                                     .background(Color.gray)

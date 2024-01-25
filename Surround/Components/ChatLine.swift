@@ -13,7 +13,7 @@ struct ChatLine: View {
     var horizontalAlignment: HorizontalAlignment = .leading
 
     var chatBody: Text {
-        var result = Text("")
+        var result = Text(verbatim: "")
         var index = chatLine.body.startIndex
         var mutableSelf = self
         for coordinateRange in mutableSelf.chatLine.coordinatesRanges {
@@ -40,7 +40,7 @@ struct ChatLine: View {
                 }
                 VStack(alignment: horizontalAlignment, spacing: 2) {
                     if showUsername {
-                        Text("\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
+                        Text(verbatim: "\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
                             .font(.caption2).bold()
                             .foregroundColor(chatLine.user.uiColor)
                     }

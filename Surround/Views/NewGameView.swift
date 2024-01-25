@@ -116,7 +116,7 @@ struct QuickMatchForm: View {
                                 BoardView(boardPosition: BoardPosition(width: size, height: size))
                                     .aspectRatio(1, contentMode: .fill)
                                     .opacity(boardSizes.contains(size) ? 1 : 0.2)
-                                Text("\(size)×\(size)")
+                                Text(verbatim: "\(size)×\(size)")
                                     .font(Font.footnote.bold())
                             }
                             .onTapGesture {
@@ -411,7 +411,7 @@ struct CustomGameForm: View {
                             }
                         ),
                         in: standardBoardSize ? 0...2 : 2...25, step: 1) {
-                        Text("\(boardWidth)")
+                            Text(verbatim: "\(boardWidth)")
                     }
                     Spacer().frame(height: 10)
                     Divider()
@@ -426,7 +426,7 @@ struct CustomGameForm: View {
                             }
                         ),
                         in: standardBoardSize ? 0...2 : 2...25, step: 1) {
-                        Text("\(boardHeight)")
+                            Text(verbatim: "\(boardHeight)")
                     }
                 }
             }
@@ -462,7 +462,7 @@ struct CustomGameForm: View {
                 }
             }
             Divider()
-            (Text("\(finalTimeControl.systemName): ").bold() + finalTimeControl.system.descriptionText)
+            (Text(verbatim: "\(finalTimeControl.systemName): ").bold() + finalTimeControl.system.descriptionText)
                 .font(.subheadline)
                 .leadingAlignedInScrollView()
             Spacer().frame(height: 10)
@@ -502,7 +502,7 @@ struct CustomGameForm: View {
                     }.pickerStyle(SegmentedPickerStyle())
                 } else {
                     NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
-                        (Text("\(rulesSet.fullName) ").bold() + Text(Image(systemName: "chevron.forward")))
+                        (Text(verbatim: "\(rulesSet.fullName) ").bold() + Text(Image(systemName: "chevron.forward")))
                             .font(.subheadline)
                     }
                 }

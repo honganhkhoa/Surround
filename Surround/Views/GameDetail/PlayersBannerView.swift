@@ -127,15 +127,15 @@ struct PlayersBannerView: View {
     func playerName(color: StoneColor) -> some View {
         if game.rengo {
             if let player = game.orderedRengoTeam[color]?.first, let teamSize = game.orderedRengoTeam[color]?.count {
-                (Text(player.username).font(Font.body.bold()) +
-                 Text(" [\(player.formattedRank)]").font(Font.caption.bold()) +
-                 (teamSize <= 1 ? Text("") : (Text(" + \(teamSize - 1)×") + Text(Image(systemName: "person.fill")))))
+                (Text(verbatim: player.username).font(Font.body.bold()) +
+                 Text(verbatim: " [\(player.formattedRank)]").font(Font.caption.bold()) +
+                 (teamSize <= 1 ? Text(verbatim: "") : (Text(verbatim: " + \(teamSize - 1)×") + Text(Image(systemName: "person.fill")))))
             } else {
                 EmptyView()
             }
         } else if let player = color == .black ? game.blackPlayer : game.whitePlayer {
-            (Text(player.username).font(Font.body.bold()) +
-            Text(" [\(player.formattedRank)]").font(Font.caption.bold()))
+            (Text(verbatim: player.username).font(Font.body.bold()) +
+             Text(verbatim: " [\(player.formattedRank)]").font(Font.caption.bold()))
         } else {
             EmptyView()
         }
@@ -242,19 +242,19 @@ struct PlayersBannerView: View {
                     VStack(alignment: .trailing) {
                         Group {
                             if gameData.scoreTerritory {
-                                Text("\(score.territory)")
+                                Text(verbatim: "\(score.territory)")
                             }
                             if gameData.scoreStones {
-                                Text("\(score.stones)")
+                                Text(verbatim: "\(score.stones)")
                             }
                             if gameData.scorePrisoners {
-                                Text("\(score.prisoners)")
+                                Text(verbatim: "\(score.prisoners)")
                             }
                             if score.komi > 0 {
-                                Text("\(String(format: "%.1f", score.komi))")
+                                Text(verbatim: "\(String(format: "%.1f", score.komi))")
                             }
                         }.font(Font.footnote.monospacedDigit())
-                        Text("\((String(format: score.komi > 0 ? "%.1f" : "%.0f", score.total)))")
+                        Text(verbatim: "\((String(format: score.komi > 0 ? "%.1f" : "%.0f", score.total)))")
                             .font(Font.footnote.monospacedDigit().bold())
                     }
                     VStack(alignment: .leading) {
@@ -297,7 +297,7 @@ struct PlayersBannerView: View {
     func rengoPlayerDetails(for player: OGSUser, alignment: HorizontalAlignment = .leading) -> some View {
         HStack {
             if alignment == .trailing {
-                (Text(player.username).font(.subheadline.bold()) + Text(" [\(player.formattedRank)]").font(.caption))
+                (Text(verbatim: player.username).font(.subheadline.bold()) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
@@ -318,7 +318,7 @@ struct PlayersBannerView: View {
             .shadow(radius: 2)
             .matchedGeometryEffect(id: player.id, in: avatars)
             if alignment != .trailing {
-                (Text(player.username).font(.subheadline.bold()) + Text(" [\(player.formattedRank)]").font(.caption))
+                (Text(verbatim: player.username).font(.subheadline.bold()) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -333,7 +333,7 @@ struct PlayersBannerView: View {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading) {
                         HStack {
-                            (Text("\(leftTeam.count)×") + Text(Image(systemName: "person.fill")))
+                            (Text(verbatim: "\(leftTeam.count)×") + Text(Image(systemName: "person.fill")))
                                 .font(.subheadline)
                             Stone(color: topLeftPlayerColor, shadowRadius: 2)
                                 .frame(width: 20, height: 20)
@@ -369,7 +369,7 @@ struct PlayersBannerView: View {
                             )
                             Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
                                 .frame(width: 20, height: 20)
-                            (Text("\(rightTeam.count)×") + Text(Image(systemName: "person.fill")))
+                            (Text(verbatim: "\(rightTeam.count)×") + Text(Image(systemName: "person.fill")))
                                 .font(.subheadline)
                         }
                         ScrollView {
