@@ -89,7 +89,7 @@ enum OGSRule: String, Codable, CaseIterable, Hashable {
         case .korean:
             return 6.5
         case .ing:
-            return 8
+            return 7.5
         case .nz:
             return 7
         }
