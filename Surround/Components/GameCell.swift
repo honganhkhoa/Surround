@@ -97,9 +97,9 @@ struct GameCell: View {
     var gameOutCome: some View {
         VStack {
             if game.gameData?.winner == game.gameData?.players.black.id {
-                Text("B+").font(.title).bold()
+                Text("B+", comment: "Black wins (short status on large thumbnails)").font(.title).bold()
             } else {
-                Text("W+").font(.title).bold()
+                Text("W+", comment: "White wins (short status on large thumbnails)").font(.title).bold()
             }
             Text(game.gameData?.outcome ?? "")
         }

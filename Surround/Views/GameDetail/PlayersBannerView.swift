@@ -263,7 +263,7 @@ struct PlayersBannerView: View {
                                 Text("Territory", comment: "In PlayersBannerView, label for territory count")
                             }
                             if gameData.scoreStones {
-                                Text("Stones", comment: "")
+                                Text("Stones", comment: "In PlayersBannerView, label for stone count")
                             }
                             if gameData.scorePrisoners {
                                 Text("Captures")

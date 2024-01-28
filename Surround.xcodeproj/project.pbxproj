@@ -38,7 +38,6 @@
 		BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
-		BC0F1C452525946100E3E66B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C442525946100E3E66B /* LoginView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C512527290900E3E66B /* ChallengeCell.swift */; };
 		BC285B2D2557FAEB005378F9 /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC285B2C2557FAEB005378F9 /* UserNotifications.framework */; };
@@ -365,7 +364,6 @@
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		BC0F1C442525946100E3E66B /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
 		BC0F1C512527290900E3E66B /* ChallengeCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeCell.swift; sourceTree = "<group>"; };
 		BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationContent.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -625,7 +623,6 @@
 				BC55D2D524B81E90003E20E7 /* HomeView.swift */,
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
-				BC0F1C442525946100E3E66B /* LoginView.swift */,
 				BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */,
 				BCE913D025B9398D00065061 /* NewGameView.swift */,
 				BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */,
@@ -1144,7 +1141,6 @@
 				BC5EEBF7259C42EC00675761 /* ChatLine.swift in Sources */,
 				BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */,
 				BC649427253FF941002B2200 /* NavigationService.swift in Sources */,
-				BC0F1C452525946100E3E66B /* LoginView.swift in Sources */,
 				BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */,
 				BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,

@@ -137,7 +137,7 @@ struct PrivateMessageLog: View {
             messagesScrollView
             Divider()
             HStack {
-                TextField("Aa", text: $newChat, onCommit: sendMessage)
+                TextField(String("Aa"), text: $newChat, onCommit: sendMessage)
                 if self.chatSendingCancellable == nil {
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")

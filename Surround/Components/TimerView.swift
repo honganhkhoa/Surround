@@ -26,7 +26,7 @@ struct ByoYomiTimerView: View {
                     Text(verbatim: "+ \(thinkingTime.periodsLeft! - 1)× \(timeString(timeLeft: TimeInterval(thinkingTime.periodTime!)))")
                         .font(subFont.monospacedDigit())
                 } else {
-                    Text("SD")
+                    Text("SD", comment: "Final byo-yomi period (Sudden Death)")
                         .font(subFont.bold())
                         .foregroundColor(Color.red)
                 }

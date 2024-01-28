@@ -619,11 +619,39 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     var status: String {
-        if let outcome = gameData?.outcome {
-            if let winnerId = gameData?.winner, let winner = playerByOGSId[winnerId], let winnerColor = stoneColor(of: winner), winnerColor == .black {
-                return "Black wins by \(outcome)"
+        if let outcome = gameData?.outcome, let winnerId = gameData?.winner {
+            if winnerId == 0 {
+                return String(localized: "Game ended in a draw")
+            }
+            let firstPart = outcome.split(separator: " ").first ?? ""
+            let difference = Float(firstPart)
+            
+            if let winner = playerByOGSId[winnerId], let winnerColor = stoneColor(of: winner) {
+                switch outcome.lowercased() {
+                case "resignation":
+                    return winnerColor == .black ? String(localized: "Black wins by Resignation") : String(localized: "White wins by Resignation")
+                case "disconnection":
+                    return winnerColor == .black ? String(localized: "Black wins by Disconnection") : String(localized: "White wins by Disconnection")
+                case "stone removal timeout":
+                    return winnerColor == .black ? String(localized: "Black wins by Stone Removal Timeout") : String(localized: "White wins by Stone Removal Timeout")
+                case "timeout":
+                    return winnerColor == .black ? String(localized: "Black wins by Timeout") : String(localized: "White wins by Timeout")
+                case "cancellation":
+                    return winnerColor == .black ? String(localized: "Black wins by Cancellation") : String(localized: "White wins by Cancellation")
+                case "disqualification":
+                    return winnerColor == .black ? String(localized: "Black wins by Disqualification") : String(localized: "White wins by Disqualification")
+                case "moderator decision":
+                    return winnerColor == .black ? String(localized: "Black wins by Moderator Decision") : String(localized: "White wins by Moderator Decision")
+                case "abandonment":
+                    return winnerColor == .black ? String(localized: "Black wins by Abandonment") : String(localized: "White wins by Abandonment")
+                default:
+                    if let difference {
+                        return winnerColor == .black ? String(localized: "Black wins by \(difference, specifier: "%.1f") points") : String(localized: "White wins by \(difference, specifier: "%.1f") points")
+                    }
+                    return winnerColor == .black ? String(localized: "Black wins by \(outcome)") : String(localized: "White wins by \(outcome)")
+                }
             } else {
-                return "White wins by \(outcome)"
+                return ""
             }
         } else if let estimatedScores = currentPosition.estimatedScores {
             var whiteScore: Double = 0

@@ -159,7 +159,7 @@ struct SingleGameView: View {
             if game.chatUnreadCount > 0 {
                 ZStack {
                     Circle().fill(Color(.systemRed))
-                    Text(game.chatUnreadCount > 9 ? "9+" : "\(game.chatUnreadCount)")
+                    Text(verbatim: game.chatUnreadCount > 9 ? "9+" : "\(game.chatUnreadCount)")
                         .font(.caption2).bold()
                         .minimumScaleFactor(0.2)
                         .foregroundColor(.white)

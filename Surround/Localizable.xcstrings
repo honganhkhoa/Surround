@@ -422,6 +422,12 @@
             "state" : "new",
             "value" : "%1$@ %2$@"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@"
+          }
         }
       }
     },
@@ -431,6 +437,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
           }
         }
@@ -494,6 +506,12 @@
             "state" : "new",
             "value" : "%1$@%2$@%3$@/%4$lld"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@%3$@/%4$lld"
+          }
         }
       }
     },
@@ -503,6 +521,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@%2$@%3$lld×%4$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@%2$@%3$lld×%4$@"
           }
         }
@@ -516,11 +540,24 @@
             "state" : "new",
             "value" : "%1$02d:%2$02d"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$02d:%2$02d"
+          }
         }
       }
     },
     "%lld" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
     },
     "%lld captures" : {
       "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
@@ -718,6 +755,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "ライブ対局：%lld"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ván trực tiếp"
                 }
               }
             }
@@ -947,7 +996,15 @@
       }
     },
     "%lldh" : {
-      "comment" : "Duration - hours part, short format"
+      "comment" : "Duration - hours part, short format",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldh"
+          }
+        }
+      }
     },
     "%lldh %02dm" : {
       "comment" : "Time left - 1 hour to 1 day.",
@@ -955,6 +1012,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$lldh %2$02dm"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$lldh %2$02dm"
           }
         }
@@ -1093,10 +1156,24 @@
       }
     },
     "• Push notifications for correspondence games (optional)" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Chức năng gửi thông báo liên quan tới các ván trường kỳ."
+          }
+        }
+      }
     },
     "• Support for Surround's ongoing development" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Hỗ trợ quá trình phát triển và duy trì Surround"
+          }
+        }
+      }
     },
     "• URLImage" : {
       "localizations" : {
@@ -1115,11 +1192,14 @@
             "state" : "translated",
             "value" : "⚠️ OGS モデレーター公式メッセージ: ご返信下さい。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Tin nhắn từ quản trị viên OGS. Vui lòng trả lời."
+          }
         }
       }
-    },
-    "9+" : {
-
     },
     "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
       "localizations" : {
@@ -1164,9 +1244,6 @@
           }
         }
       }
-    },
-    "Aa" : {
-
     },
     "About" : {
       "localizations" : {
@@ -1333,10 +1410,24 @@
       }
     },
     "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiền hỗ trợ một khi đã thanh toán không thể hoàn trả được, vì Surround không hoàn trả được giao dịch bằng tài khoản Apple."
+          }
+        }
+      }
     },
     "All Supporter tiers includes:" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tất cả các cấp Hỗ trợ bên dưới đều bao gồm:"
+          }
+        }
+      }
     },
     "Alternatively, there are %lld open custom games matching your preferences that you can accept to start a game immediately." : {
       "localizations" : {
@@ -1582,11 +1673,12 @@
       }
     },
     "B+" : {
+      "comment" : "Black wins (short status on large thumbnails)",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B+"
+            "value" : "Đen thắng"
           }
         }
       }
@@ -1614,11 +1706,24 @@
             "state" : "translated",
             "value" : "サポーターに"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trở thành nhà tài trợ"
+          }
         }
       }
     },
     "Become a Supporter to support the ongoing development of this app and gain access to some additional features." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trở thành nhà tài trợ để hỗ trợ quá trình phát triển và duy trì Surround, đồng thời mở thêm một số chức năng phụ."
+          }
+        }
+      }
     },
     "Black" : {
       "localizations" : {
@@ -1648,6 +1753,130 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tới lượt Đen"
+          }
+        }
+      }
+    },
+    "Black wins by %.1f points" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Black wins by %.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "Black wins by %.1f points"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đen thắng %.1f mục"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Black wins by %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì %@"
+          }
+        }
+      }
+    },
+    "Black wins by Abandonment" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng bỏ cuộc"
+          }
+        }
+      }
+    },
+    "Black wins by Cancellation" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng huỷ ván"
+          }
+        }
+      }
+    },
+    "Black wins by Disconnection" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng mất kết nối"
+          }
+        }
+      }
+    },
+    "Black wins by Disqualification" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng bị loại"
+          }
+        }
+      }
+    },
+    "Black wins by Moderator Decision" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng do Quản trị viên quyết định"
+          }
+        }
+      }
+    },
+    "Black wins by Resignation" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng nhận thua"
+          }
+        }
+      }
+    },
+    "Black wins by Stone Removal Timeout" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng hết giờ"
+          }
+        }
+      }
+    },
+    "Black wins by Timeout" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen thắng vì Trắng hết giờ"
           }
         }
       }
@@ -1808,6 +2037,12 @@
             "state" : "translated",
             "value" : "サポートを辞める"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ hỗ trợ"
+          }
         }
       }
     },
@@ -1834,11 +2069,24 @@
             "state" : "translated",
             "value" : "対局要請を受けました"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhận được thách đấu!"
+          }
         }
       }
     },
     "Challenge type" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loại thách đấu"
+          }
+        }
+      }
     },
     "Challenges received" : {
       "comment" : "Homeview",
@@ -1847,6 +2095,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局要請"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thách đấu nhận được"
           }
         }
       }
@@ -1857,6 +2111,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "チャット"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tán gẫu"
           }
         }
       }
@@ -2003,6 +2263,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "コンパクト"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gọn"
           }
         }
       }
@@ -2314,13 +2580,34 @@
       }
     },
     "Display mode" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ hiển thị"
+          }
+        }
+      }
     },
     "Done" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xong"
+          }
+        }
+      }
     },
     "Error: Cannot load Supporter information at the moment." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lỗi: hiện tại không truy cập được thông tin tài trợ."
+          }
+        }
+      }
     },
     "Estimate score" : {
       "localizations" : {
@@ -2339,7 +2626,14 @@
       }
     },
     "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Những người tham gia quá trình [test beta](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437) ứng dụng."
+          }
+        }
+      }
     },
     "Exit Zen mode" : {
       "localizations" : {
@@ -2347,6 +2641,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zenモードを切る"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tắt chế độ đầy màn hình"
           }
         }
       }
@@ -2409,6 +2709,12 @@
             "state" : "translated",
             "value" : "友人"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn bè"
+          }
         }
       }
     },
@@ -2418,6 +2724,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Từ "
+          }
+        }
+      }
+    },
+    "Game ended in a draw" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoà vì hai bên bằng điểm"
           }
         }
       }
@@ -2621,10 +2937,14 @@
       }
     },
     "If you choose to purchase a Surround App Supporter subscription, payment will be charged to your Apple ID account at the confirmation of purchase. The subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase." : {
-
-    },
-    "If your OGS account was linked to a social account:" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nếu bạn chọn trở thành nhà tài trợ, tiền tài trợ sẽ được thanh toán qua tài khoản Apple của bạn sau khi xác nhận. Sau đó tiền tài trợ sẽ được thanh toán tự động mỗi kì nếu bạn không huỷ hỗ trợ ít nhất 24 tiếng trước khi hết kì hiện tại. Bạn có thể quản lí hoặc huỷ tài trợ bằng cách vào mục quản lí tài khoản của App Store."
+          }
+        }
+      }
     },
     "Ing SST" : {
       "comment" : "rules name",
@@ -2650,11 +2970,24 @@
             "state" : "translated",
             "value" : "初期持ち時間"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thời gian ban đầu"
+          }
         }
       }
     },
     "Is open" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở"
+          }
+        }
+      }
     },
     "Japanese" : {
       "comment" : "rules name",
@@ -2762,6 +3095,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "広い"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lớn"
           }
         }
       }
@@ -2932,11 +3271,24 @@
             "state" : "translated",
             "value" : "メモ(対局相手に非公開)"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Malkovich"
+          }
         }
       }
     },
     "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ghi chú Malkovich sau khi hết trận đối thủ mới xem được."
+          }
+        }
+      }
     },
     "Max time" : {
       "localizations" : {
@@ -2955,22 +3307,64 @@
       }
     },
     "Message organizer" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhắn tin cho người tổ chức"
+          }
+        }
+      }
     },
     "More actions" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các lựa chọn khác"
+          }
+        }
+      }
     },
     "Move %@" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nước thứ %@"
+          }
+        }
+      }
     },
     "Move %lld" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nước thứ %lld"
+          }
+        }
+      }
     },
     "Move to Black team" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển qua đội Đen"
+          }
+        }
+      }
     },
     "Move to White team" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển qua đội Trắng"
+          }
+        }
+      }
     },
     "My turn" : {
       "comment" : "Correspondence games notification setting",
@@ -2990,7 +3384,14 @@
       }
     },
     "Navigation" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Định hướng"
+          }
+        }
+      }
     },
     "New game" : {
       "localizations" : {
@@ -3009,7 +3410,14 @@
       }
     },
     "New game option" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn ván mới"
+          }
+        }
+      }
     },
     "New Zealand" : {
       "comment" : "rules name",
@@ -3140,6 +3548,12 @@
             "state" : "translated",
             "value" : "ユーザーが見つかりません"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không tìm thấy người chơi nào."
+          }
         }
       }
     },
@@ -3189,7 +3603,14 @@
       }
     },
     "Note to yourself" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ghi chú cho bạn"
+          }
+        }
+      }
     },
     "Note: Sounds and voice countdown will not play when your device is in **Silent** mode." : {
       "localizations" : {
@@ -3289,7 +3710,14 @@
       }
     },
     "Options" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn"
+          }
+        }
+      }
     },
     "or" : {
       "localizations" : {
@@ -3336,22 +3764,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bỏ lượt"
-          }
-        }
-      }
-    },
-    "Password" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "パスワード"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mật khẩu"
           }
         }
       }
@@ -3439,7 +3851,14 @@
       }
     },
     "Playback mode" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ xem lại"
+          }
+        }
+      }
     },
     "Player info" : {
       "localizations" : {
@@ -3447,6 +3866,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対局者情報"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông tin người chơi"
           }
         }
       }
@@ -3483,16 +3908,6 @@
         }
       }
     },
-    "private" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "非公開"
-          }
-        }
-      }
-    },
     "Private" : {
       "localizations" : {
         "ja" : {
@@ -3517,11 +3932,24 @@
             "state" : "translated",
             "value" : "プライベートメッセージ"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tin nhắn riêng"
+          }
         }
       }
     },
     "Private messages are only stored for a few days, so please make sure to save any important information somewhere else." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tin nhắn riêng chỉ được giữ trong vài ngày, nên nếu có thông tin gì cần lưu lại bạn cần ghi lại ở chỗ khác."
+          }
+        }
+      }
     },
     "Public games" : {
       "comment" : "in navigation menu",
@@ -3574,7 +4002,14 @@
       }
     },
     "Quick match request" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm ván nhanh"
+          }
+        }
+      }
     },
     "Ranked" : {
       "localizations" : {
@@ -3631,6 +4066,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "断る"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Từ chối"
           }
         }
       }
@@ -3707,6 +4148,12 @@
             "state" : "translated",
             "value" : "復元"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khôi phục"
+          }
         }
       }
     },
@@ -3732,6 +4179,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再開"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiếp tục"
           }
         }
       }
@@ -3827,14 +4280,28 @@
       }
     },
     "Say hi!" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tin nhắn..."
+          }
+        }
+      }
     },
     "SD" : {
+      "comment" : "Final byo-yomi period (Sudden Death)",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "切れ負け"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SD"
           }
         }
       }
@@ -3845,6 +4312,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ユーザー名で検索"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm theo tên tài khoản"
           }
         }
       }
@@ -3930,52 +4403,18 @@
         }
       }
     },
-    "Sign in" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログイン"
-          }
-        }
-      }
-    },
-    "Sign in to OGS with Facebook" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Facebookでログイン"
-          }
-        }
-      }
-    },
-    "Sign in to OGS with Google" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Googleでコグイン"
-          }
-        }
-      }
-    },
-    "Sign in to OGS with Twitter" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Twitterでコグイン"
-          }
-        }
-      }
-    },
     "Sign in to your Account" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アカウント"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đăng nhập"
           }
         }
       }
@@ -3992,16 +4431,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đăng nhập vào tài khoản OGS"
-          }
-        }
-      }
-    },
-    "Sign in to your Online-go.com (OGS) account:" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Online-go.com (OGS) アカウントにロギン："
           }
         }
       }
@@ -4061,6 +4490,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通常のサイズ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kích thước bàn chuẩn"
           }
         }
       }
@@ -4152,7 +4587,14 @@
       }
     },
     "Stone removal option" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lựa chọn lọc quân"
+          }
+        }
+      }
     },
     "Stone Removal Phase" : {
       "comment" : "Game",
@@ -4188,7 +4630,15 @@
       }
     },
     "Stones" : {
-
+      "comment" : "In PlayersBannerView, label for stone count",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quân"
+          }
+        }
+      }
     },
     "Submit" : {
       "localizations" : {
@@ -4255,11 +4705,24 @@
             "state" : "new",
             "value" : "Supporter Tier %1$@: %2$@ monthly"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cấp hỗ trợ %1$@: %2$@ mỗi tháng"
+          }
         }
       }
     },
     "Surround" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround"
+          }
+        }
+      }
     },
     "Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS)." : {
       "localizations" : {
@@ -4295,11 +4758,24 @@
             "state" : "translated",
             "value" : "タップとドラッグで石を置けられます。碁盤外までドラッグすることで、キャンセルが出来ます。"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm và kéo để đặt quân cờ. Kéo ra khỏi bàn cờ để huỷ thao tác."
+          }
         }
       }
     },
     "Tap on avatars to assign players into teams." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm vào hình đại diện để xếp người chơi vào đội."
+          }
+        }
+      }
     },
     "Tap to go to game" : {
       "comment" : "Popup. When a single game is in progress.",
@@ -4342,6 +4818,12 @@
             "state" : "translated",
             "value" : "タップで表示"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm vào để xem"
+          }
         }
       }
     },
@@ -4368,6 +4850,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "陣地"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đất"
           }
         }
       }
@@ -4492,40 +4980,10 @@
     },
     "There are %lld open challenges that you can accept to start a game immediately." : {
       "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "There is %lld open challenge that you can accept to start a game immediately."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "new",
-                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
-                }
-              }
-            }
-          }
-        },
         "vi" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "new",
-                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có %lld thách đấu mở, bạn có thể chấp nhận để bắt đầu ván mới ngay lập tức."
           }
         }
       }
@@ -4580,6 +5038,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一回の増分"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thời gian tăng thêm"
           }
         }
       }
@@ -4660,6 +5124,12 @@
             "state" : "translated",
             "value" : "検討モード切り替え"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật/tắt chế độ phân tích"
+          }
         }
       }
     },
@@ -4670,11 +5140,24 @@
             "state" : "translated",
             "value" : "グループ切り替え"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn theo nhóm"
+          }
         }
       }
     },
     "Toggle playback mode" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật/tắt chế độ xem lại"
+          }
+        }
+      }
     },
     "Toggle single point" : {
       "localizations" : {
@@ -4682,6 +5165,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "交点切り替え"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn từng điểm"
           }
         }
       }
@@ -4692,6 +5181,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サムネイル切り替え"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật/tắt bàn cờ nhỏ"
           }
         }
       }
@@ -4741,7 +5236,14 @@
       }
     },
     "Unassign" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gỡ khỏi đội"
+          }
+        }
+      }
     },
     "Undo request" : {
       "comment" : "Game - when undo received",
@@ -4812,6 +5314,12 @@
             "state" : "translated",
             "value" : "極端のサイズ： %1$lld×%2$lld"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kích thước bàn không bình thường: %1$lld×%2$lld"
+          }
         }
       }
     },
@@ -4822,15 +5330,11 @@
             "state" : "translated",
             "value" : "持ち時間が特殊な設定"
           }
-        }
-      }
-    },
-    "Username" : {
-      "localizations" : {
-        "ja" : {
+        },
+        "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ユーザー名"
+            "value" : "Thời gian không bình thường"
           }
         }
       }
@@ -4858,6 +5362,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表示"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem"
           }
         }
       }
@@ -4895,7 +5405,15 @@
       }
     },
     "W+" : {
-
+      "comment" : "White wins (short status on large thumbnails)",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng"
+          }
+        }
+      }
     },
     "Waiting" : {
       "localizations" : {
@@ -4904,11 +5422,24 @@
             "state" : "translated",
             "value" : "待機中"
           }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ"
+          }
         }
       }
     },
     "Waiting (%@)" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ (%@)"
+          }
+        }
+      }
     },
     "Waiting (%lld)" : {
       "comment" : "NewGameView top Picker",
@@ -4945,7 +5476,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -5143,6 +5674,130 @@
         }
       }
     },
+    "White wins by %.1f points" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "White wins by %.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "White wins by %.1f points"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Trắng thắng %.1f mục"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "White wins by %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì %@"
+          }
+        }
+      }
+    },
+    "White wins by Abandonment" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen bỏ cuộc"
+          }
+        }
+      }
+    },
+    "White wins by Cancellation" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen huỷ ván"
+          }
+        }
+      }
+    },
+    "White wins by Disconnection" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen mất kết nối"
+          }
+        }
+      }
+    },
+    "White wins by Disqualification" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen bị loại"
+          }
+        }
+      }
+    },
+    "White wins by Moderator Decision" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng do Quản trị viên quyết định"
+          }
+        }
+      }
+    },
+    "White wins by Resignation" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen nhận thua"
+          }
+        }
+      }
+    },
+    "White wins by Stone Removal Timeout" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen hết giờ"
+          }
+        }
+      }
+    },
+    "White wins by Timeout" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng thắng vì Đen hết giờ"
+          }
+        }
+      }
+    },
     "Width" : {
       "localizations" : {
         "ja" : {
@@ -5240,7 +5895,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5279,6 +5934,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zenモード"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chế độ đầy màn hình"
           }
         }
       }
