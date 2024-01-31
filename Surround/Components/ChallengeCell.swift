@@ -424,7 +424,7 @@ struct ChallengeCell: View {
                 HStack {
                     VStack(alignment: .leading) {
                         if challenge.useCustomKomi {
-                            Label("Custom komi: \(String(format: "%.1f", challenge.game.komi!))", systemImage: "exclamationmark.triangle.fill")
+                            Label("Custom komi: \(challenge.game.komi!, specifier: "%.1f")", systemImage: "exclamationmark.triangle.fill")
                         }
                         if challenge.hasHandicap {
                             Label("Has handicap: \(challenge.game.handicap)", systemImage: "exclamationmark.triangle.fill")
@@ -472,7 +472,7 @@ struct ChallengeCell: View {
                             Spacer()
                             Text("Komi: ").bold()
                                 .offset(x: 8)
-                            Text(String(format: "%.1f", game.komi!))
+                            Text(verbatim: String(format: "%.1f", game.komi!))
                         }
                     }
                 } icon: {

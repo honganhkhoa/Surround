@@ -180,7 +180,7 @@ struct PlayersBannerView: View {
                         .font(Font.caption.monospacedDigit())
                     if let komi = game.gameData?.komi {
                         if color == .white && komi != 0 {
-                            Text("\(String(format: "%.1f", komi)) komi")
+                            Text("\(komi, specifier: "%.1f") komi")
                                 .font(Font.caption.monospacedDigit())
                         }
                     }

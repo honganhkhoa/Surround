@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="JvB-BH-gxO">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22505" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="JvB-BH-gxO">
     <device id="ipad10_9rounded" orientation="landscape" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17703"/>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -13,7 +14,7 @@
             <objects>
                 <navigationController id="tgW-vv-0gk" sceneMemberID="viewController">
                     <navigationBar key="navigationBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" largeTitles="YES" id="9FU-Jw-4mc">
-                        <rect key="frame" x="0.0" y="0.0" width="420" height="102"/>
+                        <rect key="frame" x="0.0" y="24" width="420" height="102"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <connections>
@@ -29,7 +30,7 @@
             <objects>
                 <navigationController id="zu1-Gv-QyI" sceneMemberID="viewController">
                     <navigationBar key="navigationBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" largeTitles="YES" id="PtS-ym-jjo">
-                        <rect key="frame" x="0.0" y="0.0" width="859.5" height="102"/>
+                        <rect key="frame" x="0.0" y="24" width="859.5" height="102"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <connections>
@@ -56,7 +57,7 @@
             </objects>
             <point key="canvasLocation" x="1146" y="13"/>
         </scene>
-        <!--Active games-->
+        <!--View Controller-->
         <scene sceneID="mNW-ox-DmE">
             <objects>
                 <viewController id="uko-jv-xkd" sceneMemberID="viewController">
@@ -66,7 +67,7 @@
                         <viewLayoutGuide key="safeArea" id="5OO-YW-YPs"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
-                    <navigationItem key="navigationItem" title="Active games" id="Fwh-ZL-7Z7"/>
+                    <navigationItem key="navigationItem" id="Fwh-ZL-7Z7"/>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="G3E-qA-ecR" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>

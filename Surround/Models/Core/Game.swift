@@ -669,9 +669,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
             let difference = whiteScore + (gameData?.komi ?? 0) - blackScore
             if difference > 0 {
-                return String(format: "White by %.1f", difference)
+                return String(localized: "White by \(difference, specifier: "%.1f")")
             } else {
-                return String(format: "Black by %.1f", -difference)
+                return String(localized: "Black by \(difference, specifier: "%.1f")")
             }
         } else {
             if gamePhase == .stoneRemoval {
@@ -691,7 +691,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     } else {
                         let time = userStoneColor == .black ? clock?.blackTime : clock?.whiteTime
                         if let timeLeft = time?.timeLeft, timeLeft <= 10 {
-                            return String(localized: "Your move (\(String(format: "%02d", Int(timeLeft))))", comment: "Integer is for time left")
+                            return String(localized: "Your move (\(Int(timeLeft), specifier: "%02d"))", comment: "Integer is for time left")
                         }
                         return String(localized: "Your move", comment: "Game")
                     }

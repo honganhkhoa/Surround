@@ -414,6 +414,22 @@
         }
       }
     },
+    "%.1f komi" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.1f目のコミ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.1f komi"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "comment" : "Time left on timer - more than 2 days [days - hours]",
       "localizations" : {
@@ -461,22 +477,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ + %2$@ cho tới %3$@"
-          }
-        }
-      }
-    },
-    "%@ komi" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@目のコミ"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ komi"
           }
         }
       }
@@ -560,7 +560,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1741,6 +1741,16 @@
         }
       }
     },
+    "Black by %.1f" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đen hơn %.1f"
+          }
+        }
+      }
+    },
     "Black to move" : {
       "localizations" : {
         "ja" : {
@@ -2481,12 +2491,12 @@
         }
       }
     },
-    "Custom komi: %@" : {
+    "Custom komi: %.1f" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Komi tự chọn: %@"
+            "value" : "Komi tự chọn: %.1f"
           }
         }
       }
@@ -5658,6 +5668,16 @@
         }
       }
     },
+    "White by %.1f" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trắng hơn %.1f"
+          }
+        }
+      }
+    },
     "White to move" : {
       "localizations" : {
         "ja" : {
@@ -5911,19 +5931,19 @@
         }
       }
     },
-    "Your move (%@)" : {
+    "Your move (%02d)" : {
       "comment" : "Integer is for time left",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "あなたの番（%@）"
+            "value" : "あなたの番（%02d）"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lượt của bạn (%@)"
+            "value" : "Lượt của bạn (%02d)"
           }
         }
       }
