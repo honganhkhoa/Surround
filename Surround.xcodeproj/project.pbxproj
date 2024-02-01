@@ -249,6 +249,9 @@
 		BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
+		BCD0849C2B6B96E4000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
+		BCD0849D2B6B96E5000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
+		BCD0849E2B6B96E6000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD214D8255A946D00F78E2A /* NotificationService.swift */; };
 		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
@@ -1052,6 +1055,7 @@
 				BCB98D1F256D185500B1F8FD /* game-27671778.json in Resources */,
 				BCB98CD2256D15B500B1F8FD /* game-23871959.json in Resources */,
 				BC285B352557FAEB005378F9 /* MainInterface.storyboard in Resources */,
+				BCD0849D2B6B96E5000B15D6 /* Localizable.xcstrings in Resources */,
 				BCB98CF3256D168200B1F8FD /* game-26268404.json in Resources */,
 				BCB98D09256D16F600B1F8FD /* game-27053412.json in Resources */,
 				BCB98CB8256D130100B1F8FD /* game-18759438.json in Resources */,
@@ -1071,6 +1075,7 @@
 				BCB98D1E256D185500B1F8FD /* game-27671778.json in Resources */,
 				BCB98CD1256D15B500B1F8FD /* game-23871959.json in Resources */,
 				BC64938125380AA1002B2200 /* Assets.xcassets in Resources */,
+				BCD0849C2B6B96E4000B15D6 /* Localizable.xcstrings in Resources */,
 				BCB98CF2256D168200B1F8FD /* game-26268404.json in Resources */,
 				BCB98D08256D16F600B1F8FD /* game-27053412.json in Resources */,
 				BCB98CB7256D130100B1F8FD /* game-18759438.json in Resources */,
@@ -1086,6 +1091,7 @@
 			files = (
 				BCB98CDE256D15F200B1F8FD /* game-25291907.json in Resources */,
 				BCB98D0A256D16F600B1F8FD /* game-27053412.json in Resources */,
+				BCD0849E2B6B96E6000B15D6 /* Localizable.xcstrings in Resources */,
 				BCB98D2B256D18C400B1F8FD /* game-25076729.json in Resources */,
 				BCB98D15256D17D600B1F8FD /* game-25758368.json in Resources */,
 				BCB98CE9256D163600B1F8FD /* game-26268396.json in Resources */,

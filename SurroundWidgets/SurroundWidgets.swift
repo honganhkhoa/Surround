@@ -17,7 +17,10 @@ class Provider: TimelineProvider {
     }
     
     var notLoggedInEntry: CorrespondenceGamesEntry {
-        CorrespondenceGamesEntry(date: Date(), noGamesMessage: "Sign in to your online-go.com account to see your games here.")
+        CorrespondenceGamesEntry(
+            date: Date(),
+            noGamesMessage: String(localized: "Sign in to your online-go.com account to see your games here.", comment: "Correspondence Games Widget error")
+        )
     }
     
     func placeholder(in context: Context) -> CorrespondenceGamesEntry {
@@ -49,7 +52,7 @@ class Provider: TimelineProvider {
                 date: Date(),
                 games: games,
                 widgetFamily: context.family,
-                noGamesMessage: "You don't have any correspondence games at the moment."
+                noGamesMessage: String(localized: "You don't have any correspondence games at the moment.", comment: "Correspondence Games Widget error")
             )
         }
         return nil
@@ -146,7 +149,10 @@ class Provider: TimelineProvider {
                 if case OGSServiceError.notLoggedIn = error {
                     completion(Timeline(entries: [self.notLoggedInEntry], policy: .after(nextReloadDate)))
                 } else {
-                    let entry = CorrespondenceGamesEntry(date: currentDate, noGamesMessage: "Failed to load your correspondence games.")
+                    let entry = CorrespondenceGamesEntry(
+                        date: currentDate,
+                        noGamesMessage: String(localized: "Failed to load your correspondence games.", comment: "Correspondence Games Widget error")
+                    )
                     completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                 }
             }
@@ -230,7 +236,7 @@ struct CorrespondenceGamesWidgetView : View {
                     if thinkingTime.periodsLeft! > 1 {
                         auxiliaryLabel = " (\(thinkingTime.periodsLeft!))"
                     } else {
-                        auxiliaryLabel = " (SD)"
+                        auxiliaryLabel = " (\(String(localized: "SD")))"
                     }
                 }
             case .Canadian:
@@ -256,7 +262,7 @@ struct CorrespondenceGamesWidgetView : View {
                             .minimumScaleFactor(0.7)
                     }
                 }
-                if auxiliaryLabel == " (SD)" {
+                if auxiliaryLabel == " (\(String(localized: "SD")))" {
                     Text(auxiliaryLabel).foregroundColor(.red)
                 } else {
                     Text(auxiliaryLabel)
@@ -348,15 +354,14 @@ struct CorrespondenceGamesWidgetView : View {
         }
         
         let gamesToDisplay = self.gamesToDisplay
-
-        return ZStack {
+        let widgetContent = ZStack {
             Color(UIColor.systemGray4)
             HStack(alignment: .center, spacing: 0) {
                 if gamesToDisplay.count > 0 {
                     boards
                         .padding(.top, 5)
                 } else {
-                    Text(entry.noGamesMessage ?? "Failed to load your correspondence games.")
+                    Text(entry.noGamesMessage ?? String(localized: "Failed to load your correspondence games.", comment: "Correspondence Games Widget error"))
                         .font(.subheadline)
                         .minimumScaleFactor(0.7)
                         .padding()
@@ -366,7 +371,7 @@ struct CorrespondenceGamesWidgetView : View {
                     Color(.systemIndigo)
                         .frame(width: 25)
                     if entry.games.count > 0 {
-                        Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)")
+                        Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)", comment: "On Correspondence Games Widget")
                             .font(.subheadline)
                             .bold()
                             .foregroundColor(.white)
@@ -376,6 +381,14 @@ struct CorrespondenceGamesWidgetView : View {
                 }
                 .frame(width: 25)
             }
+        }
+        
+        if #available(iOSApplicationExtension 17.0, *) {
+            return widgetContent.containerBackground(for: .widget) {
+                Color(UIColor.systemGray4)
+            }
+        } else {
+            return widgetContent
         }
     }
 }
@@ -388,9 +401,10 @@ struct SurroundWidgets: Widget {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             CorrespondenceGamesWidgetView(entry: entry)
         }
-        .configurationDisplayName("Correspondence Games")
-        .description("This Widget display a summary of your correspondence games on online-go.com.")
+        .configurationDisplayName(String(localized: "Correspondence Games", comment: "Correspondence Games Widget name"))
+        .description(String(localized: "This Widget display a summary of your correspondence games on online-go.com.", comment: "Correspondence Games Widget description"))
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
@@ -403,7 +417,7 @@ struct SurroundWidgets_Previews: PreviewProvider {
                     1: WidgetFamily.systemMedium,
                     2: WidgetFamily.systemLarge
                 ][familyId]!
-                CorrespondenceGamesWidgetView(
+                let widget = CorrespondenceGamesWidgetView(
                     entry: CorrespondenceGamesEntry(
                         date: Date(),
                         games: [
@@ -415,14 +429,25 @@ struct SurroundWidgets_Previews: PreviewProvider {
                     )
                 )
                 .previewContext(WidgetPreviewContext(family: family))
+                
+                if #available(iOSApplicationExtension 17.0, *) {
+                    widget.padding(-16)
+                } else {
+                    widget
+                }
             }
-            CorrespondenceGamesWidgetView(
+            let widget = CorrespondenceGamesWidgetView(
                 entry: CorrespondenceGamesEntry(
                     date: Date(),
                     games: [],
                     noGamesMessage: "You don't have any correspondence games at the moment."
                 )
             ).previewContext(WidgetPreviewContext(family: .systemMedium))
+            if #available(iOSApplicationExtension 17.0, *) {
+                widget.padding(-16)
+            } else {
+                widget
+            }
         }
     }
 }

@@ -560,7 +560,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -2376,6 +2376,17 @@
         }
       }
     },
+    "Correspondence Games" : {
+      "comment" : "Correspondence Games Widget name",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các ván trường kỳ"
+          }
+        }
+      }
+    },
     "Correspondence games notifications" : {
       "localizations" : {
         "ja" : {
@@ -2657,6 +2668,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tắt chế độ đầy màn hình"
+          }
+        }
+      }
+    },
+    "Failed to load your correspondence games." : {
+      "comment" : "Correspondence Games Widget error",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không tải được các ván trường kỳ của bạn."
           }
         }
       }
@@ -4445,6 +4467,17 @@
         }
       }
     },
+    "Sign in to your online-go.com account to see your games here." : {
+      "comment" : "Correspondence Games Widget error",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đăng nhập vào tài khoản online-go.com để xem các ván trường kỳ của bạn ở đây."
+          }
+        }
+      }
+    },
     "Simple" : {
       "comment" : "TimeControl system name",
       "localizations" : {
@@ -5038,6 +5071,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện không có thách đấu nào đang chờ."
+          }
+        }
+      }
+    },
+    "This Widget display a summary of your correspondence games on online-go.com." : {
+      "comment" : "Correspondence Games Widget description",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiện ích này hiển thị tóm tắt về các ván trường kỳ bạn đang chơi trên online-go.com."
           }
         }
       }
@@ -5882,6 +5926,17 @@
         }
       }
     },
+    "You don't have any correspondence games at the moment." : {
+      "comment" : "Correspondence Games Widget error",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tại bạn không có ván trường kỳ nào."
+          }
+        }
+      }
+    },
     "You need to choose an opponent or make the challenge open." : {
       "localizations" : {
         "ja" : {
@@ -5944,6 +5999,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lượt của bạn (%02d)"
+          }
+        }
+      }
+    },
+    "Your turn: %lld/%lld" : {
+      "comment" : "On Correspondence Games Widget",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your turn: %1$lld/%2$lld"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến lượt bạn: %1$lld/%2$lld"
           }
         }
       }
