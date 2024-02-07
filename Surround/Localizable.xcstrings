@@ -14,6 +14,12 @@
     " SD" : {
       "comment" : "Final byo-yomi period (Sudden Death)",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切れ負け"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -34,6 +40,12 @@
     },
     "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップ・アイコンの作成とデザインのご相談は、[**Linh Pham**](https://linhpham.me)さんにご提供いいただきました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -240,6 +252,12 @@
     },
     "**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討モードでは、対局中に変化図をつけることができます。何でも試してみることができる別の碁盤のようなものです。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -250,6 +268,12 @@
     },
     "**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動置き碁では、お互いの棋力によって、システムが決めます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -340,6 +364,12 @@
     },
     "**Custom** komi: **%.1f**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズされたコミ：**%.1f**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -350,6 +380,12 @@
     },
     "**Custom** komi: **%lf**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズされたコミ：**%lf**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -376,6 +412,12 @@
     },
     "**Standard** komi: **%.1f**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**通常**コミ：**%.1f**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -396,6 +438,12 @@
     },
     "**Surround** includes these open source components:" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundには、こちらのOSSコンポーネントを含まれています："
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -439,6 +487,12 @@
             "value" : "%1$@ %2$@"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -453,6 +507,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
           }
         },
@@ -471,6 +531,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ + %2$@ up to %3$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ + %2$@ 、%3$@まで"
           }
         },
         "vi" : {
@@ -504,6 +570,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@%2$@%3$@/%4$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@%2$@%3$@/%4$lld"
           }
         },
@@ -541,6 +613,12 @@
             "value" : "%1$02d:%2$02d"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$02d:%2$02d"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -551,6 +629,12 @@
     },
     "%lld" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -644,6 +728,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 日"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -665,6 +761,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld days"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日"
           }
         },
         "vi" : {
@@ -795,6 +897,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld分"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -860,6 +974,18 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld seconds"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld秒"
                 }
               }
             }
@@ -947,6 +1073,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld週間"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -964,6 +1102,12 @@
     "%lldd" : {
       "comment" : "Duration - week parts, short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -998,6 +1142,12 @@
     "%lldh" : {
       "comment" : "Duration - hours part, short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld時"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1013,6 +1163,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lldh %2$02dm"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld時 %2$02d分"
           }
         },
         "vi" : {
@@ -1039,6 +1195,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lldhs"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld時間"
                 }
               }
             }
@@ -1084,6 +1252,12 @@
     "%lldm" : {
       "comment" : "Duration - minutes part, short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld分"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1095,6 +1269,12 @@
     "%lldp" : {
       "comment" : "formattedRank - pro - short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldp"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1106,6 +1286,12 @@
     "%llds" : {
       "comment" : "Duration - seconds part, short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1117,6 +1303,12 @@
     "%lldw" : {
       "comment" : "Duration - week parts, short format",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld週"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1127,6 +1319,12 @@
     },
     "• Alamofire" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Alamofire"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1137,6 +1335,12 @@
     },
     "• DictionaryCoding" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• DictionaryCoding"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1147,6 +1351,12 @@
     },
     "• OGS's score-estimator" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• OGS's score-estimator"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1157,6 +1367,12 @@
     },
     "• Push notifications for correspondence games (optional)" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 通信対局のプッシュ通知（推進）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1167,6 +1383,12 @@
     },
     "• Support for Surround's ongoing development" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•Surroundの開発をサポート"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1177,6 +1399,12 @@
     },
     "• URLImage" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• URLImage"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1411,6 +1639,12 @@
     },
     "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全てのご購入はキャンセルが出来ません。お客様のApple Accountへの返金ができかねます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1421,6 +1655,12 @@
     },
     "All Supporter tiers includes:" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全てのサポーターが利用できる機能："
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1509,6 +1749,12 @@
     },
     "Analyze mode" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討モード"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1664,6 +1910,12 @@
     },
     "Automatically decide handicap" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動置き碁"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1675,6 +1927,12 @@
     "B+" : {
       "comment" : "Black wins (short status on large thumbnails)",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B+"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1743,6 +2001,12 @@
     },
     "Black by %.1f" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒（%.1fの差）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1787,6 +2051,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "黒の%.1f目勝ち"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -1803,6 +2079,12 @@
     },
     "Black wins by %@" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（%@）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1813,6 +2095,12 @@
     },
     "Black wins by Abandonment" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（対局放棄）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1823,6 +2111,12 @@
     },
     "Black wins by Cancellation" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（キャンセル）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1833,6 +2127,12 @@
     },
     "Black wins by Disconnection" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（切断）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1843,6 +2143,12 @@
     },
     "Black wins by Disqualification" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（失格）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1853,6 +2159,12 @@
     },
     "Black wins by Moderator Decision" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（管理者による裁定）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1863,6 +2175,12 @@
     },
     "Black wins by Resignation" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の中押し勝ち"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1873,6 +2191,12 @@
     },
     "Black wins by Stone Removal Timeout" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（死石除法フェーズでの時間切れ）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1883,6 +2207,12 @@
     },
     "Black wins by Timeout" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒の勝ち（時間切れ）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2286,6 +2616,12 @@
     "Connected" : {
       "comment" : "Connection status",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続済み"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2379,6 +2715,12 @@
     "Correspondence Games" : {
       "comment" : "Correspondence Games Widget name",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2405,6 +2747,12 @@
     },
     "Correspondence rengo games" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁の通信対局"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2447,6 +2795,12 @@
     },
     "Create challenge" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局要請作成"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2457,6 +2811,12 @@
     },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundは、現在、一部だけのOGSの機能を対応していますが、少しずつ使える機能を増えていく予定です。OGS の精神に従い、ほとんどの機能は無料でご利用いただけますが、アプリの開発をサポートしていただければ感謝いたします。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2484,6 +2844,12 @@
     "Custom" : {
       "comment" : "NewGameView top Picker",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズ"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2494,6 +2860,12 @@
     },
     "Custom komi: **%.1f**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタマイズされたコミ：**%.1f**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2504,6 +2876,12 @@
     },
     "Custom komi: %.1f" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミの設定：%.1f"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2602,6 +2980,12 @@
     },
     "Display mode" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディスプレイモード"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2612,6 +2996,12 @@
     },
     "Done" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻る"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2648,6 +3038,12 @@
     },
     "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[ベタ版をテスト](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437)の皆さんからのフィードバックとバッグレポートが大変助かりました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2675,6 +3071,12 @@
     "Failed to load your correspondence games." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局の読み込みができませんでした。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2762,6 +3164,12 @@
     },
     "Game ended in a draw" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引き分け（持碁）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2820,6 +3228,12 @@
     },
     "Game starts automatically when there are **%@** players." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あと%@名の参加で自動で対局が開始します"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2970,6 +3384,12 @@
     },
     "If you choose to purchase a Surround App Supporter subscription, payment will be charged to your Apple ID account at the confirmation of purchase. The subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundサポーター・サブスクリプションを購入しますと、注文確認後、課金がApple Accountに請求されます。その後、１ヶ月ごとに自動更新します。サブスクリプションを削除されない限り、期間終了直前24時間以内に自動更新します。購入後、App Storeの設定からサブスクリプション管理と削除ができます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3256,6 +3676,12 @@
     },
     "Live rengo games" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁のライブ対局"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3314,6 +3740,12 @@
     },
     "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモ(対局相手に非公開)。対局終了後に閲覧可。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3340,6 +3772,12 @@
     },
     "Message organizer" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主催者へメッセージ"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3350,6 +3788,12 @@
     },
     "More actions" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他のアクション"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3360,6 +3804,12 @@
     },
     "Move %@" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "着手%@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3380,6 +3830,12 @@
     },
     "Move to Black team" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "黒いチームに移動"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3390,6 +3846,12 @@
     },
     "Move to White team" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白のチームへ移動"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3417,6 +3879,12 @@
     },
     "Navigation" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニュー"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3443,6 +3911,12 @@
     },
     "New game option" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい対局のオプション"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3542,6 +4016,12 @@
             "value" : "None"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "なし"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3598,6 +4078,12 @@
             "value" : "None"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "なし"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3636,6 +4122,12 @@
     },
     "Note to yourself" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分へのノート"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3743,6 +4235,12 @@
     },
     "Options" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3884,6 +4382,12 @@
     },
     "Playback mode" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレーバック・モード"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3975,6 +4479,12 @@
     },
     "Private messages are only stored for a few days, so please make sure to save any important information somewhere else." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートメッセージは数日しか保存されませんので、重要な情報がありましたら、別の所にセーブして下さい。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4313,6 +4823,12 @@
     },
     "Say hi!" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「hi」を言いって！"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4555,6 +5071,12 @@
     },
     "Standard komi: **%.1f**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通常コミ：**%.1f**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4588,6 +5110,12 @@
     },
     "Start" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4631,6 +5159,12 @@
     },
     "Stone removal option" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "死に石除去オプション"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4675,6 +5209,12 @@
     "Stones" : {
       "comment" : "In PlayersBannerView, label for stone count",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "子"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4749,6 +5289,12 @@
             "value" : "Supporter Tier %1$@: %2$@ monthly"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "￼%1$@流サポーター：月に%2$@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4759,6 +5305,12 @@
     },
     "Surround" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4769,6 +5321,12 @@
     },
     "Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS)." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundは、オンライン囲碁対局「Online-go.com」（いわゆる「OGS」）と言うWEBさいとのクライアントです。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4905,6 +5463,12 @@
     },
     "Thank you for being a Supporter!" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポートしてくれて、ありがとうございます！"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4915,6 +5479,12 @@
     },
     "Thanks to" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "謝辞"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4925,6 +5495,12 @@
     },
     "The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Online Go Server** (OGS)has,"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5023,6 +5599,12 @@
     },
     "There are %lld open challenges that you can accept to start a game immediately." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受ければ今すぐ開始できる対局要請%lld件があります。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5051,6 +5633,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "公開連碁対局%lld局があります。"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -5067,6 +5661,12 @@
     },
     "There are currently no open challenges." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在、公開要請がありません。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5205,6 +5805,12 @@
     },
     "Toggle playback mode" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレーバックモード切り替え"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5264,6 +5870,12 @@
     },
     "Total time" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合計時間"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5461,6 +6073,12 @@
     "W+" : {
       "comment" : "White wins (short status on large thumbnails)",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W+"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5487,6 +6105,12 @@
     },
     "Waiting (%@)" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待ち（%@)"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5595,6 +6219,12 @@
     },
     "Waiting for players to join and the organizer to start the game." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局者と主催者の開始待ちです…"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5714,6 +6344,12 @@
     },
     "White by %.1f" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白（%.1fの差）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5758,6 +6394,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "白の%.1f目勝ち"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -5774,6 +6422,12 @@
     },
     "White wins by %@" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（%@）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5784,6 +6438,12 @@
     },
     "White wins by Abandonment" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（対局廃棄）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5794,6 +6454,12 @@
     },
     "White wins by Cancellation" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（キャンセル）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5804,6 +6470,12 @@
     },
     "White wins by Disconnection" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（切断）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5814,6 +6486,12 @@
     },
     "White wins by Disqualification" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（失格）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5824,6 +6502,12 @@
     },
     "White wins by Moderator Decision" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（管理者による裁定）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5834,6 +6518,12 @@
     },
     "White wins by Resignation" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の中押し勝ち"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5844,6 +6534,12 @@
     },
     "White wins by Stone Removal Timeout" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（死石除去フェーズでの時間切れ）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5854,6 +6550,12 @@
     },
     "White wins by Timeout" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "白の勝ち（時間切れ）"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
