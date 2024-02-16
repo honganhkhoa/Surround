@@ -87,8 +87,8 @@ class SurroundNotificationService {
             if oldGame.clock?.currentPlayerId != newGame.clock?.currentPlayerId
                 && newGame.clock?.currentPlayerId == userId {
                 self.scheduleNotification(
-                    title: "Your turn",
-                    message: "It is your turn in the game with \(opponentName).",
+                    title: String(localized: "Your turn", comment: "Notification title"),
+                    message: String(localized: "It is your turn in the game with \(opponentName).", comment: "Notification body"),
                     game: newGame,
                     setting: .notificationOnUserTurn
                 )
@@ -111,16 +111,16 @@ class SurroundNotificationService {
                     let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
                     if lastTimeLeft > twelveHours && timeLeft <= twelveHours {
                         self.scheduleNotification(
-                            title: "Time running out",
-                            message: "You have 12 hours to make your move in the game with \(opponentName).",
+                            title: String(localized: "Time running out", comment: "Notification title"),
+                            message: String(localized: "You have \(12) hours to make your move in the game with \(opponentName).", comment: "Notification body"),
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
                         return true
                     } else if lastTimeLeft > threeHours && timeLeft <= threeHours {
                         self.scheduleNotification(
-                            title: "Time running out",
-                            message: "You have 3 hours to make your move in the game with \(opponentName).",
+                            title: String(localized: "Time running out", comment: "Notification title"),
+                            message: String(localized: "You have \(3) hours to make your move in the game with \(opponentName).", comment: "Notification body"),
                             game: newGame,
                             setting: .notificationOnTimeRunningOut
                         )
@@ -133,13 +133,12 @@ class SurroundNotificationService {
     }
     
     func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
-        if let outcome = newGame.gameData?.outcome, let userId = userId {
+        if newGame.gameData?.outcome != nil, let userId = userId {
             if oldGame.gameData?.outcome == nil {
                 let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
-                let result = newGame.gameData?.winner == userId ? "won" : "lost"
                 self.scheduleNotification(
-                    title: "Game has ended",
-                    message: "Your game with \(opponentName) has ended. You \(result) by \(outcome).",
+                    title: String(localized: "Game ended", comment: "Notification title"),
+                    message: String(localized: "Your game with \(opponentName) has ended.", comment: "Notification body"),
                     game: newGame,
                     setting: .notiticationOnGameEnd
                 )
@@ -183,8 +182,8 @@ class SurroundNotificationService {
         if let userId = userId {
             let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
             self.scheduleNotification(
-                title: "Game started",
-                message: "Your game with \(opponentName) has started.",
+                title: String(localized: "Game started", comment: "Notification title"),
+                message: String(localized: "Your game with \(opponentName) has started.", comment: "Notification body"),
                 game: newGame,
                 setting: .notificationOnNewGame
             )

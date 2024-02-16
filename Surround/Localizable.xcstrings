@@ -644,7 +644,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -3162,6 +3162,17 @@
         }
       }
     },
+    "Game ended" : {
+      "comment" : "Notification title",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu kết thúc"
+          }
+        }
+      }
+    },
     "Game ended in a draw" : {
       "localizations" : {
         "ja" : {
@@ -3222,6 +3233,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chế độ thời gian: %@"
+          }
+        }
+      }
+    },
+    "Game started" : {
+      "comment" : "Notification title",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu bắt đầu"
           }
         }
       }
@@ -3437,6 +3459,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở"
+          }
+        }
+      }
+    },
+    "It is your turn in the game with %@." : {
+      "comment" : "Notification body",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến lượt của bạn trong ván đấu với %@."
           }
         }
       }
@@ -5751,6 +5784,17 @@
         }
       }
     },
+    "Time running out" : {
+      "comment" : "Notification title",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gần hết thời gian"
+          }
+        }
+      }
+    },
     "To " : {
       "localizations" : {
         "vi" : {
@@ -6154,7 +6198,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -6639,6 +6683,23 @@
         }
       }
     },
+    "You have %lld hours to make your move in the game with %@." : {
+      "comment" : "Notification body",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "You have %1$lld hours to make your move in the game with %2$@."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn còn %1$lld tiếng thời gian trong ván đấu với %2$@."
+          }
+        }
+      }
+    },
     "You need to choose an opponent or make the challenge open." : {
       "localizations" : {
         "ja" : {
@@ -6667,6 +6728,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Màu của bạn"
+          }
+        }
+      }
+    },
+    "Your game with %@ has ended." : {
+      "comment" : "Notification body",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu của bạn với %@ đã kết thúc."
+          }
+        }
+      }
+    },
+    "Your game with %@ has started." : {
+      "comment" : "Notification body",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván đấu của bạn với %@ đã bắt đầu."
           }
         }
       }
@@ -6701,6 +6784,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lượt của bạn (%02d)"
+          }
+        }
+      }
+    },
+    "Your turn" : {
+      "comment" : "Notification title",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến lượt của bạn"
           }
         }
       }

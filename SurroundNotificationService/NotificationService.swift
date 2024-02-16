@@ -79,28 +79,24 @@ class NotificationService: UNNotificationServiceExtension {
     
     func triggerContentHandler() {
         if let contentHandler = self.contentHandler, let notificationContent = self.notificationContent {
-            if notificationContent.userInfo["notificationCategory"] as? String == SettingKey<Any>.notiticationOnGameEnd.mainName {
-                if let ogsGameId = notificationContent.userInfo["ogsGameId"] as? Int {
-                    var game = self.activeOGSGamesByIdFromOverview[ogsGameId]
-                    if game == nil {
-                        if let cachedGameData = userDefaults[.cachedOGSGames]?[ogsGameId] {
-                            if let cachedGameValue = try? JSONSerialization.jsonObject(with: cachedGameData) as? [String: Any] {
-                                let decoder = DictionaryDecoder()
-                                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                                if let ogsGame = try? decoder.decode(OGSGame.self, from: cachedGameValue) {
-                                    game = Game(ogsGame: ogsGame)
-                                }
-                            }
-                        }
-                    }
-                    if let game = game {
-                        if let userId = userDefaults[.ogsUIConfig]?.user.id {
-                            if let outcome = game.gameData?.outcome {
-                                let result = game.gameData?.winner == userId ? "won" : "lost"
-                                notificationContent.body += " You \(result) by \(outcome)."
-                            }
-                        }
-                    }
+            if let category = notificationContent.userInfo["notificationCategory"] as? String,
+               let opponentName = notificationContent.userInfo["opponentName"] as? String {
+                switch category {
+                case SettingKey<Any>.notificationOnNewGame.mainName:
+                    notificationContent.title = String(localized: "Game started", comment: "Notification title")
+                    notificationContent.body = String(localized: "Your game with \(opponentName) has started.", comment: "Notification body")
+                case SettingKey<Any>.notificationOnUserTurn.mainName:
+                    notificationContent.title = String(localized: "Your turn", comment: "Notification title")
+                    notificationContent.body = String(localized: "It is your turn in the game with \(opponentName).", comment: "Notification body")
+                case SettingKey<Any>.notificationOnTimeRunningOut.mainName:
+                    let hoursLeft = notificationContent.body.hasPrefix("You have 3 hours") ? 3 : 12
+                    notificationContent.title = String(localized: "Time running out", comment: "Notification title")
+                    notificationContent.body = String(localized: "You have \(hoursLeft) hours to make your move in the game with \(opponentName).", comment: "Notification body")
+                case SettingKey<Any>.notiticationOnGameEnd.mainName:
+                    notificationContent.title = String(localized: "Game ended", comment: "Notification title")
+                    notificationContent.body = String(localized: "Your game with \(opponentName) has ended.", comment: "Notification body")
+                default:
+                    break
                 }
             }
             contentHandler(notificationContent)
