@@ -13,16 +13,21 @@ struct ThanksView: View {
         ScrollView {
             VStack(spacing: 10) {
                 Group {
-                    (Text("[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app.").foregroundColor(Color(.label)))
+                    Text("[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app.")
+                        .foregroundColor(Color(.label))
                         .leadingAlignedInScrollView()
                     Divider()
-                    (Text("[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label)))
+                    Text("[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development.").foregroundColor(Color(.label))
                         .leadingAlignedInScrollView()
                     Divider()
-                    (Text("[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app.").foregroundColor(Color(.label)))
+                    Text("[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app.").foregroundColor(Color(.label))
                         .leadingAlignedInScrollView()
                     Divider()
                     Text("Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports.")
+                        .foregroundColor(Color(.label))
+                        .leadingAlignedInScrollView()
+                    Divider()
+                    Text("[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), for kickstarting the effort to translate this app to multiple languages, and for translating the app to Japanese.")
                         .foregroundColor(Color(.label))
                         .leadingAlignedInScrollView()
                 }

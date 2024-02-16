@@ -54,6 +54,16 @@
         }
       }
     },
+    "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), for kickstarting the effort to translate this app to multiple languages, and for translating the app to Japanese." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), người bắt đầu quá trình dịch Surround ra các ngôn ngữ khác, và giúp dịch Surround sang tiếng Nhật."
+          }
+        }
+      }
+    },
     "[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
       "localizations" : {
         "vi" : {
@@ -644,7 +654,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -6198,7 +6208,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
