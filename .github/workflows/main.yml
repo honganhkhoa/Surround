@@ -17,11 +17,11 @@ on:
 jobs:
   test:
     # The type of runner that the job will run on
-    runs-on: macos-12
+    runs-on: macos-14
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       - name: Run unit tests
-        run: xcodebuild test -scheme Surround -project Surround.xcodeproj -destination 'platform=iOS Simulator,name=iPhone 12,OS=16.2' | xcpretty && exit ${PIPESTATUS[0]}
+        run: xcodebuild test -scheme Surround -project Surround.xcodeproj -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' | xcbeautify
