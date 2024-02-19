@@ -137,6 +137,10 @@ extension SettingKey {
         return .init(name: "ogsSessionId")
     }
     
+    static var ogsCsrfCookie: SettingKey<String> {
+        return .init(name: "ogsCsrfCookie")
+    }
+    
     static var latestOGSOverview: SettingKey<Data> {
         return .init(name: "latestOGSOverview")
     }

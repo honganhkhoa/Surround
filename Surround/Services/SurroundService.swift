@@ -100,6 +100,9 @@ class SurroundService: NSObject, ObservableObject, SKProductsRequestDelegate, SK
                     parameters["receiptData"] = receiptData
                 }
             }
+            if let ogsCsrfCookie = userDefaults[.ogsCsrfCookie] {
+                parameters["ogsCsrfCookie"] = ogsCsrfCookie
+            }
             AF.request(
                 "\(self.sgsRoot)/register",
                 method: .post,

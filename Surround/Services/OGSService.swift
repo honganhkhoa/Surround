@@ -517,6 +517,9 @@ class OGSService: ObservableObject {
                 if cookie.name == "sessionid" {
                     userDefaults[.ogsSessionId] = cookie.value
                 }
+                if cookie.name == "csrftoken" {
+                    userDefaults[.ogsCsrfCookie] = cookie.value
+                }
             }
         }
     }
@@ -549,6 +552,8 @@ class OGSService: ObservableObject {
         self.ogsUIConfig = nil
         SurroundService.shared.unregisterDevice()
         
+        userDefaults.reset(.ogsSessionId)
+        userDefaults.reset(.ogsCsrfCookie)
         userDefaults.reset(.latestOGSOverview)
         userDefaults.reset(.latestOGSOverviewTime)
         userDefaults.reset(.latestOGSOverviewOutdated)
@@ -597,7 +602,7 @@ class OGSService: ObservableObject {
                     return false
                 }
                 let domain = URL(string: ogsRoot)!.host!
-                if let csrfToken = ogsUIConfig.csrfToken {
+                if let csrfToken = userDefaults[.ogsCsrfCookie] ?? ogsUIConfig.csrfToken {
                     if !hasCSRFToken {
                         if let cookie = HTTPCookie(properties: [
                             .name: "csrftoken",
@@ -1139,6 +1144,9 @@ class OGSService: ObservableObject {
                     Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
                     if cookie.name == "sessionid" {
                         userDefaults[.ogsSessionId] = cookie.value
+                    }
+                    if cookie.name == "csrftoken" {
+                        userDefaults[.ogsCsrfCookie] = cookie.value
                     }
                 }
             }

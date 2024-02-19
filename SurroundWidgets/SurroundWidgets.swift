@@ -113,7 +113,7 @@ class Provider: TimelineProvider {
         
         overviewLoadingCancellable = SurroundService.shared.getOGSOverview().catch { error in
             return Future<[String: Any], Error> { promise in
-                if let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
+                if let csrfToken = userDefaults[.ogsCsrfCookie] ?? userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] {
                     let ogsDomain = URL(string: OGSService.ogsRoot)!.host!
                     let csrfCookie = HTTPCookie(properties: [.name: "csrftoken", .value: csrfToken, .domain: ogsDomain, .path: "/"])
                     let sessionIdCookie = HTTPCookie(properties: [.name: "sessionid", .value: sessionId, .domain: ogsDomain, .path: "/"])

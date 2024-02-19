@@ -45,7 +45,7 @@ class NotificationService: UNNotificationServiceExtension {
                 return
             }
 
-            guard let csrfToken = userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] else {
+            guard let csrfToken = userDefaults[.ogsCsrfCookie] ?? userDefaults[.ogsUIConfig]?.csrfToken, let sessionId = userDefaults[.ogsSessionId] else {
                 self.triggerContentHandler()
                 return
             }
