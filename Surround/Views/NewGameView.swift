@@ -302,11 +302,11 @@ struct CustomGameForm: View {
                 }
                 if rankRestricted {
                     Stepper(value: $minRank, in: rankRestrictionRange) {
-                        (Text("From ") + Text(RankUtils.formattedRank(Double(minRank), longFormat: true)).bold())
+                        Text("From **\(RankUtils.formattedRank(Double(minRank), longFormat: true))**", comment: "Custom game rank restriction")
                             .font(.subheadline)
                     }
                     Stepper(value: $maxRank, in: rankRestrictionRange) {
-                        (Text("To ") + Text(RankUtils.formattedRank(Double(maxRank), longFormat: true)).bold())
+                        Text("To **\(RankUtils.formattedRank(Double(maxRank), longFormat: true))**", comment: "Custom game rank restriction")
                             .font(.subheadline)
                     }
                 }

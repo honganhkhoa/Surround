@@ -654,7 +654,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -3162,12 +3162,13 @@
         }
       }
     },
-    "From " : {
+    "From **%@**" : {
+      "comment" : "Custom game rank restriction",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Từ "
+            "value" : "Từ **%@**"
           }
         }
       }
@@ -5805,12 +5806,13 @@
         }
       }
     },
-    "To " : {
+    "To **%@**" : {
+      "comment" : "Custom game rank restriction",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đến "
+            "value" : "Đến **%@**"
           }
         }
       }
@@ -6765,7 +6767,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
