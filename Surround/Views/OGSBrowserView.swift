@@ -45,6 +45,7 @@ func firstParam(in url: URL, named name: String) -> String? {
 struct OGSBrowserView: View {
     @State var title: String?
     @State var isLoading: Bool = true
+    @State var isLoggingIn: Bool = false
     @State var webView: WKWebView?
     var initialURL: URL
     @State var url: URL?
@@ -69,11 +70,12 @@ struct OGSBrowserView: View {
                     .padding(.horizontal, 5)
                     .padding(.vertical, 5)
             }
-            OGSBrowserWebView(isLoading: $isLoading, title: $title, webView: $webView, initialURL: initialURL, url: $url, showsGoogleLogin: $showsGoogleLogin, googleLoginURL: $googleLoginURL, googleOAuthState: $googleOAuthState, requestedURL: requestedURL)
+            OGSBrowserWebView(isLoading: $isLoading, isLoggingIn: $isLoggingIn, title: $title, webView: $webView, initialURL: initialURL, url: $url, showsGoogleLogin: $showsGoogleLogin, googleLoginURL: $googleLoginURL, googleOAuthState: $googleOAuthState, requestedURL: requestedURL)
+                .opacity(isLoggingIn ? 0 : 1)
         }
 //        .navigationBarTitleDisplayMode(.inline)   // Using a different mode than other root views leads to a strange crash on iPad, related to switching sidebar away from NavigationLink
         .navigationBarItems(
-            trailing: isLoading ?
+            trailing: isLoading || isLoggingIn ?
                 AnyView(ProgressView()) :
                 AnyView(Button(action: { webView?.reload() }) {
                     Image(systemName: "arrow.clockwise")
@@ -112,6 +114,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
     typealias UIViewType = WKWebView
     @EnvironmentObject var ogs: OGSService
     @Binding var isLoading: Bool
+    @Binding var isLoggingIn: Bool
     @Binding var title: String?
     @Binding var webView: WKWebView?
     var initialURL: URL
@@ -130,8 +133,41 @@ struct OGSBrowserWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
 
+        if ogs.isLoggedIn {
+            let script = WKUserScript(
+                source: """
+var attemptCount = 0;
+var check = () => {
+    var user = localStorage.getItem('ogs.config.user');
+    window.webkit.messageHandlers.ogsLoginHandler.postMessage('checking');
+    if (user != null && !JSON.parse(user).anonymous) {
+        window.webkit.messageHandlers.ogsLoginHandler.postMessage('done');
+        location.reload();
+    } else if (attemptCount < 7) {
+        attemptCount += 1;
+        setTimeout(check, 1000);
+    }
+}
+if (localStorage.getItem('ogs.config.user')==null) {
+    setTimeout(check, 1000);
+}
+""",
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+            configuration.userContentController.addUserScript(script)
+            configuration.userContentController.add(context.coordinator, name: "ogsLoginHandler")
+            DispatchQueue.main.async {
+                isLoggingIn = true
+            }
+        }
+
         let webView = WKWebView(frame: CGRect.zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+                
+//        if webView.responds(to: Selector(("setInspectable:"))) {
+//            webView.perform(Selector(("setInspectable:")), with: true)
+//        }
 
         context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new], changeHandler: { _, change in
             if let newValue = change.newValue {
@@ -222,7 +258,7 @@ struct OGSBrowserWebView: UIViewRepresentable {
         }
     }
     
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: OGSBrowserWebView
         var loginCancellable: AnyCancellable?
         var loadingObservation: NSKeyValueObservation?
@@ -230,9 +266,24 @@ struct OGSBrowserWebView: UIViewRepresentable {
         var urlObservation: NSKeyValueObservation?
         var cookiesToSet: [HTTPCookie] = []
         var initialRequestLoaded = false
+        var loginAttemptCount = 0
         
         init(_ parent: OGSBrowserWebView) {
             self.parent = parent
+        }
+        
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if let message = message.body as? String {
+                print("Web view message: " + message)
+                if message == "checking" {
+                    loginAttemptCount += 1
+                }
+                if loginAttemptCount > 7 || message == "done" {
+                    DispatchQueue.main.async {
+                        self.parent.isLoggingIn = false
+                    }
+                }
+            }
         }
         
         func loginUsingWebviewCredentialsIfNecessary(_ webView: WKWebView) {
