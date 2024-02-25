@@ -25,6 +25,8 @@ struct GameDetailView: View {
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
     @State var analyzeMode = false
+    
+    @State var columnVisibilityBeforeZenMode = NavigationSplitViewVisibility.automatic
 
     @ObservedObject var settings = userDefaults
     
@@ -91,6 +93,21 @@ struct GameDetailView: View {
         }
     }
     
+    func enterZenMode() {
+        withAnimation {
+            columnVisibilityBeforeZenMode = nav.columnVisibility
+            zenMode = true
+            nav.columnVisibility = .detailOnly
+        }
+    }
+    
+    func exitZenMode() {
+        withAnimation {
+            zenMode = false
+            nav.columnVisibility = columnVisibilityBeforeZenMode
+        }
+    }
+    
     var compactBody: some View {
         GeometryReader { geometry -> AnyView in
 //            print("Geometry \(geometry.size)")
@@ -114,6 +131,7 @@ struct GameDetailView: View {
                         reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
                         goToNextGame: goToNextGame,
                         zenMode: $zenMode,
+                        exitZenMode: self.exitZenMode,
                         attachedKeyboardVisible: self.attachedKeyboardVisible,
                         analyzeMode: self.$analyzeMode,
                         shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
@@ -142,6 +160,7 @@ struct GameDetailView: View {
                         goToNextGame: goToNextGame,
                         horizontal: horizontal,
                         zenMode: $zenMode,
+                        exitZenMode: self.exitZenMode,
                         attachedKeyboardVisible: self.attachedKeyboardVisible,
                         analyzeMode: self.$analyzeMode
                     )
@@ -253,7 +272,7 @@ struct GameDetailView: View {
                         if !navigationBarHidden {
                             HStack {
                                 if !analyzeMode {
-                                    Button(action: { withAnimation { zenMode = true } }) {
+                                    Button(action: enterZenMode) {
                                         Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                                     }
                                 }
@@ -262,7 +281,7 @@ struct GameDetailView: View {
                                 }
                             }
                         } else if zenMode {
-                            Button(action: { withAnimation { zenMode = false } }) {
+                            Button(action: exitZenMode) {
                                 Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
                             }
                         }
@@ -300,7 +319,7 @@ struct GameDetailView: View {
                         .disabled(!shouldShowActiveGamesCarousel)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { withAnimation { zenMode = true } }) {
+                        Button(action: enterZenMode) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
                         .disabled(analyzeMode)

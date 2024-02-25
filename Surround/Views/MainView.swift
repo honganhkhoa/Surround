@@ -94,27 +94,36 @@ struct MainView: View {
             set: { if let rootView = $0 { nav.main.rootView = rootView } }
         )
         return ZStack(alignment: .top) {
-            NavigationView {
+            Group {
                 if compactSizeClass {
-                    nav.main.rootView.view
-                        .modifier(RootViewSwitchingMenu())
-                } else {
-                    List(selection: navigationCurrentView) {
-                        RootView.home.navigationLink(currentView: navigationCurrentView)
-                        RootView.publicGames.navigationLink(currentView: navigationCurrentView)
-                        if ogs.privateMessagesActivePeerIds.count > 0 {
-                            RootView.privateMessages.navigationLink(currentView: navigationCurrentView)
-                        }
-                        Divider()
-                        RootView.settings.navigationLink(currentView: navigationCurrentView)
-                        RootView.about.navigationLink(currentView: navigationCurrentView)
-                        Divider()
-                        RootView.browser.navigationLink(currentView: navigationCurrentView)
-                        RootView.forums.navigationLink(currentView: navigationCurrentView)
+                    NavigationStack {
+                        nav.main.rootView.view
+                            .modifier(RootViewSwitchingMenu())
                     }
-                    .listStyle(SidebarListStyle())
-                    .navigationTitle("Surround")
-                    nav.main.rootView.view
+                } else {
+                    NavigationSplitView(columnVisibility: Binding(
+                        get: { nav.columnVisibility },
+                        set: { nav.columnVisibility = $0 })) {
+                        List(selection: navigationCurrentView) {
+                            RootView.home.navigationLink(currentView: navigationCurrentView)
+                            RootView.publicGames.navigationLink(currentView: navigationCurrentView)
+                            if ogs.privateMessagesActivePeerIds.count > 0 {
+                                RootView.privateMessages.navigationLink(currentView: navigationCurrentView)
+                            }
+                            Divider()
+                            RootView.settings.navigationLink(currentView: navigationCurrentView)
+                            RootView.about.navigationLink(currentView: navigationCurrentView)
+                            Divider()
+                            RootView.browser.navigationLink(currentView: navigationCurrentView)
+                            RootView.forums.navigationLink(currentView: navigationCurrentView)
+                        }
+                        .listStyle(SidebarListStyle())
+                        .navigationTitle("Surround")
+                    } detail: {
+                        NavigationStack {
+                            nav.main.rootView.view
+                        }
+                    }
                 }
             }
             .fullScreenCover(isPresented: Binding(

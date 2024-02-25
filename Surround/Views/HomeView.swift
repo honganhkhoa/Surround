@@ -17,7 +17,6 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
-    @State var showRegisterWebView = false
     @State var gameDetailCancellable: AnyCancellable?
     
     @State var displayMode: GameCell.CellDisplayMode
@@ -240,26 +239,13 @@ struct HomeView: View {
             } else {
                 WelcomeView()
             }
-            NavigationLink(
-                destination: GameDetailView(currentGame: nav.home.activeGame),
-                isActive: Binding(
-                    get: { nav.home.activeGame != nil },
-                    set: { if !$0 { nav.home.activeGame = nil } }
-                )) {
-                EmptyView()
-            }
-            NavigationLink(
-                destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/register")!),
-                isActive: $showRegisterWebView
-            ) {
-                EmptyView()
-            }
-            // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
-            // https://developer.apple.com/forums/thread/677333#672042022
-            NavigationLink(destination: EmptyView()) {
-                EmptyView()
-            }
         }
+        .navigationDestination(isPresented: Binding(
+            get: { nav.home.activeGame != nil },
+            set: { if !$0 { nav.home.activeGame = nil } }
+        ), destination: {
+            GameDetailView(currentGame: nav.home.activeGame)
+        })
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {
                 DispatchQueue.main.async {

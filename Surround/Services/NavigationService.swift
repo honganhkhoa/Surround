@@ -33,6 +33,8 @@ class NavigationService: ObservableObject {
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
     @Published var publicGames = PublicGamesViewParameter()
+    
+    @Published var columnVisibility = NavigationSplitViewVisibility.automatic
 
     static func instance(forSceneWithID sceneID: String) -> NavigationService {
         if let result = instances[sceneID] {

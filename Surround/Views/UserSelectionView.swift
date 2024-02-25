@@ -57,9 +57,9 @@ struct SearchBar: UIViewRepresentable {
 
 struct UserSelectionView: View {
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.dismiss) private var dismiss
     
     var user: Binding<OGSUser?> = .constant(nil)
-    var isPresented: Binding<Bool> = .constant(true)
     @State var searchText = ""
     @State var searchResultByKeyword = [String: [OGSUser]]()
     @State var searchRequestByKeyword = [String: AnyCancellable]()
@@ -67,7 +67,7 @@ struct UserSelectionView: View {
     func selectUser(_ user: OGSUser) {
         if user.id != ogs.user?.id {
             self.user.wrappedValue = user
-            self.isPresented.wrappedValue = false
+            dismiss()
         }
     }
     

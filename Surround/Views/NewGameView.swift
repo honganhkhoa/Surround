@@ -316,7 +316,7 @@ struct CustomGameForm: View {
                     .leadingAlignedInScrollView()
                 Spacer().frame(height: 10)
                 Divider()
-                NavigationLink(destination: UserSelectionView(user: $opponent, isPresented: $selectingOpponent), isActive: $selectingOpponent) {
+                NavigationLink(destination: UserSelectionView(user: $opponent)) {
                     HStack {
                         if let opponent = opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
                             URLImage(url: opponentIconURL) { $0.resizable() }

@@ -28,16 +28,14 @@ struct PublicGamesList: View {
                     }
                 }
                 .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
-                NavigationLink(
-                    destination: GameDetailView(currentGame: nav.publicGames.activeGame),
-                    isActive: Binding(
-                        get: { nav.publicGames.activeGame != nil },
-                        set: { if !$0 { nav.publicGames.activeGame = nil } }
-                    )) {
-                    EmptyView()
-                }
             }
         }
+        .navigationDestination(isPresented: Binding(
+            get: { nav.publicGames.activeGame != nil },
+            set: { if !$0 { nav.publicGames.activeGame = nil } }
+        ), destination: {
+            GameDetailView(currentGame: nav.publicGames.activeGame)
+        })
         .onAppear {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()

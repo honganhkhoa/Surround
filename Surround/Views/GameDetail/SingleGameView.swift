@@ -16,6 +16,7 @@ struct SingleGameView: View {
     var goToNextGame: (() -> ())?
     var horizontal = false
     @Binding var zenMode: Bool
+    var exitZenMode: (() -> ())?
     
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -493,7 +494,7 @@ struct SingleGameView: View {
                 }
             }
             if !compact || !iOS15 {
-                Button(action: { withAnimation { zenMode = false } }) {
+                Button(action: { if let exitZenMode { exitZenMode() } }) {
                     Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
                         .labelStyle(IconOnlyLabelStyle())
                 }
