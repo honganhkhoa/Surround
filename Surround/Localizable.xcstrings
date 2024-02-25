@@ -112,12 +112,6 @@
     "**%@** of total play time for each player." : {
       "comment" : "TimeControl - long description for absolute system",
       "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thời gian suy nghĩ **%@** cho mỗi bên."
-          }
-        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6210,7 +6204,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -6767,7 +6761,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

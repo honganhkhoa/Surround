@@ -45,6 +45,7 @@ struct AnalyzeTreeSlice: View {
                                 .onTapGesture {
                                     self.selectedPosition = position
                                 }
+                                .position(x: 15, y: 15)
                         }
                     }
 //                    else {
@@ -186,7 +187,7 @@ struct AnalyzeTreeView: View {
                                 }
                             }
                         }
-                    }
+                    }.frame(minHeight: geometry.size.height)
                 }.frame(minHeight: geometry.size.height)
             }.frame(height: geometry.size.height)
         }

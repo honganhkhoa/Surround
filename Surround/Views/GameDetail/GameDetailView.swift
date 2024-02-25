@@ -27,6 +27,8 @@ struct GameDetailView: View {
     @State var analyzeMode = false
 
     @ObservedObject var settings = userDefaults
+    
+    var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
 
     var shouldShowActiveGamesCarousel: Bool {
         guard !zenMode else {
@@ -271,7 +273,7 @@ struct GameDetailView: View {
             return AnyView(
                 result.toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { withAnimation { analyzeMode.toggle() } }) {
+                        Toggle(isOn: $analyzeMode.animation()) {
                             if currentGame.analysisAvailable {
                                 Label("Toggle analyze mode", systemImage: "arrow.triangle.branch")
                                     .labelStyle(IconOnlyLabelStyle())
@@ -282,16 +284,16 @@ struct GameDetailView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            withAnimation {
-                                if analyzeMode {
-                                    analyzeMode.toggle()
-                                    Setting(.showsActiveGamesCarousel).binding.wrappedValue = true
-                                } else {
-                                    Setting(.showsActiveGamesCarousel).binding.wrappedValue.toggle()
+                        Toggle(isOn: Binding<Bool>(
+                            get: { showsActiveGamesCarouselSetting.wrappedValue },
+                            set: { newValue in
+                                withAnimation {
+                                    if newValue && analyzeMode {
+                                        analyzeMode.toggle()
+                                    }
+                                    showsActiveGamesCarouselSetting.wrappedValue = newValue
                                 }
-                            }
-                        }) {
+                            })) {
                             Label("Toggle thumbnails", systemImage: "rectangle.topthird.inset")
                                 .labelStyle(IconOnlyLabelStyle())
                         }
