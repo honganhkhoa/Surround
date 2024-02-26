@@ -148,7 +148,6 @@
 		BC70596225FF00F400AC4DE9 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596125FF00F400AC4DE9 /* AboutView.swift */; };
 		BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596925FF209300AC4DE9 /* SupporterView.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
-		BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */; };
 		BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8CE87E2657B1B100E4BE1A /* GameTests.swift */; };
 		BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
 		BC8CE8812657B2E100E4BE1A /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
@@ -418,7 +417,6 @@
 		BC70596125FF00F400AC4DE9 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		BC70596925FF209300AC4DE9 /* SupporterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupporterView.swift; sourceTree = "<group>"; };
 		BC7407DA25493B71001D5581 /* SurroundService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundService.swift; sourceTree = "<group>"; };
-		BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutofocusTextField.swift; sourceTree = "<group>"; };
 		BC8CE87E2657B1B100E4BE1A /* GameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameTests.swift; sourceTree = "<group>"; };
 		BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSystemPickerView.swift; sourceTree = "<group>"; };
 		BC92008125CE5BE400C14433 /* UserSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSelectionView.swift; sourceTree = "<group>"; };
@@ -702,7 +700,6 @@
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
-				BC7E7EA925D0235300A8251B /* AutofocusTextField.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
@@ -1134,7 +1131,6 @@
 				BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */,
 				BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
-				BC7E7EAA25D0235400A8251B /* AutofocusTextField.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
 				BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */,
 				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,

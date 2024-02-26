@@ -648,7 +648,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -3140,6 +3140,23 @@
         }
       }
     },
+    "Friendly Match" : {
+      "comment" : "Default game name",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "親睦戦"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ván giao hữu"
+          }
+        }
+      }
+    },
     "Friends" : {
       "localizations" : {
         "ja" : {
@@ -3194,7 +3211,7 @@
         }
       }
     },
-    "Game name: " : {
+    "Game name:" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3205,7 +3222,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tên ván: "
+            "value" : "Tên ván:"
           }
         }
       }
@@ -6204,7 +6221,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {

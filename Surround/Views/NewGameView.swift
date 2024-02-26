@@ -176,6 +176,8 @@ struct QuickMatchForm: View {
     }
 }
 
+let defaultGameName = String(localized: "Friendly Match", comment: "Default game name")
+
 struct CustomGameForm: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -191,7 +193,7 @@ struct CustomGameForm: View {
                 isPrivate: false,
                 handicap: 0,
                 disableAnalysis: false,
-                name: "Friendly Match",
+                name: defaultGameName,
                 rules: .japanese,
                 timeControl: TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
             )
@@ -199,7 +201,7 @@ struct CustomGameForm: View {
         return newChallenge
     }()
     
-    @State var gameName = "Friendly Match"
+    @State var gameName = defaultGameName
     
     @State var isPrivate = false
     @State var isRanked = true
@@ -551,29 +553,21 @@ struct CustomGameForm: View {
         }
     }
     
-    @State var isEditingGameName = false
-    
     var otherOptions: some View {
         GroupBox(label: Text("Others", comment: "NewGameView, title for `Others` section")) {
             Spacer().frame(height: 10)
-            if isEditingGameName {
-                AutofocusTextField(
-                    text: $gameName,
-                    isEditing: $isEditingGameName,
-                    placeholder: "Friendly Match",
-                    textStyle: .subheadline,
-                    onEditingDone: {
+            HStack {
+                Text("Game name:")
+                    .font(.subheadline)
+                TextField(defaultGameName, text: $gameName)
+                    .submitLabel(.done)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.subheadline)
+                    .onSubmit {
                         if gameName.count == 0 {
-                            gameName = "Friendly Match"
+                            gameName = defaultGameName
                         }
                     }
-                )
-            } else {
-                Button(action: { isEditingGameName = true }) {
-                    (Text("Game name: ") + Text(gameName).bold())
-                        .font(.subheadline)
-                        .leadingAlignedInScrollView()
-                }
             }
             Toggle(isOn: $analysisDisabled) {
                 Text("Disable analysis").font(.subheadline)
@@ -657,6 +651,7 @@ struct CustomGameForm: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .onChange(of: gameName) { challenge.game.name = $0 }
         .onChange(of: isRanked) { challenge.game.ranked = $0 }
