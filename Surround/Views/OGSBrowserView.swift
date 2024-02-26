@@ -113,6 +113,8 @@ struct OGSBrowserView: View {
 struct OGSBrowserWebView: UIViewRepresentable {
     typealias UIViewType = WKWebView
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.dismiss) var dismiss
+
     @Binding var isLoading: Bool
     @Binding var isLoggingIn: Bool
     @Binding var title: String?
@@ -303,6 +305,7 @@ if (localStorage.getItem('ogs.config.user')==null) {
                                 }
                             }, receiveValue: { ogsUIConfig in
                                 ogs.loadOverview()
+                                self.parent.dismiss()
                                 print(ogsUIConfig)
                             })
                     }
