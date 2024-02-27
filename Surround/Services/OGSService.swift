@@ -800,13 +800,14 @@ class OGSService: ObservableObject {
                 }
             }
         }.receive(on: RunLoop.main).sink(receiveCompletion: { result in
-            if case .failure(let error) = result {
-                print(error)
-                self.logout()
-                return
-            }
             self.isLoadingOverview = false
             self.overviewLoadingCancellable = nil
+            if case .failure(let error) = result {
+                print(error)
+                if let error = error as? AFError, case .responseValidationFailed(.unacceptableStatusCode(403)) = error {
+                    self.logout()
+                }
+            }
             if let finishCallback = finishCallback {
                 finishCallback()
             }
