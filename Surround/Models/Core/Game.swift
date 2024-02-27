@@ -671,7 +671,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             if difference > 0 {
                 return String(localized: "White by \(difference, specifier: "%.1f")")
             } else {
-                return String(localized: "Black by \(difference, specifier: "%.1f")")
+                return String(localized: "Black by \(-difference, specifier: "%.1f")")
             }
         } else {
             if gamePhase == .stoneRemoval {
