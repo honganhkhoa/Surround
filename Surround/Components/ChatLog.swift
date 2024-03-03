@@ -192,9 +192,12 @@ struct NewChatInput: View {
                 }
                 TextField(
                     malkovich ? "Note to yourself" : "Say hi!",
-                    text: $newChat,
-                    onCommit: sendChat
+                    text: $newChat
                 )
+                .submitLabel(.send)
+                .onSubmit {
+                    self.sendChat()
+                }
                 if self.chatSendingCancellable == nil {
                     Button(action: sendChat) {
                         Image(systemName: "arrow.up.circle.fill")

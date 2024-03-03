@@ -178,7 +178,7 @@ struct GameDetailView: View {
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
         #endif
-        var navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
+        let navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.username) [\(opponent.formattedRank)]"
