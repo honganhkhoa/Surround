@@ -178,8 +178,7 @@ struct GameDetailView: View {
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
         #endif
-        var navigationBarHidden = attachedKeyboardVisible || zenMode
-        var iOS15 = false
+        var navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.username) [\(opponent.formattedRank)]"
@@ -190,10 +189,6 @@ struct GameDetailView: View {
                     }
                 }
             }
-        }
-        if #available(iOS 15, *) {
-            iOS15 = true
-            navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
         }
         
         let result = Group {
@@ -286,7 +281,7 @@ struct GameDetailView: View {
                             }
                         }
                     }
-                }.ignoresSafeArea(edges: iOS15 && navigationBarHidden ? [.top] : [])
+                }.ignoresSafeArea(edges: navigationBarHidden ? [.top] : [])
             )
         } else {
             return AnyView(

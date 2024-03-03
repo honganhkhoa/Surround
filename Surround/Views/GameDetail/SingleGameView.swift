@@ -46,8 +46,6 @@ struct SingleGameView: View {
     
     @Namespace var animation
     
-    @State var iOS15 = false
-    
     enum DisplayMode {
         case playerInfo
         case chat
@@ -493,7 +491,7 @@ struct SingleGameView: View {
                     }
                 }
             }
-            if !compact || !iOS15 {
+            if !compact {
                 Button(action: { if let exitZenMode { exitZenMode() } }) {
                     Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
                         .labelStyle(IconOnlyLabelStyle())
@@ -548,9 +546,6 @@ struct SingleGameView: View {
             }
         }
         .onAppear {
-            if #available(iOS 15, *) {
-                self.iOS15 = true
-            }
             if self.soundOnStonePlacement {
                 if let audioData = NSDataAsset(name: "stonePlacing")?.data {
                     self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
