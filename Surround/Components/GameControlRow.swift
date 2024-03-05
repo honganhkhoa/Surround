@@ -29,7 +29,7 @@ struct GameControlRow: View {
 
     func submitMove(move: Move) {
         self.ogsRequestCancellable = ogs.submitMove(move: move, forGame: game)
-            .zip(game.$currentPosition.setFailureType(to: Error.self))
+            .zip(game.$currentPosition.filter({ $0.lastMoveNumber != game.currentPosition.lastMoveNumber }).setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
                 DispatchQueue.main.async {
                     self.ogsRequestCancellable = nil
