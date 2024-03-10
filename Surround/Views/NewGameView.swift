@@ -266,23 +266,12 @@ struct CustomGameForm: View {
     }
 
     var rankRestrictionRange: ClosedRange<Int> {
-        guard isRanked, let user = ogs.user else {
-            return 5...38
-        }
-        
-        let rank = Int(user.rank())
-        
-        return max(rank - 9, 5)...min(rank + 9, 38)
+        return 5...38
     }
     
     func updateForRankedGames() {
         isPrivate = false
         standardBoardSize = true
-        if let user = ogs.user {
-            let rank = Int(user.rank())
-            minRank = max(minRank, rank - 9)
-            maxRank = min(maxRank, rank + 9)
-        }
         komi = rulesSet.defaultKomi
         handicap = min(handicap, 9)
     }
@@ -992,18 +981,19 @@ struct NewGameView_Previews: PreviewProvider {
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
-            .colorScheme(.dark)
+            .previewDisplayName("Quick match")
             NavigationView {
                 NewGameView(newGameOption: .custom)
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
+            .previewDisplayName("Custom game")
             NavigationView {
                 NewGameView(newGameOption: .openChallenges)
                     .navigationBarTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
             }
-            .colorScheme(.dark)
+            .previewDisplayName("Open challenges")
         }
         .environmentObject(
             OGSService.previewInstance(
