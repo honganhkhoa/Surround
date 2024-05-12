@@ -227,7 +227,7 @@ enum TimeControlSystem: Equatable {
     }
 }
 
-enum TimeControlSpeed: String, Codable {
+enum TimeControlSpeed: String, Codable, Hashable {
     case live
     case correspondence
     case blitz
@@ -272,8 +272,8 @@ enum TimeControlSpeed: String, Codable {
 }
 
 @dynamicMemberLookup
-struct TimeControl: Codable, Equatable {
-    struct TimeControlCodingData: Codable, Equatable {
+struct TimeControl: Codable, Equatable, Hashable {
+    struct TimeControlCodingData: Codable, Hashable {
         internal init(timeControl: String, system: String? = nil, initialTime: Int? = nil, timeIncrement: Int? = nil, maxTime: Int? = nil, mainTime: Int? = nil, periods: Int? = nil, periodTime: Int? = nil, perMove: Int? = nil, stonesPerPeriod: Int? = nil, totalTime: Int? = nil, speed: TimeControlSpeed? = nil, pauseOnWeekends: Bool? = nil) {
             self.timeControl = timeControl
             self.system = system ?? timeControl
@@ -319,10 +319,6 @@ struct TimeControl: Codable, Equatable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(codingData)
-    }
-
-    static func == (lhs: TimeControl, rhs: TimeControl) -> Bool {
-        return lhs.codingData == rhs.codingData
     }
 
     subscript<T>(dynamicMember keyPath: WritableKeyPath<TimeControlCodingData, T>) -> T {

@@ -10,17 +10,19 @@ import Combine
 
 struct RengoPlayerCard: View {
     @EnvironmentObject var ogs: OGSService
-    var challenge: OGSChallenge
+    var challenge: any OGSChallenge
     var player: OGSUser
     var color: StoneColor?
     @State var playerAsssignCancellable: AnyCancellable?
     
     func assignPlayer(to newColor: StoneColor?) {
-        playerAsssignCancellable = ogs.assignRengoTeam(challenge: challenge, player: player, color: newColor).sink(receiveCompletion: { completion in
-            playerAsssignCancellable = nil
-        }, receiveValue: {
-            playerAsssignCancellable = nil
-        })
+        if let challenge = challenge as? OGSSeekgraphChallenge {
+            playerAsssignCancellable = ogs.assignRengoTeam(challenge: challenge, player: player, color: newColor).sink(receiveCompletion: { completion in
+                playerAsssignCancellable = nil
+            }, receiveValue: {
+                playerAsssignCancellable = nil
+            })
+        }
     }
     
     var body: some View {
@@ -70,7 +72,7 @@ struct RengoPlayerCard: View {
 
 struct RengoPlayersDetail: View {
     @EnvironmentObject var ogs: OGSService
-    var challenge: OGSChallenge
+    var challenge: any OGSChallenge
     
     @Namespace var playerCards
 
@@ -165,7 +167,7 @@ struct RengoPlayersDetail: View {
 }
 
 struct RengoActions: View {
-    var challenge: OGSChallenge
+    var challenge: OGSSeekgraphChallenge
     @EnvironmentObject var ogs: OGSService
     @State var ogsRequestCancellable: AnyCancellable?
     @EnvironmentObject var nav: NavigationService
@@ -277,10 +279,10 @@ struct RengoActions: View {
 struct ChallengeCell: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
-    var challenge: OGSChallenge
+    var challenge: any OGSChallenge
     @State var ogsRequestCancellable: AnyCancellable?
         
-    func withdrawOrDeclineChallenge(challenge: OGSChallenge) {
+    func withdrawOrDeclineChallenge(challenge: any OGSSubmittedChallenge) {
         self.ogsRequestCancellable = ogs.withdrawOrDeclineChallenge(challenge: challenge)
             .zip(ogs.$challengesSent.setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
@@ -288,7 +290,7 @@ struct ChallengeCell: View {
             }, receiveValue: { _ in})
     }
     
-    func acceptChallenge(challenge: OGSChallenge) {
+    func acceptChallenge(challenge: any OGSSubmittedChallenge) {
         self.ogsRequestCancellable = ogs.acceptChallenge(challenge: challenge)
             .zip(ogs.$challengesReceived.setFailureType(to: Error.self))
             .sink(receiveCompletion: { completion in
@@ -310,11 +312,10 @@ struct ChallengeCell: View {
     }
     
     var playerInfos: some View {
-        let isUserTheChallenger = challenge.challenger?.id == ogs.user?.id
         let challengerStoneColor = challenge.challengerColor
         
         return VStack {
-            if let challenger = challenge.challenger {
+            if let challenger = challenge.challenger ?? ogs.user {
                 HStack(alignment: .top) {
                     if let iconURL = challenger.iconURL(ofSize: 64) {
                         ZStack(alignment: .bottomTrailing) {
@@ -343,8 +344,8 @@ struct ChallengeCell: View {
                         }
                     }
                     Spacer()
-                    if challenge.id != 0 {
-                        if isUserTheChallenger {
+                    if let challenge = challenge as? (any OGSSubmittedChallenge) {
+                        if challenger.id == ogs.user?.id {
                             if ogsRequestCancellable != nil {
                                 ProgressView()
                             } else {
@@ -368,7 +369,7 @@ struct ChallengeCell: View {
                 }
                 Spacer().frame(height: 15)
             }
-            if let challenged = challenge.challenged {
+            if let challenge = challenge as? (any OGSSubmittedChallenge), let challenged = challenge.challenged {
                 HStack(alignment: .top) {
                     Spacer()
                     VStack(alignment: .trailing) {
@@ -411,9 +412,73 @@ struct ChallengeCell: View {
         }
     }
     
+    var gameDetails: some View {
+        let game = challenge.game
+        return VStack(alignment: .leading, spacing: 3) {
+            Label{
+                HStack {
+                    (Text(verbatim: "\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
+                        .leadingAlignedInScrollView()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("Handicap: ").bold()
+                        .offset(x: 8)
+                    if game.handicap == -1 {
+                        Text("Auto")
+                    } else {
+                        Text(verbatim: "\(game.handicap)")
+                    }
+                }
+            } icon: {
+                Image(systemName: "squareshape.split.3x3")
+            }
+            Label {
+                HStack {
+                    (Text("Rules: ").bold() + Text(game.rules.fullName))
+                        .leadingAlignedInScrollView()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    if challenge.useCustomKomi {
+                        Spacer()
+                        Text("Komi: ").bold()
+                            .offset(x: 8)
+                        Text(verbatim: String(format: "%.1f", game.komi!))
+                    }
+                }
+            } icon: {
+                Image(systemName: "text.badge.checkmark")
+            }
+            let timeControl = game.timeControl
+            Label {
+                VStack(alignment: .leading) {
+                    Text(verbatim: "\(timeControl.systemName): \(timeControl.shortDescription)")
+                        .leadingAlignedInScrollView()
+                    if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
+                        Text("Pause on weekend")
+                    }
+                }
+                
+            } icon: {
+                Image(systemName: "clock")
+            }
+            if (game.disableAnalysis) {
+                Label("Analysis disabled", systemImage: "arrow.triangle.branch")
+            } else {
+                Label("Analysis enabled", systemImage: "arrow.triangle.branch")
+            }
+            if let minRank = game.minRank, let maxRank = game.maxRank {
+                if minRank > -1000 && maxRank < 1000 {
+                    Label(String("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))"), systemImage: "arrow.up.and.down.square")
+                }
+            }
+        }
+        .font(.subheadline)
+    }
+    
     var body: some View {
         VStack {
-            if challenge.rengo {
+            if let challenge = challenge as? OGSSeekgraphChallenge, challenge.rengo {
                 RengoPlayersDetail(challenge: challenge)
                 RengoActions(challenge: challenge)
             } else {
@@ -442,67 +507,7 @@ struct ChallengeCell: View {
                     Spacer()
                 }
             }
-            let game = challenge.game
-            VStack(alignment: .leading, spacing: 3) {
-                Label{
-                    HStack {
-                        (Text(verbatim: "\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
-                            .leadingAlignedInScrollView()
-                            .minimumScaleFactor(0.7)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("Handicap: ").bold()
-                            .offset(x: 8)
-                        if game.handicap == -1 {
-                            Text("Auto")
-                        } else {
-                            Text(verbatim: "\(game.handicap)")
-                        }
-                    }
-                } icon: {
-                    Image(systemName: "squareshape.split.3x3")
-                }
-                Label {
-                    HStack {
-                        (Text("Rules: ").bold() + Text(game.rules.fullName))
-                            .leadingAlignedInScrollView()
-                            .minimumScaleFactor(0.7)
-                            .lineLimit(1)
-                        if game.komi != nil && game.komi != game.rules.defaultKomi {
-                            Spacer()
-                            Text("Komi: ").bold()
-                                .offset(x: 8)
-                            Text(verbatim: String(format: "%.1f", game.komi!))
-                        }
-                    }
-                } icon: {
-                    Image(systemName: "text.badge.checkmark")
-                }
-                let timeControl = game.timeControl
-                Label {
-                    VStack(alignment: .leading) {
-                        Text(verbatim: "\(timeControl.systemName): \(timeControl.shortDescription)")
-                            .leadingAlignedInScrollView()
-                        if (timeControl.pauseOnWeekends ?? false) && timeControl.speed == .correspondence {
-                            Text("Pause on weekend")
-                        }
-                    }
-                    
-                } icon: {
-                    Image(systemName: "clock")
-                }
-                if (game.disableAnalysis) {
-                    Label("Analysis disabled", systemImage: "arrow.triangle.branch")
-                } else {
-                    Label("Analysis enabled", systemImage: "arrow.triangle.branch")
-                }
-                if let minRank = game.minRank, let maxRank = game.maxRank {
-                    if minRank > -1000 && maxRank < 1000 {
-                        Label(String("\(RankUtils.formattedRank(Double(minRank), longFormat: true)) - \(RankUtils.formattedRank(Double(maxRank), longFormat: true))"), systemImage: "arrow.up.and.down.square")
-                    }
-                }
-            }
-            .font(.subheadline)
+            gameDetails
         }
     }
 }
@@ -511,7 +516,7 @@ struct ChallengeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             VStack {
-                ChallengeCell(challenge: OGSChallenge.sampleRengoChallenge)
+                ChallengeCell(challenge: OGSChallengeSampleData.sampleRengoChallenge)
                     .padding()
                     .background(Color(UIColor.systemBackground).shadow(radius: 2))
             }
@@ -541,8 +546,9 @@ struct ChallengeView_Previews: PreviewProvider {
                     ]
                 )
             )
+            .previewDisplayName("Rengo")
             VStack {
-                ChallengeCell(challenge: OGSChallenge.sampleOpenChallenge)
+                ChallengeCell(challenge: OGSChallengeSampleData.sampleOpenChallenge)
                     .padding()
                     .background(Color(UIColor.systemBackground).shadow(radius: 2))
             }
@@ -555,8 +561,9 @@ struct ChallengeView_Previews: PreviewProvider {
                     )
                 )
             )
+            .previewDisplayName("Open challenge")
             VStack {
-                ChallengeCell(challenge: OGSChallenge.sampleChallenge)
+                ChallengeCell(challenge: OGSChallengeSampleData.sampleChallenge)
                     .padding()
                     .background(Color(UIColor.systemGray5).shadow(radius: 2))
             }
@@ -571,7 +578,23 @@ struct ChallengeView_Previews: PreviewProvider {
                 )
             )
             .colorScheme(.dark)
+            .previewDisplayName("Direct challenge")
+            VStack {
+                ChallengeCell(challenge: OGSChallengeSampleData.sampleChallengeTemplate)
+                    .padding()
+                    .background(Color(UIColor.systemBackground).shadow(radius: 2))
+            }
+            .padding()
+            .environmentObject(
+                OGSService.previewInstance(
+                    user: OGSUser(
+                        username: "HongAnhKhoa",
+                        id: 314459
+                    )
+                )
+            )
+            .previewDisplayName("Challenge template")
         }
-        .previewLayout(.fixed(width: 320, height: 480))
+        .previewLayout(.fixed(width: 320, height: 600))
     }
 }

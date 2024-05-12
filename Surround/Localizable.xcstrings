@@ -1038,7 +1038,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -4104,6 +4104,9 @@
         }
       }
     },
+    "Create open challenge" : {
+
+    },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
       "localizations" : {
         "fr" : {
@@ -6006,6 +6009,9 @@
         }
       }
     },
+    "No saved preferred settings." : {
+
+    },
     "No time control" : {
       "comment" : "TimeControl system name",
       "localizations" : {
@@ -6481,6 +6487,12 @@
           }
         }
       }
+    },
+    "Preferred settings" : {
+
+    },
+    "Preferred Settings" : {
+
     },
     "Preview" : {
       "localizations" : {
@@ -7059,6 +7071,9 @@
         }
       }
     },
+    "Save settings" : {
+
+    },
     "Say hi!" : {
       "localizations" : {
         "fr" : {
@@ -7125,6 +7140,9 @@
           }
         }
       }
+    },
+    "Select opponent" : {
+
     },
     "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
       "localizations" : {
@@ -9634,6 +9652,9 @@
           }
         }
       }
+    },
+    "xxx" : {
+
     },
     "You" : {
       "localizations" : {

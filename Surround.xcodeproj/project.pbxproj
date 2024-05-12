@@ -81,6 +81,9 @@
 		BC3CD7D525EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
 		BC3CD7D625EE479900C931EB /* OGSPrivateMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */; };
 		BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */; };
+		BC3ECFC72B9EAE5500F4E546 /* PreferredSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3ECFC62B9EAE5500F4E546 /* PreferredSettingsView.swift */; };
+		BC3ECFCE2BA7ECCE00F4E546 /* ChallengeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3ECFCD2BA7ECCE00F4E546 /* ChallengeTests.swift */; };
+		BC3ECFCF2BA7ED1800F4E546 /* OGSRemoteSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */; };
 		BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */; };
 		BC463AF3265B70E300D40D3A /* DictionaryCoding in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF2265B70E300D40D3A /* DictionaryCoding */; };
 		BC463AF5265B70E300D40D3A /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BC463AF4265B70E300D40D3A /* Alamofire */; };
@@ -271,6 +274,10 @@
 		BCD21501255A94A400F78E2A /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BCD2151B255A954A00F78E2A /* se_wrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413924D1234500B5DB74 /* se_wrapper.cpp */; };
 		BCD21522255A954E00F78E2A /* Goban.cc in Sources */ = {isa = PBXBuildFile; fileRef = BCAE413624D1213100B5DB74 /* Goban.cc */; };
+		BCD3009B2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */; };
+		BCD3009C2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */; };
+		BCD3009D2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */; };
+		BCD3009E2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */; };
 		BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */ = {isa = PBXBuildFile; fileRef = BCDD9B4927797CB20072229C /* game-beta-11289.json */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 		BCE913D125B9398D00065061 /* NewGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE913D025B9398D00065061 /* NewGameView.swift */; };
@@ -385,6 +392,8 @@
 		BC3C7E9624D2840700D39AEB /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		BC3CD7D225EE479600C931EB /* OGSPrivateMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPrivateMessage.swift; sourceTree = "<group>"; };
 		BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageLog.swift; sourceTree = "<group>"; };
+		BC3ECFC62B9EAE5500F4E546 /* PreferredSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferredSettingsView.swift; sourceTree = "<group>"; };
+		BC3ECFCD2BA7ECCE00F4E546 /* ChallengeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeTests.swift; sourceTree = "<group>"; };
 		BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardPositionTests.swift; sourceTree = "<group>"; };
 		BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSMoveTreeNode.swift; sourceTree = "<group>"; };
@@ -457,6 +466,7 @@
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BCD2150E255A952300F78E2A /* SurroundNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationService.entitlements; sourceTree = "<group>"; };
+		BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSRemoteSetting.swift; sourceTree = "<group>"; };
 		BCDD9B4927797CB20072229C /* game-beta-11289.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-beta-11289.json"; sourceTree = "<group>"; };
 		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 		BCE913D025B9398D00065061 /* NewGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameView.swift; sourceTree = "<group>"; };
@@ -605,6 +615,7 @@
 				BC8CE87E2657B1B100E4BE1A /* GameTests.swift */,
 				BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */,
 				BC463B0326624D5D00D40D3A /* PuzzleTests.swift */,
+				BC3ECFCD2BA7ECCE00F4E546 /* ChallengeTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -638,6 +649,7 @@
 				BC70596925FF209300AC4DE9 /* SupporterView.swift */,
 				BC6E33F3260C388F008A59F7 /* WelcomeView.swift */,
 				BC511BC72C3CE61E00DDA256 /* View+apply.swift */,
+				BC3ECFC62B9EAE5500F4E546 /* PreferredSettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -675,6 +687,7 @@
 				BC463AFA2662494A00D40D3A /* OGSMoveTreeNode.swift */,
 				BC463AFD26624B6100D40D3A /* OGSPuzzle.swift */,
 				BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */,
+				BCD3009A2B90786C002B11E0 /* OGSRemoteSetting.swift */,
 			);
 			path = OGS;
 			sourceTree = "<group>";
@@ -1142,6 +1155,7 @@
 				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,
 				BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */,
 				BCAE413824D1213100B5DB74 /* Goban.cc in Sources */,
+				BCD3009B2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
 				BCACD3E229DEC06D00655D8B /* OGSWebsocket.swift in Sources */,
 				BC463AFB2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BCC3276027B66475005EB2E3 /* OGSChatMessage.swift in Sources */,
@@ -1173,6 +1187,7 @@
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
+				BC3ECFC72B9EAE5500F4E546 /* PreferredSettingsView.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
 				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
@@ -1189,6 +1204,7 @@
 				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,
 				BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */,
+				BC3ECFCE2BA7ECCE00F4E546 /* ChallengeTests.swift in Sources */,
 				BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */,
 				BC8CE8832657B2E100E4BE1A /* Variation.swift in Sources */,
 				BC4ED4CF2802EEF1003A85A2 /* OGSChatMessage.swift in Sources */,
@@ -1208,6 +1224,7 @@
 				BC463AFC2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC8CE8812657B2E100E4BE1A /* OGSAutomatchEntry.swift in Sources */,
 				BC8CE8892657B2E100E4BE1A /* OGSClock.swift in Sources */,
+				BC3ECFCF2BA7ED1800F4E546 /* OGSRemoteSetting.swift in Sources */,
 				BC8CE8822657B2E100E4BE1A /* OGSPrivateMessage.swift in Sources */,
 				BC8CE88A2657B2E100E4BE1A /* OGSChallenge.swift in Sources */,
 				BC463AFF26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
@@ -1253,6 +1270,7 @@
 				BC5EEBE9259B33BE00675761 /* Stone.swift in Sources */,
 				BC285B6D2557FCBA005378F9 /* Game.swift in Sources */,
 				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
+				BCD3009D2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
 				BC285B5C2557FCAC005378F9 /* OGSGame.swift in Sources */,
 				BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */,
 				BC285B5A2557FCAC005378F9 /* OGSClock.swift in Sources */,
@@ -1290,6 +1308,7 @@
 				BC5EEBE8259B33BE00675761 /* Stone.swift in Sources */,
 				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
 				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,
+				BCD3009C2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
 				BC64939625380D96002B2200 /* Game.swift in Sources */,
 				BC649428253FF942002B2200 /* NavigationService.swift in Sources */,
 				BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */,
@@ -1309,6 +1328,7 @@
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,
 				BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */,
+				BCD3009E2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
 				BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */,
 				BC463B0A2662515900D40D3A /* OGSPuzzle.swift in Sources */,
 				BC3037F92692D03300181570 /* MoveTree.swift in Sources */,
@@ -1576,7 +1596,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1597,7 +1617,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

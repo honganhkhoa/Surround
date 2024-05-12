@@ -7,15 +7,98 @@
 
 import Foundation
 
-struct OGSChallenge: Codable, Identifiable {
-    var id: Int
-    var challenger: OGSUser?
-    var challenged: OGSUser?
-    var challengerColor: StoneColor?
-    var game: OGSChallengeGameDetail
+protocol OGSChallenge: Decodable, Hashable {
+    associatedtype GameDetail: OGSChallengeGameDetail
+    
+    var challenger: OGSUser? { get set }
+    var challenged: OGSUser? { get set }
+    var challengerColor: StoneColor? { get set }
+    var game: GameDetail { get set }
 
+//    enum CodingKeys: String, CodingKey {
+//        case id
+//        case challenger
+//        case challenged
+//        case challengerColor
+//        case game
+//        
+//        // Encode only
+//        case maxRanking
+//        case minRanking
+//        case initialized
+//        case agaRanked
+//    }
+//    
+//    init(from decoder: Decoder) throws {
+//        let container = try decoder.container(keyedBy: CodingKeys.self)
+//        
+//        if container.contains(.challenged) {
+//            // Direct challenge
+//            id = try container.decode(Int.self, forKey: .id)
+//            challenger = try container.decode(OGSUser.self, forKey: .challenger)
+//            challenged = try container.decode(OGSUser.self, forKey: .challenged)
+//            challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
+//            game = try container.decode(OGSChallengeGameDetail.self, forKey: .game)
+//        } else {
+//            // Custom game
+//            let singleKeyContainer = try decoder.singleValueContainer()
+//            do {
+//                game = try singleKeyContainer.decode(OGSChallengeGameDetail.self)
+//            } catch {
+//                game = try container.decode(OGSChallengeGameDetail.self, forKey: .game)
+//            }
+//            id = game.challengeId ?? 0
+//            if let username = game.username, let userId = game.userId, let userRank = game.userRank {
+//                challenger = OGSUser(
+//                    username: username,
+//                    id: userId,
+//                    rank: userRank
+//                )
+//            }
+//            if id == 0 {
+//                id = self.hashValue
+//            }
+//        }
+//    }
+//    
+//    func encode(to encoder: Encoder) throws {
+//        var container = encoder.container(keyedBy: CodingKeys.self)
+//        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
+//        if let maxRank = game.maxRank, let minRank = game.minRank {
+//            try container.encode(maxRank, forKey: .maxRanking)
+//            try container.encode(minRank, forKey: .minRanking)
+//        } else {
+//            try container.encode(1000, forKey: .maxRanking)
+//            try container.encode(-1000, forKey: .minRanking)
+//        }
+//        try container.encode(false, forKey: .initialized)
+//        try container.encode(game, forKey: .game)
+//        try container.encode(false, forKey: .agaRanked)
+//
+//        // This is used when creating challenges, so be careful when adding stuff...
+//
+//    }
+//       
+//    init(id: Int, challenger: OGSUser? = nil, challenged: OGSUser? = nil, challengerColor: StoneColor? = nil, game: OGSChallengeGameDetail) {
+//        self.id = id
+//        self.challenger = challenger
+//        self.challenged = challenged
+//        self.challengerColor = challengerColor
+//        self.game = game
+//    }
+
+}
+
+extension OGSChallenge {
     var hasHandicap: Bool { game.handicap > 0 }
-    var useCustomKomi: Bool { game.komi != nil && game.komi != game.rules.defaultKomi }
+    var useCustomKomi: Bool {
+        if let game = game as? OGSChallengeTemplate.GameDetail {
+            if game.komiAuto == "automatic" {
+                return false
+            }
+        }
+        return (game.komi != nil && game.komi != game.rules.defaultKomi)
+    }
     var unusualBoardSize: Bool { game.width != game.height || ![9, 13, 19].contains(game.width) }
     var isUnusual: Bool { hasHandicap || useCustomKomi || game.timeControl.system.isUnusual || unusualBoardSize }
     
@@ -23,69 +106,6 @@ struct OGSChallenge: Codable, Identifiable {
         return game.rengo ?? false
     }
     
-    enum CodingKeys: String, CodingKey {
-        case id
-        case challenger
-        case challenged
-        case challengerColor
-        case game
-        
-        // Encode only
-        case maxRanking
-        case minRanking
-        case initialized
-        case agaRanked
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        if container.contains(.challenged) {
-            // Direct challenge
-            id = try container.decode(Int.self, forKey: .id)
-            challenger = try container.decode(OGSUser.self, forKey: .challenger)
-            challenged = try container.decode(OGSUser.self, forKey: .challenged)
-            challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
-            game = try container.decode(OGSChallengeGameDetail.self, forKey: .game)
-        } else {
-            // Custom game
-            let singleKeyContainer = try decoder.singleValueContainer()
-            game = try singleKeyContainer.decode(OGSChallengeGameDetail.self)
-            id = game.challengeId!
-            challenger = OGSUser(
-                username: game.username!,
-                id: game.userId!,
-                rank: game.userRank!
-            )
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
-        if let maxRank = game.maxRank, let minRank = game.minRank {
-            try container.encode(maxRank, forKey: .maxRanking)
-            try container.encode(minRank, forKey: .minRanking)
-        } else {
-            try container.encode(1000, forKey: .maxRanking)
-            try container.encode(-1000, forKey: .minRanking)
-        }
-        try container.encode(false, forKey: .initialized)
-        try container.encode(game, forKey: .game)
-        try container.encode(false, forKey: .agaRanked)
-
-        // This is used when creating challenges, so be careful when adding stuff...
-
-    }
-       
-    init(id: Int, challenger: OGSUser? = nil, challenged: OGSUser? = nil, challengerColor: StoneColor? = nil, game: OGSChallengeGameDetail) {
-        self.id = id
-        self.challenger = challenger
-        self.challenged = challenged
-        self.challengerColor = challengerColor
-        self.game = game
-    }
-
     func isUserEligible(user: OGSUser) -> Bool {
         if user.id == self.challenger?.id {
             return false
@@ -95,7 +115,7 @@ struct OGSChallenge: Codable, Identifiable {
             return false
         }
 
-        let userRank = user.rank()        
+        let userRank = user.rank()
         if let minRank = game.minRank, let maxRank = game.maxRank {
             if userRank < Double(minRank) || userRank > Double(maxRank) {
                 return false
@@ -111,182 +131,572 @@ struct OGSChallenge: Codable, Identifiable {
     }
 }
 
-struct OGSChallengeGameDetail: Codable, Equatable {
-    init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, challengerColor: StoneColor? = nil, challengeId: Int? = nil, userId: Int? = nil, username: String? = nil, userRank: Double? = nil, minRank: Int? = nil, maxRank: Int? = nil, rengo: Bool? = nil) {
-        self.width = width
-        self.height = height
-        self.ranked = ranked
-        self.isPrivate = isPrivate
-        self.komi = komi
-        self.handicap = handicap
-        self.disableAnalysis = disableAnalysis
-        self.name = name
-        self.rules = rules
-        self.timeControl = timeControl
-        self.challengerColor = challengerColor
-        self.challengeId = challengeId
-        self.userId = userId
-        self.username = username
-        self.userRank = userRank
-        self.minRank = minRank
-        self.maxRank = maxRank
-    }
+protocol OGSChallengeGameDetail: Decodable, Hashable {
+//    init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, challengerColor: StoneColor? = nil, challengeId: Int? = nil, userId: Int? = nil, username: String? = nil, userRank: Double? = nil, minRank: Int? = nil, maxRank: Int? = nil, rengo: Bool? = nil) {
+//        self.width = width
+//        self.height = height
+//        self.ranked = ranked
+//        self.isPrivate = isPrivate
+//        self.komi = komi
+//        self.handicap = handicap
+//        self.disableAnalysis = disableAnalysis
+//        self.name = name
+//        self.rules = rules
+//        self.timeControl = timeControl
+//        self.challengerColor = challengerColor
+//        self.challengeId = challengeId
+//        self.userId = userId
+//        self.username = username
+//        self.userRank = userRank
+//        self.minRank = minRank
+//        self.maxRank = maxRank
+//    }
     
-    var width: Int
-    var height: Int
+    var width: Int { get set }
+    var height: Int { get set }
     
-    var ranked: Bool
-    var isPrivate: Bool = false
-    var komi: Double?
-    var handicap: Int
-    var disableAnalysis: Bool
-    var name: String
-    var rules: OGSRule
-    var timeControl: TimeControl
+    var ranked: Bool { get set }
+    var isPrivate: Bool { get set } // = false
+    var komi: Double? { get set }
+    var handicap: Int { get set }
+    var disableAnalysis: Bool { get set }
+    var name: String { get set }
+    var rules: OGSRule { get set }
+    var timeControl: TimeControl { get set }
 
-    // Encode only
-    var challengerColor: StoneColor?
-    
-    // Custom game
-    var challengeId: Int?
-    var userId: Int?
-    var username: String?
-    var userRank: Double?
-    var minRank: Int?
-    var maxRank: Int?
+//    // Encode only
+//    var challengerColor: StoneColor?
+//    
+//    // Custom game
+//    var challengeId: Int?
+//    var userId: Int?
+//    var username: String?
+//    var userRank: Double?
+    var minRank: Int? { get set }
+    var maxRank: Int? { get set }
     
     // Rengo
-    var rengo: Bool?
-    var rengoCasualMode: Bool?
-    var rengoAutoStart: Int?
-    var rengoBlackTeam: [Int]?
-    var rengoWhiteTeam: [Int]?
-    var rengoNominees: [Int]?
-    var rengoParticipants: [Int]?
+    var rengo: Bool? { get set }
+    var rengoCasualMode: Bool? { get set }
+    var rengoAutoStart: Int? { get set }
+    var rengoBlackTeam: [Int]? { get set }
+    var rengoWhiteTeam: [Int]? { get set }
+    var rengoNominees: [Int]? { get set }
+    var rengoParticipants: [Int]? { get set }
     
-    var id: Int?
+//    var id: Int?
     
+//    enum CodingKeys: String, CodingKey {
+//        case width
+//        case height
+//        case ranked
+//        case komi
+//        case handicap
+//        case disableAnalysis
+//        case name
+//        case rules
+//        case timeControlParameters
+//        
+//        // Encode only
+//        case initialState
+//        case komiAuto
+//        case challengerColor
+//        case isPrivate = "private"
+//        case timeControl
+//        case pauseOnWeekends
+//        
+//        // Custom games
+//        case gameId
+//        case userId
+//        case username
+//        case maxRank
+//        case minRank
+//        case challengeId
+//        case rank
+//        
+//        // Rengo
+//        case rengo
+//        case rengoCasualMode
+//        case rengoAutoStart
+//        case rengoBlackTeam
+//        case rengoWhiteTeam
+//        case rengoNominees
+//        case rengoParticipants
+//    }
+//    
+//    init(from decoder: Decoder) throws {
+//        let container = try decoder.container(keyedBy: CodingKeys.self)
+//        
+//        width = try container.decode(Int.self, forKey: .width)
+//        height = try container.decode(Int.self, forKey: .height)
+//        ranked = try container.decode(Bool.self, forKey: .ranked)
+//        isPrivate = (try? container.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? false
+//        if let komiString = try? container.decodeIfPresent(String.self, forKey: .komi) {
+//            komi = Double(komiString)!
+//        } else {
+//            komi = try container.decodeIfPresent(Double.self, forKey: .komi)
+//        }
+//        if let handicapString = try? container.decode(String.self, forKey: .handicap) {
+//            handicap = Int(handicapString) ?? 0
+//        } else {
+//            handicap = try container.decode(Int.self, forKey: .handicap)
+//        }
+//        disableAnalysis = try container.decode(Bool.self, forKey: .disableAnalysis)
+//        name = try container.decode(String.self, forKey: .name)
+//        rules = OGSRule(rawValue: try container.decode(String.self, forKey: .rules))!
+//        if let timeControlParameters = try? container.decodeIfPresent(String.self, forKey: .timeControlParameters) {
+//            let jsonDecoder = JSONDecoder()
+//            jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
+//            timeControl = try jsonDecoder.decode(TimeControl.self, from: timeControlParameters.data(using: String.Encoding.utf8)!)
+//        } else {
+//            timeControl = try container.decode(TimeControl.self, forKey: .timeControlParameters)
+//        }
+//        
+//        // Custom game
+//        challengeId = try container.decodeIfPresent(Int.self, forKey: .challengeId)
+//        id = try container.decodeIfPresent(Int.self, forKey: .gameId)
+//        userId = try container.decodeIfPresent(Int.self, forKey: .userId)
+//        username = try container.decodeIfPresent(String.self, forKey: .username)
+//        userRank = try container.decodeIfPresent(Double.self, forKey: .rank)
+//        minRank = try container.decodeIfPresent(Int.self, forKey: .minRank)
+//        maxRank = try container.decodeIfPresent(Int.self, forKey: .maxRank)
+//        
+//        // Rengo
+//        rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
+//        rengoCasualMode = try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode)
+//        rengoAutoStart = try container.decodeIfPresent(Int.self, forKey: .rengoAutoStart)
+//        rengoBlackTeam = try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam)
+//        rengoWhiteTeam = try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam)
+//        rengoNominees = try container.decodeIfPresent([Int].self, forKey: .rengoNominees)
+//        rengoParticipants = try container.decodeIfPresent([Int].self, forKey: .rengoParticipants)
+//    }
+//    
+//    func encode(to encoder: Encoder) throws {
+//        var container = encoder.container(keyedBy: CodingKeys.self)
+//        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
+//        try container.encode(disableAnalysis, forKey: .disableAnalysis)
+//        try container.encode(handicap, forKey: .handicap)
+//        try container.encode(height, forKey: .height)
+//        try container.encode(width, forKey: .width)
+//        try container.encodeNil(forKey: .initialState)
+//        if komi == rules.defaultKomi || komi == nil {
+//            try container.encodeNil(forKey: .komi)
+//            try container.encode("automatic", forKey: .komiAuto)
+//        } else if let komi = komi {
+//            try container.encode(komi, forKey: .komi)
+//            try container.encode("custom", forKey: .komiAuto)
+//        }
+//        try container.encode(name, forKey: .name)
+//        try container.encode(isPrivate, forKey: .isPrivate)
+//        try container.encode(ranked, forKey: .ranked)
+//        try container.encode(rules, forKey: .rules)
+//        try container.encode(timeControl.timeControl, forKey: .timeControl)
+//        try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
+//        try container.encode(timeControl, forKey: .timeControlParameters)
+//        try container.encode(rengo ?? false, forKey: .rengo)
+//        try container.encode(rengoCasualMode ?? false, forKey: .rengoCasualMode)
+//        
+//        // This is used when creating challenges, so be careful when adding stuff...
+//        
+//    }
+}
+
+extension OGSChallengeGameDetail {
     var rengoReadyToStart: Bool {
         guard rengo == true, let blackTeam = rengoBlackTeam, let whiteTeam = rengoWhiteTeam else {
             return false
         }
         return blackTeam.count > 0 && whiteTeam.count > 0 && blackTeam.count + whiteTeam.count > 2
     }
+}
+
+protocol OGSSubmittedChallenge: OGSChallenge, Identifiable {
+    var id: Int { get set }
+}
+
+struct OGSDirectChallenge: OGSSubmittedChallenge, Identifiable {
+    struct GameDetail: OGSChallengeGameDetail {
+        var id: Int
+        var width: Int
+        var height: Int
+        var ranked: Bool
+        var isPrivate: Bool = false
+        var komi: Double?
+        var handicap: Int
+        var disableAnalysis: Bool
+        var name: String
+        var rules: OGSRule
+        var timeControl: TimeControl
+        var minRank: Int?
+        var maxRank: Int?
+        var rengo: Bool?
+        var rengoCasualMode: Bool?
+        var rengoAutoStart: Int?
+        var rengoBlackTeam: [Int]?
+        var rengoWhiteTeam: [Int]?
+        var rengoNominees: [Int]?
+        var rengoParticipants: [Int]?
+        
+        enum CodingKeys: String, CodingKey {
+            case id
+            case width
+            case height
+            case ranked
+            case isPrivate = "private"
+            case komi
+            case handicap
+            case disableAnalysis
+            case name
+            case rules
+            case timeControlParameters
+            
+            case rengo
+            case rengoCasualMode
+            case rengoAutoStart
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            id = try container.decode(Int.self, forKey: .id)
+            width = try container.decode(Int.self, forKey: .width)
+            height = try container.decode(Int.self, forKey: .height)
+            ranked = try container.decode(Bool.self, forKey: .ranked)
+            isPrivate = (try? container.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? false
+            if let komiString = try? container.decodeIfPresent(String.self, forKey: .komi) {
+                komi = Double(komiString)!
+            } else {
+                komi = try container.decodeIfPresent(Double.self, forKey: .komi)
+            }
+            handicap = try container.decode(Int.self, forKey: .handicap)
+            disableAnalysis = try container.decode(Bool.self, forKey: .disableAnalysis)
+            name = try container.decode(String.self, forKey: .name)
+            rules = OGSRule(rawValue: try container.decode(String.self, forKey: .rules))!
+
+            let timeControlParameters = try container.decode(String.self, forKey: .timeControlParameters)
+            let jsonDecoder = JSONDecoder()
+            jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
+            timeControl = try jsonDecoder.decode(TimeControl.self, from: timeControlParameters.data(using: .utf8)!)
+        }
+    }
+
+    var id: Int
+    var challenger: OGSUser?
+    var challenged: OGSUser?
+    var challengerColor: StoneColor?
+    var game: OGSDirectChallenge.GameDetail
     
     enum CodingKeys: String, CodingKey {
-        case width
-        case height
-        case ranked
-        case komi
-        case handicap
-        case disableAnalysis
-        case name
-        case rules
-        case timeControlParameters
-        
-        // Encode only
-        case initialState
-        case komiAuto
+        case id
+        case challenger
+        case challenged
         case challengerColor
-        case isPrivate = "private"
-        case timeControl
-        case pauseOnWeekends
-        
-        // Custom games
-        case gameId
+        case game
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(Int.self, forKey: .id)
+        self.challenger = try container.decodeIfPresent(OGSUser.self, forKey: .challenger)
+        self.challenged = try container.decodeIfPresent(OGSUser.self, forKey: .challenged)
+        self.challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
+        self.game = try container.decode(OGSDirectChallenge.GameDetail.self, forKey: .game)
+    }
+}
+
+struct OGSSeekgraphChallenge: OGSSubmittedChallenge, Identifiable {
+    struct GameDetail: OGSChallengeGameDetail {
+        var id: Int
+        var width: Int
+        var height: Int
+        var ranked: Bool
+        var isPrivate: Bool = false
+        var komi: Double?
+        var handicap: Int
+        var disableAnalysis: Bool
+        var name: String
+        var rules: OGSRule
+        var timeControl: TimeControl
+        var minRank: Int?
+        var maxRank: Int?
+        var rengo: Bool?
+        var rengoCasualMode: Bool?
+        var rengoAutoStart: Int?
+        var rengoBlackTeam: [Int]?
+        var rengoWhiteTeam: [Int]?
+        var rengoNominees: [Int]?
+        var rengoParticipants: [Int]?
+    }
+
+    var id: Int
+    var challenger: OGSUser?
+    var challenged: OGSUser?
+    var challengerColor: StoneColor?
+    var game: OGSSeekgraphChallenge.GameDetail
+    
+    enum CodingKeys: String, CodingKey {
+        case challengeId
         case userId
         case username
-        case maxRank
-        case minRank
-        case challengeId
         case rank
+        case minRank
+        case maxRank
+        case gameId
+        case name
+        case ranked
+        case handicap
+        case komi
+        case rules
+        case width
+        case height
+        case challengerColor
+        case disableAnalysis
+        case timeControlParameters
         
-        // Rengo
         case rengo
-        case rengoCasualMode
-        case rengoAutoStart
+        case rengoNominees
         case rengoBlackTeam
         case rengoWhiteTeam
-        case rengoNominees
         case rengoParticipants
+        case rengoCasualMode
+        case rengoAutoStart
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        width = try container.decode(Int.self, forKey: .width)
-        height = try container.decode(Int.self, forKey: .height)
-        ranked = try container.decode(Bool.self, forKey: .ranked)
-        isPrivate = (try? container.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? false
+        id = try container.decode(Int.self, forKey: .challengeId)
+        let userid = try container.decode(Int.self, forKey: .userId)
+        let username = try container.decode(String.self, forKey: .username)
+        let userrank = try container.decode(Double.self, forKey: .rank)
+        challenger = OGSUser(username: username, id: userid, rank: userrank)
+        challengerColor = StoneColor(rawValue: try container.decode(String.self, forKey: .challengerColor))
+
+        var komi: Double?
         if let komiString = try? container.decodeIfPresent(String.self, forKey: .komi) {
             komi = Double(komiString)!
         } else {
             komi = try container.decodeIfPresent(Double.self, forKey: .komi)
         }
-        handicap = try container.decode(Int.self, forKey: .handicap)
-        disableAnalysis = try container.decode(Bool.self, forKey: .disableAnalysis)
-        name = try container.decode(String.self, forKey: .name)
-        rules = OGSRule(rawValue: try container.decode(String.self, forKey: .rules))!
-        if let timeControlParameters = try? container.decodeIfPresent(String.self, forKey: .timeControlParameters) {
-            let jsonDecoder = JSONDecoder()
-            jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
-            timeControl = try jsonDecoder.decode(TimeControl.self, from: timeControlParameters.data(using: String.Encoding.utf8)!)
-        } else {
-            timeControl = try container.decode(TimeControl.self, forKey: .timeControlParameters)
+
+        game = OGSSeekgraphChallenge.GameDetail(
+            id: try container.decode(Int.self, forKey: .gameId),
+            width: try container.decode(Int.self, forKey: .width),
+            height: try container.decode(Int.self, forKey: .height),
+            ranked: try container.decode(Bool.self, forKey: .ranked),
+            komi: komi,
+            handicap: try container.decode(Int.self, forKey: .handicap),
+            disableAnalysis: try container.decode(Bool.self, forKey: .disableAnalysis),
+            name: try container.decode(String.self, forKey: .name),
+            rules: OGSRule(rawValue: try container.decode(String.self, forKey: .rules))!,
+            timeControl: try container.decode(TimeControl.self, forKey: .timeControlParameters),
+            minRank: try container.decodeIfPresent(Int.self, forKey: .minRank),
+            maxRank: try container.decodeIfPresent(Int.self, forKey: .maxRank),
+            rengo: try container.decodeIfPresent(Bool.self, forKey: .rengo),
+            rengoCasualMode: try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode),
+            rengoAutoStart: try container.decodeIfPresent(Int.self, forKey: .rengoAutoStart),
+            rengoBlackTeam: try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam),
+            rengoWhiteTeam: try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam),
+            rengoNominees: try container.decodeIfPresent([Int].self, forKey: .rengoNominees),
+            rengoParticipants: try container.decodeIfPresent([Int].self, forKey: .rengoParticipants)
+        )
+    }
+}
+
+struct OGSChallengeTemplate: OGSChallenge, Encodable {
+    struct GameDetail: OGSChallengeGameDetail, Encodable {
+        internal init(width: Int, height: Int, ranked: Bool, isPrivate: Bool = false, komi: Double? = nil, komiAuto: String? = nil, handicap: Int, disableAnalysis: Bool, name: String, rules: OGSRule, timeControl: TimeControl, minRank: Int? = nil, maxRank: Int? = nil, initialState: OGSGame.InitialState? = nil, rengo: Bool? = nil, rengoCasualMode: Bool? = nil, rengoAutoStart: Int? = nil, rengoBlackTeam: [Int]? = nil, rengoWhiteTeam: [Int]? = nil, rengoNominees: [Int]? = nil, rengoParticipants: [Int]? = nil) {
+            self.width = width
+            self.height = height
+            self.ranked = ranked
+            self.isPrivate = isPrivate
+            self.komi = komi
+            self.komiAuto = komiAuto
+            self.handicap = handicap
+            self.disableAnalysis = disableAnalysis
+            self.name = name
+            self.rules = rules
+            self.timeControl = timeControl
+            self.minRank = minRank
+            self.maxRank = maxRank
+            self.initialState = initialState
+            self.rengo = rengo
+            self.rengoCasualMode = rengoCasualMode
+            self.rengoAutoStart = rengoAutoStart
+            self.rengoBlackTeam = rengoBlackTeam
+            self.rengoWhiteTeam = rengoWhiteTeam
+            self.rengoNominees = rengoNominees
+            self.rengoParticipants = rengoParticipants
         }
         
-        // Custom game
-        challengeId = try container.decodeIfPresent(Int.self, forKey: .challengeId)
-        id = try container.decodeIfPresent(Int.self, forKey: .gameId)
-        userId = try container.decodeIfPresent(Int.self, forKey: .userId)
-        username = try container.decodeIfPresent(String.self, forKey: .username)
-        userRank = try container.decodeIfPresent(Double.self, forKey: .rank)
-        minRank = try container.decodeIfPresent(Int.self, forKey: .minRank)
-        maxRank = try container.decodeIfPresent(Int.self, forKey: .maxRank)
+        var width: Int
+        var height: Int
+        var ranked: Bool
+        var isPrivate: Bool = false
+        var komi: Double?
+        var komiAuto: String?
+        var handicap: Int
+        var disableAnalysis: Bool
+        var name: String
+        var rules: OGSRule
+        var timeControl: TimeControl
+        var minRank: Int?
+        var maxRank: Int?
+        var initialState: OGSGame.InitialState?
+        var rengo: Bool?
+        var rengoCasualMode: Bool?
+        var rengoAutoStart: Int?
+        var rengoBlackTeam: [Int]?
+        var rengoWhiteTeam: [Int]?
+        var rengoNominees: [Int]?
+        var rengoParticipants: [Int]?
         
-        // Rengo
-        rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
-        rengoCasualMode = try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode)
-        rengoAutoStart = try container.decodeIfPresent(Int.self, forKey: .rengoAutoStart)
-        rengoBlackTeam = try container.decodeIfPresent([Int].self, forKey: .rengoBlackTeam)
-        rengoWhiteTeam = try container.decodeIfPresent([Int].self, forKey: .rengoWhiteTeam)
-        rengoNominees = try container.decodeIfPresent([Int].self, forKey: .rengoNominees)
-        rengoParticipants = try container.decodeIfPresent([Int].self, forKey: .rengoParticipants)
+        enum CodingKeys: String, CodingKey {
+            case width
+            case height
+            case ranked
+            case isPrivate = "private"
+            case komi
+            case komiAuto
+            case handicap
+            case disableAnalysis
+            case name
+            case rules
+            case timeControlParameters
+            
+            case rengo
+            case rengoCasualMode
+            case rengoAutoStart
+            
+            // Encode only
+            case initialState
+            case pauseOnWeekends
+            case timeControl
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            width = try container.decode(Int.self, forKey: .width)
+            height = try container.decode(Int.self, forKey: .height)
+            ranked = try container.decode(Bool.self, forKey: .ranked)
+            isPrivate = (try? container.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? false
+            komi = try? container.decode(Double.self, forKey: .komi)
+            komiAuto = try? container.decode(String.self, forKey: .komiAuto)
+            disableAnalysis = try container.decode(Bool.self, forKey: .disableAnalysis)
+            handicap = try container.decode(Int.self, forKey: .handicap)
+            name = try container.decode(String.self, forKey: .name)
+            rules = OGSRule(rawValue: try container.decode(String.self, forKey: .rules))!
+            timeControl = try container.decode(TimeControl.self, forKey: .timeControlParameters)
+            
+            rengo = try? container.decodeIfPresent(Bool.self, forKey: .rengo) ?? false
+            rengoCasualMode = try? container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode) ?? false
+        }
+        
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(name, forKey: .name)
+            try container.encode(rules, forKey: .rules)
+            try container.encode(ranked, forKey: .ranked)
+            try container.encode(width, forKey: .width)
+            try container.encode(height, forKey: .height)
+            try container.encode(handicap, forKey: .handicap)
+            if komiAuto == "automatic" {
+                try container.encode(komi, forKey: .komi)
+                try container.encode(komiAuto, forKey: .komiAuto)
+            } else {
+                if komi == rules.defaultKomi || komi == nil {
+                    try container.encodeNil(forKey: .komi)
+                    try container.encode("automatic", forKey: .komiAuto)
+                } else {
+                    try container.encode(komi, forKey: .komi)
+                    try container.encode("custom", forKey: .komiAuto)
+                }
+            }
+            
+            try container.encode(disableAnalysis, forKey: .disableAnalysis)
+            try container.encode(initialState, forKey: .initialState)
+            try container.encode(isPrivate, forKey: .isPrivate)
+            try container.encode(rengo ?? false, forKey: .rengo)
+            try container.encode(rengoCasualMode ?? true, forKey: .rengoCasualMode)
+            try container.encode(timeControl.timeControl, forKey: .timeControl)
+            try container.encode(timeControl, forKey: .timeControlParameters)
+            try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
+        }
+    }
+
+    var challenger: OGSUser?
+    var challenged: OGSUser?
+    var challengerColor: StoneColor?
+    var randomColor: Bool = false
+    var game: OGSChallengeTemplate.GameDetail
+    
+    var initialized: Bool? = false
+    var minRanking: Int? = nil
+    var maxRanking: Int? = nil
+    var agaRanked: Bool = false
+    var rengoAutoStart: Int? = 0
+    
+    enum CodingKeys: String, CodingKey {
+        case initialized
+        case minRanking
+        case maxRanking
+        case challengerColor
+        case game
+        case rengoAutoStart
+        case agaRanked
+    }
+    
+    init(game: OGSChallengeTemplate.GameDetail) {
+        self.game = game
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        initialized = try? container.decodeIfPresent(Bool.self, forKey: .initialized)
+        minRanking = try? container.decodeIfPresent(Int.self, forKey: .minRanking)
+        maxRanking = try? container.decodeIfPresent(Int.self, forKey: .maxRanking)
+        rengoAutoStart = try? container.decodeIfPresent(Int.self, forKey: .rengoAutoStart)
+        let challengerColorString = try container.decode(String.self, forKey: .challengerColor)
+        if challengerColorString == "random" {
+            randomColor = true
+        }
+        challengerColor = StoneColor(rawValue: challengerColorString)
+        game = try container.decode(OGSChallengeTemplate.GameDetail.self, forKey: .game)
+        game.minRank = minRanking
+        game.maxRank = maxRanking
+        game.rengoAutoStart = rengoAutoStart
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
-        try container.encode(disableAnalysis, forKey: .disableAnalysis)
-        try container.encode(String(handicap), forKey: .handicap)
-        try container.encode(height, forKey: .height)
-        try container.encode(width, forKey: .width)
-        try container.encodeNil(forKey: .initialState)
-        if komi == rules.defaultKomi || komi == nil {
-            try container.encodeNil(forKey: .komi)
-            try container.encode("automatic", forKey: .komiAuto)
-        } else if let komi = komi {
-            try container.encode(komi, forKey: .komi)
-            try container.encode("custom", forKey: .komiAuto)
+        
+        if randomColor {
+            try container.encode("random", forKey: .challengerColor)
+        } else {
+            try container.encode(challengerColor?.rawValue ?? "automatic", forKey: .challengerColor)
         }
-        try container.encode(name, forKey: .name)
-        try container.encode(isPrivate, forKey: .isPrivate)
-        try container.encode(ranked, forKey: .ranked)
-        try container.encode(rules, forKey: .rules)
-        try container.encode(timeControl.timeControl, forKey: .timeControl)
-        try container.encode(timeControl.pauseOnWeekends ?? true, forKey: .pauseOnWeekends)
-        try container.encode(timeControl, forKey: .timeControlParameters)
-        try container.encode(rengo ?? false, forKey: .rengo)
-        try container.encode(rengoCasualMode ?? false, forKey: .rengoCasualMode)
-        
-        // This is used when creating challenges, so be careful when adding stuff...
-        
+        if let maxRank = game.maxRank, let minRank = game.minRank {
+            try container.encode(maxRank, forKey: .maxRanking)
+            try container.encode(minRank, forKey: .minRanking)
+        } else {
+            try container.encode(1000, forKey: .maxRanking)
+            try container.encode(-1000, forKey: .minRanking)
+        }
+        try container.encode(false, forKey: .initialized)
+        try container.encode(game, forKey: .game)
+        try container.encode(false, forKey: .agaRanked)
+        try container.encode(rengoAutoStart ?? 0, forKey: .rengoAutoStart)
     }
 }
 
 
-extension OGSChallenge {
-    static var sampleChallenge: OGSChallenge {
+
+
+class OGSChallengeSampleData {
+    static var sampleChallenge: OGSDirectChallenge {
         let data = #"""
             {
               "id": 8849956,
@@ -381,9 +791,9 @@ extension OGSChallenge {
         """#
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try! decoder.decode(OGSChallenge.self, from: data.data(using: .utf8)!)
+        return try! decoder.decode(OGSDirectChallenge.self, from: data.data(using: .utf8)!)
     }
-    static var sampleOpenChallenge: OGSChallenge {
+    static var sampleOpenChallenge: OGSSeekgraphChallenge {
         let data = #"""
             {
               "challenge_id": 16255024,
@@ -418,9 +828,9 @@ extension OGSChallenge {
         """#
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try! decoder.decode(OGSChallenge.self, from: data.data(using: .utf8)!)
+        return try! decoder.decode(OGSSeekgraphChallenge.self, from: data.data(using: .utf8)!)
     }
-    static var sampleRengoChallenge: OGSChallenge {
+    static var sampleRengoChallenge: OGSSeekgraphChallenge {
         let data = #"""
             {
               "challenge_id": 3366,
@@ -467,6 +877,46 @@ extension OGSChallenge {
         """#
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try! decoder.decode(OGSChallenge.self, from: data.data(using: .utf8)!)
+        return try! decoder.decode(OGSSeekgraphChallenge.self, from: data.data(using: .utf8)!)
+    }
+    
+    static var sampleChallengeTemplate: OGSChallengeTemplate {
+        let challengeTemplate = #"""
+            {
+              "initialized": false,
+              "min_ranking": 10,
+              "max_ranking": 33,
+              "challenger_color": "random",
+              "game": {
+                "name": "Test",
+                "rules": "ing",
+                "ranked": true,
+                "width": 19,
+                "height": 19,
+                "handicap": 0,
+                "komi_auto": "automatic",
+                "komi": 5.5,
+                "disable_analysis": true,
+                "initial_state": null,
+                "private": false,
+                "rengo": false,
+                "time_control": "absolute",
+                "time_control_parameters": {
+                  "system": "absolute",
+                  "speed": "correspondence",
+                  "total_time": 2419200,
+                  "pause_on_weekends": true,
+                  "time_control": "absolute"
+                },
+                "pause_on_weekends": true
+              },
+              "rengo_auto_start": 0,
+              "aga_ranked": false
+            }
+            """#
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try! decoder.decode(OGSChallengeTemplate.self, from: challengeTemplate.data(using: .utf8)!)
     }
 }

@@ -49,11 +49,12 @@ class OGSService: ObservableObject {
         publicGames: [Game] = [],
         friends: [OGSUser] = [],
         socketStatus: OGSWebsocketStatus = .connected,
-        eligibleOpenChallenges: [OGSChallenge] = [],
-        openChallengesSent: [OGSChallenge] = [],
-        challengesReceived: [OGSChallenge] = [],
+        eligibleOpenChallenges: [OGSSeekgraphChallenge] = [],
+        openChallengesSent: [OGSSeekgraphChallenge] = [],
+        challengesReceived: [OGSDirectChallenge] = [],
         automatchEntries: [OGSAutomatchEntry] = [],
-        cachedUsers: [OGSUser] = []
+        cachedUsers: [OGSUser] = [],
+        preferredGameSettings: [OGSChallengeTemplate] = []
     ) -> OGSService {
         let ogs = OGSService(forPreview: true)
         ogs.user = user
@@ -91,11 +92,13 @@ class OGSService: ObservableObject {
             ogs.cachedUsersById[user.id] = user
         }
         
+        ogs.preferredGameSettings = Set(preferredGameSettings)
+        
         return ogs
     }
 
-    static let ogsRoot = "https://online-go.com"
-//    static let ogsRoot = "https://beta.online-go.com"
+//    static let ogsRoot = "https://online-go.com"
+    static let ogsRoot = "https://beta.online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
     private let ogsWebsocket: OGSWebsocket
@@ -127,17 +130,17 @@ class OGSService: ObservableObject {
     @Published private(set) public var sortedPublicGames: [Game] = []
     private var activeGamesSortingCancellable: AnyCancellable?
     
-    @Published private(set) public var challengesReceived = [OGSChallenge]()
-    @Published private(set) public var challengesSent = [OGSChallenge]()
-    @Published private(set) public var openChallengeSentById = [Int: OGSChallenge]()
+    @Published private(set) public var challengesReceived = [OGSDirectChallenge]()
+    @Published private(set) public var challengesSent = [OGSDirectChallenge]()
+    @Published private(set) public var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var autoMatchEntryById = [String: OGSAutomatchEntry]()
     var waitingGames: Int {
         return challengesSent.count + openChallengeSentById.count + autoMatchEntryById.count
     }
     @Published private(set) public var waitingLiveGames: Int = 0
     private var waitingLiveGamesCancellable: AnyCancellable?
-    @Published private(set) public var hostingRengoChallengeById = [Int: OGSChallenge]()
-    @Published private(set) public var participatingRengoChallengeById = [Int: OGSChallenge]()
+    @Published private(set) public var hostingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
+    @Published private(set) public var participatingRengoChallengeById = [Int: OGSSeekgraphChallenge]()
     
     var pendingRengoGames: Int {
         return participatingRengoChallengeById.count
@@ -145,8 +148,8 @@ class OGSService: ObservableObject {
 
     @Published private(set) public var isLoadingOverview = true
     
-    private var openChallengeById: [Int: OGSChallenge] = [:]
-    @Published private(set) public var eligibleOpenChallengeById: [Int: OGSChallenge] = [:]
+    private var openChallengeById: [Int: OGSSeekgraphChallenge] = [:]
+    @Published private(set) public var eligibleOpenChallengeById: [Int: OGSSeekgraphChallenge] = [:]
     
     @Published private var cachedUserIds = Set<Int>()
     @Published private(set) public var cachedUsersById = [Int: OGSUser]()
@@ -160,6 +163,11 @@ class OGSService: ObservableObject {
     @Published private(set) public var superchatPeerIds = Set<Int>()
     
     @Published private(set) public var chatMessagesByChannel = [String: [OGSChatMessage]]()
+    
+    var remoteSettings: OGSRemoteSetting {
+        OGSRemoteSetting.shared
+    }
+    @Published private(set) public var preferredGameSettings = Set<OGSChallengeTemplate>()
     
     var dictionaryDecoder: DictionaryDecoder = {
         let decoder = DictionaryDecoder()
@@ -247,9 +255,18 @@ class OGSService: ObservableObject {
         })
         
         waitingLiveGamesCancellable = Publishers.CombineLatest3($challengesSent, $openChallengeSentById, $autoMatchEntryById).receive(on: DispatchQueue.main).sink(receiveValue: { challengesSent, openChallengeSentById, autoMatchEntryById in
-            self.waitingLiveGames = (challengesSent + openChallengeSentById.values).filter {
-                $0.game.timeControl.speed != .correspondence
-            }.count + autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }.count
+            self.waitingLiveGames =
+                challengesSent.filter {
+                    $0.game.timeControl.speed != .correspondence
+                }.count
+                +
+                openChallengeSentById.values.filter {
+                    $0.game.timeControl.speed != .correspondence
+                }.count
+                +
+                autoMatchEntryById.values.filter {
+                    $0.timeControlSpeed != .correspondence
+                }.count
         })
         
         self.checkLoginStatus()
@@ -285,6 +302,7 @@ class OGSService: ObservableObject {
         case "surround/socketAuthenticated":
             self.autoMatchEntryById.removeAll()
             ogsWebsocket.emit(command: "automatch/list")
+            self.syncRemoteStorage()
         case "net/pong":
             if let data = data as? [String: Double] {
                 let now = Date().timeIntervalSince1970 * 1000
@@ -342,6 +360,8 @@ class OGSService: ObservableObject {
             }
         case "seekgraph/global":
             onSeekGraphEvent(data: data)
+        case "remote_storage/update":
+            processRemoteStorageUpdate(data: data)
         case _ where eventName.starts(with: "game/"):
             let components = eventName.split(separator: "/")
             if components.count == 3, let ogsGameId = Int(components[1]) {
@@ -551,6 +571,7 @@ class OGSService: ObservableObject {
     func logout() {
         self.ogsUIConfig = nil
         SurroundService.shared.unregisterDevice()
+        OGSRemoteSetting.shared.resetAllSettings()
         
         userDefaults.reset(.ogsSessionId)
         userDefaults.reset(.ogsCsrfCookie)
@@ -561,6 +582,7 @@ class OGSService: ObservableObject {
         userDefaults.reset(.lastSeenChatIdByOGSGameId)
         userDefaults.reset(.lastAutomatchEntry)
         userDefaults.reset(.lastSeenPrivateMessageByOGSUserId)
+        userDefaults.reset(.ogsRemoteStorageLastSync)
     }
     
     func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
@@ -757,11 +779,15 @@ class OGSService: ObservableObject {
         if let challenges = overview["challenges"] as? [[String: Any]] {
             let decoder = DictionaryDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
-            var challengesSent = [OGSChallenge]()
-            var challengesReceived = [OGSChallenge]()
+            var challengesSent = [OGSDirectChallenge]()
+            var challengesReceived = [OGSDirectChallenge]()
             for challengeData in challenges {
                 do {
-                    let challenge = try decoder.decode(OGSChallenge.self, from: challengeData)
+                    let challenge = try decoder.decode(OGSDirectChallenge.self, from: challengeData)
+                    if challenge.challenged == nil {
+                        // These will be processed in seekgraph
+                        continue
+                    }
                     if challenge.challenger?.id == self.user?.id {
                         challengesSent.append(challenge)
                     } else {
@@ -1174,7 +1200,7 @@ class OGSService: ObservableObject {
     }
     #endif
     
-    func withdrawOrDeclineChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+    func withdrawOrDeclineChallenge(challenge: any OGSSubmittedChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = challenge.challenged == nil ?
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)" :
@@ -1198,7 +1224,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func acceptChallenge(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
+    func acceptChallenge(challenge: any OGSSubmittedChallenge) -> AnyPublisher<Int, Error> {
         return Future<Int, Error> { promise in
             let url = challenge.challenged == nil ?
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/accept" :
@@ -1227,7 +1253,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func joinRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+    func joinRengoChallenge(challenge: OGSSeekgraphChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
@@ -1248,7 +1274,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func leaveRengoChallenge(challenge: OGSChallenge) -> AnyPublisher<Void, Error> {
+    func leaveRengoChallenge(challenge: OGSSeekgraphChallenge) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
@@ -1269,7 +1295,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func assignRengoTeam(challenge: OGSChallenge, player: OGSUser, color: StoneColor?) -> AnyPublisher<Void, Error> {
+    func assignRengoTeam(challenge: OGSSeekgraphChallenge, player: OGSUser, color: StoneColor?) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/team"
             let assignParameter = color == .black ? "assign_black" : color == .white ? "assign_white" : "unassign"
@@ -1293,7 +1319,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func startRengoGame(challenge: OGSChallenge) -> AnyPublisher<Int, Error> {
+    func startRengoGame(challenge: OGSSeekgraphChallenge) -> AnyPublisher<Int, Error> {
         return Future<Int, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/start"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
@@ -1384,7 +1410,7 @@ class OGSService: ObservableObject {
                         self.hostingRengoChallengeById.removeValue(forKey: challengeId)
                         self.participatingRengoChallengeById.removeValue(forKey: challengeId)
                     } else {
-                        if var challenge = try? decoder.decode(OGSChallenge.self, from: challengeData) {
+                        if var challenge = try? decoder.decode(OGSSeekgraphChallenge.self, from: challengeData) {
                             if challenge.rengo {
                                 if let userId = self.user?.id {
                                     if let challengerId = challenge.challenger?.id, challengerId == userId {
@@ -1528,8 +1554,12 @@ class OGSService: ObservableObject {
         }
     }
     
-    func sendChallenge(opponent: OGSUser?, challenge: OGSChallenge) -> AnyPublisher<OGSChallenge, Error> {
-        return Future<OGSChallenge, Error> { promise in
+    func sendChallenge(opponent: OGSUser?, challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
+        var challenge = challenge
+        if !challenge.useCustomKomi {
+            challenge.game.komi = nil
+        }
+        return Future<Void, Error> { promise in
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
             var url = "\(self.ogsRoot)/api/v1/challenges"
@@ -1548,11 +1578,12 @@ class OGSService: ObservableObject {
                     case .success(let data):
                         if let result = data as? [String: Any] {
                             if result["status"] as? String == "ok" {
-                                if let challengeId = result["challenge"] as? Int, let gameId = result["game"] as? Int {
-                                    var challenge = challenge
-                                    challenge.id = challengeId
-                                    challenge.game.id = gameId
-                                    promise(.success(challenge))
+                                if let _ = result["challenge"] as? Int, let _ = result["game"] as? Int {
+//                                    var challenge = challenge
+//                                    challenge.id = challengeId
+//                                    challenge.game.id = gameId
+//                                    promise(.success(challenge))
+                                    promise(.success(()))
                                     if opponent == nil && !self.sendingKeepAliveSignal {
                                         self.sendingKeepAliveSignal = true
                                         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
@@ -1743,5 +1774,71 @@ class OGSService: ObservableObject {
         ogsWebsocket.emit(command: "gamelist/count/unsubscribe")
         sitewiseLiveGamesCount = nil
         sitewiseCorrespondenceGamesCount = nil
+    }
+    
+    func syncRemoteStorage() {
+        guard ogsWebsocket.authenticated else {
+            return
+        }
+        let since = userDefaults[.ogsRemoteStorageLastSync]!
+        
+        ogsWebsocket.emit(command: "remote_storage/sync", data: [
+            "since": since.ISO8601Format(.iso8601
+                .year()
+                .month()
+                .day()
+                .time(includingFractionalSeconds: true)
+                .timeZone(separator: .colon))
+        ]) { data, _ in
+            
+        }
+        
+        if let gameSettings = remoteSettings[.preferredGameSettings] {
+            preferredGameSettings = Set(gameSettings)
+        }
+    }
+    
+    func processRemoteStorageUpdate(data: Any?) {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        guard let data = data as? [String: Any],
+              let key = data["key"] as? String,
+              let value = data["value"],
+              let replication = data["replication"] as? Int,
+              let replication = OGSRemoteReplication(rawValue: replication),
+              let modified = data["modified"] as? String,
+              let modified = isoFormatter.date(from: modified) else {
+            return
+        }
+        
+        if remoteSettings.saveIfValid(
+            settings: value,
+            remoteName: key,
+            replication: replication,
+            modified: modified
+        ) {
+            if key == remoteSettings.remoteName(key: .preferredGameSettings), let gameSettings = remoteSettings[.preferredGameSettings] {
+                preferredGameSettings = Set(gameSettings)
+            }
+        }
+                
+        userDefaults[.ogsRemoteStorageLastSync] = max(userDefaults[.ogsRemoteStorageLastSync]!, modified)
+        
+//        if key == OGSRemoteSetting.preferredGameSettings.rawValue, let value = value as? [[String: Any]] {
+//            var decodedChallenges = [OGSChallenge]()
+//            for challenge in value {
+//                if let decodedChallenge = try? self.dictionaryDecoder.decode(OGSChallenge.self, from: challenge) {
+//                    decodedChallenges.append(decodedChallenge)
+//                }
+//            }
+//            userDefaults[.preferredGameSettings] = OGSRemoteSettingValue(
+//                value: decodedChallenges,
+//                replication: OGSRemoteReplication(rawValue: replication) ?? .None,
+//                modified: modified
+//            )
+//            userDefaults[.ogsRemoteStorageLastSync] = max(userDefaults[.ogsRemoteStorageLastSync]!, modified)
+//            print(decodedChallenges)
+//        }
     }
 }

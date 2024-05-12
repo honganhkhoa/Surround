@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct OGSCategoryRating: Codable, Equatable {
+struct OGSCategoryRating: Codable, Equatable, Hashable {
     var rating: Double
     var deviation: Double
     var volatility: Double
@@ -29,7 +29,7 @@ enum OGSRatingCategory: String, Codable, CodingKey, CaseIterable {
     case correspondence_overall = "correspondence"
 }
 
-struct OGSRating: Codable, Equatable {
+struct OGSRating: Codable, Equatable, Hashable {
     var ratingByCategory: [OGSRatingCategory: OGSCategoryRating]
     
     init(from decoder: Decoder) throws {
@@ -57,7 +57,7 @@ struct OGSRating: Codable, Equatable {
     }
 }
 
-struct OGSUser : Codable, Equatable {
+struct OGSUser : Codable, Equatable, Hashable {
     var username: String
     var id: Int
     var ranking: Double?

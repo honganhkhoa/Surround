@@ -34,7 +34,7 @@ struct SettingKey<Value> {
     }
 }
 
-// Cannot make this confirms to `ObservableObject` when testing because if will not compile...,
+// Cannot make this conforms to `ObservableObject` when testing because if will not compile...,
 // so we include two implementation here
 //
 // Related: https://stackoverflow.com/questions/56169303/redundant-conformance-to-protocol-in-unit-test-only
@@ -153,11 +153,11 @@ extension SettingKey {
         return .init(name: "latestOGSOverviewOutdated", defaultValue: false)
     }
     
-    #if MAIN_APP
+#if MAIN_APP
     static var homeViewDisplayMode: SettingKey<String> {
         return .init(name: "homeViewDisplayMode")
     }
-    #endif
+#endif
     
     static var hapticsFeedback: SettingKey<Bool> {
         return .init(name: "hapticsFeedback", defaultValue: true)
@@ -198,11 +198,11 @@ extension SettingKey {
     static var notificationOnNewGame: SettingKey<Bool> {
         return .init(name: "notification.onNewGame", defaultValue: true)
     }
-        
+    
     static var notiticationOnGameEnd: SettingKey<Bool> {
         return .init(name: "notification.onGameEnd", defaultValue: true)
     }
-
+    
     static var notificationOnTimeRunningOut: SettingKey<Bool> {
         return .init(name: "notification.onTimeRunningOut", defaultValue: true)
     }
@@ -245,6 +245,10 @@ extension SettingKey {
     
     static var supporterProductExpiryDate: SettingKey<Date> {
         return .init(name: "supporterProductExpiryDate")
+    }
+    
+    static var ogsRemoteStorageLastSync: SettingKey<Date> {
+        return .init(name: "ogsRemoteStorageLastSync", defaultValue: Date(timeIntervalSince1970: 946684800)) // 2000/01/01 00:00 GMT
     }
     
     // Reminder: When adding a key, check if it needs to be reset on logout.

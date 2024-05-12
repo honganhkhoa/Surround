@@ -37,13 +37,20 @@ struct WaitingGamesView: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
 
-    @State var liveChallenges: [OGSChallenge] = []
-    @State var correspondenceChallenges: [OGSChallenge] = []
+    @State var liveChallenges: [any OGSSubmittedChallenge] = []
+    @State var correspondenceChallenges: [any OGSSubmittedChallenge] = []
     
     func updateWaitingGamesList() {
-        var liveChallenges = [OGSChallenge]()
-        var correspondenceChallenges = [OGSChallenge]()
-        for challenge in ogs.challengesSent + ogs.openChallengeSentById.values {
+        var liveChallenges = [any OGSSubmittedChallenge]()
+        var correspondenceChallenges = [any OGSSubmittedChallenge]()
+        for challenge in ogs.challengesSent {
+            if challenge.game.timeControl.speed == .correspondence {
+                correspondenceChallenges.append(challenge)
+            } else {
+                liveChallenges.append(challenge)
+            }
+        }
+        for challenge in ogs.openChallengeSentById.values {
             if challenge.game.timeControl.speed == .correspondence {
                 correspondenceChallenges.append(challenge)
             } else {
@@ -93,7 +100,7 @@ struct WaitingGamesView: View {
                                 .padding()
                                 .background(cardBackground)
                         }
-                        ForEach(self.liveChallenges) { challenge in
+                        ForEach(self.liveChallenges, id: \.id) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
                                 .background(cardBackground)
@@ -112,7 +119,7 @@ struct WaitingGamesView: View {
                                 .padding()
                                 .background(cardBackground)
                         }
-                        ForEach(self.correspondenceChallenges) { challenge in
+                        ForEach(self.correspondenceChallenges, id: \.id) { challenge in
                             ChallengeCell(challenge: challenge)
                                 .padding()
                                 .background(cardBackground)
@@ -160,7 +167,7 @@ struct WaitingGamesView_Previews: PreviewProvider {
                 username: "#albatros",
                 id: 442873
             ),
-            openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
             automatchEntries: [OGSAutomatchEntry.sampleEntry]
         ))
     }

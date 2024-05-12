@@ -33,7 +33,7 @@ struct QuickMatchForm: View {
     @State var boardSizes = Set<Int>([19])
     @State var timeControlSpeed: TimeControlSpeed = .live
     @State var blitz = false
-    var eligibleOpenChallenges = [OGSChallenge]()
+    var eligibleOpenChallenges = [OGSSeekgraphChallenge]()
 
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -51,7 +51,7 @@ struct QuickMatchForm: View {
         }
     }
 
-    var customChallengesMatchingAutomatchCondition: [OGSChallenge] {
+    var customChallengesMatchingAutomatchCondition: [OGSSeekgraphChallenge] {
         return Array(ogs.eligibleOpenChallengeById.values.filter { challenge in
             let width = challenge.game.width
             let height = challenge.game.height
@@ -183,10 +183,9 @@ struct CustomGameForm: View {
     @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
     
-    @State var challenge: OGSChallenge = {
-        var newChallenge = OGSChallenge(
-            id: 0,
-            game: OGSChallengeGameDetail(
+    @State var challenge: OGSChallengeTemplate = {
+        var newChallenge = OGSChallengeTemplate(
+            game: OGSChallengeTemplate.GameDetail(
                 width: 19,
                 height: 19,
                 ranked: true,
@@ -604,7 +603,7 @@ struct CustomGameForm: View {
             self.challengeCreatingCancellable = ogs.sendChallenge(opponent: isOpen ? nil : opponent, challenge: challenge).sink(
                 receiveCompletion: { _ in
                     self.challengeCreatingCancellable = nil
-                }, receiveValue: { challenge in
+                }, receiveValue: { _ in
                     nav.home.showingNewGameView = false
                 })
         }
@@ -621,10 +620,16 @@ struct CustomGameForm: View {
                     rulesOptions
                     otherOptions
                     actionButton
-                    Text("Preview")
-                        .font(.title3).bold()
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack {
+                        Text("Preview")
+                            .font(.title3).bold()
+                        Spacer()
+                        Button(action: {}) {
+                            Label("Save settings", systemImage: "star")
+                        }
+                        .tint(.green)
+                        .buttonStyle(.bordered)
+                    }
                     ChallengeCell(challenge: challenge)
                         .padding()
                         .background(
@@ -671,11 +676,9 @@ struct CustomGameForm: View {
         .onChange(of: handicap) { challenge.game.handicap = $0 }
         .onChange(of: automaticColor) {
             challenge.challengerColor = $0 ? nil : yourColor
-            challenge.game.challengerColor = challenge.challengerColor
         }
         .onChange(of: yourColor) {
             challenge.challengerColor = $0
-            challenge.game.challengerColor = challenge.challengerColor
         }
         .onChange(of: boardWidth) { challenge.game.width = $0 }
         .onChange(of: boardHeight) { challenge.game.height = $0 }
@@ -701,7 +704,7 @@ struct CustomGameForm: View {
 struct OpenChallengesForm: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
-    var eligibleOpenChallenges: [OGSChallenge] {
+    var eligibleOpenChallenges: [OGSSeekgraphChallenge] {
         didSet {
             var _challengeIds = [Int]()
             var _rengoIds = [Int]()
@@ -740,10 +743,10 @@ struct OpenChallengesForm: View {
     }
 
     var body: some View {
-        var liveGameChallenges = [OGSChallenge]()
-        var correspondenceGameChallenges = [OGSChallenge]()
-        var liveRengoChallenges = [OGSChallenge]()
-        var correspondenceRengoChallenges = [OGSChallenge]()
+        var liveGameChallenges = [OGSSeekgraphChallenge]()
+        var correspondenceGameChallenges = [OGSSeekgraphChallenge]()
+        var liveRengoChallenges = [OGSSeekgraphChallenge]()
+        var correspondenceRengoChallenges = [OGSSeekgraphChallenge]()
         for challenge in eligibleOpenChallenges {
             if challenge.rengo {
                 if challenge.game.timeControl.speed == .correspondence {
@@ -862,7 +865,7 @@ struct NewGameView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @State var newGameOption: NewGameOption = .quickMatch
-    @State var eligibleOpenChallenges = [OGSChallenge]()
+    @State var eligibleOpenChallenges = [OGSSeekgraphChallenge]()
 
     enum NewGameOption {
         case quickMatch
@@ -1011,8 +1014,8 @@ struct NewGameView_Previews: PreviewProvider {
                     ranking: 27,
                     icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
                 ), 
-                eligibleOpenChallenges: [OGSChallenge.sampleOpenChallenge, OGSChallenge.sampleRengoChallenge],
-                openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+                eligibleOpenChallenges: [OGSChallengeSampleData.sampleOpenChallenge, OGSChallengeSampleData.sampleRengoChallenge],
+                openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
                 cachedUsers: [
                     OGSUser(
                         username: "hakhoa4", id: 1769,

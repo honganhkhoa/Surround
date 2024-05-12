@@ -19,6 +19,7 @@ struct HomeViewParameters {
     var activeGame: Game?
     var ogsIdToOpen = -1
     var showingNewGameView = false
+    var showingPreferredSettings = false
 }
 
 struct PublicGamesViewParameter {

@@ -225,7 +225,7 @@ struct NotificationPopup_Previews: PreviewProvider {
             }
             .environmentObject(OGSService.previewInstance(
                 user: OGSUser(username: "hakhoa", id: 765826),
-                openChallengesSent: [OGSChallenge.sampleOpenChallenge]
+                openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge]
             ))
             .colorScheme(.dark)
 
@@ -254,7 +254,7 @@ struct NotificationPopup_Previews: PreviewProvider {
             }
             .environmentObject(OGSService.previewInstance(
                 user: OGSUser(username: "hakhoa", id: 765826),
-                challengesReceived: [OGSChallenge.sampleChallenge]
+                challengesReceived: [OGSChallengeSampleData.sampleChallenge]
             ))
 
             ZStack(alignment: .top) {

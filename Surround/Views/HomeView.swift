@@ -100,15 +100,20 @@ struct HomeView: View {
                             }
                         }
                     }
-                    Button(action: { nav.home.showingNewGameView = true }) {
-                        HStack {
-                            Label {
-                                Text("New game").font(Font.body.bold())
-                            } icon: {
-                                Image(systemName: "plus.app.fill").font(Font.body.bold())
-                            }
-                        }.padding()
-                        Spacer()
+                    HStack {
+                        Button(action: { nav.home.showingNewGameView = true }) {
+                            HStack {
+                                Label("New game", systemImage: "plus.app.fill")
+                                    .font(.body.bold())
+                            }.padding()
+                            Spacer()
+                        }
+                        Button(action: { nav.home.showingPreferredSettings = true }) {
+                            Image(systemName: "star.square.on.square")
+                        }
+                        .font(.body.bold())
+                        .padding()
+                        .tint(.green)
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
                         if ogs.challengesReceived.count > 0 {
@@ -302,6 +307,21 @@ struct HomeView: View {
                     .environmentObject(nav)
             }
         }
+        .sheet(isPresented: $nav.home.showingPreferredSettings) {
+            NavigationStack {
+                PreferredSettingsView()
+                    .navigationTitle("Preferred Settings")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { nav.home.showingPreferredSettings = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+            }
+        }
         .onChange(of: nav.home.ogsIdToOpen) { ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
                 if ogsGameIdToOpen != nav.home.activeGame?.ogsID {
@@ -338,7 +358,7 @@ struct HomeView_Previews: PreviewProvider {
                         OGSService.previewInstance(
                             user: OGSUser(username: "kata-bot", id: 592684),
                             activeGames: games,
-                            openChallengesSent: [OGSChallenge.sampleOpenChallenge],
+                            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
                             automatchEntries: [OGSAutomatchEntry.sampleEntry]
                         )
                     )

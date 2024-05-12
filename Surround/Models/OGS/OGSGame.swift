@@ -156,7 +156,7 @@ struct OGSMove: Decodable {
 }
 
 struct OGSGame: Decodable {
-    struct InitialState: Codable {
+    struct InitialState: Codable, Hashable {
         var black: String
         var white: String
     }
