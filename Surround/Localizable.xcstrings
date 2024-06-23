@@ -3,6 +3,12 @@
   "strings" : {
     " — players may drop mid-game" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ー　プレーヤーは、途中でも対局を抜けられます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -30,6 +36,12 @@
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[「**Sente**」](https://github.com/acristescu/OnlineGo) というAndroid用アプリを作り、オープンソースで提供してくれて、[**Alexandru Cristescu**](https://github.com/acristescu)にありがとうございます。このAndroidアプリのプロジェクトはSurroundの開発には大変参考なりました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56,6 +68,12 @@
     },
     "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), for kickstarting the effort to translate this app to multiple languages, and for translating the app to Japanese." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php)は、このアプリの翻訳を開始して、日本語の翻訳を提供しました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -66,6 +84,12 @@
     },
     "[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンAPIを使った素晴らしい囲碁サーバーを作り、そしてこのアプリの開発に大事なサポートもしてくれて、[**OGSチーム**](https://online-go.com/docs/team)には大変ありがとうございます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -95,6 +119,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%2$lld**手を**%1$@**以内"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -112,6 +148,12 @@
     "**%@** of total play time for each player." : {
       "comment" : "TimeControl - long description for absolute system",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%@**切り抜け"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -123,6 +165,12 @@
     "**%@** per move." : {
       "comment" : "TimeControl - long description for simple system",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一手**%@**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -174,6 +222,42 @@
                     "stringUnit" : {
                       "state" : "translated",
                       "value" : "%arg live games"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局中：%lld局、ライブ対局中：%lld"
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "通信対局：%arg "
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "ライブ対局：%arg"
                     }
                   }
                 }
@@ -235,6 +319,18 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "**%1$lld periods** of **%2$@**."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "考慮時間は**%3$@**(%2$lld回)。"
                 }
               }
             }
@@ -432,6 +528,12 @@
     },
     "**Standard** komi: **%lf**" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**通常コミ**：**%lf**"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -458,6 +560,12 @@
     },
     "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Surround**は、最高のOGSエクスペリエンスを可能にするという目的を持ったiOSアプリです。このアプリは、OGSのオーペンなAPIを使ってサーバーと通信し、iOSネイティブ機能を使用する事によって、いくつかの側面でOGSのWEB版より良いエクスペリエンスを提供ができています。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -600,6 +708,12 @@
             "value" : "%1$@%2$@%3$lld×%4$@"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@%3$lld×%4$@"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -648,7 +762,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -802,6 +916,18 @@
             }
           }
         },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld時間"
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "variations" : {
             "plural" : {
@@ -943,6 +1069,18 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld pending Rengo games "
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "待機中連碁対局は%lld件があります"
                 }
               }
             }
@@ -1131,7 +1269,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "%lld段"
           }
         },
@@ -1241,7 +1379,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "%lld級"
           }
         },
@@ -1435,6 +1573,12 @@
     },
     "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**連語**対局とは、白チームと黒チームに分けて、プレーヤは順番に一人一手を打つ対局です。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1479,6 +1623,12 @@
     },
     "About" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundについて"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1979,6 +2129,12 @@
     },
     "Become a Supporter to support the ongoing development of this app and gain access to some additional features." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundの開発をサポート、追加機能を解除。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2424,6 +2580,12 @@
     },
     "Challenge type" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局タイプ"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2507,6 +2669,12 @@
             "value" : "Clock starts with **%1$@** and increases by **%2$@** per move, up to a maximum of **%3$@**."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持ち時間**%1$@**,一手ごとに**%2$@**加算、**%3$@**まで。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2531,6 +2699,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld moves**."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "持ち時間は**%1$@**、その後**%3$lld**手**%2$@**以内"
                 }
               }
             }
@@ -2566,6 +2746,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Clock starts with **%1$@** main time, follows by **%2$lld periods** of **%3$@**."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "持ち時間は**%1$@**、考慮時間は**%3$@**(%2$lld回)。"
                 }
               }
             }
@@ -2905,8 +3097,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "カストマイズ"
+            "state" : "translated",
+            "value" : "カスタマイズ"
           }
         },
         "vi" : {
@@ -3016,6 +3208,12 @@
     },
     "Error: Cannot load Supporter information at the moment." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エラー：現在、サプーター・データーを読み込めません。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3176,6 +3374,12 @@
     "From **%@**" : {
       "comment" : "Custom game rank restriction",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%@**から"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3187,6 +3391,12 @@
     "Game ended" : {
       "comment" : "Notification title",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局終了"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3262,6 +3472,12 @@
     "Game started" : {
       "comment" : "Notification title",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局開始"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3288,6 +3504,12 @@
     },
     "Game starts automatically when there are **%lld** players." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレーヤー人数は%lld人になったら、対局が自動的に開始します。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3477,6 +3699,12 @@
     },
     "Is open" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開かどうか"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3488,6 +3716,12 @@
     "It is your turn in the game with %@." : {
       "comment" : "Notification body",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@との対局では、あなたの番です。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3875,6 +4109,12 @@
     },
     "Move %lld" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "着手%lld"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4022,6 +4262,12 @@
             "value" : "None"
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "なし"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4096,7 +4342,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "なし"
           }
         },
@@ -4167,6 +4413,12 @@
     "No time limits." : {
       "comment" : "TimeControl - long description for no system",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間が無制限"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4227,7 +4479,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "誰でも"
           }
         },
@@ -4600,6 +4852,12 @@
     },
     "Quick match request" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オートマッチの申し込み"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4804,6 +5062,12 @@
     },
     "Revert to standard time setting." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通常設定に戻す"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4962,7 +5226,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "フリエンド（又は特定のプレーヤ）に対局要請を送る。"
+            "value" : "フレンド（又は特定のプレーヤ）に対局要請を送る。"
           }
         },
         "vi" : {
@@ -5041,6 +5305,12 @@
     "Sign in to your online-go.com account to see your games here." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "online-go.comのアカウントにロギンすれば、ここに対局リストが表示されます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5116,6 +5386,12 @@
     },
     "Standard komi" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通常コミ"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5151,7 +5427,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "普通"
           }
         },
@@ -5328,6 +5604,12 @@
     },
     "Support Surround" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surroundをサポート"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5379,7 +5661,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Surroundは、オンライン囲碁対局「Online-go.com」（いわゆる「OGS」）と言うWEBさいとのクライアントです。"
+            "value" : "Surroundは、オンライン囲碁対局「Online-go.com」（いわゆる「OGS」）と言うWEBサイトのクライアントです。"
           }
         },
         "vi" : {
@@ -5425,6 +5707,12 @@
     },
     "Tap on avatars to assign players into teams." : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンをタップして、チーム構成ができます。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5553,7 +5841,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**Online Go Server** (OGS)has,"
+            "value" : "**Online Go Server** (OGS)は、使いやすいインテーフェスとフレンドリーなユーザーのあるインタネット囲碁サーバーです。https://online-go.comでアクセスができます。"
           }
         },
         "vi" : {
@@ -5614,6 +5902,42 @@
             }
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受ければ今すぐ開始できる対局要請は%lld件があり、空きがある連碁対局もあります。"
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "受け入れられる対局要請は%arg 件"
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "空きあり連碁対局は%arg 件"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5657,7 +5981,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受ければ今すぐ開始できる対局要請%lld件があります。"
+            "value" : "受ければ今すぐ開始できる対局要請は%lld件があります。"
           }
         },
         "vi" : {
@@ -5733,6 +6057,12 @@
     "This Widget display a summary of your correspondence games on online-go.com." : {
       "comment" : "Correspondence Games Widget description",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウイジェットは、あなたのonline-go.comでの通信対局の概要を表示します。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5809,6 +6139,12 @@
     "Time running out" : {
       "comment" : "Notification title",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り時間がすくない"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5820,6 +6156,12 @@
     "To **%@**" : {
       "comment" : "Custom game rank restriction",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@まで"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5830,6 +6172,12 @@
     },
     "To start playing:" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "囲碁を打つには："
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5970,6 +6318,12 @@
     },
     "Unassign" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未割り当てにする"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5989,7 +6343,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "待った要請"
           }
         },
@@ -6319,6 +6673,12 @@
     },
     "Waiting games" : {
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期待中対局"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6698,6 +7058,12 @@
     "You don't have any correspondence games at the moment." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信対局がありません"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6713,6 +7079,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "You have %1$lld hours to make your move in the game with %2$@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@との対局では、後%1$lld時間が残っています。"
           }
         },
         "vi" : {
@@ -6758,6 +7130,12 @@
     "Your game with %@ has ended." : {
       "comment" : "Notification body",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "％＠との対局は終了しました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6769,6 +7147,12 @@
     "Your game with %@ has started." : {
       "comment" : "Notification body",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@との対局は開始しました。"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6778,7 +7162,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Game\nHomeview",
+      "comment" : "Homeview\nGame",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6814,6 +7198,12 @@
     "Your turn" : {
       "comment" : "Notification title",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの番"
+          }
+        },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6829,6 +7219,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Your turn: %1$lld/%2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの番：%1$lld/%2$lld"
           }
         },
         "vi" : {
