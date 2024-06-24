@@ -232,7 +232,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通信対局中：%lld局、ライブ対局中：%lld"
+            "value" : "%#@arg1@、%#@arg2@"
           },
           "substitutions" : {
             "arg1" : {
@@ -243,7 +243,7 @@
                   "other" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "通信対局：%arg "
+                      "value" : "通信対局中：%arg "
                     }
                   }
                 }
@@ -762,7 +762,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -5905,7 +5905,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "受ければ今すぐ開始できる対局要請は%lld件があり、空きがある連碁対局もあります。"
+            "value" : "%#@arg1@ があり、%#@arg2@もあります。"
           },
           "substitutions" : {
             "arg1" : {
@@ -6575,7 +6575,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
