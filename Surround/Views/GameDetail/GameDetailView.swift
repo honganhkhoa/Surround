@@ -170,10 +170,16 @@ struct GameDetailView: View {
     }
     
     var body: some View {
-        guard let currentGame = currentGame else {
+        guard let currentGame = self.currentGame else {
+            // Work-around for pre-iOS 16.4 bug related navigation destination with data dependencies captured from ancestor views.
+            if let currentGameFromNav = nav.home.activeGame {
+                DispatchQueue.main.async {
+                    self.currentGame = currentGameFromNav
+                }
+            }
             return AnyView(EmptyView())
         }
-        
+
         var compactLayout = true
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
