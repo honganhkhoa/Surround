@@ -26,7 +26,48 @@ struct PublicGamesViewParameter {
     var ogsIdToOpen = -1
 }
 
+enum NavigationSplitViewVisibilityProxy: String {
+    case automatic
+    case all
+    case doubleColumn
+    case detailOnly
+    
+    @available(iOS 16.0, *)
+    var target: NavigationSplitViewVisibility {
+        get {
+            switch self {
+            case .automatic:
+                NavigationSplitViewVisibility.automatic
+            case .all:
+                NavigationSplitViewVisibility.all
+            case .doubleColumn:
+                NavigationSplitViewVisibility.doubleColumn
+            case .detailOnly:
+                NavigationSplitViewVisibility.detailOnly
+            }
+        }
+    }
+    
+    @available(iOS 16.0, *)
+    init?(from: NavigationSplitViewVisibility) {
+        switch from {
+        case .automatic:
+            self.init(rawValue: "automatic")
+        case .all:
+            self.init(rawValue: "all")
+        case .doubleColumn:
+            self.init(rawValue: "doubleColumn")
+        case .detailOnly:
+            self.init(rawValue: "detailOnly")
+        default:
+            return nil
+        }
+    }
+}
+
 class NavigationService: ObservableObject {
+    
+    
     static var shared = NavigationService()
     static var instances = [String: NavigationService]()
     
@@ -34,7 +75,7 @@ class NavigationService: ObservableObject {
     @Published var main = MainViewParameters()
     @Published var publicGames = PublicGamesViewParameter()
     
-    @Published var columnVisibility = NavigationSplitViewVisibility.automatic
+    @Published var columnVisibility = NavigationSplitViewVisibilityProxy.automatic
 
     static func instance(forSceneWithID sceneID: String) -> NavigationService {
         if let result = instances[sceneID] {

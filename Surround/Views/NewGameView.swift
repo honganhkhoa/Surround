@@ -640,7 +640,13 @@ struct CustomGameForm: View {
                 }
                 .padding()
             }
-            .scrollDismissesKeyboard(.interactively)
+            .apply {
+                if #available(iOS 16.0, *) {
+                    $0.scrollDismissesKeyboard(.interactively)
+                } else {
+                    $0
+                }
+            }
         }
         .onChange(of: gameName) { challenge.game.name = $0 }
         .onChange(of: isRanked) { challenge.game.ranked = $0 }

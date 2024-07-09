@@ -26,7 +26,7 @@ struct GameDetailView: View {
     @State var zenMode = false
     @State var analyzeMode = false
     
-    @State var columnVisibilityBeforeZenMode = NavigationSplitViewVisibility.automatic
+    @State var columnVisibilityBeforeZenMode = NavigationSplitViewVisibilityProxy.automatic
 
     @ObservedObject var settings = userDefaults
     
