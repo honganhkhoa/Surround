@@ -333,6 +333,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AE40B2CB2C42644F000ED564 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -972,6 +973,7 @@
 				Base,
 				ja,
 				vi,
+				fr,
 			);
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
@@ -1369,6 +1371,7 @@
 			children = (
 				BC285B342557FAEB005378F9 /* Base */,
 				AE535B9B2AE2274000B98D58 /* ja */,
+				AE40B2CB2C42644F000ED564 /* fr */,
 			);
 			name = MainInterface.storyboard;
 			sourceTree = "<group>";

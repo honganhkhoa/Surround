@@ -279,8 +279,8 @@ struct CustomGameForm: View {
     var opponentOptions: some View {
         GroupBox(label: Text("Opponent")) {
             Picker(selection: $isOpen.animation(), label: Text("Is open")) {
-                Text("Open").tag(true)
-                Text("vs. Friend").tag(false)
+                Text("Open", comment: "Opponent section of NewGameView, 'Open' here means anyone").tag(true)
+                Text("vs. Friend", comment: "Opponent section of NewGameView").tag(false)
             }.pickerStyle(SegmentedPickerStyle())
             if isOpen {
                 Text("Create and show a challenge publicly, then wait for other players to accept.")
