@@ -112,8 +112,8 @@
         },
         "vi" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), người bắt đầu quá trình dịch Surround ra các ngôn ngữ khác, và giúp dịch Surround sang tiếng Nhật."
+            "state" : "translated",
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), người bắt đầu quá trình dịch Surround ra các ngôn ngữ khác, và giúp dịch Surround sang tiếng Nhật và tiếng Pháp."
           }
         }
       }
@@ -5122,7 +5122,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bro-yomi japonais"
+            "value" : "Byo-yomi japonais"
           }
         },
         "ja" : {
@@ -6103,7 +6103,7 @@
       }
     },
     "Open" : {
-      "comment" : "Opponent section of NewGameView, means anyone",
+      "comment" : "Opponent section of NewGameView, 'Open' here means anyone",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8836,7 +8836,7 @@
       }
     },
     "vs. Friend" : {
-      "comment" : "Oppenent section of NewGameView",
+      "comment" : "Opponent section of NewGameView",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
