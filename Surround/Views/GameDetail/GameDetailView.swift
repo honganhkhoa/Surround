@@ -219,7 +219,7 @@ struct GameDetailView: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(action: { self.showSettings = false }) {
-                            Text("Done").bold()
+                            Text("Done", comment: "close button for in-game settings").bold()
                         }
                     }
                 }

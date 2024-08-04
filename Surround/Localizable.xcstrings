@@ -3,6 +3,12 @@
   "strings" : {
     " — players may drop mid-game" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- les participants peuvent quitter pendant la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20,6 +26,12 @@
     " SD" : {
       "comment" : "Final byo-yomi period (Sudden Death)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -36,6 +48,12 @@
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Alexandru Cristescu**](https://github.com/acristescu), pour la création du client OGS open-source [**Sente**](https://github.com/acristescu/OnlineGo) pour Android. Le procédé de création de cette application ainsi que du projet en tant que tel ont étés une précieuse aide pour moi pendant le développement."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -52,6 +70,12 @@
     },
     "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advises for the app." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Linh Pham**](https://linhpham.me), pour la création de l'icône de l'application et pour ses conseils de conception."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -68,15 +92,27 @@
     },
     "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), for kickstarting the effort to translate this app to multiple languages, and for translating the app to Japanese." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), for kickstarting the effort to translate this app to multiple languages, and for translating the app to Japanese and French."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), pour la mise en branle de l'effort de traduction de l'application en plusieurs langues ainsi que pour les traductions japonaise et française."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php)は、このアプリの翻訳を開始して、日本語の翻訳を提供しました。"
+            "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php)は、このアプリの翻訳を開始して、日本語とフランス語の翻訳を提供しました。"
           }
         },
         "vi" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "[**Raphaël Assenat**](https://www.raphnet.net/index_en.php), người bắt đầu quá trình dịch Surround ra các ngôn ngữ khác, và giúp dịch Surround sang tiếng Nhật."
           }
         }
@@ -84,6 +120,12 @@
     },
     "[**The OGS Team**](https://online-go.com/docs/team), for creating and maintaining an excellent Go Server with open API, and for all the support during the development of the app." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**L'équipe d'OGS**](https://online-go.com/docs/team), pour la creation et la maintenance d'un excellent serveur de Go à API ouverte, et pour le support lors du développement de l'application."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -119,6 +161,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$@** pour chaque **%2$lld coup**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$@** pour chaque **%2$lld coups**."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -148,6 +208,12 @@
     "**%@** of total play time for each player." : {
       "comment" : "TimeControl - long description for absolute system",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%@** de temps total par joueur."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -165,6 +231,12 @@
     "**%@** per move." : {
       "comment" : "TimeControl - long description for simple system",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%@** par coup."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -222,6 +294,54 @@
                     "stringUnit" : {
                       "state" : "translated",
                       "value" : "%arg live games"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%#@arg1@** et **%#@arg2@** sont en ce moment en cours."
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg partie par correspondance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg parties par correspondence"
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg partie en temps réel"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg parties en temps réel"
                     }
                   }
                 }
@@ -324,6 +444,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$lld période** de **%2$@**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%1$lld périodes** de **%2$@**."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -352,6 +490,12 @@
     },
     "**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le **Mode d'analyse** permet aux joueurs d'essayer des variations pendant la partie. C'est comme un plateau de jeu séparé où vous pouvez expérimenter."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -368,6 +512,12 @@
     },
     "**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nombre de pierres d'handicap sera déterminé en fonction du niveau des adversaires."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -384,6 +534,12 @@
     },
     "**Automatic** setting will either assign white to the stronger player, or just assign randomly." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque le choix des couleurs est **automatique**, les pierres blanches sont assignées au joueur le plus fort, ou simplement au hasard."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -400,6 +556,12 @@
     },
     "**Casual**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Détente**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -416,6 +578,12 @@
     },
     "**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les **parties par correspondance** se jouent sur une longe période, à un rythme moyen d'environ 1 coup par jour. Les joueurs jouent couramment plusieurs parties par correspondance en simultané."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -432,6 +600,12 @@
     },
     "**Custom** board sizes are not available in **ranked** games." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un plateau de taille **sur mesure** n'est pas possible pour les parties **classées**."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -448,6 +622,12 @@
     },
     "**Custom** komi is not available in **ranked** games." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un komi **sur mesure** n'est pas possible pour les parties **comptabilisées**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -464,6 +644,12 @@
     },
     "**Custom** komi: **%.1f**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "komi **sur mesure**: **%.1f**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -480,6 +666,12 @@
     },
     "**Custom** komi: **%lf**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "komi **sur mesure**: **%lf**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -496,6 +688,12 @@
     },
     "**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une **partie en temps réel** se termine en général en une session, au rythme de 30 secondes par coup, ou 10 en mode **Blitz**."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -512,6 +710,12 @@
     },
     "**Standard** komi: **%.1f**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi **standard**: **%.1f**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -528,6 +732,12 @@
     },
     "**Standard** komi: **%lf**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "komi **standard**: **%lf**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -544,6 +754,12 @@
     },
     "**Surround** includes these open source components:" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Surround** incorpore les éléments open-source suivants:"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -560,6 +776,12 @@
     },
     "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting every kinds of devices." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Surround** est une application iOS visant à fournir une expérience OGS exceptionnelle sur les appareils iOS. Cette application utilise l'API ouverte d'OGS pour communiquer avec le serveur, et grace à l'exploitation des fonctionnalités uniques à iOS, Surround réussi même à surpasser OGS qui, étant une application web, doit fonctionner sur une plus grande variété d'appareils."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -576,6 +798,12 @@
     },
     "%.1f komi" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "komi de %.1f"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -596,6 +824,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@ %2$@"
           }
         },
@@ -622,6 +856,12 @@
             "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ %3$@ %4$@ %5$@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -645,6 +885,12 @@
             "value" : "%1$@ + %2$@ up to %3$@"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ + %2$@ jusqu'à %3$@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -662,6 +908,12 @@
     "%@/move" : {
       "comment" : "TimeControl - short description for simple system",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/coup"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -682,6 +934,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@%2$@%3$@/%4$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@%2$@%3$@/%4$lld"
           }
         },
@@ -708,6 +966,12 @@
             "value" : "%1$@%2$@%3$lld×%4$@"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@%3$lld×%4$@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -731,6 +995,12 @@
             "value" : "%1$02d:%2$02d"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$02d:%2$02d"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -747,6 +1017,12 @@
     },
     "%lld" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -762,7 +1038,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
+      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -776,6 +1052,24 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "new",
+                  "value" : "%lld captures"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld capture"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
                   "value" : "%lld captures"
                 }
               }
@@ -811,6 +1105,12 @@
     "%lld Dan" : {
       "comment" : "formattedRank - dan - long format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldDan"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -841,6 +1141,24 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld days"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld jour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld jours"
                 }
               }
             }
@@ -881,6 +1199,12 @@
             "value" : "%lld days"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld jours"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -916,6 +1240,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld heure"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld heures"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -945,6 +1287,12 @@
     "%lld Kyu" : {
       "comment" : "formattedRank - kyu - long format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Kyu"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -975,6 +1323,24 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld live games"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld partie en temps réel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld parties en temps réel"
                 }
               }
             }
@@ -1021,6 +1387,24 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "new",
+                  "value" : "%lld minutes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minute"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
                   "value" : "%lld minutes"
                 }
               }
@@ -1074,6 +1458,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld partie Rengo en attente"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld parties Rengo en attente"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -1116,6 +1518,24 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld seconds"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld seconde"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld secondes"
                 }
               }
             }
@@ -1168,6 +1588,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Pierre"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Pierres"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -1215,6 +1653,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld semaine"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld semaines"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -1244,6 +1700,12 @@
     "%lldd" : {
       "comment" : "Duration - week parts, short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldj"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1267,6 +1729,12 @@
             "value" : "%lldd"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldd"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1284,6 +1752,12 @@
     "%lldh" : {
       "comment" : "Duration - hours part, short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldh"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1307,6 +1781,12 @@
             "value" : "%1$lldh %2$02dm"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lldh %2$02dm"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1325,6 +1805,24 @@
       "comment" : "Time left - more than 2 days left, hours part",
       "localizations" : {
         "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldh"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldhs"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
           "variations" : {
             "plural" : {
               "one" : {
@@ -1377,6 +1875,12 @@
             "value" : "%lldk"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldk"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1394,6 +1898,12 @@
     "%lldm" : {
       "comment" : "Duration - minutes part, short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldm"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1411,6 +1921,12 @@
     "%lldp" : {
       "comment" : "formattedRank - pro - short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldp"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1428,6 +1944,12 @@
     "%llds" : {
       "comment" : "Duration - seconds part, short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%llds"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1445,6 +1967,12 @@
     "%lldw" : {
       "comment" : "Duration - week parts, short format",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%llds"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1461,6 +1989,12 @@
     },
     "• Alamofire" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Alamofire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1477,6 +2011,12 @@
     },
     "• DictionaryCoding" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• DictionaryCoding"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1493,6 +2033,12 @@
     },
     "• OGS's score-estimator" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• L'estimateur de score d'OGS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1509,6 +2055,12 @@
     },
     "• Push notifications for correspondence games (optional)" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Notifications push pour les parties par correspondance (optionnel)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1525,6 +2077,12 @@
     },
     "• Support for Surround's ongoing development" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Support pour la continuation du développement de Surround"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1541,6 +2099,12 @@
     },
     "• URLImage" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• URLImage"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1557,6 +2121,12 @@
     },
     "⚠️ OGS Moderator's official message. Please respond." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Message d'un modérateur OGS. Veuillez répondre."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1573,6 +2143,12 @@
     },
     "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie **rengo** se joue entre deux équipes, une avec les pierres blanches, l'autre avec les pierres noires. Les joueurs de chaque équipe jouent à tour de rôle."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1590,6 +2166,12 @@
     "A game ends" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie prends fin"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1607,6 +2189,12 @@
     "A game starts" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie commence"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1623,6 +2211,12 @@
     },
     "About" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À propos"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1640,6 +2234,12 @@
     "About & Support" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informations & Support"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1657,6 +2257,12 @@
     "Absolute" : {
       "comment" : "TimeControl system name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Absolue"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1673,6 +2279,12 @@
     },
     "Accept" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1696,6 +2308,12 @@
             "value" : "Accept"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1712,6 +2330,12 @@
     },
     "Accept undo" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter la reprise"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1728,6 +2352,12 @@
     },
     "Active games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties en cours"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1744,6 +2374,12 @@
     },
     "Advanced rules settings" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres de règles avancés"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1760,6 +2396,12 @@
     },
     "Advanced time settings" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres de temps avancés"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1777,6 +2419,12 @@
     "AGA" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AGA"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1793,6 +2441,12 @@
     },
     "All purchases are final. I cannot issue refunds for purchases charged to your Apple ID." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les achats sont finaux. Je ne peux pas rembourser les achats effectués avec votre Apple ID."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1809,6 +2463,12 @@
     },
     "All Supporter tiers includes:" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les niveaux de support comprennent:"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1843,6 +2503,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a également %lld partie ouverte correspondant à vos préférences que vous pouvez accepter pour commencer une partie immédiatement."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a également %lld parties ouvertes correspondant à vos préférences que vous pouvez accepter pour commencer une partie immédiatement."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -1871,6 +2549,12 @@
     },
     "Analysis disabled" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse interdite"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1887,6 +2571,12 @@
     },
     "Analysis enabled" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse permise"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1903,6 +2593,12 @@
     },
     "Analyze mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode d'analyse"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1919,6 +2615,12 @@
     },
     "Are you sure you want to abandon your team?" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Êtes-vous sûr de vouloir abandonner votre équipe?"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1935,6 +2637,12 @@
     },
     "Are you sure you want to cancel this game?" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous vraiment annuler la partie?"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1951,6 +2659,12 @@
     },
     "Are you sure you want to pass?" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous vraiment passer votre tour?"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1967,6 +2681,12 @@
     },
     "Are you sure you want to resign this game?" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous vraiment abandonner la partie?"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1983,6 +2703,12 @@
     },
     "Are you sure you want to resume the game?" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voulez-vous vraiment reprendre la partie?"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1999,6 +2725,12 @@
     },
     "Auto" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2015,6 +2747,12 @@
     },
     "Auto submiting moves" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi automatique des coups"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2032,6 +2770,12 @@
     "Automatic" : {
       "comment" : "NewGameView handicap selection, automatic handicap",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2048,6 +2792,12 @@
     },
     "Automatically assign stone colors" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs automatiques"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2064,6 +2814,12 @@
     },
     "Automatically decide handicap" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handicap automatique"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2081,6 +2837,12 @@
     "B+" : {
       "comment" : "Black wins (short status on large thumbnails)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N+"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2097,6 +2859,12 @@
     },
     "Back" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2113,6 +2881,12 @@
     },
     "Become a Supporter" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devenez un supporteur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2129,6 +2903,12 @@
     },
     "Become a Supporter to support the ongoing development of this app and gain access to some additional features." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devenez un supporteur pour encourager la continuation du développement de cette appli et avoir accès à certaines fonctionnalités additionnelles."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2145,6 +2925,12 @@
     },
     "Black" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2161,6 +2947,12 @@
     },
     "Black by %.1f" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir par %.1f"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2177,6 +2969,12 @@
     },
     "Black to move" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au tour de noir"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2211,6 +3009,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Noir a gagné par %.1fpoint"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Noir a gagné par %.1fpoints"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -2239,6 +3055,12 @@
     },
     "Black wins by %@" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné par %@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2255,6 +3077,12 @@
     },
     "Black wins by Abandonment" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Abandon)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2271,6 +3099,12 @@
     },
     "Black wins by Cancellation" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Annulation)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2287,6 +3121,12 @@
     },
     "Black wins by Disconnection" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Déconnexion)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2303,6 +3143,12 @@
     },
     "Black wins by Disqualification" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Disqualification)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2319,6 +3165,12 @@
     },
     "Black wins by Moderator Decision" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Décision du modérateur)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2335,6 +3187,12 @@
     },
     "Black wins by Resignation" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Abandon)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2351,6 +3209,12 @@
     },
     "Black wins by Stone Removal Timeout" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Expiration du délai de retrait des pierres)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2367,6 +3231,12 @@
     },
     "Black wins by Timeout" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noir a gagné (Temps écoulé)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2384,6 +3254,12 @@
     "blitz" : {
       "comment" : "TimeControlSpeed enum localization",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blitz"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2400,6 +3276,12 @@
     },
     "Blitz" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blitz"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2416,6 +3298,12 @@
     },
     "Board coordinates" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordonnées du plateau"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2433,6 +3321,12 @@
     "Board size" : {
       "comment" : "New game view, board size selection section",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taille du plateau"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2450,6 +3344,12 @@
     "Byo-Yomi" : {
       "comment" : "TimeControl system name - shorter",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Byo-yomi"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2467,6 +3367,12 @@
     "Canadian" : {
       "comment" : "TimeControl system name - shorter",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canadien"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2484,6 +3390,12 @@
     "Canadian Byo-Yomi" : {
       "comment" : "TimeControl system name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Byo-yomi canadien"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2500,6 +3412,12 @@
     },
     "Cancel" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2516,6 +3434,12 @@
     },
     "Cancel game" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2532,6 +3456,12 @@
     },
     "Cancel support" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulation du support"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2548,6 +3478,12 @@
     },
     "Captures" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Captures"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2564,6 +3500,12 @@
     },
     "Challenge received!" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défi reçu!"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2580,6 +3522,12 @@
     },
     "Challenge type" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type de défi"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2597,6 +3545,12 @@
     "Challenges received" : {
       "comment" : "Homeview",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défi reçu"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2613,6 +3567,12 @@
     },
     "Chat" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2630,6 +3590,12 @@
     "Chinese" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chinoises"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2646,6 +3612,12 @@
     },
     "Clear estimates" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer l'estimé"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2667,6 +3639,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Clock starts with **%1$@** and increases by **%2$@** per move, up to a maximum of **%3$@**."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'horloge commence avec **%1$@** et augmente de **%2$@** par coup, jusqu'à un maximum de **%3$@**."
           }
         },
         "ja" : {
@@ -2699,6 +3677,24 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld moves**."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lldcoup**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lldcoups**."
                 }
               }
             }
@@ -2751,6 +3747,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Temps principal de **%1$@**, suivi par **%2$lld période** de **%3$@**."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Temps principal de **%1$@**, suivi par **%2$lld périodes** de **%3$@**."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -2779,6 +3793,12 @@
     },
     "Close" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2795,6 +3815,12 @@
     },
     "Compact" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compact"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2812,6 +3838,12 @@
     "Connected" : {
       "comment" : "Connection status",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2829,6 +3861,12 @@
     "Connecting" : {
       "comment" : "Connection status",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connextion..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2845,6 +3883,12 @@
     },
     "Contact" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2862,6 +3906,12 @@
     "correspondence" : {
       "comment" : "TimeControlSpeed enum localization",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2878,6 +3928,12 @@
     },
     "Correspondence" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2894,6 +3950,12 @@
     },
     "Correspondence games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties par correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2911,6 +3973,12 @@
     "Correspondence Games" : {
       "comment" : "Correspondence Games Widget name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties par correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2927,6 +3995,12 @@
     },
     "Correspondence games notifications" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications de parties par correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2943,6 +4017,12 @@
     },
     "Correspondence rengo games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties rengo par correspondance"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2959,6 +4039,12 @@
     },
     "Create a game precisely as you want." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créé une partie exactement comme vous le voulez."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2975,6 +4061,12 @@
     },
     "Create and show a challenge publicly, then wait for other players to accept." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créez et affichez un défi publiquement, puis attendez qu'un joueur l'accepte."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2991,6 +4083,12 @@
     },
     "Create challenge" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer le défi"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3007,6 +4105,12 @@
     },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour le moment, **Surround** ne supporte qu'un sous-ensemble des fonctions disponibles sur OGS et je planifie de progressivement en supporter davantage. En accord avec l'esprit d'OGS, la plupart des fonctions sont disponibles gratuitement, mais j'apprécierai énormément votre support si vous décidez de devenir un supporteur."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3023,6 +4127,12 @@
     },
     "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En ce moment, cette fonction n'est offerte qu'aux supporteurs de l'application en raison des frais liés à la maintenance du serveur."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3040,6 +4150,12 @@
     "Custom" : {
       "comment" : "NewGameView top Picker",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalisée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3056,6 +4172,12 @@
     },
     "Custom komi: **%.1f**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi sur mesure: **%.1f**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3072,6 +4194,12 @@
     },
     "Custom komi: %.1f" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi sur mesure: %.1f"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3095,6 +4223,12 @@
             "value" : "Custom"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur mesure"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3111,6 +4245,12 @@
     },
     "Disable analysis" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interdire le mode d'analyse"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3127,6 +4267,12 @@
     },
     "Disable the **ranked** option above if you don't want the result to count towards your rating. **Ranked** games cannot be **private** and have fewer customizing options." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déactivez l'option **Comptabilisée** si vous ne souhaitez pas que le résultat compte dans le calcul de votre niveau. Les parties **comptabilisées** ne peuvent pas être **privées** et offrent moins d'options de personnalisation."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3144,6 +4290,12 @@
     "Disconnected" : {
       "comment" : "Connection status",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déconnecté"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3160,6 +4312,12 @@
     },
     "Dismiss" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3176,6 +4334,12 @@
     },
     "Display mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode d'affichage"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3191,7 +4355,14 @@
       }
     },
     "Done" : {
+      "comment" : "close button for in-game settings",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3208,6 +4379,12 @@
     },
     "Error: Cannot load Supporter information at the moment." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreur: Impossible de charger les informations sur les supporteurs en ce moment."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3224,6 +4401,12 @@
     },
     "Estimate score" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimation du score"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3240,6 +4423,12 @@
     },
     "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les participants du [test beta](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), pour m'avoir aidé à améliorer l'application et pour de nombreux commentaires et rapports d'erreur."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3256,6 +4445,12 @@
     },
     "Exit Zen mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sortir du mode Zen"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3273,6 +4468,12 @@
     "Failed to load your correspondence games." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreur de chargement de vos parties par correspondance."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3290,6 +4491,12 @@
     "Find a game" : {
       "comment" : "New game view",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trouver une partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3307,6 +4514,12 @@
     "Fischer" : {
       "comment" : "TimeControl system name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fischer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3324,6 +4537,12 @@
     "Forums" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forums"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3341,6 +4560,12 @@
     "Friendly Match" : {
       "comment" : "Default game name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partie amicale"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3357,6 +4582,12 @@
     },
     "Friends" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amis"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3374,6 +4605,12 @@
     "From **%@**" : {
       "comment" : "Custom game rank restriction",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De **%@**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3391,6 +4628,12 @@
     "Game ended" : {
       "comment" : "Notification title",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3407,6 +4650,12 @@
     },
     "Game ended in a draw" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La partie s'est terminée a égalité"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3423,6 +4672,12 @@
     },
     "Game name:" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3439,6 +4694,12 @@
     },
     "Game speed" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitesse de la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3455,6 +4716,12 @@
     },
     "Game speed: %@" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitesse du jeu: %@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3472,6 +4739,12 @@
     "Game started" : {
       "comment" : "Notification title",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Début de la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3488,6 +4761,12 @@
     },
     "Game starts automatically when there are **%@** players." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La partie commencera automatiquement lorsqu'il y aura **%@** joueurs."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3504,6 +4783,12 @@
     },
     "Game starts automatically when there are **%lld** players." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La partie commence automatiquement lorsqu'il y a **%lld** joueurs. "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3520,6 +4805,12 @@
     },
     "Game type" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type de partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3536,6 +4827,12 @@
     },
     "Gameplay" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3552,6 +4849,12 @@
     },
     "Handicap: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handicap: "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3568,6 +4871,12 @@
     },
     "Haptics" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour haptique"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3584,6 +4893,12 @@
     },
     "Has handicap: %lld" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec handicap:%lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3600,6 +4915,12 @@
     },
     "Height" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hauteur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3617,6 +4938,12 @@
     "Hide demo board" : {
       "comment" : "Demo board in settings",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cacher le plateau de démonstration"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3634,6 +4961,12 @@
     "Home" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accueil"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3650,6 +4983,12 @@
     },
     "If you choose to purchase a Surround App Supporter subscription, payment will be charged to your Apple ID account at the confirmation of purchase. The subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si vous faites le choix d'acheter un abonnement de support pour l'application Surround, le montant de l'abonnement sera prélevé de votre compte Apple ID au moment de la confirmation de l'achat. L'abonnement sera ensuite renouvelé automatiquement à moins d'être annulé au moins 24 heures avant la fin de la période en cours. Le montant du renouvellement sera prélevé de votre compte à l'intérieur   des 24 dernières heures de la période. Après votre achat, vous pourrez en tout temps gérer et annuler vos abonnements en accédant à la section abonnements dans les paramètres de votre compte apple via l'App Store."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3667,6 +5006,12 @@
     "Ing SST" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ing SST"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3683,6 +5028,12 @@
     },
     "Initial time" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps initial"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3699,6 +5050,12 @@
     },
     "Is open" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Est ouvert"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3716,6 +5073,12 @@
     "It is your turn in the game with %@." : {
       "comment" : "Notification body",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C'est à votre tour de jouer dans la partie contre %@."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3733,6 +5096,12 @@
     "Japanese" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japonaises"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3750,6 +5119,12 @@
     "Japanese Byo-Yomi" : {
       "comment" : "TimeControl system name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bro-yomi japonais"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3767,6 +5142,12 @@
     "Join" : {
       "comment" : "joinRengoChallenge",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3783,6 +5164,12 @@
     },
     "Komi" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3799,6 +5186,12 @@
     },
     "Komi: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi:"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3816,6 +5209,12 @@
     "Korean" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coréennes"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3832,6 +5231,12 @@
     },
     "Large" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3848,6 +5253,12 @@
     },
     "Learn more..." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour en apprendre davantage..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3865,6 +5276,12 @@
     "Leave" : {
       "comment" : "leaveRengoChallenge",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3882,6 +5299,12 @@
     "live" : {
       "comment" : "TimeControlSpeed enum localization",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps réel"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3898,6 +5321,12 @@
     },
     "Live" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps réel"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3915,6 +5344,12 @@
     "Live game in progress..." : {
       "comment" : "In Popup. When only 1 game in progress.",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partie en temps réel en cours..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3932,6 +5367,12 @@
     "Live games" : {
       "comment" : "Homeview",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties en temps réel"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3949,6 +5390,12 @@
     "Live games in progress..." : {
       "comment" : "In Popup. When multiple games are in progress.",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties en temps réel en cours..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3965,6 +5412,12 @@
     },
     "Live rengo games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties rengo en temps réel"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3981,6 +5434,12 @@
     },
     "Logout" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se déconnecter"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3997,6 +5456,12 @@
     },
     "Main time" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps principal"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4013,6 +5478,12 @@
     },
     "Malkovich" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Malkovich"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4029,6 +5500,12 @@
     },
     "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal Malkovich est invisible pour l'adversaire pendant la partie et visible en tout temps pour vous et les spectateurs."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4045,6 +5522,12 @@
     },
     "Max time" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps maximum"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4061,6 +5544,12 @@
     },
     "Message organizer" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un message à l'organisateur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4077,6 +5566,12 @@
     },
     "More actions" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions additionelles"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4093,6 +5588,12 @@
     },
     "Move %@" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coup %@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4109,6 +5610,12 @@
     },
     "Move %lld" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coup %lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4125,6 +5632,12 @@
     },
     "Move to Black team" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers l'équipe des noir"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4141,6 +5654,12 @@
     },
     "Move to White team" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers l'équipe des blancs"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4158,6 +5677,12 @@
     "My turn" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C'est mon tour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4174,6 +5699,12 @@
     },
     "Navigation" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navigation"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4190,6 +5721,12 @@
     },
     "New game" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4206,6 +5743,12 @@
     },
     "New game option" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de nouvelle partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4223,6 +5766,12 @@
     "New Zealand" : {
       "comment" : "rules name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Néo-Zélandaises"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4239,6 +5788,12 @@
     },
     "Next" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivant"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4262,6 +5817,12 @@
             "value" : "None"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4278,6 +5839,12 @@
     },
     "No correspondence games on your opponents' turn" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de parties par correspondance où c'est au tour de l'adversaire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4294,6 +5861,12 @@
     },
     "No correspondence games on your turn" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de parties par correspondance où c'est votre tour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4315,6 +5888,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "None"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune"
           }
         },
         "ja" : {
@@ -4340,6 +5919,12 @@
             "value" : "None"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4356,6 +5941,12 @@
     },
     "No players found." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun joueurs trouvés."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4379,6 +5970,12 @@
             "value" : "None"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4396,6 +5993,12 @@
     "No time limits" : {
       "comment" : "TimeControl - short description for no system",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune limite de temps"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4413,6 +6016,12 @@
     "No time limits." : {
       "comment" : "TimeControl - long description for no system",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune limite de temps"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4429,6 +6038,12 @@
     },
     "Note to yourself" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note pour vous-même"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4445,6 +6060,12 @@
     },
     "Note: Sounds and voice countdown will not play when your device is in **Silent** mode." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention: Les sons et le compte à rebours seront inaudibles si votre appareil est en mode **silencieux**."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4461,6 +6082,12 @@
     },
     "Online-go.com Account" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte online-go.com"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4476,7 +6103,14 @@
       }
     },
     "Open" : {
+      "comment" : "Opponent section of NewGameView, means anyone",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N'importe qui"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4493,6 +6127,12 @@
     },
     "Open in browser" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans le navigateur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4509,6 +6149,12 @@
     },
     "Opponent" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adversaire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4526,6 +6172,12 @@
     "Opponent passed" : {
       "comment" : "Game",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre adversaire a passé"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4542,6 +6194,12 @@
     },
     "Options" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4558,6 +6216,12 @@
     },
     "or" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ou"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4575,6 +6239,12 @@
     "Others" : {
       "comment" : "NewGameView, title for `Others` section",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres options"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4591,6 +6261,12 @@
     },
     "Pass" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4607,6 +6283,12 @@
     },
     "Pause game" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspendre la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4623,6 +6305,12 @@
     },
     "Pause on weekend" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspendre les fins de semaines"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4640,6 +6328,12 @@
     "Paused" : {
       "comment" : "pause reason",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4657,6 +6351,12 @@
     "Paused, %lld left" : {
       "comment" : "pause reason (pausing player is you)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partie suspendue, reste %lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4673,6 +6373,12 @@
     },
     "Periods: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Périodes: "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4689,6 +6395,12 @@
     },
     "Playback mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode relecture"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4705,6 +6417,12 @@
     },
     "Player info" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile du joueur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4721,6 +6439,12 @@
     },
     "Preview" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperçu"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4737,6 +6461,12 @@
     },
     "Privacy Policy" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Politique de confidentialité"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4753,6 +6483,12 @@
     },
     "Private" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4770,6 +6506,12 @@
     "Private messages" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages privés"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4786,6 +6528,12 @@
     },
     "Private messages are only stored for a few days, so please make sure to save any important information somewhere else." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages privés ne sont stockés que pour quelques jours, alors assurez-vous d'enregistrer toute information importante ailleurs."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4803,6 +6551,12 @@
     "Public games" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties publiques"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4819,6 +6573,12 @@
     },
     "Public live games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties publiques"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4836,6 +6596,12 @@
     "Quick match" : {
       "comment" : "NewGameView top Picker",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partie rapide"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4852,6 +6618,12 @@
     },
     "Quick match request" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes de partie rapide"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4868,6 +6640,12 @@
     },
     "Ranked" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comptabilisée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4885,6 +6663,12 @@
     "Reconnecting" : {
       "comment" : "Connection status",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnexion en cours..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4901,6 +6685,12 @@
     },
     "Register an OGS account" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S'inscrire à OGS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4917,6 +6707,12 @@
     },
     "Reject" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4933,6 +6729,12 @@
     },
     "Rengo (%@)" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo (%@)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4950,6 +6752,12 @@
     "Rengo (%lld)" : {
       "comment" : "NewGameView  (rengoCount)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo (%lld)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4966,6 +6774,12 @@
     },
     "Request undo" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demander une reprise"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4982,6 +6796,12 @@
     },
     "Resign" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4998,6 +6818,12 @@
     },
     "Restore" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5014,6 +6840,12 @@
     },
     "Restrict opponent rank" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restriction de niveau d'adversaire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5030,6 +6862,12 @@
     },
     "Resume" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5046,6 +6884,12 @@
     },
     "Resume game" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5062,6 +6906,12 @@
     },
     "Revert to standard time setting." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir des paramètres de temps standard."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5078,6 +6928,12 @@
     },
     "Rule set" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règles"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5094,6 +6950,12 @@
     },
     "Rules" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règles"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5110,6 +6972,12 @@
     },
     "Rules set: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règles: "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5126,6 +6994,12 @@
     },
     "Rules: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règles: "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5142,6 +7016,12 @@
     },
     "Say hi!" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dites bonjour!"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5159,6 +7039,12 @@
     "SD" : {
       "comment" : "Final byo-yomi period (Sudden Death)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5175,6 +7061,12 @@
     },
     "Search by user name" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche par nom d'utilisateur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5191,6 +7083,12 @@
     },
     "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez les dimensions du plateau et les paramètres de temps que vous désirez puis laissez le système vous trouver un adversaire de niveau similaire."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5207,6 +7105,12 @@
     },
     "Select your opponent " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionnez votre adversaire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5223,6 +7127,12 @@
     },
     "Send a challenge directly to a friend (or a specific player) so they can accept to start a game." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancez un défi directement à un ami (ou un joueur spécifique) qui devra l'accepter pour commencer la partie."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5239,6 +7149,12 @@
     },
     "Send a notification on..." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer une notification lorsque..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5256,6 +7172,12 @@
     "Settings" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5272,6 +7194,12 @@
     },
     "Sign in to your Account" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à votre compte"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5288,6 +7216,12 @@
     },
     "Sign in to your OGS account" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à OGS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5305,6 +7239,12 @@
     "Sign in to your online-go.com account to see your games here." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à votre compte OGS pour voir vos parties ici."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5322,6 +7262,12 @@
     "Simple" : {
       "comment" : "TimeControl system name",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simple"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5338,6 +7284,12 @@
     },
     "Standard 1v1 (%@)" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard 1v1 (%@)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5354,6 +7306,12 @@
     },
     "Standard 1v1 (%lld)" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard 1v1 (%lld)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5370,6 +7328,12 @@
     },
     "Standard board size" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taille standard"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5386,6 +7350,12 @@
     },
     "Standard komi" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi standard"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5402,6 +7372,12 @@
     },
     "Standard komi: **%.1f**" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi standard: **%.1f**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5425,6 +7401,12 @@
             "value" : "Standard"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5441,6 +7423,12 @@
     },
     "Start" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commencer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5457,6 +7445,12 @@
     },
     "Stone per period: " : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pierres par période: "
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5474,6 +7468,12 @@
     "Stone removal" : {
       "comment" : "pause reason",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppression des pierres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5490,6 +7490,12 @@
     },
     "Stone removal option" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de suppression des pierres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5507,6 +7513,12 @@
     "Stone Removal Phase" : {
       "comment" : "Game",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phase de suppression des pierres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5523,6 +7535,12 @@
     },
     "Stone sounds" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bruit des pierres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5540,6 +7558,12 @@
     "Stones" : {
       "comment" : "In PlayersBannerView, label for stone count",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pierres"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5556,6 +7580,12 @@
     },
     "Submit" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5572,6 +7602,12 @@
     },
     "Submit move" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer votre coup"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5588,6 +7624,12 @@
     },
     "Support OGS" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support OGS"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5604,6 +7646,12 @@
     },
     "Support Surround" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supported Surround"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5626,6 +7674,12 @@
             "value" : "Supporter Tier %1$@: %2$@ monthly"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niveau de support %1$@: %2$@par mois"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5642,6 +7696,12 @@
     },
     "Surround" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5658,6 +7718,12 @@
     },
     "Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS)." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surround est un client pour jouer au Go en ligne contre d'autres joueurs sur le site web Online-Go.com, aussi connu sous le nom Online Go Server (OGS)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5675,6 +7741,12 @@
     "System" : {
       "comment" : "pause reason",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Système"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5691,6 +7763,12 @@
     },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tapez et faites glisser pour placer une pierre. Glissez jusqu'à l'extérieur du plateau pour annuler."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5707,6 +7785,12 @@
     },
     "Tap on avatars to assign players into teams." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez sur les avatars pour assigner un joueur à une équipe."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5724,6 +7808,12 @@
     "Tap to go to game" : {
       "comment" : "Popup. When a single game is in progress.",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez pour aller à la partie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5741,6 +7831,12 @@
     "Tap to go to games" : {
       "comment" : "Popup. When multiplpe games are in progress.",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez pour aller aux parties"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5757,6 +7853,12 @@
     },
     "Tap to view" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appuyez pour voir"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5773,6 +7875,12 @@
     },
     "Terms of Use" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conditions d'utilisation"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5790,6 +7898,12 @@
     "Territory" : {
       "comment" : "In PlayersBannerView, label for territory count",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territoire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5806,6 +7920,12 @@
     },
     "Thank you for being a Supporter!" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci d'être un supporteur!"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5822,6 +7942,12 @@
     },
     "Thanks to" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remerciements"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5838,6 +7964,12 @@
     },
     "The **Online Go Server** (OGS) is a popular server to play Go online, accessed by visiting https://online-go.com. OGS features a modern user interface and a friendly, welcoming community of Go players." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Online Go Server** (OGS) est un serveur populaire pour jouer au Go en ligne accessible en visitant https://online-go.com. OGS présente une interface usager moderne et une communauté amicale et accueillante de joueurs de Go."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5895,6 +8027,54 @@
                     "stringUnit" : {
                       "state" : "translated",
                       "value" : "%arg open rengo games"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il y a %#@arg1@ que vous pouvez accepter pour jouer immédiatement, et %#@arg2@."
+          },
+          "substitutions" : {
+            "arg1" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg défi ouvert"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg défis ouverts"
+                    }
+                  }
+                }
+              }
+            },
+            "arg2" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg défi rengo ouvert"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg défis rengo ouverts"
                     }
                   }
                 }
@@ -5978,6 +8158,12 @@
     },
     "There are %lld open challenges that you can accept to start a game immediately." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il y a %lld défis ouverts que vous pouvez accepter pour commencer une partie immédiatement."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6012,6 +8198,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld partie de rengo ouvertes."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld parties de rengo ouvertes."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -6040,6 +8244,12 @@
     },
     "There are currently no open challenges." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n'y a pas de défis ouverts en ce moment."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6057,6 +8267,12 @@
     "This Widget display a summary of your correspondence games on online-go.com." : {
       "comment" : "Correspondence Games Widget description",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce widget affiche un aperçu de vos parties par correspondance sur online-go.com."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6073,6 +8289,12 @@
     },
     "Time increment" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incrément de temps"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6089,6 +8311,12 @@
     },
     "Time per move" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps par coup"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6105,6 +8333,12 @@
     },
     "Time per period" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps par période"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6122,6 +8356,12 @@
     "Time running low" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il reste peu de temps"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6139,6 +8379,12 @@
     "Time running out" : {
       "comment" : "Notification title",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peu de temps restant"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6156,6 +8402,12 @@
     "To **%@**" : {
       "comment" : "Custom game rank restriction",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à **%@**"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6172,6 +8424,12 @@
     },
     "To start playing:" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour commencer à jouer:"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6188,6 +8446,12 @@
     },
     "Toggle analyze mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir/Fermer le mode d'analyze"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6204,6 +8468,12 @@
     },
     "Toggle group" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure/Exclure ce groupe"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6220,6 +8490,12 @@
     },
     "Toggle playback mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basculer le mode relecture"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6236,6 +8512,12 @@
     },
     "Toggle single point" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure/Exclure ce point"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6252,6 +8534,12 @@
     },
     "Toggle thumbnails" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher/Cacher les thumbnails"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6269,6 +8557,12 @@
     "Total" : {
       "comment" : "In PlayersBannerView, label for total points",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6285,6 +8579,12 @@
     },
     "Total time" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps total"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6302,6 +8602,12 @@
     "Try it out" : {
       "comment" : "Demo board in settings",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faire un essai"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6318,6 +8624,12 @@
     },
     "Unassign" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déassigner"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6341,6 +8653,12 @@
             "value" : "Undo requested"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande de reprise"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6358,6 +8676,12 @@
     "Undo requested" : {
       "comment" : "Game - after undo requested",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande de reprise envoyée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6374,6 +8698,12 @@
     },
     "Unranked" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non classée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6396,6 +8726,12 @@
             "value" : "Unusual board size: %1$lld×%2$lld"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plateau de taille inhabituelle:  %1$lld×%2$lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6412,6 +8748,12 @@
     },
     "Unusual time settings" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres de temps inhabituels"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6429,6 +8771,12 @@
     "Vacation" : {
       "comment" : "pause reason",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vacances"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6445,6 +8793,12 @@
     },
     "View" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6461,6 +8815,12 @@
     },
     "Voice countdown" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décompte verbal"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6476,7 +8836,14 @@
       }
     },
     "vs. Friend" : {
+      "comment" : "Oppenent section of NewGameView",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contre un ami"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6494,6 +8861,12 @@
     "W+" : {
       "comment" : "White wins (short status on large thumbnails)",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B+"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6510,6 +8883,12 @@
     },
     "Waiting" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6526,6 +8905,12 @@
     },
     "Waiting (%@)" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente (%@)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6543,6 +8928,12 @@
     "Waiting (%lld)" : {
       "comment" : "NewGameView top Picker",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente (%lld)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6560,6 +8951,12 @@
     "Waiting for opponent" : {
       "comment" : "Game",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de l'adversaire"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6575,7 +8972,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -6590,6 +8987,24 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "Waiting for opponent: %lld games "
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En attente de l'adversaire: %lld partie"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En attente de l'adversaire: %lld parties"
                 }
               }
             }
@@ -6624,6 +9039,12 @@
     "Waiting for opponents/teammates" : {
       "comment" : "Homeview",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d'adversaires/coéquipier"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6640,6 +9061,12 @@
     },
     "Waiting for players to join and the organizer to start the game." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de joueurs supplémentaires et de l'organisateur pour commencer."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6657,6 +9084,12 @@
     "Waiting for teammate" : {
       "comment" : "Game",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d'un coéquipier"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6673,6 +9106,12 @@
     },
     "Waiting games" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parties en attente"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6689,6 +9128,12 @@
     },
     "Waiting..." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente..."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6706,6 +9151,12 @@
     "Web version" : {
       "comment" : "in navigation menu",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version web"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6723,6 +9174,12 @@
     "Weekend" : {
       "comment" : "pause reason",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de semaine"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6739,6 +9196,12 @@
     },
     "Welcome" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accueil"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6755,6 +9218,12 @@
     },
     "White" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6771,6 +9240,12 @@
     },
     "White by %.1f" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc par %.1f"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6787,6 +9262,12 @@
     },
     "White to move" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au tour de blanc"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6821,6 +9302,24 @@
             }
           }
         },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Blanc a gagné par %.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Blanc a gagné par %.1f points"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "variations" : {
             "plural" : {
@@ -6849,6 +9348,12 @@
     },
     "White wins by %@" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné par %@"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6865,6 +9370,12 @@
     },
     "White wins by Abandonment" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Abandon)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6881,6 +9392,12 @@
     },
     "White wins by Cancellation" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Annulation)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6897,6 +9414,12 @@
     },
     "White wins by Disconnection" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Déconnexion)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6913,6 +9436,12 @@
     },
     "White wins by Disqualification" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Disqualification)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6929,6 +9458,12 @@
     },
     "White wins by Moderator Decision" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Décision du modérateur)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6945,6 +9480,12 @@
     },
     "White wins by Resignation" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Abandon)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6961,6 +9502,12 @@
     },
     "White wins by Stone Removal Timeout" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Expiration du délai de retrait des pierres)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6977,6 +9524,12 @@
     },
     "White wins by Timeout" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blanc a gagné (Temps écoulé)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6993,6 +9546,12 @@
     },
     "Width" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Largeur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7009,6 +9568,12 @@
     },
     "Withdraw" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandon"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7025,6 +9590,12 @@
     },
     "You" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7041,6 +9612,12 @@
     },
     "You can select multiple options." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pouvez sélectionnez plusieurs options."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7058,6 +9635,12 @@
     "You don't have any correspondence games at the moment." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous n'avez pas de parties par correspondance en ce moment."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7081,6 +9664,12 @@
             "value" : "You have %1$lld hours to make your move in the game with %2$@."
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez %1$lld heures pour jouer votre coup dans la partie contre %2$@."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7097,6 +9686,12 @@
     },
     "You need to choose an opponent or make the challenge open." : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous devez choisir un adversaire ou rendre le défis publique."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7113,6 +9708,12 @@
     },
     "Your color" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre couleur"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7130,6 +9731,12 @@
     "Your game with %@ has ended." : {
       "comment" : "Notification body",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre partie contre %@ est terminée"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7147,6 +9754,12 @@
     "Your game with %@ has started." : {
       "comment" : "Notification body",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre partie contre %@ a commencé."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7164,6 +9777,12 @@
     "Your move" : {
       "comment" : "Homeview\nGame",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À votre tour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7181,6 +9800,12 @@
     "Your move (%02d)" : {
       "comment" : "Integer is for time left",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre coup (%02d)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7198,6 +9823,12 @@
     "Your turn" : {
       "comment" : "Notification title",
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À votre tour"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7221,6 +9852,12 @@
             "value" : "Your turn: %1$lld/%2$lld"
           }
         },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre tour: %1$lld/%2$lld"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7237,6 +9874,12 @@
     },
     "Zen mode" : {
       "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode zen"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
