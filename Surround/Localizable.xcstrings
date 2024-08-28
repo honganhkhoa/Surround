@@ -2767,6 +2767,9 @@
         }
       }
     },
+    "Auto Zen mode" : {
+
+    },
     "Automatic" : {
       "comment" : "NewGameView handicap selection, automatic handicap",
       "localizations" : {

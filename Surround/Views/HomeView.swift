@@ -17,6 +17,8 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
+    @Setting(.autoZen) var autoZenEnabled: Bool
+    
     @State var gameDetailCancellable: AnyCancellable?
     
     @State var displayMode: GameCell.CellDisplayMode
@@ -241,7 +243,7 @@ struct HomeView: View {
             }
             if #unavailable(iOS 16.0) {
                 NavigationLink(
-                    destination: GameDetailView(currentGame: nav.home.activeGame),
+                    destination: GameDetailView(currentGame: nav.home.activeGame, zenMode: autoZenEnabled),
                     isActive: Binding(
                         get: { nav.home.activeGame != nil },
                         set: { if !$0 { nav.home.activeGame = nil } }
@@ -261,7 +263,7 @@ struct HomeView: View {
                     get: { nav.home.activeGame != nil },
                     set: { if !$0 { nav.home.activeGame = nil } }
                 ), destination: {
-                    GameDetailView(currentGame: nav.home.activeGame)
+                    GameDetailView(currentGame: nav.home.activeGame, zenMode: autoZenEnabled)
                 })
             } else {
                 $0
