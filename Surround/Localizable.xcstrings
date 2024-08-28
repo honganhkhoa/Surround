@@ -4958,6 +4958,9 @@
         }
       }
     },
+    "Hide opponent rank" : {
+
+    },
     "Home" : {
       "comment" : "in navigation menu",
       "localizations" : {

@@ -12,6 +12,7 @@ struct PlayerInfoLine: View {
     var color: StoneColor
     var displayMode: GameCell.CellDisplayMode
     @EnvironmentObject var ogs: OGSService
+    @Setting(.hideOpponentRank) var hideOpponentRank: Bool
 
     var isUserLine: Bool {
         guard let user = ogs.user else {
@@ -22,6 +23,17 @@ struct PlayerInfoLine: View {
         } else {
             return color == game.userStoneColor
         }
+    }
+    
+    var nameWithRank: some View {
+        if let player = game.currentPlayer(with: color) {
+            var text = Text(verbatim: player.username).font(.subheadline)
+            if !hideOpponentRank {
+                text = text + Text(verbatim: " [\(player.formattedRank)]").font(.caption)
+            }
+            return AnyView(text.bold().lineLimit(1).foregroundColor(player.uiColor))
+        }
+        return AnyView(EmptyView())
     }
     
     var body: some View {
@@ -36,11 +48,7 @@ struct PlayerInfoLine: View {
                                 .background(Color(UIColor.systemTeal).cornerRadius(5))
                                 .offset(x: -3)
                         } else {
-                            if let player = game.currentPlayer(with: color) {
-                                (Text(verbatim: player.username).font(.subheadline) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
-                                    .bold().lineLimit(1)
-                                    .foregroundColor(player.uiColor)
-                            }
+                            nameWithRank
                         }
                     }
                     if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
@@ -64,11 +72,7 @@ struct PlayerInfoLine: View {
                                     .background(Color(UIColor.systemTeal).cornerRadius(5))
                                     .offset(x: -3)
                             } else {
-                                if let player = game.currentPlayer(with: color) {
-                                    (Text(verbatim: player.username).font(.subheadline) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
-                                        .bold().lineLimit(1)
-                                        .foregroundColor(player.uiColor)
-                                }
+                                nameWithRank
                             }
                         }
                         if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {

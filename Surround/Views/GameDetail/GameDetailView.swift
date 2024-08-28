@@ -15,6 +15,8 @@ struct GameDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    
+    @Setting(.hideOpponentRank) var hideOpponentRank: Bool
 
     @State var currentGame: Game?
     @State var activeGames: [Game] = []
@@ -188,6 +190,9 @@ struct GameDetailView: View {
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.username) [\(opponent.formattedRank)]"
+            if hideOpponentRank {
+                title = "vs \(opponent.username)"
+            }
             if currentGame.rengo {
                 if let opponentTeam = currentGame.gameData?.rengoTeams?[userColor.opponentColor()] {
                     if opponentTeam.count > 1 {

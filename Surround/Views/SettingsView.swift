@@ -150,6 +150,7 @@ struct GameplaySettings: View {
     var body: some View {
         GroupBox(label: Text("Gameplay")) {
             Toggle("Board coordinates", isOn: Setting(.showsBoardCoordinates).binding)
+            Toggle("Hide opponent rank", isOn: Setting(.hideOpponentRank).binding)
             Toggle("Haptics", isOn: Setting(.hapticsFeedback).binding)
             Toggle("Stone sounds", isOn: Setting(.soundOnStonePlacement).binding)
             Toggle("Voice countdown", isOn: Setting(.voiceCountdown).binding)
