@@ -344,7 +344,8 @@ struct PlayersBannerView: View {
                                 mainFont: .subheadline,
                                 subFont: .footnote,
                                 pauseControl: game.pauseControl,
-                                showsPauseReason: true)
+                                showsPauseReason: true,
+                                gameFinished: game.gamePhase == .finished)
                         }
                         ScrollView {
                             VStack(alignment: .leading, spacing: 5) {
@@ -365,7 +366,8 @@ struct PlayersBannerView: View {
                                 mainFont: .subheadline,
                                 subFont: .footnote,
                                 pauseControl: game.pauseControl,
-                                showsPauseReason: true
+                                showsPauseReason: true,
+                                gameFinished: game.gamePhase == .finished
                             )
                             Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
                                 .frame(width: 20, height: 20)
