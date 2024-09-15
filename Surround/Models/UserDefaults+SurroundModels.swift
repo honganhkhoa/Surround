@@ -211,6 +211,10 @@ extension SettingKey {
         return .init(name: "notification.onChallengeReceived", defaultValue: true)
     }
     
+    static var hidesRank: SettingKey<Bool> {
+        return .init(name: "hidesRank", defaultValue: false)
+    }
+    
     static var sgsAccessToken: SettingKey<String> {
         return .init(name: "sgsAccessToken")
     }

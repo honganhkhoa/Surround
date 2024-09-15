@@ -468,7 +468,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "考慮時間は**%3$@**(%2$lld回)。"
+                  "value" : "考慮時間は**%2$@**(%1$lld回)。"
                 }
               }
             }
@@ -1038,7 +1038,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1802,7 +1802,7 @@
       }
     },
     "%lldh left" : {
-      "comment" : "Time left - more than 2 days left, hours part",
+      "comment" : "Time left - 1 day to 2 days.\nTime left - more than 2 days left, hours part",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -2255,7 +2255,7 @@
       }
     },
     "Absolute" : {
-      "comment" : "TimeControl system name",
+      "comment" : "TimeControl system name\nTimeControl system name - shorter",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2858,6 +2858,7 @@
       }
     },
     "Back" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4847,6 +4848,28 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Général"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt chung"
+          }
+        }
+      }
+    },
     "Handicap: " : {
       "localizations" : {
         "fr" : {
@@ -4954,6 +4977,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ẩn bàn cờ minh hoạ"
+          }
+        }
+      }
+    },
+    "Hide ranks and ratings" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cacher les rangs et les classements"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ランクとレーティングを表示しない"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ẩn xếp hạng người chơi"
           }
         }
       }
@@ -7260,7 +7305,7 @@
       }
     },
     "Simple" : {
-      "comment" : "TimeControl system name",
+      "comment" : "TimeControl system name\nTimeControl system name - shorter",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7293,7 +7338,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "普通一対一(%lld)"
+            "value" : "普通一対一(%@)"
           }
         },
         "vi" : {
@@ -8792,6 +8837,7 @@
       }
     },
     "View" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8882,6 +8928,7 @@
       }
     },
     "Waiting" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8972,7 +9019,7 @@
       }
     },
     "Waiting for opponent: %lld games " : {
-      "comment" : "NewGameView - vary for plural\nHomeView - vary for plural",
+      "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -9775,7 +9822,7 @@
       }
     },
     "Your move" : {
-      "comment" : "Homeview\nGame",
+      "comment" : "Game\nHomeview",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

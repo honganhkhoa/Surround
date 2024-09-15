@@ -22,7 +22,7 @@ struct Stone: View {
                         ZStack {
                             if #available(iOS 18, *) {
                                 Path(path).fill(
-                                    Color(red: 0.7, green: 0.7, blue: 0.7)
+                                    Color(red: 0.6, green: 0.6, blue: 0.6)
                                         .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
                                 ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
                             } else {

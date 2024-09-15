@@ -127,15 +127,13 @@ struct PlayersBannerView: View {
     func playerName(color: StoneColor) -> some View {
         if game.rengo {
             if let player = game.orderedRengoTeam[color]?.first, let teamSize = game.orderedRengoTeam[color]?.count {
-                (Text(verbatim: player.username).font(Font.body.bold()) +
-                 Text(verbatim: " [\(player.formattedRank)]").font(Font.caption.bold()) +
-                 (teamSize <= 1 ? Text(verbatim: "") : (Text(verbatim: " + \(teamSize - 1)×") + Text(Image(systemName: "person.fill")))))
+                Text(verbatim: player.usernameAndRank).font(Font.body.bold()) +
+                 (teamSize <= 1 ? Text(verbatim: "") : (Text(verbatim: " + \(teamSize - 1)×") + Text(Image(systemName: "person.fill"))))
             } else {
                 EmptyView()
             }
         } else if let player = color == .black ? game.blackPlayer : game.whitePlayer {
-            (Text(verbatim: player.username).font(Font.body.bold()) +
-             Text(verbatim: " [\(player.formattedRank)]").font(Font.caption.bold()))
+            Text(verbatim: player.usernameAndRank).font(Font.body.bold())
         } else {
             EmptyView()
         }
@@ -297,7 +295,7 @@ struct PlayersBannerView: View {
     func rengoPlayerDetails(for player: OGSUser, alignment: HorizontalAlignment = .leading) -> some View {
         HStack {
             if alignment == .trailing {
-                (Text(verbatim: player.username).font(.subheadline.bold()) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
+                Text(verbatim: player.usernameAndRank).font(.subheadline.bold())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
@@ -318,7 +316,7 @@ struct PlayersBannerView: View {
             .shadow(radius: 2)
             .matchedGeometryEffect(id: player.id, in: avatars)
             if alignment != .trailing {
-                (Text(verbatim: player.username).font(.subheadline.bold()) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
+                Text(verbatim: player.usernameAndRank).font(.subheadline.bold())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }

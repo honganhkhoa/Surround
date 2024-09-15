@@ -14,6 +14,7 @@ struct SettingsView: View {
         
     @State var notificationEnabled = Setting(.notificationEnabled).wrappedValue
     @State var showSupporterView = false
+    @State var hidesRank: Bool = Setting(.hidesRank).wrappedValue
     
     var accountSettings: some View {
         Group {
@@ -28,8 +29,11 @@ struct SettingsView: View {
                         }
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text(verbatim: user.username)
-                                Text(verbatim: "[\(user.formattedRank)]")
+                                if hidesRank {
+                                    Text(verbatim: user.username)
+                                } else {
+                                    Text(verbatim: "\(user.username) [\(user.formattedRank)]") 
+                                }
                             }
                             .font(.title3)
                             Button(action: { ogs.logout() }) {
@@ -53,6 +57,16 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal)
             }
+        }
+    }
+    
+    var generalSettings: some View {
+        GroupBox(label: Text("General")) {
+            Toggle(String(localized: "Hide ranks and ratings"), isOn: $hidesRank)
+        }
+        .padding(.horizontal)
+        .onChange(of: hidesRank) { newValue in
+            userDefaults[.hidesRank] = newValue
         }
     }
     
@@ -134,6 +148,7 @@ struct SettingsView: View {
         ScrollView {
             VStack {
                 accountSettings
+                generalSettings
                 GameplaySettings(withDemoOption: true)
                 notificationSettings
             }

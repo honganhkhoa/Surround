@@ -236,6 +236,9 @@ struct Stones: View {
                                 }
                             }
                             whiteLivingPath.addEllipse(in: stoneRect)
+                            
+                            // New drawing method on iOS 18+, needs 4 paths to avoid drawing adjacent
+                            // (orthogonally and diagonally) stones in the same path.
                             whitePaths[(row % 2) * 2 + (column % 2)].addEllipse(in: stoneRect)
                         } else {
                             if drawsShadow {
@@ -306,7 +309,7 @@ struct Stones: View {
                 if #available(iOS 18, *) {
                     ForEach(blackPaths, id:\.self) { path in
                         Path(path).fill(
-                            Color(red: 0.7, green: 0.7, blue: 0.7)
+                            Color(red: 0.6, green: 0.6, blue: 0.6)
                                 .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
                         ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
                     }

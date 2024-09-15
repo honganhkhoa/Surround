@@ -168,6 +168,18 @@ struct OGSUser : Codable, Equatable {
         return "?"
     }
     
+    func usernameAndRank(hidesRank: Bool = false) -> String {
+        if hidesRank {
+            return username
+        } else {
+            return "\(username) [\(formattedRank)]"
+        }
+    }
+    
+    var usernameAndRank: String {
+        return usernameAndRank(hidesRank: userDefaults[.hidesRank] ?? false)
+    }
+    
     func isProvisional() -> Bool {
         if uiClass?.contains("provisional") == true {
             return true

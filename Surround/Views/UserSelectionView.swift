@@ -82,7 +82,9 @@ struct UserSelectionView: View {
                 }
                 VStack(alignment: .leading) {
                     Text(verbatim: user.username).bold()
-                    Text(verbatim: "[\(user.formattedRank)]").font(.subheadline)
+                    if !Setting(.hidesRank).wrappedValue {
+                        Text(verbatim: "[\(user.formattedRank)]").font(.subheadline)
+                    }
                 }
                 .foregroundColor(user.uiColor)
                 Spacer()

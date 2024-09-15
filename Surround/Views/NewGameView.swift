@@ -323,7 +323,9 @@ struct CustomGameForm: View {
                         if let opponent = opponent {
                             VStack(alignment: .leading) {
                                 Text(verbatim: opponent.username).bold()
-                                Text(verbatim: "[\(opponent.formattedRank)]").font(.subheadline)
+                                if !Setting(.hidesRank).wrappedValue {
+                                    Text(verbatim: "[\(opponent.formattedRank)]").font(.subheadline)
+                                }
                             }
                             .foregroundColor(opponent.uiColor)
                         } else {

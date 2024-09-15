@@ -37,7 +37,7 @@ struct PlayerInfoLine: View {
                                 .offset(x: -3)
                         } else {
                             if let player = game.currentPlayer(with: color) {
-                                (Text(verbatim: player.username).font(.subheadline) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
+                                (Text(verbatim: player.usernameAndRank).font(.subheadline))
                                     .bold().lineLimit(1)
                                     .foregroundColor(player.uiColor)
                             }
@@ -65,7 +65,7 @@ struct PlayerInfoLine: View {
                                     .offset(x: -3)
                             } else {
                                 if let player = game.currentPlayer(with: color) {
-                                    (Text(verbatim: player.username).font(.subheadline) + Text(verbatim: " [\(player.formattedRank)]").font(.caption))
+                                    (Text(verbatim: player.usernameAndRank).font(.subheadline))
                                         .bold().lineLimit(1)
                                         .foregroundColor(player.uiColor)
                                 }

@@ -26,7 +26,7 @@ struct RengoPlayerCard: View {
     var body: some View {
         HStack(spacing: 1) {
             Menu {
-                Text(verbatim: "\(player.username) [\(player.formattedRank)]")
+                Text(verbatim: "\(player.usernameAndRank)")
                 if let userId = ogs.user?.id, challenge.challenger?.id == userId {
                     Divider()
                     if color != .black {
@@ -56,9 +56,11 @@ struct RengoPlayerCard: View {
                 .frame(width: 40, height: 40)
             }
             if playerAsssignCancellable == nil {
-                Text(verbatim: "[\(player.formattedRank)]")
-                    .font(.caption).bold()
-                    .foregroundColor(player.uiColor)
+                if !Setting(.hidesRank).wrappedValue {
+                    Text(verbatim: "[\(player.formattedRank)]")
+                        .font(.caption).bold()
+                        .foregroundColor(player.uiColor)
+                }
             } else {
                 ProgressView()
             }
@@ -332,8 +334,7 @@ struct ChallengeCell: View {
                                 Stone(color: challengerStoneColor, shadowRadius: 1)
                                     .frame(width: 20, height: 20)
                             }
-                            Text(verbatim: challenger.username) +
-                            Text(verbatim: " [\(challenger.formattedRank)]")
+                            Text(verbatim: challenger.usernameAndRank)
                         }
                         if challenge.game.isPrivate {
                             Text("Private")
@@ -371,8 +372,7 @@ struct ChallengeCell: View {
                 HStack(alignment: .top) {
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text(verbatim: challenged.username) +
-                        Text(verbatim: " [\(challenged.formattedRank)]")
+                        Text(verbatim: challenged.usernameAndRank)
                         if challenged.id == ogs.user?.id {
                             HStack {
                                 Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {

@@ -40,7 +40,7 @@ struct ChatLine: View {
                 }
                 VStack(alignment: horizontalAlignment, spacing: 2) {
                     if showUsername {
-                        Text(verbatim: "\(chatLine.user.username) [\(chatLine.user.formattedRank)]")
+                        Text(verbatim: "\(chatLine.user.usernameAndRank)")
                             .font(.caption2).bold()
                             .foregroundColor(chatLine.user.uiColor)
                     }
