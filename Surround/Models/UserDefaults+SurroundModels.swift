@@ -183,6 +183,10 @@ extension SettingKey {
         return .init(name: "voiceCountdown", defaultValue: false)
     }
     
+    static var autoZen: SettingKey<Bool> {
+        return .init(name: "autoZen", defaultValue: false)
+    }
+    
     static var soundOnStonePlacement: SettingKey<Bool> {
         return .init(name: "soundOnStonePlacement", defaultValue: false)
     }

@@ -171,6 +171,7 @@ struct GameplaySettings: View {
             (Text("Note: Sounds and voice countdown will not play when your device is in **Silent** mode."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
+            Toggle("Auto Zen mode", isOn: Setting(.autoZen).binding)
             GroupBox(label: Text("Auto submiting moves")) {
                 Toggle("Live games", isOn: Setting(.autoSubmitForLiveGames).binding)
                 Toggle("Correspondence games", isOn: Setting(.autoSubmitForCorrespondenceGames).binding)
