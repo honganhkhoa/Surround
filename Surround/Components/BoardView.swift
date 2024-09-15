@@ -210,6 +210,9 @@ struct Stones: View {
         let blackShadowPath2 = CGMutablePath()
         let drawsShadow = size >= 14
         let shadowOffset: CGFloat = size > 30 ? 2 : 1
+        
+        let whitePaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
+        let blackPaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
 
         for row in 0..<height {
             for column in 0..<width {
@@ -233,6 +236,7 @@ struct Stones: View {
                                 }
                             }
                             whiteLivingPath.addEllipse(in: stoneRect)
+                            whitePaths[(row % 2) * 2 + (column % 2)].addEllipse(in: stoneRect)
                         } else {
                             if drawsShadow {
                                 if (row + column) % 2 == 0 {
@@ -242,6 +246,7 @@ struct Stones: View {
                                 }
                             }
                             blackLivingPath.addEllipse(in: stoneRect)
+                            blackPaths[(row % 2) * 2 + (column % 2)].addEllipse(in: stoneRect)
                         }
                     }
                     
@@ -281,20 +286,38 @@ struct Stones: View {
         
         return ZStack {
             if drawsShadow {
-                Path(whiteLivingPath).fill(Color(red: 0.75, green: 0.75, blue: 0.75))
-                    .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
-                Path(whiteShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(whiteShadowPath1))
-                Path(whiteShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(whiteShadowPath2))
+                if #available(iOS 18, *) {
+                    ForEach(whitePaths, id:\.self) { path in
+                        Path(path).fill(
+                            Color.white
+                                .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                        ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
+                    }
+                } else {
+                    Path(whiteLivingPath).fill(Color(red: 0.75, green: 0.75, blue: 0.75))
+                        .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
+                    Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
+                    Path(whiteShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                        .clipShape(Path(whiteShadowPath1))
+                    Path(whiteShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
+                        .clipShape(Path(whiteShadowPath2))
+                }
 
-                Path(blackLivingPath).fill(Color.black)
-                    .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                Path(blackShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(blackShadowPath1))
-                Path(blackShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                    .clipShape(Path(blackShadowPath2))
+                if #available(iOS 18, *) {
+                    ForEach(blackPaths, id:\.self) { path in
+                        Path(path).fill(
+                            Color(red: 0.7, green: 0.7, blue: 0.7)
+                                .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                        ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
+                    }
+                } else {
+                    Path(blackLivingPath).fill(Color.black)
+                        .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
+                    Path(blackShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                        .clipShape(Path(blackShadowPath1))
+                    Path(blackShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
+                        .clipShape(Path(blackShadowPath2))
+                }
             } else {
                 Path(whiteLivingPath).fill(Color.white)
                 Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
