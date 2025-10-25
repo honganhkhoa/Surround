@@ -1038,7 +1038,7 @@
       }
     },
     "%lld captures" : {
-      "comment" : "show captures in player banner view\nSingleGameView - vary for plural",
+      "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -6131,6 +6131,9 @@
         }
       }
     },
+    "OGS" : {
+
+    },
     "Online-go.com Account" : {
       "localizations" : {
         "fr" : {
@@ -6487,9 +6490,6 @@
           }
         }
       }
-    },
-    "Preferred settings" : {
-
     },
     "Preferred Settings" : {
 

@@ -107,8 +107,6 @@
 		BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */; };
 		BC4ED4CF2802EEF1003A85A2 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */; };
-		BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */; };
-		BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */; };
 		BC4F95F2252ED54900A86A8A /* OGSBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */; };
 		BC511BC82C3CE61E00DDA256 /* View+apply.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC511BC72C3CE61E00DDA256 /* View+apply.swift */; };
 		BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC55D2D524B81E90003E20E7 /* HomeView.swift */; };
@@ -403,8 +401,6 @@
 		BC463B0C266353D700D40D3A /* SingleGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleGameView.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
-		BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "LaunchScreen~iPad.storyboard"; sourceTree = "<group>"; };
-		BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBrowserView.swift; sourceTree = "<group>"; };
 		BC511BC72C3CE61E00DDA256 /* View+apply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+apply.swift"; sourceTree = "<group>"; };
 		BC55D2D524B81E90003E20E7 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -576,8 +572,6 @@
 				BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */,
 				BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */,
 				BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */,
-				BC4F95E1252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard */,
-				BC4F95E9252DB99100A86A8A /* LaunchScreen.storyboard */,
 				BC042AFB24AB2CFA0050B2D1 /* Info.plist */,
 				BC042AF824AB2CFA0050B2D1 /* Preview Content */,
 				AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */,
@@ -1017,7 +1011,6 @@
 				BCB98CAB256D129F00B1F8FD /* chat-27671778.json in Resources */,
 				BCB98CE6256D163600B1F8FD /* game-26268396.json in Resources */,
 				BCB98D12256D17D600B1F8FD /* game-25758368.json in Resources */,
-				BC4F95E2252DB2DD00A86A8A /* LaunchScreen~iPad.storyboard in Resources */,
 				BCB98D28256D18C400B1F8FD /* game-25076729.json in Resources */,
 				BCB98CB6256D130100B1F8FD /* game-18759438.json in Resources */,
 				BCB98D07256D16F600B1F8FD /* game-27053412.json in Resources */,
@@ -1025,7 +1018,6 @@
 				BCB98D1D256D185500B1F8FD /* game-27671778.json in Resources */,
 				BC463B0126624D3500D40D3A /* puzzle-2630.json in Resources */,
 				BCB98CDB256D15F200B1F8FD /* game-25291907.json in Resources */,
-				BC4F95EA252DB99100A86A8A /* LaunchScreen.storyboard in Resources */,
 				BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */,
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
 				AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */,
@@ -1535,18 +1527,18 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024091501;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.16;
+				MARKETING_VERSION = 2.0;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1566,18 +1558,18 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024091501;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				ENABLE_PREVIEWS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.16;
+				MARKETING_VERSION = 2.0;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1596,7 +1588,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1617,7 +1609,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1638,7 +1630,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundUITests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1659,7 +1651,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundUITests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1678,14 +1670,16 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1700,14 +1694,16 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1724,15 +1720,17 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1750,15 +1748,17 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = SurroundWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1774,14 +1774,16 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1796,14 +1798,16 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2025062201;
 				DEVELOPMENT_TEAM = 269H7P4WSN;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

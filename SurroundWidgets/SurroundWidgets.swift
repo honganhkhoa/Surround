@@ -192,6 +192,9 @@ struct CorrespondenceGamesEntry: TimelineEntry {
 }
 
 struct CorrespondenceGamesWidgetView : View {
+    @Environment(\.widgetRenderingMode) var widgetRenderingMode
+    @Environment(\.displayScale) var displayScale
+    
     var entry: Provider.Entry
 
     var gamesCount: Int {
@@ -273,17 +276,35 @@ struct CorrespondenceGamesWidgetView : View {
     }
     
     func gameCell(game: Game, boardSize: CGFloat) -> some View {
+        let boardRenderer = ImageRenderer(
+            content: BoardView(widgetRenderingMode: widgetRenderingMode, boardPosition: game.currentPosition, cornerRadius: 10).frame(width: boardSize, height: boardSize)
+        )
+        boardRenderer.scale = displayScale
+        let boardImage = boardRenderer.uiImage
         return VStack(spacing: 0) {
             Link(destination: NavigationService.appURL(rootView: .home, game: game)!) {
                 ZStack {
                     if game.clock?.currentPlayerId == userId {
-                        Color(.systemTeal)
-                            .frame(width: boardSize + 6, height: boardSize + 6)
-                            .cornerRadius(10)
+                        if widgetRenderingMode == .accented {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.clear)
+                                .stroke(.white)
+                                .frame(width: boardSize + 6, height: boardSize + 6)
+                        } else {
+                            Color(.systemTeal)
+                                .frame(width: boardSize + 6, height: boardSize + 6)
+                                .cornerRadius(10)
+                        }
                     }
-                    BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
-                        .frame(width: boardSize, height: boardSize)
-                        .padding(3)
+                    if let boardImage {
+                        Image(uiImage: boardImage)
+                            .widgetAccentedRenderingMode(.desaturated)
+                            .padding(3)
+                    } else {
+                        BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
+                            .frame(width: boardSize, height: boardSize)
+                            .padding(3)
+                    }
                 }
             }
             HStack {
@@ -354,8 +375,8 @@ struct CorrespondenceGamesWidgetView : View {
         }
         
         let gamesToDisplay = self.gamesToDisplay
-        let widgetContent = ZStack {
-            Color(UIColor.systemGray4)
+        return ZStack {
+            AccessoryWidgetBackground()
             HStack(alignment: .center, spacing: 0) {
                 if gamesToDisplay.count > 0 {
                     boards
@@ -368,8 +389,14 @@ struct CorrespondenceGamesWidgetView : View {
                         .frame(maxWidth: .infinity)
                 }
                 ZStack {
-                    Color(.systemIndigo)
-                        .frame(width: 25)
+                    if widgetRenderingMode == .fullColor {
+                        Color(.systemIndigo)
+                            .frame(width: 25)
+                    } else {
+                        Color(.systemIndigo)
+                            .luminanceToAlpha()
+                            .frame(width: 25)
+                    }
                     if entry.games.count > 0 {
                         Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)", comment: "On Correspondence Games Widget")
                             .font(.subheadline)
@@ -381,14 +408,9 @@ struct CorrespondenceGamesWidgetView : View {
                 }
                 .frame(width: 25)
             }
-        }
-        
-        if #available(iOSApplicationExtension 17.0, *) {
-            return widgetContent.containerBackground(for: .widget) {
-                Color(UIColor.systemGray4)
+            .containerBackground(for: .widget) {
+                Color.clear
             }
-        } else {
-            return widgetContent
         }
     }
 }

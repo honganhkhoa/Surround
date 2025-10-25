@@ -10,9 +10,7 @@ import WidgetKit
 import Combine
 
 struct MainView: View {
-    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
     
@@ -167,14 +165,34 @@ struct MainView: View {
                 }
             }
         }
+
+        let navigationCurrentView = Binding<RootView>(
+            get: { nav.main.rootView },
+            set: { nav.main.rootView = $0 }
+        )
+
         return ZStack(alignment: .top) {
-            Group {
-                if #available(iOS 16.0, *) {
-                    mainBody
-                } else {
-                    mainBodyiOS15
+            TabView(selection: navigationCurrentView) {
+                Tab(RootView.home.title, systemImage: RootView.home.systemImage, value: RootView.home) {
+                    RootView.home.navigationView
                 }
+                Tab(RootView.publicGames.title, systemImage: RootView.publicGames.systemImage, value: RootView.publicGames) {
+                    RootView.publicGames.navigationView
+                }
+                if ogs.privateMessagesActivePeerIds.count > 0 {
+                    Tab(RootView.privateMessages.title, systemImage: RootView.privateMessages.systemImage, value: RootView.privateMessages) {
+                        RootView.privateMessages.navigationView
+                    }
+                }
+                TabSection("OGS") {
+                    Tab(RootView.browser.title, systemImage: RootView.browser.systemImage, value: RootView.browser) {
+                        RootView.browser.navigationView
+                    }
+                }
+                .hidden(horizontalSizeClass == .compact)
+                .defaultVisibility(.hidden, for: .tabBar)
             }
+            .tabViewStyle(.sidebarAdaptable)
             .fullScreenCover(isPresented: Binding(
                                 get: { nav.main.modalLiveGame != nil },
                                 set: { if !$0 { nav.main.modalLiveGame = nil } })

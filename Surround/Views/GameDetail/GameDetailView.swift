@@ -287,7 +287,9 @@ struct GameDetailView: View {
                             }
                         }
                     }
-                }.ignoresSafeArea(edges: navigationBarHidden ? [.top] : [])
+                }
+                .toolbar(.hidden, for: .tabBar)
+                .ignoresSafeArea(edges: navigationBarHidden ? [.top] : [])
             )
         } else {
             return AnyView(

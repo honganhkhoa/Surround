@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 func stoneSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
     let size = min(geometry.size.width, geometry.size.height)
@@ -508,6 +509,7 @@ struct MarkerOverlay: View {
 }
 
 struct BoardView: View {
+    var widgetRenderingMode: WidgetRenderingMode = .fullColor
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
     var showsCoordinate = false
@@ -584,7 +586,11 @@ struct BoardView: View {
         let height: CGFloat = CGFloat(boardPosition.height)
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
+                if widgetRenderingMode == .fullColor {
+                    Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
+                } else {
+                    Color.white.cornerRadius(cornerRadius).opacity(0.5)
+                }
                 gobanAndStones
                     .frame(
                         width: showsCoordinate ? geometry.size.width * width / (width + 1) : geometry.size.width,

@@ -20,6 +20,7 @@ struct HomeViewParameters {
     var ogsIdToOpen = -1
     var showingNewGameView = false
     var showingPreferredSettings = false
+    var showingSettings = false
 }
 
 struct PublicGamesViewParameter {
@@ -67,8 +68,6 @@ enum NavigationSplitViewVisibilityProxy: String {
 }
 
 class NavigationService: ObservableObject {
-    
-    
     static var shared = NavigationService()
     static var instances = [String: NavigationService]()
     
@@ -118,7 +117,9 @@ class NavigationService: ObservableObject {
     }
 }
 
-enum RootView: String {
+enum RootView: String, CaseIterable, Identifiable {
+    var id: String { self.rawValue }
+    
     case home
     case publicGames
     case privateMessages
@@ -179,6 +180,13 @@ enum RootView: String {
             }
         }) {
             self.label
+        }
+    }
+    
+    @ViewBuilder
+    var navigationView : some View {
+        NavigationStack {
+            self.view
         }
     }
 

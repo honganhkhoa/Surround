@@ -97,8 +97,8 @@ class OGSService: ObservableObject {
         return ogs
     }
 
-//    static let ogsRoot = "https://online-go.com"
-    static let ogsRoot = "https://beta.online-go.com"
+    static let ogsRoot = "https://online-go.com"
+//    static let ogsRoot = "https://beta.online-go.com"
     private var ogsRoot = OGSService.ogsRoot
 
     private let ogsWebsocket: OGSWebsocket

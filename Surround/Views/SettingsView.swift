@@ -148,6 +148,17 @@ struct SettingsView: View {
         ScrollView {
             VStack {
                 accountSettings
+                GroupBox {
+                    NavigationLink(destination: AboutView()) {
+                        HStack {
+                            Text("About & Support")
+                                .bold()
+                                .leadingAlignedInScrollView()
+                            Spacer()
+                            Image(systemName: "chevron.forward")
+                        }
+                    }
+                }.padding(.horizontal)
                 generalSettings
                 GameplaySettings(withDemoOption: true)
                 notificationSettings

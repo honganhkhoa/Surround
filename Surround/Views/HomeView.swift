@@ -244,34 +244,31 @@ struct HomeView: View {
             } else {
                 WelcomeView()
             }
-            if #unavailable(iOS 16.0) {
-                NavigationLink(
-                    destination: GameDetailView(currentGame: nav.home.activeGame),
-                    isActive: Binding(
-                        get: { nav.home.activeGame != nil },
-                        set: { if !$0 { nav.home.activeGame = nil } }
-                    )) {
-                    EmptyView()
+        }
+        .toolbar {
+            if (ogs.isLoggedIn) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    Button(action: { nav.home.showingSettings = true }) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
-                // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
-                // https://developer.apple.com/forums/thread/677333#672042022
-                NavigationLink(destination: EmptyView()) {
-                    EmptyView()
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
+                        Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
+                        Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
+                    }
+                    .fixedSize()
+                    .pickerStyle(SegmentedPickerStyle())
+                    
                 }
             }
         }
-        .apply {
-            if #available(iOS 16.0, *) {
-                $0.navigationDestination(isPresented: Binding(
-                    get: { nav.home.activeGame != nil },
-                    set: { if !$0 { nav.home.activeGame = nil } }
-                ), destination: {
-                    GameDetailView(currentGame: nav.home.activeGame)
-                })
-            } else {
-                $0
-            }
-        }
+        .navigationDestination(isPresented: Binding(
+            get: { nav.home.activeGame != nil },
+            set: { if !$0 { nav.home.activeGame = nil } }
+        ), destination: {
+            GameDetailView(currentGame: nav.home.activeGame)
+        })
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {
                 DispatchQueue.main.async {
@@ -280,17 +277,6 @@ struct HomeView: View {
             }
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
-                    Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
-                    Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .disabled(!ogs.isLoggedIn)
-                .opacity(ogs.isLoggedIn ? 1 : 0)
-            }
-        }
         .sheet(isPresented: $nav.home.showingNewGameView) {
             NavigationView {
                 NewGameView()
@@ -315,6 +301,21 @@ struct HomeView: View {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(action: { nav.home.showingPreferredSettings = false }) {
                                 Text("Cancel")
+                            }
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+            }
+        }
+        .sheet(isPresented: $nav.home.showingSettings) {
+            NavigationStack {
+                SettingsView()
+                    .navigationTitle("Settings")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done", systemImage: "checkmark") {
+                                nav.home.showingSettings = false
                             }
                         }
                     }
