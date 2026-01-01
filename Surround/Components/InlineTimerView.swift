@@ -95,6 +95,7 @@ struct InlineTimerView: View {
     var subFont: Font?
     var pauseControl: OGSPauseControl?
     var showsPauseReason = true
+    var gameFinished: Bool
 
     var body: some View {
         guard let clock = clock, let timeControl = timeControl else {
@@ -107,6 +108,7 @@ struct InlineTimerView: View {
 
         let playerId = player == .black ? clock.blackPlayerId : clock.whitePlayerId
         let isPaused = pauseControl?.isPaused() ?? false
+        let isFinished = self.gameFinished
         let pausedReason = pauseControl?.pauseReason(playerId: playerId) ?? ""
         
         return AnyView(HStack(alignment: .firstTextBaseline) {
@@ -142,7 +144,7 @@ struct InlineTimerView: View {
                 default:
                     Text(verbatim: "").font(mainFont)
                 }
-                if isPaused {
+                if isPaused && !isFinished {
                     if showsPauseReason {
                         Text(pausedReason).font(subFont.bold()).minimumScaleFactor(0.5)
                     } else {
@@ -175,9 +177,9 @@ struct InlineTimerView_Previews: PreviewProvider {
         )
 
         return Group {
-            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .black)
-            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .white)
-            InlineTimerView(timeControl: timeControl2, clock: clock2, player: .white)
+            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .black, gameFinished: false)
+            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .white, gameFinished: false)
+            InlineTimerView(timeControl: timeControl2, clock: clock2, player: .white, gameFinished: false)
         }.previewLayout(.fixed(width: 180, height: 44))
     }
 }
