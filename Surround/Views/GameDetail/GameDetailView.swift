@@ -9,9 +9,7 @@ import SwiftUI
 import Combine
 
 struct GameDetailView: View {
-    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService

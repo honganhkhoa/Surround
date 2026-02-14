@@ -29,7 +29,7 @@ struct PreferredSettingsView: View {
                     Section {
                         ForEach(Array(settings.enumerated()), id: \.0) { _, setting in
                             VStack {
-                                ChallengeCell(challenge: setting)
+                                ChallengeCell(challenge: setting, hidePlayerDetails: true)
                                     .padding()
                                 Divider()
                                 Button(action: {

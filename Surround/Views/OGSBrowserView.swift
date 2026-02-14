@@ -81,6 +81,7 @@ struct OGSBrowserView: View {
                     Image(systemName: "arrow.clockwise")
                 }))
         .navigationTitle(title ?? "")
+        .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: Binding(
             // Using a simple `$showsGoogleLogin` here is not sufficient, as
             // `googleLoginURL` will sometimes be nil if no-one is looking...
@@ -92,12 +93,12 @@ struct OGSBrowserView: View {
                 googleOAuthCode: $googleOAuthCode
             )
         }
-        .onChange(of: url) { newURL in
+        .onChange(of: url, initial: true) { _, newURL in
             if newURL?.absoluteString.hasPrefix("\(OGSService.ogsRoot)/login-error") ?? false {
                 requestedURL = initialURL
             }
         }
-        .onChange(of: googleOAuthCode) { newCode in
+        .onChange(of: googleOAuthCode, initial: true) { _, newCode in
             if let code = newCode {
                 showsGoogleLogin = false
                 if let state = googleOAuthState {

@@ -280,6 +280,7 @@ struct ChallengeCell: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     var challenge: any OGSChallenge
+    var hidePlayerDetails: Bool = false
     @State var ogsRequestCancellable: AnyCancellable?
         
     func withdrawOrDeclineChallenge(challenge: any OGSSubmittedChallenge) {
@@ -315,95 +316,107 @@ struct ChallengeCell: View {
         let challengerStoneColor = challenge.challengerColor
         
         return VStack {
-            if let challenger = challenge.challenger ?? ogs.user {
-                HStack(alignment: .top) {
-                    if let iconURL = challenger.iconURL(ofSize: 64) {
-                        ZStack(alignment: .bottomTrailing) {
-                            AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
-                                .frame(width: 64, height: 64)
-                                .background(Color.gray)
-                            Stone(color: challengerStoneColor, shadowRadius: 1)
-                                .frame(width: 20, height: 20)
-                                .offset(x: 10, y: 10)
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(challenge.game.name)
-                            .font(.headline)
-                        HStack {
-                            if challenger.icon == nil {
+            if hidePlayerDetails {
+                Text(challenge.game.name)
+                    .font(.headline)
+                    .leadingAlignedInScrollView()
+                if challenge.game.isPrivate {
+                    Text("Private")
+                        .italic()
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                }
+            } else {
+                if let challenger = challenge.challenger ?? ogs.user {
+                    HStack(alignment: .top) {
+                        if let iconURL = challenger.iconURL(ofSize: 64) {
+                            ZStack(alignment: .bottomTrailing) {
+                                AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    .frame(width: 64, height: 64)
+                                    .background(Color.gray)
                                 Stone(color: challengerStoneColor, shadowRadius: 1)
                                     .frame(width: 20, height: 20)
-                            }
-                            Text(verbatim: challenger.usernameAndRank)
-                        }
-                        if challenge.game.isPrivate {
-                            Text("Private")
-                                .italic()
-                                .font(.subheadline)
-                        }
-                    }
-                    Spacer()
-                    if let challenge = challenge as? (any OGSSubmittedChallenge) {
-                        if challenger.id == ogs.user?.id {
-                            if ogsRequestCancellable != nil {
-                                ProgressView()
-                            } else {
-                                Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                                    Text("Withdraw")
-                                        .bold()
-                                        .foregroundColor(.red)
-                                }
-                            }
-                        } else if challenge.challenged == nil {
-                            if ogsRequestCancellable != nil {
-                                ProgressView()
-                            } else {
-                                Button(action: { acceptChallenge(challenge: challenge) }) {
-                                    Text("Accept")
-                                        .bold()
-                                }
+                                    .offset(x: 10, y: 10)
                             }
                         }
-                    }
-                }
-                Spacer().frame(height: 15)
-            }
-            if let challenge = challenge as? (any OGSSubmittedChallenge), let challenged = challenge.challenged {
-                HStack(alignment: .top) {
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text(verbatim: challenged.usernameAndRank)
-                        if challenged.id == ogs.user?.id {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(challenge.game.name)
+                                .font(.headline)
                             HStack {
-                                Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
-                                    Text("Reject")
-                                        .bold()
-                                        .foregroundColor(.red)
+                                if challenger.icon == nil {
+                                    Stone(color: challengerStoneColor, shadowRadius: 1)
+                                        .frame(width: 20, height: 20)
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .contentShape(RoundedRectangle(cornerRadius: 10))
-                                .hoverEffect(.highlight)
-                                Button(action: { self.acceptChallenge(challenge: challenge) }) {
-                                    Text("Accept")
-                                        .bold()
+                                Text(verbatim: challenger.usernameAndRank)
+                            }
+                            if challenge.game.isPrivate {
+                                Text("Private")
+                                    .italic()
+                                    .font(.subheadline)
+                            }
+                        }
+                        Spacer()
+                        if let challenge = challenge as? (any OGSSubmittedChallenge) {
+                            if challenger.id == ogs.user?.id {
+                                if ogsRequestCancellable != nil {
+                                    ProgressView()
+                                } else {
+                                    Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                        Text("Withdraw")
+                                            .bold()
+                                            .foregroundColor(.red)
+                                    }
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .contentShape(RoundedRectangle(cornerRadius: 10))
-                                .hoverEffect(.highlight)
-                            }.offset(x: 10)
+                            } else if challenge.challenged == nil {
+                                if ogsRequestCancellable != nil {
+                                    ProgressView()
+                                } else {
+                                    Button(action: { acceptChallenge(challenge: challenge) }) {
+                                        Text("Accept")
+                                            .bold()
+                                    }
+                                }
+                            }
                         }
                     }
-                    if let iconURL = challenged.iconURL(ofSize: 64) {
-                        ZStack(alignment: .bottomLeading) {
-                            AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
-                                .frame(width: 64, height: 64)
-                                .background(Color.gray)
-                            Stone(color: challengerStoneColor?.opponentColor(), shadowRadius: 1)
-                                .frame(width: 20, height: 20)
-                                .offset(x: -10, y: 10)
+                    Spacer().frame(height: 15)
+                }
+                if let challenge = challenge as? (any OGSSubmittedChallenge), let challenged = challenge.challenged {
+                    HStack(alignment: .top) {
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text(verbatim: challenged.usernameAndRank)
+                            if challenged.id == ogs.user?.id {
+                                HStack {
+                                    Button(action: { self.withdrawOrDeclineChallenge(challenge: challenge) }) {
+                                        Text("Reject")
+                                            .bold()
+                                            .foregroundColor(.red)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                                    .hoverEffect(.highlight)
+                                    Button(action: { self.acceptChallenge(challenge: challenge) }) {
+                                        Text("Accept")
+                                            .bold()
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                                    .hoverEffect(.highlight)
+                                }.offset(x: 10)
+                            }
+                        }
+                        if let iconURL = challenged.iconURL(ofSize: 64) {
+                            ZStack(alignment: .bottomLeading) {
+                                AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    .frame(width: 64, height: 64)
+                                    .background(Color.gray)
+                                Stone(color: challengerStoneColor?.opponentColor(), shadowRadius: 1)
+                                    .frame(width: 20, height: 20)
+                                    .offset(x: -10, y: 10)
+                            }
                         }
                     }
                 }

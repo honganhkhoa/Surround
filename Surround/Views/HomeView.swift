@@ -10,15 +10,12 @@ import Combine
 import DictionaryCoding
 
 struct HomeView: View {
-    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
     @State var gameDetailCancellable: AnyCancellable?
-    
     @State var displayMode: GameCell.CellDisplayMode
     
     init(previewGames: [Game] = []) {
@@ -113,7 +110,7 @@ struct HomeView: View {
                         }
                         .font(.body.bold())
                         .padding()
-                        .tint(.green)
+                        .tint(.mint)
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
                         if ogs.challengesReceived.count > 0 {
@@ -323,7 +320,7 @@ struct HomeView: View {
                     .environmentObject(nav)
             }
         }
-        .onChange(of: nav.home.ogsIdToOpen) { ogsGameIdToOpen in
+        .onChange(of: nav.home.ogsIdToOpen, initial: true) { _, ogsGameIdToOpen in
             if ogsGameIdToOpen != -1 {
                 if ogsGameIdToOpen != nav.home.activeGame?.ogsID {
                     if nav.home.activeGame != nil {
@@ -342,7 +339,7 @@ struct HomeView: View {
                 }
             }
         }
-        .onChange(of: displayMode) { newDisplayMode in
+        .onChange(of: displayMode, initial: true) { _, newDisplayMode in
             userDefaults[.homeViewDisplayMode] = newDisplayMode.rawValue
         }
     }

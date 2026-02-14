@@ -206,7 +206,7 @@ class OGSService: ObservableObject {
         self.liveGames = liveGames
         
         #if MAIN_APP
-        UIApplication.shared.applicationIconBadgeNumber = self.sortedActiveCorrespondenceGamesOnUserTurn.count
+        UNUserNotificationCenter.current().setBadgeCount(self.sortedActiveCorrespondenceGamesOnUserTurn.count)
         #endif
     }
     

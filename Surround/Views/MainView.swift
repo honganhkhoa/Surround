@@ -74,88 +74,6 @@ struct MainView: View {
         }
     }
         
-    @available(iOS 16.0, *)
-    var mainBody: some View {
-        var compactSizeClass = false
-        #if os(iOS)
-        compactSizeClass = horizontalSizeClass == .compact
-        #endif
-        
-        let navigationCurrentView = Binding<RootView?>(
-            get: { nav.main.rootView },
-            set: { if let rootView = $0 { nav.main.rootView = rootView } }
-        )
-
-        return Group {
-            if compactSizeClass {
-                NavigationStack {
-                    nav.main.rootView.view
-                        .modifier(RootViewSwitchingMenu())
-                }
-            } else {
-                NavigationSplitView(columnVisibility: Binding(
-                    get: { nav.columnVisibility.target },
-                    set: { nav.columnVisibility = NavigationSplitViewVisibilityProxy(from: $0) ?? .automatic })) {
-                        List(selection: navigationCurrentView) {
-                            RootView.home.navigationLink(currentView: navigationCurrentView)
-                            RootView.publicGames.navigationLink(currentView: navigationCurrentView)
-                            if ogs.privateMessagesActivePeerIds.count > 0 {
-                                RootView.privateMessages.navigationLink(currentView: navigationCurrentView)
-                            }
-                            Divider()
-                            RootView.settings.navigationLink(currentView: navigationCurrentView)
-                            RootView.about.navigationLink(currentView: navigationCurrentView)
-                            Divider()
-                            RootView.browser.navigationLink(currentView: navigationCurrentView)
-                            RootView.forums.navigationLink(currentView: navigationCurrentView)
-                        }
-                        .listStyle(SidebarListStyle())
-                        .navigationTitle("Surround")
-                    } detail: {
-                        NavigationStack {
-                            nav.main.rootView.view
-                        }
-                    }
-            }
-        }
-    }
-    
-    var mainBodyiOS15: some View {
-        var compactSizeClass = false
-        #if os(iOS)
-        compactSizeClass = horizontalSizeClass == .compact
-        #endif
-
-        let navigationCurrentView = Binding<RootView?>(
-            get: { nav.main.rootView },
-            set: { if let rootView = $0 { nav.main.rootView = rootView } }
-        )
-
-        return NavigationView {
-            if compactSizeClass {
-                nav.main.rootView.view
-                    .modifier(RootViewSwitchingMenu())
-            } else {
-                List(selection: navigationCurrentView) {
-                    RootView.home.navigationLink(currentView: navigationCurrentView)
-                    RootView.publicGames.navigationLink(currentView: navigationCurrentView)
-                    if ogs.privateMessagesActivePeerIds.count > 0 {
-                        RootView.privateMessages.navigationLink(currentView: navigationCurrentView)
-                    }
-                    Divider()
-                    RootView.settings.navigationLink(currentView: navigationCurrentView)
-                    RootView.about.navigationLink(currentView: navigationCurrentView)
-                    Divider()
-                    RootView.browser.navigationLink(currentView: navigationCurrentView)
-                    RootView.forums.navigationLink(currentView: navigationCurrentView)
-                }
-                .listStyle(SidebarListStyle())
-                .navigationTitle("Surround")
-                nav.main.rootView.view
-            }
-        }
-    }
-    
     var body: some View {
         if firstLaunch {
             DispatchQueue.main.async {
@@ -233,7 +151,7 @@ struct MainView: View {
                 NotificationPopup()
             }
         }
-        .onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase, initial: true) { _, phase in
             if phase == .active {
                 self.onAppActive(newLaunch: false)
             } else if phase == .background {
