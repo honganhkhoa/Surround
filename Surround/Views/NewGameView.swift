@@ -550,7 +550,7 @@ struct CustomGameForm: View {
                 }
             }
             Divider()
-            (Text(verbatim: "\(finalTimeControl.systemName): ").bold() + finalTimeControl.system.descriptionText)
+            Text("**\(finalTimeControl.systemName):** \(finalTimeControl.system.descriptionText)")
                 .font(.subheadline)
                 .leadingAlignedInScrollView()
             Spacer().frame(height: 10)

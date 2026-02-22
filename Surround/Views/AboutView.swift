@@ -89,7 +89,7 @@ struct AboutView: View {
                         .leadingAlignedInScrollView()
                     Group {
                         Divider()
-                        if SKPaymentQueue.canMakePayments() {
+                        if AppStore.canMakePayments {
                             NavigationLink(destination: SupporterView()) {
                                 HStack {
                                     Text("Support Surround").bold()

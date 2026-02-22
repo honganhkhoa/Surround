@@ -40,7 +40,7 @@ struct SettingKey<Value> {
 // Related: https://stackoverflow.com/questions/56169303/redundant-conformance-to-protocol-in-unit-test-only
 //
 #if !TESTING
-extension UserDefaults: ObservableObject {
+extension UserDefaults: @retroactive ObservableObject {
     subscript<T>(key: SettingKey<T>) -> T? where T: Codable {
         get {
             if !key.encoded {

@@ -140,6 +140,16 @@
         }
       }
     },
+    "**%@:** %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "**%1$@:** %2$@"
+          }
+        }
+      }
+    },
     "**%@** for every **%lld moves**." : {
       "comment" : "TimeControl - long description for Canadian byo-yomi system without main time",
       "localizations" : {
@@ -901,17 +911,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ + %2$@ cho tới %3$@"
-          }
-        }
-      }
-    },
-    "%@: %@" : {
-      "comment" : "Generic formatter that joins a label and value with a colon separator.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@: %2$@"
           }
         }
       }

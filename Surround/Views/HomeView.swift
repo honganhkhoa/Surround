@@ -23,7 +23,7 @@ struct HomeView: View {
         if let savedDisplayMode = userDefaults[.homeViewDisplayMode] {
             _displayMode = State(initialValue: GameCell.CellDisplayMode(rawValue: savedDisplayMode) ?? .full)
         } else {
-            if UIScreen.main.traitCollection.horizontalSizeClass == .compact {
+            if UIDevice.current.userInterfaceIdiom == .phone {
                 _displayMode = State(initialValue: .compact)
             } else {
                 _displayMode = State(initialValue: .full)

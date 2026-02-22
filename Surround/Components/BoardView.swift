@@ -8,10 +8,10 @@
 import SwiftUI
 import WidgetKit
 
-func stoneSize(geometry: GeometryProxy, boardSize: Int) -> CGFloat {
+func stoneSize(geometry: GeometryProxy, boardSize: Int, displayScale: CGFloat) -> CGFloat {
     let size = min(geometry.size.width, geometry.size.height)
     return CGFloat(
-        floor(size / CGFloat(boardSize) * UIScreen.main.nativeScale) / UIScreen.main.nativeScale
+        floor(size / CGFloat(boardSize) * displayScale) / displayScale
     )
 }
 
@@ -21,6 +21,7 @@ enum StoneRemovalOption: Int {
 }
 
 struct Goban: View {
+    @Environment(\.displayScale) private var displayScale
     var geometry: GeometryProxy
     var width: Int
     var height: Int
@@ -37,7 +38,7 @@ struct Goban: View {
     @Setting(.hapticsFeedback) var hapticsFeedbback: Bool
     
     var body: some View {
-        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         var starPoints = [[CGFloat]]()
         if size > 10 {
             if height == 19 && width == 19 {
@@ -80,7 +81,7 @@ struct Goban: View {
                         path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
                 }
-                .stroke(Color.black, lineWidth: size < 10 ? 1 / UIScreen.main.nativeScale : 0.5)
+                .stroke(Color.black, lineWidth: size < 10 ? 1 / displayScale : 0.5)
                 Path { path in
                     path.move(to: CGPoint(x: size / 2, y: size / 2))
                     path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
@@ -185,6 +186,7 @@ struct VariationNumberings: View {
 }
 
 struct Stones: View {
+    @Environment(\.displayScale) private var displayScale
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
     var geometry: GeometryProxy
@@ -194,7 +196,7 @@ struct Stones: View {
         let width = boardPosition.width
         let height = boardPosition.height
                 
-        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let whiteLivingPath = CGMutablePath()
         let blackLivingPath = CGMutablePath()
         let whiteCapturedPath = CGMutablePath()
@@ -383,6 +385,7 @@ struct Stones: View {
 }
 
 struct StoneRemovalOverlay: View {
+    @Environment(\.displayScale) private var displayScale
     @ObservedObject var boardPosition: BoardPosition
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var geometry: GeometryProxy
@@ -394,7 +397,7 @@ struct StoneRemovalOverlay: View {
     var body: some View {
         let width = boardPosition.width
         let height = boardPosition.height
-        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
 
         let toBeRemovedPath = CGMutablePath()
         let toBeAddedPath = CGMutablePath()
@@ -471,6 +474,7 @@ struct StoneRemovalOverlay: View {
 }
 
 struct MarkerOverlay: View {
+    @Environment(\.displayScale) private var displayScale
     @ObservedObject var boardPosition: BoardPosition
     var geometry: GeometryProxy
     var highlightCoordinates: [[Int]]
@@ -479,7 +483,7 @@ struct MarkerOverlay: View {
         let width = boardPosition.width
         let height = boardPosition.height
                 
-        let size = stoneSize(geometry: geometry, boardSize: max(width, height))
+        let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let highlightedCoordinatesPath = CGMutablePath()
         let highlightWidth: CGFloat = size >= 20 ? 3 : (size > 10 ? 2 : 1)
 

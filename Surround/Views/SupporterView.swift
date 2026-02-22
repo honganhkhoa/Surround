@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import StoreKit
 
 struct SupporterView: View {
     @EnvironmentObject var sgs: SurroundService
@@ -40,30 +39,24 @@ struct SupporterView: View {
                     Text("• Support for Surround's ongoing development")
                         .leadingAlignedInScrollView()
                     Divider()
-                    ForEach(sgs.supporterProducts, id: \.productIdentifier) { product -> AnyView in
-                        let formatter = NumberFormatter()
-                        formatter.numberStyle = .currency
-                        formatter.locale = product.priceLocale
-                        if let price = formatter.string(from: product.price) {
-                            return AnyView(Button(action: {
-                                if product.productIdentifier != sgs.supporterProductId { sgs.subscribe(to: product)
-                                }
-                            }) {
-                                VStack {
-                                    HStack {
-                                        Text("Supporter Tier \(String(product.productIdentifier.last!)): \(price) monthly").bold()
-                                        Spacer()
-                                        if sgs.processingProductIds.contains(product.productIdentifier) {
-                                            ProgressView()
-                                        } else if product.productIdentifier == sgs.supporterProductId {
-                                            Image(systemName: "checkmark")
-                                        }
+                    ForEach(sgs.supporterProducts) { product in
+                        Button(action: {
+                            if product.id != sgs.supporterProductId {
+                                sgs.subscribe(to: product)
+                            }
+                        }) {
+                            VStack {
+                                HStack {
+                                    Text("Supporter Tier \(String(product.id.last ?? "1")): \(product.displayPrice) monthly").bold()
+                                    Spacer()
+                                    if sgs.processingProductIds.contains(product.id) {
+                                        ProgressView()
+                                    } else if product.id == sgs.supporterProductId {
+                                        Image(systemName: "checkmark")
                                     }
-                                    Divider()
                                 }
-                            })
-                        } else {
-                            return AnyView(EmptyView())
+                                Divider()
+                            }
                         }
                     }
                     if sgs.supporterProductId != nil {
@@ -121,7 +114,7 @@ struct SupporterView_Previews: PreviewProvider {
     static var previews: some View {
         SurroundService.shared.initializeProductsForPreview()
 //        userDefaults[.supporterProductId] = nil
-        userDefaults[.supporterProductId] = SurroundService.shared.supporterProducts[0].productIdentifier
+        userDefaults[.supporterProductId] = SurroundService.shared.supporterProducts[0].id
         return Group {
             NavigationView {
                 SupporterView()

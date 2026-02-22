@@ -238,7 +238,7 @@ struct SingleGameView: View {
                     .padding(.horizontal)
                 Spacer(minLength: 10)
             }
-            if attachedKeyboardVisible && UIScreen.main.bounds.size.height < 600 {
+            if attachedKeyboardVisible && compactBoardSize < 320 {
                 EmptyView()
             } else {
                 if attachedKeyboardVisible, let blackPlayer = game.currentPlayer(with: .black), let whitePlayer = game.currentPlayer(with: .white) {
@@ -515,7 +515,7 @@ struct SingleGameView: View {
                         }
                         if analyzeMode.wrappedValue && !attachedKeyboardVisible {
                             AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
-                                .frame(maxHeight: UIScreen.main.bounds.size.height / 3.7)
+                                .frame(maxHeight: 240)
                         }
                     }
                 }

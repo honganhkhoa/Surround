@@ -12,19 +12,27 @@ import StoreKit
 
 enum SurroundServiceError: Error {
     case notLoggedIn
+    case failedVerification
 }
 
-class SurroundService: NSObject, ObservableObject, SKProductsRequestDelegate, SKPaymentTransactionObserver {
+struct SupporterProduct: Identifiable {
+    let id: String
+    let displayPrice: String
+}
+
+class SurroundService: NSObject, ObservableObject {
     static var shared = SurroundService()
     
-//    static let sgsRoot = "http://192.168.1.16:8000"
+//    static let sgsRoot = "http://192.168.1.118:8000"
     static let sgsRoot = "https://surround.honganhkhoa.com"
     
     private var sgsRoot = SurroundService.sgsRoot
+    private var transactionUpdatesTask: Task<Void, Never>?
+    private var storeProductsById = [String: Product]()
     
     private override init() {
         super.init()
-        SKPaymentQueue.default().add(self)
+        transactionUpdatesTask = observeTransactionUpdates()
     }
     
     func isProductionEnvironment() -> Bool {
@@ -103,27 +111,33 @@ class SurroundService: NSObject, ObservableObject, SKProductsRequestDelegate, SK
             if let ogsCsrfCookie = userDefaults[.ogsCsrfCookie] {
                 parameters["ogsCsrfCookie"] = ogsCsrfCookie
             }
-            AF.request(
-                "\(self.sgsRoot)/register",
-                method: .post,
-                parameters: parameters,
-                headers: headers
-            ).validate().responseJSON { response in
-                switch response.result {
-                case .success:
-                    if let responseData = response.value as? [String: Any] {
-                        if let accessToken = responseData["accessToken"] as? String {
-                            userDefaults[.sgsAccessToken] = accessToken
-                            if let receiptData = parameters["receiptData"] as? String {
-                                userDefaults[.lastSentReceiptData] = receiptData
+            Task {
+                var parametersWithStoreKit2Data = parameters
+                if let renewalInfo = await self.supporterRenewalInfoJSONString() {
+                    parametersWithStoreKit2Data["renewalInfo"] = renewalInfo
+                }
+                AF.request(
+                    "\(self.sgsRoot)/register",
+                    method: .post,
+                    parameters: parametersWithStoreKit2Data,
+                    headers: headers
+                ).validate().responseJSON { response in
+                    switch response.result {
+                    case .success:
+                        if let responseData = response.value as? [String: Any] {
+                            if let accessToken = responseData["accessToken"] as? String {
+                                userDefaults[.sgsAccessToken] = accessToken
+                                if let receiptData = parametersWithStoreKit2Data["receiptData"] as? String {
+                                    userDefaults[.lastSentReceiptData] = receiptData
+                                }
+                            }
+                            if let supporterExpiryTimestamp = responseData["supporterExpires"] as? Double {
+                                userDefaults[.supporterProductExpiryDate] = Date(timeIntervalSince1970: supporterExpiryTimestamp)
                             }
                         }
-                        if let supporterExpiryTimestamp = responseData["supporterExpires"] as? Double {
-                            userDefaults[.supporterProductExpiryDate] = Date(timeIntervalSince1970: supporterExpiryTimestamp)
-                        }
+                    case .failure(let error):
+                        print(error)
                     }
-                case .failure(let error):
-                    print(error)
                 }
             }
         }
@@ -183,8 +197,7 @@ class SurroundService: NSObject, ObservableObject, SKProductsRequestDelegate, SK
     
     // - Subscriptions
     private var supporterProductIds = Set([1, 2, 3, 4].map { "com.honganhkhoa.Surround.SurroundSupporter\($0)" })
-    private var productsRequest: SKProductsRequest?
-    @Published private(set) var supporterProducts: [SKProduct] = []
+    @Published private(set) var supporterProducts: [SupporterProduct] = []
     @Published private(set) var fetchingProducts = false
     @Published private(set) var fetchError: Error?
     @Published private(set) var processingProductIds = Set<String>()
@@ -204,143 +217,192 @@ class SurroundService: NSObject, ObservableObject, SKProductsRequestDelegate, SK
         return productId
     }
     
-    func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
-        DispatchQueue.main.async {
-            self.supporterProducts = response.products.sorted(by: { $0.price.compare($1.price) == .orderedAscending })
-            self.fetchingProducts = false
-        }
-    }
-    
-    func request(_ request: SKRequest, didFailWithError error: Error) {
-        DispatchQueue.main.async {
-            self.fetchError = error
-            self.fetchingProducts = false
-        }
-    }
-    
     func fetchProducts() {
         fetchingProducts = true
-        productsRequest = SKProductsRequest(productIdentifiers: supporterProductIds)
-        productsRequest?.delegate = self
-        productsRequest?.start()
+        fetchError = nil
+        Task {
+            do {
+                let products = try await Product.products(for: supporterProductIds)
+                let sortedProducts = products.sorted { $0.price < $1.price }
+                let productsById = Dictionary(uniqueKeysWithValues: sortedProducts.map { ($0.id, $0) })
+                let productsForDisplay = sortedProducts.map {
+                    SupporterProduct(id: $0.id, displayPrice: $0.displayPrice)
+                }
+                await MainActor.run {
+                    self.storeProductsById = productsById
+                    self.supporterProducts = productsForDisplay
+                    self.fetchingProducts = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.fetchError = error
+                    self.fetchingProducts = false
+                }
+            }
+        }
     }
     
     func initializeProductsForPreview() {
-        supporterProducts = []
-        for (index, price) in ["0.49", "1.99", "4.99", "9.99"].enumerated() {
-            let product = MockSKProduct(price: Decimal(string: price)!, index: index)
-            supporterProducts.append(product)
-        }
+        supporterProducts = [
+            SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter1", displayPrice: "$0.49"),
+            SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter2", displayPrice: "$1.99"),
+            SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter3", displayPrice: "$4.99"),
+            SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter4", displayPrice: "$9.99")
+        ]
     }
 
-    func subscribe(to product: SKProduct) {
-        let payment = SKPayment(product: product)
-        SKPaymentQueue.default().add(payment)
+    func subscribe(to product: SupporterProduct) {
+        guard let storeProduct = storeProductsById[product.id] else {
+            return
+        }
         processingTransaction = true
-        processingProductIds.insert(product.productIdentifier)
+        processingProductIds.insert(product.id)
+        Task {
+            do {
+                let result = try await storeProduct.purchase()
+                switch result {
+                case .success(let verificationResult):
+                    let transaction = try self.verify(verificationResult)
+                    await MainActor.run {
+                        self.updateSupporterState(with: transaction)
+                        self.processingProductIds.remove(transaction.productID)
+                        self.processingTransaction = false
+                    }
+                    await transaction.finish()
+                case .pending:
+                    break
+                case .userCancelled:
+                    await MainActor.run {
+                        self.processingProductIds.remove(product.id)
+                        self.processingTransaction = false
+                    }
+                @unknown default:
+                    await MainActor.run {
+                        self.processingProductIds.remove(product.id)
+                        self.processingTransaction = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.processingProductIds.remove(product.id)
+                    self.processingTransaction = false
+                }
+            }
+        }
     }
     
     func restorePurchases() {
-        SKPaymentQueue.default().restoreCompletedTransactions()
         processingTransaction = true
-    }
-    
-    func paymentQueueRestoreCompletedTransactionsFinished(_ queue: SKPaymentQueue) {
-        processingTransaction = false
-    }
-    
-    func paymentQueue(_ queue: SKPaymentQueue, restoreCompletedTransactionsFailedWithError error: Error) {
-        processingTransaction = false
-    }
-    
-    func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
-        var restoredTransactions = [SKPaymentTransaction]()
-        for transaction in transactions {
-            let productId = transaction.payment.productIdentifier
-            print("\(productId): \(transaction.transactionState)")
-            switch transaction.transactionState {
-            case .purchased:
-                userDefaults[.supporterProductId] = productId
-                userDefaults[.supporterProductExpiryDate] = nil
-                processingProductIds.remove(productId)
-                SKPaymentQueue.default().finishTransaction(transaction)
-                processingTransaction = false
-            case .purchasing:
-                processingProductIds.insert(transaction.payment.productIdentifier)
-            case .restored:
-                restoredTransactions.append(transaction)
-            case .failed:
-                if userDefaults[.supporterProductId] == productId {
-                    userDefaults[.supporterProductId] = nil
+        Task {
+            do {
+                try await AppStore.sync()
+                await refreshSupporterEntitlements()
+            } catch {
+                await MainActor.run {
+                    self.processingTransaction = false
                 }
-                processingProductIds.remove(productId)
-                SKPaymentQueue.default().finishTransaction(transaction)
-                processingTransaction = false
-            case .deferred:
-                processingProductIds.insert(transaction.payment.productIdentifier)
-            @unknown default:
-                break
             }
         }
-        if restoredTransactions.count > 0 {
-            restoredTransactions.sort(by: { $0.transactionDate ?? Date.distantPast < $1.transactionDate ?? Date.distantPast })
-            if let lastTransaction = restoredTransactions.last {
-                userDefaults[.supporterProductId] = lastTransaction.payment.productIdentifier
+    }
+    
+    private func observeTransactionUpdates() -> Task<Void, Never> {
+        Task.detached { [weak self] in
+            guard let self else {
+                return
+            }
+            for await verificationResult in Transaction.updates {
+                guard let transaction = try? self.verify(verificationResult) else {
+                    continue
+                }
+                await MainActor.run {
+                    self.updateSupporterState(with: transaction)
+                    self.processingProductIds.remove(transaction.productID)
+                    self.processingTransaction = false
+                }
+                await transaction.finish()
+            }
+        }
+    }
+    
+    private func refreshSupporterEntitlements() async {
+        var latestSupporterTransaction: Transaction?
+        for await verificationResult in Transaction.currentEntitlements {
+            guard let transaction = try? verify(verificationResult) else {
+                continue
+            }
+            guard supporterProductIds.contains(transaction.productID) else {
+                continue
+            }
+            if latestSupporterTransaction == nil || transaction.purchaseDate > latestSupporterTransaction!.purchaseDate {
+                latestSupporterTransaction = transaction
+            }
+        }
+        let latestTransaction = latestSupporterTransaction
+        await MainActor.run {
+            if let transaction = latestTransaction {
+                self.updateSupporterState(with: transaction)
+            } else {
+                userDefaults[.supporterProductId] = nil
                 userDefaults[.supporterProductExpiryDate] = nil
             }
-            for transaction in restoredTransactions {
-                SKPaymentQueue.default().finishTransaction(transaction)
-            }
-            processingTransaction = false
+            self.processingProductIds.removeAll()
+            self.processingTransaction = false
         }
     }
     
     func receiptData() -> String? {
-        if let receiptURL = Bundle.main.appStoreReceiptURL, FileManager.default.fileExists(atPath: receiptURL.path) {
-            do {
-                let receiptData = try Data(contentsOf: receiptURL, options: .alwaysMapped)
-                let receiptString = receiptData.base64EncodedString(options: [])
-                return receiptString
-            } catch {
-                return nil
+        if #unavailable(iOS 18.0) {
+            if let receiptURL = Bundle.main.appStoreReceiptURL,
+               FileManager.default.fileExists(atPath: receiptURL.path) {
+                let receiptData = try? Data(contentsOf: receiptURL, options: .alwaysMapped)
+                return receiptData?.base64EncodedString(options: [])
             }
         }
         return nil
     }
-}
-
-class MonthlySubscriptionPeriod: SKProductSubscriptionPeriod {
-    private let _numberOfUnits: Int
-    private let _unit: SKProduct.PeriodUnit
-
-    override init() {
-        _numberOfUnits = 1
-        _unit = .year
-    }
-
-    override var numberOfUnits: Int {
-        self._numberOfUnits
-    }
-
-    override var unit: SKProduct.PeriodUnit {
-        self._unit
-    }
-}
-
-class MockSKProduct: SKProduct {
-    private var _subscriptionPeriod: SKProductSubscriptionPeriod
-
-    init(price: Decimal, index: Int) {
-        _subscriptionPeriod = MonthlySubscriptionPeriod()
-        super.init()
-        self.setValue(price, forKey: "price")
-        self.setValue("com.honganhkhoa.Surround.SurroundSupporter\(index + 1)", forKey: "productIdentifier")
-        self.setValue(Locale(identifier: "en_US"), forKey: "priceLocale")
-    }
-
-    override var subscriptionPeriod: SKProductSubscriptionPeriod? {
-        get {
-            _subscriptionPeriod
+    
+    private func supporterRenewalInfoJSONString() async -> String? {
+        var renewalInfoObjects = [[String: Any]]()
+        for await verificationResult in Transaction.currentEntitlements {
+            guard let transaction = try? verify(verificationResult) else {
+                continue
+            }
+            guard supporterProductIds.contains(transaction.productID) else {
+                continue
+            }
+            guard let status = await transaction.subscriptionStatus else {
+                continue
+            }
+            guard let renewalInfo = try? verify(status.renewalInfo) else {
+                continue
+            }
+            guard var renewalInfoObject = try? JSONSerialization.jsonObject(with: renewalInfo.jsonRepresentation) as? [String: Any] else {
+                continue
+            }
+            renewalInfoObject["renewalState"] = String(describing: status.state)
+            renewalInfoObjects.append(renewalInfoObject)
         }
+        guard renewalInfoObjects.count > 0 else {
+            return nil
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: renewalInfoObjects) {
+            return String(data: data, encoding: .utf8)
+        }
+        return nil
+    }
+    
+    private func verify<T>(_ verificationResult: VerificationResult<T>) throws -> T {
+        switch verificationResult {
+        case .verified(let value):
+            return value
+        case .unverified:
+            throw SurroundServiceError.failedVerification
+        }
+    }
+    
+    @MainActor
+    private func updateSupporterState(with transaction: Transaction) {
+        userDefaults[.supporterProductId] = transaction.productID
+        userDefaults[.supporterProductExpiryDate] = transaction.expirationDate
     }
 }
