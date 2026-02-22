@@ -76,6 +76,15 @@ struct RengoPlayersDetail: View {
     
     @Namespace var playerCards
 
+    private func casualAttributedNotice() -> AttributedString {
+        var casualText = AttributedString(localized: "**Casual**")
+        casualText.font = .subheadline.bold()
+        var casualSuffix = AttributedString(localized: " — players may drop mid-game")
+        casualSuffix.font = .caption
+        casualText.append(casualSuffix)
+        return casualText
+    }
+
     var body: some View {
         if let blackTeam = challenge.game.rengoBlackTeam, let whiteTeam = challenge.game.rengoWhiteTeam, let nominees = challenge.game.rengoNominees, let userId = ogs.user?.id {
             VStack(alignment: .leading, spacing: 0) {
@@ -84,7 +93,8 @@ struct RengoPlayersDetail: View {
                 .foregroundColor(Color(.systemPurple))
                 Spacer().frame(height: 10)
                 if challenge.game.rengoCasualMode ?? false {
-                    (Text("**Casual**").font(.subheadline) + Text(" — players may drop mid-game").font(.caption))
+                    let casualText = casualAttributedNotice()
+                    Text(casualText)
                         .leadingAlignedInScrollView()
                     if let autoStart = challenge.game.rengoAutoStart, autoStart > 0 {
                         Spacer().frame(height: 5)
@@ -98,8 +108,11 @@ struct RengoPlayersDetail: View {
                     HStack {
                         Stone(color: .black, shadowRadius: 2)
                             .frame(width: 15, height: 15)
-                        (Text(verbatim: "\(blackTeam.count)×") + Text(Image(systemName: "person.fill")))
-                            .font(.subheadline)
+                        HStack(spacing: 2) {
+                            Text(verbatim: "\(blackTeam.count)×")
+                            Image(systemName: "person.fill")
+                        }
+                        .font(.subheadline)
                         Spacer()
                     }
                     ScrollView(.horizontal) {
@@ -118,8 +131,11 @@ struct RengoPlayersDetail: View {
                     HStack {
                         Stone(color: .white, shadowRadius: 2)
                             .frame(width: 15, height: 15)
-                        (Text(verbatim: "\(whiteTeam.count)×") + Text(Image(systemName: "person.fill")))
-                            .font(.subheadline)
+                        HStack(spacing: 2) {
+                            Text(verbatim: "\(whiteTeam.count)×")
+                            Image(systemName: "person.fill")
+                        }
+                        .font(.subheadline)
                         Spacer()
                     }
                     ScrollView(.horizontal) {
@@ -139,8 +155,11 @@ struct RengoPlayersDetail: View {
                         HStack {
                             Stone(color: nil, shadowRadius: 2)
                                 .frame(width: 15, height: 15)
-                            (Text(verbatim: "\(nominees.count)×") + Text(Image(systemName: "person.fill")))
-                                .font(.subheadline)
+                            HStack(spacing: 2) {
+                                Text(verbatim: "\(nominees.count)×")
+                                Image(systemName: "person.fill")
+                            }
+                            .font(.subheadline)
                             Spacer()
                         }
                         ScrollView(.horizontal) {
@@ -266,9 +285,12 @@ struct RengoActions: View {
                             .navigationBarTitle(host.username)
                             .navigationBarTitleDisplayMode(.inline)
                     ) {
-                        (Text("Message organizer") + Text(Image(systemName: "chevron.forward")))
-                            .font(.subheadline.bold())
-                            .leadingAlignedInScrollView()
+                        HStack(spacing: 4) {
+                            Text("Message organizer")
+                            Image(systemName: "chevron.forward")
+                        }
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -282,6 +304,17 @@ struct ChallengeCell: View {
     var challenge: any OGSChallenge
     var hidePlayerDetails: Bool = false
     @State var ogsRequestCancellable: AnyCancellable?
+
+    private func rulesAttributedLabel(for rulesName: String) -> AttributedString {
+        var rulesLabel = AttributedString(String(localized: "Rules: "))
+        rulesLabel.font = .subheadline.bold()
+
+        var rulesNameLabel = AttributedString(rulesName)
+        rulesNameLabel.font = .subheadline
+        rulesLabel.append(rulesNameLabel)
+
+        return rulesLabel
+    }
         
     func withdrawOrDeclineChallenge(challenge: any OGSSubmittedChallenge) {
         self.ogsRequestCancellable = ogs.withdrawOrDeclineChallenge(challenge: challenge)
@@ -430,7 +463,15 @@ struct ChallengeCell: View {
         return VStack(alignment: .leading, spacing: 3) {
             Label{
                 HStack {
-                    (Text(verbatim: "\(game.width)×\(game.height)") + Text(verbatim: " ") + Text(game.ranked ? "Ranked" : "Unranked"))
+                let rankStatus = game.ranked
+                    ? String(localized: "Ranked", comment: "ChallengeCell rank status")
+                    : String(localized: "Unranked", comment: "ChallengeCell rank status")
+                Text(
+                    String(
+                        localized: "\(game.width)×\(game.height) \(rankStatus)",
+                        comment: "ChallengeCell board size and rank status"
+                    )
+                )
                         .leadingAlignedInScrollView()
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
@@ -448,7 +489,8 @@ struct ChallengeCell: View {
             }
             Label {
                 HStack {
-                    (Text("Rules: ").bold() + Text(game.rules.fullName))
+                    let rulesLabel = rulesAttributedLabel(for: game.rules.fullName)
+                    Text(rulesLabel)
                         .leadingAlignedInScrollView()
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)

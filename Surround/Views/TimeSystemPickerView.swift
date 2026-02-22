@@ -166,7 +166,14 @@ struct TimeControlAdjustmentSteppers: View {
             return [:]
         }
     }
-    
+
+    private func boldLabel(prefix: String, value: String) -> AttributedString {
+        var label = AttributedString(prefix)
+        label.font = .body.bold()
+        label.append(AttributedString(value))
+        return label
+    }
+
     func timeStepper(keyPath: WritableKeyPath<TimeControl.TimeControlCodingData, Int?>, canBeZero: Bool = false, label: String) -> some View {
         TimeStepper(
             value: Binding(
@@ -176,8 +183,12 @@ struct TimeControlAdjustmentSteppers: View {
             range: timeRanges[timeControlSpeed]![keyPath]!,
             canBeZero: canBeZero
         ) {
-            Text(verbatim: "\(label): ").bold() +
-                Text(durationString(seconds: timeControl.codingData[keyPath: keyPath]!, longFormat: true))
+            Text(
+                boldLabel(
+                    prefix: "\(label): ",
+                    value: durationString(seconds: timeControl.codingData[keyPath: keyPath]!, longFormat: true)
+                )
+            )
         }
     }
     
@@ -188,7 +199,7 @@ struct TimeControlAdjustmentSteppers: View {
                 timeStepper(keyPath: \.mainTime, canBeZero: true, label: String(localized: "Main time"))
                 if let periods = timeControl.periods {
                     Stepper(value: Binding(get: { periods }, set: { timeControl.periods = $0 }), in: 1...300) {
-                        Text("Periods: ").bold() + Text(verbatim: "\(periods)")
+                        Text(boldLabel(prefix: String(localized: "Periods: "), value: "\(periods)"))
                     }
                 }
                 timeStepper(keyPath: \.periodTime, label: String(localized: "Time per period"))
@@ -207,7 +218,7 @@ struct TimeControlAdjustmentSteppers: View {
                         ),
                         in: 1...50
                     ) {
-                        Text("Stone per period: ").bold() + Text(verbatim: "\(stonePerPeriod)")
+                        Text(boldLabel(prefix: String(localized: "Stone per period: "), value: "\(stonePerPeriod)"))
                     }
                 }
             case .Simple:

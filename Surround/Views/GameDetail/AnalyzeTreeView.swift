@@ -168,7 +168,7 @@ struct AnalyzeTreeView: View {
                                 EmptyView().id("endOfAnalyzeTree")
                             }
                             .padding(.horizontal, 10)
-                            .onChange(of: self.selectedPosition?.lastMoveNumber) { newLastMoveNumber in
+                            .onChange(of: self.selectedPosition?.lastMoveNumber) { _, newLastMoveNumber in
                                 DispatchQueue.main.async {
                                     withAnimation {
                                         horizontalScrollView.scrollTo(newLastMoveNumber)

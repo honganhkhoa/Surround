@@ -149,7 +149,7 @@ struct BoardDemoView: View {
                 }
             }
         }
-        .onChange(of: lastUtterance) { _ in
+        .onChange(of: lastUtterance) { _, _ in
             if clearLastUtteranceCancellable != nil {
                 clearLastUtteranceCancellable?.cancel()
             }
@@ -162,12 +162,12 @@ struct BoardDemoView: View {
         .onDisappear {
             self.speechSynthesizer = nil
         }
-        .onChange(of: pendingMove) { move in
+        .onChange(of: pendingMove) { _, move in
             if let move = move, autoSubmitForLiveGames {
                 self.submitMove(move: move)
             }
         }
-        .onChange(of: voiceCountdown) { _ in
+        .onChange(of: voiceCountdown) { _, _ in
             self.initializePlayersIfNecessary()
         }
     }

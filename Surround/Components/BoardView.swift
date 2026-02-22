@@ -462,7 +462,7 @@ struct StoneRemovalOverlay: View {
                     highlightedColumn = -1
                 }
         )
-        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { newSelectedPoints in
+        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { _, newSelectedPoints in
             if newSelectedPoints.count == 0 {
                 hoveredGroup.removeAll()
             }
@@ -547,7 +547,7 @@ struct BoardView: View {
                     selectedPoint: $selectedPoint
                 )
                 .allowsHitTesting(playable && displayedPosition.estimatedScores == nil)
-                .onChange(of: hoveredPoint) { value in
+                .onChange(of: hoveredPoint) { _, value in
                     isHoveredPointValid = nil
                     if let hoveredPoint = hoveredPoint {
                         do {
@@ -558,7 +558,7 @@ struct BoardView: View {
                         }
                     }
                 }
-                .onChange(of: selectedPoint) { value in
+                .onChange(of: selectedPoint) { _, value in
                     if let selectedPoint = value {
                         newMove.wrappedValue = .placeStone(selectedPoint[0], selectedPoint[1])
                     } else {

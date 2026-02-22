@@ -44,8 +44,11 @@ struct PlayerInfoLine: View {
                         }
                     }
                     if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
-                        (Text(verbatim: "+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
-                            .font(.subheadline)
+                        HStack(spacing: 2) {
+                            Text(verbatim: "+ \(rengoTeam.count - 1)×")
+                            Image(systemName: "person.fill")
+                        }
+                        .font(.subheadline)
                     }
                     Spacer()
                     InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
@@ -72,8 +75,11 @@ struct PlayerInfoLine: View {
                             }
                         }
                         if game.rengo, let rengoTeam = game.gameData?.rengoTeams?[color], rengoTeam.count > 1 {
-                            (Text(verbatim: "+ \(rengoTeam.count - 1)×") + Text(Image(systemName: "person.fill")))
-                                .font(.subheadline)
+                            HStack(spacing: 2) {
+                                Text(verbatim: "+ \(rengoTeam.count - 1)×")
+                                Image(systemName: "person.fill")
+                            }
+                            .font(.subheadline)
                         }
                     }
                     InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)

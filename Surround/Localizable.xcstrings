@@ -905,6 +905,17 @@
         }
       }
     },
+    "%@: %@" : {
+      "comment" : "Generic formatter that joins a label and value with a colon separator.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
     "%@/move" : {
       "comment" : "TimeControl - short description for simple system",
       "localizations" : {
@@ -924,6 +935,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@/nước"
+          }
+        }
+      }
+    },
+    "%@%@" : {
+      "comment" : "Generic formatter that concatenates two localized string fragments.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@"
           }
         }
       }
@@ -1693,6 +1715,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld×%lld %@" : {
+      "comment" : "ChallengeCell board size and rank status",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld×%2$lld %3$@"
           }
         }
       }
@@ -6696,6 +6729,7 @@
       }
     },
     "Ranked" : {
+      "comment" : "ChallengeCell rank status",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8760,6 +8794,7 @@
       }
     },
     "Unranked" : {
+      "comment" : "ChallengeCell rank status",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

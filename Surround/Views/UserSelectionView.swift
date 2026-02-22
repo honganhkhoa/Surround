@@ -154,7 +154,7 @@ struct UserSelectionView: View {
             Spacer()
         }
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: searchText) { keyword in
+        .onChange(of: searchText) { _, keyword in
             if keyword.count > 0 {
                 if searchRequestByKeyword[keyword] == nil {
                     searchRequestByKeyword[keyword] = ogs.searchByUsername(keyword: keyword).sink(receiveCompletion: { _ in

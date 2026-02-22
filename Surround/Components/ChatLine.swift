@@ -13,17 +13,24 @@ struct ChatLine: View {
     var horizontalAlignment: HorizontalAlignment = .leading
 
     var chatBody: Text {
-        var result = Text(verbatim: "")
+        Text(chatBodyAttributedString())
+    }
+
+    private func chatBodyAttributedString() -> AttributedString {
+        var result = AttributedString()
         var index = chatLine.body.startIndex
         var mutableSelf = self
         for coordinateRange in mutableSelf.chatLine.coordinatesRanges {
             let coordinateStartIndex = chatLine.body.index(chatLine.body.startIndex, offsetBy: coordinateRange.location)
             let coordinateEndIndex = chatLine.body.index(coordinateStartIndex, offsetBy: coordinateRange.length)
-            result = result + Text(chatLine.body[index..<coordinateStartIndex])
-            result = result + Text(chatLine.body[coordinateStartIndex..<coordinateEndIndex]).bold().foregroundColor(Color(.systemIndigo))
+            result.append(AttributedString(String(chatLine.body[index..<coordinateStartIndex])))
+            var highlighted = AttributedString(String(chatLine.body[coordinateStartIndex..<coordinateEndIndex]))
+            highlighted.foregroundColor = Color(.systemIndigo)
+            highlighted.font = .callout.bold()
+            result.append(highlighted)
             index = coordinateEndIndex
         }
-        result = result + Text(chatLine.body[index..<chatLine.body.endIndex])
+        result.append(AttributedString(String(chatLine.body[index..<chatLine.body.endIndex])))
         return result
     }
     

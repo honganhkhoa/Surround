@@ -255,6 +255,90 @@ struct CustomGameForm: View {
     @State var komi = 6.5
     
     @State var analysisDisabled = false
+
+    private struct ChangeHandlersBase: ViewModifier {
+        @Binding var challenge: OGSChallengeTemplate
+        @Binding var gameName: String
+        @Binding var isRanked: Bool
+        @Binding var isPrivate: Bool
+        @Binding var rankRestricted: Bool
+        @Binding var isOpen: Bool
+        @Binding var maxRank: Int
+        @Binding var minRank: Int
+        @Binding var handicap: Int
+        @Binding var automaticColor: Bool
+        @Binding var yourColor: StoneColor
+        @Binding var boardWidth: Int
+        @Binding var boardHeight: Int
+        @Binding var opponent: OGSUser?
+
+        func body(content: Content) -> some View {
+            content
+                .onChange(of: gameName) { _, newValue in challenge.game.name = newValue }
+                .onChange(of: isRanked) { _, newValue in challenge.game.ranked = newValue }
+                .onChange(of: isPrivate) { _, newValue in challenge.game.isPrivate = newValue }
+                .onChange(of: rankRestricted) { _, newValue in
+                    challenge.game.maxRank = newValue && isOpen ? maxRank : 1000
+                    challenge.game.minRank = newValue && isOpen ? minRank : -1000
+                }
+                .onChange(of: isOpen) { _, newValue in
+                    challenge.game.maxRank = newValue && rankRestricted ? maxRank : 1000
+                    challenge.game.minRank = newValue && rankRestricted ? minRank : -1000
+                    if newValue {
+                        challenge.challenged = nil
+                    } else {
+                        challenge.challenged = opponent
+                    }
+                }
+                .onChange(of: maxRank) { _, newValue in challenge.game.maxRank = newValue }
+                .onChange(of: minRank) { _, newValue in challenge.game.minRank = newValue }
+                .onChange(of: handicap) { _, newValue in challenge.game.handicap = newValue }
+                .onChange(of: automaticColor) { _, newValue in
+                    challenge.challengerColor = newValue ? nil : yourColor
+                }
+                .onChange(of: yourColor) { _, newValue in
+                    challenge.challengerColor = newValue
+                }
+                .onChange(of: boardWidth) { _, newValue in challenge.game.width = newValue }
+                .onChange(of: boardHeight) { _, newValue in challenge.game.height = newValue }
+                .onChange(of: opponent) { _, newValue in challenge.challenged = newValue }
+        }
+    }
+
+    private struct ChangeHandlersTime: ViewModifier {
+        @Binding var challenge: OGSChallengeTemplate
+        @Binding var timeControlSpeed: TimeControlSpeed
+        @Binding var isBlitz: Bool
+        @Binding var liveTimeControl: TimeControl
+        @Binding var blitzTimeControl: TimeControl
+        @Binding var correspondenceTimeControl: TimeControl
+        @Binding var pauseOnWeekend: Bool
+        let updateTimeControl: () -> Void
+
+        func body(content: Content) -> some View {
+            content
+                .onChange(of: timeControlSpeed) { updateTimeControl() }
+                .onChange(of: isBlitz) { updateTimeControl() }
+                .onChange(of: liveTimeControl) { updateTimeControl() }
+                .onChange(of: blitzTimeControl) { updateTimeControl() }
+                .onChange(of: correspondenceTimeControl) { updateTimeControl() }
+                .onChange(of: pauseOnWeekend) { _, newValue in challenge.game.timeControl.pauseOnWeekends = newValue }
+        }
+    }
+
+    private struct ChangeHandlersRules: ViewModifier {
+        @Binding var challenge: OGSChallengeTemplate
+        @Binding var rulesSet: OGSRule
+        @Binding var komi: Double
+        @Binding var analysisDisabled: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .onChange(of: rulesSet) { _, newValue in challenge.game.rules = newValue }
+                .onChange(of: komi) { _, newValue in challenge.game.komi = newValue }
+                .onChange(of: analysisDisabled) { _, newValue in challenge.game.disableAnalysis = newValue }
+        }
+    }
     
     func revertToStandardTimeSetting() {
         withAnimation {
@@ -273,6 +357,20 @@ struct CustomGameForm: View {
         standardBoardSize = true
         komi = rulesSet.defaultKomi
         handicap = min(handicap, 9)
+    }
+
+    private func handicapAttributedLabel(handicap: Int) -> AttributedString {
+        var label = AttributedString(String(localized: "Handicap: "))
+        label.font = .subheadline.bold()
+        let value = handicap == -1
+            ? String(localized: "Automatic", comment: "NewGameView handicap selection, automatic handicap")
+            : handicap == 0
+            ? String(localized: "No handicap", comment: "NewGameView handicap seletion, no handicap")
+            : String(localized: "\(handicap) Stones", comment: "NewGameView handicap selection - vary for plural")
+        var valueAttributedString = AttributedString(value)
+        valueAttributedString.font = .subheadline
+        label.append(valueAttributedString)
+        return label
     }
     
     var opponentOptions: some View {
@@ -328,9 +426,12 @@ struct CustomGameForm: View {
                             }
                             .foregroundColor(opponent.uiColor)
                         } else {
-                            (Text("Select your opponent ") + Text(Image(systemName: "chevron.forward")))
-                                .font(.subheadline)
-                                .bold()
+                            HStack(spacing: 4) {
+                                Text("Select your opponent ")
+                                Image(systemName: "chevron.forward")
+                            }
+                            .font(.subheadline)
+                            .bold()
                         }
                         Spacer()
                     }
@@ -342,12 +443,7 @@ struct CustomGameForm: View {
             }
             if handicap > -1 {
                 Stepper(value: $handicap, in: 0...(isRanked ? 9 : 36)) {
-                    (Text("Handicap: ").bold() + Text(
-                        handicap == -1 ? String(localized: "Automatic", comment: "NewGameView handicap selection, automatic handicap") :
-                            handicap == 0 ? String(localized: "No handicap", comment : "NewGameView handicap seletion, no handicap") :
-                            String(localized: "\(handicap) Stones", comment: "NewGameView handicap selection - vary for plural")
-                    ))
-                    .font(.subheadline)
+                    Text(handicapAttributedLabel(handicap: handicap))
                 }
             } else {
                 (Text("**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank."))
@@ -373,10 +469,10 @@ struct CustomGameForm: View {
                     .leadingAlignedInScrollView()
             }
         }
-        .onChange(of: maxRank) { newValue in
+        .onChange(of: maxRank) { _, newValue in
             minRank = min(minRank, newValue)
         }
-        .onChange(of: minRank) { newValue in
+        .onChange(of: minRank) { _, newValue in
             maxRank = max(maxRank, newValue)
         }
     }
@@ -429,7 +525,7 @@ struct CustomGameForm: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: standardBoardSize) { standard in
+        .onChange(of: standardBoardSize) { _, standard in
             if standard && (boardWidth != boardHeight || ![9, 13, 19].contains(boardWidth)) {
                 self.boardWidth = 19
                 self.boardHeight = 19
@@ -475,9 +571,12 @@ struct CustomGameForm: View {
                     isBlitz: $isBlitz,
                     pauseOnWeekend: $pauseOnWeekend)
             ) {
-                (Text("Advanced time settings") + Text(verbatim: " ") + Text(Image(systemName: "chevron.forward")))
-                    .font(.subheadline).bold()
-                    .leadingAlignedInScrollView()
+                HStack(spacing: 4) {
+                    Text("Advanced time settings")
+                    Image(systemName: "chevron.forward")
+                }
+                .font(.subheadline).bold()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -494,8 +593,11 @@ struct CustomGameForm: View {
                     }.pickerStyle(SegmentedPickerStyle())
                 } else {
                     NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
-                        (Text(verbatim: "\(rulesSet.fullName) ").bold() + Text(Image(systemName: "chevron.forward")))
-                            .font(.subheadline)
+                        HStack(spacing: 4) {
+                            Text(verbatim: "\(rulesSet.fullName) ").bold()
+                            Image(systemName: "chevron.forward")
+                        }
+                        .font(.subheadline)
                     }
                 }
                 Spacer()
@@ -511,12 +613,15 @@ struct CustomGameForm: View {
             }
             Spacer().frame(height: 10)
             NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
-                (Text("Advanced rules settings") + Text(verbatim: " ") + Text(Image(systemName: "chevron.forward")))
-                    .font(.subheadline).bold()
-                    .leadingAlignedInScrollView()
+                HStack(spacing: 4) {
+                    Text("Advanced rules settings")
+                    Image(systemName: "chevron.forward")
+                }
+                .font(.subheadline).bold()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .onChange(of: rulesSet) { newValue in
+        .onChange(of: rulesSet) { _, newValue in
             komi = newValue.defaultKomi
         }
     }
@@ -534,7 +639,7 @@ struct CustomGameForm: View {
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }
-        .onChange(of: isRanked) { newValue in
+        .onChange(of: isRanked) { _, newValue in
             if newValue {
                 withAnimation {
                     updateForRankedGames()
@@ -609,43 +714,53 @@ struct CustomGameForm: View {
         }
     }
     
+    @ViewBuilder
+    var previewSection: some View {
+        HStack {
+            Text("Preview")
+                .font(.title3).bold()
+            Spacer()
+            Button(action: {}) {
+                Label("Save settings", systemImage: "star")
+            }
+            .tint(.green)
+            .buttonStyle(.bordered)
+        }
+        ChallengeCell(challenge: challenge)
+            .padding()
+            .background(
+                Color(
+                    colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
+                )
+                .cornerRadius(8)
+                .shadow(radius: 2)
+            )
+    }
+
+    @ViewBuilder
+    var scrollContent: some View {
+        VStack(alignment: .leading) {
+            gameTypeOptions
+            opponentOptions
+            boardSizeOptions
+            gameSpeedOptions
+            rulesOptions
+            otherOptions
+            actionButton
+            previewSection
+            // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
+            // https://developer.apple.com/forums/thread/677333#672042022
+            NavigationLink(destination: EmptyView()) {
+                EmptyView()
+            }
+        }
+        .padding()
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading) {
-                    gameTypeOptions
-                    opponentOptions
-                    boardSizeOptions
-                    gameSpeedOptions
-                    rulesOptions
-                    otherOptions
-                    actionButton
-                    HStack {
-                        Text("Preview")
-                            .font(.title3).bold()
-                        Spacer()
-                        Button(action: {}) {
-                            Label("Save settings", systemImage: "star")
-                        }
-                        .tint(.green)
-                        .buttonStyle(.bordered)
-                    }
-                    ChallengeCell(challenge: challenge)
-                        .padding()
-                        .background(
-                            Color(
-                                colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                            )
-                            .cornerRadius(8)
-                            .shadow(radius: 2)
-                        )
-                    // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
-                    // https://developer.apple.com/forums/thread/677333#672042022
-                    NavigationLink(destination: EmptyView()) {
-                        EmptyView()
-                    }
-                }
-                .padding()
+                scrollContent
             }
             .apply {
                 if #available(iOS 16.0, *) {
@@ -655,43 +770,38 @@ struct CustomGameForm: View {
                 }
             }
         }
-        .onChange(of: gameName) { challenge.game.name = $0 }
-        .onChange(of: isRanked) { challenge.game.ranked = $0 }
-        .onChange(of: isPrivate) { challenge.game.isPrivate = $0 }
-        .onChange(of: rankRestricted) {
-            challenge.game.maxRank = $0 && isOpen ? maxRank : 1000
-            challenge.game.minRank = $0 && isOpen ? minRank : -1000
-        }
-        .onChange(of: isOpen) {
-            challenge.game.maxRank = $0 && rankRestricted ? maxRank : 1000
-            challenge.game.minRank = $0 && rankRestricted ? minRank : -1000
-            if $0 {
-                challenge.challenged = nil
-            } else {
-                challenge.challenged = opponent
-            }
-        }
-        .onChange(of: maxRank) { challenge.game.maxRank = $0 }
-        .onChange(of: minRank) { challenge.game.minRank = $0 }
-        .onChange(of: handicap) { challenge.game.handicap = $0 }
-        .onChange(of: automaticColor) {
-            challenge.challengerColor = $0 ? nil : yourColor
-        }
-        .onChange(of: yourColor) {
-            challenge.challengerColor = $0
-        }
-        .onChange(of: boardWidth) { challenge.game.width = $0 }
-        .onChange(of: boardHeight) { challenge.game.height = $0 }
-        .onChange(of: timeControlSpeed) { _ in updateTimeControl() }
-        .onChange(of: isBlitz) { _ in updateTimeControl() }
-        .onChange(of: liveTimeControl) { _ in updateTimeControl() }
-        .onChange(of: blitzTimeControl) { _ in updateTimeControl() }
-        .onChange(of: correspondenceTimeControl) { _ in updateTimeControl() }
-        .onChange(of: pauseOnWeekend) { challenge.game.timeControl.pauseOnWeekends = $0 }
-        .onChange(of: rulesSet) { challenge.game.rules = $0 }
-        .onChange(of: komi) { challenge.game.komi = $0 }
-        .onChange(of: analysisDisabled) { challenge.game.disableAnalysis = $0 }
-        .onChange(of: opponent) { challenge.challenged = $0 }
+        .modifier(ChangeHandlersBase(
+            challenge: $challenge,
+            gameName: $gameName,
+            isRanked: $isRanked,
+            isPrivate: $isPrivate,
+            rankRestricted: $rankRestricted,
+            isOpen: $isOpen,
+            maxRank: $maxRank,
+            minRank: $minRank,
+            handicap: $handicap,
+            automaticColor: $automaticColor,
+            yourColor: $yourColor,
+            boardWidth: $boardWidth,
+            boardHeight: $boardHeight,
+            opponent: $opponent
+        ))
+        .modifier(ChangeHandlersTime(
+            challenge: $challenge,
+            timeControlSpeed: $timeControlSpeed,
+            isBlitz: $isBlitz,
+            liveTimeControl: $liveTimeControl,
+            blitzTimeControl: $blitzTimeControl,
+            correspondenceTimeControl: $correspondenceTimeControl,
+            pauseOnWeekend: $pauseOnWeekend,
+            updateTimeControl: updateTimeControl
+        ))
+        .modifier(ChangeHandlersRules(
+            challenge: $challenge,
+            rulesSet: $rulesSet,
+            komi: $komi,
+            analysisDisabled: $analysisDisabled
+        ))
         .onAppear {
             challenge.challenger = ogs.user
             if isRanked {
@@ -895,13 +1005,16 @@ struct NewGameView: View {
                 Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
                     HStack {
-                        (Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "NewGameView - vary for plural") + Text(Image(systemName: "chevron.forward")))
-                            .font(.subheadline)
-                            .bold()
-                            .leadingAlignedInScrollView()
-                            .foregroundColor(.white)
+                        HStack(spacing: 4) {
+                            Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "NewGameView - vary for plural")
+                            Image(systemName: "chevron.forward")
+                        }
+                        .font(.subheadline)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundColor(Color.white)
                         Spacer()
-                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: Color.white))
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 8)
@@ -913,13 +1026,16 @@ struct NewGameView: View {
                 Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
                     HStack {
-                        (Text("\(ogs.pendingRengoGames) pending Rengo games ") + Text(Image(systemName: "chevron.forward")))
-                            .font(.subheadline)
-                            .bold()
-                            .leadingAlignedInScrollView()
-                            .foregroundColor(.white)
+                        HStack(spacing: 4) {
+                            Text("\(ogs.pendingRengoGames) pending Rengo games ")
+                            Image(systemName: "chevron.forward")
+                        }
+                        .font(.subheadline)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundColor(Color.white)
                         Spacer()
-                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: Color.white))
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 8)

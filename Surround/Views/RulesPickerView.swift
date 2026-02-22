@@ -64,7 +64,7 @@ struct RulesPickerView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarTitle("Advanced rules settings")
-        .onChange(of: standardKomi) { value in
+        .onChange(of: standardKomi) { _, value in
             if value {
                 withAnimation {
                     komi = rulesSet.defaultKomi

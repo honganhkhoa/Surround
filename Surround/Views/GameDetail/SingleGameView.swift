@@ -94,7 +94,7 @@ struct SingleGameView: View {
                     newPosition: $analyticsPendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false
                 )
-                .onChange(of: analyticsPendingMove) { newMove in
+                .onChange(of: analyticsPendingMove) { _, newMove in
                     if let newMove = newMove {
                         if let newPosition = try? game.makeMove(move: newMove, fromAnalyticsPosition: analyticsPosition) {
                             self.analyticsPosition = newPosition
@@ -275,7 +275,7 @@ struct SingleGameView: View {
             }
             Spacer(minLength: 0)
         }
-        .onChange(of: compactDisplayMode) { newValue in
+        .onChange(of: compactDisplayMode) { _, newValue in
             withAnimation {
                 shouldHideActiveGamesCarousel.wrappedValue = newValue != .playerInfo
                 if newValue == .analyze {
@@ -553,7 +553,7 @@ struct SingleGameView: View {
         .onDisappear {
             self.stonePlacingPlayer = nil
         }
-        .onChange(of: analyzeMode.wrappedValue) { newValue in
+        .onChange(of: analyzeMode.wrappedValue) { _, newValue in
             if newValue {
                 analyticsPosition = game.currentPosition
             }

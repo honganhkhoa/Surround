@@ -199,7 +199,7 @@ struct NotificationPopup: View {
             }
             connectionPopup
         }
-        .onChange(of: ogs.superchatPeerIds) { superchatPeerIds in
+        .onChange(of: ogs.superchatPeerIds) { _, superchatPeerIds in
             if superchatPeerIds.count > 0 {
                 DispatchQueue.main.async {
                     self.showingPrivateChatView = true

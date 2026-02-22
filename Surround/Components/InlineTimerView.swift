@@ -14,31 +14,31 @@ struct InlineByoYomiTimerView: View {
     
     var body: some View {
         if thinkingTime.thinkingTimeLeft! > 0 {
-            (
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text(verbatim: timeString(timeLeft: thinkingTime.thinkingTimeLeft!))
                     .font(mainFont)
-                +
                 Text(verbatim: " (\(thinkingTime.periods!))")
                     .font(subFont)
-            ).minimumScaleFactor(0.5)
+            }
+            .minimumScaleFactor(0.5)
         } else {
             if thinkingTime.periodsLeft! > 1 {
-                (
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                         .font(mainFont)
-                    +
                     Text(verbatim: " (\(thinkingTime.periodsLeft!))")
                         .font(subFont)
-                ).minimumScaleFactor(0.5)
+                }
+                .minimumScaleFactor(0.5)
             } else {
-                (
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(verbatim: timeString(timeLeft: thinkingTime.periodTimeLeft!))
                         .font(mainFont)
-                    +
                     Text(" SD", comment: "Final byo-yomi period (Sudden Death)")
                         .font(subFont.bold())
                         .foregroundColor(Color.red)
-                ).minimumScaleFactor(0.5)
+                }
+                .minimumScaleFactor(0.5)
             }
         }
     }

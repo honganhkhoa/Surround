@@ -111,7 +111,7 @@ struct PrivateMessageLog: View {
                         scrollView.scrollTo("scrollViewBottom")
                         ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
                     }
-                    .onChange(of: messages) { _ in
+                    .onChange(of: messages) {
                         if atEndOfChat {
                             scrollView.scrollTo("scrollViewBottom")
                         }

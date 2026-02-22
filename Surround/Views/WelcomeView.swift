@@ -76,7 +76,7 @@ struct WelcomeView: View {
             ogs.unsubscribeFromGameCount()
             ogs.cancelPublicGamesCycling()
         }
-        .onChange(of: ogs.sortedPublicGames) { games in
+        .onChange(of: ogs.sortedPublicGames) { _, games in
             if self.publicGames.count > 0 {
                 withAnimation(.easeInOut(duration: 2)) {
                     self.publicGames = []

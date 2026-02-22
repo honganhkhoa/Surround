@@ -237,7 +237,7 @@ struct GameDetailView: View {
                 self.updateDetailOfCurrentGameIfNecessary()
             }
         }
-        .onChange(of: currentGame) { [currentGame] newGame in
+        .onChange(of: currentGame) { [currentGame] _, newGame in
             if newGame.ID != currentGame.ID {
                 DispatchQueue.main.async {
                     self.updateDetailOfCurrentGameIfNecessary()

@@ -65,7 +65,7 @@ struct SettingsView: View {
             Toggle(String(localized: "Hide ranks and ratings"), isOn: $hidesRank)
         }
         .padding(.horizontal)
-        .onChange(of: hidesRank) { newValue in
+        .onChange(of: hidesRank) { _, newValue in
             userDefaults[.hidesRank] = newValue
         }
     }
@@ -87,6 +87,15 @@ struct SettingsView: View {
         
         return false
     }
+
+    var notificationSupporterNotice: AttributedString {
+        var notice = AttributedString(String(localized: "Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. "))
+        notice.font = .subheadline
+        var suffix = AttributedString(String(localized: "Learn more..."))
+        suffix.font = .subheadline.bold()
+        notice.append(suffix)
+        return notice
+    }
     
     var notificationSettings: some View {
         return GroupBox(
@@ -97,8 +106,8 @@ struct SettingsView: View {
         ) {
             if !canToggleNotifications {
                 Button(action: { showSupporterView = true }) {
-                    (Text("Currently, notification is only available for Supporters, due to ongoing server cost associated with the feature. ").foregroundColor(Color(.label)) + Text("Learn more...").bold())
-                        .font(.subheadline)
+                    Text(notificationSupporterNotice)
+                        .foregroundColor(Color(.label))
                         .leadingAlignedInScrollView()
                 }
             }
@@ -112,7 +121,7 @@ struct SettingsView: View {
             .disabled(!notificationEnabled)
         }
         .padding(.horizontal)
-        .onChange(of: notificationEnabled) { enabled in
+        .onChange(of: notificationEnabled) { _, enabled in
             userDefaults[.notificationEnabled] = enabled
             sgs.setPushEnabled(enabled: enabled)
             if enabled {

@@ -111,7 +111,7 @@ struct PrivateMessageNotificationView: View {
         .onAppear {
             selectedPeerId = ogs.superchatPeerIds.first ?? sortedPeers.first?.id ?? -1
         }
-        .onChange(of: ogs.superchatPeerIds) { superchatPeerIds in
+        .onChange(of: ogs.superchatPeerIds) { _, superchatPeerIds in
             if superchatPeerIds.count > 0, let firstPeerId = superchatPeerIds.first {
                 if !superchatPeerIds.contains(selectedPeerId) {
                     DispatchQueue.main.async {

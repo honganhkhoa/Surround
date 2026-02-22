@@ -323,10 +323,10 @@ struct GameControlRow: View {
                 }
             }
         }
-        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { selectedPoints in
+        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { _, selectedPoints in
             self.toggleRemovedStones(stones: selectedPoints)
         }
-        .onChange(of: pendingMove.wrappedValue) { newPendingMove in
+        .onChange(of: pendingMove.wrappedValue) { _, newPendingMove in
             if let newPendingMove = newPendingMove {
                 if let timeControl = game.gameData?.timeControl {
                     var shouldAutoSubmitMove = timeControl.speed == .correspondence && autoSubmitForCorrespondenceGames

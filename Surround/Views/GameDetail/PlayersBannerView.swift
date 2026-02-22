@@ -127,8 +127,14 @@ struct PlayersBannerView: View {
     func playerName(color: StoneColor) -> some View {
         if game.rengo {
             if let player = game.orderedRengoTeam[color]?.first, let teamSize = game.orderedRengoTeam[color]?.count {
-                Text(verbatim: player.usernameAndRank).font(Font.body.bold()) +
-                 (teamSize <= 1 ? Text(verbatim: "") : (Text(verbatim: " + \(teamSize - 1)×") + Text(Image(systemName: "person.fill"))))
+                HStack(spacing: 2) {
+                    Text(verbatim: player.usernameAndRank)
+                        .font(Font.body.bold())
+                    if teamSize > 1 {
+                        Text(verbatim: " + \(teamSize - 1)×")
+                        Image(systemName: "person.fill")
+                    }
+                }
             } else {
                 EmptyView()
             }
@@ -331,8 +337,11 @@ struct PlayersBannerView: View {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading) {
                         HStack {
-                            (Text(verbatim: "\(leftTeam.count)×") + Text(Image(systemName: "person.fill")))
-                                .font(.subheadline)
+                            HStack(spacing: 2) {
+                                Text(verbatim: "\(leftTeam.count)×")
+                                Image(systemName: "person.fill")
+                            }
+                            .font(.subheadline)
                             Stone(color: topLeftPlayerColor, shadowRadius: 2)
                                 .frame(width: 20, height: 20)
                             InlineTimerView(
@@ -367,8 +376,11 @@ struct PlayersBannerView: View {
                             )
                             Stone(color: topLeftPlayerColor.opponentColor(), shadowRadius: 2)
                                 .frame(width: 20, height: 20)
-                            (Text(verbatim: "\(rightTeam.count)×") + Text(Image(systemName: "person.fill")))
-                                .font(.subheadline)
+                            HStack(spacing: 2) {
+                                Text(verbatim: "\(rightTeam.count)×")
+                                Image(systemName: "person.fill")
+                            }
+                            .font(.subheadline)
                         }
                         ScrollView {
                             VStack(alignment: .trailing, spacing: 5) {
@@ -472,7 +484,7 @@ struct PlayersBannerView: View {
         .onAppear {
             initializeSpeechSynthesizerIfNecessary()
         }
-        .onChange(of: voiceCountdown) { _ in
+        .onChange(of: voiceCountdown) { _, _ in
             DispatchQueue.main.async {
                 initializeSpeechSynthesizerIfNecessary()
             }
@@ -497,7 +509,7 @@ struct PlayersBannerView: View {
                 }
             }
         }
-        .onChange(of: lastUtterance) { _ in
+        .onChange(of: lastUtterance) { _, _ in
             if clearLastUtteranceCancellable != nil {
                 clearLastUtteranceCancellable?.cancel()
             }

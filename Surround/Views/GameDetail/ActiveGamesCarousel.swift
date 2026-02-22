@@ -61,7 +61,7 @@ struct ActiveGamesCarousel: View {
         }
         .padding(.horizontal, selectionRingPadding / 2)
         .id(game.ID)
-        .onChange(of: currentGame.wrappedValue) { _ in
+        .onChange(of: currentGame.wrappedValue) {
             self.renderedCurrentGame.send(game == currentGame.wrappedValue)
         }
         .contentShape(Rectangle())
@@ -94,7 +94,7 @@ struct ActiveGamesCarousel: View {
                     }
                 }
                 .padding(.horizontal, 5)
-                .onChange(of: scrollTarget) { target in
+                .onChange(of: scrollTarget) { _, target in
                     if let target = target {
                         if discardNextScrollTarget {
                             discardNextScrollTarget = false
