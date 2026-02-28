@@ -685,6 +685,7 @@ struct CustomGameForm: View {
     }
     
     @State var challengeCreatingCancellable: AnyCancellable?
+    @State var savePreferredSettingCancellable: AnyCancellable?
     
     var actionButton: some View {
         VStack(alignment: .leading) {
@@ -714,17 +715,35 @@ struct CustomGameForm: View {
         }
     }
     
+    func savePreferredSetting() {
+        guard self.savePreferredSettingCancellable == nil else {
+            return
+        }
+        
+        self.savePreferredSettingCancellable = ogs.addPreferredGameSetting(challenge: challenge).sink(
+            receiveCompletion: { _ in
+                self.savePreferredSettingCancellable = nil
+            },
+            receiveValue: { _ in }
+        )
+    }
+    
     @ViewBuilder
     var previewSection: some View {
         HStack {
             Text("Preview")
                 .font(.title3).bold()
             Spacer()
-            Button(action: {}) {
-                Label("Save settings", systemImage: "star")
+            Button(action: savePreferredSetting) {
+                if self.savePreferredSettingCancellable != nil {
+                    ProgressView()
+                } else {
+                    Label("Save settings", systemImage: "star")
+                }
             }
             .tint(.green)
             .buttonStyle(.bordered)
+            .disabled(self.savePreferredSettingCancellable != nil)
         }
         ChallengeCell(challenge: challenge)
             .padding()

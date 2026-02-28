@@ -1605,6 +1605,71 @@ class OGSService: ObservableObject {
             }
         }.eraseToAnyPublisher()
     }
+    
+    func addPreferredGameSetting(challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
+        var setting = challenge
+        if !setting.useCustomKomi {
+            setting.game.komi = nil
+        }
+        
+        var preferredSettings = self.remoteSettings[.preferredGameSettings] ?? []
+        if preferredSettings.contains(setting) {
+            return Just(())
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+        preferredSettings.append(setting)
+        
+        return persistPreferredGameSettings(preferredSettings)
+    }
+    
+    func removePreferredGameSetting(challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
+        var preferredSettings = self.remoteSettings[.preferredGameSettings] ?? []
+        preferredSettings.removeAll { $0 == challenge }
+        return persistPreferredGameSettings(preferredSettings)
+    }
+    
+    private func persistPreferredGameSettings(_ preferredSettings: [OGSChallengeTemplate]) -> AnyPublisher<Void, Error> {
+        guard ogsWebsocket.authenticated else {
+            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
+        }
+        
+        return Future<Void, Error> { promise in
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            
+            guard let preferredSettingsData = try? encoder.encode(preferredSettings),
+                  let preferredSettingsJSON = try? JSONSerialization.jsonObject(with: preferredSettingsData) as? [[String: Any]] else {
+                promise(.failure(OGSServiceError.invalidJSON))
+                return
+            }
+            
+            let remoteName = self.remoteSettings.remoteName(key: .preferredGameSettings)
+            self.ogsWebsocket.emit(
+                command: "remote_storage/set",
+                data: [
+                    "key": remoteName,
+                    "value": preferredSettingsJSON,
+                    "replication": OGSRemoteReplication.RemoteOverwritesLocal.rawValue
+                ]
+            ) { _, error in
+                if let error {
+                    let messages = error.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+                    promise(.failure(OGSServiceError.loginError(error: messages)))
+                    return
+                }
+                
+                _ = self.remoteSettings.saveIfValid(
+                    settings: preferredSettingsJSON,
+                    remoteName: remoteName,
+                    replication: .RemoteOverwritesLocal,
+                    modified: Date()
+                )
+                self.preferredGameSettings = Set(preferredSettings)
+                promise(.success(()))
+            }
+        }.eraseToAnyPublisher()
+    }
 
     func isOnUserTurn(game: Game) -> Bool {
         if game.gamePhase == .stoneRemoval {
