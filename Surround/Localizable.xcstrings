@@ -2404,6 +2404,9 @@
         }
       }
     },
+    "Add your preferred game settings to create a game with the exact settings you want faster." : {
+
+    },
     "Advanced rules settings" : {
       "localizations" : {
         "fr" : {
@@ -4279,9 +4282,6 @@
         }
       }
     },
-    "Delete setting" : {
-
-    },
     "Disable analysis" : {
       "localizations" : {
         "fr" : {
@@ -4415,6 +4415,9 @@
           }
         }
       }
+    },
+    "Edit preferred setting" : {
+
     },
     "Error: Cannot load Supporter information at the moment." : {
       "localizations" : {
@@ -5846,6 +5849,9 @@
         }
       }
     },
+    "New preferred setting" : {
+
+    },
     "New Zealand" : {
       "comment" : "rules name",
       "localizations" : {
@@ -6043,9 +6049,6 @@
           }
         }
       }
-    },
-    "No saved preferred settings." : {
-
     },
     "No time control" : {
       "comment" : "TimeControl system name",
@@ -6530,6 +6533,7 @@
 
     },
     "Preview" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -6820,6 +6824,9 @@
         }
       }
     },
+    "Rengo" : {
+
+    },
     "Rengo (%@)" : {
       "localizations" : {
         "fr" : {
@@ -7107,7 +7114,7 @@
         }
       }
     },
-    "Save settings" : {
+    "Save" : {
 
     },
     "Say hi!" : {
@@ -9810,6 +9817,12 @@
           }
         }
       }
+    },
+    "You play as Black" : {
+
+    },
+    "You play as White" : {
+
     },
     "Your color" : {
       "localizations" : {

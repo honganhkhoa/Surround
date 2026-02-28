@@ -1629,6 +1629,26 @@ class OGSService: ObservableObject {
         return persistPreferredGameSettings(preferredSettings)
     }
     
+    func replacePreferredGameSetting(oldChallenge: OGSChallengeTemplate, newChallenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
+        var newSetting = newChallenge
+        if !newSetting.useCustomKomi {
+            newSetting.game.komi = nil
+        }
+        
+        var preferredSettings = self.remoteSettings[.preferredGameSettings] ?? []
+        if let existingIndex = preferredSettings.firstIndex(of: oldChallenge) {
+            preferredSettings[existingIndex] = newSetting
+        } else if !preferredSettings.contains(newSetting) {
+            preferredSettings.append(newSetting)
+        } else {
+            return Just(())
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+        
+        return persistPreferredGameSettings(preferredSettings)
+    }
+    
     private func persistPreferredGameSettings(_ preferredSettings: [OGSChallengeTemplate]) -> AnyPublisher<Void, Error> {
         guard ogsWebsocket.authenticated else {
             return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()

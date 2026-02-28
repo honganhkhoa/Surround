@@ -359,6 +359,17 @@ struct ChallengeCell: View {
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
                 }
+                if challenge.rengo {
+                    Text("Rengo")
+                        .italic()
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                }
+                if let challengerStoneColor {
+                    Text(challengerStoneColor == .black ? "You play as Black" : "You play as White")
+                        .font(.subheadline)
+                        .leadingAlignedInScrollView()
+                }
             } else {
                 if let challenger = challenge.challenger ?? ogs.user {
                     HStack(alignment: .top) {
