@@ -7184,9 +7184,6 @@
         }
       }
     },
-    "Select opponent" : {
-
-    },
     "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
       "localizations" : {
         "fr" : {

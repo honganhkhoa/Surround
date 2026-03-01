@@ -16,6 +16,8 @@ struct PreferredSettingsView: View {
     @State var openChallengeCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
     @State var deleteSettingCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
     @State var settingBeingEdited: OGSChallengeTemplate?
+    @State var settingSelectingOpponent: OGSChallengeTemplate?
+    @State var selectedOpponent: OGSUser?
     @State var creatingNewPreferredSetting = false
     
     var cardBackground: some View {
@@ -119,12 +121,7 @@ struct PreferredSettingsView: View {
             }
             Divider()
             Button(action: {
-                self.openChallengeCancellableBySetting[setting] = ogs.sendChallenge(opponent: nil, challenge: setting).sink(
-                    receiveCompletion: { _ in
-                        self.openChallengeCancellableBySetting.removeValue(forKey: setting)
-                    }, receiveValue: { _ in
-                        nav.home.showingPreferredSettings = false
-                    })
+                createChallenge(for: setting, opponent: nil)
             }) {
                 HStack {
                     if self.openChallengeCancellableBySetting[setting] != nil {
@@ -140,9 +137,12 @@ struct PreferredSettingsView: View {
             }
             if !setting.rengo {
                 Divider()
-                Button(action: {}) {
+                Button(action: {
+                    selectedOpponent = nil
+                    settingSelectingOpponent = setting
+                }) {
                     HStack {
-                        Text("Select opponent")
+                        Text("Select your opponent ")
                         Spacer()
                         Image(systemName: "chevron.forward")
                     }
@@ -150,10 +150,25 @@ struct PreferredSettingsView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 5)
                 }
+                .disabled(self.openChallengeCancellableBySetting[setting] != nil)
             }
         }
         .padding(.bottom, 5)
         .background(cardBackground)
+    }
+
+    private func createChallenge(for setting: OGSChallengeTemplate, opponent: OGSUser?) {
+        guard self.openChallengeCancellableBySetting[setting] == nil else {
+            return
+        }
+        self.openChallengeCancellableBySetting[setting] = ogs.sendChallenge(opponent: opponent, challenge: setting).sink(
+            receiveCompletion: { _ in
+                self.openChallengeCancellableBySetting.removeValue(forKey: setting)
+            },
+            receiveValue: { _ in
+                nav.home.showingPreferredSettings = false
+            }
+        )
     }
     
     var body: some View {
@@ -164,30 +179,47 @@ struct PreferredSettingsView: View {
             .onDisappear {
                 ogs.unsubscribeFromSeekGraphWhenDone()
             }
-            .sheet(isPresented: Binding(
+            .onChange(of: selectedOpponent) { _, opponent in
+                guard let opponent, let settingSelectingOpponent else {
+                    return
+                }
+                createChallenge(for: settingSelectingOpponent, opponent: opponent)
+                self.settingSelectingOpponent = nil
+                self.selectedOpponent = nil
+            }
+            .navigationDestination(isPresented: $creatingNewPreferredSetting) {
+                CustomGameForm(mode: .createPreferredSetting)
+                    .navigationTitle("New preferred setting")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationDestination(isPresented: Binding(
+                get: { settingSelectingOpponent != nil },
+                set: { isActive in
+                    if !isActive {
+                        settingSelectingOpponent = nil
+                        selectedOpponent = nil
+                    }
+                }
+            )) {
+                UserSelectionView(user: $selectedOpponent)
+                    .navigationTitle("Select your opponent ")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationDestination(isPresented: Binding(
                 get: { settingBeingEdited != nil },
-                set: { isPresented in
-                    if !isPresented {
+                set: { isActive in
+                    if !isActive {
                         settingBeingEdited = nil
                     }
                 }
             )) {
                 if let settingBeingEdited {
-                    NavigationStack {
-                        CustomGameForm(
-                            initialChallenge: settingBeingEdited,
-                            mode: .editPreferredSetting(original: settingBeingEdited)
-                        )
-                        .navigationTitle("Edit preferred setting")
-                        .navigationBarTitleDisplayMode(.inline)
-                    }
-                }
-            }
-            .sheet(isPresented: $creatingNewPreferredSetting) {
-                NavigationStack {
-                    CustomGameForm(mode: .createPreferredSetting)
-                        .navigationTitle("New preferred setting")
-                        .navigationBarTitleDisplayMode(.inline)
+                    CustomGameForm(
+                        initialChallenge: settingBeingEdited,
+                        mode: .editPreferredSetting(original: settingBeingEdited)
+                    )
+                    .navigationTitle("Edit preferred setting")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
             }
             .toolbar {

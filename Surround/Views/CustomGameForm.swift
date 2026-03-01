@@ -790,11 +790,6 @@ struct CustomGameForm: View {
         }
         .toolbar {
             if isPreferredSettingMode {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) {
-                        dismiss()
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     if self.editPreferredSettingCancellable != nil || self.createPreferredSettingCancellable != nil {
                         ProgressView()
