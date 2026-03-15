@@ -740,13 +740,7 @@ struct CustomGameForm: View {
             ScrollView {
                 scrollContent
             }
-            .apply {
-                if #available(iOS 16.0, *) {
-                    $0.scrollDismissesKeyboard(.interactively)
-                } else {
-                    $0
-                }
-            }
+            .scrollDismissesKeyboard(.interactively)
         }
         .modifier(ChangeHandlersBase(
             challenge: $challenge,

@@ -20,16 +20,10 @@ struct Stone: View {
                 case .black:
                     if shadowRadius > 0 {
                         ZStack {
-                            if #available(iOS 18, *) {
-                                Path(path).fill(
-                                    Color(red: 0.6, green: 0.6, blue: 0.6)
-                                        .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                                ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            } else {
-                                Path(path).fill(Color.black).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                                Path(path).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                                    .clipShape(Circle())
-                            }
+                            Path(path).fill(
+                                Color(red: 0.6, green: 0.6, blue: 0.6)
+                                    .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                            ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
                         }
                     } else {
                         Circle().fill(Color.black)
@@ -37,16 +31,10 @@ struct Stone: View {
                 case .white:
                     ZStack {
                         if shadowRadius > 0 {
-                            if #available(iOS 18, *) {
-                                Path(path).fill(
-                                    Color.white
-                                        .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                                ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                            } else {
-                                Path(path).fill(Color(red: 0.75, green: 0.75, blue: 0.75)).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
-                                Path(path).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                                    .clipShape(Circle())
-                            }
+                            Path(path).fill(
+                                Color.white
+                                    .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                            ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
                         } else {
                             Circle().fill(Color.white)
                         }

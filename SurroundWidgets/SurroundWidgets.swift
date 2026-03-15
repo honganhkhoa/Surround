@@ -451,12 +451,7 @@ struct SurroundWidgets_Previews: PreviewProvider {
                     )
                 )
                 .previewContext(WidgetPreviewContext(family: family))
-                
-                if #available(iOSApplicationExtension 17.0, *) {
-                    widget.padding(-16)
-                } else {
-                    widget
-                }
+                widget.padding(-16)
             }
             let widget = CorrespondenceGamesWidgetView(
                 entry: CorrespondenceGamesEntry(
@@ -465,11 +460,7 @@ struct SurroundWidgets_Previews: PreviewProvider {
                     noGamesMessage: "You don't have any correspondence games at the moment."
                 )
             ).previewContext(WidgetPreviewContext(family: .systemMedium))
-            if #available(iOSApplicationExtension 17.0, *) {
-                widget.padding(-16)
-            } else {
-                widget
-            }
+            widget.padding(-16)
         }
     }
 }

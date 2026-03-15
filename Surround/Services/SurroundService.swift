@@ -103,11 +103,6 @@ class SurroundService: NSObject, ObservableObject {
                 "pushSettings": pushSettings,
                 "deviceModelIdentifier": self.deviceModelIdentifier()
             ]
-            if let receiptData = self.receiptData() {
-                if userDefaults[.lastSentReceiptData] != receiptData {
-                    parameters["receiptData"] = receiptData
-                }
-            }
             if let ogsCsrfCookie = userDefaults[.ogsCsrfCookie] {
                 parameters["ogsCsrfCookie"] = ogsCsrfCookie
             }
@@ -348,17 +343,6 @@ class SurroundService: NSObject, ObservableObject {
             self.processingProductIds.removeAll()
             self.processingTransaction = false
         }
-    }
-    
-    func receiptData() -> String? {
-        if #unavailable(iOS 18.0) {
-            if let receiptURL = Bundle.main.appStoreReceiptURL,
-               FileManager.default.fileExists(atPath: receiptURL.path) {
-                let receiptData = try? Data(contentsOf: receiptURL, options: .alwaysMapped)
-                return receiptData?.base64EncodedString(options: [])
-            }
-        }
-        return nil
     }
     
     private func supporterRenewalInfoJSONString() async -> String? {

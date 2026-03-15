@@ -231,7 +231,7 @@ struct HomeView: View {
 
     var shouldShowSettingsButton: Bool {
         #if os(iOS)
-        if #available(iOS 18.0, *), let tabBarPlacement {
+        if let tabBarPlacement {
             return tabBarPlacement != .sidebar
         }
         return horizontalSizeClass == .compact

@@ -207,10 +207,6 @@ struct Stones: View {
         let whiteEstimatedScore = CGMutablePath()
         let blackEstimatedScore = CGMutablePath()
 
-        let whiteShadowPath1 = CGMutablePath()
-        let whiteShadowPath2 = CGMutablePath()
-        let blackShadowPath1 = CGMutablePath()
-        let blackShadowPath2 = CGMutablePath()
         let drawsShadow = size >= 14
         let shadowOffset: CGFloat = size > 30 ? 2 : 1
         
@@ -230,27 +226,12 @@ struct Stones: View {
                         }
                     } else {
                         if stoneColor == .white {
-                            if drawsShadow {
-                                // Separate shadows of adjacent stones
-                                if (row + column) % 2 == 0 {
-                                    whiteShadowPath1.addEllipse(in: stoneRect)
-                                } else {
-                                    whiteShadowPath2.addEllipse(in: stoneRect)
-                                }
-                            }
                             whiteLivingPath.addEllipse(in: stoneRect)
                             
-                            // New drawing method on iOS 18+, needs 4 paths to avoid drawing adjacent
-                            // (orthogonally and diagonally) stones in the same path.
+                            // Needs 4 paths to avoid drawing adjacent (orthogonally and diagonally)
+                            // stones in the same path.
                             whitePaths[(row % 2) * 2 + (column % 2)].addEllipse(in: stoneRect)
                         } else {
-                            if drawsShadow {
-                                if (row + column) % 2 == 0 {
-                                    blackShadowPath1.addEllipse(in: stoneRect)
-                                } else {
-                                    blackShadowPath2.addEllipse(in: stoneRect)
-                                }
-                            }
                             blackLivingPath.addEllipse(in: stoneRect)
                             blackPaths[(row % 2) * 2 + (column % 2)].addEllipse(in: stoneRect)
                         }
@@ -292,37 +273,18 @@ struct Stones: View {
         
         return ZStack {
             if drawsShadow {
-                if #available(iOS 18, *) {
-                    ForEach(whitePaths, id:\.self) { path in
-                        Path(path).fill(
-                            Color.white
-                                .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                        ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
-                    }
-                } else {
-                    Path(whiteLivingPath).fill(Color(red: 0.75, green: 0.75, blue: 0.75))
-                        .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                    Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
-                    Path(whiteShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                        .clipShape(Path(whiteShadowPath1))
-                    Path(whiteShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color.white, radius: size / 4, x: -size / 4, y: -size / 4)
-                        .clipShape(Path(whiteShadowPath2))
+                ForEach(whitePaths, id:\.self) { path in
+                    Path(path).fill(
+                        Color.white
+                            .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                    ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
                 }
 
-                if #available(iOS 18, *) {
-                    ForEach(blackPaths, id:\.self) { path in
-                        Path(path).fill(
-                            Color(red: 0.6, green: 0.6, blue: 0.6)
-                                .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                        ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
-                    }
-                } else {
-                    Path(blackLivingPath).fill(Color.black)
-                        .shadow(radius: 2, x: shadowOffset, y:shadowOffset)
-                    Path(blackShadowPath1).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                        .clipShape(Path(blackShadowPath1))
-                    Path(blackShadowPath2).fill(Color(UIColor(white: 1, alpha: 0.01))).shadow(color: Color(red: 0.45, green: 0.45, blue: 0.45), radius: size / 4, x: -size / 4, y: -size / 4)
-                        .clipShape(Path(blackShadowPath2))
+                ForEach(blackPaths, id:\.self) { path in
+                    Path(path).fill(
+                        Color(red: 0.6, green: 0.6, blue: 0.6)
+                            .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
+                    ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
                 }
             } else {
                 Path(whiteLivingPath).fill(Color.white)
