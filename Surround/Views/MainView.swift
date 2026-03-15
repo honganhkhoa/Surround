@@ -73,7 +73,7 @@ struct MainView: View {
             }
         }
     }
-        
+
     var body: some View {
         if firstLaunch {
             DispatchQueue.main.async {
@@ -102,6 +102,16 @@ struct MainView: View {
                         RootView.privateMessages.navigationView
                     }
                 }
+                TabSection("Surround") {
+                    Tab(RootView.settings.title, systemImage: RootView.settings.systemImage, value: RootView.settings) {
+                        RootView.settings.navigationView
+                    }
+                    Tab(RootView.about.title, systemImage: RootView.about.systemImage, value: RootView.about) {
+                        RootView.about.navigationView
+                    }
+                }
+                .hidden(horizontalSizeClass == .compact)
+                .defaultVisibility(.hidden, for: .tabBar)
                 TabSection("OGS") {
                     Tab(RootView.browser.title, systemImage: RootView.browser.systemImage, value: RootView.browser) {
                         RootView.browser.navigationView

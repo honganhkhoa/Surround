@@ -691,7 +691,6 @@ class OGSService: ObservableObject {
                     }
                 case .failure(let error):
                     print(error)
-                    print("xxx")
                     promise(.failure(error))
                 }
             }

@@ -54,6 +54,8 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<key>LSSupportsGameMode</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

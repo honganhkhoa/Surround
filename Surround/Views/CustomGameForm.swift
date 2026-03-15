@@ -718,7 +718,7 @@ struct CustomGameForm: View {
             rulesOptions
             otherOptions
             actionButton
-            if !isEditingPreferredSetting {
+            if !isPreferredSettingMode {
                 previewSection
             }
             // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.

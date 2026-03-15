@@ -12,6 +12,7 @@ import DictionaryCoding
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.tabBarPlacement) private var tabBarPlacement
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
@@ -110,6 +111,7 @@ struct HomeView: View {
                         }
                         .font(.body.bold())
                         .padding()
+                        .padding(.leading, 10)
                         .tint(.mint)
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
@@ -226,6 +228,17 @@ struct HomeView: View {
             })
         }
     }
+
+    var shouldShowSettingsButton: Bool {
+        #if os(iOS)
+        if #available(iOS 18.0, *), let tabBarPlacement {
+            return tabBarPlacement != .sidebar
+        }
+        return horizontalSizeClass == .compact
+        #else
+        return true
+        #endif
+    }
         
     var body: some View {
         if let currentActiveGame = nav.home.activeGame {
@@ -245,8 +258,10 @@ struct HomeView: View {
         .toolbar {
             if (ogs.isLoggedIn) {
                 ToolbarItemGroup(placement: .navigationBarLeading) {
-                    Button(action: { nav.home.showingSettings = true }) {
-                        Label("Settings", systemImage: "gearshape")
+                    if shouldShowSettingsButton {
+                        Button(action: { nav.home.showingSettings = true }) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                     }
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {

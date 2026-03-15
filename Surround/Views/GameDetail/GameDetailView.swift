@@ -334,6 +334,7 @@ struct GameDetailView: View {
                         }
                     }
                 }
+                .toolbar(zenMode ? .hidden : .automatic, for: .tabBar)
             )
         }
     }

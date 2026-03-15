@@ -147,6 +147,24 @@
             "state" : "new",
             "value" : "**%1$@:** %2$@"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%1$@:** %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%1$@：** %2$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%1$@:** %2$@"
+          }
         }
       }
     },
@@ -946,6 +964,24 @@
             "state" : "new",
             "value" : "%1$@%2$@"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
         }
       }
     },
@@ -1726,6 +1762,24 @@
             "state" : "new",
             "value" : "%1$lld×%2$lld %3$@"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld×%2$lld %3$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld×%2$lld %3$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld×%2$lld %3$@"
+          }
         }
       }
     },
@@ -2405,7 +2459,26 @@
       }
     },
     "Add your preferred game settings to create a game with the exact settings you want faster." : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez vos paramètres de partie préférés pour créer plus rapidement une partie avec les réglages exacts que vous voulez."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく使う対局設定を追加しておくと、希望どおりの設定でより素早く対局を作成できます。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thêm các tuỳ chọn ván ưa thích để tạo ván mới nhanh hơn với đúng thiết lập bạn muốn."
+          }
+        }
+      }
     },
     "Advanced rules settings" : {
       "localizations" : {
@@ -4140,7 +4213,26 @@
       }
     },
     "Create open challenge" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer un défi ouvert"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開対局要請を作成"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo thách đấu mở"
+          }
+        }
+      }
     },
     "Currently, **Surround** only supports a small subset of features on OGS, and I plan to implement support for more features gradually. Following the spirit of OGS, most features are available for free, but I would really appreciate if you decide to support the development of the app." : {
       "localizations" : {
@@ -4417,7 +4509,26 @@
       }
     },
     "Edit preferred setting" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier le paramètre préféré"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく使う設定を編集"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa tuỳ chọn ưa thích"
+          }
+        }
+      }
     },
     "Error: Cannot load Supporter information at the moment." : {
       "localizations" : {
@@ -5850,7 +5961,26 @@
       }
     },
     "New preferred setting" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau paramètre préféré"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく使う設定を追加"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn ưa thích mới"
+          }
+        }
+      }
     },
     "New Zealand" : {
       "comment" : "rules name",
@@ -6170,7 +6300,26 @@
       }
     },
     "OGS" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS"
+          }
+        }
+      }
     },
     "Online-go.com Account" : {
       "localizations" : {
@@ -6530,7 +6679,26 @@
       }
     },
     "Preferred Settings" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres préférés"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく使う設定"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn ưa thích"
+          }
+        }
+      }
     },
     "Preview" : {
       "extractionState" : "stale",
@@ -6825,7 +6993,26 @@
       }
     },
     "Rengo" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo"
+          }
+        }
+      }
     },
     "Rengo (%@)" : {
       "localizations" : {
@@ -7115,7 +7302,26 @@
       }
     },
     "Save" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lưu"
+          }
+        }
+      }
     },
     "Say hi!" : {
       "localizations" : {
@@ -9694,9 +9900,6 @@
         }
       }
     },
-    "xxx" : {
-
-    },
     "You" : {
       "localizations" : {
         "fr" : {
@@ -9816,10 +10019,48 @@
       }
     },
     "You play as Black" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous jouez les noirs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたは黒番です"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn chơi quân Đen"
+          }
+        }
+      }
     },
     "You play as White" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous jouez les blancs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたは白番です"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn chơi quân Trắng"
+          }
+        }
+      }
     },
     "Your color" : {
       "localizations" : {
