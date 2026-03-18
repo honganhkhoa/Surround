@@ -117,8 +117,6 @@ struct MainView: View {
                         RootView.browser.navigationView
                     }
                 }
-                .hidden(horizontalSizeClass == .compact)
-                .defaultVisibility(.hidden, for: .tabBar)
             }
             .tabViewStyle(.sidebarAdaptable)
             .fullScreenCover(isPresented: Binding(

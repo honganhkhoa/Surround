@@ -81,7 +81,6 @@ struct OGSBrowserView: View {
                     Image(systemName: "arrow.clockwise")
                 }))
         .navigationTitle(title ?? "")
-        .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: Binding(
             // Using a simple `$showsGoogleLogin` here is not sufficient, as
             // `googleLoginURL` will sometimes be nil if no-one is looking...

@@ -280,6 +280,25 @@ struct CustomGameForm: View {
         return label
     }
     
+    var opponentRankOptions: some View {
+        Group {
+            Toggle(isOn: $rankRestricted.animation()) {
+                Text("Restrict opponent rank")
+                    .font(.subheadline)
+            }
+            if rankRestricted {
+                Stepper(value: $minRank, in: rankRestrictionRange) {
+                    Text("From **\(RankUtils.formattedRank(Double(minRank), longFormat: true))**", comment: "Custom game rank restriction")
+                        .font(.subheadline)
+                }
+                Stepper(value: $maxRank, in: rankRestrictionRange) {
+                    Text("To **\(RankUtils.formattedRank(Double(maxRank), longFormat: true))**", comment: "Custom game rank restriction")
+                        .font(.subheadline)
+                }
+            }
+        }
+    }
+    
     var opponentOptions: some View {
         GroupBox(label: Text("Opponent")) {
             if !isPreferredSettingMode {
@@ -292,20 +311,7 @@ struct CustomGameForm: View {
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
                     Divider()
-                    Toggle(isOn: $rankRestricted.animation()) {
-                        Text("Restrict opponent rank")
-                            .font(.subheadline)
-                    }
-                    if rankRestricted {
-                        Stepper(value: $minRank, in: rankRestrictionRange) {
-                            Text("From **\(RankUtils.formattedRank(Double(minRank), longFormat: true))**", comment: "Custom game rank restriction")
-                                .font(.subheadline)
-                        }
-                        Stepper(value: $maxRank, in: rankRestrictionRange) {
-                            Text("To **\(RankUtils.formattedRank(Double(maxRank), longFormat: true))**", comment: "Custom game rank restriction")
-                                .font(.subheadline)
-                        }
-                    }
+                    opponentRankOptions
                 } else {
                     Text("Send a challenge directly to a friend (or a specific player) so they can accept to start a game.")
                         .font(.subheadline)
@@ -346,6 +352,8 @@ struct CustomGameForm: View {
                     }
                 }
                 Divider()
+            } else {
+                opponentRankOptions
             }
             Toggle(isOn: Binding ( get: { handicap == -1 }, set: { handicap = ($0 ? -1 : 0) })) {
                 Text("Automatically decide handicap").font(.subheadline)
