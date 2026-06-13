@@ -693,6 +693,7 @@
       }
     },
     "**Custom** komi: **%lf**" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -759,6 +760,7 @@
       }
     },
     "**Standard** komi: **%lf**" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4913,6 +4915,7 @@
       }
     },
     "Game starts automatically when there are **%@** players." : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5018,6 +5021,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cài đặt chung"
+          }
+        }
+      }
+    },
+    "Google Account" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte Google"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Googleアカウント"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài khoản Google"
           }
         }
       }
@@ -5784,6 +5809,7 @@
       }
     },
     "Move %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -6384,6 +6410,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở bằng trình duyệt"
+          }
+        }
+      }
+    },
+    "Open OGS Account Settings" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les paramètres du compte OGS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSアカウント設定を開く"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở cài đặt tài khoản OGS"
           }
         }
       }
@@ -7015,6 +7063,7 @@
       }
     },
     "Rengo (%@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7568,6 +7617,28 @@
         }
       }
     },
+    "Signing in to Surround with Google is currently not supported. To use this OGS account in Surround, please open OGS Account Settings on the web (https://online-go.com/settings/account) and either add a password or link another sign-in method. Then return to Surround and sign in with that method instead." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connexion à Surround avec Google n’est actuellement pas prise en charge. Pour utiliser ce compte OGS dans Surround, ouvrez les paramètres du compte OGS sur le web (https://online-go.com/settings/account), puis ajoutez un mot de passe ou associez une autre méthode de connexion. Revenez ensuite dans Surround et connectez-vous avec cette méthode."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GoogleでSurroundにサインインすることは現在サポートされていません。このOGSアカウントをSurroundで使うには、WebのOGSアカウント設定（https://online-go.com/settings/account）を開き、パスワードを追加するか別のサインイン方法をリンクしてください。その後Surroundに戻り、その方法でサインインしてください。"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tại Surround chưa hỗ trợ đăng nhập bằng Google. Để dùng tài khoản OGS này trong Surround, vui lòng mở phần Cài đặt tài khoản OGS trên web (https://online-go.com/settings/account), rồi thêm mật khẩu hoặc liên kết một phương thức đăng nhập khác. Sau đó quay lại Surround và đăng nhập bằng phương thức đó."
+          }
+        }
+      }
+    },
     "Simple" : {
       "comment" : "TimeControl system name\nTimeControl system name - shorter",
       "localizations" : {
@@ -7592,6 +7663,7 @@
       }
     },
     "Standard 1v1 (%@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -9216,6 +9288,7 @@
       }
     },
     "Waiting (%@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
