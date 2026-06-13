@@ -26,42 +26,44 @@ struct ActiveGamesCarousel: View {
     var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
 
     func gameCell(game: Game) -> some View {
-        VStack(alignment: .trailing) {
-            ZStack(alignment: .center) {
-                if game.gamePhase == .stoneRemoval {
-                    Color(UIColor.systemOrange).cornerRadius(3)
-                } else if game.clock?.currentPlayerId == ogs.user?.id {
-                    Color(UIColor.systemTeal).cornerRadius(3)
-                } else {
-                    if colorScheme == .dark {
-                        Color(UIColor.systemGray5)
+        Button(action: {
+            withAnimation {
+                discardNextScrollTarget = true
+                currentGame.wrappedValue = game
+                scrollTarget = currentGame.wrappedValue?.ID
+            }
+        }) {
+            VStack(alignment: .trailing) {
+                ZStack(alignment: .center) {
+                    if game.gamePhase == .stoneRemoval {
+                        Color(UIColor.systemOrange).cornerRadius(3)
+                    } else if game.clock?.currentPlayerId == ogs.user?.id {
+                        Color(UIColor.systemTeal).cornerRadius(3)
                     } else {
-                        Color(UIColor.systemBackground)
-                    }
-                }
-                BoardView(boardPosition: game.currentPosition)
-                    .frame(width: cellSize, height: cellSize)
-                    .padding(.horizontal, 5)
-                    .onTapGesture {
-                        withAnimation {
-                            discardNextScrollTarget = true
-                            currentGame.wrappedValue = game
-                            scrollTarget = currentGame.wrappedValue?.ID
+                        if colorScheme == .dark {
+                            Color(UIColor.systemGray5)
+                        } else {
+                            Color(UIColor.systemBackground)
                         }
                     }
-                if game.ID == currentGame.wrappedValue?.ID {
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                        .padding(1)
-                        .foregroundColor(Color(UIColor.label))
-                        .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
+                    BoardView(boardPosition: game.currentPosition)
+                        .frame(width: cellSize, height: cellSize)
+                        .padding(.horizontal, 5)
+                    if game.ID == currentGame.wrappedValue?.ID {
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                            .padding(1)
+                            .foregroundColor(Color(UIColor.label))
+                            .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
+                    }
                 }
+                .frame(width: cellSize + selectionRingPadding * 2, height: cellSize + selectionRingPadding * 2)
             }
-            .frame(width: cellSize + selectionRingPadding * 2, height: cellSize + selectionRingPadding * 2)
+            .padding(.horizontal, selectionRingPadding / 2)
         }
-        .padding(.horizontal, selectionRingPadding / 2)
+        .buttonStyle(.plain)
         .id(game.ID)
-        .onChange(of: currentGame.wrappedValue) {
+        .onChange(of: currentGame.wrappedValue) { _, _ in
             self.renderedCurrentGame.send(game == currentGame.wrappedValue)
         }
         .contentShape(Rectangle())

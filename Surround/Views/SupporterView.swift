@@ -97,7 +97,7 @@ struct SupporterView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if sgs.processingTransaction {
                     ProgressView()
                 } else {

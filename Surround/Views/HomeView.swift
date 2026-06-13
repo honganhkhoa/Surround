@@ -106,9 +106,10 @@ struct HomeView: View {
                             }.padding()
                             Spacer()
                         }
-                        Button(action: { nav.home.showingPreferredSettings = true }) {
-                            Image(systemName: "star.square.on.square")
+                        Button("Preferred Settings", systemImage: "star.square.on.square") {
+                            nav.home.showingPreferredSettings = true
                         }
+                        .labelStyle(.iconOnly)
                         .font(.body.bold())
                         .padding()
                         .padding(.leading, 10)
@@ -129,10 +130,10 @@ struct HomeView: View {
                         if ogs.liveGames.count > 0 {
                             Section(header: sectionHeader(title: String(localized: "Live games", comment: "Homeview"))) {
                                 ForEach(ogs.liveGames) { game in
-                                    GameCell(game: game, displayMode: displayMode)
-                                    .onTapGesture {
-                                        showGameDetail(game: game)
+                                    Button(action: { showGameDetail(game: game) }) {
+                                        GameCell(game: game, displayMode: displayMode)
                                     }
+                                    .buttonStyle(.plain)
                                     .padding(.vertical, displayMode == .full ? nil : 0)
                                     .padding(.horizontal)
                                 }
@@ -140,10 +141,10 @@ struct HomeView: View {
                         }
                         Section(header: sectionHeader(title: String(localized: "Your move", comment: "Homeview"))) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesOnUserTurn) { game in
-                                GameCell(game: game, displayMode: displayMode)
-                                .onTapGesture {
-                                    showGameDetail(game: game)
+                                Button(action: { showGameDetail(game: game) }) {
+                                    GameCell(game: game, displayMode: displayMode)
                                 }
+                                .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }
@@ -156,10 +157,10 @@ struct HomeView: View {
                         }
                         Section(header: sectionHeader(title: String(localized: "Waiting for opponents/teammates", comment: "Homeview"))) {
                             ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
-                                GameCell(game: game, displayMode: displayMode)
-                                .onTapGesture {
-                                    self.showGameDetail(game: game)
+                                Button(action: { showGameDetail(game: game) }) {
+                                    GameCell(game: game, displayMode: displayMode)
                                 }
+                                .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }
@@ -257,14 +258,14 @@ struct HomeView: View {
         }
         .toolbar {
             if (ogs.isLoggedIn) {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
                     if shouldShowSettingsButton {
                         Button(action: { nav.home.showingSettings = true }) {
                             Label("Settings", systemImage: "gearshape")
                         }
                     }
                 }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
                         Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
                         Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
@@ -290,7 +291,7 @@ struct HomeView: View {
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
-            NavigationView {
+            NavigationStack {
                 NewGameView()
                     .navigationTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)

@@ -124,7 +124,7 @@ struct MainView: View {
                                 set: { if !$0 { nav.main.modalLiveGame = nil } })
             ) {
                 ZStack(alignment: .top) {
-                    NavigationView {
+                    NavigationStack {
                         GameDetailView(currentGame: nav.main.modalLiveGame)
                             .toolbar {
                                 ToolbarItem(placement: .cancellationAction) {
@@ -142,7 +142,7 @@ struct MainView: View {
                 .environmentObject(nav)
             }
             .sheet(isPresented: $nav.main.showWaitingGames) {
-                NavigationView {
+                NavigationStack {
                     WaitingGamesView()
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {

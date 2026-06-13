@@ -208,7 +208,7 @@ struct GameDetailView: View {
                 Color.white.edgesIgnoringSafeArea(.bottom)
         )
         .sheet(isPresented: self.$showSettings) {
-            NavigationView {
+            NavigationStack {
                 VStack {
                     GameplaySettings()
                     Spacer()
@@ -270,7 +270,7 @@ struct GameDetailView: View {
         if compactLayout {
             return AnyView(
                 result.toolbar {
-                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
                             HStack {
                                 if !analyzeMode {
@@ -295,7 +295,7 @@ struct GameDetailView: View {
         } else {
             return AnyView(
                 result.toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Toggle(isOn: $analyzeMode.animation()) {
                             if currentGame.analysisAvailable {
                                 Label("Toggle analyze mode", systemImage: "arrow.triangle.branch")
@@ -306,7 +306,7 @@ struct GameDetailView: View {
                             }
                         }
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Toggle(isOn: Binding<Bool>(
                             get: { showsActiveGamesCarouselSetting.wrappedValue },
                             set: { newValue in
@@ -322,13 +322,13 @@ struct GameDetailView: View {
                         }
                         .disabled(!shouldShowActiveGamesCarousel)
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button(action: enterZenMode) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
                         .disabled(analyzeMode)
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button(action: { self.showSettings = true }) {
                             Label("Options", systemImage: "gearshape.2")
                         }

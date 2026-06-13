@@ -138,7 +138,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showSupporterView) {
-            NavigationView {
+            NavigationStack {
                 SupporterView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {

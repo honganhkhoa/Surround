@@ -216,7 +216,7 @@ struct RootViewSwitchingMenu: ViewModifier {
         #endif
         
         return content.toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Section {
                         RootView.home.menuButton(currentView: $nav.main.rootView)

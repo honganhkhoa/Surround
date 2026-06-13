@@ -20,11 +20,11 @@ struct PublicGamesList: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
                     ForEach(ogs.sortedPublicGames) { game in
-                        GameCell(game: game)
-                            .onTapGesture {
-                                nav.publicGames.activeGame = game
-                            }
-                            .padding()
+                        Button(action: { nav.publicGames.activeGame = game }) {
+                            GameCell(game: game)
+                        }
+                        .buttonStyle(.plain)
+                        .padding()
                     }
                 }
                 .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
