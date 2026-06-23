@@ -199,7 +199,8 @@ struct SingleGameView: View {
                         clock: game.clock,
                         player: currentPlayerColor,
                         pauseControl: game.pauseControl,
-                        showsPauseReason: true
+                        showsPauseReason: true,
+                        gameFinished: game.gamePhase == .finished
                     )
                 }
             }
