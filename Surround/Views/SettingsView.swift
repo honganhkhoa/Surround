@@ -7,6 +7,7 @@
 
 import SwiftUI
 import URLImage
+import UserNotifications
 
 struct SettingsView: View {
     @EnvironmentObject var ogs: OGSService
@@ -16,6 +17,28 @@ struct SettingsView: View {
     @State var showSupporterView = false
     @State var hidesRank: Bool = Setting(.hidesRank).wrappedValue
     
+    func requestLocalNotificationAuthorization() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print(error)
+            } else {
+                print("Local notifications permission granted: \(granted)")
+            }
+        }
+    }
+
+    func widgetNotificationBinding(_ key: SettingKey<Bool>) -> Binding<Bool> {
+        Binding(
+            get: { userDefaults[key] ?? false },
+            set: { newValue in
+                userDefaults[key] = newValue
+                if newValue {
+                    requestLocalNotificationAuthorization()
+                }
+            }
+        )
+    }
+
     var accountSettings: some View {
         Group {
             if let user = ogs.user {
@@ -152,6 +175,18 @@ struct SettingsView: View {
             .environmentObject(ogs)
         }
     }
+
+    var widgetSettings: some View {
+        GroupBox(label: Text("Widget")) {
+            GroupBox(label: Text("Send a notification on...")) {
+                Toggle(String(localized: "My turn", comment: "Correspondence games notification setting"), isOn: widgetNotificationBinding(.widgetNotificationOnUserTurn))
+                Toggle(String(localized: "Time running low", comment: "Correspondence games notification setting"), isOn: widgetNotificationBinding(.widgetNotificationOnTimeRunningOut))
+                Toggle(String(localized: "A game starts", comment: "Correspondence games notification setting"), isOn: widgetNotificationBinding(.widgetNotificationOnNewGame))
+                Toggle(String(localized: "A game ends", comment: "Correspondence games notification setting"), isOn: widgetNotificationBinding(.widgetNotificationOnGameEnd))
+            }
+        }
+        .padding(.horizontal)
+    }
     
     var body: some View {
         ScrollView {
@@ -171,6 +206,7 @@ struct SettingsView: View {
                 generalSettings
                 GameplaySettings(withDemoOption: true)
                 notificationSettings
+                widgetSettings
             }
             .frame(maxWidth: 600)
         }

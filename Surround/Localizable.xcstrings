@@ -9929,6 +9929,9 @@
         }
       }
     },
+    "Widget" : {
+
+    },
     "Width" : {
       "localizations" : {
         "fr" : {

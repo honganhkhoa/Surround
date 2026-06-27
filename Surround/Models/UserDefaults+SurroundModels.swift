@@ -210,6 +210,22 @@ extension SettingKey {
     static var notificationOnChallengeReceived: SettingKey<Bool> {
         return .init(name: "notification.onChallengeReceived", defaultValue: true)
     }
+
+    static var widgetNotificationOnUserTurn: SettingKey<Bool> {
+        return .init(name: "widgetNotification.onUserTurn", defaultValue: true)
+    }
+
+    static var widgetNotificationOnTimeRunningOut: SettingKey<Bool> {
+        return .init(name: "widgetNotification.onTimeRunningOut", defaultValue: true)
+    }
+
+    static var widgetNotificationOnNewGame: SettingKey<Bool> {
+        return .init(name: "widgetNotification.onNewGame", defaultValue: true)
+    }
+
+    static var widgetNotificationOnGameEnd: SettingKey<Bool> {
+        return .init(name: "widgetNotification.onGameEnd", defaultValue: true)
+    }
     
     static var hidesRank: SettingKey<Bool> {
         return .init(name: "hidesRank", defaultValue: false)
