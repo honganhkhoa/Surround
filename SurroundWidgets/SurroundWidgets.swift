@@ -162,7 +162,7 @@ class Provider: TimelineProvider {
             let nextReloadDate = currentDate.advanced(by: 15 * 60)
 
             if let oldOverviewData = userDefaults[.latestOGSOverview], let overviewData = overviewData {
-                SurroundNotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, completionHandler: { _ in
+                SurroundNotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, settingsProfile: .widget, completionHandler: { _ in
                     if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
                         completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                     }

@@ -15,10 +15,70 @@ import BackgroundTasks
 class SurroundNotificationService {
     static let shared = SurroundNotificationService()
     
+    enum NotificationSettingsProfile {
+        case push
+        case widget
+
+        var isEnabled: Bool {
+            switch self {
+            case .push:
+                return userDefaults[.notificationEnabled] == true
+            case .widget:
+                let widgetSettings: [SettingKey<Bool>] = [
+                    .widgetNotificationOnUserTurn,
+                    .widgetNotificationOnTimeRunningOut,
+                    .widgetNotificationOnNewGame,
+                    .widgetNotificationOnGameEnd
+                ]
+                return widgetSettings.contains { userDefaults[$0] == true }
+            }
+        }
+
+        var userTurnSetting: SettingKey<Bool> {
+            switch self {
+            case .push:
+                return .notificationOnUserTurn
+            case .widget:
+                return .widgetNotificationOnUserTurn
+            }
+        }
+
+        var timeRunningOutSetting: SettingKey<Bool> {
+            switch self {
+            case .push:
+                return .notificationOnTimeRunningOut
+            case .widget:
+                return .widgetNotificationOnTimeRunningOut
+            }
+        }
+
+        var newGameSetting: SettingKey<Bool> {
+            switch self {
+            case .push:
+                return .notificationOnNewGame
+            case .widget:
+                return .widgetNotificationOnNewGame
+            }
+        }
+
+        var gameEndSetting: SettingKey<Bool> {
+            switch self {
+            case .push:
+                return .notiticationOnGameEnd
+            case .widget:
+                return .widgetNotificationOnGameEnd
+            }
+        }
+    }
+
     var userId: Int? { userDefaults[.ogsUIConfig]?.user.id }
     var notificationCheckCounter = [String: Int]()
     var notificationScheduledCounter = [String: Int]()
     
+    var hasAnyWidgetNotificationsEnabled: Bool {
+        NotificationSettingsProfile.widget.isEnabled
+    }
+
     func activeOGSGamesById(from data: [String: Any]) -> [Int: Game] {
         var result = [Int: Game]()
         if let activeGamesData = data["active_games"] as? [[String: Any]] {
@@ -80,7 +140,7 @@ class SurroundNotificationService {
         }
     }
     
-    func scheduleNewMoveNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
+    func scheduleNewMoveNotificationIfNecessary(oldGame: Game, newGame: Game, setting: SettingKey<Bool>) -> Bool {
         if let userId = userId {
             let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
     //        print(oldGame.ogsID, oldGame.clock?.currentPlayerId, newGame.clock?.currentPlayerId)
@@ -90,7 +150,7 @@ class SurroundNotificationService {
                     title: String(localized: "Your turn", comment: "Notification title"),
                     message: String(localized: "It is your turn in the game with \(opponentName).", comment: "Notification body"),
                     game: newGame,
-                    setting: .notificationOnUserTurn
+                    setting: setting
                 )
                 return true
             }
@@ -98,7 +158,7 @@ class SurroundNotificationService {
         return false
     }
     
-    func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
+    func scheduleTimeRunningOutNotificationIfNecessary(oldGame: Game, newGame: Game, setting: SettingKey<Bool>) -> Bool {
         if let lastCheck = userDefaults[.latestOGSOverviewTime], let userId = userId {
             if oldGame.clock?.currentPlayerId == userId
                 && newGame.clock?.currentPlayerId == userId
@@ -114,7 +174,7 @@ class SurroundNotificationService {
                             title: String(localized: "Time running out", comment: "Notification title"),
                             message: String(localized: "You have \(12) hours to make your move in the game with \(opponentName).", comment: "Notification body"),
                             game: newGame,
-                            setting: .notificationOnTimeRunningOut
+                            setting: setting
                         )
                         return true
                     } else if lastTimeLeft > threeHours && timeLeft <= threeHours {
@@ -122,7 +182,7 @@ class SurroundNotificationService {
                             title: String(localized: "Time running out", comment: "Notification title"),
                             message: String(localized: "You have \(3) hours to make your move in the game with \(opponentName).", comment: "Notification body"),
                             game: newGame,
-                            setting: .notificationOnTimeRunningOut
+                            setting: setting
                         )
                         return true
                     }
@@ -132,7 +192,7 @@ class SurroundNotificationService {
         return false
     }
     
-    func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game) -> Bool {
+    func scheduleGameEndNotificationIfNecessary(oldGame: Game, newGame: Game, setting: SettingKey<Bool>) -> Bool {
         if newGame.gameData?.outcome != nil, let userId = userId {
             if oldGame.gameData?.outcome == nil {
                 let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
@@ -140,7 +200,7 @@ class SurroundNotificationService {
                     title: String(localized: "Game ended", comment: "Notification title"),
                     message: String(localized: "Your game with \(opponentName) has ended.", comment: "Notification body"),
                     game: newGame,
-                    setting: .notiticationOnGameEnd
+                    setting: setting
                 )
                 return true
             }
@@ -148,7 +208,7 @@ class SurroundNotificationService {
         return false
     }
     
-    func scheduleGameEndNotificationIfNecessary(oldGame: Game, completionHandler: ((Bool) -> Void)? = nil) {
+    func scheduleGameEndNotificationIfNecessary(oldGame: Game, setting: SettingKey<Bool>, completionHandler: ((Bool) -> Void)? = nil) {
         if let ogsId = oldGame.ogsID {
             AF.request("\(OGSService.ogsRoot)/api/v1/games/\(ogsId)").responseJSON { response in
                 if case .success = response.result {
@@ -158,7 +218,7 @@ class SurroundNotificationService {
                             decoder.keyDecodingStrategy = .convertFromSnakeCase
                             if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
                                 let newGame = Game(ogsGame: ogsGame)
-                                let result = self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame)
+                                let result = self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame, setting: setting)
                                 if let callback = completionHandler {
                                     callback(result)
                                 }
@@ -178,22 +238,27 @@ class SurroundNotificationService {
         }
     }
     
-    func scheduleNewGameNotificationIfNecessary(newGame: Game) -> Bool {
+    func scheduleNewGameNotificationIfNecessary(newGame: Game, setting: SettingKey<Bool>) -> Bool {
         if let userId = userId {
             let opponentName = newGame.stoneColor(ofPlayerWithId: userId) == .black ? newGame.whiteName : newGame.blackName
             self.scheduleNotification(
                 title: String(localized: "Game started", comment: "Notification title"),
                 message: String(localized: "Your game with \(opponentName) has started.", comment: "Notification body"),
                 game: newGame,
-                setting: .notificationOnNewGame
+                setting: setting
             )
             return true
         }
         return false
     }
     
-    func scheduleNotificationsIfNecessary(withOldOverviewData oldData: Data, newOverviewData newData: Data, completionHandler: ((Int) -> Void)? = nil) {
-        guard userDefaults[.notificationEnabled] == true else {
+    func scheduleNotificationsIfNecessary(
+        withOldOverviewData oldData: Data,
+        newOverviewData newData: Data,
+        settingsProfile: NotificationSettingsProfile = .push,
+        completionHandler: ((Int) -> Void)? = nil
+    ) {
+        guard settingsProfile.isEnabled else {
             if let callback = completionHandler {
                 callback(0)
             }
@@ -222,18 +287,18 @@ class SurroundNotificationService {
 //            self.scheduleNotification(title: "Test", message: "Testing...", game: newActiveGamesById.values.first!, setting: .notificationEnabled)
             for oldGame in oldActiveGamesById.values {
                 if let newGame = newActiveGamesById[oldGame.ogsID!] {
-                    if self.scheduleNewMoveNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                    if self.scheduleNewMoveNotificationIfNecessary(oldGame: oldGame, newGame: newGame, setting: settingsProfile.userTurnSetting) {
                         self.notificationScheduledCounter[sessionId]! += 1
                     }
-                    if self.scheduleTimeRunningOutNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                    if self.scheduleTimeRunningOutNotificationIfNecessary(oldGame: oldGame, newGame: newGame, setting: settingsProfile.timeRunningOutSetting) {
                         self.notificationScheduledCounter[sessionId]! += 1
                     }
-                    if self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame) {
+                    if self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, newGame: newGame, setting: settingsProfile.gameEndSetting) {
                         self.notificationScheduledCounter[sessionId]! += 1
                     }
                 } else {
                     self.notificationCheckCounter[sessionId]! += 1
-                    self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, completionHandler: { notified in
+                    self.scheduleGameEndNotificationIfNecessary(oldGame: oldGame, setting: settingsProfile.gameEndSetting, completionHandler: { notified in
                         if notified {
                             self.notificationScheduledCounter[sessionId]! += 1
                         }
@@ -244,7 +309,7 @@ class SurroundNotificationService {
             }
             for newGame in newActiveGamesById.values {
                 if oldActiveGamesById[newGame.ogsID!] == nil {
-                    if self.scheduleNewGameNotificationIfNecessary(newGame: newGame) {
+                    if self.scheduleNewGameNotificationIfNecessary(newGame: newGame, setting: settingsProfile.newGameSetting) {
                         self.notificationScheduledCounter[sessionId]! += 1
                     }
                 }
