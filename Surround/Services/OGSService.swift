@@ -910,14 +910,16 @@ class OGSService: ObservableObject {
     }
         
     func ensureConnect(thenExecute callback: (() -> ())? = nil) {
-        guard let callback else {
+        if ogsWebsocket.opened {
+            callback?()
             return
         }
-        if ogsWebsocket.opened {
-            callback()
-        } else {
+        if let callback {
             ogsWebsocket.onConnectTasks.append(callback)
         }
+        // If the socket is dead (e.g. a reconnect that got stuck), revive it so
+        // the queued callbacks actually get a chance to run.
+        ogsWebsocket.reconnectIfNeeded()
     }
     
     func disconnect(from game: Game) {

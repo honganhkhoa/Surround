@@ -51,6 +51,30 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
         }
     }
 
+    // MARK: - Reconnection state
+    //
+    // All of the reconnection bookkeeping below is only ever touched on the main
+    // queue. Delegate callbacks arrive on `websocketDelegateQueue`, so every
+    // handler hops back onto main before reading or mutating this state.
+
+    /// True while we are actively trying to (re)establish a connection. While
+    /// this is set, failed attempts schedule the next attempt instead of
+    /// dead-ending, so the socket can never get permanently stuck.
+    private var isReconnecting = false
+    /// Number of connection attempts made in the current reconnect cycle, used
+    /// to compute the backoff delay.
+    private var reconnectAttempt = 0
+    /// Fires if a connection attempt neither opens nor errors within the
+    /// timeout (e.g. the network stack isn't ready right after foregrounding).
+    private var connectWatchdog: DispatchWorkItem?
+    /// The next scheduled connection attempt, kept so we never schedule two.
+    private var pendingReconnect: DispatchWorkItem?
+    /// How long a single attempt may spend trying to open before we give up on
+    /// it and retry.
+    private let connectTimeout: TimeInterval = 15
+    /// Upper bound on the exponential backoff between attempts.
+    private let maxReconnectDelay: TimeInterval = 30
+
     private lazy var jsonEncoder = JSONEncoder()
 
     public var drift = 0.0
@@ -65,14 +89,27 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
         websocketDelegateQueue.maxConcurrentOperationCount = 1
 
         super.init()
-
-        urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: websocketDelegateQueue)
-        websocketTask = urlSession?.webSocketTask(with: websocketURL)
     }
     
     public func connect() {
-        status = .connecting
-        websocketTask?.resume()
+        DispatchQueue.main.async {
+            self.status = .connecting
+            self.isReconnecting = false
+            self.reconnectAttempt = 0
+            self.startNewConnection()
+        }
+    }
+
+    /// Kicks a reconnect if the socket is neither open nor already trying to
+    /// connect. Used as a safety net from `ensureConnect` so a dead socket is
+    /// revived instead of silently queuing callbacks forever.
+    public func reconnectIfNeeded() {
+        DispatchQueue.main.async {
+            guard !self.opened, !self.isReconnecting, self.status != .connecting else {
+                return
+            }
+            self.enterReconnecting()
+        }
     }
     
     var anonymousSession: Session? = nil
@@ -118,14 +155,17 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     }
     
     private func receiveFromWebsocket() {
+        guard let task = websocketTask else {
+            return
+        }
         print("[websocket] Listening...")
         
-        websocketTask?.receive { result in
+        task.receive { result in
             switch result {
             case .failure(let error):
                 print("[websocket] Received error: \(error)")
-                self.closeThenReconnect()
-                
+                self.handleConnectionFailure(for: task)
+
             case .success(let message):
                 switch message {
                 case .string(let text):
@@ -175,10 +215,11 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
             }
             print("[websocket] Sending \(message)")
 
-            websocketTask?.send(URLSessionWebSocketTask.Message.string(message)) { error in
+            let task = websocketTask
+            task?.send(URLSessionWebSocketTask.Message.string(message)) { error in
                 if let error {
                     print("[websocket] Sending failed: \(error)")
-                    self.closeThenReconnect()
+                    self.handleConnectionFailure(for: task)
                     if resultCallback != nil {
                         DispatchQueue.main.async { [self] in
                             callbackById.removeValue(forKey: latestCallbackId)
@@ -190,35 +231,126 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     }
     
     public func closeThenReconnect() {
-        guard status != .reconnecting else {
-            return
+        DispatchQueue.main.async {
+            self.enterReconnecting()
         }
+    }
 
-        print("[websocket] Reconnecting...")        
+    // MARK: - Reconnection engine
+
+    /// Tears down the current connection and enters (or continues) a reconnect
+    /// cycle. Safe to call repeatedly: the first call in a cycle notifies
+    /// listeners (so subscribed games are captured for reconnection) and resets
+    /// the backoff, subsequent calls just schedule the next attempt. Must be
+    /// called on the main queue.
+    private func enterReconnecting() {
+        let wasReconnecting = isReconnecting
+
+        // Tear down whatever connection or in-flight attempt we currently have.
+        connectWatchdog?.cancel()
+        connectWatchdog = nil
+        pingCancellable?.cancel()
+        pingCancellable = nil
+        opened = false
+        authenticated = false
+        websocketTask?.cancel(with: .normalClosure, reason: nil)
+        websocketTask = nil
+
         status = .reconnecting
 
-        DispatchQueue.main.async {
-            if let callback = self.serverEventCallback {
+        if !wasReconnecting {
+            isReconnecting = true
+            reconnectAttempt = 0
+            print("[websocket] Reconnecting...")
+            if let callback = serverEventCallback {
                 callback("surround/socketClosed", nil)
             }
         }
-        
-        websocketTask?.cancel(with: .normalClosure, reason: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now().advanced(by: .seconds(1))) {
-            self.urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: self.websocketDelegateQueue)
 
-            self.websocketTask = self.urlSession?.webSocketTask(with: self.websocketURL)
-            self.websocketTask?.resume()
+        scheduleNextConnectionAttempt()
+    }
+
+    /// Handles a failure reported by a delegate/completion callback. Callbacks
+    /// from tasks we've already replaced are ignored so a single failure never
+    /// triggers multiple overlapping reconnects.
+    private func handleConnectionFailure(for task: URLSessionTask?) {
+        DispatchQueue.main.async {
+            if let task, task !== self.websocketTask {
+                // Stale callback from a task we've already discarded.
+                return
+            }
+            self.enterReconnecting()
         }
     }
-    
-    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
-        status = .connected
-        opened = true
-        print("[websocket] Opened")
-        receiveFromWebsocket()
 
+    /// Schedules the next connection attempt using exponential backoff. Cancels
+    /// any previously scheduled attempt so there is only ever one in flight.
+    private func scheduleNextConnectionAttempt() {
+        pendingReconnect?.cancel()
+
+        let delay = min(pow(2.0, Double(reconnectAttempt)), maxReconnectDelay)
+        reconnectAttempt += 1
+        print("[websocket] Next connection attempt in \(Int(delay))s (attempt \(reconnectAttempt))")
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.isReconnecting else {
+                return
+            }
+            self.startNewConnection()
+        }
+        pendingReconnect = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// Creates a fresh session/task and starts connecting, arming a watchdog so
+    /// an attempt that hangs without ever opening or erroring still gets
+    /// retried. Must be called on the main queue.
+    private func startNewConnection() {
+        connectWatchdog?.cancel()
+        connectWatchdog = nil
+        websocketTask?.cancel(with: .normalClosure, reason: nil)
+
+        let session = URLSession(configuration: .default, delegate: self, delegateQueue: websocketDelegateQueue)
+        let task = session.webSocketTask(with: websocketURL)
+        urlSession = session
+        websocketTask = task
+        task.resume()
+        print("[websocket] Opening connection...")
+
+        let watchdog = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            // Only fire if this is still the current, not-yet-opened attempt.
+            guard self.websocketTask === task, !self.opened else {
+                return
+            }
+            print("[websocket] Connection attempt timed out")
+            self.enterReconnecting()
+        }
+        connectWatchdog = watchdog
+        DispatchQueue.main.asyncAfter(deadline: .now() + connectTimeout, execute: watchdog)
+    }
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         DispatchQueue.main.async { [self] in
+            guard webSocketTask === websocketTask else {
+                // A previous, superseded attempt opened late — ignore it.
+                return
+            }
+
+            connectWatchdog?.cancel()
+            connectWatchdog = nil
+            pendingReconnect?.cancel()
+            pendingReconnect = nil
+            isReconnecting = false
+            reconnectAttempt = 0
+
+            status = .connected
+            opened = true
+            print("[websocket] Opened")
+            receiveFromWebsocket()
+
             pingCancellable = Timer.publish(every: 10, on: .main, in: .common).autoconnect().sink { _ in
                 self.emit(command: "net/ping", data: ["client": Date().timeIntervalSince1970 * 1000, "drift": self.drift, "latency": self.latency])
             }
@@ -236,17 +368,14 @@ class OGSWebsocket: NSObject, URLSessionWebSocketDelegate {
     }
     
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        status = .disconnected
-        opened = false
-        print("[websocket] Closed")
+        print("[websocket] Closed with code \(closeCode.rawValue)")
+        handleConnectionFailure(for: webSocketTask)
+    }
 
-        DispatchQueue.main.async { [self] in
-            pingCancellable?.cancel()
-            pingCancellable = nil
-            authenticated = false
-            if let callback = serverEventCallback {
-                callback("surround/socketClosed", nil)
-            }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            print("[websocket] Task completed with error: \(error)")
         }
+        handleConnectionFailure(for: task)
     }
 }
