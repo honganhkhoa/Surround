@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
+		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
+		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
+		AE20000439A0000000000004 /* GameReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000439A0000000000004 /* GameReplayTests.swift */; };
+		AE20000539A0000000000005 /* OGSServiceIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */; };
+		AE20000639A0000000000006 /* OGSServiceEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000639A0000000000006 /* OGSServiceEventTests.swift */; };
+		AE20000739A0000000000007 /* OGSWebsocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000739A0000000000007 /* OGSWebsocketTests.swift */; };
+		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
 		BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */; };
@@ -285,6 +293,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		D976323208EA22A5DA84C01A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC042AEE24AB2CF40050B2D1;
+			remoteInfo = Surround;
+		};
 		BC042B0124AB2CFA0050B2D1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BC042AE724AB2CF40050B2D1 /* Project object */;
@@ -339,6 +354,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AE10000139A0000000000001 /* TimeControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeControlTests.swift; sourceTree = "<group>"; };
+		AE10000239A0000000000002 /* OGSModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSModelDecodingTests.swift; sourceTree = "<group>"; };
+		AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBehaviorTests.swift; sourceTree = "<group>"; };
+		AE10000439A0000000000004 /* GameReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameReplayTests.swift; sourceTree = "<group>"; };
+		AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceIsolationTests.swift; sourceTree = "<group>"; };
+		AE10000639A0000000000006 /* OGSServiceEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceEventTests.swift; sourceTree = "<group>"; };
+		AE10000739A0000000000007 /* OGSWebsocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocketTests.swift; sourceTree = "<group>"; };
+		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AE40B2CB2C42644F000ED564 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -472,6 +496,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		9F233A86944D7099107AE38F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BC042AEC24AB2CF40050B2D1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -533,6 +564,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3BD5D54ABE85E08FD5C1CF57 /* SurroundBetaTests */ = {
+			isa = PBXGroup;
+			children = (
+				86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */,
+			);
+			path = SurroundBetaTests;
+			sourceTree = "<group>";
+		};
 		BC042AE624AB2CF40050B2D1 = {
 			isa = PBXGroup;
 			children = (
@@ -543,6 +582,7 @@
 				BCD214D7255A946D00F78E2A /* SurroundNotificationService */,
 				BC042B0324AB2CFA0050B2D1 /* SurroundTests */,
 				BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */,
+				3BD5D54ABE85E08FD5C1CF57 /* SurroundBetaTests */,
 				BC64937825380A9F002B2200 /* Frameworks */,
 				BC042AF024AB2CF50050B2D1 /* Products */,
 			);
@@ -557,6 +597,7 @@
 				BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */,
 				BC285B2B2557FAEB005378F9 /* SurroundNotificationContent.appex */,
 				BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */,
+				78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -612,6 +653,13 @@
 				BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */,
 				BC463B0326624D5D00D40D3A /* PuzzleTests.swift */,
 				BC3ECFCD2BA7ECCE00F4E546 /* ChallengeTests.swift */,
+				AE10000139A0000000000001 /* TimeControlTests.swift */,
+				AE10000239A0000000000002 /* OGSModelDecodingTests.swift */,
+				AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */,
+				AE10000439A0000000000004 /* GameReplayTests.swift */,
+				AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */,
+				AE10000639A0000000000006 /* OGSServiceEventTests.swift */,
+				AE10000739A0000000000007 /* OGSWebsocketTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -814,6 +862,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3F5CC81EA65EBB9CA0A9545F /* SurroundBetaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 50FD47BDD2CF4FD3B6B74F50 /* Build configuration list for PBXNativeTarget "SurroundBetaTests" */;
+			buildPhases = (
+				30146F83DB3FD13F0FDF9F7C /* Sources */,
+				9F233A86944D7099107AE38F /* Frameworks */,
+				54244B2323BF0CBDE9A36E2D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				726515A0963F28B7E18E62F8 /* PBXTargetDependency */,
+			);
+			name = SurroundBetaTests;
+			productName = SurroundBetaTests;
+			productReference = 78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		BC042AEE24AB2CF40050B2D1 /* Surround */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BC042B1424AB2CFA0050B2D1 /* Build configuration list for PBXNativeTarget "Surround" */;
@@ -953,6 +1019,10 @@
 				LastSwiftUpdateCheck = 1210;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					3F5CC81EA65EBB9CA0A9545F = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = BC042AEE24AB2CF40050B2D1;
+					};
 					BC042AEE24AB2CF40050B2D1 = {
 						CreatedOnToolsVersion = 12.0;
 					};
@@ -994,18 +1064,26 @@
 			productRefGroup = BC042AF024AB2CF50050B2D1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (
-				BC042AEE24AB2CF40050B2D1 /* Surround */,
-				BC042AFF24AB2CFA0050B2D1 /* SurroundTests */,
-				BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
-				BC64937625380A9F002B2200 /* SurroundWidgetsExtension */,
-				BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */,
-				BCD214D5255A946D00F78E2A /* SurroundNotificationService */,
-			);
+				targets = (
+					BC042AEE24AB2CF40050B2D1 /* Surround */,
+					BC042AFF24AB2CFA0050B2D1 /* SurroundTests */,
+					BC042B0A24AB2CFA0050B2D1 /* SurroundUITests */,
+					BC64937625380A9F002B2200 /* SurroundWidgetsExtension */,
+					BC285B2A2557FAEB005378F9 /* SurroundNotificationContent */,
+					BCD214D5255A946D00F78E2A /* SurroundNotificationService */,
+					3F5CC81EA65EBB9CA0A9545F /* SurroundBetaTests */,
+				);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		54244B2323BF0CBDE9A36E2D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BC042AED24AB2CF40050B2D1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1118,6 +1196,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		30146F83DB3FD13F0FDF9F7C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BC042AEB24AB2CF40050B2D1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1196,6 +1282,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE20000139A0000000000001 /* TimeControlTests.swift in Sources */,
+				AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */,
+				AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */,
+				AE20000439A0000000000004 /* GameReplayTests.swift in Sources */,
+				AE20000539A0000000000005 /* OGSServiceIsolationTests.swift in Sources */,
+				AE20000639A0000000000006 /* OGSServiceEventTests.swift in Sources */,
+				AE20000739A0000000000007 /* OGSWebsocketTests.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
 				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,
@@ -1352,6 +1445,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		726515A0963F28B7E18E62F8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Surround;
+			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
+			targetProxy = D976323208EA22A5DA84C01A /* PBXContainerItemProxy */;
+		};
 		BC042B0224AB2CFA0050B2D1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = BC042AEE24AB2CF40050B2D1 /* Surround */;
@@ -1395,6 +1494,48 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		92327E5399C57F32BD7C4093 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = SurroundBetaTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.SurroundBetaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surround.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Surround";
+			};
+			name = Release;
+		};
+		C78B468058B571CA1E20D66D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = SurroundBetaTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.SurroundBetaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Surround.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Surround";
+			};
+			name = Debug;
+		};
 		BC042B1224AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1824,6 +1965,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		50FD47BDD2CF4FD3B6B74F50 /* Build configuration list for PBXNativeTarget "SurroundBetaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C78B468058B571CA1E20D66D /* Debug */,
+				92327E5399C57F32BD7C4093 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		BC042AEA24AB2CF40050B2D1 /* Build configuration list for PBXProject "Surround" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

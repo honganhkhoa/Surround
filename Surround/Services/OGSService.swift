@@ -18,6 +18,91 @@ enum OGSServiceError: Error {
     case loginError(error: String)
 }
 
+/// The HTTP and WebSocket endpoints that make up one OGS environment.
+///
+/// Pass the same value to every dependency owned by an `OGSService`. Keeping
+/// the destination explicit prevents tests and non-production clients from
+/// silently falling back to the production server. If `websocketURL` is not
+/// supplied, it is derived from `rootURL` by mapping HTTP to WS and HTTPS to
+/// WSS.
+struct OGSEnvironment: Equatable {
+    /// The origin used for REST requests and anonymous UI configuration.
+    let rootURL: URL
+
+    /// The endpoint used for the live OGS socket protocol.
+    let websocketURL: URL
+
+    /// The shipping OGS service.
+    static let production = OGSEnvironment(rootURL: URL(string: "https://online-go.com")!)
+
+    /// The isolated OGS beta service used only by opt-in integration tests.
+    static let beta = OGSEnvironment(rootURL: URL(string: "https://beta.online-go.com")!)
+
+    /// Creates an endpoint pair without validating that either URL is trusted.
+    /// Callers are responsible for supplying credential-free, expected origins.
+    init(rootURL: URL, websocketURL: URL? = nil) {
+        self.rootURL = rootURL
+        if let websocketURL {
+            self.websocketURL = websocketURL
+        } else {
+            var components = URLComponents(url: rootURL, resolvingAgainstBaseURL: false)!
+            components.scheme = rootURL.scheme == "http" ? "ws" : "wss"
+            self.websocketURL = components.url!
+        }
+    }
+}
+
+/// Supplies the Alamofire session and cookie jar used by an `OGSService`.
+///
+/// Login cookies are part of a player's identity, so the session and
+/// `cookieStorage` must come from the same URL session configuration. A
+/// multi-player test should inject a different client for every player.
+protocol OGSHTTPClient: AnyObject {
+    /// The session through which all OGS REST requests are sent.
+    var session: Session { get }
+
+    /// The session's cookie jar, used to inspect and clear OGS login cookies.
+    var cookieStorage: HTTPCookieStorage? { get }
+}
+
+/// The production `OGSHTTPClient` implementation backed by Alamofire.
+///
+/// Use `shared` for the app's historical global session. Tests and secondary
+/// OGS accounts should use a new `isolated()` instance instead.
+final class AlamofireOGSHTTPClient: OGSHTTPClient {
+    let session: Session
+    let cookieStorage: HTTPCookieStorage?
+
+    /// Preserves the app's existing shared-session and persistent-cookie behavior.
+    static let shared = AlamofireOGSHTTPClient(
+        session: .default,
+        cookieStorage: Session.default.sessionConfiguration.httpCookieStorage
+    )
+
+    init(session: Session, cookieStorage: HTTPCookieStorage?) {
+        self.session = session
+        self.cookieStorage = cookieStorage
+    }
+
+    /// Creates an ephemeral client with its own cookie jar.
+    ///
+    /// The returned client does not share authentication state with `shared`
+    /// or with other isolated clients. Create one instance per simulated
+    /// player and retain it for that player's complete session. This isolates
+    /// only HTTP state; preferences, remote settings, and sockets must also be
+    /// scoped separately.
+    static func isolated() -> AlamofireOGSHTTPClient {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = true
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        return AlamofireOGSHTTPClient(
+            session: Session(configuration: configuration),
+            cookieStorage: configuration.httpCookieStorage
+        )
+    }
+}
+
 extension OGSServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
@@ -97,11 +182,21 @@ class OGSService: ObservableObject {
         return ogs
     }
 
-    static let ogsRoot = "https://online-go.com"
+    static let ogsRoot = OGSEnvironment.production.rootURL.absoluteString
 //    static let ogsRoot = "https://beta.online-go.com"
-    private var ogsRoot = OGSService.ogsRoot
+    private let environment: OGSEnvironment
+    private var ogsRoot: String { environment.rootURL.absoluteString }
 
-    private let ogsWebsocket: OGSWebsocket
+    private let httpClient: OGSHTTPClient
+
+    /// Account-scoped configuration, session metadata, caches, and read state.
+    let preferences: UserDefaults
+    private let remoteSettingStore: OGSRemoteSetting
+    private let usesSurroundOverviewService: Bool
+    private let enablesAppSideEffects: Bool
+    private let startsTimers: Bool
+
+    private let ogsWebsocket: OGSWebsocketProtocol
     private var timerCancellable: AnyCancellable?
     private var pingCancellale: AnyCancellable?
     private var drift : Double {
@@ -112,6 +207,11 @@ class OGSService: ObservableObject {
     }
     var serverTimeOffset: Double {
         return drift - latency
+    }
+
+    /// Test-visible local authentication readiness, not a server acknowledgement.
+    var isWebsocketAuthenticated: Bool {
+        return ogsWebsocket.authenticated
     }
 
     @Published var isLoggedIn: Bool = false
@@ -164,8 +264,9 @@ class OGSService: ObservableObject {
     
     @Published private(set) public var chatMessagesByChannel = [String: [OGSChatMessage]]()
     
+    /// Account-scoped view of OGS remote settings.
     var remoteSettings: OGSRemoteSetting {
-        OGSRemoteSetting.shared
+        remoteSettingStore
     }
     @Published private(set) public var preferredGameSettings = Set<OGSChallengeTemplate>()
     
@@ -206,12 +307,84 @@ class OGSService: ObservableObject {
         self.liveGames = liveGames
         
         #if MAIN_APP
-        UNUserNotificationCenter.current().setBadgeCount(self.sortedActiveCorrespondenceGamesOnUserTurn.count)
+        if enablesAppSideEffects {
+            UNUserNotificationCenter.current().setBadgeCount(self.sortedActiveCorrespondenceGamesOnUserTurn.count)
+        }
         #endif
     }
     
-    private init(forPreview: Bool = false) {
-        ogsWebsocket = OGSWebsocket()
+    private convenience init(forPreview: Bool = false) {
+        self.init(
+            environment: .production,
+            httpClient: AlamofireOGSHTTPClient.shared,
+            preferences: userDefaults,
+            ogsWebsocket: OGSWebsocket(),
+            connectsAutomatically: !forPreview,
+            usesSurroundOverviewService: !forPreview,
+            enablesAppSideEffects: !forPreview,
+            startsTimers: !forPreview,
+            installsObservers: !forPreview,
+            remoteSettings: .shared
+        )
+    }
+
+    /// Creates an OGS service from explicitly scoped dependencies.
+    ///
+    /// This initializer is the composition point for previews, deterministic
+    /// tests, and live beta players. Production callers continue to use
+    /// `instance(forSceneWithID:)`, which supplies the app's shared services.
+    /// For a multi-player test, create a separate HTTP client, preferences
+    /// suite, remote-setting store, and WebSocket instance for every player.
+    /// Automatic connection and observers default to enabled, so deterministic
+    /// tests should explicitly disable either behavior they do not exercise.
+    ///
+    /// - Parameters:
+    ///   - environment: Destination for all REST and WebSocket traffic.
+    ///   - httpClient: Session and matching cookie jar for this identity.
+    ///   - preferences: Storage for this identity's UI configuration, cached
+    ///     overview, chat state, and session metadata. Use a unique suite in
+    ///     tests and remove its persistent domain during teardown.
+    ///   - ogsWebsocket: Socket owned by this identity. Its endpoints must
+    ///     match `environment`; the service installs its scoped authentication
+    ///     provider and event callbacks.
+    ///   - connectsAutomatically: Whether to call `connect()` during
+    ///     initialization. Deterministic tests normally disable this.
+    ///   - usesSurroundOverviewService: Whether overview loading may use the
+    ///     private Surround companion service. Keep this false for OGS-only
+    ///     tests so requests go directly to the selected environment.
+    ///   - enablesAppSideEffects: Enables app-global behavior such as device
+    ///     registration, widgets, badges, and remote-setting synchronization.
+    ///     Tests should keep this false.
+    ///   - startsTimers: Subscribes to the app clock timer to continuously
+    ///     update live game clocks. Deterministic tests normally keep this
+    ///     false and drive clock inputs themselves.
+    ///   - installsObservers: Installs the debounced model observers and runs
+    ///     the initial login check. Set this false for synchronous previews or
+    ///     narrowly scoped tests that must not initiate follow-up requests.
+    ///   - remoteSettings: Store for this identity's OGS remote settings. When
+    ///     omitted, a store scoped to `preferences` is created automatically.
+    init(
+        environment: OGSEnvironment,
+        httpClient: OGSHTTPClient,
+        preferences: UserDefaults,
+        ogsWebsocket: OGSWebsocketProtocol,
+        connectsAutomatically: Bool = true,
+        usesSurroundOverviewService: Bool = false,
+        enablesAppSideEffects: Bool = false,
+        startsTimers: Bool = false,
+        installsObservers: Bool = true,
+        remoteSettings: OGSRemoteSetting? = nil
+    ) {
+        self.environment = environment
+        self.httpClient = httpClient
+        self.preferences = preferences
+        self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
+        self.ogsWebsocket = ogsWebsocket
+        self.usesSurroundOverviewService = usesSurroundOverviewService
+        self.enablesAppSideEffects = enablesAppSideEffects
+        self.startsTimers = startsTimers
+
+        ogsWebsocket.authenticationConfigProvider = { [weak self] in self?.ogsUIConfig }
         ogsWebsocket.serverEventCallback = self.onWebsocketServerEvent(name:data:)
         ogsWebsocket.onStatusChanged = {
             DispatchQueue.main.async {
@@ -219,24 +392,29 @@ class OGSService: ObservableObject {
             }
         }
         
-        if forPreview {
-            return
+        if connectsAutomatically {
+            ogsWebsocket.connect()
         }
-        
-        ogsWebsocket.connect()
-        
-        timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { [self] _ in
-            for game in connectedGames.values {
-                if game.gameData?.outcome == nil {
-                    let isPaused = game.pauseControl?.isPaused() ?? false
-                    if game.gamePhase == .stoneRemoval || !isPaused {
-                        if let timeControlSystem = game.gameData?.timeControl.system {
-                            game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency, pauseControl: game.pauseControl)
+
+        if startsTimers {
+            timerCancellable = TimeUtilities.shared.timer.receive(on: RunLoop.main).sink { [self] _ in
+                for game in connectedGames.values {
+                    if game.gameData?.outcome == nil {
+                        let isPaused = game.pauseControl?.isPaused() ?? false
+                        if game.gamePhase == .stoneRemoval || !isPaused {
+                            if let timeControlSystem = game.gameData?.timeControl.system {
+                                game.clock?.calculateTimeLeft(with: timeControlSystem, serverTimeOffset: drift - latency, pauseControl: game.pauseControl)
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Preview instances are populated synchronously by `previewInstance`.
+        // They must not install debounced observers that can later issue real
+        // production requests for the preview's sample players.
+        guard installsObservers else { return }
         
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).receive(on: RunLoop.main).sink(receiveValue: { activeGamesValues in
             if let activeGames = activeGamesValues.last {
@@ -302,12 +480,16 @@ class OGSService: ObservableObject {
         case "surround/socketAuthenticated":
             self.autoMatchEntryById.removeAll()
             ogsWebsocket.emit(command: "automatch/list")
-            self.syncRemoteStorage()
+            if enablesAppSideEffects {
+                self.syncRemoteStorage()
+            }
         case "net/pong":
-            if let data = data as? [String: Double] {
+            if let data = data as? [String: Double],
+               let clientTime = data["client"],
+               let serverTime = data["server"] {
                 let now = Date().timeIntervalSince1970 * 1000
-                ogsWebsocket.latency = now - data["client"]!
-                ogsWebsocket.drift = (now - ogsWebsocket.latency / 2) - data["server"]!
+                ogsWebsocket.latency = now - clientTime
+                ogsWebsocket.drift = (now - ogsWebsocket.latency / 2) - serverTime
             }
         case "active_game":
             if let activeGameData = data as? [String: Any] {
@@ -387,7 +569,7 @@ class OGSService: ObservableObject {
             }
         case "move":
             if let movedata = data as? [String: Any] {
-                if let move = movedata["move"] as? [Any] {
+                if let move = movedata["move"] as? [Any], move.count >= 2 {
                     if let column = move[0] as? Int, let row = move[1] as? Int {
                         do {
                             try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
@@ -401,7 +583,7 @@ class OGSService: ObservableObject {
                         }
 
                         if let _ = self.activeGames[ogsGameId] {
-                            userDefaults[.latestOGSOverviewOutdated] = true
+                            preferences[.latestOGSOverviewOutdated] = true
                         }
                     }
                 }
@@ -450,7 +632,7 @@ class OGSService: ObservableObject {
             if let phase = OGSGamePhase(rawValue: data as? String ?? "") {
                 connectedGame.gamePhase = phase
                 if let _ = self.activeGames[ogsGameId] {
-                    userDefaults[.latestOGSOverviewOutdated] = true
+                    preferences[.latestOGSOverviewOutdated] = true
                 }
             }
         case "auto_resign":
@@ -496,23 +678,37 @@ class OGSService: ObservableObject {
     
     var ogsUIConfig: OGSUIConfig? {
         get {
-            return userDefaults[.ogsUIConfig]
+            return preferences[.ogsUIConfig]
         }
         set {
-            if newValue?.userJwt != userDefaults[.ogsUIConfig]?.userJwt {
-                Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
+            let previousConfig = preferences[.ogsUIConfig]
+            let authenticationChanged = newValue?.userJwt != previousConfig?.userJwt
+            if authenticationChanged {
                 for game in activeGames.values {
                     self.disconnect(from: game)
                 }
                 activeGames.removeAll()
-                ogsWebsocket.closeThenReconnect()
                 _gamesToBeReconnected = []
             }
-            userDefaults[.ogsUIConfig] = newValue
+
+            // Login requests have just established a fresh cookie session, so
+            // retaining those cookies is essential when switching identities.
+            // Clearing the cookie jar belongs to logout (or the beginning of a
+            // new login request), not to assigning the returned UI config.
+            if newValue == nil {
+                httpClient.cookieStorage?.removeCookies(since: Date.distantPast)
+            }
+            preferences[.ogsUIConfig] = newValue
             self.updateSessionId()
             checkLoginStatus()
+            if authenticationChanged {
+                // Reconnect after storing the config so the new socket sends
+                // the matching JWT instead of authenticating anonymously or
+                // with the previous account.
+                ogsWebsocket.closeThenReconnect()
+            }
             #if MAIN_APP
-            if isLoggedIn && (userDefaults[.notificationEnabled] == true) {
+            if enablesAppSideEffects && isLoggedIn && (preferences[.notificationEnabled] == true) {
                 UIApplication.shared.registerForRemoteNotifications()
             }
             #endif
@@ -532,13 +728,13 @@ class OGSService: ObservableObject {
     }
     
     func updateSessionId() {
-        if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: self.ogsRoot)!) {
+        if let cookies = httpClient.cookieStorage?.cookies(for: environment.rootURL) {
             for cookie in cookies {
                 if cookie.name == "sessionid" {
-                    userDefaults[.ogsSessionId] = cookie.value
+                    preferences[.ogsSessionId] = cookie.value
                 }
                 if cookie.name == "csrftoken" {
-                    userDefaults[.ogsCsrfCookie] = cookie.value
+                    preferences[.ogsCsrfCookie] = cookie.value
                 }
             }
         }
@@ -547,9 +743,14 @@ class OGSService: ObservableObject {
     func login(username: String, password: String) -> AnyPublisher<OGSUIConfig, Error> {
         let jsonDecoder = JSONDecoder()
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        // A login attempt is an authentication boundary. Clearing the old
+        // identity up front avoids leaving the UI and WebSocket authenticated
+        // as one account after the REST credentials for that account are gone.
+        self.ogsUIConfig = nil
+        self.preferences.reset(.ogsSessionId)
+        self.preferences.reset(.ogsCsrfCookie)
         return Future<Data, Error> { promise in
-            Session.default.sessionConfiguration.httpCookieStorage?.removeCookies(since: Date.distantPast)
-            AF.request("\(self.ogsRoot)/api/v0/login",
+            self.httpClient.session.request("\(self.ogsRoot)/api/v0/login",
                 method: .post,
                 parameters: ["username": username, "password": password],
                 encoder: JSONParameterEncoder.default
@@ -570,26 +771,30 @@ class OGSService: ObservableObject {
     
     func logout() {
         self.ogsUIConfig = nil
-        SurroundService.shared.unregisterDevice()
-        OGSRemoteSetting.shared.resetAllSettings()
+        if enablesAppSideEffects {
+            SurroundService.shared.unregisterDevice()
+        }
+        if enablesAppSideEffects {
+            remoteSettingStore.resetAllSettings()
+        }
         
-        userDefaults.reset(.ogsSessionId)
-        userDefaults.reset(.ogsCsrfCookie)
-        userDefaults.reset(.latestOGSOverview)
-        userDefaults.reset(.latestOGSOverviewTime)
-        userDefaults.reset(.latestOGSOverviewOutdated)
-        userDefaults.reset(.cachedOGSGames)
-        userDefaults.reset(.lastSeenChatIdByOGSGameId)
-        userDefaults.reset(.lastAutomatchEntry)
-        userDefaults.reset(.lastSeenPrivateMessageByOGSUserId)
-        userDefaults.reset(.ogsRemoteStorageLastSync)
+        preferences.reset(.ogsSessionId)
+        preferences.reset(.ogsCsrfCookie)
+        preferences.reset(.latestOGSOverview)
+        preferences.reset(.latestOGSOverviewTime)
+        preferences.reset(.latestOGSOverviewOutdated)
+        preferences.reset(.cachedOGSGames)
+        preferences.reset(.lastSeenChatIdByOGSGameId)
+        preferences.reset(.lastAutomatchEntry)
+        preferences.reset(.lastSeenPrivateMessageByOGSUserId)
+        preferences.reset(.ogsRemoteStorageLastSync)
     }
     
     func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
         let jsonDecoder = JSONDecoder()
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
         return Future<Data, Error> { promise in
-            AF.request("\(self.ogsRoot)/api/v1/ui/config").validate().responseData { response in
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/ui/config").validate().responseData { response in
                 switch response.result {
                 case .success:
                     promise(.success(response.value!))
@@ -610,7 +815,7 @@ class OGSService: ObservableObject {
             if let ogsUIConfig = self.ogsUIConfig {
                 var hasCSRFToken = false
                 var hasSessionId = false
-                if let cookies = Session.default.sessionConfiguration.httpCookieStorage?.cookies(for: URL(string: ogsRoot)!) {
+                if let cookies = httpClient.cookieStorage?.cookies(for: environment.rootURL) {
                     for cookie in cookies {
                         if cookie.name == "csrftoken" {
                             hasCSRFToken = true
@@ -620,11 +825,11 @@ class OGSService: ObservableObject {
                         }
                     }
                 }
-                if (!hasCSRFToken && ogsUIConfig.csrfToken == nil) || (!hasSessionId && userDefaults[.ogsSessionId] == nil) {
+                if (!hasCSRFToken && ogsUIConfig.csrfToken == nil) || (!hasSessionId && preferences[.ogsSessionId] == nil) {
                     return false
                 }
                 let domain = URL(string: ogsRoot)!.host!
-                if let csrfToken = userDefaults[.ogsCsrfCookie] ?? ogsUIConfig.csrfToken {
+                if let csrfToken = preferences[.ogsCsrfCookie] ?? ogsUIConfig.csrfToken {
                     if !hasCSRFToken {
                         if let cookie = HTTPCookie(properties: [
                             .name: "csrftoken",
@@ -632,12 +837,12 @@ class OGSService: ObservableObject {
                             .domain: domain,
                             .path: "/"
                         ]) {
-                            Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                            httpClient.cookieStorage?.setCookie(cookie)
                             hasCSRFToken = true
                         }
                     }
                 }
-                if let sessionId = userDefaults[.ogsSessionId] {
+                if let sessionId = preferences[.ogsSessionId] {
                     if !hasSessionId {
                         if let cookie = HTTPCookie(properties: [
                             .name: "sessionid",
@@ -645,7 +850,7 @@ class OGSService: ObservableObject {
                             .domain: domain,
                             .path: "/"
                         ]) {
-                            Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                            httpClient.cookieStorage?.setCookie(cookie)
                             hasSessionId = true
                         }
                     }
@@ -671,7 +876,7 @@ class OGSService: ObservableObject {
         }
         print("Fetching player info: \(userIds)")
         return Future<[OGSUser], Error> { promise in
-            AF.request(
+            self.httpClient.session.request(
                 "\(self.ogsRoot)/termination-api/players",
                 parameters: ["ids": userIds.map { String($0) }.joined(separator: ".")]
             ).validate().responseJSON { response in
@@ -759,7 +964,7 @@ class OGSService: ObservableObject {
             }
             self.activeGames = newActiveGames
             self.sortActiveGames(activeGames: self.activeGames.values)
-            if let lastSeenChatIdByOGSGameId = userDefaults[.lastSeenChatIdByOGSGameId] {
+            if let lastSeenChatIdByOGSGameId = preferences[.lastSeenChatIdByOGSGameId] {
                 var lastSeenChatIdByOGSGameId = lastSeenChatIdByOGSGameId
                 var toBeRemovedOGSIds = [Int]()
                 for ogsId in lastSeenChatIdByOGSGameId.keys {
@@ -771,7 +976,7 @@ class OGSService: ObservableObject {
                     lastSeenChatIdByOGSGameId.removeValue(forKey: ogsId)
                 }
                 if toBeRemovedOGSIds.count > 0 {
-                    userDefaults[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
+                    preferences[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
                 }
             }
         }
@@ -802,29 +1007,69 @@ class OGSService: ObservableObject {
     }
     
     var overviewLoadingCancellable: AnyCancellable?
+    private func fetchOverviewDirectlyFromOGS() -> AnyPublisher<[String: Any], Error> {
+        Future<[String: Any], Error> { promise in
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/ui/overview").validate().responseData { response in
+                switch response.result {
+                case .success:
+                    guard let responseValue = response.value,
+                          let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] else {
+                        promise(.failure(OGSServiceError.invalidJSON))
+                        return
+                    }
+                    promise(.success(data))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+
+    private func applyOverview(_ overviewValue: [String: Any]) {
+        if let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue) {
+            preferences.updateLatestOGSOverview(overviewData: overviewData)
+            if enablesAppSideEffects {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        }
+        processOverview(overview: overviewValue)
+    }
+
+    /// Direct, error-propagating overview refresh used by live integration tests.
+    ///
+    /// This bypasses the private Surround backend, applies the returned
+    /// overview to the service, and caches it only in the injected preferences.
+    /// Unlike the UI-oriented `loadOverview`, a failed request remains
+    /// observable so cleanup cannot mistake an unavailable OGS backend for an
+    /// empty artifact list.
+    func refreshOverviewFromOGS() -> AnyPublisher<Void, Error> {
+        fetchOverviewDirectlyFromOGS()
+            .receive(on: RunLoop.main)
+            .map { overview in
+                self.applyOverview(overview)
+            }
+            .eraseToAnyPublisher()
+    }
+
     func loadOverview(allowsCache: Bool = false, finishCallback: (() -> ())? = nil) {
         guard isLoggedIn else {
+            finishCallback?()
             return
         }
         
         self.fetchFriends()
         
         isLoadingOverview = true
-        overviewLoadingCancellable = SurroundService.shared.getOGSOverview(allowsCache: allowsCache).catch { error in
-            return Future<[String: Any], Error> { promise in
-                AF.request("\(self.ogsRoot)/api/v1/ui/overview").validate().responseData { response in
-                    switch response.result {
-                    case .success:
-                        if let responseValue = response.value, let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any] {
+        let overviewPublisher: AnyPublisher<[String: Any], Error>
+        if usesSurroundOverviewService {
+            overviewPublisher = SurroundService.shared.getOGSOverview(allowsCache: allowsCache)
+                .catch { _ in self.fetchOverviewDirectlyFromOGS() }
+                .eraseToAnyPublisher()
+        } else {
+            overviewPublisher = fetchOverviewDirectlyFromOGS()
+        }
 
-                            promise(.success(data))
-                        }
-                    case .failure(let error):
-                        promise(.failure(error))
-                    }
-                }
-            }
-        }.receive(on: RunLoop.main).sink(receiveCompletion: { result in
+        overviewLoadingCancellable = overviewPublisher.receive(on: RunLoop.main).sink(receiveCompletion: { result in
             self.isLoadingOverview = false
             self.overviewLoadingCancellable = nil
             if case .failure(let error) = result {
@@ -837,17 +1082,13 @@ class OGSService: ObservableObject {
                 finishCallback()
             }
         }, receiveValue: { overviewValue in
-            if let overviewData = try? JSONSerialization.data(withJSONObject: overviewValue) {
-                userDefaults.updateLatestOGSOverview(overviewData: overviewData)
-                WidgetCenter.shared.reloadAllTimelines()
-            }
-            self.processOverview(overview: overviewValue)
+            self.applyOverview(overviewValue)
         })
     }
     
     func getGameDetailAndConnect(gameID: Int) -> AnyPublisher<Game, Error> {
         return Future<Game, Error> { promise in
-            AF.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseJSON { response in
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseJSON { response in
                 switch response.result {
                 case .success:
                     if let data = response.value as? [String: Any] {
@@ -1015,8 +1256,15 @@ class OGSService: ObservableObject {
     
     func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
-            if let gameId = game.gameData?.gameId {
-                self.ogsWebsocket.emit(command: "game/move", data: ["game_id": gameId, "move": move.toOGSString()]) { _, _ in
+            guard let gameId = game.gameData?.gameId else {
+                promise(.failure(OGSServiceError.invalidJSON))
+                return
+            }
+            self.ogsWebsocket.emit(command: "game/move", data: ["game_id": gameId, "move": move.toOGSString()]) { _, error in
+                if let error {
+                    let message = error.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+                    promise(.failure(OGSServiceError.loginError(error: message)))
+                } else {
                     promise(.success(()))
                 }
             }
@@ -1025,24 +1273,26 @@ class OGSService: ObservableObject {
     
     func toggleRemovedStones(stones: Set<[Int]>, forGame game: Game) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
-            if let gameId = game.gameData?.gameId {
-                var toBeAdded = Set<[Int]>()
-                var toBeRemoved = Set<[Int]>()
-                for point in stones {
-                    if game.currentPosition.removedStones?.contains(point) ?? false {
-                        toBeAdded.insert(point)
-                    } else {
-                        toBeRemoved.insert(point)
-                    }
-                }
-                if toBeAdded.count > 0 {
-                    self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 0, "stones": BoardPosition.positionString(fromPoints: toBeAdded)])
-                }
-                if toBeRemoved.count > 0 {
-                    self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 1, "stones": BoardPosition.positionString(fromPoints: toBeRemoved)])
-                }
-                promise(.success(()))
+            guard let gameId = game.gameData?.gameId else {
+                promise(.failure(OGSServiceError.invalidJSON))
+                return
             }
+            var toBeAdded = Set<[Int]>()
+            var toBeRemoved = Set<[Int]>()
+            for point in stones {
+                if game.currentPosition.removedStones?.contains(point) ?? false {
+                    toBeAdded.insert(point)
+                } else {
+                    toBeRemoved.insert(point)
+                }
+            }
+            if toBeAdded.count > 0 {
+                self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 0, "stones": BoardPosition.positionString(fromPoints: toBeAdded)])
+            }
+            if toBeRemoved.count > 0 {
+                self.ogsWebsocket.emit(command: "game/removed_stones/set", data: ["game_id": gameId, "removed": 1, "stones": BoardPosition.positionString(fromPoints: toBeRemoved)])
+            }
+            promise(.success(()))
         }.eraseToAnyPublisher()
     }
     
@@ -1050,7 +1300,10 @@ class OGSService: ObservableObject {
         if let ogsID = game.ogsID {
             self.ogsWebsocket.emit(command: "game/removed_stones/accept", data: [
                 "game_id": ogsID,
-                "stones": BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? Set<[Int]>())
+                "stones": BoardPosition.positionString(fromPoints: game.currentPosition.removedStones ?? Set<[Int]>()),
+                // OGS keeps this legacy field in the wire contract even
+                // though current clients no longer expose strict seki mode.
+                "strict_seki_mode": false
             ])
         }
     }
@@ -1169,12 +1422,12 @@ class OGSService: ObservableObject {
             let host = URL(string: self.ogsRoot)!.host
             for cookie in cookies {
                 if cookie.domain == host {
-                    Session.default.sessionConfiguration.httpCookieStorage?.setCookie(cookie)
+                    self.httpClient.cookieStorage?.setCookie(cookie)
                     if cookie.name == "sessionid" {
-                        userDefaults[.ogsSessionId] = cookie.value
+                        self.preferences[.ogsSessionId] = cookie.value
                     }
                     if cookie.name == "csrftoken" {
-                        userDefaults[.ogsCsrfCookie] = cookie.value
+                        self.preferences[.ogsCsrfCookie] = cookie.value
                     }
                 }
             }
@@ -1207,7 +1460,7 @@ class OGSService: ObservableObject {
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)" :
                 "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url,
                     method: .delete,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
@@ -1231,7 +1484,7 @@ class OGSService: ObservableObject {
                 "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/accept" :
                 "\(self.ogsRoot)/api/v1/me/challenges/\(challenge.id)/accept"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url,
                     method: .post,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/overview"]
@@ -1258,7 +1511,7 @@ class OGSService: ObservableObject {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url, method: .put,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
                 ).validate().response { response in
@@ -1279,7 +1532,7 @@ class OGSService: ObservableObject {
         return Future<Void, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/join"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url, method: .delete,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
                 ).validate().response { response in
@@ -1301,7 +1554,7 @@ class OGSService: ObservableObject {
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/team"
             let assignParameter = color == .black ? "assign_black" : color == .white ? "assign_white" : "unassign"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url, method: .put,
                     parameters: [assignParameter: [player.id]],
                     encoder: JSONParameterEncoder(),
@@ -1324,7 +1577,7 @@ class OGSService: ObservableObject {
         return Future<Int, Error> { promise in
             let url = "\(self.ogsRoot)/api/v1/challenges/\(challenge.id)/start"
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url, method: .post,
                     headers: ["x-csrftoken": csrfToken, "referer": "\(self.ogsRoot)/play"]
                 ).validate().responseJSON { response in
@@ -1488,7 +1741,7 @@ class OGSService: ObservableObject {
     }
     
     func fetchFriends() {
-        AF.request("\(self.ogsRoot)/api/v1/ui/friends").validate().responseJSON { response in
+        httpClient.session.request("\(self.ogsRoot)/api/v1/ui/friends").validate().responseJSON { response in
             if case .success(let data) = response.result {
                 if let friends = (data as? [String: Any] ?? [:])["friends"] as? [[String: Any]] {
                     let decoder = DictionaryDecoder()
@@ -1507,7 +1760,7 @@ class OGSService: ObservableObject {
     
     func searchByUsername(keyword: String) -> AnyPublisher<[OGSUser], Error> {
         return Future<[OGSUser], Error> { promise in
-            AF.request("\(self.ogsRoot)/api/v1/ui/omniSearch", parameters: ["q": keyword])
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/ui/omniSearch", parameters: ["q": keyword])
                 .validate().responseJSON { response in
                     switch response.result {
                     case .success(let data):
@@ -1568,7 +1821,7 @@ class OGSService: ObservableObject {
                 url = "\(self.ogsRoot)/api/v1/players/\(opponentId)/challenge"
             }
             if let csrfToken = self.ogsUIConfig?.csrfToken {
-                AF.request(
+                self.httpClient.session.request(
                     url,
                     method: .post,
                     parameters: challenge,
@@ -1770,7 +2023,7 @@ class OGSService: ObservableObject {
 
     private func _calculatePrivateMessageUnreadCount() {
         privateMessagesUnreadCount = privateMessagesByPeerId.keys.filter { peerId in
-            if let lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peerId] {
+            if let lastSeen = preferences[.lastSeenPrivateMessageByOGSUserId]?[peerId] {
                 if let lastInThread = privateMessagesByPeerId[peerId]?.last {
                     return lastInThread.content.timestamp > lastSeen
                 } else {
@@ -1811,9 +2064,9 @@ class OGSService: ObservableObject {
     
     func markPrivateMessageThreadAsRead(peerId: Int) {
         if let lastMessage = privateMessagesByPeerId[peerId]?.last {
-            if var lastSeen = userDefaults[.lastSeenPrivateMessageByOGSUserId] {
+            if var lastSeen = preferences[.lastSeenPrivateMessageByOGSUserId] {
                 lastSeen[peerId] = lastMessage.content.timestamp
-                userDefaults[.lastSeenPrivateMessageByOGSUserId] = lastSeen
+                preferences[.lastSeenPrivateMessageByOGSUserId] = lastSeen
                 _calculatePrivateMessageUnreadCount()
             }
         }
@@ -1866,7 +2119,7 @@ class OGSService: ObservableObject {
         guard ogsWebsocket.authenticated else {
             return
         }
-        let since = userDefaults[.ogsRemoteStorageLastSync]!
+        let since = preferences[.ogsRemoteStorageLastSync]!
         
         ogsWebsocket.emit(command: "remote_storage/sync", data: [
             "since": since.ISO8601Format(.iso8601
@@ -1909,7 +2162,7 @@ class OGSService: ObservableObject {
             }
         }
                 
-        userDefaults[.ogsRemoteStorageLastSync] = max(userDefaults[.ogsRemoteStorageLastSync]!, modified)
+        preferences[.ogsRemoteStorageLastSync] = max(preferences[.ogsRemoteStorageLastSync]!, modified)
         
 //        if key == OGSRemoteSetting.preferredGameSettings.rawValue, let value = value as? [[String: Any]] {
 //            var decodedChallenges = [OGSChallenge]()

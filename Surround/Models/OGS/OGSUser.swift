@@ -31,6 +31,10 @@ enum OGSRatingCategory: String, Codable, CodingKey, CaseIterable {
 
 struct OGSRating: Codable, Equatable, Hashable {
     var ratingByCategory: [OGSRatingCategory: OGSCategoryRating]
+
+    internal init(ratingByCategory: [OGSRatingCategory: OGSCategoryRating]) {
+        self.ratingByCategory = ratingByCategory
+    }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: OGSRatingCategory.self)
@@ -76,7 +80,7 @@ struct OGSUser : Codable, Equatable, Hashable {
     
     // In-game
     var acceptedStones: String?
-    var acceptedStrickSekiMode: Bool?
+    var acceptedStrictSekiMode: Bool?
     
     enum CodingKeys: String, CodingKey {
         case username
@@ -94,6 +98,8 @@ struct OGSUser : Codable, Equatable, Hashable {
         case ratings
         case iconUrl = "icon-url"
         case anonymous
+        case acceptedStones
+        case acceptedStrictSekiMode
     }
     
     var formattedRank: String {

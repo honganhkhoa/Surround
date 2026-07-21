@@ -22,9 +22,9 @@ struct OGSRemoteSettingValue<T>: Codable where T: Codable {
 }
 
 protocol OGSRemoteSettingKeyProtocol {
-    func saveIfValid(settings: [String: Any], replication: OGSRemoteReplication, modified: Date) -> Bool
-    func saveIfValid(settings: [[String: Any]], replication: OGSRemoteReplication, modified: Date) -> Bool
-    func reset()
+    func saveIfValid(settings: [String: Any], replication: OGSRemoteReplication, modified: Date, preferences: UserDefaults) -> Bool
+    func saveIfValid(settings: [[String: Any]], replication: OGSRemoteReplication, modified: Date, preferences: UserDefaults) -> Bool
+    func reset(preferences: UserDefaults)
 }
 
 struct OGSRemoteSettingKey<T>: OGSRemoteSettingKeyProtocol where T: Codable {
@@ -37,12 +37,12 @@ struct OGSRemoteSettingKey<T>: OGSRemoteSettingKeyProtocol where T: Codable {
     }
     
     @discardableResult
-    func saveIfValid(settings: [String: Any], replication: OGSRemoteReplication, modified: Date) -> Bool {
+    func saveIfValid(settings: [String: Any], replication: OGSRemoteReplication, modified: Date, preferences: UserDefaults = userDefaults) -> Bool {
         let decoder = DictionaryDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         if let settings = try? decoder.decode(T.self, from: settings) {
             do {
-                try userDefaults.setValue(
+                try preferences.setValue(
                     JSONEncoder().encode(
                         OGSRemoteSettingValue(
                             value: settings,
@@ -58,12 +58,12 @@ struct OGSRemoteSettingKey<T>: OGSRemoteSettingKeyProtocol where T: Codable {
     }
     
     @discardableResult
-    func saveIfValid(settings: [[String: Any]], replication: OGSRemoteReplication, modified: Date) -> Bool {
+    func saveIfValid(settings: [[String: Any]], replication: OGSRemoteReplication, modified: Date, preferences: UserDefaults = userDefaults) -> Bool {
         let decoder = DictionaryDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         if let settingsWrapper = try? decoder.decode([String: T].self, from: ["a": settings]) {
             do {
-                try userDefaults.setValue(
+                try preferences.setValue(
                     JSONEncoder().encode(
                         OGSRemoteSettingValue(
                             value: settingsWrapper["a"]!,
@@ -78,13 +78,14 @@ struct OGSRemoteSettingKey<T>: OGSRemoteSettingKeyProtocol where T: Codable {
         return false
     }
     
-    func reset() {
-        userDefaults.removeObject(forKey: self.name)
+    func reset(preferences: UserDefaults = userDefaults) {
+        preferences.removeObject(forKey: self.name)
     }
 }
 
 class OGSRemoteSetting {
-    static var shared = OGSRemoteSetting()
+    static var shared = OGSRemoteSetting(preferences: userDefaults)
+    private let preferences: UserDefaults
     var settingByRemoteName: [String: Any] = [:]
     var dictionaryDecoder: DictionaryDecoder = {
         let decoder = DictionaryDecoder()
@@ -92,7 +93,8 @@ class OGSRemoteSetting {
         return decoder
     }()
     
-    private init() {
+    init(preferences: UserDefaults) {
+        self.preferences = preferences
         let allSettingKeys: [OGSRemoteSettingKey] = [.preferredGameSettings]
         for key in allSettingKeys {
             settingByRemoteName[key.remoteName] = key
@@ -101,7 +103,7 @@ class OGSRemoteSetting {
     
     subscript<T>(key: OGSRemoteSettingKey<T>) -> T? where T: Codable {
         get {
-            if let result = userDefaults.data(forKey: key.name) {
+            if let result = preferences.data(forKey: key.name) {
                 return try? JSONDecoder().decode(OGSRemoteSettingValue<T>.self, from: result).value
             } else {
                 return nil
@@ -117,9 +119,9 @@ class OGSRemoteSetting {
     public func saveIfValid(settings: Any, remoteName: String, replication: OGSRemoteReplication, modified: Date) -> Bool {
         if let settingKey = settingByRemoteName[remoteName] as? OGSRemoteSettingKeyProtocol {
             if let settings = settings as? [String: Any] {
-                return settingKey.saveIfValid(settings: settings, replication: replication, modified: modified)
+                return settingKey.saveIfValid(settings: settings, replication: replication, modified: modified, preferences: preferences)
             } else if let settings = settings as? [[String: Any]] {
-                return settingKey.saveIfValid(settings: settings, replication: replication, modified: modified)
+                return settingKey.saveIfValid(settings: settings, replication: replication, modified: modified, preferences: preferences)
             }
         }
         return false
@@ -128,7 +130,7 @@ class OGSRemoteSetting {
     public func resetAllSettings() {
         for settingKey in settingByRemoteName.values {
             if let settingKey = settingKey as? OGSRemoteSettingKeyProtocol {
-                settingKey.reset()
+                settingKey.reset(preferences: preferences)
             }
         }
     }

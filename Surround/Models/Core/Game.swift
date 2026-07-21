@@ -195,9 +195,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     var playerCacheObservingCancellable: AnyCancellable?
+    var preferences: UserDefaults = userDefaults
     weak var ogs: OGSService? {
         didSet {
             if let ogs = ogs {
+                preferences = ogs.preferences
                 if playerCacheObservingCancellable != nil {
                     playerCacheObservingCancellable?.cancel()
                 }
@@ -784,7 +786,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     func resetChats() {
         self.chatLog.removeAll()
         if let ogsId = self.ogsID {
-            lastSeenChatId = userDefaults[.lastSeenChatIdByOGSGameId]?[ogsId]
+            lastSeenChatId = preferences[.lastSeenChatIdByOGSGameId]?[ogsId]
         }
     }
     
@@ -796,9 +798,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         chatUnreadCount = 0
         lastSeenChatIndex = chatLog.count - 1
         if lastSeenChatId != lastChat.id {
-            var lastSeenChatIdByOGSGameId = userDefaults[.lastSeenChatIdByOGSGameId] ?? [Int: String]()
+            var lastSeenChatIdByOGSGameId = preferences[.lastSeenChatIdByOGSGameId] ?? [Int: String]()
             lastSeenChatIdByOGSGameId[ogsId] = lastChat.id
-            userDefaults[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
+            preferences[.lastSeenChatIdByOGSGameId] = lastSeenChatIdByOGSGameId
             lastSeenChatId = lastChat.id
         }
     }

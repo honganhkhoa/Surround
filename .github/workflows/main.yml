@@ -1,27 +1,54 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run. 
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: main
+    branches:
+      - main
   pull_request:
-    branches: main
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches:
+      - main
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+
 jobs:
   test:
-    # The type of runner that the job will run on
-    runs-on: macos-14
+    runs-on: macos-26
+    timeout-minutes: 30
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Select an iOS 26 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
       - name: Run unit tests
-        run: xcodebuild test -scheme Surround -project Surround.xcodeproj -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' | xcbeautify
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          xcodebuild test \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults/SurroundTests.xcresult
+
+      - name: Export coverage report
+        if: ${{ always() && hashFiles('TestResults/SurroundTests.xcresult/**') != '' }}
+        shell: bash
+        run: xcrun xccov view --report --json TestResults/SurroundTests.xcresult > TestResults/coverage.json
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,72 @@
+name: OGS beta integration tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: surround-ogs-beta-integration
+  cancel-in-progress: false
+
+jobs:
+  play-through:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      OGS_BETA_HOST: https://beta.online-go.com
+      OGS_BETA_USERNAMES: hakhoa,hakhoa2,hakhoa3,hakhoa4
+      OGS_BETA_DIAGNOSTICS_DIR: ${{ runner.temp }}/SurroundBetaDiagnostics
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate beta-only configuration
+        shell: bash
+        env:
+          OGS_BETA_PASSWORD: ${{ secrets.OGS_BETA_PASSWORD }}
+        run: .github/ci-tools/validate-ogs-beta-environment.sh
+
+      - name: Select an iOS 26 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run beta play-through
+        shell: bash
+        env:
+          TEST_RUNNER_OGS_BETA_HOST: ${{ env.OGS_BETA_HOST }}
+          TEST_RUNNER_OGS_BETA_USERNAMES: ${{ env.OGS_BETA_USERNAMES }}
+          TEST_RUNNER_OGS_BETA_PASSWORD: ${{ secrets.OGS_BETA_PASSWORD }}
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/SurroundBetaResults"
+          xcodebuild test \
+            -scheme SurroundBetaTests \
+            -project Surround.xcodeproj \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -resultBundlePath "$RUNNER_TEMP/SurroundBetaResults/SurroundBetaTests.xcresult"
+
+      - name: Export sanitized failure attachments
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          result_bundle="$RUNNER_TEMP/SurroundBetaResults/SurroundBetaTests.xcresult"
+          if [[ -d "$result_bundle" ]]; then
+            xcrun xcresulttool export attachments \
+              --path "$result_bundle" \
+              --output-path "$OGS_BETA_DIAGNOSTICS_DIR" \
+              --only-failures
+          fi
+
+      - name: Upload sanitized test diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-beta-test-results
+          path: ${{ env.OGS_BETA_DIAGNOSTICS_DIR }}
+          if-no-files-found: warn
+          retention-days: 7
