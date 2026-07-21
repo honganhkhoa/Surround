@@ -17,7 +17,6 @@ jobs:
     env:
       OGS_BETA_HOST: https://beta.online-go.com
       OGS_BETA_USERNAMES: hakhoa,hakhoa2,hakhoa3,hakhoa4
-      OGS_BETA_DIAGNOSTICS_DIR: ${{ runner.temp }}/SurroundBetaDiagnostics
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +57,7 @@ jobs:
           if [[ -d "$result_bundle" ]]; then
             xcrun xcresulttool export attachments \
               --path "$result_bundle" \
-              --output-path "$OGS_BETA_DIAGNOSTICS_DIR" \
+              --output-path "$RUNNER_TEMP/SurroundBetaDiagnostics" \
               --only-failures
           fi
 
@@ -67,6 +66,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surround-beta-test-results
-          path: ${{ env.OGS_BETA_DIAGNOSTICS_DIR }}
+          path: ${{ runner.temp }}/SurroundBetaDiagnostics
           if-no-files-found: warn
           retention-days: 7
