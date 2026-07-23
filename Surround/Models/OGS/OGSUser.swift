@@ -159,16 +159,16 @@ struct OGSUser : Codable, Equatable, Hashable {
         let explicitRank: Double? = self.ranking != nil ? Double(self.ranking!) : self.rank
         if self.professional == true {
             if let ranking = explicitRank {
-                return RankUtils.formattedRank(ranking, professional: true)
+                return RankUtils.formattedRank(ranking, longFormat: longFormat, professional: true)
             }
         }
-        
+
         if self.isProvisional() {
             return "?"
         }
 
-        if let ranking = self.ratings != nil ? self.rank() : explicitRank {
-            return RankUtils.formattedRank(ranking)
+        if let ranking = self.ratings != nil ? self.rank(category: category) : explicitRank {
+            return RankUtils.formattedRank(ranking, longFormat: longFormat)
         }
         
         return "?"

@@ -14,6 +14,11 @@
 		AE20000539A0000000000005 /* OGSServiceIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */; };
 		AE20000639A0000000000006 /* OGSServiceEventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000639A0000000000006 /* OGSServiceEventTests.swift */; };
 		AE20000739A0000000000007 /* OGSWebsocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000739A0000000000007 /* OGSWebsocketTests.swift */; };
+		AE20000839A0000000000008 /* GameScoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000839A0000000000008 /* GameScoringTests.swift */; };
+		AE20000939A0000000000009 /* OGSClockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000939A0000000000009 /* OGSClockTests.swift */; };
+		AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000A39A000000000000A /* OGSPauseControlTests.swift */; };
+		AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000B39A000000000000B /* TimeUtilitiesTests.swift */; };
+		AE20000C39A000000000000C /* OGSUserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000C39A000000000000C /* OGSUserTests.swift */; };
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
@@ -361,6 +366,11 @@
 		AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceIsolationTests.swift; sourceTree = "<group>"; };
 		AE10000639A0000000000006 /* OGSServiceEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceEventTests.swift; sourceTree = "<group>"; };
 		AE10000739A0000000000007 /* OGSWebsocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocketTests.swift; sourceTree = "<group>"; };
+		AE10000839A0000000000008 /* GameScoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScoringTests.swift; sourceTree = "<group>"; };
+		AE10000939A0000000000009 /* OGSClockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSClockTests.swift; sourceTree = "<group>"; };
+		AE10000A39A000000000000A /* OGSPauseControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPauseControlTests.swift; sourceTree = "<group>"; };
+		AE10000B39A000000000000B /* TimeUtilitiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeUtilitiesTests.swift; sourceTree = "<group>"; };
+		AE10000C39A000000000000C /* OGSUserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSUserTests.swift; sourceTree = "<group>"; };
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AE40B2CB2C42644F000ED564 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/MainInterface.strings; sourceTree = "<group>"; };
@@ -660,6 +670,11 @@
 				AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */,
 				AE10000639A0000000000006 /* OGSServiceEventTests.swift */,
 				AE10000739A0000000000007 /* OGSWebsocketTests.swift */,
+				AE10000839A0000000000008 /* GameScoringTests.swift */,
+				AE10000939A0000000000009 /* OGSClockTests.swift */,
+				AE10000A39A000000000000A /* OGSPauseControlTests.swift */,
+				AE10000B39A000000000000B /* TimeUtilitiesTests.swift */,
+				AE10000C39A000000000000C /* OGSUserTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -1289,6 +1304,11 @@
 				AE20000539A0000000000005 /* OGSServiceIsolationTests.swift in Sources */,
 				AE20000639A0000000000006 /* OGSServiceEventTests.swift in Sources */,
 				AE20000739A0000000000007 /* OGSWebsocketTests.swift in Sources */,
+				AE20000839A0000000000008 /* GameScoringTests.swift in Sources */,
+				AE20000939A0000000000009 /* OGSClockTests.swift in Sources */,
+				AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */,
+				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
+				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
 				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,

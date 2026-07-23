@@ -99,9 +99,10 @@ extension OGSClock: Decodable {
                     thinkingTimeLeft: timeUntilExpiration
                 )
             } else {
+                // A scalar clock value arrives in milliseconds; Surround works in seconds.
                 blackTime = ThinkingTime(
-                    thinkingTime: blackThinkingTime,
-                    thinkingTimeLeft: blackThinkingTime
+                    thinkingTime: blackThinkingTime / 1000,
+                    thinkingTimeLeft: blackThinkingTime / 1000
                 )
             }
         } else if let blackThinkingTime = try? container.decode(ThinkingTime.self, forKey: .blackTime) {
@@ -121,9 +122,10 @@ extension OGSClock: Decodable {
                     thinkingTimeLeft: timeUntilExpiration
                 )
             } else {
+                // A scalar clock value arrives in milliseconds; Surround works in seconds.
                 whiteTime = ThinkingTime(
-                    thinkingTime: whiteThinkingTime,
-                    thinkingTimeLeft: whiteThinkingTime
+                    thinkingTime: whiteThinkingTime / 1000,
+                    thinkingTimeLeft: whiteThinkingTime / 1000
                 )
             }
         } else if let whiteThinkingTime = try? container.decode(ThinkingTime.self, forKey: .whiteTime) {
@@ -137,7 +139,9 @@ extension OGSClock: Decodable {
         }
                 
         lastMoveTime = try container.decode(Double.self, forKey: .lastMove)
-        started = !container.contains(.startMode)
+        // Only a truthy start_mode marks the game as not yet started; false and an
+        // omitted key are equivalent and mean the normal clock is running.
+        started = !(try container.decodeIfPresent(Bool.self, forKey: .startMode) ?? false)
         
         pausedTime = try container.decodeIfPresent(Double.self, forKey: .pausedSince)
         if let pauseDetail = try container.decodeIfPresent(OGSPauseDetail.self, forKey: .pause) {
@@ -145,9 +149,7 @@ extension OGSClock: Decodable {
         }
     }
     
-    mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?) {
-
-        let now = Date().timeIntervalSince1970 * 1000
+    mutating func calculateTimeLeft(with system: TimeControlSystem, serverTimeOffset: Double = 0, pauseControl: OGSPauseControl?, now: Double = Date().timeIntervalSince1970 * 1000) {
 
         if let blackAutoResignTime = autoResignTime[.black] {
             blackTimeUntilAutoResign = (blackAutoResignTime + serverTimeOffset - now) / 1000
@@ -169,7 +171,7 @@ extension OGSClock: Decodable {
             return
         }
         
-        // logic from GobanCore.ts -> GobanCore -> setGameClock -> make_player_clock
+        // logic from goban -> OGSConnectivity.ts -> computeNewPlayerClock
         let paused = pauseControl?.isPaused() ?? false
         let since = (paused && pausedTime != nil) ? max(pausedTime!, lastMoveTime) : now
         let secondsElapsed = floor((since - (lastMoveTime + serverTimeOffset)) / 1000)
@@ -179,44 +181,57 @@ extension OGSClock: Decodable {
             var otherPlayerThinkingTime = currentPlayerColor == .black ? whiteTime : blackTime
             switch system {
             case .ByoYomi(_, _, let periodTime):
-                var timeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
-                if timeLeft > 0 {
-                    currentPlayerThinkingTime.thinkingTimeLeft = timeLeft
-                } else {
-                    currentPlayerThinkingTime.thinkingTimeLeft = 0
-                    currentPlayerThinkingTime.periodsLeft = currentPlayerThinkingTime.periods
-                    timeLeft += Double(periodTime)
-                    while timeLeft < 0 && currentPlayerThinkingTime.periodsLeft! > 0 {
-                        timeLeft += Double(periodTime)
-                        currentPlayerThinkingTime.periodsLeft! -= 1
-                    }
-                    if timeLeft < 0 {
-                        currentPlayerThinkingTime.periodTimeLeft = 0
+                let periodTime = Double(periodTime)
+                var overtimeUsage = 0.0
+                if (currentPlayerThinkingTime.thinkingTime ?? 0) > 0 {
+                    let mainTimeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
+                    if mainTimeLeft <= 0 {
+                        overtimeUsage = -mainTimeLeft
+                        currentPlayerThinkingTime.thinkingTimeLeft = 0
                     } else {
-                        currentPlayerThinkingTime.periodTimeLeft = timeLeft
+                        currentPlayerThinkingTime.thinkingTimeLeft = mainTimeLeft
+                    }
+                } else {
+                    currentPlayerThinkingTime.thinkingTimeLeft = 0
+                    overtimeUsage = secondsElapsed
+                }
+                currentPlayerThinkingTime.periodsLeft = currentPlayerThinkingTime.periods
+                currentPlayerThinkingTime.periodTimeLeft = periodTime
+                if overtimeUsage > 0 {
+                    let periodsUsed = floor(overtimeUsage / periodTime)
+                    currentPlayerThinkingTime.periodsLeft = (currentPlayerThinkingTime.periods ?? 0) - Int(periodsUsed)
+                    currentPlayerThinkingTime.periodTimeLeft = periodTime - (overtimeUsage - periodsUsed * periodTime)
+                    if (currentPlayerThinkingTime.periodsLeft ?? 0) <= 0 {
+                        // Every period is spent, so this clock has timed out. Goban
+                        // keeps the leftover period time for display and flags a
+                        // separate timed_out state; Surround does not model that flag,
+                        // so the effective time must read zero instead.
+                        currentPlayerThinkingTime.periodsLeft = 0
+                        currentPlayerThinkingTime.periodTimeLeft = 0
+                    } else if (currentPlayerThinkingTime.periodTimeLeft ?? 0) < 0 {
+                        currentPlayerThinkingTime.periodTimeLeft = 0
                     }
                 }
-            case .Canadian(_, let periodTime, _):
-                var timeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
-                if timeLeft > 0 {
-                    currentPlayerThinkingTime.thinkingTimeLeft = timeLeft
-                } else {
-                    timeLeft += Double(periodTime)
-                    currentPlayerThinkingTime.thinkingTimeLeft = 0
-                    currentPlayerThinkingTime.blockTimeLeft = timeLeft
+            case .Canadian(_, _, _):
+                let timeLeft = (currentPlayerThinkingTime.thinkingTime ?? 0) - secondsElapsed
+                currentPlayerThinkingTime.thinkingTimeLeft = max(0, timeLeft)
+                var blockTimeLeft = currentPlayerThinkingTime.blockTime ?? 0
+                if timeLeft < 0 {
+                    blockTimeLeft += timeLeft
                 }
+                currentPlayerThinkingTime.blockTimeLeft = max(0, blockTimeLeft)
             case .Simple(let perMove):
                 if paused {
-                    currentPlayerThinkingTime.thinkingTimeLeft = Double(perMove) - secondsElapsed
+                    currentPlayerThinkingTime.thinkingTimeLeft = max(0, Double(perMove) - secondsElapsed)
                 } else {
-                    currentPlayerThinkingTime.thinkingTimeLeft = timeUntilExpiration
+                    currentPlayerThinkingTime.thinkingTimeLeft = max(0, timeUntilExpiration ?? Double(perMove) - secondsElapsed)
                 }
                 otherPlayerThinkingTime.thinkingTimeLeft = Double(perMove)
             case .Absolute, .Fischer(_, _, _):
                 if paused {
-                    currentPlayerThinkingTime.thinkingTimeLeft = currentPlayerThinkingTime.thinkingTime! - secondsElapsed
+                    currentPlayerThinkingTime.thinkingTimeLeft = max(0, (currentPlayerThinkingTime.thinkingTime ?? 0) - secondsElapsed)
                 } else {
-                    currentPlayerThinkingTime.thinkingTimeLeft = timeUntilExpiration
+                    currentPlayerThinkingTime.thinkingTimeLeft = max(0, timeUntilExpiration ?? (currentPlayerThinkingTime.thinkingTime ?? 0) - secondsElapsed)
                 }
             default:
                 break

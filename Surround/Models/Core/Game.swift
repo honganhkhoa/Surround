@@ -470,8 +470,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
         }
         
-        for row in 0..<width {
-            for column in 0..<height {
+        for row in 0..<height {
+            for column in 0..<width {
                 if case .hasStone(let color) = currentPosition[row, column] {
                     let isRemoved = currentPosition.removedStones?.contains([row, column]) ?? false
                     if !isRemoved && gameData.scoreStones {

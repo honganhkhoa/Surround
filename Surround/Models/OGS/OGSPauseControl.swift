@@ -12,8 +12,13 @@ struct OGSUserPauseDetail: Codable {
     var pausingPlayerId: Int?
 }
 
+struct OGSModeratorPauseDetail: Codable {
+    var moderatorId: Int?
+}
+
 struct OGSPauseControl: Decodable {
     var userPauseDetail: OGSUserPauseDetail?
+    var moderatorPauseDetail: OGSModeratorPauseDetail?
     var weekend: Bool?
     var system: Bool?
     var stoneRemoval: Bool?
@@ -43,9 +48,14 @@ struct OGSPauseControl: Decodable {
                 }
             case "paused":
                 userPauseDetail = try container.decode(OGSUserPauseDetail.self, forKey: key)
+            // OGS sends "moderator_paused" as an object; the decoder's snake-case
+            // strategy surfaces it as "moderatorPaused", but accept the raw form too.
+            case "moderatorPaused", "moderator_paused":
+                moderatorPauseDetail = try container.decode(OGSModeratorPauseDetail.self, forKey: key)
             case "weekend":
                 weekend = try container.decode(Bool.self, forKey: key)
-            case "system":
+            // Goban treats the legacy "server" pause the same as "system".
+            case "system", "server":
                 system = try container.decode(Bool.self, forKey: key)
             case "stone-removal":
                 stoneRemoval = try container.decode(Bool.self, forKey: key)
@@ -59,23 +69,27 @@ struct OGSPauseControl: Decodable {
         if self.userPauseDetail != nil {
             return true
         }
-        
+
+        if self.moderatorPauseDetail != nil {
+            return true
+        }
+
         if weekend ?? false {
             return true
         }
-        
+
         if system ?? false {
             return true
         }
-        
+
         if stoneRemoval ?? false {
             return true
         }
-        
+
         if vacationPlayerIds.count > 0 {
             return true
         }
-        
+
         return false
     }
     
@@ -95,6 +109,10 @@ struct OGSPauseControl: Decodable {
             if vacationPlayerIds.contains(playerId) {
                 return String(localized: "Vacation", comment: "pause reason")
             }
+        }
+
+        if moderatorPauseDetail != nil {
+            return String(localized: "Moderator", comment: "pause reason")
         }
 
         if weekend ?? false {

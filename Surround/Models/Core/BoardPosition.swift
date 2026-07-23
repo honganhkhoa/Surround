@@ -486,9 +486,6 @@ class BoardPosition: ObservableObject {
                 }
             }
         }
-        for row in 0..<height {
-            print(_territoryGroupId[row])
-        }
         return groups
     }
     

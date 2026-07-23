@@ -85,6 +85,21 @@ class BoardPositionTests: XCTestCase {
         XCTAssertThrowsError(try position.makeMove(move: .placeStone(1, 2)))
     }
 
+    func testCoordinateStringRoundTrips() throws {
+        let points: Set<[Int]> = [[0, 0], [2, 4], [18, 3]]
+        let encoded = BoardPosition.positionString(fromPoints: points)
+        XCTAssertEqual(encoded, "aaecds")
+        XCTAssertEqual(BoardPosition.points(fromPositionString: encoded), points)
+        XCTAssertEqual(BoardPosition.points(fromPositionString: ""), [])
+
+        XCTAssertEqual(Move.placeStone(2, 4).toOGSString(), "ec")
+        XCTAssertEqual(Move.pass.toOGSString(), "..")
+        XCTAssertEqual(
+            Move.fromMoveString(moveString: "aaecds"),
+            [.placeStone(0, 0), .placeStone(2, 4), .placeStone(18, 3)]
+        )
+    }
+
     static func position(fromVisualStrings visualStrings: [String], nextToMove: StoneColor = .black) -> BoardPosition {
         let position = BoardPosition(width: visualStrings[0].count, height: visualStrings.count)
         for row in 0..<position.height {

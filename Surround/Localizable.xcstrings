@@ -5786,6 +5786,29 @@
         }
       }
     },
+    "Moderator" : {
+      "comment" : "pause reason",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modérateur"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデレータ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quản trị viên"
+          }
+        }
+      }
+    },
     "More actions" : {
       "localizations" : {
         "fr" : {
