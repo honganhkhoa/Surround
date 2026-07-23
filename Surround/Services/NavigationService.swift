@@ -31,6 +31,12 @@ struct PublicGamesViewParameter {
 class NavigationService: ObservableObject {
     static var shared = NavigationService()
     static var instances = [String: NavigationService]()
+
+    #if OGS_BETA
+    private static let appURLScheme = "surround-beta"
+    #else
+    private static let appURLScheme = "surround"
+    #endif
     
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
@@ -49,7 +55,7 @@ class NavigationService: ObservableObject {
     }
     
     static func appURL(rootView: RootView, game: Game? = nil, ogsGameId: Int? = nil) -> URL? {
-        var urlString = "surround://\(rootView)"
+        var urlString = "\(appURLScheme)://\(rootView)"
         if let ogsId = game?.ogsID {
             urlString += "/\(ogsId)"
         } else if let ogsGameId = ogsGameId {

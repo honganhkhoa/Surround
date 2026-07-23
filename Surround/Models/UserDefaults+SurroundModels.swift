@@ -9,7 +9,11 @@ import Foundation
 import Combine
 import SwiftUI
 
+#if OGS_BETA
+let userDefaultsSuite = "group.com.honganhkhoa.Surround.Beta"
+#else
 let userDefaultsSuite = "group.com.honganhkhoa.Surround"
+#endif
 let userDefaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
 
 // From https://www.swiftbysundell.com/articles/the-power-of-subscripts-in-swift/

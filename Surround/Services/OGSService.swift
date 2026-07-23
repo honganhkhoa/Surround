@@ -35,8 +35,15 @@ struct OGSEnvironment: Equatable {
     /// The shipping OGS service.
     static let production = OGSEnvironment(rootURL: URL(string: "https://online-go.com")!)
 
-    /// The isolated OGS beta service used only by opt-in integration tests.
+    /// The isolated OGS beta service used by opt-in beta builds and integration tests.
     static let beta = OGSEnvironment(rootURL: URL(string: "https://beta.online-go.com")!)
+
+    /// The environment selected by the active app build configuration.
+    #if OGS_BETA
+    static let current = beta
+    #else
+    static let current = production
+    #endif
 
     /// Creates an endpoint pair without validating that either URL is trusted.
     /// Callers are responsible for supplying credential-free, expected origins.
@@ -182,8 +189,7 @@ class OGSService: ObservableObject {
         return ogs
     }
 
-    static let ogsRoot = OGSEnvironment.production.rootURL.absoluteString
-//    static let ogsRoot = "https://beta.online-go.com"
+    static let ogsRoot = OGSEnvironment.current.rootURL.absoluteString
     private let environment: OGSEnvironment
     private var ogsRoot: String { environment.rootURL.absoluteString }
 
@@ -315,12 +321,15 @@ class OGSService: ObservableObject {
     
     private convenience init(forPreview: Bool = false) {
         self.init(
-            environment: .production,
+            environment: .current,
             httpClient: AlamofireOGSHTTPClient.shared,
             preferences: userDefaults,
-            ogsWebsocket: OGSWebsocket(),
+            ogsWebsocket: OGSWebsocket(
+                rootURL: OGSEnvironment.current.rootURL,
+                websocketURL: OGSEnvironment.current.websocketURL
+            ),
             connectsAutomatically: !forPreview,
-            usesSurroundOverviewService: !forPreview,
+            usesSurroundOverviewService: !forPreview && OGSEnvironment.current == .production,
             enablesAppSideEffects: !forPreview,
             startsTimers: !forPreview,
             installsObservers: !forPreview,

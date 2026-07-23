@@ -61,11 +61,11 @@ struct OGSBrowserView: View {
 struct UnsupportedGoogleLoginView: View {
     @Environment(\.openURL) private var openURL
 
-    private let accountSettingsURL = URL(string: "https://online-go.com/settings/account")!
+    private let accountSettingsURL = URL(string: "\(OGSService.ogsRoot)/settings/account")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Signing in to Surround with Google is currently not supported. To use this OGS account in Surround, please open OGS Account Settings on the web (https://online-go.com/settings/account) and either add a password or link another sign-in method. Then return to Surround and sign in with that method instead.")
+            Text("Signing in to Surround with Google is currently not supported. To use this OGS account in Surround, please open OGS Account Settings on the web (\(accountSettingsURL.absoluteString)) and either add a password or link another sign-in method. Then return to Surround and sign in with that method instead.")
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button(action: { openURL(accountSettingsURL) }) {
@@ -301,4 +301,3 @@ if (localStorage.getItem('ogs.config.user')==null) {
         }
     }
 }
-

@@ -13,6 +13,7 @@ import StoreKit
 enum SurroundServiceError: Error {
     case notLoggedIn
     case failedVerification
+    case unavailableForOGSEnvironment
 }
 
 struct SupporterProduct: Identifiable {
@@ -22,6 +23,11 @@ struct SupporterProduct: Identifiable {
 
 class SurroundService: NSObject, ObservableObject {
     static var shared = SurroundService()
+
+    /// The companion service only supports accounts from the production OGS site.
+    private static var isAvailableForCurrentOGSEnvironment: Bool {
+        OGSEnvironment.current == .production
+    }
     
 //    static let sgsRoot = "http://192.168.1.118:8000"
     static let sgsRoot = "https://surround.honganhkhoa.com"
@@ -81,6 +87,8 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func registerDeviceIfLoggedIn(pushToken: Data) {
+        guard Self.isAvailableForCurrentOGSEnvironment else { return }
+
         if let uiconfig = userDefaults[.ogsUIConfig],
            let ogsSessionId = userDefaults[.ogsSessionId],
            let ogsCsrfToken = uiconfig.csrfToken {
@@ -139,6 +147,8 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func unregisterDevice() {
+        guard Self.isAvailableForCurrentOGSEnvironment else { return }
+
         if let accessToken = userDefaults[.sgsAccessToken] {
             AF.request(
                 "\(self.sgsRoot)/unregister",
@@ -151,6 +161,8 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func setPushEnabled(enabled: Bool) {
+        guard Self.isAvailableForCurrentOGSEnvironment else { return }
+
         if let accessToken = userDefaults[.sgsAccessToken] {
             AF.request(
                 "\(self.sgsRoot)/enable_push",
@@ -166,6 +178,11 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func getOGSOverview(allowsCache: Bool = false) -> AnyPublisher<[String: Any], Error> {
+        guard Self.isAvailableForCurrentOGSEnvironment else {
+            return Fail(error: SurroundServiceError.unavailableForOGSEnvironment)
+                .eraseToAnyPublisher()
+        }
+
         return Future<[String: Any], Error> { promise in
             if let accessToken = userDefaults[.sgsAccessToken] {
                 AF.request(

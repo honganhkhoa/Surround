@@ -21,7 +21,7 @@ I made this project open source with a permissive license in the hope that it ca
 # Getting Started
 1. It is quite straightforward to run this project, just open the Xcode project file (`Surround.xcodeproj`) with a not-too-old version of Xcode, and you should be able to build and run the project.
 2. You might have a warning on missing a "pc file". That is a [known issue](https://github.com/daltoniam/Starscream/issues/719) caused by the [Starscream](https://github.com/daltoniam/Starscream) library, which is a dependency of the [Socket.io client library for Swift](https://github.com/socketio/socket.io-client-swift). You can ignore the warning or install `pkg-config` as instructed in the issue link to silence the warning.
-3. To use the beta site of OGS, change the `ogsRoot` variable in the `OGSService.swift` file to the URL of OGS's beta site (https://beta.online-go.com).
+3. To run against the isolated OGS beta site, select the shared **Surround Beta** scheme. It installs beside the production app with a separate bundle ID, icon, app-group data, and URL scheme.
 
 ### About Surround on macOS
 Surround can run as a macOS app without any modification, just set Xcode to build and run for macOS and it should work pretty well. However, I have not done any work to optimize the app for macOS so it is pretty rough, might contains a lot of bugs.

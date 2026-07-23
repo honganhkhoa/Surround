@@ -58,6 +58,12 @@ debounced model observers that can initiate follow-up requests.
 
 ## Live OGS beta tests
 
+To explore the beta site interactively, select the shared **Surround Beta**
+scheme in Xcode and run the app normally. Its dedicated build configurations
+select `https://beta.online-go.com` for both REST and WebSocket traffic, use a
+separate bundle ID and app-group suite, and bypass the production-only Surround
+companion service. The scheme does not contain account names or credentials.
+
 The beta workflow is intentionally absent from push, pull request, and scheduled triggers. Its concurrency group allows only one play-through to use the shared account pool at a time.
 
 The workflow fixes the destination to `https://beta.online-go.com` and provides these dedicated account names:

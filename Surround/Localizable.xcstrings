@@ -7640,24 +7640,24 @@
         }
       }
     },
-    "Signing in to Surround with Google is currently not supported. To use this OGS account in Surround, please open OGS Account Settings on the web (https://online-go.com/settings/account) and either add a password or link another sign-in method. Then return to Surround and sign in with that method instead." : {
+    "Signing in to Surround with Google is currently not supported. To use this OGS account in Surround, please open OGS Account Settings on the web (%@) and either add a password or link another sign-in method. Then return to Surround and sign in with that method instead." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La connexion à Surround avec Google n’est actuellement pas prise en charge. Pour utiliser ce compte OGS dans Surround, ouvrez les paramètres du compte OGS sur le web (https://online-go.com/settings/account), puis ajoutez un mot de passe ou associez une autre méthode de connexion. Revenez ensuite dans Surround et connectez-vous avec cette méthode."
+            "value" : "La connexion à Surround avec Google n’est actuellement pas prise en charge. Pour utiliser ce compte OGS dans Surround, ouvrez les paramètres du compte OGS sur le web (%@), puis ajoutez un mot de passe ou associez une autre méthode de connexion. Revenez ensuite dans Surround et connectez-vous avec cette méthode."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GoogleでSurroundにサインインすることは現在サポートされていません。このOGSアカウントをSurroundで使うには、WebのOGSアカウント設定（https://online-go.com/settings/account）を開き、パスワードを追加するか別のサインイン方法をリンクしてください。その後Surroundに戻り、その方法でサインインしてください。"
+            "value" : "GoogleでSurroundにサインインすることは現在サポートされていません。このOGSアカウントをSurroundで使うには、WebのOGSアカウント設定（%@）を開き、パスワードを追加するか別のサインイン方法をリンクしてください。その後Surroundに戻り、その方法でサインインしてください。"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hiện tại Surround chưa hỗ trợ đăng nhập bằng Google. Để dùng tài khoản OGS này trong Surround, vui lòng mở phần Cài đặt tài khoản OGS trên web (https://online-go.com/settings/account), rồi thêm mật khẩu hoặc liên kết một phương thức đăng nhập khác. Sau đó quay lại Surround và đăng nhập bằng phương thức đó."
+            "value" : "Hiện tại Surround chưa hỗ trợ đăng nhập bằng Google. Để dùng tài khoản OGS này trong Surround, vui lòng mở phần Cài đặt tài khoản OGS trên web (%@), rồi thêm mật khẩu hoặc liên kết một phương thức đăng nhập khác. Sau đó quay lại Surround và đăng nhập bằng phương thức đó."
           }
         }
       }
