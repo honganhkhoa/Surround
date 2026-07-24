@@ -6,35 +6,180 @@
 //
 
 import XCTest
+import UIKit
 
-class SurroundUITests: XCTestCase {
+final class SurroundUITests: XCTestCase {
+    private func activateZenControl(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        #if targetEnvironment(macCatalyst)
+        element(
+            identifier,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        app.typeKey("z", modifierFlags: [.control, .option])
+        #else
+        tap(
+            identifier,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        #endif
+    }
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
+    private func launchApp() -> XCUIApplication {
+        #if !targetEnvironment(macCatalyst)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        #endif
 
-    func testExample() throws {
-        // UI tests must launch the application that they test.
         let app = XCUIApplication()
+        app.launchArguments = [SurroundUITestContract.launchArgument]
         app.launch()
-
-        // Use recording to get started writing UI tests.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        #if targetEnvironment(macCatalyst)
+        app.activate()
+        #endif
+        return app
     }
 
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+    @discardableResult
+    private func element(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching elementType: XCUIElement.ElementType = .any,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let element = app
+            .descendants(matching: elementType)
+            .matching(identifier: identifier)
+            .firstMatch
+        let appeared = element.waitForExistence(timeout: 10)
+        if !appeared {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Accessibility hierarchy – missing \(identifier)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
         }
+        XCTAssertTrue(
+            appeared,
+            "Expected element with identifier \(identifier)",
+            file: file,
+            line: line
+        )
+        return element
+    }
+
+    private func tap(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching elementType: XCUIElement.ElementType = .any,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let element = element(
+            identifier,
+            in: app,
+            matching: elementType,
+            file: file,
+            line: line
+        )
+        let hittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"),
+            object: element
+        )
+        let result = XCTWaiter.wait(for: [hittable], timeout: 10)
+        if result != .completed {
+            let hierarchy = XCTAttachment(
+                string: """
+                Element:
+                \(element.debugDescription)
+
+                Application hierarchy:
+                \(app.debugDescription)
+                """
+            )
+            hierarchy.name = "Accessibility hierarchy – not hittable \(identifier)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertEqual(
+            result,
+            .completed,
+            "Expected element with identifier \(identifier) to be hittable",
+            file: file,
+            line: line
+        )
+        #if targetEnvironment(macCatalyst)
+        element.click()
+        #else
+        element.tap()
+        #endif
+    }
+
+    func testTopLevelNavigation() throws {
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom == .phone,
+            "Top-level navigation requires the regular-width iPad or Mac layout."
+        )
+
+        let app = launchApp()
+
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationPublicGames, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationAbout, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationBrowser, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenBrowser, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+    }
+
+    func testFixtureGameOpens() {
+        let app = launchApp()
+        let gameID = SurroundUITestContract.fixtureGameID
+
+        tap(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        element(SurroundUITestContract.AccessibilityID.gameOptions, in: app)
+    }
+
+    func testZenModeRoundTrip() {
+        let app = launchApp()
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeGame(SurroundUITestContract.fixtureGameID),
+            in: app
+        )
+        activateZenControl(
+            SurroundUITestContract.AccessibilityID.gameZenEnter,
+            in: app
+        )
+        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        activateZenControl(
+            SurroundUITestContract.AccessibilityID.gameZenExit,
+            in: app
+        )
+        element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
     }
 }

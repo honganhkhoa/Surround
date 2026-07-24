@@ -52,6 +52,7 @@ struct PublicGamesList: View {
             }
         }
         .navigationBarTitle(Text("Public live games"))
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenPublicGames)
     }
 }
 

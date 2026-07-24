@@ -36,6 +36,7 @@ jobs:
             -scheme Surround \
             -project Surround.xcodeproj \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -only-testing:SurroundTests \
             -enableCodeCoverage YES \
             -resultBundlePath TestResults/SurroundTests.xcresult
 
@@ -49,6 +50,41 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surround-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
+  ipad-ui-tests:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select an iPadOS 26 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run iPad UI tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          xcodebuild test \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -only-testing:SurroundUITests \
+            -resultBundlePath TestResults/SurroundUITests-iPad.xcresult
+
+      - name: Upload iPad UI test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ipad-ui-test-results
           path: TestResults
           if-no-files-found: warn
           retention-days: 14

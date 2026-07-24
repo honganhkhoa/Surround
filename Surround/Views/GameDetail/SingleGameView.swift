@@ -117,6 +117,16 @@ struct SingleGameView: View {
                     highlightCoordinates: hoveredCoordinates
                 )
             }
+            #if DEBUG && MAIN_APP
+            if SurroundUITestContract.isEnabled {
+                // Canvas does not otherwise expose a stable element to XCTest.
+                Text(verbatim: "Go board")
+                    .foregroundStyle(.clear)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameBoard)
+            }
+            #endif
         }
     }
     
@@ -494,6 +504,8 @@ struct SingleGameView: View {
                     Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
                         .labelStyle(IconOnlyLabelStyle())
                 }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
+                .surroundUITestZenShortcut()
                 .padding()
             }
         }

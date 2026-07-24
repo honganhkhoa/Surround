@@ -133,6 +133,9 @@ struct HomeView: View {
                                     Button(action: { showGameDetail(game: game) }) {
                                         GameCell(game: game, displayMode: displayMode)
                                     }
+                                    .accessibilityIdentifier(
+                                        SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                    )
                                     .buttonStyle(.plain)
                                     .padding(.vertical, displayMode == .full ? nil : 0)
                                     .padding(.horizontal)
@@ -144,6 +147,9 @@ struct HomeView: View {
                                 Button(action: { showGameDetail(game: game) }) {
                                     GameCell(game: game, displayMode: displayMode)
                                 }
+                                .accessibilityIdentifier(
+                                    SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
@@ -160,6 +166,9 @@ struct HomeView: View {
                                 Button(action: { showGameDetail(game: game) }) {
                                     GameCell(game: game, displayMode: displayMode)
                                 }
+                                .accessibilityIdentifier(
+                                    SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
@@ -358,6 +367,7 @@ struct HomeView: View {
         .onChange(of: displayMode, initial: true) { _, newDisplayMode in
             userDefaults[.homeViewDisplayMode] = newDisplayMode.rawValue
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenHome)
     }
 }
 

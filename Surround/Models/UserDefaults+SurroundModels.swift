@@ -14,7 +14,23 @@ let userDefaultsSuite = "group.com.honganhkhoa.Surround.Beta"
 #else
 let userDefaultsSuite = "group.com.honganhkhoa.Surround"
 #endif
-let userDefaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
+
+private func makeSurroundUserDefaults() -> UserDefaults {
+    #if DEBUG && MAIN_APP
+    if SurroundUITestContract.isEnabled {
+        let suiteName = SurroundUITestContract.preferencesSuite
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            fatalError("Unable to create the isolated Surround UI-test preferences suite.")
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+    #endif
+
+    return UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
+}
+
+let userDefaults = makeSurroundUserDefaults()
 
 // From https://www.swiftbysundell.com/articles/the-power-of-subscripts-in-swift/
 struct SettingKey<Value> {

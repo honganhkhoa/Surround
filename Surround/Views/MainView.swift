@@ -13,6 +13,8 @@ struct MainView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
+
+    let allowsRemoteActivity: Bool
     
     @State var backgroundTask: PlatformBackgroundTask?
     @State var widgetInfos = [WidgetInfo]()
@@ -20,7 +22,12 @@ struct MainView: View {
 
     @EnvironmentObject var nav: NavigationService
 
+    init(allowsRemoteActivity: Bool = true) {
+        self.allowsRemoteActivity = allowsRemoteActivity
+    }
+
     func updateDisplaySleepPrevention() {
+        guard allowsRemoteActivity else { return }
         let hasLiveGame = !ogs.liveGames.isEmpty || ogs.waitingLiveGames > 0
         SystemPlatformServices.shared.setPreventsDisplaySleep(
             scenePhase == .active && hasLiveGame
@@ -33,6 +40,7 @@ struct MainView: View {
     }
     
     func onAppActive(newLaunch: Bool) {
+        guard allowsRemoteActivity else { return }
         WidgetCenter.shared.getCurrentConfigurations { result in
             if case .success(let widgetInfos) = result {
                 self.widgetInfos = widgetInfos
@@ -91,7 +99,9 @@ struct MainView: View {
             DispatchQueue.main.async {
                 if self.firstLaunch {
                     self.firstLaunch = false
-                    self.onAppActive(newLaunch: true)
+                    if allowsRemoteActivity {
+                        self.onAppActive(newLaunch: true)
+                    }
                 }
             }
         }
@@ -103,31 +113,46 @@ struct MainView: View {
 
         return ZStack(alignment: .top) {
             TabView(selection: navigationCurrentView) {
-                Tab(RootView.home.title, systemImage: RootView.home.systemImage, value: RootView.home) {
+                Tab(value: RootView.home) {
                     RootView.home.navigationView
+                } label: {
+                    RootView.home.label
                 }
-                Tab(RootView.publicGames.title, systemImage: RootView.publicGames.systemImage, value: RootView.publicGames) {
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationHome)
+                Tab(value: RootView.publicGames) {
                     RootView.publicGames.navigationView
+                } label: {
+                    RootView.publicGames.label
                 }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
                 if ogs.privateMessagesActivePeerIds.count > 0 {
                     Tab(RootView.privateMessages.title, systemImage: RootView.privateMessages.systemImage, value: RootView.privateMessages) {
                         RootView.privateMessages.navigationView
                     }
                 }
                 TabSection("Surround") {
-                    Tab(RootView.settings.title, systemImage: RootView.settings.systemImage, value: RootView.settings) {
+                    Tab(value: RootView.settings) {
                         RootView.settings.navigationView
+                    } label: {
+                        RootView.settings.label
                     }
-                    Tab(RootView.about.title, systemImage: RootView.about.systemImage, value: RootView.about) {
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationSettings)
+                    Tab(value: RootView.about) {
                         RootView.about.navigationView
+                    } label: {
+                        RootView.about.label
                     }
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationAbout)
                 }
                 .hidden(horizontalSizeClass == .compact)
                 .defaultVisibility(.hidden, for: .tabBar)
                 TabSection("OGS") {
-                    Tab(RootView.browser.title, systemImage: RootView.browser.systemImage, value: RootView.browser) {
+                    Tab(value: RootView.browser) {
                         RootView.browser.navigationView
+                    } label: {
+                        RootView.browser.label
                     }
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationBrowser)
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
@@ -172,6 +197,7 @@ struct MainView: View {
             }
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
+            guard allowsRemoteActivity else { return }
             if phase == .active {
                 updateDisplaySleepPrevention()
                 self.onAppActive(newLaunch: false)
@@ -192,6 +218,7 @@ struct MainView: View {
             }
         }
         .onReceive(Publishers.CombineLatest(ogs.$liveGames, ogs.$waitingLiveGames), perform: { liveGames, waitingLiveGames in
+            guard allowsRemoteActivity else { return }
             SystemPlatformServices.shared.setPreventsDisplaySleep(
                 scenePhase == .active && (!liveGames.isEmpty || waitingLiveGames > 0)
             )

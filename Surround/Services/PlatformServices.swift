@@ -124,6 +124,11 @@ final class SystemPlatformServices: PlatformServicing {
     }
 
     func open(_ url: URL) {
+        #if DEBUG && MAIN_APP
+        guard !SurroundUITestContract.isEnabled else {
+            return
+        }
+        #endif
         UIApplication.shared.open(url)
     }
 

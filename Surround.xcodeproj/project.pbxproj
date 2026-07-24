@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		AE3000013A00000000000001 /* PlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3000023A00000000000002 /* PlatformServices.swift */; };
+		AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
+		AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */; };
+		AE3100033A00000000000003 /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
 		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
 		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
 		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
@@ -407,6 +410,8 @@
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 		AE3000023A00000000000002 /* PlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformServices.swift; sourceTree = "<group>"; };
+		AE3100043A00000000000004 /* SurroundUITestContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestContract.swift; sourceTree = "<group>"; };
+		AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestOfflineServices.swift; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -624,6 +629,7 @@
 				BC042B3E24AB2DD10050B2D1 /* Components */,
 				BC042B2924AB2DD00050B2D1 /* Views */,
 				BC042B3024AB2DD00050B2D1 /* Data */,
+				AE3100063A00000000000006 /* UITesting */,
 				BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */,
 				BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */,
 				BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */,
@@ -654,6 +660,15 @@
 				BC042AF924AB2CFA0050B2D1 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		AE3100063A00000000000006 /* UITesting */ = {
+			isa = PBXGroup;
+			children = (
+				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
+				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
+			);
+			path = UITesting;
 			sourceTree = "<group>";
 		};
 		BC042B0324AB2CFA0050B2D1 /* SurroundTests */ = {
@@ -1227,6 +1242,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
+				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
+				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
 				BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
@@ -1350,6 +1367,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE3100033A00000000000003 /* SurroundUITestContract.swift in Sources */,
 				BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2016,8 +2034,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.SurroundUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 				TEST_TARGET_NAME = Surround;
 			};
 			name = Debug;
@@ -2035,8 +2054,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.SurroundUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 				TEST_TARGET_NAME = Surround;
 			};
 			name = Release;

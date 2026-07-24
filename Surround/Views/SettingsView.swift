@@ -175,6 +175,7 @@ struct SettingsView: View {
             .frame(maxWidth: 600)
         }
         .navigationTitle("Settings")
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenSettings)
     }
 }
 

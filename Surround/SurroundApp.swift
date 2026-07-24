@@ -20,6 +20,9 @@ struct SurroundApp: App {
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        guard !SurroundUITestContract.isEnabled else {
+            return true
+        }
         
         SystemPlatformServices.shared.configureAmbientAudioSession()
         
@@ -38,10 +41,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
     
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        guard !SurroundUITestContract.isEnabled else { return }
         SurroundService.shared.registerDeviceIfLoggedIn(pushToken: deviceToken)
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        guard !SurroundUITestContract.isEnabled else {
+            completionHandler()
+            return
+        }
         
         let userInfo = response.notification.request.content.userInfo
         if let rootViewString = userInfo["rootView"] as? String,

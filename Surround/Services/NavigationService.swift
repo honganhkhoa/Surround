@@ -41,8 +41,6 @@ class NavigationService: ObservableObject {
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
     @Published var publicGames = PublicGamesViewParameter()
-    
-    @Published var columnVisibility = NavigationSplitViewVisibility.automatic
 
     static func instance(forSceneWithID sceneID: String) -> NavigationService {
         if let result = instances[sceneID] {
@@ -171,7 +169,25 @@ enum RootView: String, CaseIterable, Identifiable {
         case .about:
             AboutView()
         case .browser:
+            #if DEBUG
+            if SurroundUITestContract.isEnabled {
+                VStack(spacing: 12) {
+                    Image(systemName: "safari")
+                        .font(.largeTitle)
+                    Text("Web version")
+                        .font(.headline)
+                    Text("The web view is unavailable in offline UI tests.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenBrowser)
+            } else {
+                OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/overview")!)
+            }
+            #else
             OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/overview")!)
+            #endif
         case .forums:
             OGSBrowserView(initialURL: URL(string: "https://forums.online-go.com/")!)
         }

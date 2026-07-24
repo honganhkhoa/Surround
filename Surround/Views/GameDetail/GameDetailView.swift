@@ -23,8 +23,6 @@ struct GameDetailView: View {
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
     @State var analyzeMode = false
-    
-    @State var columnVisibilityBeforeZenMode = NavigationSplitViewVisibility.automatic
 
     @ObservedObject var settings = userDefaults
     
@@ -93,16 +91,13 @@ struct GameDetailView: View {
     
     func enterZenMode() {
         withAnimation {
-            columnVisibilityBeforeZenMode = nav.columnVisibility
             zenMode = true
-            nav.columnVisibility = .detailOnly
         }
     }
     
     func exitZenMode() {
         withAnimation {
             zenMode = false
-            nav.columnVisibility = columnVisibilityBeforeZenMode
         }
     }
     
@@ -202,6 +197,10 @@ struct GameDetailView: View {
                 regularBody
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameDetail(currentGame.ogsID ?? -1)
+        )
         .background(
             colorScheme == .dark ?
                 Color(UIColor.systemGray5).edgesIgnoringSafeArea(.bottom) :
@@ -269,15 +268,20 @@ struct GameDetailView: View {
                                     Button(action: enterZenMode) {
                                         Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                                     }
+                                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenEnter)
+                                    .surroundUITestZenShortcut()
                                 }
                                 Button(action: { self.showSettings = true }) {
                                     Label("Options", systemImage: "gearshape.2")
                                 }
+                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                             }
                         } else if zenMode {
                             Button(action: exitZenMode) {
                                 Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
                             }
+                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
+                            .surroundUITestZenShortcut()
                         }
                     }
                 }
@@ -318,17 +322,37 @@ struct GameDetailView: View {
                         Button(action: enterZenMode) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenEnter)
+                        .surroundUITestZenShortcut()
                         .disabled(analyzeMode)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: { self.showSettings = true }) {
                             Label("Options", systemImage: "gearshape.2")
                         }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                     }
                 }
                 .toolbar(zenMode ? .hidden : .automatic, for: .tabBar)
             )
         }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func surroundUITestZenShortcut() -> some View {
+        #if DEBUG
+        if SurroundUITestContract.isEnabled {
+            // Catalyst 26 exposes the toolbar control to XCTest but does not
+            // dispatch its action through synthesized pointer events.
+            keyboardShortcut("z", modifiers: [.control, .option])
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }
 

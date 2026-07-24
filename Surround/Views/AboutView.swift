@@ -137,6 +137,7 @@ struct AboutView: View {
             .padding()
         }
         .navigationTitle("About")
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenAbout)
     }
 }
 

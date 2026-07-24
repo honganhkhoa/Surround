@@ -146,6 +146,27 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(data["strict_seki_mode"] as? Bool, false)
     }
 
+    func testFinishedActiveGameEventRemovesGameWithoutCreatingFinishedGames() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var event = makeShortGameData(id: 101, phase: "finished")
+
+        socket.deliver(name: "active_game", data: event)
+
+        XCTAssertNil(service.activeGames[101])
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        event["phase"] = "play"
+        socket.deliver(name: "active_game", data: event)
+        XCTAssertNotNil(service.activeGames[101])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/connect"])
+
+        event["phase"] = "finished"
+        socket.deliver(name: "active_game", data: event)
+        XCTAssertNil(service.activeGames[101])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/connect"])
+    }
+
     private func makeService(socket: OGSWebsocketProtocol) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -159,6 +180,17 @@ final class OGSServiceEventTests: XCTestCase {
             enablesAppSideEffects: false,
             startsTimers: false
         )
+    }
+
+    private func makeShortGameData(id: Int, phase: String) -> [String: Any] {
+        [
+            "id": id,
+            "phase": phase,
+            "width": 5,
+            "height": 5,
+            "black": ["id": 1, "username": "black"],
+            "white": ["id": 2, "username": "white"],
+        ]
     }
 
     private func makeEmptyGameData(id: Int) throws -> OGSGame {

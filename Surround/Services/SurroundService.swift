@@ -22,7 +22,11 @@ struct SupporterProduct: Identifiable {
 }
 
 class SurroundService: NSObject, ObservableObject {
-    static var shared = SurroundService()
+    static var shared = SurroundService(allowsRemoteActivity: true)
+
+    #if DEBUG && MAIN_APP
+    static let offlineUITestInstance = SurroundService(allowsRemoteActivity: false)
+    #endif
 
     /// The companion service only supports accounts from the production OGS site.
     private static var isAvailableForCurrentOGSEnvironment: Bool {
@@ -35,10 +39,14 @@ class SurroundService: NSObject, ObservableObject {
     private var sgsRoot = SurroundService.sgsRoot
     private var transactionUpdatesTask: Task<Void, Never>?
     private var storeProductsById = [String: Product]()
+    private let allowsRemoteActivity: Bool
     
-    private override init() {
+    private init(allowsRemoteActivity: Bool) {
+        self.allowsRemoteActivity = allowsRemoteActivity
         super.init()
-        transactionUpdatesTask = observeTransactionUpdates()
+        if allowsRemoteActivity {
+            transactionUpdatesTask = observeTransactionUpdates()
+        }
     }
     
     func isProductionEnvironment() -> Bool {
@@ -87,6 +95,7 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func registerDeviceIfLoggedIn(pushToken: Data) {
+        guard allowsRemoteActivity else { return }
         guard Self.isAvailableForCurrentOGSEnvironment else { return }
 
         if let uiconfig = userDefaults[.ogsUIConfig],
@@ -147,6 +156,7 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func unregisterDevice() {
+        guard allowsRemoteActivity else { return }
         guard Self.isAvailableForCurrentOGSEnvironment else { return }
 
         if let accessToken = userDefaults[.sgsAccessToken] {
@@ -161,6 +171,7 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func setPushEnabled(enabled: Bool) {
+        guard allowsRemoteActivity else { return }
         guard Self.isAvailableForCurrentOGSEnvironment else { return }
 
         if let accessToken = userDefaults[.sgsAccessToken] {
@@ -178,6 +189,10 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func getOGSOverview(allowsCache: Bool = false) -> AnyPublisher<[String: Any], Error> {
+        guard allowsRemoteActivity else {
+            return Fail(error: SurroundServiceError.unavailableForOGSEnvironment)
+                .eraseToAnyPublisher()
+        }
         guard Self.isAvailableForCurrentOGSEnvironment else {
             return Fail(error: SurroundServiceError.unavailableForOGSEnvironment)
                 .eraseToAnyPublisher()
@@ -230,6 +245,7 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func fetchProducts() {
+        guard allowsRemoteActivity else { return }
         fetchingProducts = true
         fetchError = nil
         Task {
@@ -264,6 +280,7 @@ class SurroundService: NSObject, ObservableObject {
     }
 
     func subscribe(to product: SupporterProduct) {
+        guard allowsRemoteActivity else { return }
         guard let storeProduct = storeProductsById[product.id] else {
             return
         }
@@ -304,6 +321,7 @@ class SurroundService: NSObject, ObservableObject {
     }
     
     func restorePurchases() {
+        guard allowsRemoteActivity else { return }
         processingTransaction = true
         Task {
             do {

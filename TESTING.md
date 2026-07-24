@@ -1,29 +1,76 @@
 # Testing Surround
 
-Surround's automated tests are split into two groups:
+Surround's automated tests are split into three groups:
 
 - `SurroundTests` contains deterministic unit and service tests. These run for every push and pull request and must not contact OGS.
+- `SurroundUITests` contains deterministic, offline journeys shared by iPadOS and
+  Mac Catalyst. Each test launches independently with bundled fixtures and the
+  Debug-only `--surround-ui-testing` argument.
 - `SurroundBetaTests` contains live integration scenarios against the isolated OGS beta service. Its separate shared scheme keeps it out of normal test runs; run it only by explicitly selecting that scheme locally or manually dispatching the **OGS beta integration tests** workflow.
 
-## Deterministic tests
+The offline UI-test runtime uses a dedicated preferences suite, rejecting HTTP
+transport, and a no-op WebSocket. It does not use the production or Beta
+account data and cannot contact OGS.
 
-Run the normal suite from Xcode, or select an installed iOS 26 simulator and run it from the command line:
+## Deterministic unit tests
+
+Run `SurroundTests` from Xcode, or select an installed iOS 26 iPhone simulator
+and run the unit target from the command line:
 
 ```sh
-simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26)"
+simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPhone)"
 xcodebuild test \
   -scheme Surround \
   -project Surround.xcodeproj \
-  -destination "platform=iOS Simulator,id=${simulator_id}"
+  -destination "platform=iOS Simulator,id=${simulator_id}" \
+  -only-testing:SurroundTests
 ```
 
-## Mac Catalyst build
+The simulator helper accepts an iOS major version and an optional exact family
+of `iPhone` or `iPad`; it defaults to `iPhone`.
+
+## Offline iPad UI tests
+
+The shared journeys cover top-level navigation, opening the bundled fixture
+game, and entering and leaving Zen mode. The suite selects landscape orientation
+itself:
+
+```sh
+simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+xcodebuild test \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=${simulator_id}" \
+  -only-testing:SurroundUITests
+```
+
+## Signed local Mac Catalyst UI tests
+
+Mac Catalyst UI automation needs a signed build and an unlocked Mac UI session.
+Select the **Surround** scheme and **My Mac (Mac Catalyst)** in Xcode, then run
+`SurroundUITests`, or use:
+
+```sh
+xcodebuild test \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination 'platform=macOS,variant=Mac Catalyst,name=My Mac' \
+  -only-testing:SurroundUITests
+```
+
+Hosted CI remains compile-only for Catalyst. The deterministic Catalyst UI
+journeys are run locally on an unlocked Mac.
+
+## Unsigned Mac Catalyst builds
 
 The main app and widget support the Mac-optimized Catalyst interface. The
 notification content and notification service extensions remain iOS-only, so
 the Catalyst app intentionally excludes them.
 
-Use the same unsigned compile-only check as CI:
+Build the production configuration with the same unsigned compile-only check as
+CI:
 
 ```sh
 xcodebuild build \
@@ -34,13 +81,16 @@ xcodebuild build \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-For a signed manual smoke test, run the **Surround** scheme on **My Mac
-(Mac Catalyst)** and verify:
+Build the Beta configuration independently:
 
-1. Sign in and load the overview.
-2. Move between Home, Public Games, Settings, and About.
-3. Open a game, interact with the board, and return to the overview.
-4. Use **Open in browser** from the game menu.
+```sh
+xcodebuild build \
+  -scheme 'Surround Beta' \
+  -project Surround.xcodeproj \
+  -configuration 'Beta Debug' \
+  -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+  CODE_SIGNING_ALLOWED=NO
+```
 
 ## OGS service and WebSocket test seams
 

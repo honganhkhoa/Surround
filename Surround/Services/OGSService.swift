@@ -189,6 +189,51 @@ class OGSService: ObservableObject {
         return ogs
     }
 
+    #if DEBUG && MAIN_APP
+    /// A deterministic, signed-in OGS service for app-driven UI tests.
+    ///
+    /// Both transports are incapable of reaching OGS. The fixture is loaded
+    /// synchronously from the app bundle, and observers, timers, automatic
+    /// connection, companion-service access, and app-global side effects are
+    /// all disabled.
+    static func offlineUITestInstance() -> OGSService {
+        let ogs = OGSService(
+            environment: .current,
+            httpClient: SurroundUITestRejectingHTTPClient(),
+            preferences: userDefaults,
+            ogsWebsocket: SurroundUITestNoOpWebsocket(),
+            connectsAutomatically: false,
+            usesSurroundOverviewService: false,
+            enablesAppSideEffects: false,
+            startsTimers: false,
+            installsObservers: false,
+            remoteSettings: OGSRemoteSetting(preferences: userDefaults)
+        )
+
+        let fixtureUser = OGSUser(username: "kata-bot", id: 592_684)
+        ogs.user = fixtureUser
+        ogs.isLoggedIn = true
+        ogs.cachedUsersById[fixtureUser.id] = fixtureUser
+        ogs.socketStatus = .connected
+        ogs.isLoadingOverview = false
+
+        let fixtureGame = TestData.Ongoing19x19wBot2
+        precondition(fixtureGame.ogsID == SurroundUITestContract.fixtureGameID)
+        fixtureGame.ogs = ogs
+        fixtureGame.ogsRawData = fixtureGame.ogsRawData ?? [:]
+        ogs.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
+        ogs.sortActiveGames(activeGames: ogs.activeGames.values)
+
+        let publicGame = TestData.Ongoing19x19HandicappedWithNoInitialState
+        publicGame.ogs = ogs
+        publicGame.ogsRawData = publicGame.ogsRawData ?? [:]
+        ogs.publicGames[publicGame.ogsID!] = publicGame
+        ogs.sortedPublicGames = [publicGame]
+
+        return ogs
+    }
+    #endif
+
     static let ogsRoot = OGSEnvironment.current.rootURL.absoluteString
     private let environment: OGSEnvironment
     private var ogsRoot: String { environment.rootURL.absoluteString }
@@ -1147,6 +1192,10 @@ class OGSService: ObservableObject {
     
     func updateActiveGames(withShortGameData gameData: [String: Any]) {
         if let gameId = gameData["id"] as? Int {
+            if gameData["phase"] as? String == OGSGamePhase.finished.rawValue {
+                self.activeGames.removeValue(forKey: gameId)
+                return
+            }
             if let game = self.activeGames[gameId] {
                 // Trigger $activeGames publisher
                 self.activeGames[gameId] = game
