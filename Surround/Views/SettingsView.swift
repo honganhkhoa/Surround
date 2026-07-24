@@ -130,7 +130,7 @@ struct SettingsView: View {
                         print(error)
                     } else if granted {
                         DispatchQueue.main.async {
-                            UIApplication.shared.registerForRemoteNotifications()
+                            SystemPlatformServices.shared.registerForRemoteNotifications()
                         }
                     }
                     print("Notifications permission granted: \(granted)")

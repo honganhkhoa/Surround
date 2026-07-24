@@ -33,7 +33,9 @@ struct Goban: View {
     var hoveredPoint: Binding<[Int]?> = .constant(nil)
     var isHoveredPointValid: Bool? = nil
     var selectedPoint: Binding<[Int]?> = .constant(nil)
+    #if MAIN_APP
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
+    #endif
 
     @Setting(.hapticsFeedback) var hapticsFeedbback: Bool
     
@@ -115,17 +117,21 @@ struct Goban: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged({ value in
+                    #if MAIN_APP
                     if self.selectionFeedbackGenerator == nil && self.hapticsFeedbback {
-                        self.selectionFeedbackGenerator = UISelectionFeedbackGenerator()
-                        self.selectionFeedbackGenerator?.prepare()
+                        self.selectionFeedbackGenerator = SystemPlatformServices.shared
+                            .makeSelectionFeedbackGenerator()
                     }
+                    #endif
                     selectedPoint.wrappedValue = nil
                     highlightedRow = Int((value.location.y / size - 0.5).rounded())
                     highlightedColumn = Int((value.location.x / size - 0.5).rounded())
                     if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
                         if hoveredPoint.wrappedValue != [highlightedRow, highlightedColumn] {
                             hoveredPoint.wrappedValue = [highlightedRow, highlightedColumn]
+                            #if MAIN_APP
                             self.selectionFeedbackGenerator?.selectionChanged()
+                            #endif
                         }
                     } else {
                         hoveredPoint.wrappedValue = nil
@@ -137,17 +143,23 @@ struct Goban: View {
                     if isHoveredPointValid ?? false {
                         if let hoveredPoint = hoveredPoint.wrappedValue {
                             selectedPoint.wrappedValue = hoveredPoint
+                            #if MAIN_APP
                             if self.hapticsFeedbback {
-                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                SystemPlatformServices.shared.playNotificationFeedback(.success)
                             }
+                            #endif
                         } else {
+                            #if MAIN_APP
                             if self.hapticsFeedbback {
-                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                SystemPlatformServices.shared.playNotificationFeedback(.warning)
                             }
+                            #endif
                         }
                     }
                     hoveredPoint.wrappedValue = nil
+                    #if MAIN_APP
                     self.selectionFeedbackGenerator = nil
+                    #endif
                 }
         )
     }

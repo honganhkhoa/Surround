@@ -24,9 +24,13 @@ I made this project open source with a permissive license in the hope that it ca
 3. To run against the isolated OGS beta site, select the shared **Surround Beta** scheme. It installs beside the production app with a separate bundle ID, icon, app-group data, and URL scheme.
 
 ### About Surround on macOS
-Surround can run as a macOS app without any modification, just set Xcode to build and run for macOS and it should work pretty well. However, I have not done any work to optimize the app for macOS so it is pretty rough, might contains a lot of bugs.
+Surround now builds for Mac Catalyst using the Mac-optimized interface. The app
+and widget build for macOS, while the notification content and notification
+service extensions remain iOS-only for now.
 
-Currently I don't have plan to work on the macOS part. If you want to use this project as a base to create your own macOS client for OGS, feel free to do so as long as you follow the terms in the license.
+This is the platform foundation rather than the finished desktop experience.
+The current adaptive navigation and game UI are shared with iPadOS, and further
+work will add more Mac-specific interaction and window behavior.
 
 # Contact
 - Send me a message on either [OGS](https://online-go.com/player/314459/) or the [OGS Forums](https://forums.online-go.com/u/honganhkhoa/summary).

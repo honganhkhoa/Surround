@@ -67,7 +67,7 @@ class NavigationService: ObservableObject {
     #if MAIN_APP
     func navigateTo(rootView: RootView, game: Game? = nil, ogsGameId: Int? = nil) {
         if let url = NavigationService.appURL(rootView: rootView, game: game, ogsGameId: ogsGameId) {
-            UIApplication.shared.open(url)
+            SystemPlatformServices.shared.open(url)
         }
     }
     #endif
@@ -141,7 +141,7 @@ enum RootView: String, CaseIterable, Identifiable {
     func menuButton(currentView: Binding<RootView>) -> some View {
         Button(action: {
             if self == .forums {
-                UIApplication.shared.open(URL(string: "https://forums.online-go.com/")!)
+                SystemPlatformServices.shared.open(URL(string: "https://forums.online-go.com/")!)
             } else {
                 currentView.wrappedValue = self
             }
@@ -180,7 +180,7 @@ enum RootView: String, CaseIterable, Identifiable {
     func navigationLink(currentView: Binding<RootView?>) -> some View {
         Button(action: {
             if self == .forums {
-                UIApplication.shared.open(URL(string: "https://forums.online-go.com/")!)
+                SystemPlatformServices.shared.open(URL(string: "https://forums.online-go.com/")!)
             } else {
                 currentView.wrappedValue = self
             }

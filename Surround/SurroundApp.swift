@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVFAudio
 
 @main
 struct SurroundApp: App {
@@ -22,14 +21,14 @@ struct SurroundApp: App {
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+        SystemPlatformServices.shared.configureAmbientAudioSession()
         
         UNUserNotificationCenter.current().delegate = self
         if userDefaults[.notificationEnabled] == true {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
                 if granted {
                     DispatchQueue.main.async {
-                        application.registerForRemoteNotifications()
+                        SystemPlatformServices.shared.registerForRemoteNotifications()
                     }
                 }
             }

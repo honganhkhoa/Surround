@@ -128,10 +128,10 @@ struct ChatLog: View {
                                 }
                             }
                         }
-                        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { _ in
+                        .onReceive(SystemPlatformServices.shared.keyboardWillChangeFramePublisher) { _ in
                             self.shouldScrollToEndAfterKeyboardChange = self.atEndOfChat
                         }
-                        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in
+                        .onReceive(SystemPlatformServices.shared.keyboardDidChangeFramePublisher) { _ in
                             if self.shouldScrollToEndAfterKeyboardChange {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")

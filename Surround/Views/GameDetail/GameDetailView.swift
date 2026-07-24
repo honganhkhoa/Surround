@@ -254,17 +254,9 @@ struct GameDetailView: View {
                 updateActiveGameList()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                let screenBounds = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .first(where: { $0.activationState == .foregroundActive })?
-                    .screen.bounds ?? keyboardFrame
-                self.attachedKeyboardVisible = !keyboardFrame.isEmpty && keyboardFrame.height > 100 &&
-                    screenBounds.maxX == keyboardFrame.maxX &&
-                    screenBounds.maxY == keyboardFrame.maxY &&
-                    screenBounds.width == keyboardFrame.width
-            }
+        .onReceive(SystemPlatformServices.shared.keyboardWillChangeFramePublisher) { notification in
+            self.attachedKeyboardVisible = SystemPlatformServices.shared
+                .isAttachedSoftwareKeyboardVisible(from: notification)
         }
         
         if compactLayout {

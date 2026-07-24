@@ -17,6 +17,31 @@ xcodebuild test \
   -destination "platform=iOS Simulator,id=${simulator_id}"
 ```
 
+## Mac Catalyst build
+
+The main app and widget support the Mac-optimized Catalyst interface. The
+notification content and notification service extensions remain iOS-only, so
+the Catalyst app intentionally excludes them.
+
+Use the same unsigned compile-only check as CI:
+
+```sh
+xcodebuild build \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+For a signed manual smoke test, run the **Surround** scheme on **My Mac
+(Mac Catalyst)** and verify:
+
+1. Sign in and load the overview.
+2. Move between Home, Public Games, Settings, and About.
+3. Open a game, interact with the board, and return to the overview.
+4. Use **Open in browser** from the game menu.
+
 ## OGS service and WebSocket test seams
 
 The production client keeps its historical shared dependencies, while tests

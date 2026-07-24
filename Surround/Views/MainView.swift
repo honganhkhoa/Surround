@@ -14,11 +14,23 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var ogs: OGSService
     
-    @State var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    @State var backgroundTask: PlatformBackgroundTask?
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
 
     @EnvironmentObject var nav: NavigationService
+
+    func updateDisplaySleepPrevention() {
+        let hasLiveGame = !ogs.liveGames.isEmpty || ogs.waitingLiveGames > 0
+        SystemPlatformServices.shared.setPreventsDisplaySleep(
+            scenePhase == .active && hasLiveGame
+        )
+    }
+
+    func endBackgroundTask() {
+        SystemPlatformServices.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = nil
+    }
     
     func onAppActive(newLaunch: Bool) {
         WidgetCenter.shared.getCurrentConfigurations { result in
@@ -161,27 +173,28 @@ struct MainView: View {
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             if phase == .active {
+                updateDisplaySleepPrevention()
                 self.onAppActive(newLaunch: false)
             } else if phase == .background {
-                self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(expirationHandler: {
-                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                    self.backgroundTaskID = .invalid
-                })
+                SystemPlatformServices.shared.setPreventsDisplaySleep(false)
+                self.backgroundTask = SystemPlatformServices.shared.beginBackgroundTask {
+                    self.endBackgroundTask()
+                }
                 userDefaults[.cachedOGSGames] = [Int: Data]()
                 if self.widgetInfos.count > 0 {
                     WidgetCenter.shared.reloadAllTimelines()
-                    UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                    self.backgroundTaskID = .invalid
+                    self.endBackgroundTask()
                 } else {
                     ogs.loadOverview(finishCallback: {
-                        UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
-                        self.backgroundTaskID = .invalid
+                        self.endBackgroundTask()
                     })
                 }
             }
         }
         .onReceive(Publishers.CombineLatest(ogs.$liveGames, ogs.$waitingLiveGames), perform: { liveGames, waitingLiveGames in
-            UIApplication.shared.isIdleTimerDisabled = !liveGames.isEmpty || waitingLiveGames > 0
+            SystemPlatformServices.shared.setPreventsDisplaySleep(
+                scenePhase == .active && (!liveGames.isEmpty || waitingLiveGames > 0)
+            )
         })
         .onOpenURL { url in
             navigateTo(appURL: url)

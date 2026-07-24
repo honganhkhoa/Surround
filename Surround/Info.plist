@@ -39,8 +39,6 @@
 	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.board-games</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>13.0.0</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
@@ -52,10 +50,6 @@
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
-	<key>UIRequiredDeviceCapabilities</key>
-	<array>
-		<string>armv7</string>
-	</array>
 	<key>LSSupportsGameMode</key>
 	<false/>
 	<key>UISupportedInterfaceOrientations</key>

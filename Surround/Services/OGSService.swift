@@ -718,7 +718,7 @@ class OGSService: ObservableObject {
             }
             #if MAIN_APP
             if enablesAppSideEffects && isLoggedIn && (preferences[.notificationEnabled] == true) {
-                UIApplication.shared.registerForRemoteNotifications()
+                SystemPlatformServices.shared.registerForRemoteNotifications()
             }
             #endif
         }

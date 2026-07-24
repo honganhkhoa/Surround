@@ -148,7 +148,7 @@ struct GameControlRow: View {
                 }
             }
             Section {
-                Button(action: { UIApplication.shared.open(game.ogsURL!) }) {
+                Button(action: { SystemPlatformServices.shared.open(game.ogsURL!) }) {
                     Label("Open in browser", systemImage: "safari")
                 }
             }

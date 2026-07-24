@@ -52,3 +52,20 @@ jobs:
           path: TestResults
           if-no-files-found: warn
           retention-days: 14
+
+  catalyst-build:
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build for Mac Catalyst
+        shell: bash
+        run: |
+          xcodebuild build \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            CODE_SIGNING_ALLOWED=NO

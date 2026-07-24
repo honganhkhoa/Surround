@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AE3000013A00000000000001 /* PlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3000023A00000000000002 /* PlatformServices.swift */; };
 		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
 		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
 		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
@@ -405,6 +406,7 @@
 		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
+		AE3000023A00000000000002 /* PlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformServices.swift; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -787,6 +789,7 @@
 		BC042B4124AB2DD10050B2D1 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AE3000023A00000000000002 /* PlatformServices.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
@@ -1223,6 +1226,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
 				BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
@@ -1861,10 +1865,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = Debug;
 		};
@@ -1892,10 +1896,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = Release;
 		};
@@ -1923,10 +1927,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = "Beta Debug";
 		};
@@ -1954,10 +1958,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Surround/ScoreEstimator/Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = "Beta Release";
 		};
@@ -2154,7 +2158,7 @@
 				SKIP_INSTALL = YES;
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = Debug;
 		};
@@ -2183,7 +2187,7 @@
 				SKIP_INSTALL = YES;
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = Release;
 		};
@@ -2212,7 +2216,7 @@
 				SKIP_INSTALL = YES;
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = "Beta Debug";
 		};
@@ -2241,7 +2245,7 @@
 				SKIP_INSTALL = YES;
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,6";
 			};
 			name = "Beta Release";
 		};
