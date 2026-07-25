@@ -51,7 +51,7 @@ struct PlayerInfoLine: View {
                         .font(.subheadline)
                     }
                     Spacer()
-                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
+                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl, gameFinished: game.gamePhase == .finished)
                 }
             }
         } else {
@@ -82,7 +82,7 @@ struct PlayerInfoLine: View {
                             .font(.subheadline)
                         }
                     }
-                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
+                    InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl, gameFinished: game.gamePhase == .finished)
                 }
                 Spacer()
             }
