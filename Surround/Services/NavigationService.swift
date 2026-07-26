@@ -17,6 +17,8 @@ struct MainViewParameters {
 
 struct HomeViewParameters {
     var activeGame: Game?
+    var activeGameShowsCarousel = true
+    var showingGameHistory = false
     var ogsIdToOpen = -1
     var showingNewGameView = false
     var showingPreferredSettings = false
@@ -26,6 +28,10 @@ struct HomeViewParameters {
 struct PublicGamesViewParameter {
     var activeGame: Game?
     var ogsIdToOpen = -1
+}
+
+struct GameHistoryViewParameters {
+    var activeGame: Game?    // history → detail push
 }
 
 class NavigationService: ObservableObject {
@@ -41,6 +47,7 @@ class NavigationService: ObservableObject {
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
     @Published var publicGames = PublicGamesViewParameter()
+    @Published var gameHistory = GameHistoryViewParameters()
 
     static func instance(forSceneWithID sceneID: String) -> NavigationService {
         if let result = instances[sceneID] {
@@ -75,6 +82,10 @@ class NavigationService: ObservableObject {
             self.home.showingNewGameView = false
         }
         if self.main.rootView == .home && self.home.activeGame == nil {
+            // Restore the default: the flag may still be false from a finished
+            // game opened out of Game history, which would otherwise suppress
+            // this live game's carousel.
+            self.home.activeGameShowsCarousel = true
             self.home.activeGame = game
             return
         }

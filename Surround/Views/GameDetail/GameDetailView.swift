@@ -17,6 +17,10 @@ struct GameDetailView: View {
     @State var currentGame: Game?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
+
+    /// When false (e.g. opening a finished game from Game History), the
+    /// active-games carousel is never shown regardless of the active game list.
+    var allowsActiveGamesCarousel = true
     
     @State var showSettings = false
     @State var attachedKeyboardVisible = false
@@ -29,6 +33,9 @@ struct GameDetailView: View {
     var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
 
     var shouldShowActiveGamesCarousel: Bool {
+        guard allowsActiveGamesCarousel else {
+            return false
+        }
         guard !zenMode else {
             return false
         }

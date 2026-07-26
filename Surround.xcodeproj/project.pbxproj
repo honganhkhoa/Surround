@@ -35,6 +35,8 @@
 		BC042B4824AB2DD10050B2D1 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2C24AB2DD00050B2D1 /* TimerView.swift */; };
 		BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2D24AB2DD00050B2D1 /* MainView.swift */; };
 		BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */; };
+		BCFA11510000000000000002 /* GameHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000001 /* GameHistoryView.swift */; };
+		BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000005 /* HistoryGameCell.swift */; };
 		BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3124AB2DD00050B2D1 /* TestData.swift */; };
 		BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
 		BC042B4E24AB2DD10050B2D1 /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
@@ -396,6 +398,8 @@
 		BC042B2C24AB2DD00050B2D1 /* TimerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		BC042B2D24AB2DD00050B2D1 /* MainView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PublicGamesList.swift; sourceTree = "<group>"; };
+		BCFA11510000000000000001 /* GameHistoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHistoryView.swift; sourceTree = "<group>"; };
+		BCFA11510000000000000005 /* HistoryGameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryGameCell.swift; sourceTree = "<group>"; };
 		BC042B3124AB2DD00050B2D1 /* TestData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestData.swift; sourceTree = "<group>"; };
 		BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSUIConfig.swift; sourceTree = "<group>"; };
 		BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSPauseControl.swift; sourceTree = "<group>"; };
@@ -711,6 +715,7 @@
 				BC463B0B266353B400D40D3A /* GameDetail */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
+				BCFA11510000000000000001 /* GameHistoryView.swift */,
 				BC55D2D524B81E90003E20E7 /* HomeView.swift */,
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
@@ -790,6 +795,7 @@
 				BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */,
 				BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */,
 				BC042B2A24AB2DD00050B2D1 /* GameCell.swift */,
+				BCFA11510000000000000005 /* HistoryGameCell.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
@@ -1250,6 +1256,8 @@
 				BC4658AE2508927D00859316 /* ActiveGamesCarousel.swift in Sources */,
 				BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */,
 				BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */,
+				BCFA11510000000000000002 /* GameHistoryView.swift in Sources */,
+				BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */,
 				BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */,
 				BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */,
 				BC5EEC29259D851B00675761 /* Variation.swift in Sources */,

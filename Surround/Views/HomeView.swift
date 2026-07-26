@@ -18,6 +18,10 @@ struct HomeView: View {
     
     @State var gameDetailCancellable: AnyCancellable?
     @State var displayMode: GameCell.CellDisplayMode
+
+    @State var recentFinishedGames: [Game] = []
+    @State var recentFinishedCancellable: AnyCancellable?
+    @State var isLoadingRecentFinished = false
     
     init(previewGames: [Game] = []) {
         #if os(iOS)
@@ -36,20 +40,69 @@ struct HomeView: View {
     }
 
     func sectionHeader(title: String) -> some View {
+        sectionHeader(title: title, trailing: { EmptyView() })
+    }
+
+    func sectionHeader<Trailing: View>(title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack {
             Text(title)
                 .font(Font.title3.bold())
             Spacer()
+            trailing()
         }
         .padding([.vertical], 5)
         .padding([.horizontal])
         .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
-    
-    func showGameDetail(game: Game) {
+
+    func showGameDetail(game: Game, showsCarousel: Bool = true) {
         print("Opening game \(game)")
+        nav.home.activeGameShowsCarousel = showsCarousel
         nav.home.activeGame = game
+    }
+
+    /// Reloads the most recent finished games.
+    ///
+    /// Called whenever the home screen appears and whenever a game leaves the
+    /// active list (i.e. it just finished), so a game shows up here as soon as
+    /// it ends rather than only after a relaunch. Only guards against
+    /// overlapping requests, not against refetching.
+    func loadRecentFinishedGames() {
+        guard ogs.isLoggedIn, let playerId = ogs.user?.id, !isLoadingRecentFinished else {
+            return
+        }
+        isLoadingRecentFinished = true
+        let reusableGames = Dictionary(
+            recentFinishedGames.compactMap { game in game.ogsID.map { ($0, game) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+        recentFinishedCancellable = ogs.fetchFinishedGames(playerId: playerId, page: 1, pageSize: 10, reusing: reusableGames)
+            .receive(on: RunLoop.main)
+            .sink(
+                receiveCompletion: { _ in
+                    isLoadingRecentFinished = false
+                    recentFinishedCancellable = nil
+                },
+                receiveValue: { result in
+                    // Drop a response that belongs to whoever was signed in when
+                    // the request went out — otherwise a user switch mid-flight
+                    // installs the previous account's history.
+                    guard ogs.user?.id == playerId else {
+                        return
+                    }
+                    recentFinishedGames = result.games
+                }
+            )
+    }
+
+    /// Clears history state that belongs to the previous account and reloads.
+    func resetRecentFinishedGames() {
+        recentFinishedCancellable?.cancel()
+        recentFinishedCancellable = nil
+        isLoadingRecentFinished = false
+        recentFinishedGames = []
+        loadRecentFinishedGames()
     }
     
     var activeGamesView: some View {
@@ -180,6 +233,31 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                             }
                         }
+                        if recentFinishedGames.count > 0 {
+                            Section(header: sectionHeader(title: String(localized: "Game History", comment: "Homeview"))) {
+                                ForEach(recentFinishedGames) { game in
+                                    HistoryGameCell(game: game) {
+                                        showGameDetail(game: game, showsCarousel: false)
+                                    }
+                                    .padding(.horizontal)
+                                }
+                                Button(action: { nav.home.showingGameHistory = true }) {
+                                    HStack {
+                                        Spacer()
+                                        Text("View full history", comment: "Homeview")
+                                            .font(.body.bold())
+                                        Image(systemName: "chevron.right")
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 12)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(.accentColor)
+                                .padding(.horizontal)
+                                .padding(.bottom, 8)
+                            }
+                        }
                         Spacer()
                     }
                     .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
@@ -187,7 +265,7 @@ struct HomeView: View {
             }
         }
     }
-    
+
     func openRequestedActiveGameIfReady() {
         print("Checking game #\(nav.home.ogsIdToOpen)")
         if nav.home.activeGame == nil && nav.home.ogsIdToOpen != -1 && gameDetailCancellable == nil {
@@ -287,9 +365,22 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: Binding(
             get: { nav.home.activeGame != nil },
-            set: { if !$0 { nav.home.activeGame = nil } }
+            set: {
+                if !$0 {
+                    nav.home.activeGame = nil
+                    nav.home.activeGameShowsCarousel = true
+                }
+            }
         ), destination: {
-            GameDetailView(currentGame: nav.home.activeGame)
+            let openedGame = nav.home.activeGame
+            GameDetailView(currentGame: openedGame, allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel)
+                .onDisappear {
+                    // A finished game opened from here would otherwise stay in
+                    // connectedGames forever; active games keep their connection.
+                    if let openedGame {
+                        ogs.releaseConnectionIfNotActive(for: openedGame)
+                    }
+                }
         })
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {
@@ -297,6 +388,15 @@ struct HomeView: View {
                     openRequestedActiveGameIfReady()
                 }
             }
+            loadRecentFinishedGames()
+        }
+        .onChange(of: ogs.user?.id) { _, _ in
+            resetRecentFinishedGames()
+        }
+        .onChange(of: ogs.activeGames.count) { _, _ in
+            // A game leaving (or joining) the active list usually means one
+            // just finished — refresh so it appears here immediately.
+            loadRecentFinishedGames()
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
@@ -338,6 +438,20 @@ struct HomeView: View {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done", systemImage: "checkmark") {
                                 nav.home.showingSettings = false
+                            }
+                        }
+                    }
+                    .environmentObject(ogs)
+                    .environmentObject(nav)
+            }
+        }
+        .fullScreenCover(isPresented: $nav.home.showingGameHistory) {
+            NavigationStack {
+                GameHistoryView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(action: { nav.home.showingGameHistory = false }) {
+                                Text("Done")
                             }
                         }
                     }

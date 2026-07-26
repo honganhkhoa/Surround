@@ -1278,6 +1278,9 @@
         }
       }
     },
+    "%lld handicap stones " : {
+      "comment" : "HistoryGameCell - vary for plural"
+    },
     "%lld hours" : {
       "comment" : "Duration - hours part, long format",
       "localizations" : {
@@ -4825,6 +4828,12 @@
         }
       }
     },
+    "Game history" : {
+
+    },
+    "Game History" : {
+      "comment" : "Homeview"
+    },
     "Game name:" : {
       "localizations" : {
         "fr" : {
@@ -6177,6 +6186,9 @@
           }
         }
       }
+    },
+    "No finished games yet" : {
+
     },
     "No handicap" : {
       "comment" : "NewGameView handicap seletion, no handicap",
@@ -9218,6 +9230,9 @@
           }
         }
       }
+    },
+    "View full history" : {
+      "comment" : "Homeview"
     },
     "Voice countdown" : {
       "localizations" : {

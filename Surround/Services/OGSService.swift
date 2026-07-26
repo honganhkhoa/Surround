@@ -842,6 +842,7 @@ class OGSService: ObservableObject {
         preferences.reset(.lastAutomatchEntry)
         preferences.reset(.lastSeenPrivateMessageByOGSUserId)
         preferences.reset(.ogsRemoteStorageLastSync)
+        FinishedGameCache.shared.clear()
     }
     
     func fetchUIConfig() -> AnyPublisher<OGSUIConfig, Error> {
@@ -1174,7 +1175,154 @@ class OGSService: ObservableObject {
             }
         }.eraseToAnyPublisher()
     }
-    
+
+    /// Fetches one page of the given player's finished games.
+    ///
+    /// Hits OGS's `players/{id}/games` listing (most-recently-finished first).
+    /// Each result is turned into a lightweight `Game` (players, board size)
+    /// via `createGame(fromShortGameData:)`; the final board position and result
+    /// are filled in lazily per row through `loadFinishedGameData(gameID:)`.
+    /// `hasNextPage` reflects the endpoint's `next` cursor.
+    /// - Parameter reusing: already-built rows keyed by OGS game id. A game
+    ///   present here is returned as-is instead of being rebuilt, so repeated
+    ///   refreshes do not pile up duplicate `Game` objects (each of which owns
+    ///   a board-position tree and a player-cache subscription).
+    func fetchFinishedGames(playerId: Int, page: Int, pageSize: Int = 50, reusing existingGames: [Int: Game] = [:]) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
+        return Future<(games: [Game], hasNextPage: Bool), Error> { promise in
+            let parameters: [String: Any] = [
+                "ended__isnull": "false",
+                "ordering": "-ended",
+                "page": page,
+                "page_size": pageSize
+            ]
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/players/\(playerId)/games/", parameters: parameters).validate().responseData { response in
+                switch response.result {
+                case .success:
+                    guard let responseValue = response.value,
+                          let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any],
+                          let results = data["results"] as? [[String: Any]] else {
+                        promise(.failure(OGSServiceError.invalidJSON))
+                        return
+                    }
+                    let hasNextPage = (data["next"] as? String) != nil
+                    var games = [Game]()
+                    for var result in results {
+                        if let gameId = result["id"] as? Int, let existing = existingGames[gameId] {
+                            games.append(existing)
+                            continue
+                        }
+                        // The listing nests player dicts under `players`, but
+                        // `createGame(fromShortGameData:)` expects them at the
+                        // top level (like the overview payload does).
+                        if let players = result["players"] as? [String: Any] {
+                            result["black"] = players["black"]
+                            result["white"] = players["white"]
+                        }
+                        if let game = self.createGame(fromShortGameData: result) {
+                            games.append(game)
+                        }
+                    }
+                    promise(.success((games: games, hasNextPage: hasNextPage)))
+                case .failure(let error):
+                    promise(.failure(error))
+                }
+            }
+        }.eraseToAnyPublisher()
+    }
+
+    /// Loads full game detail for a finished game, cache-first, without
+    /// connecting to the realtime socket.
+    ///
+    /// On a cache miss the raw `/api/v1/games/{id}` JSON is persisted to
+    /// `FinishedGameCache` so revisiting the game (and re-rendering its final
+    /// board) is instant and offline-capable. Unlike `getGameDetailAndConnect`
+    /// this never opens a websocket — it is meant for list thumbnails.
+    ///
+    /// Returns the decoded game *and* the raw endpoint payload. Callers should
+    /// apply both to their `Game` (`ogsRawData` as well as `gameData`), so that
+    /// opening the game's detail view later finds it already populated instead
+    /// of issuing a second request through `getGameDetailAndConnect`.
+    ///
+    /// The decode/file read happens on `queue` rather than the caller's thread —
+    /// a cache hit otherwise parses JSON and replays every move on the main
+    /// thread while the list is scrolling.
+    func loadFinishedGameData(gameID: Int, on queue: DispatchQueue = .global(qos: .userInitiated)) -> AnyPublisher<(ogsGame: OGSGame, rawData: [String: Any]), Error> {
+        let decode: (Data) -> (ogsGame: OGSGame, rawData: [String: Any])? = { data in
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let gameData = json["gamedata"] as? [String: Any] else {
+                return nil
+            }
+            let decoder = DictionaryDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // Reject an entry that decodes but describes a different game, so a
+            // stale or corrupt cache file cannot render as the wrong game.
+            guard let ogsGame = try? decoder.decode(OGSGame.self, from: gameData),
+                  ogsGame.gameId == gameID else {
+                return nil
+            }
+            return (ogsGame: ogsGame, rawData: FinishedGameCache.sanitized(json))
+        }
+
+        // Captured before the request starts: a sign-out while it is in flight
+        // bumps the generation, and the late response is then not written back.
+        let generation = FinishedGameCache.shared.currentGeneration
+
+        let cacheLookup = Deferred {
+            Future<(ogsGame: OGSGame, rawData: [String: Any])?, Error> { promise in
+                guard let cached = FinishedGameCache.shared.data(forGameID: gameID) else {
+                    promise(.success(nil))
+                    return
+                }
+                promise(.success(decode(cached)))
+            }
+        }.subscribe(on: queue)
+
+        // `Deferred` matters: a bare `Future` runs its closure when it is
+        // *created*, which would fire this request on every cache hit too.
+        let fetchFromOGS = Deferred {
+            Future<(ogsGame: OGSGame, rawData: [String: Any]), Error> { promise in
+                self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseData(queue: queue) { response in
+                    switch response.result {
+                    case .success:
+                        guard let responseValue = response.value, let decoded = decode(responseValue) else {
+                            promise(.failure(OGSServiceError.invalidJSON))
+                            return
+                        }
+                        if let sanitizedData = try? JSONSerialization.data(withJSONObject: decoded.rawData) {
+                            FinishedGameCache.shared.store(sanitizedData, forGameID: gameID, ifGeneration: generation)
+                        }
+                        promise(.success(decoded))
+                    case .failure(let error):
+                        promise(.failure(error))
+                    }
+                }
+            }
+        }
+
+        return cacheLookup
+            .flatMap { cached -> AnyPublisher<(ogsGame: OGSGame, rawData: [String: Any]), Error> in
+                if let cached {
+                    return Just(cached).setFailureType(to: Error.self).eraseToAnyPublisher()
+                }
+                return fetchFromOGS.eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
+
+    /// Releases a game connection that no screen owns any more.
+    ///
+    /// Detail views connect (with chat) to whatever game they show, including
+    /// finished ones opened from history — which, unlike active games, are never
+    /// removed from `connectedGames` by the overview, so they would be retained
+    /// and re-connected on every socket cycle. Active games are left alone:
+    /// their connection is owned by the overview, not by the detail view.
+    func releaseConnectionIfNotActive(for game: Game) {
+        guard let gameId = game.ogsID, activeGames[gameId] == nil else {
+            return
+        }
+        disconnect(from: game)
+    }
+
     var gameDetailCancellable = [Int: AnyCancellable]()
     func updateDetailsOfConnectedGame(game: Game) {
         if let gameId = game.ogsID {
@@ -2237,5 +2385,97 @@ class OGSService: ObservableObject {
 //            userDefaults[.ogsRemoteStorageLastSync] = max(userDefaults[.ogsRemoteStorageLastSync]!, modified)
 //            print(decodedChallenges)
 //        }
+    }
+}
+
+/// On-device JSON cache for finished-game detail payloads.
+///
+/// Each game's raw `/api/v1/games/{id}` response is written to its own
+/// `{id}.json` file under a dedicated folder in the Caches directory (which is
+/// regenerable and excluded from iCloud backup). The whole folder is removed on
+/// sign-out via `OGSService.logout()`.
+final class FinishedGameCache {
+    static let shared = FinishedGameCache()
+
+    /// Serializes every file operation. `directoryURL` is resolved in `init`
+    /// rather than lazily because a `lazy var` on a shared instance is not
+    /// thread-safe, and rows read the cache concurrently while a list scrolls.
+    private let queue = DispatchQueue(label: "com.honganhkhoa.Surround.FinishedGameCache")
+    private let fileManager = FileManager.default
+    private let directoryURL: URL?
+
+    /// Bumped by `clear()`. A response that began before a sign-out carries the
+    /// older generation and is dropped rather than recreating the cache.
+    private var generation = 0
+
+    private init() {
+        directoryURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("FinishedGames", isDirectory: true)
+    }
+
+    /// Capture this when a request starts, and hand it back to `store`.
+    var currentGeneration: Int {
+        return queue.sync { generation }
+    }
+
+    private func fileURL(forGameID gameID: Int) -> URL? {
+        return directoryURL?.appendingPathComponent("\(gameID).json")
+    }
+
+    func data(forGameID gameID: Int) -> Data? {
+        return queue.sync {
+            guard let fileURL = fileURL(forGameID: gameID) else {
+                return nil
+            }
+            return try? Data(contentsOf: fileURL)
+        }
+    }
+
+    func store(_ data: Data, forGameID gameID: Int, ifGeneration expectedGeneration: Int) {
+        queue.sync {
+            guard expectedGeneration == generation,
+                  let directoryURL,
+                  let fileURL = fileURL(forGameID: gameID) else {
+                return
+            }
+            if !fileManager.fileExists(atPath: directoryURL.path) {
+                try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            }
+            try? data.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    func clear() {
+        queue.sync {
+            generation += 1
+            guard let directoryURL else {
+                return
+            }
+            try? fileManager.removeItem(at: directoryURL)
+        }
+    }
+
+    /// Strips credential-bearing fields before a payload is persisted.
+    ///
+    /// An authenticated `/api/v1/games/{id}` response carries a per-game `auth`
+    /// token (confirmed against a live server). Nothing in the app reads it, so
+    /// it is dropped instead of being written to the caches directory.
+    static func sanitized(_ json: [String: Any]) -> [String: Any] {
+        var result = strippingSensitiveKeys(json)
+        if let gameData = result["gamedata"] as? [String: Any] {
+            result["gamedata"] = strippingSensitiveKeys(gameData)
+        }
+        return result
+    }
+
+    private static func strippingSensitiveKeys(_ dictionary: [String: Any]) -> [String: Any] {
+        var result = dictionary
+        for key in dictionary.keys {
+            let lowercased = key.lowercased()
+            if lowercased == "auth" || lowercased.hasSuffix("_auth") || lowercased.hasSuffix("_token") {
+                result.removeValue(forKey: key)
+            }
+        }
+        return result
     }
 }
