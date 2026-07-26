@@ -195,15 +195,17 @@ final class OGSBetaGamePlayTests: XCTestCase {
         diagnosticEvents.append("challenge accepted; game id \(gameID)")
 
         let blackGame = try await value(
-            from: black.service.getGameDetailAndConnect(gameID: gameID),
+            from: black.service.getGameDetail(gameID: gameID),
             timeout: 30,
-            description: "black game connection"
+            description: "black game detail"
         )
         let whiteGame = try await value(
-            from: white.service.getGameDetailAndConnect(gameID: gameID),
+            from: white.service.getGameDetail(gameID: gameID),
             timeout: 30,
-            description: "white game connection"
+            description: "white game detail"
         )
+        black.service.connect(to: blackGame)
+        white.service.connect(to: whiteGame)
 
         try await eventually(description: "opposite player colors") {
             blackGame.userStoneColor == .black && whiteGame.userStoneColor == .white

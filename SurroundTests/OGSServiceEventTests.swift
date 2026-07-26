@@ -22,11 +22,37 @@ final class OGSServiceEventTests: XCTestCase {
         var drift = 0.0
         var latency = 0.0
         var emissions = [Emission]()
+        private(set) var closeThenReconnectCount = 0
 
         func connect() {
+            openSocket()
+        }
+
+        func openSocket(authenticate: Bool = false) {
             opened = true
+            authenticated = false
             status = .connected
             onStatusChanged?()
+            let tasks = onConnectTasks
+            onConnectTasks = []
+            tasks.forEach { $0() }
+            deliver(name: "surround/socketOpened")
+            if authenticate {
+                markAuthenticated()
+            }
+        }
+
+        func markAuthenticated() {
+            authenticated = true
+            deliver(name: "surround/socketAuthenticated")
+        }
+
+        func dropSocket() {
+            opened = false
+            authenticated = false
+            status = .reconnecting
+            onStatusChanged?()
+            deliver(name: "surround/socketClosed")
         }
 
         func close() {
@@ -36,8 +62,11 @@ final class OGSServiceEventTests: XCTestCase {
             onStatusChanged?()
         }
 
-        func reconnectIfNeeded() { connect() }
-        func closeThenReconnect() { connect() }
+        func reconnectIfNeeded() {}
+        func closeThenReconnect() {
+            closeThenReconnectCount += 1
+            dropSocket()
+        }
 
         func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
             emissions.append(.init(command: command, data: data))
@@ -82,9 +111,114 @@ final class OGSServiceEventTests: XCTestCase {
         socket.deliver(name: "game/42/phase", data: "stone removal")
         XCTAssertEqual(game.gamePhase, .stoneRemoval)
 
-        socket.deliver(name: "surround/socketClosed")
-        socket.deliver(name: "surround/socketOpened")
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 2)
+    }
+
+    func testReleasedFinishedGameDoesNotConnectWhenSocketOpens() throws {
+        let socket = FakeWebsocket()
+        socket.dropSocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 43, phase: "finished"))
+        game.ogs = service
+
+        service.connect(to: game, withChat: true)
+        service.releaseConnectionIfNotActive(for: game)
+        socket.openSocket(authenticate: true)
+
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testReleasedPlayerGameDoesNotConnectAfterAuthentication() throws {
+        let socket = FakeWebsocket()
+        socket.authenticated = false
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 44))
+        game.ogs = service
+        service.user = game.blackPlayer
+
+        service.connect(to: game, withChat: true)
+        service.releaseConnectionIfNotActive(for: game)
+        socket.markAuthenticated()
+
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testReleasedFinishedGameDoesNotReconnectAfterSocketDrop() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 45, phase: "finished"))
+        game.ogs = service
+
+        service.connect(to: game, withChat: true)
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        service.releaseConnectionIfNotActive(for: game)
+        socket.openSocket(authenticate: true)
+
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testStaleSameIDGameCannotReleaseCanonicalConnection() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let canonicalGame = Game(ogsGame: try makeEmptyGameData(id: 48))
+        let staleGame = Game(ogsGame: try makeEmptyGameData(id: 48))
+        canonicalGame.ogs = service
+        staleGame.ogs = service
+
+        service.connect(to: canonicalGame, withChat: true)
+        service.connect(to: staleGame, withChat: true)
+        socket.emissions.removeAll()
+        service.disconnect(from: staleGame)
+
+        XCTAssertTrue(socket.emissions.isEmpty)
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "chat/join" }.count, 1)
+    }
+
+    func testActiveGameRemainsDesiredWhenDetailReleasesIt() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.deliver(name: "active_game", data: makeShortGameData(id: 46, phase: "play"))
+        let game = try XCTUnwrap(service.activeGames[46])
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        service.releaseConnectionIfNotActive(for: game)
+        socket.openSocket(authenticate: true)
+
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+    }
+
+    func testAuthenticationChangeInvalidatesFinishedGameAndChatIntent() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        service.ogsUIConfig = try makeUIConfig(jwt: "old-test-jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+
+        let game = Game(ogsGame: try makeEmptyGameData(id: 47, phase: "finished"))
+        game.ogs = service
+        service.connect(to: game, withChat: true)
+        socket.emissions.removeAll()
+        let reconnectCountBeforeChange = socket.closeThenReconnectCount
+
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-test-jwt", userID: 2)
+
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/disconnect" }.count, 1)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "chat/part" }.count, 1)
+        XCTAssertEqual(socket.closeThenReconnectCount, reconnectCountBeforeChange + 1)
+
+        socket.emissions.removeAll()
+        socket.openSocket(authenticate: true)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
     }
 
     func testMalformedAndUnknownGameEventsAreIgnored() throws {
@@ -193,7 +327,7 @@ final class OGSServiceEventTests: XCTestCase {
         ]
     }
 
-    private func makeEmptyGameData(id: Int) throws -> OGSGame {
+    private func makeEmptyGameData(id: Int, phase: String = "play") throws -> OGSGame {
         let bundle = Bundle(for: OGSServiceEventTests.self)
         let url = try XCTUnwrap(bundle.url(forResource: "game-25076729", withExtension: "json"))
         let data = try Data(contentsOf: url)
@@ -203,12 +337,27 @@ final class OGSServiceEventTests: XCTestCase {
         object["width"] = 5
         object["height"] = 5
         object["moves"] = []
-        object["phase"] = "play"
+        object["phase"] = phase
         object["outcome"] = NSNull()
         object["winner"] = NSNull()
         let fixture = try JSONSerialization.data(withJSONObject: object)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSGame.self, from: fixture)
+    }
+
+    private func makeUIConfig(jwt: String, userID: Int) throws -> OGSUIConfig {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "csrf_token": "test-csrf",
+            "user_jwt": jwt,
+            "user": [
+                "username": "player-\(userID)",
+                "id": userID,
+                "anonymous": false,
+            ],
+        ])
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(OGSUIConfig.self, from: data)
     }
 }

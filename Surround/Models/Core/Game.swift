@@ -203,7 +203,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 if playerCacheObservingCancellable != nil {
                     playerCacheObservingCancellable?.cancel()
                 }
-                playerCacheObservingCancellable = ogs.$cachedUsersById.collect(.byTime(DispatchQueue.main, 2.0)).sink(receiveValue: { values in
+                playerCacheObservingCancellable = ogs.$cachedUsersById.collect(.byTime(DispatchQueue.main, 2.0)).sink(receiveValue: { [weak self] values in
+                    guard let self else {
+                        return
+                    }
                     if let cachedPlayersById = values.last {
                         for (playerId, player) in self.playerByOGSId {
                             if let cachedPlayer = cachedPlayersById[playerId] {

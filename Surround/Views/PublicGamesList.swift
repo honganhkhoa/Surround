@@ -40,11 +40,15 @@ struct PublicGamesList: View {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()
             if nav.publicGames.ogsIdToOpen != -1 {
-                self.gameDetailCancellable = ogs.getGameDetailAndConnect(gameID: nav.publicGames.ogsIdToOpen).sink(
+                self.gameDetailCancellable = ogs.getGameDetail(gameID: nav.publicGames.ogsIdToOpen).sink(
                     receiveCompletion: { _ in
                         nav.publicGames.ogsIdToOpen = -1
                     },
                     receiveValue: { game in
+                        // `getGameDetail` is deliberately data-only. Claim the
+                        // connection here, before the public-list refresh can
+                        // install a different model for the same game ID.
+                        ogs.connect(to: game)
                         if nav.publicGames.activeGame == nil {
                             nav.publicGames.activeGame = game
                         }

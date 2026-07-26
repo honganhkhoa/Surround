@@ -234,7 +234,7 @@ struct HomeView: View {
                             }
                         }
                         if recentFinishedGames.count > 0 {
-                            Section(header: sectionHeader(title: String(localized: "Game History", comment: "Homeview"))) {
+                            Section(header: sectionHeader(title: String(localized: "Game history", comment: "Homeview"))) {
                                 ForEach(recentFinishedGames) { game in
                                     HistoryGameCell(game: game) {
                                         showGameDetail(game: game, showsCarousel: false)

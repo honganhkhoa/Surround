@@ -239,15 +239,11 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             updateActiveGameList()
-            DispatchQueue.main.async {
-                self.updateDetailOfCurrentGameIfNecessary()
-            }
+            updateDetailOfCurrentGameIfNecessary()
         }
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
-                DispatchQueue.main.async {
-                    self.updateDetailOfCurrentGameIfNecessary()
-                }
+                updateDetailOfCurrentGameIfNecessary()
             }
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { _ in

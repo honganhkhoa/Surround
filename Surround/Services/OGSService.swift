@@ -16,6 +16,7 @@ enum OGSServiceError: Error {
     case invalidJSON
     case notLoggedIn
     case loginError(error: String)
+    case staleAuthenticationContext
 }
 
 /// The HTTP and WebSocket endpoints that make up one OGS environment.
@@ -119,6 +120,8 @@ extension OGSServiceError: LocalizedError {
             return "Login required"
         case .loginError(let error):
             return error
+        case .staleAuthenticationContext:
+            return "Discarded a response from a previous account"
         }
     }
 }
@@ -269,8 +272,22 @@ class OGSService: ObservableObject {
     @Published var user: OGSUser? = nil
     @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected
 
+    /// Connections requested by app state or a visible game-detail view.
+    ///
+    /// This is deliberately separate from `connectedGames`, which represents
+    /// subscriptions on the currently open socket. A socket close clears only
+    /// actual subscriptions; release and authentication changes clear intent.
+    /// Reconnection therefore cannot resurrect a game that no longer has an
+    /// owner.
+    private struct DesiredGameConnection {
+        let game: Game
+        var withChat: Bool
+    }
+
+    private var desiredGameConnections = [Int: DesiredGameConnection]()
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
+    private var authenticationGeneration: UInt = 0
 
     @Published private(set) public var activeGames = [Int: Game]()
     @Published private(set) public var sortedActiveCorrespondenceGamesOnUserTurn: [Game] = []
@@ -519,19 +536,16 @@ class OGSService: ObservableObject {
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
         switch eventName {
         case "surround/socketClosed":
-            self._gamesToBeReconnected = Array(self.connectedGames.values)
+            // The transport has gone away, so none of these subscriptions are
+            // currently active. Keep only explicit desired state for reconnect.
+            self.connectedGames.removeAll()
+            self.connectedWithChat.removeAll()
         case "surround/socketOpened":
-            for game in self._gamesToBeReconnected {
-                if case .OGS(let ogsId) = game.ID {
-                    if self.connectedGames[ogsId] != nil {
-                        self.connectedGames[ogsId] = nil
-                    }
-                    let withChat = self.connectedWithChat[ogsId] ?? false
-                    self.connect(to: game, withChat: withChat)
-                }
-            }
-            self._gamesToBeReconnected = []
+            self.reconcileDesiredGameConnections()
         case "surround/socketAuthenticated":
+            // Player chat waits for authentication so Malkovich lines are not
+            // exposed through an anonymous subscription.
+            self.reconcileDesiredGameConnections()
             self.autoMatchEntryById.removeAll()
             ogsWebsocket.emit(command: "automatch/list")
             if enablesAppSideEffects {
@@ -728,8 +742,6 @@ class OGSService: ObservableObject {
         }
     }
     
-    private var _gamesToBeReconnected: [Game] = []
-    
     var ogsUIConfig: OGSUIConfig? {
         get {
             return preferences[.ogsUIConfig]
@@ -738,11 +750,13 @@ class OGSService: ObservableObject {
             let previousConfig = preferences[.ogsUIConfig]
             let authenticationChanged = newValue?.userJwt != previousConfig?.userJwt
             if authenticationChanged {
-                for game in activeGames.values {
-                    self.disconnect(from: game)
-                }
+                authenticationGeneration &+= 1
+                // An in-place account change is equivalent to destroying every
+                // game controller in the official client. Remove intent before
+                // the socket closes so its close/open cycle cannot repopulate
+                // finished-game or chat subscriptions under the new identity.
+                invalidateAllGameConnections()
                 activeGames.removeAll()
-                _gamesToBeReconnected = []
             }
 
             // Login requests have just established a fresh cookie session, so
@@ -1141,34 +1155,51 @@ class OGSService: ObservableObject {
         })
     }
     
-    func getGameDetailAndConnect(gameID: Int) -> AnyPublisher<Game, Error> {
+    /// Fetches and decodes one game's REST detail without changing WebSocket
+    /// connection state. If that game already has connection intent, enriches
+    /// and returns its canonical model so WebSocket events and the caller
+    /// continue observing the same object. The caller owns any subsequent
+    /// connection intent.
+    func getGameDetail(gameID: Int) -> AnyPublisher<Game, Error> {
+        let requestAuthenticationGeneration = authenticationGeneration
         return Future<Game, Error> { promise in
             self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseJSON { response in
+                guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                    promise(.failure(OGSServiceError.staleAuthenticationContext))
+                    return
+                }
                 switch response.result {
                 case .success:
-                    if let data = response.value as? [String: Any] {
-                        if let gameData = data["gamedata"] as? [String: Any] {
-                            let decoder = DictionaryDecoder()
-                            decoder.keyDecodingStrategy = .convertFromSnakeCase
-                            do {
-                                let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
-                                if let game = self.connectedGames[ogsGame.gameId] {
-                                    game.ogsRawData = data
-                                    promise(.success(game))
-                                } else {
-                                    let game = Game(ogsGame: ogsGame)
-                                    game.ogsRawData = data
-                                    game.ogs = self
-                                    self.connect(to: game)
-                                    promise(.success(game))
-                                }
-                                return
-                            } catch {
-                                promise(.failure(error))
-                            }
-                        }
+                    guard let data = response.value as? [String: Any],
+                          let gameData = data["gamedata"] as? [String: Any] else {
+                        promise(.failure(OGSServiceError.invalidJSON))
+                        return
                     }
-                    promise(.failure(OGSServiceError.invalidJSON))
+                    let decoder = DictionaryDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    do {
+                        let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
+                        guard ogsGame.gameId == gameID else {
+                            promise(.failure(OGSServiceError.invalidJSON))
+                            return
+                        }
+                        let game: Game
+                        if let existingGame = self.desiredGameConnections[gameID]?.game
+                            ?? self.connectedGames[gameID] {
+                            existingGame.ogsRawData = data
+                            if existingGame.gameData == nil {
+                                existingGame.gameData = ogsGame
+                            }
+                            game = existingGame
+                        } else {
+                            game = Game(ogsGame: ogsGame)
+                            game.ogsRawData = data
+                            game.ogs = self
+                        }
+                        promise(.success(game))
+                    } catch {
+                        promise(.failure(error))
+                    }
                 case .failure(let error):
                     promise(.failure(error))
                 }
@@ -1235,13 +1266,14 @@ class OGSService: ObservableObject {
     ///
     /// On a cache miss the raw `/api/v1/games/{id}` JSON is persisted to
     /// `FinishedGameCache` so revisiting the game (and re-rendering its final
-    /// board) is instant and offline-capable. Unlike `getGameDetailAndConnect`
-    /// this never opens a websocket — it is meant for list thumbnails.
+    /// board) is instant and offline-capable. Like `getGameDetail`, this does
+    /// not change websocket state; this variant additionally uses the cache and
+    /// is meant for list thumbnails.
     ///
     /// Returns the decoded game *and* the raw endpoint payload. Callers should
     /// apply both to their `Game` (`ogsRawData` as well as `gameData`), so that
     /// opening the game's detail view later finds it already populated instead
-    /// of issuing a second request through `getGameDetailAndConnect`.
+    /// of issuing a second request through `getGameDetail`.
     ///
     /// The decode/file read happens on `queue` rather than the caller's thread —
     /// a cache hit otherwise parses JSON and replays every move on the main
@@ -1325,17 +1357,27 @@ class OGSService: ObservableObject {
 
     var gameDetailCancellable = [Int: AnyCancellable]()
     func updateDetailsOfConnectedGame(game: Game) {
-        if let gameId = game.ogsID {
-            if connectedGames[gameId] != nil {
-                if gameDetailCancellable[gameId] == nil {
-                    gameDetailCancellable[gameId] = self.getGameDetailAndConnect(gameID: gameId).receive(on: RunLoop.main).sink(
-                        receiveCompletion: { _ in
-                            self.gameDetailCancellable.removeValue(forKey: gameId)
-                        },
-                        receiveValue: { _ in })
+        guard let gameId = game.ogsID,
+              desiredGameConnections[gameId]?.game === game,
+              gameDetailCancellable[gameId] == nil else {
+            return
+        }
+        gameDetailCancellable[gameId] = self.getGameDetail(gameID: gameId).receive(on: RunLoop.main).sink(
+            receiveCompletion: { [weak self] _ in
+                self?.gameDetailCancellable.removeValue(forKey: gameId)
+            },
+            receiveValue: { [weak self, weak game] detail in
+                guard let self,
+                      let game,
+                      self.desiredGameConnections[gameId]?.game === game else {
+                    return
+                }
+                game.ogsRawData = detail.ogsRawData
+                if game.gameData == nil {
+                    game.gameData = detail.gameData
                 }
             }
-        }
+        )
     }
     
     func updateActiveGames(withShortGameData gameData: [String: Any]) {
@@ -1368,16 +1410,50 @@ class OGSService: ObservableObject {
         // the queued callbacks actually get a chance to run.
         ogsWebsocket.reconnectIfNeeded()
     }
-    
+
+    /// Invalidates all model and chat subscriptions owned by the previous
+    /// authentication context. This must run before closing the socket.
+    private func invalidateAllGameConnections() {
+        desiredGameConnections.removeAll()
+
+        for cancellable in gameDetailCancellable.values {
+            cancellable.cancel()
+        }
+        gameDetailCancellable.removeAll()
+
+        for gameID in Array(connectedGames.keys) {
+            disconnectActualGame(gameID: gameID)
+        }
+        connectedGames.removeAll()
+        connectedWithChat.removeAll()
+    }
+
     func disconnect(from game: Game) {
         guard case .OGS(let ogsID) = game.ID else {
             return
         }
 
-        self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": ogsID])
-        self.disconnectChat(from: game)
-        connectedGames[ogsID] = nil
-        connectedWithChat[ogsID] = nil
+        // Remove intent before actual state. Any socket-open/authentication
+        // callback that follows will then have nothing to reconcile.
+        guard desiredGameConnections[ogsID]?.game === game else {
+            return
+        }
+        desiredGameConnections[ogsID] = nil
+        gameDetailCancellable.removeValue(forKey: ogsID)?.cancel()
+        disconnectActualGame(gameID: ogsID)
+    }
+
+    private func disconnectActualGame(gameID: Int) {
+        let wasConnected = connectedGames.removeValue(forKey: gameID) != nil
+        let wasConnectedWithChat = connectedWithChat.removeValue(forKey: gameID) ?? false
+
+        guard wasConnected, ogsWebsocket.opened else {
+            return
+        }
+        ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": gameID])
+        if wasConnectedWithChat {
+            ogsWebsocket.emit(command: "chat/part", data: ["channel": "game-\(gameID)"])
+        }
     }
     
     func disconnectChat(from game: Game) {
@@ -1400,37 +1476,58 @@ class OGSService: ObservableObject {
         guard case .OGS(let ogsID) = game.ID else {
             return
         }
-        
-        guard connectedGames[ogsID] == nil else {
-            if connectedWithChat[ogsID] == false && withChat {
-                connectedWithChat[ogsID] = true
-                self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": ogsID])
-                self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": ogsID, "chat": true])
-                self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
-            }
+
+        if var desired = desiredGameConnections[ogsID] {
+            desired.withChat = desired.withChat || withChat
+            desiredGameConnections[ogsID] = desired
+        } else {
+            desiredGameConnections[ogsID] = DesiredGameConnection(game: game, withChat: withChat)
+        }
+        connectIfReady(gameID: ogsID)
+    }
+
+    private func reconcileDesiredGameConnections() {
+        for gameID in Array(desiredGameConnections.keys) {
+            connectIfReady(gameID: gameID)
+        }
+    }
+
+    private func connectIfReady(gameID: Int) {
+        guard let desired = desiredGameConnections[gameID] else {
             return
         }
 
         guard self.ogsWebsocket.opened else {
-            self.ogsWebsocket.onConnectTasks.append {
-                self.connect(to: game, withChat: withChat)
+            // The desired registry is the reconnect callback. Revive a socket
+            // that is disconnected, then reconcile when socketOpened arrives.
+            self.ogsWebsocket.reconnectIfNeeded()
+            return
+        }
+
+        guard !(desired.game.isUserPlaying && desired.withChat && !self.ogsWebsocket.authenticated) else {
+            // socketAuthenticated will reconcile again. Do not leave an
+            // uncancellable polling closure behind.
+            return
+        }
+
+        if connectedGames[gameID] != nil {
+            if connectedWithChat[gameID] != true && desired.withChat {
+                connectedWithChat[gameID] = true
+                self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": gameID])
+                self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": gameID, "chat": true])
+                self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(gameID)"])
             }
             return
         }
-        
-        guard !(game.isUserPlaying && withChat && !self.ogsWebsocket.authenticated) else {
-            // If user is one of the players, wait until the socket is authenticated to prevent them from seeing Malkovich log.
-            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {
-                self.connect(to: game, withChat: withChat)
-            }
-            return
-        }
-        
-        connectedWithChat[ogsID] = withChat
-        connectedGames[ogsID] = game
-        self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": ogsID, "chat": withChat ? true : 0])
-        if withChat {
-            self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
+
+        connectedWithChat[gameID] = desired.withChat
+        connectedGames[gameID] = desired.game
+        self.ogsWebsocket.emit(
+            command: "game/connect",
+            data: ["game_id": gameID, "chat": desired.withChat]
+        )
+        if desired.withChat {
+            self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(gameID)"])
         }
     }
     

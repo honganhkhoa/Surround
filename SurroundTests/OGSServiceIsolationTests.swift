@@ -19,6 +19,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         var drift = 0.0
         var latency = 0.0
         private(set) var reconnectCount = 0
+        private(set) var emittedCommands = [String]()
 
         func connect() {}
         func close() {}
@@ -26,7 +27,12 @@ final class OGSServiceIsolationTests: XCTestCase {
         func closeThenReconnect() { reconnectCount += 1 }
 
         func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
+            emittedCommands.append(command)
             resultCallback?(nil, nil)
+        }
+
+        func resetEmittedCommands() {
+            emittedCommands.removeAll()
         }
     }
 
@@ -35,6 +41,9 @@ final class OGSServiceIsolationTests: XCTestCase {
         static var requests = [URLRequest]()
         static var cookieStorageByUsername = [String: HTTPCookieStorage]()
         static var rejectedUsernames = Set<String>()
+        static var gameDetailBody: Data?
+        static var gameDetailGate: DispatchSemaphore?
+        static var gameDetailStarted: (() -> Void)?
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -79,6 +88,14 @@ final class OGSServiceIsolationTests: XCTestCase {
                 body = Data(#"{"friends":[]}"#.utf8)
             case "/api/v1/ui/overview":
                 body = Data("{}".utf8)
+            case _ where path.hasPrefix("/api/v1/games/"):
+                Self.lock.lock()
+                body = Self.gameDetailBody ?? Data("{}".utf8)
+                let gate = Self.gameDetailGate
+                let started = Self.gameDetailStarted
+                Self.lock.unlock()
+                started?()
+                gate?.wait()
             default:
                 body = Data("{}".utf8)
             }
@@ -106,6 +123,9 @@ final class OGSServiceIsolationTests: XCTestCase {
         StubURLProtocol.requests = []
         StubURLProtocol.cookieStorageByUsername = [:]
         StubURLProtocol.rejectedUsernames = []
+        StubURLProtocol.gameDetailBody = nil
+        StubURLProtocol.gameDetailGate = nil
+        StubURLProtocol.gameDetailStarted = nil
         StubURLProtocol.lock.unlock()
     }
     override func tearDown() {
@@ -125,6 +145,130 @@ final class OGSServiceIsolationTests: XCTestCase {
 
         let local = OGSEnvironment(rootURL: URL(string: "http://127.0.0.1:8080")!)
         XCTAssertEqual(local.websocketURL.absoluteString, "ws://127.0.0.1:8080")
+    }
+
+    func testGetGameDetailDoesNotCreateWebSocketIntent() throws {
+        let gameID = 48
+        _ = try installGameDetailResponse(gameID: gameID)
+
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "game-detail"
+        )
+        let completed = expectation(description: "game detail fetched")
+        var receivedGame: Game?
+        var receivedError: Error?
+
+        service.getGameDetail(gameID: gameID)
+            .sink(
+                receiveCompletion: {
+                    if case .failure(let error) = $0 {
+                        receivedError = error
+                    }
+                    completed.fulfill()
+                },
+                receiveValue: { receivedGame = $0 }
+            )
+            .store(in: &cancellables)
+
+        wait(for: [completed], timeout: 5)
+        XCTAssertNil(receivedError)
+        XCTAssertEqual(receivedGame?.ogsID, gameID)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+        XCTAssertEqual(socket.reconnectCount, 0)
+    }
+
+    func testGameDetailResponseFromPreviousAuthenticationContextIsDiscarded() throws {
+        let gameID = 50
+        let ogsGame = try installGameDetailResponse(gameID: gameID)
+        let responseGate = DispatchSemaphore(value: 0)
+        let requestStarted = expectation(description: "old-account game detail request started")
+
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameDetailGate = responseGate
+        StubURLProtocol.gameDetailStarted = { requestStarted.fulfill() }
+        StubURLProtocol.lock.unlock()
+
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "stale-game-detail"
+        )
+        let completed = expectation(description: "old-account response discarded")
+        var receivedGame: Game?
+        var receivedError: Error?
+
+        service.getGameDetail(gameID: gameID)
+            .sink(
+                receiveCompletion: {
+                    if case .failure(let error) = $0 {
+                        receivedError = error
+                    }
+                    completed.fulfill()
+                },
+                receiveValue: { receivedGame = $0 }
+            )
+            .store(in: &cancellables)
+
+        wait(for: [requestStarted], timeout: 5)
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-account-jwt", userID: 2)
+
+        let newAccountGame = Game(ogsGame: ogsGame)
+        newAccountGame.ogs = service
+        service.connect(to: newAccountGame)
+        socket.resetEmittedCommands()
+
+        responseGate.signal()
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertNotNil(receivedError)
+        XCTAssertNil(receivedGame)
+        XCTAssertNil(newAccountGame.ogsRawData)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+    }
+
+    func testGetGameDetailReusesCanonicalConnectedGame() throws {
+        let gameID = 49
+        let ogsGame = try installGameDetailResponse(gameID: gameID)
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "canonical-game-detail"
+        )
+        let canonicalGame = Game(ogsGame: ogsGame)
+        canonicalGame.ogs = service
+        service.connect(to: canonicalGame)
+        socket.resetEmittedCommands()
+
+        let completed = expectation(description: "canonical game detail fetched")
+        var receivedGame: Game?
+        service.getGameDetail(gameID: gameID)
+            .sink(
+                receiveCompletion: { _ in completed.fulfill() },
+                receiveValue: { receivedGame = $0 }
+            )
+            .store(in: &cancellables)
+
+        wait(for: [completed], timeout: 5)
+        XCTAssertTrue(receivedGame === canonicalGame)
+        XCTAssertNotNil(canonicalGame.ogsRawData)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
     }
 
     func testTwoLoginsKeepCookiesPreferencesAndUsersIsolated() throws {
@@ -309,6 +453,44 @@ final class OGSServiceIsolationTests: XCTestCase {
             session: Session(configuration: configuration),
             cookieStorage: storage
         )
+    }
+
+    private func installGameDetailResponse(gameID: Int) throws -> OGSGame {
+        let bundle = Bundle(for: Self.self)
+        let fixtureURL = try XCTUnwrap(
+            bundle.url(forResource: "game-25076729", withExtension: "json")
+        )
+        var gameData = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL)) as? [String: Any]
+        )
+        gameData["game_id"] = gameID
+        let responseBody = try JSONSerialization.data(withJSONObject: ["gamedata": gameData])
+
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameDetailBody = responseBody
+        StubURLProtocol.lock.unlock()
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(
+            OGSGame.self,
+            from: JSONSerialization.data(withJSONObject: gameData)
+        )
+    }
+
+    private func makeUIConfig(jwt: String, userID: Int) throws -> OGSUIConfig {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "csrf_token": "test-csrf",
+            "user_jwt": jwt,
+            "user": [
+                "username": "player-\(userID)",
+                "id": userID,
+                "anonymous": false,
+            ],
+        ])
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(OGSUIConfig.self, from: data)
     }
 
     private func makeService(

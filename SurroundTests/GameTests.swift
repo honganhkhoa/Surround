@@ -52,6 +52,31 @@ class GameTests: XCTestCase {
             "-------------------"
         ])
     }
+
+    func testGameDeallocatesWhenOnlyPlayerCacheSubscriptionRemains() {
+        let service = OGSService.previewInstance()
+        weak var weakGame: Game?
+
+        withExtendedLifetime(service) {
+            var game: Game? = Game(
+                width: 5,
+                height: 5,
+                blackName: "black",
+                whiteName: "white",
+                gameId: .OGS(1)
+            )
+            weakGame = game
+            game?.ogs = service
+
+            XCTAssertNotNil(game?.playerCacheObservingCancellable)
+            game = nil
+            XCTAssertNil(weakGame)
+
+            // Break the historical cycle if this assertion is run against a
+            // regressed implementation, so the failed test cleans up after itself.
+            weakGame?.ogs = nil
+        }
+    }
     
     static func sampleGame(ogsId: Int) -> Game {
         let fileURL = Bundle(for: GameTests.self).url(forResource: "game-\(ogsId)", withExtension: "json")!
