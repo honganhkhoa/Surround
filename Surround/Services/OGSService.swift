@@ -272,6 +272,18 @@ class OGSService: ObservableObject {
     @Published var user: OGSUser? = nil
     @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected
 
+    /// The independent app features that may need the same game subscription.
+    ///
+    /// Owners are aggregated per game id so, for example, a public-list refresh
+    /// cannot tear down a visible detail view and an active game can finish
+    /// without disconnecting a detail view that is still showing its chat.
+    enum GameConnectionOwner: Hashable {
+        case explicit(UUID)
+        case activeGames
+        case publicGames
+        case detail(UUID)
+    }
+
     /// Connections requested by app state or a visible game-detail view.
     ///
     /// This is deliberately separate from `connectedGames`, which represents
@@ -281,12 +293,17 @@ class OGSService: ObservableObject {
     /// owner.
     private struct DesiredGameConnection {
         let game: Game
-        var withChat: Bool
+        var chatByOwner: [GameConnectionOwner: Bool]
+
+        var withChat: Bool {
+            chatByOwner.values.contains(true)
+        }
     }
 
     private var desiredGameConnections = [Int: DesiredGameConnection]()
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
+    private var publicGameConnectionIDs = Set<Int>()
     private var authenticationGeneration: UInt = 0
 
     @Published private(set) public var activeGames = [Int: Game]()
@@ -1010,18 +1027,21 @@ class OGSService: ObservableObject {
     
     func processOverview(overview: [String: Any]) {
         if let activeGames = overview["active_games"] as? [[String: Any]] {
+            let previouslyActiveGameIDs = Set(self.activeGames.keys)
             var newActiveGames = [Int:Game]()
             let decoder = DictionaryDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             for gameData in activeGames {
                 if let gameId = gameData["id"] as? Int {
-                    if let game = self.activeGames[gameId] {
-                        newActiveGames[gameId] = game
-                    } else {
-                        if let newGame = self.createGame(fromShortGameData: gameData) {
-                            newActiveGames[gameId] = newGame
-                            self.connect(to: newGame, withChat: true)
-                        }
+                    let candidate = self.activeGames[gameId]
+                        ?? self.desiredGameConnections[gameId]?.game
+                        ?? self.createGame(fromShortGameData: gameData)
+                    if let candidate {
+                        newActiveGames[gameId] = self.connect(
+                            to: candidate,
+                            withChat: true,
+                            owner: .activeGames
+                        )
                     }
                     if let gameData = gameData["json"] as? [String: Any] {
                         if let ogsGame = try? decoder.decode(OGSGame.self, from: gameData) {
@@ -1032,6 +1052,9 @@ class OGSService: ObservableObject {
                 }
             }
             self.activeGames = newActiveGames
+            for gameID in previouslyActiveGameIDs.subtracting(Set(newActiveGames.keys)) {
+                releaseConnection(gameID: gameID, owner: .activeGames)
+            }
             self.sortActiveGames(activeGames: self.activeGames.values)
             if let lastSeenChatIdByOGSGameId = preferences[.lastSeenChatIdByOGSGameId] {
                 var lastSeenChatIdByOGSGameId = lastSeenChatIdByOGSGameId
@@ -1209,7 +1232,8 @@ class OGSService: ObservableObject {
 
     /// Fetches one page of the given player's finished games.
     ///
-    /// Hits OGS's `players/{id}/games` listing (most-recently-finished first).
+    /// Hits OGS's `players/{id}/game_history` listing
+    /// (most-recently-finished first), matching the official web client.
     /// Each result is turned into a lightweight `Game` (players, board size)
     /// via `createGame(fromShortGameData:)`; the final board position and result
     /// are filled in lazily per row through `loadFinishedGameData(gameID:)`.
@@ -1221,12 +1245,16 @@ class OGSService: ObservableObject {
     func fetchFinishedGames(playerId: Int, page: Int, pageSize: Int = 50, reusing existingGames: [Int: Game] = [:]) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
         return Future<(games: [Game], hasNextPage: Bool), Error> { promise in
             let parameters: [String: Any] = [
-                "ended__isnull": "false",
+                // The official history view defaults to human games. Bot games
+                // are a separately paginated feed on this endpoint.
+                // Match the official web client's literal spelling. Django's
+                // BooleanWidget also accepts Alamofire's numeric `0`.
+                "bot_game": "false",
                 "ordering": "-ended",
                 "page": page,
                 "page_size": pageSize
             ]
-            self.httpClient.session.request("\(self.ogsRoot)/api/v1/players/\(playerId)/games/", parameters: parameters).validate().responseData { response in
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/players/\(playerId)/game_history", parameters: parameters).validate().responseData { response in
                 switch response.result {
                 case .success:
                     guard let responseValue = response.value,
@@ -1238,7 +1266,10 @@ class OGSService: ObservableObject {
                     let hasNextPage = (data["next"] as? String) != nil
                     var games = [Game]()
                     for var result in results {
-                        if let gameId = result["id"] as? Int, let existing = existingGames[gameId] {
+                        if let gameId = result["id"] as? Int,
+                           let existing = self.desiredGameConnections[gameId]?.game
+                            ?? self.connectedGames[gameId]
+                            ?? existingGames[gameId] {
                             games.append(existing)
                             continue
                         }
@@ -1259,6 +1290,19 @@ class OGSService: ObservableObject {
                 }
             }
         }.eraseToAnyPublisher()
+    }
+
+    /// Appends history pages without allowing mutable page boundaries to
+    /// introduce duplicate SwiftUI identities. The first instance wins so a
+    /// row that already contains replayed detail remains canonical.
+    static func mergingFinishedGames(_ existing: [Game], with incoming: [Game]) -> [Game] {
+        var seenGameIDs = Set<Int>()
+        return (existing + incoming).filter { game in
+            guard let gameID = game.ogsID else {
+                return false
+            }
+            return seenGameIDs.insert(gameID).inserted
+        }
     }
 
     /// Loads full game detail for a finished game, cache-first, without
@@ -1341,20 +1385,6 @@ class OGSService: ObservableObject {
             .eraseToAnyPublisher()
     }
 
-    /// Releases a game connection that no screen owns any more.
-    ///
-    /// Detail views connect (with chat) to whatever game they show, including
-    /// finished ones opened from history — which, unlike active games, are never
-    /// removed from `connectedGames` by the overview, so they would be retained
-    /// and re-connected on every socket cycle. Active games are left alone:
-    /// their connection is owned by the overview, not by the detail view.
-    func releaseConnectionIfNotActive(for game: Game) {
-        guard let gameId = game.ogsID, activeGames[gameId] == nil else {
-            return
-        }
-        disconnect(from: game)
-    }
-
     var gameDetailCancellable = [Int: AnyCancellable]()
     func updateDetailsOfConnectedGame(game: Game) {
         guard let gameId = game.ogsID,
@@ -1384,6 +1414,7 @@ class OGSService: ObservableObject {
         if let gameId = gameData["id"] as? Int {
             if gameData["phase"] as? String == OGSGamePhase.finished.rawValue {
                 self.activeGames.removeValue(forKey: gameId)
+                releaseConnection(gameID: gameId, owner: .activeGames)
                 return
             }
             if let game = self.activeGames[gameId] {
@@ -1391,8 +1422,10 @@ class OGSService: ObservableObject {
                 self.activeGames[gameId] = game
             } else {
                 if let game = self.createGame(fromShortGameData: gameData) {
-                    self.activeGames[gameId] = game
-                    self.connect(to: game)
+                    self.activeGames[gameId] = self.connect(
+                        to: game,
+                        owner: .activeGames
+                    )
                 }
             }
         }
@@ -1415,6 +1448,7 @@ class OGSService: ObservableObject {
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {
         desiredGameConnections.removeAll()
+        publicGameConnectionIDs.removeAll()
 
         for cancellable in gameDetailCancellable.values {
             cancellable.cancel()
@@ -1428,19 +1462,32 @@ class OGSService: ObservableObject {
         connectedWithChat.removeAll()
     }
 
-    func disconnect(from game: Game) {
+    func disconnect(from game: Game, owner: GameConnectionOwner) {
         guard case .OGS(let ogsID) = game.ID else {
             return
         }
 
-        // Remove intent before actual state. Any socket-open/authentication
-        // callback that follows will then have nothing to reconcile.
-        guard desiredGameConnections[ogsID]?.game === game else {
+        releaseConnection(gameID: ogsID, owner: owner)
+    }
+
+    func releaseConnection(gameID: Int, owner: GameConnectionOwner) {
+        guard var desired = desiredGameConnections[gameID],
+              desired.chatByOwner.removeValue(forKey: owner) != nil else {
             return
         }
-        desiredGameConnections[ogsID] = nil
-        gameDetailCancellable.removeValue(forKey: ogsID)?.cancel()
-        disconnectActualGame(gameID: ogsID)
+
+        // Remove intent before actual state. Any socket-open/authentication
+        // callback that follows will then see the remaining owners, if any.
+        if desired.chatByOwner.isEmpty {
+            desiredGameConnections[gameID] = nil
+            gameDetailCancellable.removeValue(forKey: gameID)?.cancel()
+            disconnectActualGame(gameID: gameID)
+        } else {
+            desiredGameConnections[gameID] = desired
+            // This also downgrades a chat subscription when its last chat owner
+            // leaves while a board-only owner remains.
+            connectIfReady(gameID: gameID)
+        }
     }
 
     private func disconnectActualGame(gameID: Int) {
@@ -1472,18 +1519,27 @@ class OGSService: ObservableObject {
         self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(ogsID)"])
     }
     
-    func connect(to game: Game, withChat: Bool = false) {
+    @discardableResult
+    func connect(
+        to game: Game,
+        withChat: Bool = false,
+        owner: GameConnectionOwner
+    ) -> Game {
         guard case .OGS(let ogsID) = game.ID else {
-            return
+            return game
         }
 
         if var desired = desiredGameConnections[ogsID] {
-            desired.withChat = desired.withChat || withChat
+            desired.chatByOwner[owner] = (desired.chatByOwner[owner] ?? false) || withChat
             desiredGameConnections[ogsID] = desired
         } else {
-            desiredGameConnections[ogsID] = DesiredGameConnection(game: game, withChat: withChat)
+            desiredGameConnections[ogsID] = DesiredGameConnection(
+                game: game,
+                chatByOwner: [owner: withChat]
+            )
         }
         connectIfReady(gameID: ogsID)
+        return desiredGameConnections[ogsID]?.game ?? game
     }
 
     private func reconcileDesiredGameConnections() {
@@ -1511,11 +1567,25 @@ class OGSService: ObservableObject {
         }
 
         if connectedGames[gameID] != nil {
-            if connectedWithChat[gameID] != true && desired.withChat {
-                connectedWithChat[gameID] = true
+            // A subscription is keyed by game id on the server. Route future
+            // events into the canonical model even if another feature supplied
+            // a different `Game` instance while this socket was connected.
+            connectedGames[gameID] = desired.game
+
+            let wasConnectedWithChat = connectedWithChat[gameID] ?? false
+            if wasConnectedWithChat != desired.withChat {
+                connectedWithChat[gameID] = desired.withChat
                 self.ogsWebsocket.emit(command: "game/disconnect", data: ["game_id": gameID])
-                self.ogsWebsocket.emit(command: "game/connect", data: ["game_id": gameID, "chat": true])
-                self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(gameID)"])
+                if wasConnectedWithChat {
+                    self.ogsWebsocket.emit(command: "chat/part", data: ["channel": "game-\(gameID)"])
+                }
+                self.ogsWebsocket.emit(
+                    command: "game/connect",
+                    data: ["game_id": gameID, "chat": desired.withChat]
+                )
+                if desired.withChat {
+                    self.ogsWebsocket.emit(command: "chat/join", data: ["channel": "game-\(gameID)"])
+                }
             }
             return
         }
@@ -1659,32 +1729,36 @@ class OGSService: ObservableObject {
                 var newPublicGames: [Game] = []
                 var newPublicGameIds = Set<Int>()
                 for publicGameData in publicGamesData {
-                    if let gameId = publicGameData["id"] as? Int {
+                    if let gameId = publicGameData["id"] as? Int,
+                       let newGame = self.createGame(fromShortGameData: publicGameData) {
                         newPublicGameIds.insert(gameId)
-                        if let newGame = self.createGame(fromShortGameData: publicGameData) {
-                            if let connectedGame = self.connectedGames[gameId] {
-                                newPublicGames.append(connectedGame)
-                            } else {
-                                self.connect(to: newGame)
-                                newPublicGames.append(newGame)
-                            }
-                            self.publicGames[gameId] = newPublicGames.last
-                        }
+                        let candidate = self.desiredGameConnections[gameId]?.game
+                            ?? self.connectedGames[gameId]
+                            ?? newGame
+                        let canonicalGame = self.connect(
+                            to: candidate,
+                            owner: .publicGames
+                        )
+                        newPublicGames.append(canonicalGame)
                     }
                 }
                 self.sortedPublicGames = newPublicGames
+                self.publicGames = Dictionary(
+                    newPublicGames.compactMap { game in
+                        game.ogsID.map { ($0, game) }
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
                 for game in newPublicGames {
                     self.cachedUserIds.formUnion(Set(game.playerByOGSId.keys))
                 }
                 self.fetchCachedPlayersIfNecessary()
-                // Disconnect outdated games
-                for connectedGame in self.connectedGames.values {
-                    if let gameId = connectedGame.ogsID {
-                        if !newPublicGameIds.contains(gameId) && self.activeGames[gameId] == nil {
-                            self.disconnect(from: connectedGame)
-                        }
-                    }
+                // Release only the public-list claim. Active games and visible
+                // detail views own their connections independently.
+                for gameID in self.publicGameConnectionIDs.subtracting(newPublicGameIds) {
+                    self.releaseConnection(gameID: gameID, owner: .publicGames)
                 }
+                self.publicGameConnectionIDs = newPublicGameIds
             }
         }
     }

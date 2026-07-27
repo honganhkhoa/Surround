@@ -23,6 +23,10 @@
 		AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000A39A000000000000A /* OGSPauseControlTests.swift */; };
 		AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000B39A000000000000B /* TimeUtilitiesTests.swift */; };
 		AE20000C39A000000000000C /* OGSUserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000C39A000000000000C /* OGSUserTests.swift */; };
+		AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
+		AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
+		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
+		AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
@@ -377,6 +381,8 @@
 		AE10000A39A000000000000A /* OGSPauseControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPauseControlTests.swift; sourceTree = "<group>"; };
 		AE10000B39A000000000000B /* TimeUtilitiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeUtilitiesTests.swift; sourceTree = "<group>"; };
 		AE10000C39A000000000000C /* OGSUserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSUserTests.swift; sourceTree = "<group>"; };
+		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
+		AE6000063B00000000000006 /* GameHistoryPaginationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistoryPaginationState.swift; sourceTree = "<group>"; };
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AE40B2CB2C42644F000ED564 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/MainInterface.strings; sourceTree = "<group>"; };
@@ -716,6 +722,7 @@
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
 				BCFA11510000000000000001 /* GameHistoryView.swift */,
+				AE6000063B00000000000006 /* GameHistoryPaginationState.swift */,
 				BC55D2D524B81E90003E20E7 /* HomeView.swift */,
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
@@ -839,6 +846,7 @@
 				BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */,
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
+				AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */,
 				BC463B0C266353D700D40D3A /* SingleGameView.swift */,
 				BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */,
 			);
@@ -1250,6 +1258,8 @@
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
+				AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */,
+				AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
 				BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
@@ -1338,6 +1348,8 @@
 				AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */,
 				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
 				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
+				AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */,
+				AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
 				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,

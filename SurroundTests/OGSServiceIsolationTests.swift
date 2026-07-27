@@ -44,6 +44,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         static var gameDetailBody: Data?
         static var gameDetailGate: DispatchSemaphore?
         static var gameDetailStarted: (() -> Void)?
+        static var gameHistoryBody: Data?
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -88,6 +89,11 @@ final class OGSServiceIsolationTests: XCTestCase {
                 body = Data(#"{"friends":[]}"#.utf8)
             case "/api/v1/ui/overview":
                 body = Data("{}".utf8)
+            case _ where path.hasPrefix("/api/v1/players/")
+                && path.hasSuffix("/game_history"):
+                Self.lock.lock()
+                body = Self.gameHistoryBody ?? Data("{}".utf8)
+                Self.lock.unlock()
             case _ where path.hasPrefix("/api/v1/games/"):
                 Self.lock.lock()
                 body = Self.gameDetailBody ?? Data("{}".utf8)
@@ -126,6 +132,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         StubURLProtocol.gameDetailBody = nil
         StubURLProtocol.gameDetailGate = nil
         StubURLProtocol.gameDetailStarted = nil
+        StubURLProtocol.gameHistoryBody = nil
         StubURLProtocol.lock.unlock()
     }
     override func tearDown() {
@@ -226,7 +233,7 @@ final class OGSServiceIsolationTests: XCTestCase {
 
         let newAccountGame = Game(ogsGame: ogsGame)
         newAccountGame.ogs = service
-        service.connect(to: newAccountGame)
+        service.connect(to: newAccountGame, owner: .explicit(UUID()))
         socket.resetEmittedCommands()
 
         responseGate.signal()
@@ -253,7 +260,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         )
         let canonicalGame = Game(ogsGame: ogsGame)
         canonicalGame.ogs = service
-        service.connect(to: canonicalGame)
+        service.connect(to: canonicalGame, owner: .explicit(UUID()))
         socket.resetEmittedCommands()
 
         let completed = expectation(description: "canonical game detail fetched")
@@ -269,6 +276,347 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertTrue(receivedGame === canonicalGame)
         XCTAssertNotNil(canonicalGame.ogsRawData)
         XCTAssertTrue(socket.emittedCommands.isEmpty)
+    }
+
+    func testFinishedGamesUseOfficialHistoryEndpointAndReuseExistingModels() throws {
+        let response = try JSONSerialization.data(withJSONObject: [
+            "count": 3,
+            "next": "https://ogs.test/api/v1/players/101/game_history/?page=3",
+            "previous": NSNull(),
+            "results": [
+                makeHistoryResult(id: 61, blackID: 101, whiteID: 201),
+                makeHistoryResult(id: 60, blackID: 202, whiteID: 101),
+            ],
+        ])
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameHistoryBody = response
+        StubURLProtocol.lock.unlock()
+
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            label: "game-history"
+        )
+        let existing = Game(
+            width: 9,
+            height: 9,
+            blackName: "existing-black",
+            whiteName: "existing-white",
+            gameId: .OGS(61)
+        )
+        existing.ogs = service
+        let completed = expectation(description: "history page fetched")
+        var receivedGames = [Game]()
+        var hasNextPage = false
+        var receivedError: Error?
+
+        service.fetchFinishedGames(
+            playerId: 101,
+            page: 2,
+            pageSize: 25,
+            reusing: [61: existing]
+        )
+        .sink(
+            receiveCompletion: {
+                if case .failure(let error) = $0 {
+                    receivedError = error
+                }
+                completed.fulfill()
+            },
+            receiveValue: {
+                receivedGames = $0.games
+                hasNextPage = $0.hasNextPage
+            }
+        )
+        .store(in: &cancellables)
+
+        wait(for: [completed], timeout: 5)
+        XCTAssertNil(receivedError)
+        XCTAssertEqual(receivedGames.compactMap(\.ogsID), [61, 60])
+        XCTAssertTrue(receivedGames.first === existing)
+        XCTAssertTrue(hasNextPage)
+
+        StubURLProtocol.lock.lock()
+        let requests = StubURLProtocol.requests
+        StubURLProtocol.lock.unlock()
+        let request = try XCTUnwrap(requests.last)
+        let components = try XCTUnwrap(
+            URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+        )
+        let query = Dictionary(
+            components.queryItems?.compactMap { item in
+                item.value.map { (item.name, $0) }
+            } ?? [],
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        XCTAssertEqual(request.url?.path, "/api/v1/players/101/game_history")
+        XCTAssertEqual(query["ordering"], "-ended")
+        XCTAssertEqual(query["page"], "2")
+        XCTAssertEqual(query["page_size"], "25")
+        XCTAssertEqual(query["bot_game"], "false")
+        XCTAssertNil(query["ended__isnull"])
+    }
+
+    func testMergingFinishedGamesPreservesFirstInstanceAndDeduplicatesPages() {
+        let first = makeHistoryGame(id: 5)
+        let retained = makeHistoryGame(id: 4)
+        let overlapping = makeHistoryGame(id: 4)
+        let incoming = makeHistoryGame(id: 3)
+        let repeatedIncoming = makeHistoryGame(id: 3)
+
+        let merged = OGSService.mergingFinishedGames(
+            [first, retained],
+            with: [overlapping, incoming, repeatedIncoming]
+        )
+
+        XCTAssertEqual(merged.compactMap(\.ogsID), [5, 4, 3])
+        XCTAssertTrue(merged[1] === retained)
+        XCTAssertTrue(merged[2] === incoming)
+    }
+
+    func testHistoryPaginationAutoAdvancesPastDuplicateOnlyPage() throws {
+        var pagination = GameHistoryPaginationState()
+        let firstRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        let retained = makeHistoryGame(id: 5)
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [retained], hasNextPage: true),
+                for: firstRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+
+        let duplicateRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        XCTAssertEqual(duplicateRequest.page, 2)
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 5)], hasNextPage: true),
+                for: duplicateRequest,
+                currentPlayerID: 101
+            ),
+            .loadNextPage
+        )
+        XCTAssertEqual(pagination.games.compactMap(\.ogsID), [5])
+        XCTAssertTrue(pagination.games[0] === retained)
+
+        let continuedRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        XCTAssertEqual(continuedRequest.page, 3)
+    }
+
+    func testHistoryPaginationStopsAutoAdvanceAfterUniquePage() throws {
+        var pagination = GameHistoryPaginationState()
+        let firstRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        _ = pagination.finish(
+            .success(games: [makeHistoryGame(id: 5)], hasNextPage: true),
+            for: firstRequest,
+            currentPlayerID: 101
+        )
+        let secondRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 4)], hasNextPage: true),
+                for: secondRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+        XCTAssertEqual(pagination.games.compactMap(\.ogsID), [5, 4])
+        XCTAssertEqual(pagination.nextPage, 3)
+        XCTAssertTrue(pagination.hasMore)
+        XCTAssertFalse(pagination.isLoading)
+    }
+
+    func testHistoryPaginationStopsAfterThreeConsecutiveNoProgressPages() throws {
+        var pagination = GameHistoryPaginationState()
+        let firstRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        _ = pagination.finish(
+            .success(games: [makeHistoryGame(id: 5)], hasNextPage: true),
+            for: firstRequest,
+            currentPlayerID: 101
+        )
+
+        for expectedPage in 2...3 {
+            let duplicateRequest = try XCTUnwrap(
+                pagination.beginRequest(playerID: 101)
+            )
+            XCTAssertEqual(duplicateRequest.page, expectedPage)
+            XCTAssertEqual(
+                pagination.finish(
+                    .success(
+                        games: [makeHistoryGame(id: 5)],
+                        hasNextPage: true
+                    ),
+                    for: duplicateRequest,
+                    currentPlayerID: 101
+                ),
+                .loadNextPage
+            )
+        }
+
+        let cappedRequest = try XCTUnwrap(
+            pagination.beginRequest(playerID: 101)
+        )
+        XCTAssertEqual(cappedRequest.page, 4)
+        XCTAssertEqual(
+            pagination.finish(
+                .success(
+                    games: [makeHistoryGame(id: 5)],
+                    hasNextPage: true
+                ),
+                for: cappedRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+        XCTAssertFalse(pagination.hasMore)
+        XCTAssertFalse(pagination.isLoading)
+        XCTAssertNil(pagination.beginRequest(playerID: 101))
+    }
+
+    func testHistoryPaginationProgressResetsNoProgressLimit() throws {
+        var pagination = GameHistoryPaginationState()
+        let firstRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        _ = pagination.finish(
+            .success(games: [makeHistoryGame(id: 5)], hasNextPage: true),
+            for: firstRequest,
+            currentPlayerID: 101
+        )
+
+        for _ in 0..<2 {
+            let duplicateRequest = try XCTUnwrap(
+                pagination.beginRequest(playerID: 101)
+            )
+            XCTAssertEqual(
+                pagination.finish(
+                    .success(
+                        games: [makeHistoryGame(id: 5)],
+                        hasNextPage: true
+                    ),
+                    for: duplicateRequest,
+                    currentPlayerID: 101
+                ),
+                .loadNextPage
+            )
+        }
+
+        let progressRequest = try XCTUnwrap(
+            pagination.beginRequest(playerID: 101)
+        )
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 4)], hasNextPage: true),
+                for: progressRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+
+        let duplicateAfterProgressRequest = try XCTUnwrap(
+            pagination.beginRequest(playerID: 101)
+        )
+        XCTAssertEqual(
+            pagination.finish(
+                .success(
+                    games: [makeHistoryGame(id: 4)],
+                    hasNextPage: true
+                ),
+                for: duplicateAfterProgressRequest,
+                currentPlayerID: 101
+            ),
+            .loadNextPage
+        )
+        XCTAssertTrue(pagination.hasMore)
+    }
+
+    func testHistoryPaginationStopsAtFinalDuplicatePage() throws {
+        var pagination = GameHistoryPaginationState()
+        let firstRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        _ = pagination.finish(
+            .success(games: [makeHistoryGame(id: 5)], hasNextPage: true),
+            for: firstRequest,
+            currentPlayerID: 101
+        )
+        let finalRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 5)], hasNextPage: false),
+                for: finalRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+        XCTAssertFalse(pagination.hasMore)
+        XCTAssertNil(pagination.beginRequest(playerID: 101))
+    }
+
+    func testHistoryPaginationGatesRequestsWhileLoadingAndAfterFailure() throws {
+        var pagination = GameHistoryPaginationState()
+        XCTAssertNil(pagination.beginRequest(playerID: nil))
+
+        let request = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        XCTAssertTrue(pagination.isLoading)
+        XCTAssertNil(pagination.beginRequest(playerID: 101))
+        XCTAssertNil(pagination.beginRequest(playerID: 202))
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 5)], hasNextPage: false),
+                for: request,
+                currentPlayerID: 202
+            ),
+            .ignored
+        )
+        XCTAssertTrue(pagination.isLoading)
+
+        XCTAssertEqual(
+            pagination.finish(
+                .failure,
+                for: request,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+        XCTAssertTrue(pagination.loadedOnce)
+        XCTAssertFalse(pagination.hasMore)
+        XCTAssertFalse(pagination.isLoading)
+        XCTAssertNil(pagination.beginRequest(playerID: 101))
+    }
+
+    func testHistoryPaginationIgnoresStaleResultAfterReset() throws {
+        var pagination = GameHistoryPaginationState()
+        let staleRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+
+        // Resetting for the same numeric player still starts a new generation.
+        pagination.reset(playerID: 101)
+        let currentRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        XCTAssertEqual(currentRequest.page, 1)
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 5)], hasNextPage: false),
+                for: staleRequest,
+                currentPlayerID: 101
+            ),
+            .ignored
+        )
+        XCTAssertTrue(pagination.isLoading)
+        XCTAssertTrue(pagination.games.isEmpty)
+
+        XCTAssertEqual(
+            pagination.finish(
+                .success(games: [makeHistoryGame(id: 4)], hasNextPage: false),
+                for: currentRequest,
+                currentPlayerID: 101
+            ),
+            .finished
+        )
+        XCTAssertEqual(pagination.games.compactMap(\.ogsID), [4])
+        XCTAssertFalse(pagination.isLoading)
     }
 
     func testTwoLoginsKeepCookiesPreferencesAndUsersIsolated() throws {
@@ -452,6 +800,32 @@ final class OGSServiceIsolationTests: XCTestCase {
         return AlamofireOGSHTTPClient(
             session: Session(configuration: configuration),
             cookieStorage: storage
+        )
+    }
+
+    private func makeHistoryResult(
+        id: Int,
+        blackID: Int,
+        whiteID: Int
+    ) -> [String: Any] {
+        [
+            "id": id,
+            "width": 9,
+            "height": 9,
+            "players": [
+                "black": ["id": blackID, "username": "black-\(blackID)"],
+                "white": ["id": whiteID, "username": "white-\(whiteID)"],
+            ],
+        ]
+    }
+
+    private func makeHistoryGame(id: Int) -> Game {
+        Game(
+            width: 9,
+            height: 9,
+            blackName: "black-\(id)",
+            whiteName: "white-\(id)",
+            gameId: .OGS(id)
         )
     }
 

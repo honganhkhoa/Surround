@@ -204,8 +204,16 @@ final class OGSBetaGamePlayTests: XCTestCase {
             timeout: 30,
             description: "white game detail"
         )
-        black.service.connect(to: blackGame)
-        white.service.connect(to: whiteGame)
+        let blackConnectionOwnerID = UUID()
+        let whiteConnectionOwnerID = UUID()
+        black.service.connect(
+            to: blackGame,
+            owner: .explicit(blackConnectionOwnerID)
+        )
+        white.service.connect(
+            to: whiteGame,
+            owner: .explicit(whiteConnectionOwnerID)
+        )
 
         try await eventually(description: "opposite player colors") {
             blackGame.userStoneColor == .black && whiteGame.userStoneColor == .white

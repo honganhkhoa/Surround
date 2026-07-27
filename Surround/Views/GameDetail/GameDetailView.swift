@@ -17,6 +17,7 @@ struct GameDetailView: View {
     @State var currentGame: Game?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
+    @State private var detailConnection = GameDetailConnectionCoordinator()
 
     /// When false (e.g. opening a finished game from Game History), the
     /// active-games carousel is never shown regardless of the active game list.
@@ -47,11 +48,17 @@ struct GameDetailView: View {
     }
     
     func updateDetailOfCurrentGameIfNecessary() {
-        if let currentGame = currentGame {
-            ogs.connect(to: currentGame, withChat: true)
-            if currentGame.ogsRawData == nil {
-                ogs.updateDetailsOfConnectedGame(game: currentGame)
-            }
+        guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
+            detailConnection.release(using: ogs)
+            return
+        }
+
+        let canonicalGame = detailConnection.connect(to: requestedGame, using: ogs)
+        if canonicalGame !== requestedGame {
+            currentGame = canonicalGame
+        }
+        if canonicalGame.ogsRawData == nil {
+            ogs.updateDetailsOfConnectedGame(game: canonicalGame)
         }
     }
     
@@ -245,6 +252,9 @@ struct GameDetailView: View {
             if newGame.ID != oldGame.ID {
                 updateDetailOfCurrentGameIfNecessary()
             }
+        }
+        .onDisappear {
+            detailConnection.release(using: ogs)
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { _ in
             DispatchQueue.main.async {

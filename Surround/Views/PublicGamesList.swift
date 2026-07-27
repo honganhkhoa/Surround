@@ -45,10 +45,6 @@ struct PublicGamesList: View {
                         nav.publicGames.ogsIdToOpen = -1
                     },
                     receiveValue: { game in
-                        // `getGameDetail` is deliberately data-only. Claim the
-                        // connection here, before the public-list refresh can
-                        // install a different model for the same game ID.
-                        ogs.connect(to: game)
                         if nav.publicGames.activeGame == nil {
                             nav.publicGames.activeGame = game
                         }

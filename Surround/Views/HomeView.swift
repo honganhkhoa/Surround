@@ -372,15 +372,10 @@ struct HomeView: View {
                 }
             }
         ), destination: {
-            let openedGame = nav.home.activeGame
-            GameDetailView(currentGame: openedGame, allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel)
-                .onDisappear {
-                    // A finished game opened from here would otherwise stay in
-                    // connectedGames forever; active games keep their connection.
-                    if let openedGame {
-                        ogs.releaseConnectionIfNotActive(for: openedGame)
-                    }
-                }
+            GameDetailView(
+                currentGame: nav.home.activeGame,
+                allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel
+            )
         })
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {

@@ -22,6 +22,7 @@ final class OGSServiceEventTests: XCTestCase {
         var drift = 0.0
         var latency = 0.0
         var emissions = [Emission]()
+        var gamelistResults: [[String: Any]]?
         private(set) var closeThenReconnectCount = 0
 
         func connect() {
@@ -70,7 +71,11 @@ final class OGSServiceEventTests: XCTestCase {
 
         func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
             emissions.append(.init(command: command, data: data))
-            resultCallback?(nil, nil)
+            if command == "gamelist/query", let gamelistResults {
+                resultCallback?(["results": gamelistResults], nil)
+            } else {
+                resultCallback?(nil, nil)
+            }
         }
 
         func deliver(name: String, data: Any? = nil) {
@@ -94,7 +99,7 @@ final class OGSServiceEventTests: XCTestCase {
         let game = Game(ogsGame: gameData)
         game.ogs = service
 
-        service.connect(to: game)
+        service.connect(to: game, owner: .explicit(UUID()))
         XCTAssertEqual(socket.emissions.map(\.command), ["game/connect"])
 
         socket.deliver(name: "game/42/move", data: ["move": [0, 0, 125, false]])
@@ -122,9 +127,10 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(socket: socket)
         let game = Game(ogsGame: try makeEmptyGameData(id: 43, phase: "finished"))
         game.ogs = service
+        let ownerID = UUID()
 
-        service.connect(to: game, withChat: true)
-        service.releaseConnectionIfNotActive(for: game)
+        service.connect(to: game, withChat: true, owner: .explicit(ownerID))
+        service.releaseConnection(gameID: 43, owner: .explicit(ownerID))
         socket.openSocket(authenticate: true)
 
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
@@ -138,9 +144,10 @@ final class OGSServiceEventTests: XCTestCase {
         let game = Game(ogsGame: try makeEmptyGameData(id: 44))
         game.ogs = service
         service.user = game.blackPlayer
+        let ownerID = UUID()
 
-        service.connect(to: game, withChat: true)
-        service.releaseConnectionIfNotActive(for: game)
+        service.connect(to: game, withChat: true, owner: .explicit(ownerID))
+        service.releaseConnection(gameID: 44, owner: .explicit(ownerID))
         socket.markAuthenticated()
 
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
@@ -152,11 +159,12 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(socket: socket)
         let game = Game(ogsGame: try makeEmptyGameData(id: 45, phase: "finished"))
         game.ogs = service
+        let ownerID = UUID()
 
-        service.connect(to: game, withChat: true)
+        service.connect(to: game, withChat: true, owner: .explicit(ownerID))
         socket.emissions.removeAll()
         socket.dropSocket()
-        service.releaseConnectionIfNotActive(for: game)
+        service.releaseConnection(gameID: 45, owner: .explicit(ownerID))
         socket.openSocket(authenticate: true)
 
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
@@ -170,11 +178,21 @@ final class OGSServiceEventTests: XCTestCase {
         let staleGame = Game(ogsGame: try makeEmptyGameData(id: 48))
         canonicalGame.ogs = service
         staleGame.ogs = service
+        let canonicalOwnerID = UUID()
+        let staleOwnerID = UUID()
 
-        service.connect(to: canonicalGame, withChat: true)
-        service.connect(to: staleGame, withChat: true)
+        service.connect(
+            to: canonicalGame,
+            withChat: true,
+            owner: .explicit(canonicalOwnerID)
+        )
+        service.connect(
+            to: staleGame,
+            withChat: true,
+            owner: .explicit(staleOwnerID)
+        )
         socket.emissions.removeAll()
-        service.disconnect(from: staleGame)
+        service.disconnect(from: staleGame, owner: .explicit(staleOwnerID))
 
         XCTAssertTrue(socket.emissions.isEmpty)
         socket.dropSocket()
@@ -188,13 +206,253 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(socket: socket)
         socket.deliver(name: "active_game", data: makeShortGameData(id: 46, phase: "play"))
         let game = try XCTUnwrap(service.activeGames[46])
+        let detailOwnerID = UUID()
+        service.connect(to: game, withChat: true, owner: .detail(detailOwnerID))
 
         socket.emissions.removeAll()
         socket.dropSocket()
-        service.releaseConnectionIfNotActive(for: game)
+        service.releaseConnection(gameID: 46, owner: .detail(detailOwnerID))
         socket.openSocket(authenticate: true)
 
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+    }
+
+    func testFinishedActiveGameReopensWithHistoryModelAsCanonicalConnection() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var activeEvent = makeShortGameData(id: 49, phase: "play")
+        socket.deliver(name: "active_game", data: activeEvent)
+        let formerActiveGame = try XCTUnwrap(service.activeGames[49])
+
+        socket.emissions.removeAll()
+        activeEvent["phase"] = "finished"
+        socket.deliver(name: "active_game", data: activeEvent)
+
+        XCTAssertNil(service.activeGames[49])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect"])
+
+        let historyGame = Game(ogsGame: try makeEmptyGameData(id: 49, phase: "finished"))
+        historyGame.ogs = service
+        let detailOwnerID = UUID()
+        let connectedGame = service.connect(
+            to: historyGame,
+            withChat: true,
+            owner: .detail(detailOwnerID)
+        )
+
+        XCTAssertTrue(connectedGame === historyGame)
+        socket.deliver(name: "game/49/phase", data: "stone removal")
+        XCTAssertEqual(historyGame.gamePhase, .stoneRemoval)
+        XCTAssertNotEqual(formerActiveGame.gamePhase, .stoneRemoval)
+
+        socket.emissions.removeAll()
+        service.releaseConnection(gameID: 49, owner: .detail(detailOwnerID))
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+    }
+
+    func testFinishedActiveGameKeepsVisibleDetailOwnerUntilDetailCloses() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var activeEvent = makeShortGameData(id: 50, phase: "play")
+        socket.deliver(name: "active_game", data: activeEvent)
+        let game = try XCTUnwrap(service.activeGames[50])
+        let detailOwnerID = UUID()
+        service.connect(to: game, withChat: true, owner: .detail(detailOwnerID))
+
+        socket.emissions.removeAll()
+        activeEvent["phase"] = "finished"
+        socket.deliver(name: "active_game", data: activeEvent)
+
+        XCTAssertNil(service.activeGames[50])
+        XCTAssertTrue(socket.emissions.isEmpty)
+        socket.deliver(name: "game/50/phase", data: "stone removal")
+        XCTAssertEqual(game.gamePhase, .stoneRemoval)
+
+        service.releaseConnection(gameID: 50, owner: .detail(detailOwnerID))
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+    }
+
+    func testPublicGameRefreshReleasesOnlyPublicListOwners() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let historyGame = Game(ogsGame: try makeEmptyGameData(id: 51, phase: "finished"))
+        historyGame.ogs = service
+        let detailOwnerID = UUID()
+        service.connect(to: historyGame, withChat: true, owner: .detail(detailOwnerID))
+
+        socket.emissions.removeAll()
+        socket.gamelistResults = [makeShortGameData(id: 52, phase: "play")]
+        service.fetchPublicGames()
+
+        XCTAssertFalse(socket.emissions.contains { emission in
+            emission.command == "game/disconnect"
+                && (emission.data as? [String: Any])?["game_id"] as? Int == 51
+        })
+        socket.deliver(name: "game/51/phase", data: "stone removal")
+        XCTAssertEqual(historyGame.gamePhase, .stoneRemoval)
+
+        socket.emissions.removeAll()
+        socket.gamelistResults = []
+        service.fetchPublicGames()
+
+        XCTAssertTrue(socket.emissions.contains { emission in
+            emission.command == "game/disconnect"
+                && (emission.data as? [String: Any])?["game_id"] as? Int == 52
+        })
+        XCTAssertFalse(socket.emissions.contains { emission in
+            emission.command == "game/disconnect"
+                && (emission.data as? [String: Any])?["game_id"] as? Int == 51
+        })
+    }
+
+    func testDetailOwnersAreIndependentAndChatDowngradesToPublicConnection() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 53, phase: "finished"))
+        game.ogs = service
+        let firstDetailOwnerID = UUID()
+        let secondDetailOwnerID = UUID()
+
+        service.connect(to: game, owner: .publicGames)
+        service.connect(to: game, withChat: true, owner: .detail(firstDetailOwnerID))
+        service.connect(to: game, withChat: true, owner: .detail(secondDetailOwnerID))
+        socket.emissions.removeAll()
+
+        service.releaseConnection(gameID: 53, owner: .detail(firstDetailOwnerID))
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        service.releaseConnection(gameID: 53, owner: .detail(secondDetailOwnerID))
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "chat/part", "game/connect"]
+        )
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+
+        socket.emissions.removeAll()
+        service.releaseConnection(gameID: 53, owner: .publicGames)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect"])
+    }
+
+    func testGameDetailCoordinatorReturnsCanonicalGameForRepeatedSameIDAcquisition() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let canonicalGame = Game(ogsGame: try makeEmptyGameData(id: 55))
+        let staleGame = Game(ogsGame: try makeEmptyGameData(id: 55))
+        canonicalGame.ogs = service
+        staleGame.ogs = service
+
+        service.connect(
+            to: canonicalGame,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+        socket.emissions.removeAll()
+
+        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+        let firstAcquisition = coordinator.connect(to: staleGame, using: service)
+        let secondAcquisition = coordinator.connect(to: staleGame, using: service)
+
+        XCTAssertTrue(firstAcquisition === canonicalGame)
+        XCTAssertTrue(secondAcquisition === canonicalGame)
+        XCTAssertEqual(coordinator.connectedGameID, 55)
+        XCTAssertTrue(socket.emissions.isEmpty)
+    }
+
+    func testGameDetailCoordinatorSwitchReleasesOldGameBeforeConnectingNewGame() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let firstGame = Game(ogsGame: try makeEmptyGameData(id: 56))
+        let secondGame = Game(ogsGame: try makeEmptyGameData(id: 57))
+        firstGame.ogs = service
+        secondGame.ogs = service
+        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+
+        coordinator.connect(to: firstGame, using: service)
+        socket.emissions.removeAll()
+        coordinator.connect(to: secondGame, using: service)
+
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "chat/part", "game/connect", "chat/join"]
+        )
+        guard socket.emissions.count == 4 else {
+            return
+        }
+        XCTAssertEqual(
+            (socket.emissions[0].data as? [String: Any])?["game_id"] as? Int,
+            56
+        )
+        XCTAssertEqual(
+            (socket.emissions[1].data as? [String: Any])?["channel"] as? String,
+            "game-56"
+        )
+        XCTAssertEqual(
+            (socket.emissions[2].data as? [String: Any])?["game_id"] as? Int,
+            57
+        )
+        XCTAssertEqual(
+            (socket.emissions[2].data as? [String: Any])?["chat"] as? Bool,
+            true
+        )
+        XCTAssertEqual(
+            (socket.emissions[3].data as? [String: Any])?["channel"] as? String,
+            "game-57"
+        )
+        XCTAssertEqual(coordinator.connectedGameID, 57)
+    }
+
+    func testGameDetailCoordinatorReleaseIsIdempotentAndPreventsReconnect() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 58))
+        game.ogs = service
+        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+
+        coordinator.connect(to: game, using: service)
+        socket.emissions.removeAll()
+
+        coordinator.release(using: service)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+        XCTAssertNil(coordinator.connectedGameID)
+
+        coordinator.release(using: service)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testPublicRefreshReusesDesiredCanonicalModelWhileSocketIsDown() throws {
+        let socket = FakeWebsocket()
+        socket.dropSocket()
+        let service = makeService(socket: socket)
+        let canonicalGame = Game(ogsGame: try makeEmptyGameData(id: 54))
+        canonicalGame.ogs = service
+        service.connect(to: canonicalGame, owner: .explicit(UUID()))
+
+        socket.gamelistResults = [makeShortGameData(id: 54, phase: "play")]
+        service.fetchPublicGames()
+
+        XCTAssertEqual(service.sortedPublicGames.count, 1)
+        XCTAssertTrue(service.sortedPublicGames[0] === canonicalGame)
+
+        socket.openSocket(authenticate: true)
+        socket.deliver(name: "game/54/phase", data: "stone removal")
+        XCTAssertEqual(canonicalGame.gamePhase, .stoneRemoval)
     }
 
     func testAuthenticationChangeInvalidatesFinishedGameAndChatIntent() throws {
@@ -205,7 +463,7 @@ final class OGSServiceEventTests: XCTestCase {
 
         let game = Game(ogsGame: try makeEmptyGameData(id: 47, phase: "finished"))
         game.ogs = service
-        service.connect(to: game, withChat: true)
+        service.connect(to: game, withChat: true, owner: .explicit(UUID()))
         socket.emissions.removeAll()
         let reconnectCountBeforeChange = socket.closeThenReconnectCount
 
@@ -226,7 +484,7 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(socket: socket)
         let game = Game(ogsGame: try makeEmptyGameData(id: 77))
         game.ogs = service
-        service.connect(to: game)
+        service.connect(to: game, owner: .explicit(UUID()))
 
         socket.deliver(name: "game/not-an-id/move", data: ["move": [0, 0]])
         socket.deliver(name: "game/77/move", data: ["move": []])
@@ -298,7 +556,7 @@ final class OGSServiceEventTests: XCTestCase {
         event["phase"] = "finished"
         socket.deliver(name: "active_game", data: event)
         XCTAssertNil(service.activeGames[101])
-        XCTAssertEqual(socket.emissions.map(\.command), ["game/connect"])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/connect", "game/disconnect"])
     }
 
     private func makeService(socket: OGSWebsocketProtocol) -> OGSService {
