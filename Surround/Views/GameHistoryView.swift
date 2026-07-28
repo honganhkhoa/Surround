@@ -15,7 +15,7 @@ struct GameHistoryView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
 
-    private static let pageSize = 50
+    private static let pageSize = 10
 
     @State private var pagination = GameHistoryPaginationState()
     @State private var fetchCancellable: AnyCancellable?
@@ -27,7 +27,7 @@ struct GameHistoryView: View {
                     HistoryGameCell(game: game) {
                         nav.gameHistory.activeGame = game
                     }
-                    .padding()
+                    .padding(.horizontal)
                     .onAppear {
                         if game.ogsID == pagination.games.last?.ogsID {
                             loadNextPage()
@@ -39,7 +39,24 @@ struct GameHistoryView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                 }
-                if pagination.loadedOnce && pagination.games.isEmpty && !pagination.isLoading {
+                if pagination.lastRequestFailed && !pagination.isLoading {
+                    VStack(spacing: 10) {
+                        Text("Couldn’t load game history", comment: "GameHistoryView loading error")
+                            .foregroundColor(.secondary)
+                        Button {
+                            loadNextPage()
+                        } label: {
+                            Text("Try Again", comment: "GameHistoryView retry loading")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
+                if pagination.loadedOnce
+                    && pagination.games.isEmpty
+                    && !pagination.isLoading
+                    && !pagination.lastRequestFailed {
                     Text("No finished games yet")
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
@@ -72,7 +89,7 @@ struct GameHistoryView: View {
         guard let request = pagination.beginRequest(playerID: ogs.user?.id) else {
             return
         }
-        fetchCancellable = ogs.fetchFinishedGames(
+        fetchCancellable = ogs.fetchHydratedFinishedGames(
             playerId: request.playerID,
             page: request.page,
             pageSize: Self.pageSize,

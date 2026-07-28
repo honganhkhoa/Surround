@@ -31,6 +31,7 @@ struct GameHistoryPaginationState {
     private(set) var nextPage = 1
     private(set) var hasMore = true
     private(set) var loadedOnce = false
+    private(set) var lastRequestFailed = false
 
     private var playerID: Int?
     private var generation: UInt = 0
@@ -71,6 +72,7 @@ struct GameHistoryPaginationState {
             page: nextPage,
             generation: generation
         )
+        lastRequestFailed = false
         activeRequest = request
         return request
     }
@@ -95,11 +97,12 @@ struct GameHistoryPaginationState {
 
         switch result {
         case .failure:
-            hasMore = false
+            lastRequestFailed = true
             consecutiveNoProgressPages = 0
             return .finished
 
         case .success(let incomingGames, let hasNextPage):
+            lastRequestFailed = false
             let previousCount = games.count
             games = OGSService.mergingFinishedGames(games, with: incomingGames)
             hasMore = hasNextPage
@@ -129,6 +132,7 @@ struct GameHistoryPaginationState {
         nextPage = 1
         hasMore = true
         loadedOnce = false
+        lastRequestFailed = false
         consecutiveNoProgressPages = 0
     }
 }

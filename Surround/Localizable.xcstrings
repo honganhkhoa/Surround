@@ -46,6 +46,9 @@
         }
       }
     },
+    "-%.1f points" : {
+      "comment" : "HistoryGameCell point difference when the logged-in player lost"
+    },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
       "localizations" : {
         "fr" : {
@@ -848,6 +851,9 @@
         }
       }
     },
+    "%.1f points" : {
+      "comment" : "HistoryGameCell point difference without a win or loss perspective"
+    },
     "%@ %@" : {
       "comment" : "Time left on timer - more than 2 days [days - hours]",
       "localizations" : {
@@ -1278,7 +1284,7 @@
         }
       }
     },
-    "%lld handicap stones " : {
+    "%lld handicap stones" : {
       "comment" : "HistoryGameCell - vary for plural"
     },
     "%lld hours" : {
@@ -2210,6 +2216,9 @@
         }
       }
     },
+    "+%.1f points" : {
+      "comment" : "HistoryGameCell point difference when the logged-in player won"
+    },
     "⚠️ OGS Moderator's official message. Please respond." : {
       "localizations" : {
         "fr" : {
@@ -2299,6 +2308,9 @@
           }
         }
       }
+    },
+    "Abandonment" : {
+      "comment" : "HistoryGameCell game outcome"
     },
     "About" : {
       "localizations" : {
@@ -3590,6 +3602,9 @@
         }
       }
     },
+    "Cancellation" : {
+      "comment" : "HistoryGameCell game outcome"
+    },
     "Captures" : {
       "localizations" : {
         "fr" : {
@@ -4151,6 +4166,9 @@
         }
       }
     },
+    "Couldn’t load game history" : {
+      "comment" : "GameHistoryView loading error"
+    },
     "Create a game precisely as you want." : {
       "localizations" : {
         "fr" : {
@@ -4446,6 +4464,9 @@
         }
       }
     },
+    "Disconnection" : {
+      "comment" : "HistoryGameCell game outcome"
+    },
     "Dismiss" : {
       "localizations" : {
         "fr" : {
@@ -4490,6 +4511,9 @@
         }
       }
     },
+    "Disqualification" : {
+      "comment" : "HistoryGameCell game outcome"
+    },
     "Done" : {
       "comment" : "close button for in-game settings",
       "localizations" : {
@@ -4512,6 +4536,9 @@
           }
         }
       }
+    },
+    "Draw" : {
+      "comment" : "HistoryGameCell result for the logged-in player"
     },
     "Edit preferred setting" : {
       "localizations" : {
@@ -5434,6 +5461,9 @@
         }
       }
     },
+    "Komi: %.1f" : {
+      "comment" : "HistoryGameCell nonstandard komi"
+    },
     "Korean" : {
       "comment" : "rules name",
       "localizations" : {
@@ -5682,6 +5712,9 @@
         }
       }
     },
+    "Loss" : {
+      "comment" : "HistoryGameCell result for the logged-in player"
+    },
     "Main time" : {
       "localizations" : {
         "fr" : {
@@ -5814,6 +5847,9 @@
           }
         }
       }
+    },
+    "Moderator Decision" : {
+      "comment" : "HistoryGameCell game outcome"
     },
     "More actions" : {
       "localizations" : {
@@ -7117,6 +7153,9 @@
         }
       }
     },
+    "Rengo (%lld vs. %lld)" : {
+      "comment" : "HistoryGameCell Rengo team sizes, black versus white"
+    },
     "Rengo (%lld)" : {
       "comment" : "NewGameView  (rengoCount)",
       "localizations" : {
@@ -7183,6 +7222,9 @@
           }
         }
       }
+    },
+    "Resignation" : {
+      "comment" : "HistoryGameCell game outcome"
     },
     "Restore" : {
       "localizations" : {
@@ -7945,6 +7987,9 @@
           }
         }
       }
+    },
+    "Stone Removal Timeout" : {
+      "comment" : "HistoryGameCell game outcome"
     },
     "Stone sounds" : {
       "localizations" : {
@@ -8812,6 +8857,9 @@
         }
       }
     },
+    "Timeout" : {
+      "comment" : "HistoryGameCell game outcome"
+    },
     "To **%@**" : {
       "comment" : "Custom game rank restriction",
       "localizations" : {
@@ -9011,6 +9059,9 @@
           }
         }
       }
+    },
+    "Try Again" : {
+      "comment" : "GameHistoryView retry loading"
     },
     "Try it out" : {
       "comment" : "Demo board in settings",
@@ -9252,6 +9303,9 @@
           }
         }
       }
+    },
+    "vs." : {
+      "comment" : "HistoryGameCell result versus opponent"
     },
     "vs. Friend" : {
       "comment" : "Opponent section of NewGameView",
@@ -9985,6 +10039,9 @@
           }
         }
       }
+    },
+    "Win" : {
+      "comment" : "HistoryGameCell result for the logged-in player"
     },
     "Withdraw" : {
       "localizations" : {

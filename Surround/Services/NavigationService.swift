@@ -81,7 +81,9 @@ class NavigationService: ObservableObject {
         if self.main.rootView == .home && self.home.showingNewGameView {
             self.home.showingNewGameView = false
         }
-        if self.main.rootView == .home && self.home.activeGame == nil {
+        if self.main.rootView == .home
+            && !self.home.showingGameHistory
+            && self.home.activeGame == nil {
             // Restore the default: the flag may still be false from a finished
             // game opened out of Game history, which would otherwise suppress
             // this live game's carousel.

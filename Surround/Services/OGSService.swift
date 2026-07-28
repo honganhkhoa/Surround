@@ -19,6 +19,13 @@ enum OGSServiceError: Error {
     case staleAuthenticationContext
 }
 
+/// The decoded and sanitized pieces of `/api/v1/games/{id}` needed to turn a
+/// lightweight history-list model into a complete, offline-reusable game.
+struct FinishedGameDetail {
+    let ogsGame: OGSGame
+    let rawData: [String: Any]
+}
+
 /// The HTTP and WebSocket endpoints that make up one OGS environment.
 ///
 /// Pass the same value to every dependency owned by an `OGSService`. Keeping
@@ -304,7 +311,23 @@ class OGSService: ObservableObject {
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
     private var publicGameConnectionIDs = Set<Int>()
-    private var authenticationGeneration: UInt = 0
+    private let authenticationGenerationLock = NSLock()
+    private var authenticationGenerationStorage: UInt = 0
+
+    /// Authentication can change on the UI thread while detail responses are
+    /// decoded on a background queue. Keep the generation snapshot synchronized
+    /// so stale-response checks do not introduce a data race of their own.
+    private var authenticationGeneration: UInt {
+        authenticationGenerationLock.lock()
+        defer { authenticationGenerationLock.unlock() }
+        return authenticationGenerationStorage
+    }
+
+    private func advanceAuthenticationGeneration() {
+        authenticationGenerationLock.lock()
+        authenticationGenerationStorage &+= 1
+        authenticationGenerationLock.unlock()
+    }
 
     @Published private(set) public var activeGames = [Int: Game]()
     @Published private(set) public var sortedActiveCorrespondenceGamesOnUserTurn: [Game] = []
@@ -767,7 +790,7 @@ class OGSService: ObservableObject {
             let previousConfig = preferences[.ogsUIConfig]
             let authenticationChanged = newValue?.userJwt != previousConfig?.userJwt
             if authenticationChanged {
-                authenticationGeneration &+= 1
+                advanceAuthenticationGeneration()
                 // An in-place account change is equivalent to destroying every
                 // game controller in the official client. Remove intent before
                 // the socket closes so its close/open cycle cannot repopulate
@@ -1235,14 +1258,16 @@ class OGSService: ObservableObject {
     /// Hits OGS's `players/{id}/game_history` listing
     /// (most-recently-finished first), matching the official web client.
     /// Each result is turned into a lightweight `Game` (players, board size)
-    /// via `createGame(fromShortGameData:)`; the final board position and result
-    /// are filled in lazily per row through `loadFinishedGameData(gameID:)`.
+    /// via `createGame(fromShortGameData:)`. Call
+    /// `fetchHydratedFinishedGames(...)` when every returned model must already
+    /// contain its final board position and result.
     /// `hasNextPage` reflects the endpoint's `next` cursor.
     /// - Parameter reusing: already-built rows keyed by OGS game id. A game
     ///   present here is returned as-is instead of being rebuilt, so repeated
     ///   refreshes do not pile up duplicate `Game` objects (each of which owns
     ///   a board-position tree and a player-cache subscription).
     func fetchFinishedGames(playerId: Int, page: Int, pageSize: Int = 50, reusing existingGames: [Int: Game] = [:]) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
+        let requestAuthenticationGeneration = authenticationGeneration
         return Future<(games: [Game], hasNextPage: Bool), Error> { promise in
             let parameters: [String: Any] = [
                 // The official history view defaults to human games. Bot games
@@ -1255,6 +1280,10 @@ class OGSService: ObservableObject {
                 "page_size": pageSize
             ]
             self.httpClient.session.request("\(self.ogsRoot)/api/v1/players/\(playerId)/game_history", parameters: parameters).validate().responseData { response in
+                guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                    promise(.failure(OGSServiceError.staleAuthenticationContext))
+                    return
+                }
                 switch response.result {
                 case .success:
                     guard let responseValue = response.value,
@@ -1292,6 +1321,118 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
 
+    /// Fetches a history page and fills every row with full game detail before
+    /// emitting it. Detail requests are bounded so a page cannot turn into an
+    /// unrestrained request burst, and the original server ordering is retained
+    /// even when individual requests finish out of order.
+    ///
+    /// This is the presentation-facing history API. `fetchFinishedGames`
+    /// remains available for callers that only need the summary payload.
+    func fetchHydratedFinishedGames(
+        playerId: Int,
+        page: Int,
+        pageSize: Int,
+        reusing existingGames: [Int: Game] = [:],
+        maximumConcurrentDetailRequests: Int = 4
+    ) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
+        let requestAuthenticationGeneration = authenticationGeneration
+        return fetchFinishedGames(
+            playerId: playerId,
+            page: page,
+            pageSize: pageSize,
+            reusing: existingGames
+        )
+        .flatMap { page in
+            Self.loadingFinishedGameDetails(
+                for: page.games,
+                maximumConcurrentRequests: maximumConcurrentDetailRequests,
+                loadDetail: { self.loadFinishedGameData(gameID: $0) }
+            )
+            .receive(on: RunLoop.main)
+            .tryMap { loadedGames in
+                guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                    throw OGSServiceError.staleAuthenticationContext
+                }
+                for loadedGame in loadedGames {
+                    if let detail = loadedGame.detail {
+                        Self.applyFinishedGameDetail(detail, to: loadedGame.game)
+                    }
+                }
+                return (
+                    games: loadedGames.map { $0.game },
+                    hasNextPage: page.hasNextPage
+                )
+            }
+        }
+        .eraseToAnyPublisher()
+    }
+
+    /// Loads detail without mutating the games, then emits the complete ordered
+    /// set at once. Keeping this seam pure makes bounded concurrency and atomic
+    /// page publication deterministic to test.
+    static func loadingFinishedGameDetails(
+        for games: [Game],
+        maximumConcurrentRequests: Int,
+        loadDetail: @escaping (Int) -> AnyPublisher<FinishedGameDetail, Error>
+    ) -> AnyPublisher<[(game: Game, detail: FinishedGameDetail?)], Error> {
+        let indexedGames = games.enumerated().map { (offset: $0.offset, game: $0.element) }
+        return indexedGames.publisher
+            .setFailureType(to: Error.self)
+            .flatMap(maxPublishers: .max(max(1, maximumConcurrentRequests))) { indexedGame
+                -> AnyPublisher<(offset: Int, game: Game, detail: FinishedGameDetail?), Error> in
+                if let gameData = indexedGame.game.gameData,
+                   gameData.phase == .finished,
+                   let outcome = gameData.outcome,
+                   !outcome.isEmpty,
+                   gameData.winner != nil,
+                   indexedGame.game.ogsRawData != nil {
+                    return Just((
+                        offset: indexedGame.offset,
+                        game: indexedGame.game,
+                        detail: nil
+                    ))
+                    .setFailureType(to: Error.self)
+                    .eraseToAnyPublisher()
+                }
+                guard let gameID = indexedGame.game.ogsID else {
+                    return Fail(error: OGSServiceError.invalidJSON)
+                        .eraseToAnyPublisher()
+                }
+                return loadDetail(gameID)
+                    .map { detail in
+                        (
+                            offset: indexedGame.offset,
+                            game: indexedGame.game,
+                            detail: Optional(detail)
+                        )
+                    }
+                    .eraseToAnyPublisher()
+            }
+            .collect()
+            .map { loadedGames in
+                loadedGames
+                    .sorted { $0.offset < $1.offset }
+                    .map { (game: $0.game, detail: $0.detail) }
+            }
+            .eraseToAnyPublisher()
+    }
+
+    /// Applies detail while retaining the fresher player/rank values supplied
+    /// by the history listing. Assigning `gameData` last replays all moves and
+    /// computes the final board position before the game is published as ready.
+    static func applyFinishedGameDetail(_ detail: FinishedGameDetail, to game: Game) {
+        let listedBlackPlayer = game.blackPlayer
+        let listedWhitePlayer = game.whitePlayer
+        game.ogsRawData = detail.rawData
+        if let listedBlackPlayer {
+            game.blackPlayer = listedBlackPlayer
+        }
+        if let listedWhitePlayer {
+            game.whitePlayer = listedWhitePlayer
+        }
+        game.gameData = detail.ogsGame
+    }
+
     /// Appends history pages without allowing mutable page boundaries to
     /// introduce duplicate SwiftUI identities. The first instance wins so a
     /// row that already contains replayed detail remains canonical.
@@ -1319,11 +1460,11 @@ class OGSService: ObservableObject {
     /// opening the game's detail view later finds it already populated instead
     /// of issuing a second request through `getGameDetail`.
     ///
-    /// The decode/file read happens on `queue` rather than the caller's thread —
-    /// a cache hit otherwise parses JSON and replays every move on the main
-    /// thread while the list is scrolling.
-    func loadFinishedGameData(gameID: Int, on queue: DispatchQueue = .global(qos: .userInitiated)) -> AnyPublisher<(ogsGame: OGSGame, rawData: [String: Any]), Error> {
-        let decode: (Data) -> (ogsGame: OGSGame, rawData: [String: Any])? = { data in
+    /// The decode/file read happens on `queue` rather than the caller's thread,
+    /// so a cache hit does not parse JSON on the main thread. Applying the
+    /// decoded detail to an observable `Game` remains the caller's job.
+    func loadFinishedGameData(gameID: Int, on queue: DispatchQueue = .global(qos: .userInitiated)) -> AnyPublisher<FinishedGameDetail, Error> {
+        let decode: (Data) -> FinishedGameDetail? = { data in
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let gameData = json["gamedata"] as? [String: Any] else {
                 return nil
@@ -1336,15 +1477,19 @@ class OGSService: ObservableObject {
                   ogsGame.gameId == gameID else {
                 return nil
             }
-            return (ogsGame: ogsGame, rawData: FinishedGameCache.sanitized(json))
+            return FinishedGameDetail(
+                ogsGame: ogsGame,
+                rawData: FinishedGameCache.sanitized(json)
+            )
         }
 
         // Captured before the request starts: a sign-out while it is in flight
         // bumps the generation, and the late response is then not written back.
         let generation = FinishedGameCache.shared.currentGeneration
+        let requestAuthenticationGeneration = authenticationGeneration
 
         let cacheLookup = Deferred {
-            Future<(ogsGame: OGSGame, rawData: [String: Any])?, Error> { promise in
+            Future<FinishedGameDetail?, Error> { promise in
                 guard let cached = FinishedGameCache.shared.data(forGameID: gameID) else {
                     promise(.success(nil))
                     return
@@ -1356,8 +1501,12 @@ class OGSService: ObservableObject {
         // `Deferred` matters: a bare `Future` runs its closure when it is
         // *created*, which would fire this request on every cache hit too.
         let fetchFromOGS = Deferred {
-            Future<(ogsGame: OGSGame, rawData: [String: Any]), Error> { promise in
+            Future<FinishedGameDetail, Error> { promise in
                 self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseData(queue: queue) { response in
+                    guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                        promise(.failure(OGSServiceError.staleAuthenticationContext))
+                        return
+                    }
                     switch response.result {
                     case .success:
                         guard let responseValue = response.value, let decoded = decode(responseValue) else {
@@ -1376,11 +1525,17 @@ class OGSService: ObservableObject {
         }
 
         return cacheLookup
-            .flatMap { cached -> AnyPublisher<(ogsGame: OGSGame, rawData: [String: Any]), Error> in
+            .flatMap { cached -> AnyPublisher<FinishedGameDetail, Error> in
                 if let cached {
                     return Just(cached).setFailureType(to: Error.self).eraseToAnyPublisher()
                 }
                 return fetchFromOGS.eraseToAnyPublisher()
+            }
+            .tryMap { detail in
+                guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                    throw OGSServiceError.staleAuthenticationContext
+                }
+                return detail
             }
             .eraseToAnyPublisher()
     }

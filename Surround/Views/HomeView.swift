@@ -77,7 +77,12 @@ struct HomeView: View {
             recentFinishedGames.compactMap { game in game.ogsID.map { ($0, game) } },
             uniquingKeysWith: { first, _ in first }
         )
-        recentFinishedCancellable = ogs.fetchFinishedGames(playerId: playerId, page: 1, pageSize: 10, reusing: reusableGames)
+        recentFinishedCancellable = ogs.fetchHydratedFinishedGames(
+            playerId: playerId,
+            page: 1,
+            pageSize: 10,
+            reusing: reusableGames
+        )
             .receive(on: RunLoop.main)
             .sink(
                 receiveCompletion: { _ in
@@ -377,6 +382,9 @@ struct HomeView: View {
                 allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel
             )
         })
+        .navigationDestination(isPresented: $nav.home.showingGameHistory) {
+            GameHistoryView()
+        }
         .onAppear {
             if nav.home.ogsIdToOpen != -1 {
                 DispatchQueue.main.async {
@@ -433,20 +441,6 @@ struct HomeView: View {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done", systemImage: "checkmark") {
                                 nav.home.showingSettings = false
-                            }
-                        }
-                    }
-                    .environmentObject(ogs)
-                    .environmentObject(nav)
-            }
-        }
-        .fullScreenCover(isPresented: $nav.home.showingGameHistory) {
-            NavigationStack {
-                GameHistoryView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(action: { nav.home.showingGameHistory = false }) {
-                                Text("Done")
                             }
                         }
                     }

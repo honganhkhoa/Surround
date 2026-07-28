@@ -245,6 +245,49 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertTrue(socket.emittedCommands.isEmpty)
     }
 
+    func testFinishedGameDataFromPreviousAuthenticationContextIsNotDeliveredOrCached() throws {
+        let gameID = 51
+        _ = try installGameDetailResponse(gameID: gameID)
+        FinishedGameCache.shared.clear()
+        let responseGate = DispatchSemaphore(value: 0)
+        let requestStarted = expectation(description: "old-account finished detail request started")
+
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameDetailGate = responseGate
+        StubURLProtocol.gameDetailStarted = { requestStarted.fulfill() }
+        StubURLProtocol.lock.unlock()
+
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            label: "stale-finished-detail"
+        )
+        let completed = expectation(description: "old-account finished detail discarded")
+        var receivedDetail: FinishedGameDetail?
+        var receivedError: Error?
+
+        service.loadFinishedGameData(gameID: gameID)
+            .sink(
+                receiveCompletion: {
+                    if case .failure(let error) = $0 {
+                        receivedError = error
+                    }
+                    completed.fulfill()
+                },
+                receiveValue: { receivedDetail = $0 }
+            )
+            .store(in: &cancellables)
+
+        wait(for: [requestStarted], timeout: 5)
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-account-jwt", userID: 2)
+        responseGate.signal()
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertNotNil(receivedError)
+        XCTAssertNil(receivedDetail)
+        XCTAssertNil(FinishedGameCache.shared.data(forGameID: gameID))
+    }
+
     func testGetGameDetailReusesCanonicalConnectedGame() throws {
         let gameID = 49
         let ogsGame = try installGameDetailResponse(gameID: gameID)
@@ -356,6 +399,236 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(query["page_size"], "25")
         XCTAssertEqual(query["bot_game"], "false")
         XCTAssertNil(query["ended__isnull"])
+    }
+
+    func testFinishedGameDetailLoadingIsBoundedAtomicAndOrdered() throws {
+        let gameIDs = [701, 702, 703, 704]
+        let games = gameIDs.map(makeHistoryGame(id:))
+        let subjects = Dictionary(
+            uniqueKeysWithValues: gameIDs.map {
+                ($0, PassthroughSubject<FinishedGameDetail, Error>())
+            }
+        )
+        var requestedGameIDs = [Int]()
+        var activeRequestCount = 0
+        var peakRequestCount = 0
+        var loadedGames: [(game: Game, detail: FinishedGameDetail?)]?
+        var receivedError: Error?
+        let completed = expectation(description: "all detail loaded")
+
+        OGSService.loadingFinishedGameDetails(
+            for: games,
+            maximumConcurrentRequests: 2
+        ) { gameID in
+            requestedGameIDs.append(gameID)
+            activeRequestCount += 1
+            peakRequestCount = max(peakRequestCount, activeRequestCount)
+            return subjects[gameID]!
+                .handleEvents(receiveCompletion: { _ in
+                    activeRequestCount -= 1
+                })
+                .eraseToAnyPublisher()
+        }
+        .sink(
+            receiveCompletion: {
+                if case .failure(let error) = $0 {
+                    receivedError = error
+                }
+                completed.fulfill()
+            },
+            receiveValue: { loadedGames = $0 }
+        )
+        .store(in: &cancellables)
+
+        XCTAssertEqual(requestedGameIDs, [701, 702])
+        XCTAssertNil(loadedGames)
+
+        subjects[702]?.send(try makeFinishedGameDetail(gameID: 702))
+        subjects[702]?.send(completion: .finished)
+        XCTAssertEqual(requestedGameIDs, [701, 702, 703])
+        XCTAssertNil(loadedGames)
+
+        subjects[703]?.send(try makeFinishedGameDetail(gameID: 703))
+        subjects[703]?.send(completion: .finished)
+        XCTAssertEqual(requestedGameIDs, [701, 702, 703, 704])
+        XCTAssertNil(loadedGames)
+
+        subjects[704]?.send(try makeFinishedGameDetail(gameID: 704))
+        subjects[704]?.send(completion: .finished)
+        XCTAssertNil(loadedGames)
+
+        subjects[701]?.send(try makeFinishedGameDetail(gameID: 701))
+        subjects[701]?.send(completion: .finished)
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertNil(receivedError)
+        XCTAssertEqual(peakRequestCount, 2)
+        XCTAssertEqual(loadedGames?.compactMap { $0.game.ogsID }, gameIDs)
+        XCTAssertEqual(
+            loadedGames?.compactMap { $0.detail?.ogsGame.gameId },
+            gameIDs
+        )
+    }
+
+    func testFinishedGameDetailLoadingFailurePublishesNoLightweightGames() {
+        enum ExpectedError: Error {
+            case failed
+        }
+
+        let games = [makeHistoryGame(id: 711), makeHistoryGame(id: 712)]
+        let subjects = [
+            711: PassthroughSubject<FinishedGameDetail, Error>(),
+            712: PassthroughSubject<FinishedGameDetail, Error>(),
+        ]
+        var receivedGames = false
+        var receivedError: Error?
+        let completed = expectation(description: "detail page failed atomically")
+
+        OGSService.loadingFinishedGameDetails(
+            for: games,
+            maximumConcurrentRequests: 2,
+            loadDetail: { subjects[$0]!.eraseToAnyPublisher() }
+        )
+        .sink(
+            receiveCompletion: {
+                if case .failure(let error) = $0 {
+                    receivedError = error
+                }
+                completed.fulfill()
+            },
+            receiveValue: { _ in receivedGames = true }
+        )
+        .store(in: &cancellables)
+
+        subjects[711]?.send(completion: .failure(ExpectedError.failed))
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertNotNil(receivedError)
+        XCTAssertFalse(receivedGames)
+        XCTAssertTrue(games.allSatisfy { $0.gameData == nil })
+    }
+
+    func testFinishedGameDetailLoadingSkipsCompleteReusableGame() throws {
+        let completeGame = makeHistoryGame(id: 721)
+        let completeDetail = try makeFinishedGameDetail(gameID: 721)
+        OGSService.applyFinishedGameDetail(completeDetail, to: completeGame)
+        let lightweightGame = makeHistoryGame(id: 722)
+        let lightweightDetail = try makeFinishedGameDetail(gameID: 722)
+        var requestedGameIDs = [Int]()
+        var loadedGames: [(game: Game, detail: FinishedGameDetail?)]?
+        let completed = expectation(description: "only missing detail loaded")
+
+        OGSService.loadingFinishedGameDetails(
+            for: [completeGame, lightweightGame],
+            maximumConcurrentRequests: 4
+        ) { gameID in
+            requestedGameIDs.append(gameID)
+            return Just(lightweightDetail)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+        .sink(
+            receiveCompletion: { _ in completed.fulfill() },
+            receiveValue: { loadedGames = $0 }
+        )
+        .store(in: &cancellables)
+
+        wait(for: [completed], timeout: 5)
+        XCTAssertEqual(requestedGameIDs, [722])
+        XCTAssertTrue(loadedGames?[0].game === completeGame)
+        XCTAssertNil(loadedGames?[0].detail)
+        XCTAssertTrue(loadedGames?[1].game === lightweightGame)
+        XCTAssertEqual(loadedGames?[1].detail?.ogsGame.gameId, 722)
+    }
+
+    func testFinishedGameDetailLoadingRefreshesReusedLiveGameWithoutFinalResult() throws {
+        let gameID = 723
+        let reusedGame = makeHistoryGame(id: gameID)
+        let finishedDetail = try makeFinishedGameDetail(gameID: gameID)
+        var liveGameData = finishedDetail.ogsGame
+        liveGameData.phase = .play
+        liveGameData.outcome = nil
+        liveGameData.winner = nil
+        reusedGame.ogsRawData = finishedDetail.rawData
+        reusedGame.gameData = liveGameData
+        // The websocket phase event updates `gamePhase`, but does not update
+        // the result fields inside the previously loaded `gameData`.
+        reusedGame.gamePhase = .finished
+
+        var requestedGameIDs = [Int]()
+        var loadedGames: [(game: Game, detail: FinishedGameDetail?)]?
+        let completed = expectation(description: "stale live detail refreshed")
+
+        OGSService.loadingFinishedGameDetails(
+            for: [reusedGame],
+            maximumConcurrentRequests: 4
+        ) { requestedGameID in
+            requestedGameIDs.append(requestedGameID)
+            return Just(finishedDetail)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+        .sink(
+            receiveCompletion: { _ in completed.fulfill() },
+            receiveValue: { loadedGames = $0 }
+        )
+        .store(in: &cancellables)
+
+        wait(for: [completed], timeout: 5)
+        XCTAssertEqual(requestedGameIDs, [gameID])
+        XCTAssertTrue(loadedGames?.first?.game === reusedGame)
+        XCTAssertEqual(loadedGames?.first?.detail?.ogsGame.outcome, finishedDetail.ogsGame.outcome)
+        XCTAssertEqual(loadedGames?.first?.detail?.ogsGame.winner, finishedDetail.ogsGame.winner)
+    }
+
+    func testApplyingFinishedGameDetailPreservesListingPlayersAndReplaysBoard() throws {
+        let detail = try makeFinishedGameDetail(gameID: 731)
+        let game = makeHistoryGame(id: 731)
+        let listedBlack = try makeUser(
+            id: detail.ogsGame.players.black.id,
+            username: "fresh-black",
+            ranking: 31
+        )
+        let listedWhite = try makeUser(
+            id: detail.ogsGame.players.white.id,
+            username: "fresh-white",
+            ranking: 22
+        )
+        game.blackPlayer = listedBlack
+        game.whitePlayer = listedWhite
+
+        var staleRawData = detail.rawData
+        staleRawData["players"] = [
+            "black": [
+                "id": listedBlack.id,
+                "username": "stale-black",
+                "ranking": 1,
+            ],
+            "white": [
+                "id": listedWhite.id,
+                "username": "stale-white",
+                "ranking": 2,
+            ],
+        ]
+
+        OGSService.applyFinishedGameDetail(
+            FinishedGameDetail(
+                ogsGame: detail.ogsGame,
+                rawData: staleRawData
+            ),
+            to: game
+        )
+
+        XCTAssertEqual(game.blackPlayer?.username, listedBlack.username)
+        XCTAssertEqual(game.blackPlayer?.ranking, listedBlack.ranking)
+        XCTAssertEqual(game.whitePlayer?.username, listedWhite.username)
+        XCTAssertEqual(game.whitePlayer?.ranking, listedWhite.ranking)
+        XCTAssertEqual(game.gameData?.gameId, 731)
+        XCTAssertEqual(
+            game.currentPosition.lastMoveNumber,
+            detail.ogsGame.moves.count
+        )
+        XCTAssertNotNil(game.ogsRawData)
     }
 
     func testMergingFinishedGamesPreservesFirstInstanceAndDeduplicatesPages() {
@@ -554,7 +827,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertNil(pagination.beginRequest(playerID: 101))
     }
 
-    func testHistoryPaginationGatesRequestsWhileLoadingAndAfterFailure() throws {
+    func testHistoryPaginationGatesRequestsWhileLoadingAndAllowsRetryAfterFailure() throws {
         var pagination = GameHistoryPaginationState()
         XCTAssertNil(pagination.beginRequest(playerID: nil))
 
@@ -582,9 +855,14 @@ final class OGSServiceIsolationTests: XCTestCase {
             .finished
         )
         XCTAssertTrue(pagination.loadedOnce)
-        XCTAssertFalse(pagination.hasMore)
+        XCTAssertTrue(pagination.hasMore)
         XCTAssertFalse(pagination.isLoading)
-        XCTAssertNil(pagination.beginRequest(playerID: 101))
+        XCTAssertTrue(pagination.lastRequestFailed)
+
+        let retryRequest = try XCTUnwrap(pagination.beginRequest(playerID: 101))
+        XCTAssertEqual(retryRequest.page, request.page)
+        XCTAssertTrue(pagination.isLoading)
+        XCTAssertFalse(pagination.lastRequestFailed)
     }
 
     func testHistoryPaginationIgnoresStaleResultAfterReset() throws {
@@ -830,6 +1108,17 @@ final class OGSServiceIsolationTests: XCTestCase {
     }
 
     private func installGameDetailResponse(gameID: Int) throws -> OGSGame {
+        let detail = try makeFinishedGameDetail(gameID: gameID)
+        let responseBody = try JSONSerialization.data(withJSONObject: detail.rawData)
+
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameDetailBody = responseBody
+        StubURLProtocol.lock.unlock()
+
+        return detail.ogsGame
+    }
+
+    private func makeFinishedGameDetail(gameID: Int) throws -> FinishedGameDetail {
         let bundle = Bundle(for: Self.self)
         let fixtureURL = try XCTUnwrap(
             bundle.url(forResource: "game-25076729", withExtension: "json")
@@ -838,18 +1127,29 @@ final class OGSServiceIsolationTests: XCTestCase {
             JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL)) as? [String: Any]
         )
         gameData["game_id"] = gameID
-        let responseBody = try JSONSerialization.data(withJSONObject: ["gamedata": gameData])
-
-        StubURLProtocol.lock.lock()
-        StubURLProtocol.gameDetailBody = responseBody
-        StubURLProtocol.lock.unlock()
-
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(
+        let ogsGame = try decoder.decode(
             OGSGame.self,
             from: JSONSerialization.data(withJSONObject: gameData)
         )
+        return FinishedGameDetail(
+            ogsGame: ogsGame,
+            rawData: ["gamedata": gameData]
+        )
+    }
+
+    private func makeUser(
+        id: Int,
+        username: String,
+        ranking: Double
+    ) throws -> OGSUser {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "id": id,
+            "username": username,
+            "ranking": ranking,
+        ])
+        return try JSONDecoder().decode(OGSUser.self, from: data)
     }
 
     private func makeUIConfig(jwt: String, userID: Int) throws -> OGSUIConfig {
