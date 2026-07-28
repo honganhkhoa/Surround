@@ -47,7 +47,69 @@
       }
     },
     "-%.1f points" : {
-      "comment" : "HistoryGameCell point difference when the logged-in player lost"
+      "comment" : "HistoryGameCell point difference when the logged-in player lost",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "-%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "-%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "-%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "-%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "-%.1f目"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "-%.1f mục"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
       "localizations" : {
@@ -852,7 +914,69 @@
       }
     },
     "%.1f points" : {
-      "comment" : "HistoryGameCell point difference without a win or loss perspective"
+      "comment" : "HistoryGameCell point difference without a win or loss perspective",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%.1f目"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%.1f mục"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%@ %@" : {
       "comment" : "Time left on timer - more than 2 days [days - hours]",
@@ -1285,7 +1409,69 @@
       }
     },
     "%lld handicap stones" : {
-      "comment" : "HistoryGameCell - vary for plural"
+      "comment" : "HistoryGameCell - vary for plural",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld handicap stone"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%lld handicap stones"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pierre de handicap"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pierres de handicap"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld子の置き碁"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chấp %lld quân"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%lld hours" : {
       "comment" : "Duration - hours part, long format",
@@ -2217,7 +2403,69 @@
       }
     },
     "+%.1f points" : {
-      "comment" : "HistoryGameCell point difference when the logged-in player won"
+      "comment" : "HistoryGameCell point difference when the logged-in player won",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "+%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%.1f point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%.1f points"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%.1f目"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%.1f mục"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "⚠️ OGS Moderator's official message. Please respond." : {
       "localizations" : {
@@ -2310,7 +2558,27 @@
       }
     },
     "Abandonment" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局放棄"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ cuộc"
+          }
+        }
+      }
     },
     "About" : {
       "localizations" : {
@@ -3603,7 +3871,27 @@
       }
     },
     "Cancellation" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ ván"
+          }
+        }
+      }
     },
     "Captures" : {
       "localizations" : {
@@ -4167,7 +4455,27 @@
       }
     },
     "Couldn’t load game history" : {
-      "comment" : "GameHistoryView loading error"
+      "comment" : "GameHistoryView loading error",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger l’historique des parties"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局履歴を読み込めませんでした"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể tải lịch sử ván đấu"
+          }
+        }
+      }
     },
     "Create a game precisely as you want." : {
       "localizations" : {
@@ -4465,7 +4773,27 @@
       }
     },
     "Disconnection" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déconnexion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切断"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mất kết nối"
+          }
+        }
+      }
     },
     "Dismiss" : {
       "localizations" : {
@@ -4512,7 +4840,27 @@
       }
     },
     "Disqualification" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disqualification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失格"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bị loại"
+          }
+        }
+      }
     },
     "Done" : {
       "comment" : "close button for in-game settings",
@@ -4538,7 +4886,27 @@
       }
     },
     "Draw" : {
-      "comment" : "HistoryGameCell result for the logged-in player"
+      "comment" : "HistoryGameCell result for the logged-in player",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Égalité"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持碁"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoà"
+          }
+        }
+      }
     },
     "Edit preferred setting" : {
       "localizations" : {
@@ -4856,7 +5224,27 @@
       }
     },
     "Game history" : {
-      "comment" : "Homeview"
+      "comment" : "Homeview",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historique des parties"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局履歴"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lịch sử ván đấu"
+          }
+        }
+      }
     },
     "Game name:" : {
       "localizations" : {
@@ -5462,7 +5850,27 @@
       }
     },
     "Komi: %.1f" : {
-      "comment" : "HistoryGameCell nonstandard komi"
+      "comment" : "HistoryGameCell nonstandard komi",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi : %.1f"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミ：%.1f"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komi: %.1f"
+          }
+        }
+      }
     },
     "Korean" : {
       "comment" : "rules name",
@@ -5713,7 +6121,27 @@
       }
     },
     "Loss" : {
-      "comment" : "HistoryGameCell result for the logged-in player"
+      "comment" : "HistoryGameCell result for the logged-in player",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défaite"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "負け"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thua"
+          }
+        }
+      }
     },
     "Main time" : {
       "localizations" : {
@@ -5849,7 +6277,27 @@
       }
     },
     "Moderator Decision" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décision du modérateur"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者による裁定"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quyết định của quản trị viên"
+          }
+        }
+      }
     },
     "More actions" : {
       "localizations" : {
@@ -6221,7 +6669,26 @@
       }
     },
     "No finished games yet" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune partie terminée pour le moment"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終了した対局はまだありません"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa có ván nào kết thúc"
+          }
+        }
+      }
     },
     "No handicap" : {
       "comment" : "NewGameView handicap seletion, no handicap",
@@ -7154,7 +7621,27 @@
       }
     },
     "Rengo (%lld vs. %lld)" : {
-      "comment" : "HistoryGameCell Rengo team sizes, black versus white"
+      "comment" : "HistoryGameCell Rengo team sizes, black versus white",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo (%1$lld contre %2$lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連碁（%1$lld対%2$lld）"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rengo (%1$lld đấu %2$lld)"
+          }
+        }
+      }
     },
     "Rengo (%lld)" : {
       "comment" : "NewGameView  (rengoCount)",
@@ -7224,7 +7711,27 @@
       }
     },
     "Resignation" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中押し"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhận thua"
+          }
+        }
+      }
     },
     "Restore" : {
       "localizations" : {
@@ -7989,7 +8496,27 @@
       }
     },
     "Stone Removal Timeout" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expiration du délai de retrait des pierres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "死石除去フェーズでの時間切れ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hết giờ khi lọc quân chết"
+          }
+        }
+      }
     },
     "Stone sounds" : {
       "localizations" : {
@@ -8858,7 +9385,27 @@
       }
     },
     "Timeout" : {
-      "comment" : "HistoryGameCell game outcome"
+      "comment" : "HistoryGameCell game outcome",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps écoulé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間切れ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hết giờ"
+          }
+        }
+      }
     },
     "To **%@**" : {
       "comment" : "Custom game rank restriction",
@@ -9061,7 +9608,27 @@
       }
     },
     "Try Again" : {
-      "comment" : "GameHistoryView retry loading"
+      "comment" : "GameHistoryView retry loading",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử lại"
+          }
+        }
+      }
     },
     "Try it out" : {
       "comment" : "Demo board in settings",
@@ -9280,7 +9847,27 @@
       }
     },
     "View full history" : {
-      "comment" : "Homeview"
+      "comment" : "Homeview",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir tout l’historique"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての履歴を見る"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem toàn bộ lịch sử"
+          }
+        }
+      }
     },
     "Voice countdown" : {
       "localizations" : {
@@ -9305,7 +9892,27 @@
       }
     },
     "vs." : {
-      "comment" : "HistoryGameCell result versus opponent"
+      "comment" : "HistoryGameCell result versus opponent",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "contre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trước"
+          }
+        }
+      }
     },
     "vs. Friend" : {
       "comment" : "Opponent section of NewGameView",
@@ -10041,7 +10648,27 @@
       }
     },
     "Win" : {
-      "comment" : "HistoryGameCell result for the logged-in player"
+      "comment" : "HistoryGameCell result for the logged-in player",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Victoire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "勝ち"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thắng"
+          }
+        }
+      }
     },
     "Withdraw" : {
       "localizations" : {
