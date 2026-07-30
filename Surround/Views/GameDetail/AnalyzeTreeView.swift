@@ -11,6 +11,23 @@ struct AnalyzeTreeSlice: View {
     var moveTree: MoveTree
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
+
+    private func accessibilityIdentifier(
+        for position: BoardPosition
+    ) -> String {
+        guard SurroundUITestContract.isEnabled,
+              let variation = moveTree.variation(to: position) else {
+            return ""
+        }
+        return SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+            baseMoveNumber: variation.basePosition.lastMoveNumber,
+            movePath: variation.moves.map { $0.toOGSString() }
+        )
+    }
+
+    private func isSelected(_ position: BoardPosition) -> Bool {
+        selectedPosition === position
+    }
     
     var body: some View {
         VStack {
@@ -28,16 +45,29 @@ struct AnalyzeTreeSlice: View {
                                     )
                                 }.stroke(Color(.label))
                             }
-                            if self.selectedPosition?.hasTheSamePosition(with: position) ?? false {
+                            if isSelected(position) {
                                 Color(UIColor.systemTeal).frame(width: 38, height: 38)
                                     .cornerRadius(19)
                                     .position(x: 15, y: CGFloat(level) * 40 + 15)
                             }
                             
-                            Stone(color: lastMoveColor, shadowRadius: 2).frame(width: 30, height: 30).position(x: 15, y: CGFloat(level) * 40 + 15)
+                            Stone(color: lastMoveColor, shadowRadius: 2)
+                                .frame(width: 30, height: 30)
+                                .position(x: 15, y: CGFloat(level) * 40 + 15)
                                 .onTapGesture {
                                     self.selectedPosition = position
                                 }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(
+                                    Text("Move \(lastMoveNumber)")
+                                )
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAddTraits(
+                                    isSelected(position) ? .isSelected : []
+                                )
+                                .accessibilityIdentifier(
+                                    accessibilityIdentifier(for: position)
+                                )
                         } else if lastMoveNumber == 0 {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))
@@ -106,7 +136,7 @@ struct BackgroundSlice: View {
                 if shouldShowBoardThumbnail {
                     if let position = game.positionByLastMoveNumber[lastMoveNumber] {
                         ZStack {
-                            if selectedPosition?.hasTheSamePosition(with: position) ?? false {
+                            if selectedPosition === position {
                                 Color(.systemTeal)
                                     .cornerRadius(3)
                                     .frame(width: 110, height: 110)

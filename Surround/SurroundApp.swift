@@ -10,16 +10,57 @@ import SwiftUI
 @main
 struct SurroundApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    init() {
+        #if DEBUG && MAIN_APP
+        if SurroundUITestContract
+            .isClearingAppStoreScreenshotWidgetFixture
+        {
+            OGSService.clearAppStoreScreenshotWidgetFixture()
+        }
+        #endif
+    }
     
     var body: some Scene {
         WindowGroup {
-            MainViewWrapper()
+            #if DEBUG && MAIN_APP
+            if SurroundUITestContract
+                .isClearingAppStoreScreenshotWidgetFixture
+            {
+                EmptyView()
+            } else {
+                appContent
+            }
+            #else
+            appContent
+            #endif
         }
+    }
+
+    private var appContent: some View {
+        MainViewWrapper()
+            .preferredColorScheme(
+                SurroundUITestContract.isCapturingAppStoreScreenshots
+                    ? (
+                        SurroundUITestContract.isCapturingAppStoreScreenshotsInDarkMode
+                            ? .dark
+                            : .light
+                    )
+                    : nil
+            )
     }
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        #if DEBUG && MAIN_APP
+        if SurroundUITestContract
+            .isClearingAppStoreScreenshotWidgetFixture
+        {
+            return false
+        }
+        #endif
+
         guard !SurroundUITestContract.isEnabled else {
             return true
         }

@@ -802,5 +802,8 @@ struct CustomGameForm: View {
                 }
             }
         }
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.screenCustomGame
+        )
     }
 }

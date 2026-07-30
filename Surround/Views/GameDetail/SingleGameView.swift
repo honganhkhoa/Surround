@@ -162,6 +162,9 @@ struct SingleGameView: View {
                     .tag(DisplayMode.chat)
             }
             .pickerStyle(SegmentedPickerStyle())
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameDisplayModePicker
+            )
             .fixedSize()
             .padding(.horizontal, 15)
             .padding(.vertical, 5)

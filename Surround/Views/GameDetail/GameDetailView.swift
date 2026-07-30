@@ -213,7 +213,7 @@ struct GameDetailView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
-            SurroundUITestContract.AccessibilityID.gameDetail(currentGame.ogsID ?? -1)
+            SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
         .background(
             colorScheme == .dark ?
@@ -226,6 +226,9 @@ struct GameDetailView: View {
                     GameplaySettings()
                     Spacer()
                 }
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.screenGameOptions
+                )
                 .navigationTitle("Settings")
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
@@ -314,6 +317,9 @@ struct GameDetailView: View {
                                     .labelStyle(IconOnlyLabelStyle())
                             }
                         }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle
+                        )
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Toggle(isOn: Binding<Bool>(

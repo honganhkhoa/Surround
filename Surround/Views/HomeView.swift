@@ -25,6 +25,10 @@ struct HomeView: View {
     
     init(previewGames: [Game] = []) {
         #if os(iOS)
+        if SurroundUITestContract.isCapturingAppStoreScreenshots {
+            _displayMode = State(initialValue: .compact)
+            return
+        }
         if let savedDisplayMode = userDefaults[.homeViewDisplayMode] {
             _displayMode = State(initialValue: GameCell.CellDisplayMode(rawValue: savedDisplayMode) ?? .full)
         } else {
@@ -164,9 +168,15 @@ struct HomeView: View {
                             }.padding()
                             Spacer()
                         }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.homeNewGame
+                        )
                         Button("Preferred Settings", systemImage: "star.square.on.square") {
                             nav.home.showingPreferredSettings = true
                         }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.homePreferredSettings
+                        )
                         .labelStyle(.iconOnly)
                         .font(.body.bold())
                         .padding()
@@ -192,7 +202,7 @@ struct HomeView: View {
                                         GameCell(game: game, displayMode: displayMode)
                                     }
                                     .accessibilityIdentifier(
-                                        SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                        SurroundUITestContract.AccessibilityID.homeGame(game)
                                     )
                                     .buttonStyle(.plain)
                                     .padding(.vertical, displayMode == .full ? nil : 0)
@@ -206,7 +216,7 @@ struct HomeView: View {
                                     GameCell(game: game, displayMode: displayMode)
                                 }
                                 .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                    SurroundUITestContract.AccessibilityID.homeGame(game)
                                 )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
@@ -225,7 +235,7 @@ struct HomeView: View {
                                     GameCell(game: game, displayMode: displayMode)
                                 }
                                 .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(game.ogsID ?? -1)
+                                    SurroundUITestContract.AccessibilityID.homeGame(game)
                                 )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
@@ -244,6 +254,9 @@ struct HomeView: View {
                                     HistoryGameCell(game: game) {
                                         showGameDetail(game: game, showsCarousel: false)
                                     }
+                                    .accessibilityIdentifier(
+                                        SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
+                                    )
                                     .padding(.horizontal)
                                 }
                                 Button(action: { nav.home.showingGameHistory = true }) {
@@ -404,7 +417,11 @@ struct HomeView: View {
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
             NavigationStack {
-                NewGameView()
+                NewGameView(
+                    newGameOption: SurroundUITestContract.isCapturingAppStoreScreenshots
+                        ? .openChallenges
+                        : .quickMatch
+                )
                     .navigationTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {

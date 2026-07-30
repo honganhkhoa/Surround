@@ -63,6 +63,11 @@
                BlueprintName = "SurroundUITests"
                ReferencedContainer = "container:Surround.xcodeproj">
             </BuildableReference>
+            <SkippedTests>
+               <Test
+                  Identifier = "AppStoreScreenshotTests/testAppStoreScreenshots()">
+               </Test>
+            </SkippedTests>
          </TestableReference>
       </Testables>
    </TestAction>

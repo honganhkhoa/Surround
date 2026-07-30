@@ -45,6 +45,44 @@ xcodebuild test \
   -only-testing:SurroundUITests
 ```
 
+## App Store screenshot capture
+
+The `AppStoreScreenshots` scheme and test plan capture submission-ready, localized screenshots from deterministic offline fixtures without contacting OGS.
+
+Run the complete matrix from the repository root with Xcode 26 or newer, an installed iOS simulator runtime, `jq`, Swift, and `sips`:
+
+```sh
+output_path="/private/tmp/Surround-AppStore-$(date +%Y%m%d-%H%M%S)"
+.github/ci-tools/capture-app-store-screenshots.sh \
+  --output "$output_path"
+```
+
+For a quicker single-localization run, pass the exact test-plan configuration:
+
+```sh
+output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
+.github/ci-tools/capture-app-store-screenshots.sh \
+  --output "$output_path" \
+  --locale en-US
+```
+
+`--locale` is repeatable. When it is omitted, the runner captures all four supported localizations.
+
+The output path must not already exist. Reusable build products default to the gitignored `.build/AppStoreScreenshotDerivedData` directory; pass `--derived-data` only to put that cache elsewhere. The runner:
+
+- selects an accepted 6.9-inch iPhone and 13-inch iPad simulator from the latest installed iOS runtime;
+- pins the status bar for repeatable output;
+- runs the selected test-plan configurations (`en-US`, `fr-FR`, `ja-JP`, and `vi-VN` by default);
+- captures ten portrait iPhone scenes and ten landscape iPad scenes per locale;
+- exports named XCTest attachments and uses Image I/O to bake attachment orientation into the pixel raster;
+- writes neutral orientation metadata (`1`) and current pixel dimensions;
+- validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
+- clears the screenshot widget fixture and status-bar overrides during teardown, then returns any simulator it booted to the shutdown state.
+
+The complete four-locale run produces 80 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Capturing is automated, but publishing to App Store Connect is intentionally a separate manual action.
+
+To choose a different installed runtime or devices, set `APP_STORE_IOS_RUNTIME` to its exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. If an interrupted capture leaves a Debug simulator widget showing screenshot data, running the capture command again clears that stale fixture during exit cleanup. When adding a language or a scene, keep `AppStoreScreenshots.xctestplan`, `AppStoreScreenshotTests.swift`, and `.github/ci-tools/capture-app-store-screenshots.sh` in sync.
+
 ## Signed local Mac Catalyst UI tests
 
 Mac Catalyst UI automation needs a signed build and an unlocked Mac UI session.

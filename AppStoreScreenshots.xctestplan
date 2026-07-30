@@ -1,0 +1,59 @@
+{
+  "configurations" : [
+    {
+      "id" : "7D5E6811-9AD4-42B0-8E76-BD25CC5455C0",
+      "name" : "en-US",
+      "options" : {
+        "language" : "en",
+        "region" : "US"
+      }
+    },
+    {
+      "id" : "9C0089E6-F4F7-4C74-86D8-645BBC57BA26",
+      "name" : "fr-FR",
+      "options" : {
+        "language" : "fr",
+        "region" : "FR"
+      }
+    },
+    {
+      "id" : "A8765198-DA5E-4D40-82D3-7E807E53FD54",
+      "name" : "ja-JP",
+      "options" : {
+        "language" : "ja",
+        "region" : "JP"
+      }
+    },
+    {
+      "id" : "4FAD81FA-2B27-46C6-A279-C92F3CEEA117",
+      "name" : "vi-VN",
+      "options" : {
+        "language" : "vi",
+        "region" : "VN"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Surround.xcodeproj",
+      "identifier" : "BC042AEE24AB2CF40050B2D1",
+      "name" : "Surround"
+    },
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : [
+        "AppStoreScreenshotTests/testAppStoreScreenshots()"
+      ],
+      "target" : {
+        "containerPath" : "container:Surround.xcodeproj",
+        "identifier" : "BC042B0A24AB2CFA0050B2D1",
+        "name" : "SurroundUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

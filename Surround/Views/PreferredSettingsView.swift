@@ -77,8 +77,12 @@ struct PreferredSettingsView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15) {
                 Section {
-                    ForEach(Array(settings.enumerated()), id: \.0) { _, setting in
+                    ForEach(Array(settings.enumerated()), id: \.0) { index, setting in
                         preferredSettingCard(setting)
+                            .accessibilityIdentifier(
+                                SurroundUITestContract.AccessibilityID
+                                    .preferredSetting(index)
+                            )
                     }
                 }
             }
@@ -173,6 +177,9 @@ struct PreferredSettingsView: View {
     
     var body: some View {
         preferredSettingsContent
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.screenPreferredSettings
+            )
             .onAppear {
                 ogs.subscribeToSeekGraph()
             }

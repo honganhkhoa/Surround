@@ -23,6 +23,9 @@ struct PublicGamesList: View {
                         Button(action: { nav.publicGames.activeGame = game }) {
                             GameCell(game: game)
                         }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.publicGame(game)
+                        )
                         .buttonStyle(.plain)
                         .padding()
                     }

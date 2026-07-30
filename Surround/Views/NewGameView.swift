@@ -173,6 +173,9 @@ struct QuickMatchForm: View {
                 blitz = lastAutomatchEntry.timeControlSpeed == .blitz
             }
         }
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.screenQuickMatch
+        )
     }
 }
 
@@ -334,6 +337,9 @@ struct OpenChallengesForm: View {
                 .animation(.linear, value: self.rengoIds)
             }
         }
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.screenOpenChallenges
+        )
     }
 }
 
@@ -416,6 +422,9 @@ struct NewGameView: View {
                 Text("Custom", comment: "NewGameView top Picker").tag(NewGameOption.custom)
             }
             .pickerStyle(SegmentedPickerStyle())
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.newGameOptionPicker
+            )
             Spacer().frame(height: 10)
             switch newGameOption {
             case .quickMatch:
@@ -449,6 +458,17 @@ struct NewGameView: View {
                 }
             }
             newGameOptionsPicker.background(Color(.systemGray6).shadow(radius: 2))
+            #if DEBUG && MAIN_APP
+            if SurroundUITestContract.isEnabled {
+                Text(verbatim: "New game")
+                    .foregroundStyle(.clear)
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.screenNewGame
+                    )
+            }
+            #endif
         }
         .onAppear {
             ogs.subscribeToSeekGraph()

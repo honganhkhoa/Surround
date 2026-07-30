@@ -373,9 +373,23 @@ struct ChallengeCell: View {
             } else {
                 if let challenger = challenge.challenger ?? ogs.user {
                     HStack(alignment: .top) {
-                        if let iconURL = challenger.iconURL(ofSize: 64) {
+                        if SurroundUITestContract.isCapturingAppStoreScreenshots
+                            || challenger.iconURL(ofSize: 64) != nil
+                        {
                             ZStack(alignment: .bottomTrailing) {
-                                AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                Group {
+                                    #if DEBUG && MAIN_APP
+                                    if SurroundUITestContract.isCapturingAppStoreScreenshots {
+                                        AppStoreScreenshotAvatar(player: challenger, size: 64)
+                                    } else if let iconURL = challenger.iconURL(ofSize: 64) {
+                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    }
+                                    #else
+                                    if let iconURL = challenger.iconURL(ofSize: 64) {
+                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    }
+                                    #endif
+                                }
                                     .frame(width: 64, height: 64)
                                     .background(Color.gray)
                                 Stone(color: challengerStoneColor, shadowRadius: 1)
@@ -387,7 +401,9 @@ struct ChallengeCell: View {
                             Text(challenge.game.name)
                                 .font(.headline)
                             HStack {
-                                if challenger.icon == nil {
+                                if !SurroundUITestContract.isCapturingAppStoreScreenshots
+                                    && challenger.icon == nil
+                                {
                                     Stone(color: challengerStoneColor, shadowRadius: 1)
                                         .frame(width: 20, height: 20)
                                 }
@@ -452,9 +468,23 @@ struct ChallengeCell: View {
                                 }.offset(x: 10)
                             }
                         }
-                        if let iconURL = challenged.iconURL(ofSize: 64) {
+                        if SurroundUITestContract.isCapturingAppStoreScreenshots
+                            || challenged.iconURL(ofSize: 64) != nil
+                        {
                             ZStack(alignment: .bottomLeading) {
-                                AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                Group {
+                                    #if DEBUG && MAIN_APP
+                                    if SurroundUITestContract.isCapturingAppStoreScreenshots {
+                                        AppStoreScreenshotAvatar(player: challenged, size: 64)
+                                    } else if let iconURL = challenged.iconURL(ofSize: 64) {
+                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    }
+                                    #else
+                                    if let iconURL = challenged.iconURL(ofSize: 64) {
+                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                    }
+                                    #endif
+                                }
                                     .frame(width: 64, height: 64)
                                     .background(Color.gray)
                                 Stone(color: challengerStoneColor?.opponentColor(), shadowRadius: 1)

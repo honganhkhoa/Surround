@@ -12,6 +12,27 @@ import DictionaryCoding
 import Combine
 
 class Provider: TimelineProvider {
+#if DEBUG
+    func appStoreScreenshotEntry(in context: Context) -> CorrespondenceGamesEntry? {
+        guard let fixture = userDefaults[.appStoreScreenshotWidgetFixture],
+              fixture.isValid,
+              let overview = try? JSONSerialization.jsonObject(
+                with: fixture.overviewData
+              ) as? [String: Any],
+              var entry = getEntry(
+                fromOverviewJSON: overview,
+                context: context,
+                userID: fixture.userID,
+                localeIdentifier: fixture.localeIdentifier
+              ) else {
+            return nil
+        }
+
+        entry.usesStaticClock = true
+        return entry
+    }
+#endif
+
     var isLoggedIn: Bool {
         return userDefaults[.ogsUIConfig]?.csrfToken != nil && userDefaults[.ogsSessionId] != nil
     }
@@ -28,6 +49,13 @@ class Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CorrespondenceGamesEntry) -> ()) {
+#if DEBUG
+        if let entry = appStoreScreenshotEntry(in: context) {
+            completion(entry)
+            return
+        }
+#endif
+
         if !isLoggedIn {
             completion(notLoggedInEntry)
             return
@@ -45,20 +73,47 @@ class Provider: TimelineProvider {
         completion(entry)
     }
     
-    func getEntry(fromOverviewJSON overviewJSON: [String: Any], context: Context) -> CorrespondenceGamesEntry? {
+    func getEntry(
+        fromOverviewJSON overviewJSON: [String: Any],
+        context: Context,
+        userID: Int? = nil,
+        localeIdentifier: String? = nil
+    ) -> CorrespondenceGamesEntry? {
         if let activeGames = overviewJSON["active_games"] as? [[String: Any]] {
-            let games = parseAndSortActiveGames(fromData: activeGames)
+            let resolvedUserID = userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
+            let games = parseAndSortActiveGames(
+                fromData: activeGames,
+                userID: resolvedUserID
+            )
             return CorrespondenceGamesEntry(
                 date: Date(),
                 games: games,
                 widgetFamily: context.family,
-                noGamesMessage: String(localized: "You don't have any correspondence games at the moment.", comment: "Correspondence Games Widget error")
+                userID: resolvedUserID,
+                noGamesMessage: localizedNoGamesMessage(
+                    localeIdentifier: localeIdentifier
+                ),
+                localeIdentifier: localeIdentifier
             )
         }
         return nil
     }
+
+    private func localizedNoGamesMessage(
+        localeIdentifier: String?
+    ) -> String {
+        let locale = localeIdentifier.map(Locale.init(identifier:)) ?? .current
+        return String(
+            localized: "You don't have any correspondence games at the moment.",
+            locale: locale,
+            comment: "Correspondence Games Widget error"
+        )
+    }
     
-    func parseAndSortActiveGames(fromData activeGamesData: [[String: Any]]) -> [Game] {
+    func parseAndSortActiveGames(
+        fromData activeGamesData: [[String: Any]],
+        userID: Int? = nil
+    ) -> [Game] {
         var result = [Game]()
         let decoder = DictionaryDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -71,7 +126,7 @@ class Provider: TimelineProvider {
             }
         }
         
-        let userId = userDefaults[.ogsUIConfig]?.user.id ?? -1
+        let userId = userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
         let isGamesInIncreasingOrder: (Game, Game) -> Bool = { game1, game2 in
             if let clock1 = game1.clock, let clock2 = game2.clock {
                 let isGame1OnUserTurn = clock1.currentPlayerId == userId
@@ -94,6 +149,20 @@ class Provider: TimelineProvider {
 
     var overviewLoadingCancellable: AnyCancellable?
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+#if DEBUG
+        if let fixture = userDefaults[.appStoreScreenshotWidgetFixture],
+           fixture.isValid,
+           let entry = appStoreScreenshotEntry(in: context) {
+            completion(
+                Timeline(
+                    entries: [entry],
+                    policy: .after(fixture.validUntil)
+                )
+            )
+            return
+        }
+#endif
+
         if !(userDefaults[.latestOGSOverviewOutdated] ?? false) {
             if let lastOverviewUpdate = userDefaults[.latestOGSOverviewTime] {
                 let currentDate = Date()
@@ -186,9 +255,12 @@ struct CorrespondenceGamesEntry: TimelineEntry {
     var date: Date
     var games: [Game] = []
     var widgetFamily: WidgetFamily = .systemSmall
+    var userID: Int?
     var noGamesMessage: String?
     var debugMessage: String?
     var isPlaceholder = false
+    var localeIdentifier: String?
+    var usesStaticClock = false
 }
 
 struct CorrespondenceGamesWidgetView : View {
@@ -222,7 +294,13 @@ struct CorrespondenceGamesWidgetView : View {
     }
     
     var userId: Int {
-        return userDefaults[.ogsUIConfig]?.user.id ?? -1
+        return entry.userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
+    }
+
+    private var suddenDeathLabel: String {
+        let locale = entry.localeIdentifier.map(Locale.init(identifier:))
+            ?? .current
+        return String(localized: "SD", locale: locale)
     }
     
     func timer(game: Game) -> some View {
@@ -230,6 +308,7 @@ struct CorrespondenceGamesWidgetView : View {
             let thinkingTime = clock.blackPlayerId == userId ? clock.blackTime : clock.whiteTime
             var timeLeft = thinkingTime.thinkingTimeLeft
             var auxiliaryLabel = ""
+            let suddenDeathAuxiliaryLabel = " (\(suddenDeathLabel))"
             switch timeControlSystem {
             case .ByoYomi:
                 if thinkingTime.thinkingTime! > 0 {
@@ -239,7 +318,7 @@ struct CorrespondenceGamesWidgetView : View {
                     if thinkingTime.periodsLeft! > 1 {
                         auxiliaryLabel = " (\(thinkingTime.periodsLeft!))"
                     } else {
-                        auxiliaryLabel = " (\(String(localized: "SD")))"
+                        auxiliaryLabel = suddenDeathAuxiliaryLabel
                     }
                 }
             case .Canadian:
@@ -253,8 +332,17 @@ struct CorrespondenceGamesWidgetView : View {
             return AnyView(HStack(spacing: 0) {
                 Spacer()
                 if let timeLeft = timeLeft {
-                    if (game.pauseControl?.isPaused() ?? false) || game.clock?.currentPlayerId != userId {
-                        Text(timeString(timeLeft: timeLeft))
+                    if entry.usesStaticClock
+                        || (game.pauseControl?.isPaused() ?? false)
+                        || game.clock?.currentPlayerId != userId {
+                        Text(
+                            timeString(
+                                timeLeft: timeLeft,
+                                locale: entry.localeIdentifier.map(
+                                    Locale.init(identifier:)
+                                )
+                            )
+                        )
                             .multilineTextAlignment(.trailing)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -265,7 +353,7 @@ struct CorrespondenceGamesWidgetView : View {
                             .minimumScaleFactor(0.7)
                     }
                 }
-                if auxiliaryLabel == " (\(String(localized: "SD")))" {
+                if auxiliaryLabel == suddenDeathAuxiliaryLabel {
                     Text(auxiliaryLabel).foregroundColor(.red)
                 } else {
                     Text(auxiliaryLabel)
@@ -417,11 +505,16 @@ struct CorrespondenceGamesWidgetView : View {
 
 @main
 struct SurroundWidgets: Widget {
-    let kind: String = "com.honganhkhoa.Surround.CorrespondenceWidget"
+    let kind = SurroundWidgetContract.correspondenceGamesKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             CorrespondenceGamesWidgetView(entry: entry)
+                .transformEnvironment(\.locale) { locale in
+                    if let localeIdentifier = entry.localeIdentifier {
+                        locale = Locale(identifier: localeIdentifier)
+                    }
+                }
         }
         .configurationDisplayName(String(localized: "Correspondence Games", comment: "Correspondence Games Widget name"))
         .description(String(localized: "This Widget display a summary of your correspondence games on online-go.com.", comment: "Correspondence Games Widget description"))

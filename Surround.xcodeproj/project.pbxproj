@@ -11,6 +11,9 @@
 		AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
 		AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */; };
 		AE3100033A00000000000003 /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
+		AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100083A00000000000008 /* OGSService+Fixtures.swift */; };
+		AE3100093A00000000000009 /* OGSService+Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100083A00000000000008 /* OGSService+Fixtures.swift */; };
+		AE4100013C00000000000001 /* AppStoreScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */; };
 		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
 		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
 		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
@@ -400,6 +403,8 @@
 		BC042B0B24AB2CFA0050B2D1 /* SurroundUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITests.swift; sourceTree = "<group>"; };
 		BC042B1124AB2CFA0050B2D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotTests.swift; sourceTree = "<group>"; };
+		AE4100033C00000000000003 /* AppStoreScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = AppStoreScreenshots.xctestplan; sourceTree = "<group>"; };
 		BC042B2A24AB2DD00050B2D1 /* GameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameCell.swift; sourceTree = "<group>"; };
 		BC042B2C24AB2DD00050B2D1 /* TimerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		BC042B2D24AB2DD00050B2D1 /* MainView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -422,6 +427,7 @@
 		AE3000023A00000000000002 /* PlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformServices.swift; sourceTree = "<group>"; };
 		AE3100043A00000000000004 /* SurroundUITestContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestContract.swift; sourceTree = "<group>"; };
 		AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestOfflineServices.swift; sourceTree = "<group>"; };
+		AE3100083A00000000000008 /* OGSService+Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OGSService+Fixtures.swift"; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -602,6 +608,7 @@
 		BC042AE624AB2CF40050B2D1 = {
 			isa = PBXGroup;
 			children = (
+				AE4100033C00000000000003 /* AppStoreScreenshots.xctestplan */,
 				BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */,
 				BC042AF124AB2CF50050B2D1 /* Surround */,
 				BC64937D25380A9F002B2200 /* SurroundWidgets */,
@@ -675,6 +682,7 @@
 		AE3100063A00000000000006 /* UITesting */ = {
 			isa = PBXGroup;
 			children = (
+				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
 			);
@@ -709,6 +717,7 @@
 		BC042B0E24AB2CFA0050B2D1 /* SurroundUITests */ = {
 			isa = PBXGroup;
 			children = (
+				AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */,
 				BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */,
 				BC042B1124AB2CFA0050B2D1 /* Info.plist */,
 			);
@@ -1258,6 +1267,7 @@
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
+				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,
 				AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
@@ -1348,6 +1358,7 @@
 				AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */,
 				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
 				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
+				AE3100093A00000000000009 /* OGSService+Fixtures.swift in Sources */,
 				AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
@@ -1387,6 +1398,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE4100013C00000000000001 /* AppStoreScreenshotTests.swift in Sources */,
 				AE3100033A00000000000003 /* SurroundUITestContract.swift in Sources */,
 				BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */,
 			);

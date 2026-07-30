@@ -15,6 +15,11 @@ let userDefaultsSuite = "group.com.honganhkhoa.Surround.Beta"
 let userDefaultsSuite = "group.com.honganhkhoa.Surround"
 #endif
 
+enum SurroundWidgetContract {
+    static let correspondenceGamesKind =
+        "com.honganhkhoa.Surround.CorrespondenceWidget"
+}
+
 private func makeSurroundUserDefaults() -> UserDefaults {
     #if DEBUG && MAIN_APP
     if SurroundUITestContract.isEnabled {
@@ -31,6 +36,22 @@ private func makeSurroundUserDefaults() -> UserDefaults {
 }
 
 let userDefaults = makeSurroundUserDefaults()
+
+#if DEBUG
+struct AppStoreScreenshotWidgetFixture: Codable {
+    static let currentSchemaVersion = 1
+
+    let schemaVersion: Int
+    let validUntil: Date
+    let userID: Int
+    let localeIdentifier: String
+    let overviewData: Data
+
+    var isValid: Bool {
+        schemaVersion == Self.currentSchemaVersion && validUntil > Date()
+    }
+}
+#endif
 
 // From https://www.swiftbysundell.com/articles/the-power-of-subscripts-in-swift/
 struct SettingKey<Value> {
@@ -149,6 +170,12 @@ extension UserDefaults {
 #endif
 
 extension SettingKey {
+#if DEBUG
+    static var appStoreScreenshotWidgetFixture: SettingKey<AppStoreScreenshotWidgetFixture> {
+        return .init(name: "appStoreScreenshotWidgetFixture", encoded: true)
+    }
+#endif
+
     static var ogsUIConfig: SettingKey<OGSUIConfig> {
         return .init(name: "ogsUIConfig", encoded: true)
     }

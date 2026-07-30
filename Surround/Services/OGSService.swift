@@ -134,6 +134,31 @@ extension OGSServiceError: LocalizedError {
 }
 
 class OGSService: ObservableObject {
+    /// Optional state supplied by previews and deterministic clients at
+    /// construction time. The service applies this snapshot internally so its
+    /// state setters can remain private.
+    struct BootstrapState {
+        var user: OGSUser?
+        var isLoggedIn = false
+        var socketStatus = OGSWebsocketStatus.disconnected
+        var isLoadingOverview = true
+        var activeGames = [Int: Game]()
+        var publicGames = [Int: Game]()
+        var sortedPublicGames = [Game]()
+        var friends = [OGSUser]()
+        var eligibleOpenChallengeById = [Int: OGSSeekgraphChallenge]()
+        var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
+        var challengesReceived = [OGSDirectChallenge]()
+        var autoMatchEntryById = [String: OGSAutomatchEntry]()
+        var cachedUsersById = [Int: OGSUser]()
+        var preferredGameSettings = Set<OGSChallengeTemplate>()
+        var privateMessages = [OGSPrivateMessage]()
+
+        /// A complete deterministic first page. A non-nil value suppresses
+        /// network-backed history loading and has no subsequent page.
+        var finishedGamesSnapshot: [Game]?
+    }
+
     static var instances = [String: OGSService]()
 
     static func instance(forSceneWithID sceneID: String) -> OGSService {
@@ -145,105 +170,6 @@ class OGSService: ObservableObject {
             return result
         }
     }
-    static func previewInstance(
-        user: OGSUser? = nil,
-        activeGames: [Game] = [],
-        publicGames: [Game] = [],
-        friends: [OGSUser] = [],
-        socketStatus: OGSWebsocketStatus = .connected,
-        eligibleOpenChallenges: [OGSSeekgraphChallenge] = [],
-        openChallengesSent: [OGSSeekgraphChallenge] = [],
-        challengesReceived: [OGSDirectChallenge] = [],
-        automatchEntries: [OGSAutomatchEntry] = [],
-        cachedUsers: [OGSUser] = [],
-        preferredGameSettings: [OGSChallengeTemplate] = []
-    ) -> OGSService {
-        let ogs = OGSService(forPreview: true)
-        ogs.user = user
-        ogs.isLoggedIn = user != nil
-        
-        for game in activeGames {
-            ogs.activeGames[game.ogsID!] = game
-        }
-        ogs.sortActiveGames(activeGames: ogs.activeGames.values)
-        ogs.sortedPublicGames = publicGames
-        
-        ogs.friends = friends
-        ogs.socketStatus = socketStatus
-        
-        for challenge in eligibleOpenChallenges {
-            ogs.eligibleOpenChallengeById[challenge.id] = challenge
-        }
-        for challenge in openChallengesSent {
-            ogs.openChallengeSentById[challenge.id] = challenge
-        }
-        for automatchEntry in automatchEntries {
-            ogs.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
-        }
-        ogs.challengesReceived = challengesReceived
-        
-        for message in OGSPrivateMessage.sampleData {
-            ogs.handlePrivateMessage(message)
-        }
-//        ogs.superchatPeerIds.insert(OGSPrivateMessage.sampleData.first!.from.id)
-        
-        if let user = user {
-            ogs.cachedUsersById[user.id] = user
-        }
-        for user in cachedUsers {
-            ogs.cachedUsersById[user.id] = user
-        }
-        
-        ogs.preferredGameSettings = Set(preferredGameSettings)
-        
-        return ogs
-    }
-
-    #if DEBUG && MAIN_APP
-    /// A deterministic, signed-in OGS service for app-driven UI tests.
-    ///
-    /// Both transports are incapable of reaching OGS. The fixture is loaded
-    /// synchronously from the app bundle, and observers, timers, automatic
-    /// connection, companion-service access, and app-global side effects are
-    /// all disabled.
-    static func offlineUITestInstance() -> OGSService {
-        let ogs = OGSService(
-            environment: .current,
-            httpClient: SurroundUITestRejectingHTTPClient(),
-            preferences: userDefaults,
-            ogsWebsocket: SurroundUITestNoOpWebsocket(),
-            connectsAutomatically: false,
-            usesSurroundOverviewService: false,
-            enablesAppSideEffects: false,
-            startsTimers: false,
-            installsObservers: false,
-            remoteSettings: OGSRemoteSetting(preferences: userDefaults)
-        )
-
-        let fixtureUser = OGSUser(username: "kata-bot", id: 592_684)
-        ogs.user = fixtureUser
-        ogs.isLoggedIn = true
-        ogs.cachedUsersById[fixtureUser.id] = fixtureUser
-        ogs.socketStatus = .connected
-        ogs.isLoadingOverview = false
-
-        let fixtureGame = TestData.Ongoing19x19wBot2
-        precondition(fixtureGame.ogsID == SurroundUITestContract.fixtureGameID)
-        fixtureGame.ogs = ogs
-        fixtureGame.ogsRawData = fixtureGame.ogsRawData ?? [:]
-        ogs.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
-        ogs.sortActiveGames(activeGames: ogs.activeGames.values)
-
-        let publicGame = TestData.Ongoing19x19HandicappedWithNoInitialState
-        publicGame.ogs = ogs
-        publicGame.ogsRawData = publicGame.ogsRawData ?? [:]
-        ogs.publicGames[publicGame.ogsID!] = publicGame
-        ogs.sortedPublicGames = [publicGame]
-
-        return ogs
-    }
-    #endif
-
     static let ogsRoot = OGSEnvironment.current.rootURL.absoluteString
     private let environment: OGSEnvironment
     private var ogsRoot: String { environment.rootURL.absoluteString }
@@ -336,6 +262,7 @@ class OGSService: ObservableObject {
     @Published private(set) public var liveGames: [Game] = []
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
+    private var finishedGamesSnapshot: [Game]?
     private var activeGamesSortingCancellable: AnyCancellable?
     
     @Published private(set) public var challengesReceived = [OGSDirectChallenge]()
@@ -421,7 +348,46 @@ class OGSService: ObservableObject {
         #endif
     }
     
-    private convenience init(forPreview: Bool = false) {
+    private func apply(_ state: BootstrapState) {
+        user = state.user
+        isLoggedIn = state.isLoggedIn
+        socketStatus = state.socketStatus
+        isLoadingOverview = state.isLoadingOverview
+        activeGames = state.activeGames
+        publicGames = state.publicGames
+        sortedPublicGames = state.sortedPublicGames
+        friends = state.friends
+        eligibleOpenChallengeById = state.eligibleOpenChallengeById
+        openChallengeSentById = state.openChallengeSentById
+        challengesReceived = state.challengesReceived
+        autoMatchEntryById = state.autoMatchEntryById
+        cachedUsersById = state.cachedUsersById
+        preferredGameSettings = state.preferredGameSettings
+        finishedGamesSnapshot = state.finishedGamesSnapshot
+
+        for game in activeGames.values {
+            game.ogs = self
+            game.ogsRawData = game.ogsRawData ?? [:]
+        }
+        for game in publicGames.values {
+            game.ogs = self
+            game.ogsRawData = game.ogsRawData ?? [:]
+        }
+        for game in state.finishedGamesSnapshot ?? [] {
+            game.ogs = self
+            game.ogsRawData = game.ogsRawData ?? [:]
+        }
+        sortActiveGames(activeGames: activeGames.values)
+
+        for message in state.privateMessages {
+            handlePrivateMessage(message)
+        }
+    }
+
+    convenience init(
+        forPreview: Bool = false,
+        initialState: BootstrapState? = nil
+    ) {
         self.init(
             environment: .current,
             httpClient: AlamofireOGSHTTPClient.shared,
@@ -435,7 +401,8 @@ class OGSService: ObservableObject {
             enablesAppSideEffects: !forPreview,
             startsTimers: !forPreview,
             installsObservers: !forPreview,
-            remoteSettings: .shared
+            remoteSettings: .shared,
+            initialState: initialState
         )
     }
 
@@ -474,6 +441,8 @@ class OGSService: ObservableObject {
     ///     narrowly scoped tests that must not initiate follow-up requests.
     ///   - remoteSettings: Store for this identity's OGS remote settings. When
     ///     omitted, a store scoped to `preferences` is created automatically.
+    ///   - initialState: Optional synchronous state for previews or injected
+    ///     deterministic clients. Production callers leave this nil.
     init(
         environment: OGSEnvironment,
         httpClient: OGSHTTPClient,
@@ -484,7 +453,8 @@ class OGSService: ObservableObject {
         enablesAppSideEffects: Bool = false,
         startsTimers: Bool = false,
         installsObservers: Bool = true,
-        remoteSettings: OGSRemoteSetting? = nil
+        remoteSettings: OGSRemoteSetting? = nil,
+        initialState: BootstrapState? = nil
     ) {
         self.environment = environment
         self.httpClient = httpClient
@@ -522,9 +492,12 @@ class OGSService: ObservableObject {
             }
         }
 
-        // Preview instances are populated synchronously by `previewInstance`.
-        // They must not install debounced observers that can later issue real
-        // production requests for the preview's sample players.
+        if let initialState {
+            apply(initialState)
+        }
+
+        // Bootstrap instances are populated synchronously and normally disable
+        // observers so sample players cannot trigger follow-up requests.
         guard installsObservers else { return }
         
         activeGamesSortingCancellable = self.$activeGames.collect(.byTime(DispatchQueue.main, 1.0)).receive(on: RunLoop.main).sink(receiveValue: { activeGamesValues in
@@ -559,20 +532,8 @@ class OGSService: ObservableObject {
         })
         
         self.checkLoginStatus()
-        
-//        self._testSuperChat()
     }
-    
-//    private func _testSuperChat() {   
-//        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
-//            self.superchatPeerIds.formUnion(self.privateMessagesActivePeerIds)
-//            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(10))) {
-//                self.superchatPeerIds.removeAll()
-//                self._testSuperChat()
-//            }
-//        }
-//    }
-//
+
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
         switch eventName {
         case "surround/socketClosed":
@@ -1267,6 +1228,15 @@ class OGSService: ObservableObject {
     ///   refreshes do not pile up duplicate `Game` objects (each of which owns
     ///   a board-position tree and a player-cache subscription).
     func fetchFinishedGames(playerId: Int, page: Int, pageSize: Int = 50, reusing existingGames: [Int: Game] = [:]) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
+        if let finishedGamesSnapshot {
+            let games = page == 1
+                ? Array(finishedGamesSnapshot.prefix(pageSize))
+                : []
+            return Just((games: games, hasNextPage: false))
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        }
+
         let requestAuthenticationGeneration = authenticationGeneration
         return Future<(games: [Game], hasNextPage: Bool), Error> { promise in
             let parameters: [String: Any] = [
