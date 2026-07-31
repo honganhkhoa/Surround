@@ -27,6 +27,10 @@ struct GameHistoryView: View {
                     HistoryGameCell(game: game) {
                         nav.gameHistory.activeGame = game
                     }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID
+                            .homeHistoryGame(game)
+                    )
                     .padding(.horizontal)
                     .onAppear {
                         if game.ogsID == pagination.games.last?.ogsID {

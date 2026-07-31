@@ -201,7 +201,10 @@ struct OpenChallengesForm: View {
     
     @State var challengeIds = [Int]()
     @State var rengoIds = [Int]()
-    @State var challengeType: ChallengeType = .standard
+    @State var challengeType: ChallengeType =
+        SurroundUITestContract.compatibilityScene == .rengoOpenChallenges
+            ? .rengo
+            : .standard
     
     enum ChallengeType {
         case standard

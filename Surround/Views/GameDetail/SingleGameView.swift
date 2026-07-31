@@ -564,6 +564,23 @@ struct SingleGameView: View {
                     self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
                 }
             }
+            #if DEBUG && MAIN_APP
+            switch SurroundUITestContract.compatibilityScene {
+            case .gameAnalysis, .finishedGamePlayback:
+                compactDisplayMode = .analyze
+                analyzeMode.wrappedValue = true
+                DispatchQueue.main.async {
+                    analyticsPosition = game.positionByLastMoveNumber[
+                        SurroundUITestContract
+                            .screenshotAnalysisSelectedMoveNumber
+                    ] ?? game.currentPosition
+                }
+            case .gameChat:
+                compactDisplayMode = .chat
+            default:
+                break
+            }
+            #endif
         }
         .onDisappear {
             self.stonePlacingPlayer = nil

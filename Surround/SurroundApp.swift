@@ -40,7 +40,11 @@ struct SurroundApp: App {
     private var appContent: some View {
         MainViewWrapper()
             .preferredColorScheme(
-                SurroundUITestContract.isCapturingAppStoreScreenshots
+                (
+                    SurroundUITestContract.isCapturingAppStoreScreenshots
+                        || SurroundUITestContract
+                            .isCapturingCompatibilityScreenshots
+                )
                     ? (
                         SurroundUITestContract.isCapturingAppStoreScreenshotsInDarkMode
                             ? .dark

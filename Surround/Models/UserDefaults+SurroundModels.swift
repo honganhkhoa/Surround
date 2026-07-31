@@ -46,6 +46,7 @@ struct AppStoreScreenshotWidgetFixture: Codable {
     let userID: Int
     let localeIdentifier: String
     let overviewData: Data
+    let compatibilityProofToken: String?
 
     var isValid: Bool {
         schemaVersion == Self.currentSchemaVersion && validUntil > Date()

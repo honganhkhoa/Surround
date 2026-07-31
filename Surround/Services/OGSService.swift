@@ -263,6 +263,11 @@ class OGSService: ObservableObject {
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
     private var finishedGamesSnapshot: [Game]?
+    #if DEBUG && MAIN_APP
+    var offlineUITestFinishedGames: [Game] {
+        finishedGamesSnapshot ?? []
+    }
+    #endif
     private var activeGamesSortingCancellable: AnyCancellable?
     
     @Published private(set) public var challengesReceived = [OGSDirectChallenge]()

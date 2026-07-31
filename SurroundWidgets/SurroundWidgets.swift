@@ -23,12 +23,15 @@ class Provider: TimelineProvider {
                 fromOverviewJSON: overview,
                 context: context,
                 userID: fixture.userID,
-                localeIdentifier: fixture.localeIdentifier
+                localeIdentifier: fixture.localeIdentifier,
+                usesStaticClock: true
               ) else {
             return nil
         }
 
-        entry.usesStaticClock = true
+        entry.screenshotFixtureValidUntil = fixture.validUntil
+        entry.screenshotCompatibilityProofToken =
+            fixture.compatibilityProofToken
         return entry
     }
 #endif
@@ -77,13 +80,15 @@ class Provider: TimelineProvider {
         fromOverviewJSON overviewJSON: [String: Any],
         context: Context,
         userID: Int? = nil,
-        localeIdentifier: String? = nil
+        localeIdentifier: String? = nil,
+        usesStaticClock: Bool = false
     ) -> CorrespondenceGamesEntry? {
         if let activeGames = overviewJSON["active_games"] as? [[String: Any]] {
             let resolvedUserID = userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
             let games = parseAndSortActiveGames(
                 fromData: activeGames,
-                userID: resolvedUserID
+                userID: resolvedUserID,
+                usesStaticClock: usesStaticClock
             )
             return CorrespondenceGamesEntry(
                 date: Date(),
@@ -93,7 +98,8 @@ class Provider: TimelineProvider {
                 noGamesMessage: localizedNoGamesMessage(
                     localeIdentifier: localeIdentifier
                 ),
-                localeIdentifier: localeIdentifier
+                localeIdentifier: localeIdentifier,
+                usesStaticClock: usesStaticClock
             )
         }
         return nil
@@ -112,7 +118,8 @@ class Provider: TimelineProvider {
     
     func parseAndSortActiveGames(
         fromData activeGamesData: [[String: Any]],
-        userID: Int? = nil
+        userID: Int? = nil,
+        usesStaticClock: Bool = false
     ) -> [Game] {
         var result = [Game]()
         let decoder = DictionaryDecoder()
@@ -121,6 +128,13 @@ class Provider: TimelineProvider {
             if let jsonData = gameData["json"] as? [String: Any] {
                 if let ogsGame = try? decoder.decode(OGSGame.self, from: jsonData) {
                     let game = Game(ogsGame: ogsGame)
+                    if usesStaticClock {
+                        // Game initialization advances a running clock from
+                        // its fixture timestamp to wall-clock time. Restore
+                        // the decoded snapshot before sorting and rendering so
+                        // compatibility captures cannot drift between OS runs.
+                        game.clock = game.gameData?.clock
+                    }
                     result.append(game)
                 }
             }
@@ -261,6 +275,10 @@ struct CorrespondenceGamesEntry: TimelineEntry {
     var isPlaceholder = false
     var localeIdentifier: String?
     var usesStaticClock = false
+    #if DEBUG
+    var screenshotFixtureValidUntil: Date?
+    var screenshotCompatibilityProofToken: String?
+    #endif
 }
 
 struct CorrespondenceGamesWidgetView : View {
@@ -295,6 +313,66 @@ struct CorrespondenceGamesWidgetView : View {
     
     var userId: Int {
         return entry.userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
+    }
+
+    #if DEBUG
+    private var screenshotReadinessIdentifier: String {
+        let family: String
+        switch entry.widgetFamily {
+        case .systemSmall:
+            family = "small"
+        case .systemMedium:
+            family = "medium"
+        case .systemLarge:
+            family = "large"
+        default:
+            family = "unsupported"
+        }
+
+        let expectedGameCount =
+            SurroundUITestContract.compatibilityWidgetGameCount
+        let actualGameCount = entry.games.count
+        let expectedDisplayedGameCount = gamesCount
+        let actualDisplayedGameCount = gamesToDisplay.count
+        guard entry.usesStaticClock,
+              !entry.isPlaceholder,
+              entry.debugMessage == nil,
+              actualGameCount == expectedGameCount,
+              actualDisplayedGameCount == expectedDisplayedGameCount,
+              let validUntil = entry.screenshotFixtureValidUntil,
+              let proofToken = entry.screenshotCompatibilityProofToken,
+              widgetRenderingMode == .fullColor else {
+            return [
+                "surround.compatibility.widget.unready",
+                family,
+                "games-\(actualGameCount)",
+                "expected-\(expectedGameCount)",
+                "displaying-\(actualDisplayedGameCount)",
+                "expected-display-\(expectedDisplayedGameCount)",
+            ].joined(separator: ".")
+        }
+        return [
+            "surround.compatibility.widget.ready",
+            family,
+            "games-\(expectedGameCount)",
+            "rendering-fullColor",
+            "token-\(proofToken)",
+            "expires-\(Int(validUntil.timeIntervalSince1970))",
+        ].joined(separator: ".")
+    }
+    #endif
+
+    @ViewBuilder
+    private func applyingScreenshotReadinessIdentifier<Content: View>(
+        to content: Content
+    ) -> some View {
+        #if DEBUG
+        content
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(screenshotReadinessIdentifier)
+        #else
+        content
+        #endif
     }
 
     private var suddenDeathLabel: String {
@@ -463,42 +541,44 @@ struct CorrespondenceGamesWidgetView : View {
         }
         
         let gamesToDisplay = self.gamesToDisplay
+        let widgetContent = HStack(alignment: .center, spacing: 0) {
+            if gamesToDisplay.count > 0 {
+                boards
+                    .padding(.top, 5)
+            } else {
+                Text(entry.noGamesMessage ?? String(localized: "Failed to load your correspondence games.", comment: "Correspondence Games Widget error"))
+                    .font(.subheadline)
+                    .minimumScaleFactor(0.7)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+            }
+            ZStack {
+                if widgetRenderingMode == .fullColor {
+                    Color(.systemIndigo)
+                        .frame(width: 25)
+                } else {
+                    Color(.systemIndigo)
+                        .luminanceToAlpha()
+                        .frame(width: 25)
+                }
+                if entry.games.count > 0 {
+                    Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)", comment: "On Correspondence Games Widget")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(-90))
+                        .fixedSize()
+                }
+            }
+            .frame(width: 25)
+        }
+        .containerBackground(for: .widget) {
+            Color.clear
+        }
+
         return ZStack {
             AccessoryWidgetBackground()
-            HStack(alignment: .center, spacing: 0) {
-                if gamesToDisplay.count > 0 {
-                    boards
-                        .padding(.top, 5)
-                } else {
-                    Text(entry.noGamesMessage ?? String(localized: "Failed to load your correspondence games.", comment: "Correspondence Games Widget error"))
-                        .font(.subheadline)
-                        .minimumScaleFactor(0.7)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                }
-                ZStack {
-                    if widgetRenderingMode == .fullColor {
-                        Color(.systemIndigo)
-                            .frame(width: 25)
-                    } else {
-                        Color(.systemIndigo)
-                            .luminanceToAlpha()
-                            .frame(width: 25)
-                    }
-                    if entry.games.count > 0 {
-                        Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)", comment: "On Correspondence Games Widget")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundColor(.white)
-                            .rotationEffect(.degrees(-90))
-                            .fixedSize()
-                    }
-                }
-                .frame(width: 25)
-            }
-            .containerBackground(for: .widget) {
-                Color.clear
-            }
+            applyingScreenshotReadinessIdentifier(to: widgetContent)
         }
     }
 }

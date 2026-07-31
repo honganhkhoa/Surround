@@ -67,6 +67,12 @@ struct WelcomeView: View {
             }
         }
         .onAppear {
+            #if DEBUG && MAIN_APP
+            if SurroundUITestContract.isEnabled {
+                publicGames = Array(ogs.sortedPublicGames.prefix(4))
+                return
+            }
+            #endif
             ogs.ensureConnect {
                 ogs.subscribeToGameCount()
                 ogs.cyclePublicGames()

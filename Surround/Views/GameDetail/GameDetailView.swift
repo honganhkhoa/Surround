@@ -227,7 +227,11 @@ struct GameDetailView: View {
                     Spacer()
                 }
                 .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.screenGameOptions
+                    SurroundUITestContract.compatibilityScene == .gameOptions
+                        ? SurroundUITestContract.AccessibilityID
+                            .compatibilityScreen(.gameOptions)
+                        : SurroundUITestContract.AccessibilityID
+                            .screenGameOptions
                 )
                 .navigationTitle("Settings")
                 .toolbar {

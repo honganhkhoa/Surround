@@ -26,8 +26,7 @@ xcodebuild test \
   -only-testing:SurroundTests
 ```
 
-The simulator helper accepts an iOS major version and an optional exact family
-of `iPhone` or `iPad`; it defaults to `iPhone`.
+The simulator helper accepts an iOS major version and an optional exact family of `iPhone` or `iPad`; it defaults to `iPhone`. CI runs the unit target on both the current iOS 26 simulator and the latest installed simulator in the minimum supported iOS 18 major release.
 
 ## Offline iPad UI tests
 
@@ -43,6 +42,68 @@ xcodebuild test \
   -configuration Debug \
   -destination "platform=iOS Simulator,id=${simulator_id}" \
   -only-testing:SurroundUITests
+```
+
+CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains both result bundles in the `surround-ios-18-test-results` artifact.
+
+## Deployment target validation
+
+The iPhone and iPad app, widget, and notification extensions support iOS 18.0. The Mac Catalyst app and its embedded widget continue to require macOS 26. The project expresses the latter as an SDK-qualified iPhone deployment-target override, so validate the generated bundle metadata instead of adding a manual Info.plist key.
+
+Build both iOS configurations into a new derived-data directory:
+
+```sh
+validation_path=".build/DeploymentTargetValidation-$(date +%Y%m%d-%H%M%S)"
+xcodebuild build \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath "$validation_path" \
+  CODE_SIGNING_ALLOWED=NO
+xcodebuild build \
+  -scheme 'Surround Beta' \
+  -project Surround.xcodeproj \
+  -configuration 'Beta Debug' \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath "$validation_path" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+Every generated iOS `.app` and `.appex` bundle must report `MinimumOSVersion` as `18.0`:
+
+```sh
+find "$validation_path/Build/Products" -type d \
+  \( -name '*.app' -o -name '*.appex' \) -print0 |
+while IFS= read -r -d '' bundle; do
+  minimum_version="$(plutil -extract MinimumOSVersion raw "$bundle/Info.plist")"
+  printf '%s\t%s\n' "$minimum_version" "$bundle"
+done
+```
+
+Run the unsigned Catalyst build into a separate new directory:
+
+```sh
+catalyst_validation_path=".build/CatalystTargetValidation-$(date +%Y%m%d-%H%M%S)"
+xcodebuild build \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+  -derivedDataPath "$catalyst_validation_path" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+The generated Catalyst app and widget must report `LSMinimumSystemVersion` as `26.0`:
+
+```sh
+find "$catalyst_validation_path/Build/Products" -type d \
+  \( -name '*.app' -o -name '*.appex' \) -print0 |
+while IFS= read -r -d '' bundle; do
+  info_plist="$bundle/Contents/Info.plist"
+  minimum_version="$(plutil -extract LSMinimumSystemVersion raw "$info_plist")"
+  printf '%s\t%s\n' "$minimum_version" "$bundle"
+done
 ```
 
 ## App Store screenshot capture
@@ -82,6 +143,34 @@ The output path must not already exist. Reusable build products default to the g
 The complete four-locale run produces 80 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Capturing is automated, but publishing to App Store Connect is intentionally a separate manual action.
 
 To choose a different installed runtime or devices, set `APP_STORE_IOS_RUNTIME` to its exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. If an interrupted capture leaves a Debug simulator widget showing screenshot data, running the capture command again clears that stale fixture during exit cleanup. When adding a language or a scene, keep `AppStoreScreenshots.xctestplan`, `AppStoreScreenshotTests.swift`, and `.github/ci-tools/capture-app-store-screenshots.sh` in sync.
+
+## iOS 18 and iOS 26 screenshot comparison
+
+The compatibility screenshot runner compares the minimum and current system rendering without changing the exact-ten App Store screenshot contract. It uses deterministic offline fixtures, en-US, system-light/full-color appearance, a pinned 9:41 status bar, and matching simulator hardware:
+
+- iPhone 16 Pro Max in portrait on iOS 18.0 and iOS 26.0;
+- iPad Pro 13-inch (M4) in landscape on iPadOS 18.0 and iPadOS 26.0; and
+- small, medium, and large home-screen widgets on both device families.
+
+Run the complete 63-pair matrix from the repository root:
+
+```sh
+.github/ci-tools/capture-ios-version-comparison.sh \
+  --output .build/iOS18-vs-iOS26-route-comparison
+```
+
+The output path must not already exist. The gitignored artifact contains:
+
+- `originals/ios-18/<iphone|ipad>/` and `originals/ios-26/<iphone|ipad>/`, holding 126 full-resolution captures;
+- `comparisons/<iphone|ipad>/`, holding 63 labelled, lossless side-by-side PNGs;
+- `comparison.md`, a responsive `index.html`, and `run-metadata.json`; and
+- `runs/<ios-18|ios-26>/`, retaining each run's result bundles, logs, and attachment manifests.
+
+The metadata records the source fingerprint, Xcode version, runtime and device identities, locale, system appearance, verified full-color widget rendering mode, orientation, pixel dimensions, scene manifest, and widget family.
+
+The runner requires Xcode 26 or newer, installed iOS 18.0 and iOS 26.0 simulator runtimes, matching simulator device types, `jq`, Swift, and `sips`. For each OS run, it creates fresh temporary simulators from the exact required device-type and runtime identifiers. It also verifies that the Surround app and UI-test runner are absent before testing, so old preferences, app data, and Home Screen placement cannot contaminate the captures. The temporary simulators are shut down and deleted during teardown, including after a failed capture. Each simulator boot has a three-minute bound and one clean retry so a wedged CoreSimulator display service fails deterministically instead of hanging the capture indefinitely.
+
+It rejects a changed source tree between captures, missing or duplicate scenes, mismatched dimensions, incorrect orientation, alpha channels, and widget screenshots whose frame geometry does not match the requested family. Review `index.html` for clipping, overlap, missing controls, unreadable content, broken navigation, and incorrect adaptive or widget layout; the images are intentionally not required to be pixel-identical across OS versions. The runner removes each isolated widget before adding the next family.
 
 ## Signed local Mac Catalyst UI tests
 

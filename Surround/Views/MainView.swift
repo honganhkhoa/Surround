@@ -126,8 +126,18 @@ struct MainView: View {
                 }
                 .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
                 if ogs.privateMessagesActivePeerIds.count > 0 {
-                    Tab(RootView.privateMessages.title, systemImage: RootView.privateMessages.systemImage, value: RootView.privateMessages) {
+                    Tab(value: RootView.privateMessages) {
                         RootView.privateMessages.navigationView
+                    } label: {
+                        if horizontalSizeClass == .compact {
+                            Label(
+                                "Messages",
+                                systemImage:
+                                    RootView.privateMessages.systemImage
+                            )
+                        } else {
+                            RootView.privateMessages.label
+                        }
                     }
                 }
                 TabSection("Surround") {

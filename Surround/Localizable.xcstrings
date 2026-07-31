@@ -6253,6 +6253,29 @@
         }
       }
     },
+    "Messages" : {
+      "comment" : "compact navigation label for private messages",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tin nhắn"
+          }
+        }
+      }
+    },
     "Moderator" : {
       "comment" : "pause reason",
       "localizations" : {

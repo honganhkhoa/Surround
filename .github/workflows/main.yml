@@ -89,6 +89,66 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  minimum-ios-18:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        shell: bash
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iOS 18 iPhone simulator
+        id: iphone_simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPhone)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Select an iPadOS 18 simulator
+        id: ipad_simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests on iOS 18
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          xcodebuild test \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
+            -only-testing:SurroundTests \
+            -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
+
+      - name: Run iPad UI tests on iPadOS 18
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.ipad_simulator.outputs.id }}" \
+            -only-testing:SurroundUITests \
+            -resultBundlePath TestResults/SurroundUITests-iPadOS18.xcresult
+
+      - name: Upload iOS 18 test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ios-18-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
   catalyst-build:
     runs-on: macos-26
     timeout-minutes: 20

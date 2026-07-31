@@ -11,9 +11,17 @@ enum SurroundUITestContract {
     static let launchArgument = "--surround-ui-testing"
     static let screenshotLaunchArgument = "--surround-app-store-screenshots"
     static let screenshotDarkModeLaunchArgument = "--surround-app-store-screenshots-dark-mode"
+    static let compatibilityScreenshotLaunchArgument =
+        "--surround-compatibility-screenshots"
+    static let compatibilitySceneLaunchArgument =
+        "--surround-compatibility-scene"
+    static let compatibilityWidgetProofTokenLaunchArgument =
+        "--surround-compatibility-widget-proof-token"
     static let screenshotWidgetFixtureCleanupLaunchArgument =
         "--clear-app-store-screenshot-widget-fixture"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
+    static let compatibilityWidgetGameCount = 4
+    static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
     static let screenshotPrimaryGameID = 68_301_595
     static let screenshotFixtureGameIDs = [
@@ -46,6 +54,38 @@ enum SurroundUITestContract {
         "fc",
     ]
 
+    enum CompatibilityScene: String, CaseIterable {
+        case welcome
+        case home
+        case publicGames = "public-games"
+        case gameHistory = "game-history"
+        case messagesInbox = "messages-inbox"
+        case messageThread = "message-thread"
+        case settings
+        case about
+        case thanks
+        case supporter
+        case browser
+        case unsupportedGoogle = "unsupported-google"
+        case activeGameBoard = "active-game-board"
+        case gameAnalysis = "game-analysis"
+        case zenMode = "zen-mode"
+        case gameOptions = "game-options"
+        case finishedGamePlayback = "finished-game-playback"
+        case publicGameSpectator = "public-game-spectator"
+        case quickMatch = "quick-match"
+        case openChallenges = "open-challenges"
+        case rengoOpenChallenges = "rengo-open-challenges"
+        case customGame = "custom-game"
+        case opponentPicker = "opponent-picker"
+        case advancedTime = "advanced-time"
+        case advancedRules = "advanced-rules"
+        case waitingGames = "waiting-games"
+        case preferredSettings = "preferred-settings"
+        case preferredSettingEditor = "preferred-setting-editor"
+        case gameChat = "game-chat"
+    }
+
     #if DEBUG && MAIN_APP
     static var isEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains(launchArgument)
@@ -60,6 +100,56 @@ enum SurroundUITestContract {
             && ProcessInfo.processInfo.arguments.contains(screenshotDarkModeLaunchArgument)
     }
 
+    static var isCapturingCompatibilityScreenshots: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                compatibilityScreenshotLaunchArgument
+            )
+    }
+
+    static var compatibilityScene: CompatibilityScene? {
+        guard isCapturingCompatibilityScreenshots else {
+            return nil
+        }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(
+            of: compatibilitySceneLaunchArgument
+        ),
+        arguments.indices.contains(argumentIndex + 1) else {
+            preconditionFailure(
+                "\(compatibilitySceneLaunchArgument) requires a scene raw value."
+            )
+        }
+        guard let scene = CompatibilityScene(
+            rawValue: arguments[argumentIndex + 1]
+        ) else {
+            preconditionFailure(
+                "Unknown compatibility screenshot scene: "
+                    + arguments[argumentIndex + 1]
+            )
+        }
+        return scene
+    }
+
+    static var compatibilityWidgetProofToken: String? {
+        guard isCapturingCompatibilityScreenshots else {
+            return nil
+        }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(
+            of: compatibilityWidgetProofTokenLaunchArgument
+        ) else {
+            return nil
+        }
+        guard arguments.indices.contains(argumentIndex + 1),
+              let token = UUID(uuidString: arguments[argumentIndex + 1]) else {
+            preconditionFailure(
+                "\(compatibilityWidgetProofTokenLaunchArgument) requires a UUID value."
+            )
+        }
+        return token.uuidString
+    }
+
     static var isClearingAppStoreScreenshotWidgetFixture: Bool {
         ProcessInfo.processInfo.arguments.contains(
             screenshotWidgetFixtureCleanupLaunchArgument
@@ -69,6 +159,9 @@ enum SurroundUITestContract {
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingAppStoreScreenshotsInDarkMode = false
+    static let isCapturingCompatibilityScreenshots = false
+    static let compatibilityScene: CompatibilityScene? = nil
+    static let compatibilityWidgetProofToken: String? = nil
     static let isClearingAppStoreScreenshotWidgetFixture = false
     #endif
 
@@ -151,6 +244,12 @@ enum SurroundUITestContract {
         static let gameOptions = "game.options"
         static let gameZenEnter = "game.zen.enter"
         static let gameZenExit = "game.zen.exit"
+
+        static func compatibilityScreen(
+            _ scene: CompatibilityScene
+        ) -> String {
+            "screen.compatibility.\(scene.rawValue)"
+        }
 
         static func gameAnalysisPosition(
             baseMoveNumber: Int,

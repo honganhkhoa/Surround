@@ -67,6 +67,9 @@
                <Test
                   Identifier = "AppStoreScreenshotTests/testAppStoreScreenshots()">
                </Test>
+               <Test
+                  Identifier = "CompatibilityScreenshotTests/testCompatibilityScreenshots()">
+               </Test>
             </SkippedTests>
          </TestableReference>
       </Testables>

@@ -459,6 +459,14 @@ private enum AppStoreScreenshotProfileData {
         professional: false
     )
 
+    private static let mapleRidge = OGSUser(
+        username: "MapleRidge",
+        id: 851_012,
+        ranking: 27.088_590_439_774_116,
+        country: "un",
+        professional: false
+    )
+
     private static let cedarWave = OGSUser(
         username: "CedarWave",
         id: 851_001,
@@ -626,6 +634,35 @@ private enum AppStoreScreenshotProfileData {
           [16,7],[15,7],[16,6],[8,17],[11,13],[11,14],[10,14],[10,13],
           [9,13],[10,12],[9,12],[10,11],[9,11],[12,12],[10,10],[10,15],
           [9,16],[9,14],[8,14],[10,14],[7,15]
+        ]
+        """#
+    )
+
+    /// Game 25089235 has 174 moves. The active and widget fixtures
+    /// intentionally keep only its first 68 moves.
+    static let mapleRidgeOpening = AppStoreScreenshotProfileGame(
+        id: SurroundUITestContract.compatibilityWidgetGameID,
+        sourceMoveCount: 174,
+        gameName: matchupTitle(
+            "Tournament Game: Through the Years: Long Correspondence (59567) R:1",
+            whitePlayer: mapleRidge,
+            blackPlayer: profileOwner
+        ),
+        blackPlayer: profileOwner,
+        whitePlayer: mapleRidge,
+        outcome: "Resignation",
+        winnerID: mapleRidge.id,
+        movesJSON: #"""
+        [
+          [15,3],[3,15],[15,16],[3,2],[5,16],[2,13],[9,15],[16,2],
+          [16,3],[15,2],[14,2],[14,1],[13,2],[13,1],[12,2],[12,1],
+          [11,2],[16,13],[16,9],[16,16],[16,15],[15,15],[17,15],[17,16],
+          [15,14],[14,15],[16,14],[14,16],[14,12],[14,14],[15,13],[15,8],
+          [15,9],[13,8],[14,7],[14,8],[15,7],[16,8],[11,8],[13,10],
+          [14,10],[11,9],[10,9],[11,10],[12,7],[12,8],[11,7],[12,12],
+          [13,11],[12,11],[13,9],[14,9],[12,10],[12,9],[13,10],[9,11],
+          [3,4],[2,4],[2,5],[2,3],[3,5],[5,2],[3,9],[7,16],
+          [7,15],[8,16],[8,15],[6,16]
         ]
         """#
     )
@@ -952,7 +989,9 @@ extension OGSService {
 
         var state = BootstrapState()
 
-        if !SurroundUITestContract.isCapturingAppStoreScreenshots {
+        if !SurroundUITestContract.isCapturingAppStoreScreenshots
+            && !SurroundUITestContract.isCapturingCompatibilityScreenshots
+        {
             if !SurroundUITestContract
                 .isClearingAppStoreScreenshotWidgetFixture
             {
@@ -1022,6 +1061,9 @@ extension OGSService {
         state.user = fixtureUser
         state.isLoggedIn = true
         state.cachedUsersById[fixtureUser.id] = fixtureUser
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots {
+            state.privateMessages = OGSPrivateMessage.sampleData
+        }
         state.socketStatus = .connected
         state.isLoadingOverview = false
 
@@ -1141,13 +1183,24 @@ extension OGSService {
 
         func makeFixtureGame(
             from fixture: AppStoreScreenshotProfileGame,
-            clock: AppStoreScreenshotActiveClockFixture
+            clock: AppStoreScreenshotActiveClockFixture,
+            prefixMoveCount: Int? = nil
         ) -> Game {
             guard var gameData = TestData.Ongoing19x19wBot2.gameData else {
                 preconditionFailure("The bundled UI-test game fixture must contain game data.")
             }
 
             applyProfileData(fixture, to: &gameData)
+            if let prefixMoveCount {
+                precondition(
+                    prefixMoveCount > 0
+                        && prefixMoveCount < gameData.moves.count,
+                    "Active compatibility fixtures must use an early position."
+                )
+                gameData.moves = Array(
+                    gameData.moves.prefix(prefixMoveCount)
+                )
+            }
             precondition(
                 gameData.moves.count < fixture.sourceMoveCount,
                 "Active App Store fixtures must use an early position from a finished profile game."
@@ -1282,6 +1335,11 @@ extension OGSService {
             blackTimeRemaining: 207_780,  // 57h 43m
             whiteTimeRemaining: 80_340  // 22h 19m
         )
+        let mapleRidgeClock = AppStoreScreenshotActiveClockFixture(
+            daysPerMove: 4,
+            blackTimeRemaining: 276_540,  // 76h 49m
+            whiteTimeRemaining: 129_960  // 36h 06m
+        )
         let fixtureGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.copperKoiOpening,
             clock: copperKoiClock
@@ -1339,28 +1397,55 @@ extension OGSService {
             from: AppStoreScreenshotProfileData.indigoCraneOpening,
             clock: indigoCraneClock
         )
+        let compatibilityWidgetGame = makeFixtureGame(
+            from: AppStoreScreenshotProfileData.mapleRidgeOpening,
+            clock: mapleRidgeClock
+        )
         precondition(
             additionalYourMoveGame.clock?.currentPlayerId == fixtureUser.id
                 && additionalYourMoveGame.gameData?.timeControl.speed
                     == .correspondence
         )
-        for game in [
+        precondition(
+            compatibilityWidgetGame.ogsID
+                == SurroundUITestContract.compatibilityWidgetGameID
+                && compatibilityWidgetGame.clock?.currentPlayerId
+                    == fixtureUser.id
+                && compatibilityWidgetGame.gameData?.timeControl.speed
+                    == .correspondence
+        )
+        var activeFixtureGames = [
             fixtureGame,
             additionalYourMoveGame,
             waitingGame1,
-        ] {
+        ]
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots {
+            activeFixtureGames.append(compatibilityWidgetGame)
+        }
+        for game in activeFixtureGames {
             state.activeGames[game.ogsID!] = game
         }
         precondition(
-            state.activeGames.count == 3
+            state.activeGames.count
+                == (
+                    SurroundUITestContract
+                        .isCapturingCompatibilityScreenshots
+                            ? SurroundUITestContract
+                                .compatibilityWidgetGameCount
+                            : 3
+                )
                 && state.activeGames.values.filter {
                     $0.clock?.currentPlayerId == fixtureUser.id
-                }.count == 2,
-            "The App Store fixture must contain two games in Your move and one waiting game."
+                }.count
+                    == (
+                        SurroundUITestContract
+                            .isCapturingCompatibilityScreenshots ? 3 : 2
+                    ),
+            "The screenshot fixture must contain deterministic correspondence games."
         )
 
         let widgetNow = Date()
-        let widgetActiveGames: [[String: Any]] = [
+        var widgetActiveGames: [[String: Any]] = [
             [
                 "id": AppStoreScreenshotProfileData.copperKoiOpening.id,
                 "json": AppStoreScreenshotProfileData.copperKoiOpening
@@ -1390,6 +1475,36 @@ extension OGSService {
                     ),
             ],
         ]
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots {
+            widgetActiveGames.append(
+                [
+                    "id": AppStoreScreenshotProfileData.mapleRidgeOpening.id,
+                    "json": AppStoreScreenshotProfileData
+                        .mapleRidgeOpening
+                        .widgetGameJSON(
+                            clock: mapleRidgeClock,
+                            currentPlayerID: fixtureUser.id,
+                            now: widgetNow
+                        ),
+                ]
+            )
+        }
+        precondition(
+            widgetActiveGames.count
+                == (
+                    SurroundUITestContract
+                        .isCapturingCompatibilityScreenshots
+                            ? SurroundUITestContract
+                                .compatibilityWidgetGameCount
+                            : 3
+                ),
+            "The compatibility fixture must populate every widget family."
+        )
+        precondition(
+            Set(widgetActiveGames.compactMap { $0["id"] as? Int })
+                == Set(state.activeGames.keys),
+            "The app and widget screenshot fixtures must use the same active game ids."
+        )
         let widgetOverviewData = try! JSONSerialization.data(
             withJSONObject: [
                 "active_games": widgetActiveGames,
@@ -1401,7 +1516,9 @@ extension OGSService {
             validUntil: widgetNow.addingTimeInterval(6 * 60 * 60),
             userID: fixtureUser.id,
             localeIdentifier: Locale.current.identifier,
-            overviewData: widgetOverviewData
+            overviewData: widgetOverviewData,
+            compatibilityProofToken:
+                SurroundUITestContract.compatibilityWidgetProofToken
         )
         guard let sharedWidgetDefaults = UserDefaults(
             suiteName: userDefaultsSuite
@@ -1479,6 +1596,12 @@ extension OGSService {
         precondition(
             finishedGames.count == 10,
             "The App Store home fixture must contain ten finished games."
+        )
+        precondition(
+            Set(state.activeGames.keys).isDisjoint(
+                with: Set(finishedGames.compactMap { $0.ogsID })
+            ),
+            "Active and finished screenshot fixtures must use distinct OGS game ids."
         )
         state.finishedGamesSnapshot = finishedGames
 
@@ -1574,6 +1697,32 @@ extension OGSService {
             if let challenger = challenge.challenger {
                 state.cachedUsersById[challenger.id] = challenger
             }
+        }
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots {
+            var hostedStandardChallenge = standardChallenges[0]
+            hostedStandardChallenge.id = 93_001
+            hostedStandardChallenge.challenger = fixtureUser
+            hostedStandardChallenge.game.id = 103_001
+            hostedStandardChallenge.game.name = "Weekend 19×19"
+
+            // WaitingGamesView consumes this dictionary directly. A single
+            // hosted fixture keeps the visual order stable across processes
+            // and operating-system versions.
+            let waitingChallenges = [hostedStandardChallenge]
+            for challenge in waitingChallenges {
+                state.openChallengeSentById[challenge.id] = challenge
+            }
+            let automatchEntry = OGSAutomatchEntry.sampleEntry
+            state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+            state.friends = standardChallenges.prefix(6).compactMap(
+                \.challenger
+            )
+            precondition(
+                state.openChallengeSentById.count == 1
+                    && state.autoMatchEntryById.count == 1
+                    && state.friends.count == 6,
+                "Compatibility secondary routes require stable waiting games and friends."
+            )
         }
 
         func makePublicGame(
@@ -1900,6 +2049,11 @@ extension OGSService {
             state.publicGames[publicGame.ogsID!] = publicGame
         }
         state.sortedPublicGames = publicGames
+
+        if SurroundUITestContract.compatibilityScene == .welcome {
+            state.user = nil
+            state.isLoggedIn = false
+        }
 
         return makeService(from: state)
     }
