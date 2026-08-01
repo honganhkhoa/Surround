@@ -559,7 +559,79 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.map(\.command), ["game/connect", "game/disconnect"])
     }
 
-    private func makeService(socket: OGSWebsocketProtocol) -> OGSService {
+    func testFinishedActiveGameEventImmediatelyRemovesGameFromDerivedPresentationCollections() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        let fixture = try makeEmptyGameData(id: 100)
+        service.user = fixture.players.black
+
+        let onUserTurnID = 101
+        let notOnUserTurnID = 102
+        let liveID = 103
+        service.processOverview(overview: [
+            "active_games": [
+                try makeOverviewGameData(
+                    id: onUserTurnID,
+                    speed: "correspondence",
+                    currentPlayerID: fixture.players.black.id
+                ),
+                try makeOverviewGameData(
+                    id: notOnUserTurnID,
+                    speed: "correspondence",
+                    currentPlayerID: fixture.players.white.id
+                ),
+                try makeOverviewGameData(
+                    id: liveID,
+                    speed: "live",
+                    currentPlayerID: fixture.players.black.id
+                ),
+            ],
+        ])
+
+        XCTAssertEqual(
+            service.sortedActiveCorrespondenceGamesOnUserTurn.compactMap(\.ogsID),
+            [onUserTurnID]
+        )
+        XCTAssertEqual(
+            service.sortedActiveCorrespondenceGamesNotOnUserTurn.compactMap(\.ogsID),
+            [notOnUserTurnID]
+        )
+        XCTAssertEqual(
+            service.sortedActiveCorrespondenceGames.compactMap(\.ogsID),
+            [onUserTurnID, notOnUserTurnID]
+        )
+        XCTAssertEqual(service.liveGames.compactMap(\.ogsID), [liveID])
+
+        for gameID in [onUserTurnID, notOnUserTurnID, liveID] {
+            socket.deliver(
+                name: "active_game",
+                data: makeShortGameData(id: gameID, phase: "finished")
+            )
+
+            XCTAssertNil(service.activeGames[gameID])
+            XCTAssertFalse(
+                service.sortedActiveCorrespondenceGamesOnUserTurn.contains {
+                    $0.ogsID == gameID
+                }
+            )
+            XCTAssertFalse(
+                service.sortedActiveCorrespondenceGamesNotOnUserTurn.contains {
+                    $0.ogsID == gameID
+                }
+            )
+            XCTAssertFalse(
+                service.sortedActiveCorrespondenceGames.contains {
+                    $0.ogsID == gameID
+                }
+            )
+            XCTAssertFalse(service.liveGames.contains { $0.ogsID == gameID })
+        }
+    }
+
+    private func makeService(
+        socket: OGSWebsocketProtocol,
+        installsObservers: Bool = true
+    ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         return OGSService(
@@ -570,7 +642,8 @@ final class OGSServiceEventTests: XCTestCase {
             connectsAutomatically: false,
             usesSurroundOverviewService: false,
             enablesAppSideEffects: false,
-            startsTimers: false
+            startsTimers: false,
+            installsObservers: installsObservers
         )
     }
 
@@ -582,6 +655,48 @@ final class OGSServiceEventTests: XCTestCase {
             "height": 5,
             "black": ["id": 1, "username": "black"],
             "white": ["id": 2, "username": "white"],
+        ]
+    }
+
+    private func makeOverviewGameData(
+        id: Int,
+        speed: String,
+        currentPlayerID: Int
+    ) throws -> [String: Any] {
+        let bundle = Bundle(for: OGSServiceEventTests.self)
+        let url = try XCTUnwrap(
+            bundle.url(forResource: "game-25076729", withExtension: "json")
+        )
+        var gameData = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        gameData["game_id"] = id
+        gameData["game_name"] = "event-test-\(id)"
+        gameData["width"] = 5
+        gameData["height"] = 5
+        gameData["moves"] = []
+        gameData["phase"] = "play"
+        gameData["outcome"] = NSNull()
+        gameData["winner"] = NSNull()
+
+        var timeControl = try XCTUnwrap(gameData["time_control"] as? [String: Any])
+        timeControl["speed"] = speed
+        gameData["time_control"] = timeControl
+
+        var clock = try XCTUnwrap(gameData["clock"] as? [String: Any])
+        clock["game_id"] = id
+        clock["current_player"] = currentPlayerID
+        gameData["clock"] = clock
+
+        let players = try XCTUnwrap(gameData["players"] as? [String: Any])
+        return [
+            "id": id,
+            "phase": "play",
+            "width": 5,
+            "height": 5,
+            "black": players["black"] as Any,
+            "white": players["white"] as Any,
+            "json": gameData,
         ]
     }
 

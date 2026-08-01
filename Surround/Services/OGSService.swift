@@ -1545,6 +1545,11 @@ class OGSService: ObservableObject {
             if gameData["phase"] as? String == OGSGamePhase.finished.rawValue {
                 self.activeGames.removeValue(forKey: gameId)
                 releaseConnection(gameID: gameId, owner: .activeGames)
+                // Keep the presentation projections in lockstep with the source
+                // dictionary. History reloads as soon as `activeGames` changes;
+                // waiting for the one-second batching observer would leave the
+                // finished game in an active section during that handoff.
+                sortActiveGames(activeGames: activeGames.values)
                 return
             }
             if let game = self.activeGames[gameId] {

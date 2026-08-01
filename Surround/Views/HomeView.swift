@@ -9,6 +9,31 @@ import SwiftUI
 import Combine
 import DictionaryCoding
 
+/// Gives the same OGS game a distinct identity in each home-screen section.
+/// A game can briefly exist in both an active projection and finished history
+/// while the server-side transition is settling; those rows must not share a
+/// SwiftUI identity inside the same lazy grid.
+private struct HomeGameRow: Identifiable {
+    enum Context: Hashable {
+        case live
+        case userTurn
+        case opponentTurn
+        case history
+    }
+
+    struct ID: Hashable {
+        let context: Context
+        let gameID: GameID
+    }
+
+    let game: Game
+    let context: Context
+
+    var id: ID {
+        ID(context: context, gameID: game.ID)
+    }
+}
+
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
@@ -197,12 +222,14 @@ struct HomeView: View {
                         }
                         if ogs.liveGames.count > 0 {
                             Section(header: sectionHeader(title: String(localized: "Live games", comment: "Homeview"))) {
-                                ForEach(ogs.liveGames) { game in
-                                    Button(action: { showGameDetail(game: game) }) {
-                                        GameCell(game: game, displayMode: displayMode)
+                                ForEach(
+                                    ogs.liveGames.map { HomeGameRow(game: $0, context: .live) }
+                                ) { row in
+                                    Button(action: { showGameDetail(game: row.game) }) {
+                                        GameCell(game: row.game, displayMode: displayMode)
                                     }
                                     .accessibilityIdentifier(
-                                        SurroundUITestContract.AccessibilityID.homeGame(game)
+                                        SurroundUITestContract.AccessibilityID.homeGame(row.game)
                                     )
                                     .buttonStyle(.plain)
                                     .padding(.vertical, displayMode == .full ? nil : 0)
@@ -211,12 +238,16 @@ struct HomeView: View {
                             }
                         }
                         Section(header: sectionHeader(title: String(localized: "Your move", comment: "Homeview"))) {
-                            ForEach(ogs.sortedActiveCorrespondenceGamesOnUserTurn) { game in
-                                Button(action: { showGameDetail(game: game) }) {
-                                    GameCell(game: game, displayMode: displayMode)
+                            ForEach(
+                                ogs.sortedActiveCorrespondenceGamesOnUserTurn.map {
+                                    HomeGameRow(game: $0, context: .userTurn)
+                                }
+                            ) { row in
+                                Button(action: { showGameDetail(game: row.game) }) {
+                                    GameCell(game: row.game, displayMode: displayMode)
                                 }
                                 .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(game)
+                                    SurroundUITestContract.AccessibilityID.homeGame(row.game)
                                 )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
@@ -230,12 +261,16 @@ struct HomeView: View {
                             }
                         }
                         Section(header: sectionHeader(title: String(localized: "Waiting for opponents/teammates", comment: "Homeview"))) {
-                            ForEach(ogs.sortedActiveCorrespondenceGamesNotOnUserTurn) { game in
-                                Button(action: { showGameDetail(game: game) }) {
-                                    GameCell(game: game, displayMode: displayMode)
+                            ForEach(
+                                ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.map {
+                                    HomeGameRow(game: $0, context: .opponentTurn)
+                                }
+                            ) { row in
+                                Button(action: { showGameDetail(game: row.game) }) {
+                                    GameCell(game: row.game, displayMode: displayMode)
                                 }
                                 .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(game)
+                                    SurroundUITestContract.AccessibilityID.homeGame(row.game)
                                 )
                                 .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
@@ -250,12 +285,16 @@ struct HomeView: View {
                         }
                         if recentFinishedGames.count > 0 {
                             Section(header: sectionHeader(title: String(localized: "Game history", comment: "Homeview"))) {
-                                ForEach(recentFinishedGames) { game in
-                                    HistoryGameCell(game: game) {
-                                        showGameDetail(game: game, showsCarousel: false)
+                                ForEach(
+                                    recentFinishedGames.map {
+                                        HomeGameRow(game: $0, context: .history)
+                                    }
+                                ) { row in
+                                    HistoryGameCell(game: row.game) {
+                                        showGameDetail(game: row.game, showsCarousel: false)
                                     }
                                     .accessibilityIdentifier(
-                                        SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
+                                        SurroundUITestContract.AccessibilityID.homeHistoryGame(row.game)
                                     )
                                     .padding(.horizontal)
                                 }
