@@ -1496,7 +1496,8 @@ extension OGSService {
                         .isCapturingCompatibilityScreenshots
                             ? SurroundUITestContract
                                 .compatibilityWidgetGameCount
-                            : 3
+                            : SurroundUITestContract
+                                .appStoreScreenshotWidgetGameCount
                 ),
             "The compatibility fixture must populate every widget family."
         )
@@ -1517,6 +1518,8 @@ extension OGSService {
             userID: fixtureUser.id,
             localeIdentifier: Locale.current.identifier,
             overviewData: widgetOverviewData,
+            appStoreProofToken:
+                SurroundUITestContract.appStoreScreenshotWidgetProofToken,
             compatibilityProofToken:
                 SurroundUITestContract.compatibilityWidgetProofToken
         )

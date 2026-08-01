@@ -17,9 +17,12 @@ enum SurroundUITestContract {
         "--surround-compatibility-scene"
     static let compatibilityWidgetProofTokenLaunchArgument =
         "--surround-compatibility-widget-proof-token"
+    static let appStoreScreenshotWidgetProofTokenLaunchArgument =
+        "--surround-app-store-screenshot-widget-proof-token"
     static let screenshotWidgetFixtureCleanupLaunchArgument =
         "--clear-app-store-screenshot-widget-fixture"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
+    static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
@@ -150,6 +153,25 @@ enum SurroundUITestContract {
         return token.uuidString
     }
 
+    static var appStoreScreenshotWidgetProofToken: String? {
+        guard isCapturingAppStoreScreenshots else {
+            return nil
+        }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(
+            of: appStoreScreenshotWidgetProofTokenLaunchArgument
+        ) else {
+            return nil
+        }
+        guard arguments.indices.contains(argumentIndex + 1),
+              let token = UUID(uuidString: arguments[argumentIndex + 1]) else {
+            preconditionFailure(
+                "\(appStoreScreenshotWidgetProofTokenLaunchArgument) requires a UUID value."
+            )
+        }
+        return token.uuidString
+    }
+
     static var isClearingAppStoreScreenshotWidgetFixture: Bool {
         ProcessInfo.processInfo.arguments.contains(
             screenshotWidgetFixtureCleanupLaunchArgument
@@ -162,6 +184,7 @@ enum SurroundUITestContract {
     static let isCapturingCompatibilityScreenshots = false
     static let compatibilityScene: CompatibilityScene? = nil
     static let compatibilityWidgetProofToken: String? = nil
+    static let appStoreScreenshotWidgetProofToken: String? = nil
     static let isClearingAppStoreScreenshotWidgetFixture = false
     #endif
 

@@ -15,6 +15,7 @@ final class AppStoreScreenshotTests: XCTestCase {
     }
 
     private var capturedSceneNames = [String]()
+    private var appStoreWidgetProofToken = ""
 
     private let expectedPhoneSceneNames = [
         "01-game-board",
@@ -45,6 +46,7 @@ final class AppStoreScreenshotTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         capturedSceneNames = []
+        appStoreWidgetProofToken = UUID().uuidString
     }
 
     func testAppStoreScreenshots() {
@@ -248,6 +250,9 @@ final class AppStoreScreenshotTests: XCTestCase {
         app.launchArguments = [
             SurroundUITestContract.launchArgument,
             SurroundUITestContract.screenshotLaunchArgument,
+            SurroundUITestContract
+                .appStoreScreenshotWidgetProofTokenLaunchArgument,
+            appStoreWidgetProofToken,
         ]
         if interfaceStyle == .dark {
             app.launchArguments.append(
@@ -256,6 +261,13 @@ final class AppStoreScreenshotTests: XCTestCase {
         }
         app.launch()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            setSidebarCollapsed(false, in: app)
+            XCTAssertTrue(
+                sidebarSettingsTab(in: app).isHittable,
+                "Expected every iPad app journey to start with the sidebar visible."
+            )
+        }
         return app
     }
 
@@ -333,14 +345,11 @@ final class AppStoreScreenshotTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let homeTab = app
-            .descendants(matching: .any)
-            .matching(
-                identifier:
-                    SurroundUITestContract.AccessibilityID.navigationHome
-            )
-            .firstMatch
-        guard homeTab.isHittable == collapsed else {
+        let sidebarProbe = sidebarSettingsTab(in: app)
+        let shouldToggle = collapsed
+            ? sidebarProbe.isHittable
+            : !sidebarProbe.isHittable
+        guard shouldToggle else {
             return
         }
 
@@ -352,19 +361,34 @@ final class AppStoreScreenshotTests: XCTestCase {
             line: line
         )
         let windowFrame = appWindow.frame
-        let sidebarToggle = app.buttons.allElementsBoundByIndex.first {
-            let frame = $0.frame
-            return $0.exists
-                && $0.isHittable
-                && frame.width > 1
-                && frame.height > 1
-                && frame.width < 80
-                && frame.height < 80
-                && frame.midX < windowFrame.midX
-                && frame.maxY < windowFrame.minY + 100
+        let navigationIdentifiers = Set([
+            SurroundUITestContract.AccessibilityID.navigationHome,
+            SurroundUITestContract.AccessibilityID.navigationPublicGames,
+            SurroundUITestContract.AccessibilityID.navigationSettings,
+            SurroundUITestContract.AccessibilityID.navigationAbout,
+            SurroundUITestContract.AccessibilityID.navigationBrowser,
+        ])
+        var sidebarToggle: XCUIElement?
+        let foundSidebarToggle = waitUntil(timeout: 10) {
+            sidebarToggle = app.buttons.allElementsBoundByIndex
+                .filter {
+                    let frame = $0.frame
+                    return $0.exists
+                        && $0.isHittable
+                        && !navigationIdentifiers.contains($0.identifier)
+                        && frame.width > 1
+                        && frame.height > 1
+                        && frame.width < 80
+                        && frame.height < 80
+                        && frame.midX > windowFrame.minX + 100
+                        && frame.midX < windowFrame.midX
+                        && frame.maxY < windowFrame.minY + 100
+                }
+                .min { $0.frame.midX < $1.frame.midX }
+            return sidebarToggle != nil
         }
 
-        guard let sidebarToggle else {
+        guard foundSidebarToggle, let sidebarToggle else {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "Accessibility hierarchy – sidebar toggle missing"
             hierarchy.lifetime = .keepAlways
@@ -381,15 +405,25 @@ final class AppStoreScreenshotTests: XCTestCase {
         XCTAssertTrue(
             waitUntil(timeout: 10) {
                 collapsed
-                    ? !homeTab.isHittable
-                    : homeTab.exists && homeTab.isHittable
+                    ? !sidebarProbe.isHittable
+                    : sidebarProbe.exists && sidebarProbe.isHittable
             },
             collapsed
-                ? "Expected the iPad sidebar to collapse before the Zen-mode capture."
-                : "Expected the iPad sidebar to expand after the Zen-mode capture.",
+                ? "Expected the iPad sidebar to collapse."
+                : "Expected the iPad sidebar to expand.",
             file: file,
             line: line
         )
+    }
+
+    private func sidebarSettingsTab(in app: XCUIApplication) -> XCUIElement {
+        app
+            .descendants(matching: .any)
+            .matching(
+                identifier:
+                    SurroundUITestContract.AccessibilityID.navigationSettings
+            )
+            .firstMatch
     }
 
     private func waitForHomeGames(in app: XCUIApplication) {
@@ -549,10 +583,11 @@ final class AppStoreScreenshotTests: XCTestCase {
                 name: "Widget missing after placement"
             )
         }
-        XCTAssertTrue(
-            widgetAppeared,
-            "Expected the Surround widget to render its screenshot fixture."
-        )
+        guard widgetAppeared else {
+            XCTFail("Expected the Surround widget to render its screenshot fixture.")
+            return
+        }
+        assertFreshAppStoreWidgetFixture(in: springboard)
 
         let unwantedIcons = visibleHomeScreenIcons(
             in: springboard,
@@ -581,6 +616,83 @@ final class AppStoreScreenshotTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         capturedSceneNames.append(sceneName)
+    }
+
+    private func assertFreshAppStoreWidgetFixture(
+        in springboard: XCUIApplication
+    ) {
+        let identifierPrefix = [
+            "surround.appstore.widget.ready",
+            "medium",
+            "games-\(SurroundUITestContract.appStoreScreenshotWidgetGameCount)",
+            "displaying-2",
+            "rendering-fullColor",
+            "token-\(appStoreWidgetProofToken)",
+            "locale-",
+        ].joined(separator: ".")
+        let readyContent = springboard
+            .descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@",
+                    identifierPrefix
+                )
+            )
+            .firstMatch
+
+        guard readyContent.waitForExistence(timeout: 30) else {
+            let unreadyContent = springboard
+                .descendants(matching: .any)
+                .matching(
+                    NSPredicate(
+                        format: "identifier BEGINSWITH %@",
+                        "surround.appstore.widget.unready.medium."
+                    )
+                )
+                .firstMatch
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "App Store widget fixture was not ready"
+            )
+            let unreadyDetail = unreadyContent.exists
+                ? " Widget reported '\(unreadyContent.identifier)'."
+                : ""
+            XCTFail(
+                "Expected fresh, localized App Store screenshot content in "
+                    + "the medium widget."
+                    + unreadyDetail
+            )
+            return
+        }
+
+        let identifierSuffix = String(
+            readyContent.identifier.dropFirst(identifierPrefix.count)
+        )
+        guard let expiryMarker = identifierSuffix.range(
+            of: ".expires-",
+            options: .backwards
+        ) else {
+            XCTFail("The App Store widget readiness identifier had no expiry.")
+            return
+        }
+        let localeIdentifier = String(
+            identifierSuffix[..<expiryMarker.lowerBound]
+        )
+        let expiryText = String(
+            identifierSuffix[expiryMarker.upperBound...]
+        )
+        guard !localeIdentifier.isEmpty,
+              let expiry = TimeInterval(expiryText) else {
+            XCTFail(
+                "The App Store widget readiness identifier had invalid locale or expiry metadata."
+            )
+            return
+        }
+        XCTAssertGreaterThan(
+            Date(timeIntervalSince1970: expiry),
+            Date().addingTimeInterval(5 * 60 * 60),
+            "The App Store widget fixture must come from this capture run, not a stale timeline."
+        )
     }
 
     private func isScreenshotWidgetVisible(

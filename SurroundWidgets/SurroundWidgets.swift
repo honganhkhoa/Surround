@@ -30,6 +30,7 @@ class Provider: TimelineProvider {
         }
 
         entry.screenshotFixtureValidUntil = fixture.validUntil
+        entry.screenshotAppStoreProofToken = fixture.appStoreProofToken
         entry.screenshotCompatibilityProofToken =
             fixture.compatibilityProofToken
         return entry
@@ -279,6 +280,7 @@ struct CorrespondenceGamesEntry: TimelineEntry {
     var usesStaticClock = false
     #if DEBUG
     var screenshotFixtureValidUntil: Date?
+    var screenshotAppStoreProofToken: String?
     var screenshotCompatibilityProofToken: String?
     #endif
 }
@@ -336,6 +338,41 @@ struct CorrespondenceGamesWidgetView : View {
         let actualGameCount = entry.games.count
         let expectedDisplayedGameCount = gamesCount
         let actualDisplayedGameCount = gamesToDisplay.count
+
+        if let proofToken = entry.screenshotAppStoreProofToken {
+            let expectedGameCount =
+                SurroundUITestContract.appStoreScreenshotWidgetGameCount
+            guard family == "medium",
+                  entry.usesStaticClock,
+                  !entry.isPlaceholder,
+                  entry.debugMessage == nil,
+                  actualGameCount == expectedGameCount,
+                  actualDisplayedGameCount == expectedDisplayedGameCount,
+                  let localeIdentifier = entry.localeIdentifier,
+                  !localeIdentifier.isEmpty,
+                  let validUntil = entry.screenshotFixtureValidUntil,
+                  widgetRenderingMode == .fullColor else {
+                return [
+                    "surround.appstore.widget.unready",
+                    family,
+                    "games-\(actualGameCount)",
+                    "expected-\(expectedGameCount)",
+                    "displaying-\(actualDisplayedGameCount)",
+                    "expected-display-\(expectedDisplayedGameCount)",
+                ].joined(separator: ".")
+            }
+            return [
+                "surround.appstore.widget.ready",
+                family,
+                "games-\(expectedGameCount)",
+                "displaying-\(expectedDisplayedGameCount)",
+                "rendering-fullColor",
+                "token-\(proofToken)",
+                "locale-\(localeIdentifier)",
+                "expires-\(Int(validUntil.timeIntervalSince1970))",
+            ].joined(separator: ".")
+        }
+
         guard entry.usesStaticClock,
               !entry.isPlaceholder,
               entry.debugMessage == nil,

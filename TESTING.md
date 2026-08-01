@@ -136,6 +136,7 @@ The output path must not already exist. Reusable build products default to the g
 - runs the selected test-plan configurations (`en-US`, `fr-FR`, `ja-JP`,
   `vi-VN`, `zh-Hans-CN`, `zh-Hant-TW`, and `ko-KR` by default);
 - captures ten portrait iPhone scenes and ten landscape iPad scenes per locale;
+- keeps the iPad app sidebar visible except in Zen mode (the Home Screen widget is captured from SpringBoard);
 - exports named XCTest attachments and uses Image I/O to bake attachment orientation into the pixel raster;
 - writes neutral orientation metadata (`1`) and current pixel dimensions;
 - validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
@@ -143,7 +144,7 @@ The output path must not already exist. Reusable build products default to the g
 
 The complete seven-locale run produces 140 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Capturing is automated, but publishing to App Store Connect is intentionally a separate manual action.
 
-To choose a different installed runtime or devices, set `APP_STORE_IOS_RUNTIME` to its exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. If an interrupted capture leaves a Debug simulator widget showing screenshot data, running the capture command again clears that stale fixture during exit cleanup. When adding a language or a scene, keep `AppStoreScreenshots.xctestplan`, `AppStoreScreenshotTests.swift`, and `.github/ci-tools/capture-app-store-screenshots.sh` in sync.
+To choose a different installed runtime or devices, set `APP_STORE_IOS_RUNTIME` to its exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. If an interrupted capture leaves a Debug simulator widget showing screenshot data, running the capture command again clears that stale fixture during exit cleanup. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
 
 ## iOS 18 and iOS 26 screenshot comparison
 
