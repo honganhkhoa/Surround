@@ -31,6 +31,30 @@
         "language" : "vi",
         "region" : "VN"
       }
+    },
+    {
+      "id" : "D5115A96-4B4E-478C-8D44-78B634F52CDE",
+      "name" : "zh-Hans-CN",
+      "options" : {
+        "language" : "zh-Hans",
+        "region" : "CN"
+      }
+    },
+    {
+      "id" : "491A2477-4AB3-418F-9118-808869FE357B",
+      "name" : "zh-Hant-TW",
+      "options" : {
+        "language" : "zh-Hant",
+        "region" : "TW"
+      }
+    },
+    {
+      "id" : "5C98BAEB-29FD-4181-95E9-A50DA2D81027",
+      "name" : "ko-KR",
+      "options" : {
+        "language" : "ko",
+        "region" : "KR"
+      }
     }
   ],
   "defaultOptions" : {

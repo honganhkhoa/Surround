@@ -1116,6 +1116,9 @@
 				ja,
 				vi,
 				fr,
+				"zh-Hans",
+				"zh-Hant",
+				ko,
 			);
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (

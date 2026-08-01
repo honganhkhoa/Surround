@@ -7,28 +7,40 @@
 
 import Foundation
 
+enum LocalizationBundleResolver {
+    static func preferredLocalization(
+        for locale: Locale,
+        from availableLocalizations: [String]
+    ) -> String? {
+        Bundle.preferredLocalizations(
+            from: availableLocalizations,
+            forPreferences: [locale.identifier]
+        ).first
+    }
+
+    static func bundle(
+        for locale: Locale?,
+        in baseBundle: Bundle = .main
+    ) -> Bundle {
+        guard let locale,
+              let localization = preferredLocalization(
+                  for: locale,
+                  from: baseBundle.localizations
+              ),
+              let path = baseBundle.path(
+                  forResource: localization,
+                  ofType: "lproj"
+              ),
+              let localizedBundle = Bundle(path: path) else {
+            return baseBundle
+        }
+        return localizedBundle
+    }
+}
+
 class TimeUtilities {
     static let shared = TimeUtilities()
     lazy var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    private func localizationBundle(for locale: Locale?) -> Bundle {
-        let languageCode: String?
-        if #available(iOS 16.0, macOS 13.0, macCatalyst 16.0, tvOS 16.0, watchOS 9.0, *) {
-            languageCode = locale?.language.languageCode?.identifier
-        } else {
-            languageCode = locale?.languageCode
-        }
-
-        guard let languageCode,
-              let path = Bundle.main.path(
-                  forResource: languageCode,
-                  ofType: "lproj"
-              ),
-              let bundle = Bundle(path: path) else {
-            return .main
-        }
-        return bundle
-    }
     
     func formatTimeLeft(
         timeLeft: Int,
@@ -45,7 +57,7 @@ class TimeUtilities {
         locale: Locale? = nil
     ) -> String {
         let resolvedLocale = locale ?? .current
-        let resolvedBundle = localizationBundle(for: locale)
+        let resolvedBundle = LocalizationBundleResolver.bundle(for: locale)
         var secondsLeft = max(Int(timeLeft), 0)
         let daysLeft = secondsLeft / 86400
         secondsLeft -= daysLeft * 86400

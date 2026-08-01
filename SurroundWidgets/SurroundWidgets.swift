@@ -108,9 +108,11 @@ class Provider: TimelineProvider {
     private func localizedNoGamesMessage(
         localeIdentifier: String?
     ) -> String {
-        let locale = localeIdentifier.map(Locale.init(identifier:)) ?? .current
+        let explicitLocale = localeIdentifier.map(Locale.init(identifier:))
+        let locale = explicitLocale ?? .current
         return String(
             localized: "You don't have any correspondence games at the moment.",
+            bundle: LocalizationBundleResolver.bundle(for: explicitLocale),
             locale: locale,
             comment: "Correspondence Games Widget error"
         )
@@ -376,9 +378,13 @@ struct CorrespondenceGamesWidgetView : View {
     }
 
     private var suddenDeathLabel: String {
-        let locale = entry.localeIdentifier.map(Locale.init(identifier:))
-            ?? .current
-        return String(localized: "SD", locale: locale)
+        let explicitLocale = entry.localeIdentifier.map(Locale.init(identifier:))
+        let locale = explicitLocale ?? .current
+        return String(
+            localized: "SD",
+            bundle: LocalizationBundleResolver.bundle(for: explicitLocale),
+            locale: locale
+        )
     }
     
     func timer(game: Game) -> some View {

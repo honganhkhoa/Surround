@@ -127,20 +127,21 @@ output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
   --locale en-US
 ```
 
-`--locale` is repeatable. When it is omitted, the runner captures all four supported localizations.
+`--locale` is repeatable. When it is omitted, the runner captures all seven supported localizations.
 
 The output path must not already exist. Reusable build products default to the gitignored `.build/AppStoreScreenshotDerivedData` directory; pass `--derived-data` only to put that cache elsewhere. The runner:
 
 - selects an accepted 6.9-inch iPhone and 13-inch iPad simulator from the latest installed iOS runtime;
 - pins the status bar for repeatable output;
-- runs the selected test-plan configurations (`en-US`, `fr-FR`, `ja-JP`, and `vi-VN` by default);
+- runs the selected test-plan configurations (`en-US`, `fr-FR`, `ja-JP`,
+  `vi-VN`, `zh-Hans-CN`, `zh-Hant-TW`, and `ko-KR` by default);
 - captures ten portrait iPhone scenes and ten landscape iPad scenes per locale;
 - exports named XCTest attachments and uses Image I/O to bake attachment orientation into the pixel raster;
 - writes neutral orientation metadata (`1`) and current pixel dimensions;
 - validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
 - clears the screenshot widget fixture and status-bar overrides during teardown, then returns any simulator it booted to the shutdown state.
 
-The complete four-locale run produces 80 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Capturing is automated, but publishing to App Store Connect is intentionally a separate manual action.
+The complete seven-locale run produces 140 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Capturing is automated, but publishing to App Store Connect is intentionally a separate manual action.
 
 To choose a different installed runtime or devices, set `APP_STORE_IOS_RUNTIME` to its exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. If an interrupted capture leaves a Debug simulator widget showing screenshot data, running the capture command again clears that stale fixture during exit cleanup. When adding a language or a scene, keep `AppStoreScreenshots.xctestplan`, `AppStoreScreenshotTests.swift`, and `.github/ci-tools/capture-app-store-screenshots.sh` in sync.
 

@@ -6,6 +6,16 @@
 import XCTest
 
 final class TimeUtilitiesTests: XCTestCase {
+    private let supportedLocalizations = [
+        "en",
+        "fr",
+        "ja",
+        "vi",
+        "zh-Hans",
+        "zh-Hant",
+        "ko",
+    ]
+
     // The catalog abbreviates some English forms ("5 days left" ships as "5 days",
     // "%lldh left" pluralizes), and the unit-test bundle can only resolve the
     // source-language fallback. Expectations for those strings are therefore built
@@ -42,6 +52,25 @@ final class TimeUtilitiesTests: XCTestCase {
         XCTAssertEqual(timeString(timeLeft: TimeInterval(-0.5)), "00:00")
     }
 
+    func testPreferredLocalizationPreservesChineseScript() {
+        XCTAssertEqual(preferredLocalization(for: "zh-Hans-CN"), "zh-Hans")
+        XCTAssertEqual(preferredLocalization(for: "zh_CN"), "zh-Hans")
+        XCTAssertEqual(preferredLocalization(for: "zh-Hant-TW"), "zh-Hant")
+        XCTAssertEqual(preferredLocalization(for: "zh_TW"), "zh-Hant")
+        XCTAssertEqual(preferredLocalization(for: "zh_HK"), "zh-Hant")
+    }
+
+    func testPreferredLocalizationMatchesKoreanAndExistingLanguages() {
+        XCTAssertEqual(preferredLocalization(for: "ko-KR"), "ko")
+        XCTAssertEqual(preferredLocalization(for: "fr-CA"), "fr")
+        XCTAssertEqual(preferredLocalization(for: "ja-JP"), "ja")
+        XCTAssertEqual(preferredLocalization(for: "vi-VN"), "vi")
+    }
+
+    func testPreferredLocalizationFallsBackToDevelopmentLanguage() {
+        XCTAssertEqual(preferredLocalization(for: "es-ES"), "en")
+    }
+
     private func hoursLeft(_ hours: Int) -> String {
         String(localized: "\(hours)h left")
     }
@@ -52,5 +81,12 @@ final class TimeUtilitiesTests: XCTestCase {
 
     private func daysAndHours(_ days: Int, _ hours: Int) -> String {
         String(localized: "\(daysLeft(days)) \(hoursLeft(hours))")
+    }
+
+    private func preferredLocalization(for localeIdentifier: String) -> String? {
+        LocalizationBundleResolver.preferredLocalization(
+            for: Locale(identifier: localeIdentifier),
+            from: supportedLocalizations
+        )
     }
 }
