@@ -7,6 +7,9 @@ readonly scheme_name="AppStoreScreenshots"
 readonly test_plan_name="AppStoreScreenshots"
 readonly test_identifier="SurroundUITests/AppStoreScreenshotTests/testAppStoreScreenshots"
 readonly app_bundle_identifier="com.honganhkhoa.Surround"
+readonly widget_bundle_identifier="com.honganhkhoa.Surround.SurroundWidgets"
+readonly widget_kind_identifier="com.honganhkhoa.Surround.CorrespondenceWidget"
+readonly default_app_store_ios_runtime="com.apple.CoreSimulator.SimRuntime.iOS-26-5"
 readonly widget_fixture_cleanup_launch_argument="--clear-app-store-screenshot-widget-fixture"
 readonly status_bar_offset="$(
   date -j -f "%Y-%m-%d %H:%M:%S" "2007-01-09 09:41:00" "+%z"
@@ -92,11 +95,13 @@ Options:
 
 Environment overrides:
   APP_STORE_IPHONE_DEVICE  Exact name of an available 6.9-inch-bucket iPhone
-                           simulator in the selected iOS runtime.
+                           simulator to use as the disposable device template.
   APP_STORE_IPAD_DEVICE    Exact name of an available 13-inch-bucket iPad
-                           simulator in that runtime.
+                           simulator to use as the disposable device template.
   APP_STORE_IOS_RUNTIME    Exact identifier, version, or name of an available
-                           iOS runtime. Defaults to the latest installed one.
+                           iOS runtime. Defaults to the pinned iOS 26.5 App
+                           Store submission runtime. Override deliberately
+                           when updating the submission runtime.
 
 The AppStoreScreenshots test plan must contain configurations named en-US,
 fr-FR, ja-JP, vi-VN, zh-Hans-CN, zh-Hant-TW, and ko-KR. For example, pass
@@ -109,10 +114,9 @@ The output contains the .xcresult bundle, raw exported attachments, validated
 screenshots grouped as screenshots/<locale>/<device-family>/, run metadata,
 the xcodebuild log, and an index.html review gallery.
 
-Selected simulators are preserved. On exit, the script removes its App Store
-screenshot widget fixture, clears status-bar overrides, and returns any
-simulator it booted to the shutdown state. Running it again also clears stale
-screenshot data left in a Debug widget by an interrupted capture.
+Selected simulators are preserved and used only as device-type templates. The
+script creates fresh disposable iPhone and iPad simulators for deterministic
+Home Screen state, then deletes them on exit.
 EOF
 }
 
@@ -184,7 +188,12 @@ select_device() {
             | select(.name == $name)
           ]
           | first
-          | if . == null then empty else [.udid, .name, .state] | @tsv end
+          | if . == null then empty else [
+              .udid,
+              .name,
+              .state,
+              .deviceTypeIdentifier
+            ] | @tsv end
         ' <<<"$available_devices_json"
     )"
 
@@ -217,7 +226,12 @@ select_device() {
               )
           ]
           | first
-          | if . == null then empty else [.udid, .name, .state] | @tsv end
+          | if . == null then empty else [
+              .udid,
+              .name,
+              .state,
+              .deviceTypeIdentifier
+            ] | @tsv end
         ' <<<"$available_devices_json"
     )"
 
@@ -270,58 +284,495 @@ boot_device() {
   xcrun simctl bootstatus "$device_id" -b
 }
 
+shutdown_device() {
+  local device_id="$1"
+  local device_name="$2"
+  local state
+
+  state="$(
+    xcrun simctl list --json devices \
+      | jq -r --arg id "$device_id" '
+          [
+            .devices[][]
+            | select(.udid == $id)
+            | .state
+          ]
+          | first // empty
+        '
+  )"
+
+  [[ -n "$state" ]] \
+    || fail "Could not read simulator state for ${device_name} (${device_id})."
+  if [[ "$state" == "Booted" ]]; then
+    echo "Shutting down ${device_name} (${device_id})..."
+    xcrun simctl shutdown "$device_id"
+  fi
+}
+
+simulator_data_path() {
+  local device_id="$1"
+
+  xcrun simctl list --json devices \
+    | jq -r --arg id "$device_id" '
+        [
+          .devices[][]
+          | select(.udid == $id)
+          | .dataPath
+        ]
+        | first // empty
+      '
+}
+
+prepare_isolated_iphone_home_screen() {
+  local device_id="$1"
+  local device_name="$2"
+  local app_path="$3"
+  local ui_test_runner_path="$4"
+  local data_path
+  local icon_state_path
+  local icon_state_json=""
+  local icon_position=""
+  local source_page_index
+  local source_item_index
+  local isolated_page_identifier
+  local widget_display_identifier
+  local widget_unique_identifier
+  local attempt
+
+  echo "Preinstalling screenshot products on ${device_name}..."
+  xcrun simctl install "$device_id" "$app_path"
+  xcrun simctl install "$device_id" "$ui_test_runner_path"
+
+  data_path="$(simulator_data_path "$device_id")"
+  [[ -n "$data_path" ]] \
+    || fail "Could not locate data for disposable simulator ${device_name} (${device_id})."
+  icon_state_path="${data_path}/Library/SpringBoard/IconState.plist"
+
+  for (( attempt = 0; attempt < 20; attempt++ )); do
+    if [[ -f "$icon_state_path" ]]; then
+      icon_state_json="$(
+        plutil -convert json -o - "$icon_state_path" 2>/dev/null \
+          || true
+      )"
+      icon_position="$(
+        jq -r \
+          --arg bundle_id "$app_bundle_identifier" '
+            [
+              .iconLists
+              | to_entries[]
+              | .key as $page
+              | .value
+              | to_entries[]
+              | select(.value == $bundle_id)
+              | [$page, .key]
+              | @tsv
+            ]
+            | if length == 1 then first else empty end
+          ' <<<"$icon_state_json"
+      )"
+      [[ -n "$icon_position" ]] && break
+    fi
+    sleep 0.25
+  done
+
+  [[ -n "$icon_position" ]] \
+    || fail "Could not find ${app_bundle_identifier} in ${device_name}'s Home Screen layout."
+  IFS=$'\t' read -r source_page_index source_item_index <<<"$icon_position"
+  isolated_page_identifier="$(uuidgen)"
+  widget_display_identifier="$(uuidgen)"
+  widget_unique_identifier="$(uuidgen)"
+
+  [[ "$source_page_index" =~ ^[0-9]+$ ]] \
+    || fail "Invalid source Home Screen page index: ${source_page_index}"
+  [[ "$source_item_index" =~ ^[0-9]+$ ]] \
+    || fail "Invalid source Home Screen item index: ${source_item_index}"
+
+  echo "Preparing an isolated Surround widget page on ${device_name}..."
+  shutdown_device "$device_id" "$device_name"
+  jq -e \
+    --arg app_bundle "$app_bundle_identifier" \
+    --arg widget_bundle "$widget_bundle_identifier" \
+    --arg widget_kind "$widget_kind_identifier" \
+    --arg page_identifier "$isolated_page_identifier" \
+    --arg display_identifier "$widget_display_identifier" \
+    --arg widget_unique_identifier "$widget_unique_identifier" \
+    --argjson source_page "$source_page_index" \
+    --argjson source_item "$source_item_index" '
+      if (.iconLists | length) != (.listUniqueIdentifiers | length) then
+        error("Home Screen page identifiers are out of sync")
+      else
+        .
+      end
+      | .iconLists[$source_page] |= del(.[$source_item])
+      | [
+          range(0; (.iconLists | length)) as $index
+          | {
+              icons: (
+                .iconLists[$index]
+                | map(
+                    select(
+                      (type != "object")
+                      or (.widgetIdentifier? != $widget_kind)
+                    )
+                  )
+              ),
+              identifier: .listUniqueIdentifiers[$index]
+            }
+          | select(.icons | length > 0)
+        ] as $retained_pages
+      | .iconLists = (
+          ($retained_pages | map(.icons))
+          + [[
+              {
+                widgetIdentifier: $widget_kind,
+                elementType: "widget",
+                containerBundleIdentifier: $app_bundle,
+                bundleIdentifier: $widget_bundle,
+                displayIdentifier: $display_identifier,
+                allowsExternalSuggestions: true,
+                uniqueIdentifier: $widget_unique_identifier,
+                allowsSuggestions: true,
+                gridSize: "medium",
+                iconType: "custom"
+              },
+              $app_bundle
+            ]]
+        )
+      | .listUniqueIdentifiers = (
+          ($retained_pages | map(.identifier))
+          + [$page_identifier]
+        )
+    ' <<<"$icon_state_json" \
+    | plutil -convert binary1 -o "$icon_state_path" -
+  plutil -lint "$icon_state_path" >/dev/null
+
+  icon_state_json="$(plutil -convert json -o - "$icon_state_path")"
+  jq -e \
+    --arg app_bundle "$app_bundle_identifier" \
+    --arg widget_bundle "$widget_bundle_identifier" \
+    --arg widget_kind "$widget_kind_identifier" '
+      (.iconLists[-1] | length == 2)
+      and (.iconLists[-1][1] == $app_bundle)
+      and (
+        .iconLists[-1][0]
+        | .elementType == "widget"
+        and .widgetIdentifier == $widget_kind
+        and .containerBundleIdentifier == $app_bundle
+        and .bundleIdentifier == $widget_bundle
+        and .gridSize == "medium"
+      )
+      and (
+        (.listUniqueIdentifiers | length)
+        == (.iconLists | length)
+      )
+      and (
+        [
+          .iconLists[]
+          | .[]
+          | select(. == $app_bundle)
+        ]
+        | length == 1
+      )
+      and (
+        [
+          .iconLists[]
+          | .[]
+          | select(type == "object")
+          | select(.widgetIdentifier? == $widget_kind)
+        ]
+        | length == 1
+      )
+    ' <<<"$icon_state_json" >/dev/null \
+    || fail "The isolated Surround iPhone widget layout failed validation."
+
+  boot_device "$device_id" "$device_name"
+}
+
+prepare_isolated_ipad_home_screen() {
+  local device_id="$1"
+  local device_name="$2"
+  local app_path="$3"
+  local ui_test_runner_path="$4"
+  local data_path
+  local icon_state_path
+  local icon_state_json=""
+  local icon_position=""
+  local source_page_index
+  local source_item_index
+  local isolated_page_index
+  local isolated_page_identifier
+  local widget_display_identifier
+  local widget_unique_identifier
+  local attempt
+
+  echo "Preinstalling screenshot products on ${device_name}..."
+  xcrun simctl install "$device_id" "$app_path"
+  xcrun simctl install "$device_id" "$ui_test_runner_path"
+
+  data_path="$(simulator_data_path "$device_id")"
+  [[ -n "$data_path" ]] \
+    || fail "Could not locate data for disposable simulator ${device_name} (${device_id})."
+  icon_state_path="${data_path}/Library/SpringBoard/IconState.plist"
+
+  for (( attempt = 0; attempt < 20; attempt++ )); do
+    if [[ -f "$icon_state_path" ]]; then
+      icon_state_json="$(
+        plutil -convert json -o - "$icon_state_path" 2>/dev/null \
+          || true
+      )"
+      icon_position="$(
+        jq -r \
+          --arg bundle_id "$app_bundle_identifier" '
+            [
+              .iconLists
+              | to_entries[]
+              | .key as $page
+              | .value
+              | to_entries[]
+              | select(.value == $bundle_id)
+              | [$page, .key]
+              | @tsv
+            ]
+            | if length == 1 then first else empty end
+          ' <<<"$icon_state_json"
+      )"
+      [[ -n "$icon_position" ]] && break
+    fi
+    sleep 0.25
+  done
+
+  [[ -n "$icon_position" ]] \
+    || fail "Could not find ${app_bundle_identifier} in ${device_name}'s Home Screen layout."
+  jq -e \
+    --arg widget_kind "$widget_kind_identifier" '
+      [
+        .iconLists[]
+        | .[]
+        | select(type == "object")
+        | select(.widgetIdentifier? == $widget_kind)
+      ]
+      | length == 0
+    ' <<<"$icon_state_json" >/dev/null \
+    || fail "The disposable iPad unexpectedly already contains the Surround widget."
+
+  IFS=$'\t' read -r source_page_index source_item_index <<<"$icon_position"
+  isolated_page_index="$(jq -r '.iconLists | length' <<<"$icon_state_json")"
+  isolated_page_identifier="$(uuidgen)"
+  widget_display_identifier="$(uuidgen)"
+  widget_unique_identifier="$(uuidgen)"
+
+  [[ "$source_page_index" =~ ^[0-9]+$ ]] \
+    || fail "Invalid source Home Screen page index: ${source_page_index}"
+  [[ "$source_item_index" =~ ^[0-9]+$ ]] \
+    || fail "Invalid source Home Screen item index: ${source_item_index}"
+  [[ "$isolated_page_index" =~ ^[0-9]+$ ]] \
+    || fail "Invalid isolated Home Screen page index: ${isolated_page_index}"
+
+  echo "Preparing an isolated Surround widget page on ${device_name}..."
+  shutdown_device "$device_id" "$device_name"
+  jq -e \
+    --arg app_bundle "$app_bundle_identifier" \
+    --arg widget_bundle "$widget_bundle_identifier" \
+    --arg widget_kind "$widget_kind_identifier" \
+    --arg page_identifier "$isolated_page_identifier" \
+    --arg display_identifier "$widget_display_identifier" \
+    --arg widget_unique_identifier "$widget_unique_identifier" \
+    --argjson source_page "$source_page_index" \
+    --argjson source_item "$source_item_index" '
+      .iconLists[$source_page] |= del(.[$source_item])
+      | .iconLists += [[
+          {
+            widgetIdentifier: $widget_kind,
+            elementType: "widget",
+            containerBundleIdentifier: $app_bundle,
+            bundleIdentifier: $widget_bundle,
+            displayIdentifier: $display_identifier,
+            allowsExternalSuggestions: true,
+            uniqueIdentifier: $widget_unique_identifier,
+            allowsSuggestions: true,
+            gridSize: "medium",
+            iconType: "custom"
+          },
+          $app_bundle
+        ]]
+      | .listUniqueIdentifiers += [$page_identifier]
+    ' <<<"$icon_state_json" \
+    | plutil -convert binary1 -o "$icon_state_path" -
+  plutil -lint "$icon_state_path" >/dev/null
+
+  icon_state_json="$(plutil -convert json -o - "$icon_state_path")"
+  jq -e \
+    --arg app_bundle "$app_bundle_identifier" \
+    --arg widget_bundle "$widget_bundle_identifier" \
+    --arg widget_kind "$widget_kind_identifier" \
+    --argjson page "$isolated_page_index" '
+      (.iconLists[$page] | length == 2)
+      and (.iconLists[$page][1] == $app_bundle)
+      and (
+        .iconLists[$page][0]
+        | .elementType == "widget"
+        and .widgetIdentifier == $widget_kind
+        and .containerBundleIdentifier == $app_bundle
+        and .bundleIdentifier == $widget_bundle
+        and .gridSize == "medium"
+      )
+      and (
+        (.listUniqueIdentifiers | length)
+        == (.iconLists | length)
+      )
+    ' <<<"$icon_state_json" >/dev/null \
+    || fail "The isolated Surround iPad widget layout failed validation."
+
+  boot_device "$device_id" "$device_name"
+}
+
 status_bar_device_ids=()
 shutdown_device_ids=()
 cleanup_device_ids=()
+delete_device_ids=()
+
+run_bounded_cleanup() {
+  local timeout_seconds="$1"
+  shift
+
+  local command_pid
+  local deadline
+  local attempt
+
+  "$@" &
+  command_pid=$!
+  deadline=$((SECONDS + timeout_seconds))
+
+  while kill -0 "$command_pid" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      kill -TERM "$command_pid" >/dev/null 2>&1 || true
+      for (( attempt = 0; attempt < 10; attempt++ )); do
+        kill -0 "$command_pid" >/dev/null 2>&1 || break
+        sleep 0.1
+      done
+      if kill -0 "$command_pid" >/dev/null 2>&1; then
+        kill -KILL "$command_pid" >/dev/null 2>&1 || true
+      fi
+      wait "$command_pid" >/dev/null 2>&1 || true
+      return 124
+    fi
+    sleep 0.1
+  done
+
+  wait "$command_pid"
+}
+
+device_id_is_tracked() {
+  local sought_device_id="$1"
+  shift
+
+  local tracked_device_id
+  for tracked_device_id in "$@"; do
+    if [[ "$tracked_device_id" == "$sought_device_id" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
 
 restore_simulators() {
   local saved_exit_code=$?
   local device_id
+  local devices_json
+  local state
 
   trap - EXIT
   set +e
 
-  if (( ${#cleanup_device_ids[@]} > 0 )); then
-    for device_id in "${cleanup_device_ids[@]}"; do
-      if xcrun simctl launch \
-        --terminate-running-process \
-        "$device_id" \
-        "$app_bundle_identifier" \
-        "$widget_fixture_cleanup_launch_argument" >/dev/null 2>&1; then
-        if ! xcrun simctl terminate \
-          "$device_id" \
-          "$app_bundle_identifier" >/dev/null 2>&1; then
-          echo "warning: Could not terminate the fixture-cleanup app on ${device_id}." >&2
+  if (( ${#delete_device_ids[@]} == 0 )); then
+    exit "$saved_exit_code"
+  fi
+
+  for device_id in "${delete_device_ids[@]}"; do
+    state=""
+    if ! devices_json="$(
+      run_bounded_cleanup 15 xcrun simctl list --json devices 2>/dev/null
+    )"; then
+      echo "warning: Could not query simulator state for ${device_id} during teardown." >&2
+    else
+      if ! state="$(
+        jq -r --arg id "$device_id" '
+          [
+            .devices[][]
+            | select(.udid == $id)
+            | .state
+          ]
+          | first // empty
+        ' <<<"$devices_json" 2>/dev/null
+      )"; then
+        echo "warning: Could not read simulator state for ${device_id} during teardown." >&2
+      elif [[ -z "$state" ]]; then
+        continue
+      elif [[ "$state" == "Booted" ]]; then
+        if (( ${#cleanup_device_ids[@]} > 0 )) \
+          && device_id_is_tracked "$device_id" "${cleanup_device_ids[@]}"; then
+          if run_bounded_cleanup 15 xcrun simctl launch \
+            --terminate-running-process \
+            "$device_id" \
+            "$app_bundle_identifier" \
+            "$widget_fixture_cleanup_launch_argument" >/dev/null 2>&1; then
+            if ! run_bounded_cleanup 15 xcrun simctl terminate \
+              "$device_id" \
+              "$app_bundle_identifier" >/dev/null 2>&1; then
+              echo "warning: Could not terminate the fixture-cleanup app on ${device_id}." >&2
+            fi
+          else
+            echo "warning: Could not clear the App Store screenshot widget fixture on ${device_id}." >&2
+          fi
         fi
-      else
-        echo "warning: Could not clear the App Store screenshot widget fixture on ${device_id}." >&2
-      fi
-    done
-  fi
 
-  if (( ${#status_bar_device_ids[@]} > 0 )); then
-    for device_id in "${status_bar_device_ids[@]}"; do
-      if ! xcrun simctl status_bar "$device_id" clear >/dev/null 2>&1; then
-        echo "warning: Could not clear the status-bar override for ${device_id}." >&2
-      fi
-    done
-  fi
+        if (( ${#status_bar_device_ids[@]} > 0 )) \
+          && device_id_is_tracked "$device_id" "${status_bar_device_ids[@]}"; then
+          if ! run_bounded_cleanup 15 \
+            xcrun simctl status_bar "$device_id" clear >/dev/null 2>&1; then
+            echo "warning: Could not clear the status-bar override for ${device_id}." >&2
+          fi
+        fi
 
-  if (( ${#shutdown_device_ids[@]} > 0 )); then
-    for device_id in "${shutdown_device_ids[@]}"; do
-      if ! xcrun simctl shutdown "$device_id" >/dev/null 2>&1; then
-        echo "warning: Could not restore the shutdown state for ${device_id}." >&2
+        if (( ${#shutdown_device_ids[@]} > 0 )) \
+          && device_id_is_tracked "$device_id" "${shutdown_device_ids[@]}"; then
+          if ! run_bounded_cleanup 30 \
+            xcrun simctl shutdown "$device_id" >/dev/null 2>&1; then
+            echo "warning: Could not restore the shutdown state for ${device_id}." >&2
+          fi
+        fi
+      elif [[ "$state" != "Shutdown" ]]; then
+        echo "warning: Simulator ${device_id} was in unexpected state '${state}' during teardown." >&2
       fi
-    done
-  fi
+    fi
+
+    if ! run_bounded_cleanup 30 \
+      xcrun simctl delete "$device_id" >/dev/null 2>&1; then
+      echo "warning: Could not delete disposable simulator ${device_id}." >&2
+    fi
+  done
 
   exit "$saved_exit_code"
 }
 
 pin_status_bar() {
   local device_id="$1"
+  local tracked_device_id
+  local is_tracked=false
 
-  status_bar_device_ids+=("$device_id")
+  if (( ${#status_bar_device_ids[@]} > 0 )); then
+    for tracked_device_id in "${status_bar_device_ids[@]}"; do
+      if [[ "$tracked_device_id" == "$device_id" ]]; then
+        is_tracked=true
+        break
+      fi
+    done
+  fi
+
+  if [[ "$is_tracked" == false ]]; then
+    status_bar_device_ids+=("$device_id")
+  fi
   xcrun simctl status_bar "$device_id" override \
     --time "$status_bar_date_time" \
     --batteryState charged \
@@ -530,8 +981,10 @@ derived_data_path="$(cd "$derived_data_argument" && pwd -P)"
 
 require_command awk
 require_command jq
+require_command plutil
 require_command sips
 require_command tee
+require_command uuidgen
 require_command xcodebuild
 require_command xcrun
 
@@ -565,7 +1018,7 @@ if ! [[ "$xcode_major_version" =~ ^[0-9]+$ ]] || (( xcode_major_version < 26 ));
   fail "Xcode 26 or newer is required; selected Xcode is ${xcode_version:-unknown}."
 fi
 
-runtime_override="${APP_STORE_IOS_RUNTIME:-}"
+runtime_override="${APP_STORE_IOS_RUNTIME:-$default_app_store_ios_runtime}"
 runtime_line="$(
   xcrun simctl list --json runtimes \
     | jq -r \
@@ -575,8 +1028,7 @@ runtime_line="$(
           | select(.isAvailable == true)
           | select(.identifier | contains(".SimRuntime.iOS-"))
           | select(
-              $override == ""
-              or .identifier == $override
+              .identifier == $override
               or .version == $override
               or .name == $override
             )
@@ -596,10 +1048,7 @@ runtime_line="$(
 
 [[ -n "$runtime_line" ]] || {
   xcrun simctl list runtimes >&2
-  if [[ -n "$runtime_override" ]]; then
-    fail "No available iOS simulator runtime matches APP_STORE_IOS_RUNTIME='${runtime_override}'."
-  fi
-  fail "No available iOS simulator runtime is installed."
+  fail "The pinned App Store screenshot runtime '${runtime_override}' is unavailable. Install it or deliberately set APP_STORE_IOS_RUNTIME to another available runtime."
 }
 
 IFS=$'\t' read -r runtime_identifier runtime_version runtime_name <<<"$runtime_line"
@@ -623,35 +1072,64 @@ ipad_line="$(
     "${preferred_ipad_names[@]}"
 )" || exit 1
 
-IFS=$'\t' read -r iphone_id iphone_name iphone_initial_state <<<"$iphone_line"
-IFS=$'\t' read -r ipad_id ipad_name ipad_initial_state <<<"$ipad_line"
+IFS=$'\t' read -r \
+  iphone_template_id \
+  iphone_template_name \
+  iphone_template_state \
+  iphone_device_type_identifier <<<"$iphone_line"
+IFS=$'\t' read -r \
+  ipad_template_id \
+  ipad_template_name \
+  ipad_template_state \
+  ipad_device_type_identifier <<<"$ipad_line"
 
-[[ "$iphone_id" != "$ipad_id" ]] \
+[[ "$iphone_template_id" != "$ipad_template_id" ]] \
   || fail "The selected iPhone and iPad destinations unexpectedly have the same identifier."
+[[ -n "$iphone_device_type_identifier" ]] \
+  || fail "The selected iPhone template has no device type identifier."
+[[ -n "$ipad_device_type_identifier" ]] \
+  || fail "The selected iPad template has no device type identifier."
 
-echo "Selected iPhone: ${iphone_name} (${iphone_id})"
-echo "Selected iPad:   ${ipad_name} (${ipad_id})"
-
-cleanup_device_ids=("$iphone_id" "$ipad_id")
-
-if [[ "$iphone_initial_state" != "Booted" ]]; then
-  shutdown_device_ids+=("$iphone_id")
-fi
-if [[ "$ipad_initial_state" != "Booted" ]]; then
-  shutdown_device_ids+=("$ipad_id")
-fi
+echo "Selected iPhone template: ${iphone_template_name} (${iphone_template_id})"
+echo "Selected iPad template:   ${ipad_template_name} (${ipad_template_id})"
 
 trap restore_simulators EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-boot_device "$iphone_id" "$iphone_name"
-boot_device "$ipad_id" "$ipad_name"
+iphone_name="Surround App Store iPhone $$"
+iphone_id="$(
+  xcrun simctl create \
+    "$iphone_name" \
+    "$iphone_device_type_identifier" \
+    "$runtime_identifier"
+)"
+[[ "$iphone_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] \
+  || fail "Could not create a disposable iPhone simulator."
+delete_device_ids+=("$iphone_id")
 
-pin_status_bar "$iphone_id"
-pin_status_bar "$ipad_id"
+ipad_name="Surround App Store iPad $$"
+ipad_id="$(
+  xcrun simctl create \
+    "$ipad_name" \
+    "$ipad_device_type_identifier" \
+    "$runtime_identifier"
+)"
+[[ "$ipad_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] \
+  || fail "Could not create a disposable iPad simulator."
+delete_device_ids+=("$ipad_id")
+
+echo "Created disposable iPhone: ${iphone_name} (${iphone_id})"
+echo "Created disposable iPad:   ${ipad_name} (${ipad_id})"
+
+cleanup_device_ids=("$iphone_id" "$ipad_id")
+shutdown_device_ids=("$iphone_id" "$ipad_id")
+
+boot_device "$iphone_id" "$iphone_name"
 
 result_bundle_path="${output_root}/AppStoreScreenshots.xcresult"
+locale_result_bundles_path="${output_root}/locale-results"
+destination_result_bundles_path="${output_root}/destination-results"
 raw_attachments_path="${output_root}/attachments"
 screenshots_path="${output_root}/screenshots"
 xcodebuild_log_path="${output_root}/xcodebuild.log"
@@ -659,29 +1137,118 @@ records_path="${output_root}/screenshot-attachments.tsv"
 gallery_path="${output_root}/index.html"
 metadata_path="${output_root}/run-metadata.json"
 
-xcodebuild_configuration_arguments=()
-for locale in "${selected_locales[@]}"; do
-  xcodebuild_configuration_arguments+=(
-    -only-test-configuration
-    "$locale"
-  )
-done
-
-echo "Running ${test_identifier} across ${#selected_locales[@]} locale(s) and 2 destinations..."
+echo "Building screenshot products before preparing the disposable Home Screen..."
 set -o pipefail
-xcodebuild test \
+xcodebuild build-for-testing \
   -project "$project_path" \
   -scheme "$scheme_name" \
   -testPlan "$test_plan_name" \
   -configuration Debug \
   -destination "platform=iOS Simulator,id=${iphone_id}" \
-  -destination "platform=iOS Simulator,id=${ipad_id}" \
   -derivedDataPath "$derived_data_path" \
-  -resultBundlePath "$result_bundle_path" \
   -parallel-testing-enabled NO \
-  "${xcodebuild_configuration_arguments[@]}" \
   "-only-testing:${test_identifier}" \
   2>&1 | tee "$xcodebuild_log_path"
+
+built_products_path="${derived_data_path}/Build/Products/Debug-iphonesimulator"
+screenshot_app_path="${built_products_path}/Surround.app"
+ui_test_runner_path="${built_products_path}/SurroundUITests-Runner.app"
+[[ -d "$screenshot_app_path" ]] \
+  || fail "Built screenshot app was not found: ${screenshot_app_path}"
+[[ -d "$ui_test_runner_path" ]] \
+  || fail "Built screenshot UI-test runner was not found: ${ui_test_runner_path}"
+
+locale_result_bundle_paths=()
+mkdir -p "$destination_result_bundles_path"
+if (( ${#selected_locales[@]} > 1 )); then
+  mkdir -p "$locale_result_bundles_path"
+fi
+
+shutdown_device "$iphone_id" "$iphone_name"
+boot_device "$ipad_id" "$ipad_name"
+prepare_isolated_ipad_home_screen \
+  "$ipad_id" \
+  "$ipad_name" \
+  "$screenshot_app_path" \
+  "$ui_test_runner_path"
+shutdown_device "$ipad_id" "$ipad_name"
+
+for locale in "${selected_locales[@]}"; do
+  if (( ${#selected_locales[@]} == 1 )); then
+    locale_result_bundle_path="$result_bundle_path"
+  else
+    locale_result_bundle_path="${locale_result_bundles_path}/${locale}.xcresult"
+  fi
+  locale_result_bundle_paths+=("$locale_result_bundle_path")
+
+  ipad_result_bundle_path="${destination_result_bundles_path}/${locale}-ipad.xcresult"
+  iphone_result_bundle_path="${destination_result_bundles_path}/${locale}-iphone.xcresult"
+
+  # On iPadOS 26, SpringBoard can remain non-quiescent when Xcode owns multiple
+  # simulator destinations in one test operation. Run each family in its own
+  # invocation, with the other disposable simulator shut down. The pre-seeded
+  # medium widget also keeps the test out of the widget gallery entirely.
+  boot_device "$ipad_id" "$ipad_name"
+  pin_status_bar "$ipad_id"
+
+  echo "Running ${test_identifier} for ${locale} on iPad..."
+  set -o pipefail
+  xcodebuild test-without-building \
+    -project "$project_path" \
+    -scheme "$scheme_name" \
+    -testPlan "$test_plan_name" \
+    -configuration Debug \
+    -destination "platform=iOS Simulator,id=${ipad_id}" \
+    -derivedDataPath "$derived_data_path" \
+    -resultBundlePath "$ipad_result_bundle_path" \
+    -parallel-testing-enabled NO \
+    -only-test-configuration "$locale" \
+    "-only-testing:${test_identifier}" \
+    2>&1 | tee -a "$xcodebuild_log_path"
+  shutdown_device "$ipad_id" "$ipad_name"
+
+  # XCTest reinstalls the app between test-plan configurations, which can reset
+  # SpringBoard's icon placement. Replace any prior Surround widget placement,
+  # then prepare and validate a fresh isolated medium-widget page immediately
+  # before each single-configuration invocation.
+  boot_device "$iphone_id" "$iphone_name"
+  prepare_isolated_iphone_home_screen \
+    "$iphone_id" \
+    "$iphone_name" \
+    "$screenshot_app_path" \
+    "$ui_test_runner_path"
+
+  pin_status_bar "$iphone_id"
+
+  echo "Running ${test_identifier} for ${locale} on iPhone..."
+  set -o pipefail
+  xcodebuild test-without-building \
+    -project "$project_path" \
+    -scheme "$scheme_name" \
+    -testPlan "$test_plan_name" \
+    -configuration Debug \
+    -destination "platform=iOS Simulator,id=${iphone_id}" \
+    -derivedDataPath "$derived_data_path" \
+    -resultBundlePath "$iphone_result_bundle_path" \
+    -parallel-testing-enabled NO \
+    -only-test-configuration "$locale" \
+    "-only-testing:${test_identifier}" \
+    2>&1 | tee -a "$xcodebuild_log_path"
+  shutdown_device "$iphone_id" "$iphone_name"
+
+  echo "Merging ${locale} iPad and iPhone result bundles..."
+  xcrun xcresulttool merge \
+    "$ipad_result_bundle_path" \
+    "$iphone_result_bundle_path" \
+    --output-path "$locale_result_bundle_path"
+done
+
+if (( ${#locale_result_bundle_paths[@]} > 1 )); then
+  echo "Merging ${#locale_result_bundle_paths[@]} locale result bundles..."
+  xcrun xcresulttool merge \
+    "${locale_result_bundle_paths[@]}" \
+    --output-path "$result_bundle_path"
+fi
 
 echo "Exporting XCTest attachments..."
 xcrun xcresulttool export attachments \

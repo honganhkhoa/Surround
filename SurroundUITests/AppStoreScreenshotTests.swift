@@ -589,19 +589,19 @@ final class AppStoreScreenshotTests: XCTestCase {
         }
         assertFreshAppStoreWidgetFixture(in: springboard)
 
-        let unwantedIcons = visibleHomeScreenIcons(
+        let unwantedContent = visibleHomeScreenContent(
             in: springboard,
             homeScreenIcons: homeScreenIcons
         )
         .filter { $0.identifier != "Surround" }
-        if !unwantedIcons.isEmpty {
+        if !unwantedContent.isEmpty {
             keepSpringBoardDiagnostics(
                 springboard,
                 name: "Unexpected content on Surround Home Screen page"
             )
         }
         XCTAssertTrue(
-            unwantedIcons.isEmpty,
+            unwantedContent.isEmpty,
             "Expected no other apps or widgets on the Surround Home Screen page."
         )
 
@@ -717,6 +717,18 @@ final class AppStoreScreenshotTests: XCTestCase {
         in springboard: XCUIApplication,
         homeScreenIcons: XCUIElement
     ) -> Bool {
+        guard let initialPage = homeScreenPage(in: springboard) else {
+            return false
+        }
+        if initialPage.current != 1,
+           !navigate(
+               from: initialPage,
+               to: 1,
+               in: springboard
+           ) {
+            return false
+        }
+
         for _ in 0..<12 {
             if visibleSurroundAppIcon(
                 in: springboard,
@@ -747,7 +759,28 @@ final class AppStoreScreenshotTests: XCTestCase {
         guard homeScreenPage(in: springboard) != nil else {
             return false
         }
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let visibleContent = visibleHomeScreenContent(
+                in: springboard,
+                homeScreenIcons: homeScreenIcons
+            )
+            return !visibleContent.isEmpty
+                && visibleContent.allSatisfy { $0.identifier == "Surround" }
+                && visibleSurroundAppIcon(
+                    in: springboard,
+                    homeScreenIcons: homeScreenIcons
+                ) != nil
+        }
+        return isolateSurroundHomeScreenPageOnPad(
+            in: springboard,
+            homeScreenIcons: homeScreenIcons
+        )
+    }
 
+    private func isolateSurroundHomeScreenPageOnPad(
+        in springboard: XCUIApplication,
+        homeScreenIcons: XCUIElement
+    ) -> Bool {
         let unwantedIcons = visibleHomeScreenIcons(
             in: springboard,
             homeScreenIcons: homeScreenIcons
@@ -781,7 +814,10 @@ final class AppStoreScreenshotTests: XCTestCase {
             let windowFrame = window.frame
             let iconCenterY = surroundIcon.frame.midY
             let destinationY = min(
-                max(iconCenterY, windowFrame.minY + (windowFrame.height * 0.22)),
+                max(
+                    iconCenterY,
+                    windowFrame.minY + (windowFrame.height * 0.22)
+                ),
                 windowFrame.minY + (windowFrame.height * 0.68)
             )
             let normalizedY = (destinationY - windowFrame.minY)
@@ -869,7 +905,8 @@ final class AppStoreScreenshotTests: XCTestCase {
     private func isHomeScreenEditing(
         in springboard: XCUIApplication
     ) -> Bool {
-        springboard.buttons["Done"].exists
+        let doneButton = springboard.buttons["Done"]
+        return doneButton.exists && doneButton.isHittable
     }
 
     private func addScreenshotWidget(
@@ -890,6 +927,112 @@ final class AppStoreScreenshotTests: XCTestCase {
             }
         }
 
+        guard openWidgetGallery(
+            in: springboard
+        ) else {
+            return
+        }
+
+        guard let searchField = waitForFirstHittable(
+            [
+                springboard.searchFields["Search Widgets"],
+                springboard.searchFields
+                    .matching(
+                        NSPredicate(
+                            format: "placeholderValue CONTAINS[c] %@",
+                            "Widgets"
+                        )
+                    )
+                    .firstMatch,
+            ],
+            timeout: 10
+        ) else {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "Widget search missing"
+            )
+            XCTFail("Expected the widget gallery search field.")
+            return
+        }
+        searchField.tap()
+        searchField.typeText("Surround")
+
+        guard let surroundResult = waitForFirstHittable(
+            [
+                springboard.cells["Surround"],
+                springboard.buttons["Surround"],
+                springboard.staticTexts["Surround"],
+            ],
+            timeout: 10
+        ) else {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "Surround widget result missing"
+            )
+            XCTFail("Expected Surround in the widget gallery.")
+            return
+        }
+        surroundResult.tap()
+
+        guard let addSelectedWidget = waitForFirstHittable(
+            [
+                springboard.buttons
+                    .matching(
+                        NSPredicate(
+                            format: "label CONTAINS[c] %@",
+                            "Add Widget"
+                        )
+                    )
+                    .firstMatch,
+            ],
+            timeout: 10
+        ) else {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "Widget size picker missing"
+            )
+            XCTFail("Expected the widget size picker.")
+            return
+        }
+
+        springboard.swipeLeft()
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.75))
+        addSelectedWidget.tap()
+    }
+
+    private func openWidgetGallery(
+        in springboard: XCUIApplication
+    ) -> Bool {
+        guard let addWidget = findAddWidgetAction(in: springboard) else {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "Add Widget action missing"
+            )
+            XCTFail("Expected the Add Widget action.")
+            return false
+        }
+
+        let tapStarted = Date()
+        addWidget.tap()
+        let tapDuration = Date().timeIntervalSince(tapStarted)
+        if tapDuration >= 30 {
+            let stall = XCTAttachment(
+                string: "Add Widget tap took \(tapDuration) seconds."
+            )
+            stall.name = "Widget gallery SpringBoard stall"
+            stall.lifetime = .keepAlways
+            add(stall)
+            XCTFail(
+                "The iPadOS SpringBoard widget gallery did not become quiescent."
+            )
+            return false
+        }
+        return true
+    }
+
+    private func findAddWidgetAction(
+        in springboard: XCUIApplication
+    ) -> XCUIElement? {
         var addWidget = waitForFirstHittable(
             [
                 springboard.buttons
@@ -927,84 +1070,34 @@ final class AppStoreScreenshotTests: XCTestCase {
                 timeout: 5
             )
         }
-
-        guard let addWidget else {
-            keepSpringBoardDiagnostics(
-                springboard,
-                name: "Add Widget action missing"
-            )
-            XCTFail("Expected the Add Widget action.")
-            return
-        }
-        addWidget.tap()
-
-        let searchField = springboard.searchFields.firstMatch
-        guard searchField.waitForExistence(timeout: 10) else {
-            keepSpringBoardDiagnostics(
-                springboard,
-                name: "Widget search missing"
-            )
-            XCTFail("Expected the widget gallery search field.")
-            return
-        }
-        searchField.tap()
-        searchField.typeText("Surround")
-
-        guard let surroundResult = waitForFirstHittable(
-            [
-                springboard.cells["Surround"],
-                springboard.buttons["Surround"],
-                springboard.staticTexts["Surround"],
-            ],
-            timeout: 10
-        ) else {
-            keepSpringBoardDiagnostics(
-                springboard,
-                name: "Surround widget result missing"
-            )
-            XCTFail("Expected Surround in the widget gallery.")
-            return
-        }
-        surroundResult.tap()
-
-        let addSelectedWidget = springboard.buttons
-            .matching(
-                NSPredicate(
-                    format: "label CONTAINS[c] %@",
-                    "Add Widget"
-                )
-            )
-            .firstMatch
-        guard addSelectedWidget.waitForExistence(timeout: 10) else {
-            keepSpringBoardDiagnostics(
-                springboard,
-                name: "Widget size picker missing"
-            )
-            XCTFail("Expected the widget size picker.")
-            return
-        }
-
-        springboard.swipeLeft()
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.75))
-        addSelectedWidget.tap()
+        return addWidget
     }
 
-    private func visibleHomeScreenIcons(
+    private func visibleHomeScreenContent(
         in springboard: XCUIApplication,
         homeScreenIcons: XCUIElement
     ) -> [XCUIElement] {
         let screenFrame = springboard.windows.firstMatch.frame
         let homeScreenBottom = screenFrame.minY
             + (screenFrame.height * 0.84)
-        return homeScreenIcons
-            .icons
-            .allElementsBoundByIndex
-            .filter {
-                isVisibleOnScreen($0, in: springboard)
-                    && $0.frame.width < 160
-                    && $0.frame.height < 160
-                    && $0.frame.midY < homeScreenBottom
-            }
+        return homeScreenIcons.icons.allElementsBoundByIndex.filter {
+            isVisibleOnScreen($0, in: springboard)
+                && $0.frame.midY < homeScreenBottom
+        }
+    }
+
+    private func visibleHomeScreenIcons(
+        in springboard: XCUIApplication,
+        homeScreenIcons: XCUIElement
+    ) -> [XCUIElement] {
+        visibleHomeScreenContent(
+            in: springboard,
+            homeScreenIcons: homeScreenIcons
+        )
+        .filter {
+            $0.frame.width < 160
+                && $0.frame.height < 160
+        }
     }
 
     private func visibleSurroundAppIcon(
@@ -1051,6 +1144,9 @@ final class AppStoreScreenshotTests: XCTestCase {
             )
             .compactMap(Int.init)
         guard numbers.count >= 2 else {
+            return nil
+        }
+        guard numbers[0] <= numbers[1] else {
             return nil
         }
         return HomeScreenPage(
@@ -1106,9 +1202,21 @@ final class AppStoreScreenshotTests: XCTestCase {
             timeout: 5
         ) {
             done.tap()
+            if !waitUntil(timeout: 5, condition: {
+                !doneButton.exists
+            }) {
+                XCUIDevice.shared.press(.home)
+                _ = waitUntil(timeout: 5) {
+                    !doneButton.exists
+                }
+            }
         } else {
             XCUIDevice.shared.press(.home)
+            _ = waitUntil(timeout: 5) {
+                !doneButton.exists
+            }
         }
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
     }
 
     private func waitForFirstHittable(

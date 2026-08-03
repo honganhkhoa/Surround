@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "com.honganhkhoa.Surround",
+  "platform": "IOS",
+  "localizations": [
+    {
+      "appStoreLocale": "en-US",
+      "screenshotConfiguration": "en-US"
+    },
+    {
+      "appStoreLocale": "fr-FR",
+      "screenshotConfiguration": "fr-FR"
+    },
+    {
+      "appStoreLocale": "ja",
+      "screenshotConfiguration": "ja-JP"
+    },
+    {
+      "appStoreLocale": "vi",
+      "screenshotConfiguration": "vi-VN"
+    },
+    {
+      "appStoreLocale": "zh-Hans",
+      "screenshotConfiguration": "zh-Hans-CN"
+    },
+    {
+      "appStoreLocale": "zh-Hant",
+      "screenshotConfiguration": "zh-Hant-TW"
+    },
+    {
+      "appStoreLocale": "ko",
+      "screenshotConfiguration": "ko-KR"
+    }
+  ],
+  "screenshotFamilies": [
+    {
+      "name": "iphone-6.9",
+      "directory": "iphone-6.9",
+      "displayType": "APP_IPHONE_67",
+      "expectedCount": 10,
+      "pixelWidth": 1320,
+      "pixelHeight": 2868,
+      "additionalPixelSizes": [
+        {
+          "pixelWidth": 1260,
+          "pixelHeight": 2736
+        },
+        {
+          "pixelWidth": 1290,
+          "pixelHeight": 2796
+        }
+      ]
+    },
+    {
+      "name": "ipad-13",
+      "directory": "ipad-13",
+      "displayType": "APP_IPAD_PRO_3GEN_129",
+      "expectedCount": 10,
+      "pixelWidth": 2752,
+      "pixelHeight": 2064,
+      "additionalPixelSizes": [
+        {
+          "pixelWidth": 2732,
+          "pixelHeight": 2048
+        }
+      ]
+    }
+  ]
+}
