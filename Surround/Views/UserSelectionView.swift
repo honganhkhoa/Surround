@@ -168,23 +168,70 @@ struct UserSelectionView: View {
     }
 }
 
-struct UserSelectionView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            UserSelectionView(user: .constant(OGSUser(
-                username: "kata-bot",
-                id: 592684,
-                ranking: 27,
-                icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-            )))
-        }
-        .environmentObject(OGSService.previewInstance(friends: [
-            OGSUser(
-                username: "kata-bot",
-                id: 592684,
-                ranking: 27,
-                icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-            )
-        ]))
+#if DEBUG
+#Preview("Opponent selection — Friends") {
+    @Previewable @State var selectedUser: OGSUser? = OGSUser(
+        username: "kata-bot",
+        id: 592684,
+        ranking: 27
+    )
+    let friend = OGSUser(
+        username: "kata-bot",
+        id: 592684,
+        ranking: 27
+    )
+
+    return NavigationStack {
+        UserSelectionView(user: $selectedUser)
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            friends: [friend]
+        )
+    )
 }
+
+#Preview("Opponent selection — Search results") {
+    @Previewable @State var selectedUser: OGSUser?
+    let searchText = "rin"
+    let users = [
+        OGSUser(username: "Rin", id: 101, ranking: 30),
+        OGSUser(username: "RinGo", id: 102, ranking: 18)
+    ]
+
+    return NavigationStack {
+        UserSelectionView(
+            user: $selectedUser,
+            searchText: searchText,
+            searchResultByKeyword: [searchText: users]
+        )
+    }
+    .environmentObject(OGSService.previewInstance())
+}
+
+#Preview("Opponent selection — Searching") {
+    @Previewable @State var selectedUser: OGSUser?
+    let searchText = "rin"
+
+    return NavigationStack {
+        UserSelectionView(
+            user: $selectedUser,
+            searchText: searchText,
+            searchRequestByKeyword: [searchText: AnyCancellable {}]
+        )
+    }
+    .environmentObject(OGSService.previewInstance())
+}
+
+#Preview("Opponent selection — No results") {
+    @Previewable @State var selectedUser: OGSUser?
+
+    return NavigationStack {
+        UserSelectionView(
+            user: $selectedUser,
+            searchText: "unknown-player"
+        )
+    }
+    .environmentObject(OGSService.previewInstance())
+}
+#endif

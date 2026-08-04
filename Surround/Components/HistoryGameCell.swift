@@ -272,6 +272,7 @@ struct HistoryGameCell: View {
     }
 }
 
+#if DEBUG
 private func historyGameCellPreview(game: Game, user: OGSUser) -> some View {
     List([game]) { game in
         HistoryGameCell(game: game) {}
@@ -323,3 +324,4 @@ private func rengoHistoryGameCellPreview() -> some View {
 #Preview("Rengo 3 vs. 1", traits: .fixedLayout(width: 402, height: 220)) {
     rengoHistoryGameCellPreview()
 }
+#endif

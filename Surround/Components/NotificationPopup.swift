@@ -209,60 +209,66 @@ struct NotificationPopup: View {
     }
 }
 
-struct NotificationPopup_Previews: PreviewProvider {
-    static var previews: some View {
-        let nav = NavigationService.shared
-        nav.main.rootView = .publicGames
-        return Group {
-            ZStack(alignment: .top) {
-                NavigationView {
-                    Text("View")
-                        .navigationTitle("View")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .navigationBarItems(leading: Text("Back"))
-                }.navigationViewStyle(StackNavigationViewStyle())
-                NotificationPopup(showingPrivateChatView: true)
+#if DEBUG
+private func notificationPopupPreview(
+    ogs: OGSService,
+    showingPrivateChatView: Bool = false,
+    showsNavigationBackground: Bool = true
+) -> some View {
+    let nav = NavigationService()
+    nav.main.rootView = .publicGames
+    return ZStack(alignment: .top) {
+        if showsNavigationBackground {
+            NavigationView {
+                Text("View")
+                    .navigationTitle("View")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarItems(leading: Text("Back"))
             }
-            .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "hakhoa", id: 765826),
-                openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge]
-            ))
-            .colorScheme(.dark)
-
-            ZStack(alignment: .top) {
-                NavigationView {
-                    Text("View")
-                        .navigationTitle("View")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .navigationBarItems(leading: Text("Back"))
-                }.navigationViewStyle(StackNavigationViewStyle())
-                NotificationPopup(showingPrivateChatView: true)
-            }
-            .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "hakhoa", id: 765826),
-                activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
-            ))
-
-            ZStack(alignment: .top) {
-                NavigationView {
-                    Text("View")
-                        .navigationTitle("View")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .navigationBarItems(leading: Text("Back"))
-                }.navigationViewStyle(StackNavigationViewStyle())
-                NotificationPopup()
-            }
-            .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "hakhoa", id: 765826),
-                challengesReceived: [OGSChallengeSampleData.sampleChallenge]
-            ))
-
-            ZStack(alignment: .top) {
-                Color(.systemBackground)
-                NotificationPopup()
-            }
-            .environmentObject(OGSService.previewInstance(socketStatus: .connecting))
+            .navigationViewStyle(StackNavigationViewStyle())
+        } else {
+            Color(.systemBackground)
         }
-        .environmentObject(nav)
+        NotificationPopup(showingPrivateChatView: showingPrivateChatView)
     }
+    .environmentObject(ogs)
+    .environmentObject(nav)
 }
+
+#Preview("Waiting game and conversations — Dark") {
+    notificationPopupPreview(
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826),
+            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge]
+        ),
+        showingPrivateChatView: true
+    )
+    .colorScheme(.dark)
+}
+
+#Preview("Live games and conversations") {
+    notificationPopupPreview(
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826),
+            activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
+        ),
+        showingPrivateChatView: true
+    )
+}
+
+#Preview("Challenge received") {
+    notificationPopupPreview(
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826),
+            challengesReceived: [OGSChallengeSampleData.sampleChallenge]
+        )
+    )
+}
+
+#Preview("Connecting") {
+    notificationPopupPreview(
+        ogs: OGSService.previewInstance(socketStatus: .connecting),
+        showsNavigationBackground: false
+    )
+}
+#endif

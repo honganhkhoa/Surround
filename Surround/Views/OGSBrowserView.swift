@@ -301,3 +301,12 @@ if (localStorage.getItem('ogs.config.user')==null) {
         }
     }
 }
+
+#if DEBUG
+#Preview("Google sign-in — Unsupported guidance") {
+    NavigationStack {
+        UnsupportedGoogleLoginView()
+    }
+    .environment(\.openURL, OpenURLAction { _ in .discarded })
+}
+#endif

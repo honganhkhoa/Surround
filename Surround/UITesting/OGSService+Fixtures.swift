@@ -899,6 +899,7 @@ private enum AppStoreScreenshotProfileData {
 }
 #endif
 
+#if DEBUG
 extension OGSService {
     static func previewInstance(
         user: OGSUser? = nil,
@@ -911,7 +912,8 @@ extension OGSService {
         challengesReceived: [OGSDirectChallenge] = [],
         automatchEntries: [OGSAutomatchEntry] = [],
         cachedUsers: [OGSUser] = [],
-        preferredGameSettings: [OGSChallengeTemplate] = []
+        preferredGameSettings: [OGSChallengeTemplate] = [],
+        privateMessages: [OGSPrivateMessage] = OGSPrivateMessage.sampleData
     ) -> OGSService {
         var state = BootstrapState()
         state.user = user
@@ -934,7 +936,7 @@ extension OGSService {
             state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
         }
         state.challengesReceived = challengesReceived
-        state.privateMessages = OGSPrivateMessage.sampleData
+        state.privateMessages = privateMessages
 
         if let user = user {
             state.cachedUsersById[user.id] = user
@@ -945,10 +947,10 @@ extension OGSService {
 
         state.preferredGameSettings = Set(preferredGameSettings)
 
-        return OGSService(forPreview: true, initialState: state)
+        return OGSService(previewState: state)
     }
 
-    #if DEBUG && MAIN_APP
+    #if MAIN_APP
     /// A deterministic, signed-in OGS service for app-driven UI tests.
     ///
     /// Both transports are incapable of reaching OGS. The fixture is loaded
@@ -2062,3 +2064,4 @@ extension OGSService {
     }
     #endif
 }
+#endif

@@ -173,9 +173,8 @@ struct BoardDemoView: View {
     }
 }
 
-struct BoardDemoView_Previews: PreviewProvider {
-    static var previews: some View {
-        BoardDemoView()
-            .previewLayout(.fixed(width: 300, height: 500))
-    }
+#if DEBUG
+#Preview("Interactive demo", traits: .fixedLayout(width: 300, height: 500)) {
+    BoardDemoView()
 }
+#endif

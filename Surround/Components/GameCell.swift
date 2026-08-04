@@ -148,26 +148,38 @@ struct GameCell: View {
     }
 }
 
-struct GameCell_Previews: PreviewProvider {
-    static var previews: some View {
-        let game = TestData.Resigned19x19HandicappedWithInitialState
-        return Group{
-            List([game]) { _ in
-                GameCell(game: TestData.Rengo3v1)
-            }
-            .listStyle(GroupedListStyle())
-            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526)))
-            List([game]) { _ in
-                GameCell(game: TestData.Rengo2v2, displayMode: .compact)
-            }
-            .listStyle(GroupedListStyle())
-            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526)))
-            List([game]) { _ in
-                GameCell(game: TestData.Resigned19x19HandicappedWithInitialState)
-            }
-            .listStyle(GroupedListStyle()).colorScheme(.dark)
-            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hhs214", id: 749506)))
-        }
-        .previewLayout(.fixed(width: 375, height: 500))
+#if DEBUG
+#Preview("Rengo 3 vs. 1", traits: .fixedLayout(width: 375, height: 500)) {
+    let game = TestData.Rengo3v1
+    List([game]) { game in
+        GameCell(game: game)
     }
+    .listStyle(GroupedListStyle())
+    .environmentObject(
+        OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526))
+    )
 }
+
+#Preview("Rengo 2 vs. 2 — Compact", traits: .fixedLayout(width: 375, height: 500)) {
+    let game = TestData.Rengo2v2
+    List([game]) { game in
+        GameCell(game: game, displayMode: .compact)
+    }
+    .listStyle(GroupedListStyle())
+    .environmentObject(
+        OGSService.previewInstance(user: OGSUser(username: "honganhkhoa", id: 1526))
+    )
+}
+
+#Preview("Handicap resignation — Dark", traits: .fixedLayout(width: 375, height: 500)) {
+    let game = TestData.Resigned19x19HandicappedWithInitialState
+    List([game]) { game in
+        GameCell(game: game)
+    }
+    .listStyle(GroupedListStyle())
+    .colorScheme(.dark)
+    .environmentObject(
+        OGSService.previewInstance(user: OGSUser(username: "hhs214", id: 749506))
+    )
+}
+#endif

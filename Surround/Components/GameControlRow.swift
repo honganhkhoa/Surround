@@ -340,25 +340,35 @@ struct GameControlRow: View {
     }
 }
 
-struct GameControlRow_Previews: PreviewProvider {
-    static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
-        let ogs = OGSService.previewInstance(
-            user: OGSUser(username: "kata-bot", id: 592684),
-            activeGames: games
-        )
-        for game in games {
-            game.ogs = ogs
-        }
-        return Group {
-            GameControlRow(game: games[2])
-                .previewLayout(.fixed(width: 320, height: 60))
-            HStack {
-                Spacer()
-                GameControlRow(game: games[2], horizontal: false)
-            }
-            .previewLayout(.fixed(width: 320, height: 120))
-        }
-        .environmentObject(ogs)
+#if DEBUG
+private func gameControlRowPreviewData() -> (games: [Game], ogs: OGSService) {
+    let games = [
+        TestData.Ongoing19x19wBot1,
+        TestData.Ongoing19x19wBot2,
+        TestData.Ongoing19x19wBot3
+    ]
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: games
+    )
+    for game in games {
+        game.ogs = ogs
     }
+    return (games, ogs)
 }
+
+#Preview("Horizontal controls", traits: .fixedLayout(width: 320, height: 60)) {
+    let previewData = gameControlRowPreviewData()
+    GameControlRow(game: previewData.games[2])
+        .environmentObject(previewData.ogs)
+}
+
+#Preview("Vertical controls", traits: .fixedLayout(width: 320, height: 120)) {
+    let previewData = gameControlRowPreviewData()
+    HStack {
+        Spacer()
+        GameControlRow(game: previewData.games[2], horizontal: false)
+    }
+    .environmentObject(previewData.ogs)
+}
+#endif

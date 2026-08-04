@@ -225,27 +225,54 @@ struct AnalyzeTreeView: View {
     }
 }
 
-struct AnalyzeTree_Previews: PreviewProvider {
-    static var previews: some View {
+#if DEBUG
+private struct AnalyzeTreePreviewState {
+    let game: Game
+    var selectedPosition: BoardPosition?
+
+    init() {
         let game = TestData.Ongoing19x19wBot3
-        try! game.makeMove(move: .placeStone(1, 1), fromAnalyticsPosition: game.positionByLastMoveNumber[7]!)
-        let currentPosition = try! game.makeMove(move: .placeStone(0, 0), fromAnalyticsPosition: game.positionByLastMoveNumber[7]!)
-        try! game.makeMove(move: .placeStone(1, 1), fromAnalyticsPosition: game.positionByLastMoveNumber[6]!)
-        try! game.makeMove(move: .placeStone(1, 1), fromAnalyticsPosition: game.positionByLastMoveNumber[6]!)
-        let position = try! game.makeMove(move: .placeStone(0, 0), fromAnalyticsPosition: game.positionByLastMoveNumber[6]!)
+        try! game.makeMove(
+            move: .placeStone(1, 1),
+            fromAnalyticsPosition: game.positionByLastMoveNumber[7]!
+        )
+        selectedPosition = try! game.makeMove(
+            move: .placeStone(0, 0),
+            fromAnalyticsPosition: game.positionByLastMoveNumber[7]!
+        )
+        try! game.makeMove(
+            move: .placeStone(1, 1),
+            fromAnalyticsPosition: game.positionByLastMoveNumber[6]!
+        )
+        try! game.makeMove(
+            move: .placeStone(1, 1),
+            fromAnalyticsPosition: game.positionByLastMoveNumber[6]!
+        )
+        let position = try! game.makeMove(
+            move: .placeStone(0, 0),
+            fromAnalyticsPosition: game.positionByLastMoveNumber[6]!
+        )
         try! game.makeMove(move: .placeStone(2, 2), fromAnalyticsPosition: position)
-        return Group {
-            AnalyzeTreeView(
-                game: game,
-                selectedPosition: .constant(currentPosition)
-            )
-            .previewLayout(.fixed(width: 390, height: 300))
-            AnalyzeTreeView(
-                game: game,
-                selectedPosition: .constant(currentPosition)
-            )
-            .previewLayout(.fixed(width: 390, height: 300))
-            .colorScheme(.dark)
-        }
+        self.game = game
     }
 }
+
+#Preview("Analysis tree — Light", traits: .fixedLayout(width: 390, height: 300)) {
+    @Previewable @State var preview = AnalyzeTreePreviewState()
+
+    AnalyzeTreeView(
+        game: preview.game,
+        selectedPosition: $preview.selectedPosition
+    )
+}
+
+#Preview("Analysis tree — Dark", traits: .fixedLayout(width: 390, height: 300)) {
+    @Previewable @State var preview = AnalyzeTreePreviewState()
+
+    AnalyzeTreeView(
+        game: preview.game,
+        selectedPosition: $preview.selectedPosition
+    )
+        .colorScheme(.dark)
+}
+#endif

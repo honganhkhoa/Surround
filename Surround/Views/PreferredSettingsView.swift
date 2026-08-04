@@ -12,6 +12,8 @@ struct PreferredSettingsView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
+
+    private let preferredSettingsOverride: [OGSChallengeTemplate]?
     
     @State var openChallengeCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
     @State var deleteSettingCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
@@ -19,6 +21,12 @@ struct PreferredSettingsView: View {
     @State var settingSelectingOpponent: OGSChallengeTemplate?
     @State var selectedOpponent: OGSUser?
     @State var creatingNewPreferredSetting = false
+
+    init(
+        preferredSettingsOverride: [OGSChallengeTemplate]? = nil
+    ) {
+        self.preferredSettingsOverride = preferredSettingsOverride
+    }
     
     var cardBackground: some View {
         Color(
@@ -56,7 +64,10 @@ struct PreferredSettingsView: View {
 
     @ViewBuilder
     private var preferredSettingsContent: some View {
-        if let settings = ogs.remoteSettings[.preferredGameSettings], settings.count > 0 {
+        let settings = preferredSettingsOverride
+            ?? ogs.remoteSettings[.preferredGameSettings]
+            ?? []
+        if !settings.isEmpty {
             preferredSettingsList(settings)
         } else {
             Button(action: {
@@ -241,8 +252,9 @@ struct PreferredSettingsView: View {
     }
 }
 
-#Preview {
-    let preferredSettings = [
+#if DEBUG
+private var preferredSettingsPreviewFixture: [OGSChallengeTemplate] {
+    [
         OGSChallengeTemplate(
             game: OGSChallengeTemplate.GameDetail(
                 width: 19,
@@ -256,22 +268,31 @@ struct PreferredSettingsView: View {
             )
         )
     ]
-    let user = OGSUser(
-        username: "honganhkhoa", id: 1526,
-        icon: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro",
-        iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
-    )
-    if let preferredSettingsData = try? JSONEncoder().encode(preferredSettings) {
-        if let decodedSettings = try? JSONSerialization.jsonObject(with: preferredSettingsData) as? [[String: Any]] {
-            OGSRemoteSettingKey<[OGSChallengeTemplate]>.preferredGameSettings.saveIfValid(settings: decodedSettings, replication: .RemoteOverwritesLocal, modified: Date())
-        }
-    }
+}
+
+private func preferredSettingsPreview(
+    settings: [OGSChallengeTemplate]
+) -> some View {
+    let user = OGSUser(username: "honganhkhoa", id: 1526)
+    let nav = NavigationService()
     return NavigationStack {
-        PreferredSettingsView()
+        PreferredSettingsView(preferredSettingsOverride: settings)
             .navigationTitle("Preferred settings")
     }
-    .environmentObject(OGSService.previewInstance(
-        user: user,
-        preferredGameSettings: preferredSettings
-    ))
+    .environmentObject(
+        OGSService.previewInstance(
+            user: user,
+            preferredGameSettings: settings
+        )
+    )
+    .environmentObject(nav)
 }
+
+#Preview("Preferred settings — Saved setting") {
+    preferredSettingsPreview(settings: preferredSettingsPreviewFixture)
+}
+
+#Preview("Preferred settings — Empty") {
+    preferredSettingsPreview(settings: [])
+}
+#endif

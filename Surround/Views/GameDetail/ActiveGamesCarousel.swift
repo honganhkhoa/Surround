@@ -126,18 +126,34 @@ struct ActiveGamesCarousel: View {
     }
 }
 
-struct ActiveGamesCarousel_Previews: PreviewProvider {
-    static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
-        return Group {
-            ActiveGamesCarousel(currentGame: .constant(games[0]), activeGames: games, showsToggleButton: true)
-                .previewLayout(.fixed(width: 350, height: 150))
-        }
-        .environmentObject(
-            OGSService.previewInstance(
-                user: OGSUser(username: "kata-bot", id: 592684),
-                activeGames: games
-            )
-        )
+#if DEBUG
+private struct ActiveGamesCarouselPreviewState {
+    let games: [Game]
+    var currentGame: Game?
+
+    init() {
+        let games = [
+            TestData.Ongoing19x19wBot1,
+            TestData.Ongoing19x19wBot2,
+            TestData.Ongoing19x19wBot3,
+        ]
+        self.games = games
+        currentGame = games[0]
     }
 }
+
+#Preview("Active games carousel", traits: .fixedLayout(width: 350, height: 150)) {
+    @Previewable @State var preview = ActiveGamesCarouselPreviewState()
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: preview.games
+    )
+
+    ActiveGamesCarousel(
+        currentGame: $preview.currentGame,
+        activeGames: preview.games,
+        showsToggleButton: true
+    )
+    .environmentObject(ogs)
+}
+#endif

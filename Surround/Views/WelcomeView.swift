@@ -9,8 +9,18 @@ import SwiftUI
 import Combine
 
 struct WelcomeView: View {
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @EnvironmentObject var ogs: OGSService
     @State var publicGames = [Game]()
+    private let animatesPublicGameChanges: Bool
+
+    init(
+        publicGames: [Game] = [],
+        animatesPublicGameChanges: Bool = true
+    ) {
+        _publicGames = State(initialValue: publicGames)
+        self.animatesPublicGameChanges = animatesPublicGameChanges
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -73,16 +83,22 @@ struct WelcomeView: View {
                 return
             }
             #endif
+            guard allowsRemoteActivity else { return }
             ogs.ensureConnect {
                 ogs.subscribeToGameCount()
                 ogs.cyclePublicGames()
             }
         }
         .onDisappear {
+            guard allowsRemoteActivity else { return }
             ogs.unsubscribeFromGameCount()
             ogs.cancelPublicGamesCycling()
         }
         .onChange(of: ogs.sortedPublicGames) { _, games in
+            guard animatesPublicGameChanges else {
+                publicGames = Array(games.prefix(4))
+                return
+            }
             if self.publicGames.count > 0 {
                 withAnimation(.easeInOut(duration: 2)) {
                     self.publicGames = []
@@ -97,23 +113,32 @@ struct WelcomeView: View {
     }
 }
 
-struct WelcomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            NavigationView {
-                WelcomeView()
-                    .navigationTitle("Welcome")
-            }
-            NavigationView {
-                WelcomeView()
-                    .navigationTitle("Welcome")
-            }
-            .previewDevice("iPhone SE (1st generation)")
-        }
-        .environmentObject(
-            OGSService.previewInstance(
-                publicGames: [TestData.Ongoing19x19HandicappedWithNoInitialState, TestData.Ongoing19x19wBot1]
-                )
+#if DEBUG
+private func welcomePreview() -> some View {
+    let games = [
+        TestData.Ongoing19x19HandicappedWithNoInitialState,
+        TestData.Ongoing19x19wBot1,
+    ]
+    return NavigationStack {
+        WelcomeView(
+            publicGames: games,
+            animatesPublicGameChanges: false
         )
+            .navigationTitle("Welcome")
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            publicGames: games
+        )
+    )
+    .environment(\.surroundAllowsRemoteActivity, false)
 }
+
+#Preview("Welcome — Default device") {
+    welcomePreview()
+}
+
+#Preview("Welcome — Compact layout", traits: .fixedLayout(width: 320, height: 568)) {
+    welcomePreview()
+}
+#endif

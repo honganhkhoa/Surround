@@ -325,23 +325,77 @@ struct TimeSystemPickerView: View {
     }
 }
 
-struct TimeSystemPickerView_Previews: PreviewProvider {
-    static var previews: some View {
-        let blitzTimeControl = TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
-        let liveTimeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
-        let correspondenceTimeControl = TimeControlSpeed.correspondence.defaultTimeOptions[0].timeControlObject
+#if DEBUG
+#Preview("Advanced time — Blitz") {
+    @Previewable @State var blitzTimeControl =
+        TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var liveTimeControl =
+        TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var correspondenceTimeControl =
+        TimeControlSpeed.correspondence.defaultTimeOptions[0]
+            .timeControlObject
+    @Previewable @State var timeControlSpeed = TimeControlSpeed.live
+    @Previewable @State var isBlitz = true
+    @Previewable @State var pauseOnWeekend = true
 
-        return Group {
-            NavigationView {
-                TimeSystemPickerView(
-                    blitzTimeControl: .constant(blitzTimeControl),
-                    liveTimeControl: .constant(liveTimeControl),
-                    correspondenceTimeControl: .constant(correspondenceTimeControl),
-                    timeControlSpeed: .constant(.live),
-                    isBlitz: .constant(false),
-                    pauseOnWeekend: .constant(true)
-                )
-            }
-        }
+    NavigationStack {
+        TimeSystemPickerView(
+            blitzTimeControl: $blitzTimeControl,
+            liveTimeControl: $liveTimeControl,
+            correspondenceTimeControl: $correspondenceTimeControl,
+            timeControlSpeed: $timeControlSpeed,
+            isBlitz: $isBlitz,
+            pauseOnWeekend: $pauseOnWeekend
+        )
     }
 }
+
+#Preview("Advanced time — Live") {
+    @Previewable @State var blitzTimeControl =
+        TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var liveTimeControl =
+        TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var correspondenceTimeControl =
+        TimeControlSpeed.correspondence.defaultTimeOptions[0]
+            .timeControlObject
+    @Previewable @State var timeControlSpeed = TimeControlSpeed.live
+    @Previewable @State var isBlitz = false
+    @Previewable @State var pauseOnWeekend = true
+
+    NavigationStack {
+        TimeSystemPickerView(
+            blitzTimeControl: $blitzTimeControl,
+            liveTimeControl: $liveTimeControl,
+            correspondenceTimeControl: $correspondenceTimeControl,
+            timeControlSpeed: $timeControlSpeed,
+            isBlitz: $isBlitz,
+            pauseOnWeekend: $pauseOnWeekend
+        )
+    }
+}
+
+#Preview("Advanced time — Correspondence") {
+    @Previewable @State var blitzTimeControl =
+        TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var liveTimeControl =
+        TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
+    @Previewable @State var correspondenceTimeControl =
+        TimeControlSpeed.correspondence.defaultTimeOptions[0]
+            .timeControlObject
+    @Previewable @State var timeControlSpeed =
+        TimeControlSpeed.correspondence
+    @Previewable @State var isBlitz = false
+    @Previewable @State var pauseOnWeekend = true
+
+    NavigationStack {
+        TimeSystemPickerView(
+            blitzTimeControl: $blitzTimeControl,
+            liveTimeControl: $liveTimeControl,
+            correspondenceTimeControl: $correspondenceTimeControl,
+            timeControlSpeed: $timeControlSpeed,
+            isBlitz: $isBlitz,
+            pauseOnWeekend: $pauseOnWeekend
+        )
+    }
+}
+#endif

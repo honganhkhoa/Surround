@@ -583,28 +583,36 @@ struct BoardView: View {
     }
 }
 
-struct BoardView_Previews: PreviewProvider {
-    static var previews: some View {
-        let game = TestData.Scored19x19Korean
-        let boardPosition = game.currentPosition
-        let game2 = TestData.Resigned9x9Japanese
-        let game3 = TestData.Resigned19x19HandicappedWithInitialState
-//        let game4 = TestData.Ongoing19x19HandicappedWithNoInitialState
-        let game5 = TestData.EuropeanChampionshipWithChat
-        let chatLine = game5.chatLog[36]
-        return Group {
-            BoardView(boardPosition: chatLine.variation!.position, variation: chatLine.variation, showsCoordinate: true, highlightCoordinates: [[2, 2]])
-                .previewLayout(.fixed(width: 375, height: 375))
-            BoardView(boardPosition: game2.currentPosition, showsCoordinate: true)
-                .previewLayout(.fixed(width: 375, height: 375))
-            BoardView(boardPosition: boardPosition)
-                .previewLayout(.fixed(width: 500, height: 500))
-            BoardView(boardPosition: boardPosition)
-                .previewLayout(.fixed(width: 120, height: 120))
-            BoardView(boardPosition: game3.currentPosition)
-                .previewLayout(.fixed(width: 44, height: 44))
-//            BoardView(boardPosition: game4.currentPosition)
-//                .previewLayout(.fixed(width: 375, height: 500))
-        }
-    }
+#if DEBUG
+#Preview("Analysis variation", traits: .fixedLayout(width: 375, height: 375)) {
+    let game = TestData.EuropeanChampionshipWithChat
+    let chatLine = game.chatLog[36]
+    BoardView(
+        boardPosition: chatLine.variation!.position,
+        variation: chatLine.variation,
+        showsCoordinate: true,
+        highlightCoordinates: [[2, 2]]
+    )
 }
+
+#Preview("9×9 with coordinates", traits: .fixedLayout(width: 375, height: 375)) {
+    BoardView(
+        boardPosition: TestData.Resigned9x9Japanese.currentPosition,
+        showsCoordinate: true
+    )
+}
+
+#Preview("Scored 19×19", traits: .fixedLayout(width: 500, height: 500)) {
+    BoardView(boardPosition: TestData.Scored19x19Korean.currentPosition)
+}
+
+#Preview("Game card thumbnail", traits: .fixedLayout(width: 120, height: 120)) {
+    BoardView(boardPosition: TestData.Scored19x19Korean.currentPosition)
+}
+
+#Preview("Compact handicap thumbnail", traits: .fixedLayout(width: 44, height: 44)) {
+    BoardView(
+        boardPosition: TestData.Resigned19x19HandicappedWithInitialState.currentPosition
+    )
+}
+#endif

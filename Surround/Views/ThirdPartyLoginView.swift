@@ -30,6 +30,7 @@ struct ThirdPartyLoginWebView: UIViewRepresentable {
     typealias UIViewType = WKWebView
     var type: ThirdParty
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Binding var isLoading: Bool
     
     enum ThirdParty {
@@ -59,7 +60,9 @@ struct ThirdPartyLoginWebView: UIViewRepresentable {
                 }
             }
         }
-        webview.load(URLRequest(url: OGSService.thirdPartyLoginURL(type: type)))
+        if allowsRemoteActivity {
+            webview.load(URLRequest(url: OGSService.thirdPartyLoginURL(type: type)))
+        }
         return webview
     }
 
@@ -107,3 +110,13 @@ struct ThirdPartyLoginWebView: UIViewRepresentable {
         }
     }
 }
+
+#if DEBUG
+#Preview("Third-party login — Loading") {
+    NavigationStack {
+        ThirdPartyLoginView(type: .facebook)
+    }
+    .environmentObject(OGSService.previewInstance())
+    .environment(\.surroundAllowsRemoteActivity, false)
+}
+#endif

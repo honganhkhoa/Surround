@@ -154,30 +154,140 @@ struct InlineTimerView: View {
     }
 }
 
-struct InlineTimerView_Previews: PreviewProvider {
-    static var previews: some View {
-        let timeControl1 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "byoyomi", mainTime: 300, periods: 5, periodTime: 30))
-        let clock1 = OGSClock(
-            blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185, periods: 5, periodTime: 30),
-            whiteTime: ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0, periods: 5, periodsLeft: 1, periodTime: 30, periodTimeLeft: 15),
-            currentPlayerColor: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
-            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
+#if DEBUG
+private func inlineByoYomiTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
+    let timeControl = TimeControl(
+        codingData: TimeControl.TimeControlCodingData(
+            timeControl: "byoyomi",
+            mainTime: 300,
+            periods: 5,
+            periodTime: 30
         )
-        
-        let timeControl2 = TimeControl(codingData: TimeControl.TimeControlCodingData(timeControl: "fischer", initialTime: 600, timeIncrement: 30, maxTime: 600))
-        let clock2 = OGSClock(
-            blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
-            whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
-            currentPlayerColor: .black,
-            lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
-            currentPlayerId: 1, blackPlayerId: 1, whitePlayerId: 2
-        )
-
-        return Group {
-            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .black)
-            InlineTimerView(timeControl: timeControl1, clock: clock1, player: .white)
-            InlineTimerView(timeControl: timeControl2, clock: clock2, player: .white)
-        }.previewLayout(.fixed(width: 180, height: 44))
-    }
+    )
+    let clock = OGSClock(
+        blackTime: ThinkingTime(
+            thinkingTime: 200,
+            thinkingTimeLeft: 185,
+            periods: 5,
+            periodTime: 30
+        ),
+        whiteTime: ThinkingTime(
+            thinkingTime: 0,
+            thinkingTimeLeft: 0,
+            periods: 5,
+            periodsLeft: 1,
+            periodTime: 30,
+            periodTimeLeft: 15
+        ),
+        currentPlayerColor: .black,
+        lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+        currentPlayerId: 1,
+        blackPlayerId: 1,
+        whitePlayerId: 2
+    )
+    return (timeControl, clock)
 }
+
+private func inlineFischerTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
+    let timeControl = TimeControl(
+        codingData: TimeControl.TimeControlCodingData(
+            timeControl: "fischer",
+            initialTime: 600,
+            timeIncrement: 30,
+            maxTime: 600
+        )
+    )
+    let clock = OGSClock(
+        blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
+        whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
+        currentPlayerColor: .black,
+        lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+        currentPlayerId: 1,
+        blackPlayerId: 1,
+        whitePlayerId: 2
+    )
+    return (timeControl, clock)
+}
+
+private func inlineCanadianTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
+    let timeControl = TimeControl(
+        codingData: TimeControl.TimeControlCodingData(
+            timeControl: "canadian",
+            mainTime: 600,
+            periodTime: 180,
+            stonesPerPeriod: 10
+        )
+    )
+    let clock = OGSClock(
+        blackTime: ThinkingTime(
+            thinkingTime: 300,
+            thinkingTimeLeft: 285,
+            movesLeft: 10,
+            blockTime: 180,
+            blockTimeLeft: 180
+        ),
+        whiteTime: ThinkingTime(
+            thinkingTime: 0,
+            thinkingTimeLeft: 0,
+            movesLeft: 4,
+            blockTime: 180,
+            blockTimeLeft: 75
+        ),
+        currentPlayerColor: .black,
+        lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+        currentPlayerId: 1,
+        blackPlayerId: 1,
+        whitePlayerId: 2
+    )
+    return (timeControl, clock)
+}
+
+private func inlineSimpleTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
+    let timeControl = TimeControl(
+        codingData: TimeControl.TimeControlCodingData(
+            timeControl: "simple",
+            perMove: 60
+        )
+    )
+    let clock = OGSClock(
+        blackTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 42),
+        whiteTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 60),
+        currentPlayerColor: .black,
+        lastMoveTime: Date().timeIntervalSince1970 * 1000 - 10 * 3600 * 1000,
+        currentPlayerId: 1,
+        blackPlayerId: 1,
+        whitePlayerId: 2
+    )
+    return (timeControl, clock)
+}
+
+#Preview("Byo-yomi — Main time", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineByoYomiTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .black)
+}
+
+#Preview("Byo-yomi — Final period", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineByoYomiTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .white)
+}
+
+#Preview("Fischer — Opponent", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineFischerTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .white)
+}
+
+#Preview("Canadian — Main time", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineCanadianTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .black)
+}
+
+#Preview("Canadian — Overtime", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineCanadianTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .white)
+}
+
+#Preview("Simple — Per move", traits: .fixedLayout(width: 180, height: 44)) {
+    let previewData = inlineSimpleTimerPreviewData()
+    InlineTimerView(timeControl: previewData.timeControl, clock: previewData.clock, player: .black)
+}
+#endif

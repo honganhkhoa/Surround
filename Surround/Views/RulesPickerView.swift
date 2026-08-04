@@ -74,10 +74,27 @@ struct RulesPickerView: View {
     }
 }
 
-struct RulesPickerView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            RulesPickerView(rulesSet: .constant(.japanese), komi: .constant(OGSRule.japanese.defaultKomi))
-        }
+#if DEBUG
+#Preview("Advanced rules — Japanese") {
+    @Previewable @State var rulesSet = OGSRule.japanese
+    @Previewable @State var komi = OGSRule.japanese.defaultKomi
+
+    NavigationStack {
+        RulesPickerView(rulesSet: $rulesSet, komi: $komi)
     }
 }
+
+#Preview("Advanced rules — Unranked custom komi") {
+    @Previewable @State var rulesSet = OGSRule.aga
+    @Previewable @State var komi = 0.5
+
+    NavigationStack {
+        RulesPickerView(
+            rulesSet: $rulesSet,
+            komi: $komi,
+            standardKomi: false,
+            isRanked: false
+        )
+    }
+}
+#endif

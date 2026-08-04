@@ -9,6 +9,30 @@ import SwiftUI
 import WidgetKit
 import Combine
 
+private struct SurroundAllowsRemoteActivityKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+private struct SurroundAllowsLocalPersistenceKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// Allows views to start external network, subscription, and authentication work.
+    /// Production defaults to enabled; deterministic preview and offline roots opt out.
+    var surroundAllowsRemoteActivity: Bool {
+        get { self[SurroundAllowsRemoteActivityKey.self] }
+        set { self[SurroundAllowsRemoteActivityKey.self] = newValue }
+    }
+
+    /// Allows views to persist local preferences and read-state changes.
+    /// UI-test roots keep the production default; previews opt out explicitly.
+    var surroundAllowsLocalPersistence: Bool {
+        get { self[SurroundAllowsLocalPersistenceKey.self] }
+        set { self[SurroundAllowsLocalPersistenceKey.self] = newValue }
+    }
+}
+
 struct MainView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
@@ -236,20 +260,24 @@ struct MainView: View {
         .onOpenURL { url in
             navigateTo(appURL: url)
         }
+        .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
     }
 }
 
-struct MainView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            MainView()
-                .environmentObject(OGSService.previewInstance(
-                    user: OGSUser(username: "kata-bot", id: 592684),
-                    activeGames: [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
-                ))
-            MainView()
-                .environmentObject(OGSService.previewInstance())
-        }
-        .environmentObject(NavigationService.shared)
-    }
+#if DEBUG
+#Preview("Main navigation — Signed in") {
+    MainView(allowsRemoteActivity: false)
+        .environmentObject(
+            OGSService.previewInstance(
+                user: OGSUser(username: "kata-bot", id: 592684),
+                activeGames: [
+                    TestData.Ongoing19x19wBot1,
+                    TestData.Ongoing19x19wBot2,
+                ]
+            )
+        )
+        .environmentObject(NavigationService())
+        .environmentObject(SurroundService.previewInstance())
+        .environment(\.surroundAllowsLocalPersistence, false)
 }
+#endif

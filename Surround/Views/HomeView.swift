@@ -38,6 +38,8 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.tabBarPlacement) private var tabBarPlacement
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
+    @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
@@ -49,6 +51,7 @@ struct HomeView: View {
     @State var isLoadingRecentFinished = false
     
     init(previewGames: [Game] = []) {
+        _recentFinishedGames = State(initialValue: previewGames)
         #if os(iOS)
         if SurroundUITestContract.isCapturingAppStoreScreenshots {
             _displayMode = State(initialValue: .compact)
@@ -98,7 +101,22 @@ struct HomeView: View {
     /// it ends rather than only after a relaunch. Only guards against
     /// overlapping requests, not against refetching.
     func loadRecentFinishedGames() {
-        guard ogs.isLoggedIn, let playerId = ogs.user?.id, !isLoadingRecentFinished else {
+        guard allowsRemoteActivity else {
+            #if DEBUG && MAIN_APP
+            // Screenshot UI tests carry a complete, already-hydrated history
+            // snapshot. Install it directly so this path remains offline without
+            // losing the history section that the screenshot journey verifies.
+            if SurroundUITestContract.isEnabled {
+                recentFinishedGames = Array(
+                    ogs.offlineUITestFinishedGames.prefix(10)
+                )
+            }
+            #endif
+            return
+        }
+        guard ogs.isLoggedIn,
+              let playerId = ogs.user?.id,
+              !isLoadingRecentFinished else {
             return
         }
         isLoadingRecentFinished = true
@@ -524,37 +542,48 @@ struct HomeView: View {
             }
         }
         .onChange(of: displayMode, initial: true) { _, newDisplayMode in
+            guard allowsLocalPersistence else { return }
             userDefaults[.homeViewDisplayMode] = newDisplayMode.rawValue
         }
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenHome)
     }
 }
 
-struct HomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2]
-        return Group {
-            NavigationView {
-                HomeView()
-                    .modifier(RootViewSwitchingMenu())
-                    .environmentObject(
-                        OGSService.previewInstance(
-                            user: OGSUser(username: "kata-bot", id: 592684),
-                            activeGames: games,
-                            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
-                            automatchEntries: [OGSAutomatchEntry.sampleEntry]
-                        )
-                    )
-            }
-            .navigationViewStyle(StackNavigationViewStyle())
-            NavigationView {
-                HomeView()
-                    .modifier(RootViewSwitchingMenu())
-                    .environmentObject(OGSService.previewInstance())
-            }
-            .navigationViewStyle(StackNavigationViewStyle())
-        }
-        .environmentObject(NavigationService.shared)
-//        .colorScheme(.dark)
+#if DEBUG && MAIN_APP
+#Preview("Home — Signed in") {
+    NavigationStack {
+        HomeView(
+            previewGames: [
+                TestData.Scored19x19Korean,
+                TestData.Resigned9x9Japanese,
+            ]
+        )
+            .modifier(RootViewSwitchingMenu())
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(username: "kata-bot", id: 592684),
+            activeGames: [
+                TestData.Ongoing19x19wBot1,
+                TestData.Ongoing19x19wBot2,
+            ],
+            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
+            automatchEntries: [OGSAutomatchEntry.sampleEntry]
+        )
+    )
+    .environmentObject(NavigationService())
+    .environment(\.surroundAllowsRemoteActivity, false)
+    .environment(\.surroundAllowsLocalPersistence, false)
 }
+
+#Preview("Home — Signed out") {
+    NavigationStack {
+        HomeView()
+            .modifier(RootViewSwitchingMenu())
+    }
+    .environmentObject(OGSService.previewInstance())
+    .environmentObject(NavigationService())
+    .environment(\.surroundAllowsRemoteActivity, false)
+    .environment(\.surroundAllowsLocalPersistence, false)
+}
+#endif

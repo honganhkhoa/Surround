@@ -38,6 +38,8 @@ struct QuickMatchForm: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
+    @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
 
     var finalTimeControlSpeed: TimeControlSpeed {
         if timeControlSpeed == .correspondence {
@@ -157,8 +159,12 @@ struct QuickMatchForm: View {
                         sizeOptions: self.boardSizes,
                         timeControlSpeed: self.finalTimeControlSpeed
                     )
-                    userDefaults[.lastAutomatchEntry] = automatchEntry
-                    ogs.findAutomatch(entry: automatchEntry)
+                    if allowsLocalPersistence {
+                        userDefaults[.lastAutomatchEntry] = automatchEntry
+                    }
+                    if allowsRemoteActivity {
+                        ogs.findAutomatch(entry: automatchEntry)
+                    }
                     nav.home.showingNewGameView = false
                 })
 
@@ -167,6 +173,7 @@ struct QuickMatchForm: View {
             .padding()
         }
         .onAppear {
+            guard allowsLocalPersistence else { return }
             if let lastAutomatchEntry = userDefaults[.lastAutomatchEntry] {
                 boardSizes = lastAutomatchEntry.sizeOptions
                 timeControlSpeed = lastAutomatchEntry.timeControlSpeed == .correspondence ? .correspondence : .live
@@ -347,6 +354,7 @@ struct OpenChallengesForm: View {
 }
 
 struct NewGameView: View {
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @State var newGameOption: NewGameOption = .quickMatch
@@ -474,9 +482,11 @@ struct NewGameView: View {
             #endif
         }
         .onAppear {
+            guard allowsRemoteActivity else { return }
             ogs.subscribeToSeekGraph()
         }
         .onDisappear {
+            guard allowsRemoteActivity else { return }
             ogs.unsubscribeFromSeekGraphWhenDone()
         }
         .onReceive(ogs.$eligibleOpenChallengeById) { eligibleOpenChallengesById in
@@ -489,48 +499,57 @@ struct NewGameView: View {
     }
 }
 
-struct NewGameView_Previews: PreviewProvider {
-    static var previews: some View {
-        return Group {
-            NavigationView {
-                NewGameView(newGameOption: .quickMatch)
-                    .navigationBarTitle("New game")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .previewDisplayName("Quick match")
-            NavigationView {
-                NewGameView(newGameOption: .custom)
-                    .navigationBarTitle("New game")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .previewDisplayName("Custom game")
-            NavigationView {
-                NewGameView(newGameOption: .openChallenges)
-                    .navigationBarTitle("New game")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .previewDisplayName("Open challenges")
-        }
-        .environmentObject(
-            OGSService.previewInstance(
-                user: OGSUser(
-                    username: "HongAnhKhoa",
-                    id: 314459,
-                    ranking: 27,
-                    icon: "https://b0c2ddc39d13e1c0ddad-93a52a5bc9e7cc06050c1a999beb3694.ssl.cf1.rackcdn.com/7bb95c73c9ce77095b3a330729104b35-32.png"
-                ), 
-                eligibleOpenChallenges: [OGSChallengeSampleData.sampleOpenChallenge, OGSChallengeSampleData.sampleRengoChallenge],
-                openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
-                cachedUsers: [
-                    OGSUser(
-                        username: "hakhoa4", id: 1769,
-                        iconUrl: "https://secure.gravatar.com/avatar/7eb7eabbe9bd03c2fc99881d04da9cbd?s=32&d=retro"
-                    ),
-                    OGSUser(
-                        username: "honganhkhoa", id: 1526,
-                        iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
-                    )
-                ]
-            ))
+#if DEBUG
+private func newGamePreview(
+    option: NewGameView.NewGameOption
+) -> some View {
+    let openChallenge = OGSChallengeSampleData.sampleOpenChallenge
+    let rengoChallenge = OGSChallengeSampleData.sampleRengoChallenge
+    return NavigationStack {
+        NewGameView(newGameOption: option)
+            .navigationTitle("New game")
+            .navigationBarTitleDisplayMode(.inline)
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(
+                username: "HongAnhKhoa",
+                id: 314459,
+                ranking: 27
+            ),
+            eligibleOpenChallenges: [
+                openChallenge,
+                rengoChallenge,
+            ],
+            openChallengesSent: [
+                openChallenge,
+            ],
+            cachedUsers: [
+                OGSUser(
+                    username: "hakhoa4",
+                    id: 1769
+                ),
+                OGSUser(
+                    username: "honganhkhoa",
+                    id: 1526
+                ),
+            ]
+        )
+    )
+    .environmentObject(NavigationService())
+    .environment(\.surroundAllowsRemoteActivity, false)
+    .environment(\.surroundAllowsLocalPersistence, false)
 }
+
+#Preview("New game — Quick match") {
+    newGamePreview(option: .quickMatch)
+}
+
+#Preview("New game — Custom game") {
+    newGamePreview(option: .custom)
+}
+
+#Preview("New game — Open challenges") {
+    newGamePreview(option: .openChallenges)
+}
+#endif

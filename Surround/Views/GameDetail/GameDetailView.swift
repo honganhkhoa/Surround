@@ -379,39 +379,69 @@ extension View {
     }
 }
 
-struct GameDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        let games = [TestData.Ongoing19x19wBot1, TestData.Ongoing19x19wBot2, TestData.Ongoing19x19wBot3]
-        let ogs = OGSService.previewInstance(
-            user: OGSUser(username: "kata-bot", id: 592684),
-            activeGames: games
-        )
-        for game in games {
-            game.ogs = ogs
-            game.chatUnreadCount = 2
-        }
-
-        return Group {
-            NavigationView {
-                GameDetailView(currentGame: games[0], activeGames: games, zenMode: true)
-            }
-            .previewDevice("iPhone 12 Pro")
-//            .colorScheme(.dark)
-
-            NavigationView {
-                GameDetailView(currentGame: games[0], activeGames: games)
-            }
-            .previewDevice("iPhone 12 Pro")
-
-            GameDetailView(currentGame: games[0], zenMode: true)
-                .previewLayout(.fixed(width: 960, height: 754))
-                .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
-
-            GameDetailView(currentGame: games[0])
-                .previewLayout(.fixed(width: 750, height: 1024))
-                .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
-        }
-        .environmentObject(ogs)
-        .environmentObject(NavigationService.shared)
+#if DEBUG
+private func gameDetailPreviewFixture() -> (
+    games: [Game],
+    ogs: OGSService,
+    navigation: NavigationService
+) {
+    let games = [
+        TestData.Ongoing19x19wBot1,
+        TestData.Ongoing19x19wBot2,
+        TestData.Ongoing19x19wBot3,
+    ]
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: games
+    )
+    for game in games {
+        game.chatUnreadCount = 2
     }
+    return (games, ogs, NavigationService())
 }
+
+#Preview("Phone — Zen mode", traits: .fixedLayout(width: 390, height: 844)) {
+    let fixture = gameDetailPreviewFixture()
+
+    NavigationView {
+        GameDetailView(
+            currentGame: fixture.games[0],
+            activeGames: fixture.games,
+            zenMode: true
+        )
+    }
+    .environmentObject(fixture.ogs)
+    .environmentObject(fixture.navigation)
+}
+
+#Preview("Phone — Active games", traits: .fixedLayout(width: 390, height: 844)) {
+    let fixture = gameDetailPreviewFixture()
+
+    NavigationView {
+        GameDetailView(
+            currentGame: fixture.games[0],
+            activeGames: fixture.games
+        )
+    }
+    .environmentObject(fixture.ogs)
+    .environmentObject(fixture.navigation)
+}
+
+#Preview("Regular landscape — Zen mode", traits: .fixedLayout(width: 960, height: 754)) {
+    let fixture = gameDetailPreviewFixture()
+
+    GameDetailView(currentGame: fixture.games[0], zenMode: true)
+        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+        .environmentObject(fixture.ogs)
+        .environmentObject(fixture.navigation)
+}
+
+#Preview("Regular portrait — Active game", traits: .fixedLayout(width: 750, height: 1024)) {
+    let fixture = gameDetailPreviewFixture()
+
+    GameDetailView(currentGame: fixture.games[0])
+        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+        .environmentObject(fixture.ogs)
+        .environmentObject(fixture.navigation)
+}
+#endif

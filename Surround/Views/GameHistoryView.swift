@@ -20,6 +20,10 @@ struct GameHistoryView: View {
     @State private var pagination = GameHistoryPaginationState()
     @State private var fetchCancellable: AnyCancellable?
 
+    init(pagination: GameHistoryPaginationState = GameHistoryPaginationState()) {
+        _pagination = State(initialValue: pagination)
+    }
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
@@ -139,3 +143,56 @@ struct GameHistoryView: View {
         loadNextPage()
     }
 }
+
+#if DEBUG
+private func gameHistoryPreviewPagination(
+    playerID: Int,
+    result: GameHistoryPaginationState.PageResult
+) -> GameHistoryPaginationState {
+    var pagination = GameHistoryPaginationState()
+    guard let request = pagination.beginRequest(playerID: playerID) else {
+        preconditionFailure("A fresh preview pagination state must accept its first request.")
+    }
+    _ = pagination.finish(
+        result,
+        for: request,
+        currentPlayerID: playerID
+    )
+    return pagination
+}
+
+private func gameHistoryPreview(
+    result: GameHistoryPaginationState.PageResult
+) -> some View {
+    let user = OGSUser(username: "HongAnhKhoa", id: 314459)
+    let pagination = gameHistoryPreviewPagination(
+        playerID: user.id,
+        result: result
+    )
+
+    return NavigationStack {
+        GameHistoryView(pagination: pagination)
+    }
+    .environmentObject(OGSService.previewInstance(user: user))
+    .environmentObject(NavigationService())
+}
+
+#Preview("Game history — Loaded") {
+    gameHistoryPreview(
+        result: .success(
+            games: [TestData.Scored19x19Korean],
+            hasNextPage: false
+        )
+    )
+}
+
+#Preview("Game history — Empty") {
+    gameHistoryPreview(
+        result: .success(games: [], hasNextPage: false)
+    )
+}
+
+#Preview("Game history — Load error") {
+    gameHistoryPreview(result: .failure)
+}
+#endif

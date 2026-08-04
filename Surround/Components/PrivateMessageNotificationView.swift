@@ -125,12 +125,11 @@ struct PrivateMessageNotificationView: View {
     }
 }
 
-struct PrivateMessageView_Previews: PreviewProvider {
-    static var previews: some View {
-        PrivateMessageNotificationView()
-            .environmentObject(OGSService.previewInstance(
-                user: OGSUser(username: "hakhoa", id: 765826)
-            ))
-            .previewLayout(.fixed(width: 300, height: 500))
-    }
+#if DEBUG
+#Preview("Recent conversations", traits: .fixedLayout(width: 300, height: 500)) {
+    PrivateMessageNotificationView()
+        .environmentObject(OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826)
+        ))
 }
+#endif

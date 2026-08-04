@@ -608,89 +608,90 @@ struct ChallengeCell: View {
     }
 }
 
-struct ChallengeView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            VStack {
-                ChallengeCell(challenge: OGSChallengeSampleData.sampleRengoChallenge)
-                    .padding()
-                    .background(Color(UIColor.systemBackground).shadow(radius: 2))
-            }
+#if DEBUG
+private func challengePreview(
+    challenge: any OGSChallenge,
+    ogs: OGSService,
+    cellBackground: Color = Color(UIColor.systemBackground)
+) -> some View {
+    VStack {
+        ChallengeCell(challenge: challenge)
             .padding()
-            .environmentObject(
-                OGSService.previewInstance(
-                    user: OGSUser(
-                        username: "honganhkhoa", id: 1526,
-                        iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
-//                        username: "hakhoa", id: 1765,
-//                        iconUrl: "https://secure.gravatar.com/avatar/8698ff92115213ab187d31d4ee5da8ea?s=32&d=retro"
-                    ),
-                    cachedUsers: [
-                        OGSUser(
-                            username: "hakhoa2", id: 1767,
-                            iconUrl: "https://secure.gravatar.com/avatar/e8fd4a8a5bab2b3785d794ab51fef55c?s=32&d=retro"
-                        ),
-                        OGSUser(
-                            username: "hakhoa4", id: 1769,
-                            iconUrl: "https://secure.gravatar.com/avatar/7eb7eabbe9bd03c2fc99881d04da9cbd?s=32&d=retro"
-                        ),
-                        OGSUser(
-                            username: "honganhkhoa", id: 1526,
-                            iconUrl: "https://secure.gravatar.com/avatar/4d95e45e08111986fd3fe61e1077b67d?s=32&d=retro"
-                        )
-                        
-                    ]
-                )
-            )
-            .previewDisplayName("Rengo")
-            VStack {
-                ChallengeCell(challenge: OGSChallengeSampleData.sampleOpenChallenge)
-                    .padding()
-                    .background(Color(UIColor.systemBackground).shadow(radius: 2))
-            }
-            .padding()
-            .environmentObject(
-                OGSService.previewInstance(
-                    user: OGSUser(
-                        username: "HongAnhKhoa",
-                        id: 314459
-                    )
-                )
-            )
-            .previewDisplayName("Open challenge")
-            VStack {
-                ChallengeCell(challenge: OGSChallengeSampleData.sampleChallenge)
-                    .padding()
-                    .background(Color(UIColor.systemGray5).shadow(radius: 2))
-            }
-            .padding()
-            .background(Color(UIColor.systemBackground))
-            .environmentObject(
-                OGSService.previewInstance(
-                    user: OGSUser(
-                        username: "HongAnhKhoa",
-                        id: 314459
-                    )
-                )
-            )
-            .colorScheme(.dark)
-            .previewDisplayName("Direct challenge")
-            VStack {
-                ChallengeCell(challenge: OGSChallengeSampleData.sampleChallengeTemplate)
-                    .padding()
-                    .background(Color(UIColor.systemBackground).shadow(radius: 2))
-            }
-            .padding()
-            .environmentObject(
-                OGSService.previewInstance(
-                    user: OGSUser(
-                        username: "HongAnhKhoa",
-                        id: 314459
-                    )
-                )
-            )
-            .previewDisplayName("Challenge template")
-        }
-        .previewLayout(.fixed(width: 320, height: 600))
+            .background(cellBackground.shadow(radius: 2))
     }
+    .padding()
+    .environmentObject(ogs)
+    .environmentObject(NavigationService())
 }
+
+private func directChallengeWithoutRemoteAvatars(
+    _ source: OGSDirectChallenge
+) -> OGSDirectChallenge {
+    var challenge = source
+    if var challenger = challenge.challenger {
+        challenger.icon = nil
+        challenger.iconUrl = nil
+        challenge.challenger = challenger
+    }
+    if var challenged = challenge.challenged {
+        challenged.icon = nil
+        challenged.iconUrl = nil
+        challenge.challenged = challenged
+    }
+    return challenge
+}
+
+#Preview("Rengo", traits: .fixedLayout(width: 320, height: 600)) {
+    challengePreview(
+        challenge: OGSChallengeSampleData.sampleRengoChallenge,
+        ogs: OGSService.previewInstance(
+            user: OGSUser(
+                username: "honganhkhoa", id: 1526
+            ),
+            cachedUsers: [
+                OGSUser(
+                    username: "hakhoa2", id: 1767
+                ),
+                OGSUser(
+                    username: "hakhoa4", id: 1769
+                ),
+                OGSUser(
+                    username: "honganhkhoa", id: 1526
+                ),
+            ]
+        )
+    )
+}
+
+#Preview("Open challenge", traits: .fixedLayout(width: 320, height: 600)) {
+    challengePreview(
+        challenge: OGSChallengeSampleData.sampleOpenChallenge,
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "HongAnhKhoa", id: 314459)
+        )
+    )
+}
+
+#Preview("Direct challenge — Dark", traits: .fixedLayout(width: 320, height: 600)) {
+    challengePreview(
+        challenge: directChallengeWithoutRemoteAvatars(
+            OGSChallengeSampleData.sampleChallenge
+        ),
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "HongAnhKhoa", id: 314459)
+        ),
+        cellBackground: Color(UIColor.systemGray5)
+    )
+    .background(Color(UIColor.systemBackground))
+    .colorScheme(.dark)
+}
+
+#Preview("Challenge template", traits: .fixedLayout(width: 320, height: 600)) {
+    challengePreview(
+        challenge: OGSChallengeSampleData.sampleChallengeTemplate,
+        ogs: OGSService.previewInstance(
+            user: OGSUser(username: "HongAnhKhoa", id: 314459)
+        )
+    )
+}
+#endif

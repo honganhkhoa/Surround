@@ -593,42 +593,106 @@ struct SingleGameView: View {
     }
 }
 
-struct SingleGameView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            NavigationView {
-                SingleGameView(
-                    compact: true,
-                    compactBoardSize: 390,
-                    game: TestData.Ongoing19x19wBot3,
-                    zenMode: .constant(false),
-                    compactDisplayMode: .analyze
-                )
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .previewDevice("iPhone 12 Pro")
-//            NavigationView {
-//                SingleGameView(
-//                    compact: true,
-//                    compactBoardSize: 390,
-//                    game: TestData.Ongoing19x19wBot3,
-//                    zenMode: .constant(false)
-//                )
-//                .navigationBarTitleDisplayMode(.inline)
-//            }
-//            .previewDevice("iPhone 12 Pro")
-            NavigationView {
-                SingleGameView(
-                    compact: true,
-                    compactBoardSize: 390,
-                    game: TestData.EuropeanChampionshipWithChat,
-                    zenMode: .constant(false),
-                    compactDisplayMode: .chat
-                )
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .previewDevice("iPhone 12 Pro")
-        }
-        .environmentObject(OGSService.previewInstance())
+#if DEBUG
+#Preview("Play — Player info", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    let game = TestData.Ongoing19x19wBot3
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode
+        )
+        .navigationBarTitleDisplayMode(.inline)
     }
+    .environmentObject(ogs)
 }
+
+#Preview("Play — Analysis", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    let game = TestData.Ongoing19x19wBot3
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode,
+            compactDisplayMode: .analyze
+        )
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(ogs)
+}
+
+#Preview("Finished game — Chat", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    let game = TestData.EuropeanChampionshipWithChat
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode,
+            compactDisplayMode: .chat
+        )
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(ogs)
+}
+
+#Preview("Stone removal", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    let game = TestData.StoneRemoval9x9
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "HongAnhKhoa", id: 314459),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode
+        )
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(ogs)
+}
+
+#Preview("Finished game — Score and playback", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    let game = TestData.Scored19x19Korean
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "HongAnhKhoa", id: 314459),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode
+        )
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(ogs)
+}
+#endif

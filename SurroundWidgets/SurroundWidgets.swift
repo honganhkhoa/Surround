@@ -646,37 +646,73 @@ struct SurroundWidgets: Widget {
     }
 }
 
-struct SurroundWidgets_Previews: PreviewProvider {
-    static var previews: some View {
-        return Group {
-            ForEach(0..<3) { familyId in
-                let family = [
-                    0: WidgetFamily.systemSmall,
-                    1: WidgetFamily.systemMedium,
-                    2: WidgetFamily.systemLarge
-                ][familyId]!
-                let widget = CorrespondenceGamesWidgetView(
-                    entry: CorrespondenceGamesEntry(
-                        date: Date(),
-                        games: [
-                            TestData.Ongoing19x19wBot1,
-                            TestData.Ongoing19x19wBot2,
-                            TestData.Ongoing19x19wBot3
-                        ],
-                        widgetFamily: family
-                    )
-                )
-                .previewContext(WidgetPreviewContext(family: family))
-                widget.padding(-16)
-            }
-            let widget = CorrespondenceGamesWidgetView(
-                entry: CorrespondenceGamesEntry(
-                    date: Date(),
-                    games: [],
-                    noGamesMessage: "You don't have any correspondence games at the moment."
-                )
-            ).previewContext(WidgetPreviewContext(family: .systemMedium))
-            widget.padding(-16)
-        }
-    }
+#if DEBUG
+private func populatedWidgetPreviewEntry(
+    family: WidgetFamily
+) -> CorrespondenceGamesEntry {
+    CorrespondenceGamesEntry(
+        date: Date(),
+        games: [
+            TestData.Ongoing19x19wBot1,
+            TestData.Ongoing19x19wBot2,
+            TestData.Ongoing19x19wBot3,
+        ],
+        widgetFamily: family,
+        userID: 592684,
+        usesStaticClock: true
+    )
 }
+
+#Preview("Correspondence games — Populated small", as: .systemSmall) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(family: .systemSmall)
+}
+
+#Preview("Correspondence games — Populated medium", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(family: .systemMedium)
+}
+
+#Preview("Correspondence games — Populated large", as: .systemLarge) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(family: .systemLarge)
+}
+
+#Preview("Correspondence games — Empty", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    CorrespondenceGamesEntry(
+        date: Date(),
+        widgetFamily: .systemMedium,
+        userID: 592684,
+        noGamesMessage: String(
+            localized: "You don't have any correspondence games at the moment."
+        )
+    )
+}
+
+#Preview("Correspondence games — Placeholder", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    CorrespondenceGamesEntry(
+        date: Date(),
+        widgetFamily: .systemMedium,
+        isPlaceholder: true
+    )
+}
+
+#Preview("Correspondence games — Signed out", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    CorrespondenceGamesEntry(
+        date: Date(),
+        widgetFamily: .systemMedium,
+        noGamesMessage: String(
+            localized: "Sign in to your online-go.com account to see your games here."
+        )
+    )
+}
+#endif

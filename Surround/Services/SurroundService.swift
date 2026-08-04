@@ -40,9 +40,17 @@ class SurroundService: NSObject, ObservableObject {
     private var transactionUpdatesTask: Task<Void, Never>?
     private var storeProductsById = [String: Product]()
     private let allowsRemoteActivity: Bool
+    private let usesSupporterProductIdOverride: Bool
+    private let supporterProductIdOverride: String?
     
-    private init(allowsRemoteActivity: Bool) {
+    private init(
+        allowsRemoteActivity: Bool,
+        supporterProductIdOverride: String? = nil,
+        usesSupporterProductIdOverride: Bool = false
+    ) {
         self.allowsRemoteActivity = allowsRemoteActivity
+        self.usesSupporterProductIdOverride = usesSupporterProductIdOverride
+        self.supporterProductIdOverride = supporterProductIdOverride
         super.init()
         if allowsRemoteActivity {
             transactionUpdatesTask = observeTransactionUpdates()
@@ -231,6 +239,10 @@ class SurroundService: NSObject, ObservableObject {
     @Published private(set) var processingTransaction = false
 
     var supporterProductId: String? {
+        if usesSupporterProductIdOverride {
+            return supporterProductIdOverride
+        }
+
         guard let productId = userDefaults[.supporterProductId] else {
             return nil
         }
@@ -270,6 +282,7 @@ class SurroundService: NSObject, ObservableObject {
         }
     }
     
+    #if DEBUG
     func initializeProductsForPreview() {
         supporterProducts = [
             SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter1", displayPrice: "$0.49"),
@@ -278,6 +291,19 @@ class SurroundService: NSObject, ObservableObject {
             SupporterProduct(id: "com.honganhkhoa.Surround.SurroundSupporter4", displayPrice: "$9.99")
         ]
     }
+
+    static func previewInstance(
+        supporterProductId: String? = nil
+    ) -> SurroundService {
+        let service = SurroundService(
+            allowsRemoteActivity: false,
+            supporterProductIdOverride: supporterProductId,
+            usesSupporterProductIdOverride: true
+        )
+        service.initializeProductsForPreview()
+        return service
+    }
+    #endif
 
     func subscribe(to product: SupporterProduct) {
         guard allowsRemoteActivity else { return }

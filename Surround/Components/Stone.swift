@@ -62,38 +62,47 @@ struct Stone: View {
     }
 }
 
-struct Stone_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            Stone(color: .black, shadowRadius: 2)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            Stone(color: .white, shadowRadius: 2)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            Stone(color: nil, shadowRadius: 2)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            ZStack {
-                Rectangle().fill(Color(UIColor.systemGray5))
-                Stone(color: .black, shadowRadius: 2)
-                    .frame(width: 25, height: 25)
-            }
-            .previewLayout(.fixed(width: 100, height: 50))
-            .colorScheme(.dark)
-            ZStack {
-                Rectangle().fill(Color(UIColor.systemGray5))
-                Stone(color: .white, shadowRadius: 2)
-                    .frame(width: 25, height: 25)
-            }
-            .previewLayout(.fixed(width: 100, height: 50))
-            .colorScheme(.dark)
-            Stone(color: .black)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-            Stone(color: .white)
-                .frame(width: 25, height: 25)
-                .previewLayout(.fixed(width: 100, height: 50))
-        }
-    }
+#if DEBUG
+#Preview("Black with shadow", traits: .fixedLayout(width: 100, height: 50)) {
+    Stone(color: .black, shadowRadius: 2)
+        .frame(width: 25, height: 25)
 }
+
+#Preview("White with shadow", traits: .fixedLayout(width: 100, height: 50)) {
+    Stone(color: .white, shadowRadius: 2)
+        .frame(width: 25, height: 25)
+}
+
+#Preview("Empty intersection", traits: .fixedLayout(width: 100, height: 50)) {
+    Stone(color: nil, shadowRadius: 2)
+        .frame(width: 25, height: 25)
+}
+
+#Preview("Black with shadow — Dark", traits: .fixedLayout(width: 100, height: 50)) {
+    ZStack {
+        Rectangle().fill(Color(UIColor.systemGray5))
+        Stone(color: .black, shadowRadius: 2)
+            .frame(width: 25, height: 25)
+    }
+    .colorScheme(.dark)
+}
+
+#Preview("White with shadow — Dark", traits: .fixedLayout(width: 100, height: 50)) {
+    ZStack {
+        Rectangle().fill(Color(UIColor.systemGray5))
+        Stone(color: .white, shadowRadius: 2)
+            .frame(width: 25, height: 25)
+    }
+    .colorScheme(.dark)
+}
+
+#Preview("Black without shadow", traits: .fixedLayout(width: 100, height: 50)) {
+    Stone(color: .black)
+        .frame(width: 25, height: 25)
+}
+
+#Preview("White without shadow", traits: .fixedLayout(width: 100, height: 50)) {
+    Stone(color: .white)
+        .frame(width: 25, height: 25)
+}
+#endif

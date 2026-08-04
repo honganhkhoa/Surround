@@ -51,11 +51,25 @@ struct PrivateMessageLine: View {
 }
 
 struct PrivateMessageLog: View {
+    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @EnvironmentObject var ogs: OGSService
     var peer: OGSUser
-    
+
+    private let messagesOverride: [OGSPrivateMessage]?
+    private let marksThreadAsRead: Bool
+
+    init(
+        peer: OGSUser,
+        messages: [OGSPrivateMessage]? = nil,
+        marksThreadAsRead: Bool = true
+    ) {
+        self.peer = peer
+        messagesOverride = messages
+        self.marksThreadAsRead = marksThreadAsRead
+    }
+
     var messages: [OGSPrivateMessage] {
-        ogs.privateMessagesByPeerId[peer.id] ?? []
+        messagesOverride ?? ogs.privateMessagesByPeerId[peer.id] ?? []
     }
 
     @State var atEndOfChat = false
@@ -64,6 +78,7 @@ struct PrivateMessageLog: View {
     @State var chatSendingCancellable: AnyCancellable?
     
     func sendMessage() {
+        guard allowsRemoteActivity else { return }
         if newChat.count > 0 {
             chatSendingCancellable = ogs.sendPrivateMessage(to: peer, message: newChat).sink(
                 receiveCompletion: { _ in
@@ -73,6 +88,11 @@ struct PrivateMessageLog: View {
             )
             newChat = ""
         }
+    }
+
+    func markThreadAsRead() {
+        guard marksThreadAsRead else { return }
+        ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
     }
 
     var messagesScrollView: some View {
@@ -92,7 +112,7 @@ struct PrivateMessageLog: View {
                                 if !self.atEndOfChat {
                                     DispatchQueue.main.async {
                                         self.atEndOfChat = true
-                                        ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
+                                        markThreadAsRead()
                                     }
                                 }
                             } else {
@@ -109,7 +129,7 @@ struct PrivateMessageLog: View {
                     .onAppear {
                         ogs.setUpNewPeerIfNecessary(peerId: peer.id)
                         scrollView.scrollTo("scrollViewBottom")
-                        ogs.markPrivateMessageThreadAsRead(peerId: peer.id)
+                        markThreadAsRead()
                     }
                     .onChange(of: messages) {
                         if atEndOfChat {
@@ -152,10 +172,23 @@ struct PrivateMessageLog: View {
     }
 }
 
-struct PrivateMessageLog_Previews: PreviewProvider {
-    static var previews: some View {
-        PrivateMessageLog(peer: OGSPrivateMessage.sampleData.first!.from)
-            .previewLayout(.fixed(width: 300, height: 600))
-            .environmentObject(OGSService.previewInstance(user: OGSUser(username: "hakhoa", id: 765826)))
+#if DEBUG
+#Preview("Private messages — Conversation", traits: .fixedLayout(width: 300, height: 600)) {
+    let peer = OGSPrivateMessage.sampleData.first!.from
+    let messages = OGSPrivateMessage.sampleData.filter {
+        $0.from.id == peer.id || $0.to.id == peer.id
     }
+    PrivateMessageLog(
+        peer: peer,
+        messages: messages,
+        marksThreadAsRead: false
+    )
+        .environmentObject(
+            OGSService.previewInstance(
+                user: OGSUser(username: "hakhoa", id: 765826),
+                privateMessages: []
+            )
+        )
+        .environment(\.surroundAllowsRemoteActivity, false)
 }
+#endif

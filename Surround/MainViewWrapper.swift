@@ -10,10 +10,38 @@ import SwiftUI
 struct MainViewWrapper: View {
     @SceneStorage("sceneID") var sceneID = UUID().uuidString
 
+    #if DEBUG && MAIN_APP
+    private struct PreviewDependencies {
+        let ogs: OGSService
+        let sgs: SurroundService
+        let nav: NavigationService
+    }
+
+    private let previewDependencies: PreviewDependencies?
+
+    init() {
+        previewDependencies = nil
+    }
+
+    init(
+        previewOGS: OGSService,
+        previewSGS: SurroundService,
+        previewNavigation: NavigationService
+    ) {
+        previewDependencies = PreviewDependencies(
+            ogs: previewOGS,
+            sgs: previewSGS,
+            nav: previewNavigation
+        )
+    }
+    #endif
+
     @ViewBuilder
     var body: some View {
         #if DEBUG && MAIN_APP
-        if SurroundUITestContract.isEnabled {
+        if let previewDependencies {
+            previewRootView(using: previewDependencies)
+        } else if SurroundUITestContract.isEnabled {
             OfflineUITestRootView()
         } else {
             productionRootView
@@ -32,6 +60,19 @@ struct MainViewWrapper: View {
             .environmentObject(sgs)
             .environmentObject(nav)
     }
+
+    #if DEBUG && MAIN_APP
+    private func previewRootView(
+        using dependencies: PreviewDependencies
+    ) -> some View {
+        MainView(allowsRemoteActivity: false)
+            .environmentObject(dependencies.ogs)
+            .environmentObject(dependencies.sgs)
+            .environmentObject(dependencies.nav)
+            .environment(\.openURL, OpenURLAction { _ in .discarded })
+            .environment(\.surroundAllowsLocalPersistence, false)
+    }
+    #endif
 }
 
 #if DEBUG && MAIN_APP
@@ -412,8 +453,22 @@ private enum OfflineUITestWindowCoordinator {
 #endif
 #endif
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainViewWrapper()
+#if DEBUG && MAIN_APP
+private struct MainViewWrapperPreview: View {
+    @StateObject private var ogs = OGSService.previewInstance()
+    @StateObject private var sgs = SurroundService.previewInstance()
+    @StateObject private var nav = NavigationService()
+
+    var body: some View {
+        MainViewWrapper(
+            previewOGS: ogs,
+            previewSGS: sgs,
+            previewNavigation: nav
+        )
     }
 }
+
+#Preview("App shell — Signed out") {
+    MainViewWrapperPreview()
+}
+#endif

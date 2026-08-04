@@ -656,23 +656,83 @@ struct PlayersBannerView: View {
         }
     }}
 
-struct PlayersBannerView_Previews: PreviewProvider {
-    static var previews: some View {
-        let game3 = TestData.Scored19x19Korean
-        game3.gamePhase = .stoneRemoval
-        return Group {
-            PlayersBannerView(game: TestData.Rengo2v2, showsRengoTeamDetail: false)
-                .previewLayout(.fixed(width: 320, height: 200))
-//                .colorScheme(.dark)
-            PlayersBannerView(game: TestData.Rengo3v1, showsPlayersName: true)
-                .previewLayout(.fixed(width: 320, height: 200))
-//            PlayersBannerView(game: TestData.Ongoing19x19wBot1)
-//                .previewLayout(.fixed(width: 320, height: 200))
-//            PlayersBannerView(game: TestData.Ongoing19x19wBot1, showsPlayersName: true)
-//                .previewLayout(.fixed(width: 320, height: 200))
-//            PlayersBannerView(game: game3, playerIconSize: 96, showsPlayersName: true)
-//                .previewLayout(.fixed(width: 500, height: 300))
-//                .colorScheme(.dark)
+#if DEBUG
+private extension OGSGame {
+    /// Returns deterministic preview data without external avatar URLs.
+    func withoutRemoteAvatarsForPreview() -> OGSGame {
+        var gameData = self
+
+        func sanitized(_ source: OGSUser) -> OGSUser {
+            var user = source
+            user.icon = nil
+            user.iconUrl = nil
+            return user
         }
+
+        gameData.players.black = sanitized(gameData.players.black)
+        gameData.players.white = sanitized(gameData.players.white)
+        if let playerPool = gameData.playerPool {
+            gameData.playerPool = playerPool.mapValues(sanitized)
+        }
+        if var rengoTeams = gameData.rengoTeams {
+            rengoTeams.black = rengoTeams.black.map(sanitized)
+            rengoTeams.white = rengoTeams.white.map(sanitized)
+            gameData.rengoTeams = rengoTeams
+        }
+
+        return gameData
     }
 }
+
+#Preview("Rengo 2 vs. 2", traits: .fixedLayout(width: 320, height: 200)) {
+    let game = Game(
+        ogsGame: TestData.Rengo2v2.gameData!.withoutRemoteAvatarsForPreview()
+    )
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "hakhoa", id: 1765),
+        activeGames: [game]
+    )
+
+    PlayersBannerView(game: game, showsRengoTeamDetail: false)
+        .environmentObject(ogs)
+}
+
+#Preview("Rengo 3 vs. 1", traits: .fixedLayout(width: 320, height: 200)) {
+    let game = Game(
+        ogsGame: TestData.Rengo3v1.gameData!.withoutRemoteAvatarsForPreview()
+    )
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "honganhkhoa", id: 1526),
+        activeGames: [game]
+    )
+
+    PlayersBannerView(game: game, showsPlayersName: true)
+        .environmentObject(ogs)
+}
+
+#Preview("Standard live game", traits: .fixedLayout(width: 320, height: 200)) {
+    let game = TestData.Ongoing19x19wBot3
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: [game]
+    )
+
+    PlayersBannerView(game: game, showsPlayersName: true)
+        .environmentObject(ogs)
+}
+
+#Preview("Stone removal", traits: .fixedLayout(width: 500, height: 300)) {
+    let game = TestData.StoneRemoval9x9
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "HongAnhKhoa", id: 314459),
+        activeGames: [game]
+    )
+
+    PlayersBannerView(
+        game: game,
+        playerIconSize: 96,
+        showsPlayersName: true
+    )
+    .environmentObject(ogs)
+}
+#endif

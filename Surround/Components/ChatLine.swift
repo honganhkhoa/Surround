@@ -76,20 +76,30 @@ struct ChatLine: View {
     }
 }
 
-struct ChatLine_Previews: PreviewProvider {
-    static var previews: some View {
-        let game = TestData.EuropeanChampionshipWithChat
-        return Group {
-            ChatLine(chatLine: game.chatLog[36])
-                .previewLayout(.fixed(width: 300, height: 250))
-            Group {
-                ChatLine(chatLine: game.chatLog[30])
-                ChatLine(chatLine: game.chatLog[11], horizontalAlignment: .trailing)
-                    .colorScheme(.dark)
-                ChatLine(chatLine: game.chatLog[game.chatLog.count - 1])
-                ChatLine(chatLine: game.chatLog[game.chatLog.count - 9])
-            }
-            .previewLayout(.fixed(width: 300, height: 100))
-        }
-    }
+#if DEBUG
+#Preview("Analysis variation", traits: .fixedLayout(width: 300, height: 250)) {
+    ChatLine(chatLine: TestData.EuropeanChampionshipWithChat.chatLog[36])
 }
+
+#Preview("Spectator message", traits: .fixedLayout(width: 300, height: 100)) {
+    ChatLine(chatLine: TestData.EuropeanChampionshipWithChat.chatLog[30])
+}
+
+#Preview("Trailing message — Dark", traits: .fixedLayout(width: 300, height: 100)) {
+    ChatLine(
+        chatLine: TestData.EuropeanChampionshipWithChat.chatLog[11],
+        horizontalAlignment: .trailing
+    )
+    .colorScheme(.dark)
+}
+
+#Preview("Moderator message", traits: .fixedLayout(width: 300, height: 100)) {
+    let game = TestData.EuropeanChampionshipWithChat
+    ChatLine(chatLine: game.chatLog[game.chatLog.count - 1])
+}
+
+#Preview("Professional player message", traits: .fixedLayout(width: 300, height: 100)) {
+    let game = TestData.EuropeanChampionshipWithChat
+    ChatLine(chatLine: game.chatLog[game.chatLog.count - 9])
+}
+#endif

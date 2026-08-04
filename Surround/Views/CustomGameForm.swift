@@ -807,3 +807,46 @@ struct CustomGameForm: View {
         )
     }
 }
+
+#if DEBUG
+private func customGameFormPreview(
+    initialChallenge: OGSChallengeTemplate? = nil,
+    mode: CustomGameForm.Mode = .createChallenge,
+    title: LocalizedStringKey
+) -> some View {
+    NavigationStack {
+        CustomGameForm(
+            initialChallenge: initialChallenge,
+            mode: mode
+        )
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(
+                username: "HongAnhKhoa",
+                id: 314459,
+                ranking: 27
+            ),
+            friends: [
+                OGSUser(username: "kata-bot", id: 592684, ranking: 36),
+            ]
+        )
+    )
+    .environmentObject(NavigationService())
+}
+
+#Preview("Custom game — Create challenge") {
+    customGameFormPreview(title: "Custom game")
+}
+
+#Preview("Custom game — Edit preferred setting") {
+    let setting = OGSChallengeSampleData.sampleChallengeTemplate
+    return customGameFormPreview(
+        initialChallenge: setting,
+        mode: .editPreferredSetting(original: setting),
+        title: "Edit preferred setting"
+    )
+}
+#endif

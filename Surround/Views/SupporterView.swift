@@ -110,20 +110,23 @@ struct SupporterView: View {
     }
 }
 
-struct SupporterView_Previews: PreviewProvider {
-    static var previews: some View {
-        SurroundService.shared.initializeProductsForPreview()
-//        userDefaults[.supporterProductId] = nil
-        userDefaults[.supporterProductId] = SurroundService.shared.supporterProducts[0].id
-        return Group {
-            NavigationView {
-                SupporterView()
-            }
-            .colorScheme(.dark)
-            NavigationView {
-                SupporterView()
-            }
-        }
-        .environmentObject(SurroundService.shared)
+#if DEBUG
+#Preview("Supporter — Current supporter, Dark") {
+    NavigationStack {
+        SupporterView()
     }
+    .environmentObject(
+        SurroundService.previewInstance(
+            supporterProductId: "com.honganhkhoa.Surround.SurroundSupporter1"
+        )
+    )
+    .preferredColorScheme(.dark)
 }
+
+#Preview("Supporter — Available tiers") {
+    NavigationStack {
+        SupporterView()
+    }
+    .environmentObject(SurroundService.previewInstance())
+}
+#endif

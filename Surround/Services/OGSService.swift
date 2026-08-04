@@ -118,6 +118,87 @@ final class AlamofireOGSHTTPClient: OGSHTTPClient {
     }
 }
 
+#if DEBUG
+/// Rejects every request made by a deterministic preview or UI-test service
+/// before it can reach the network.
+final class OGSOfflineRejectingURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        client?.urlProtocol(
+            self,
+            didFailWithError: URLError(
+                .notConnectedToInternet,
+                userInfo: [
+                    NSURLErrorFailingURLErrorKey: request.url as Any,
+                    NSLocalizedDescriptionKey: "Network access is disabled in deterministic Surround clients."
+                ]
+            )
+        )
+    }
+
+    override func stopLoading() {}
+}
+
+final class OGSOfflineRejectingHTTPClient: OGSHTTPClient {
+    let session: Session
+    let cookieStorage: HTTPCookieStorage? = nil
+
+    init() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OGSOfflineRejectingURLProtocol.self]
+        configuration.httpCookieStorage = nil
+        session = Session(configuration: configuration)
+    }
+}
+
+/// Provides configurable fixture readiness while making every socket lifecycle
+/// operation and command incapable of network access.
+final class OGSOfflineNoOpWebsocket: OGSWebsocketProtocol {
+    var serverEventCallback: ((String, Any?) -> Void)?
+    var onConnectTasks: [() -> Void] = []
+    var onStatusChanged: (() -> Void)?
+    var authenticationConfigProvider: () -> OGSUIConfig? = { nil }
+
+    let authenticated: Bool
+    let opened: Bool
+    let status: OGSWebsocketStatus
+    var drift = 0.0
+    var latency = 0.0
+
+    init(status: OGSWebsocketStatus = .connected) {
+        self.status = status
+        opened = status == .connected
+        authenticated = status == .connected
+    }
+
+    func connect() {}
+    func close() {}
+    func reconnectIfNeeded() {}
+    func closeThenReconnect() {}
+
+    func emit(
+        command: String,
+        data: Any,
+        resultCallback: OGSWebsocketResultCallback?
+    ) {
+        resultCallback?(
+            nil,
+            [
+                "type": "connection",
+                "message": "Network access is disabled in deterministic Surround clients."
+            ]
+        )
+    }
+}
+#endif
+
 extension OGSServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
@@ -389,10 +470,7 @@ class OGSService: ObservableObject {
         }
     }
 
-    convenience init(
-        forPreview: Bool = false,
-        initialState: BootstrapState? = nil
-    ) {
+    convenience init() {
         self.init(
             environment: .current,
             httpClient: AlamofireOGSHTTPClient.shared,
@@ -401,15 +479,35 @@ class OGSService: ObservableObject {
                 rootURL: OGSEnvironment.current.rootURL,
                 websocketURL: OGSEnvironment.current.websocketURL
             ),
-            connectsAutomatically: !forPreview,
-            usesSurroundOverviewService: !forPreview && OGSEnvironment.current == .production,
-            enablesAppSideEffects: !forPreview,
-            startsTimers: !forPreview,
-            installsObservers: !forPreview,
+            connectsAutomatically: true,
+            usesSurroundOverviewService: OGSEnvironment.current == .production,
+            enablesAppSideEffects: true,
+            startsTimers: true,
+            installsObservers: true,
             remoteSettings: .shared,
-            initialState: initialState
+            initialState: nil
         )
     }
+
+    #if DEBUG
+    convenience init(previewState: BootstrapState) {
+        self.init(
+            environment: .current,
+            httpClient: OGSOfflineRejectingHTTPClient(),
+            preferences: userDefaults,
+            ogsWebsocket: OGSOfflineNoOpWebsocket(
+                status: previewState.socketStatus
+            ),
+            connectsAutomatically: false,
+            usesSurroundOverviewService: false,
+            enablesAppSideEffects: false,
+            startsTimers: false,
+            installsObservers: false,
+            remoteSettings: .shared,
+            initialState: previewState
+        )
+    }
+    #endif
 
     /// Creates an OGS service from explicitly scoped dependencies.
     ///

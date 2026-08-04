@@ -11,11 +11,44 @@ import URLImage
 struct PrivateMessagesView: View {
     @EnvironmentObject var ogs: OGSService
 
+    private let privateMessagesOverride: [OGSPrivateMessage]?
+    private let unreadPeerIdsOverride: Set<Int>?
+    private let marksThreadsAsRead: Bool
+
+    init(
+        privateMessages: [OGSPrivateMessage]? = nil,
+        unreadPeerIds: Set<Int>? = nil,
+        marksThreadsAsRead: Bool = true
+    ) {
+        privateMessagesOverride = privateMessages
+        unreadPeerIdsOverride = unreadPeerIds
+        self.marksThreadsAsRead = marksThreadsAsRead
+    }
+
+    private var privateMessagesByPeerId: [Int: [OGSPrivateMessage]] {
+        guard let privateMessagesOverride else {
+            return ogs.privateMessagesByPeerId
+        }
+        guard let currentUserId = ogs.user?.id else {
+            return [:]
+        }
+        return Dictionary(grouping: privateMessagesOverride) { message in
+            message.from.id == currentUserId ? message.to.id : message.from.id
+        }
+    }
+
+    private var activePeerIds: Set<Int> {
+        if privateMessagesOverride != nil {
+            return Set(privateMessagesByPeerId.keys)
+        }
+        return ogs.privateMessagesActivePeerIds
+    }
+
     func user(id userId: Int) -> OGSUser? {
         if let user = ogs.cachedUsersById[userId] {
             return user
         } else {
-            if let firstMessage = ogs.privateMessagesByPeerId[userId]?.first {
+            if let firstMessage = privateMessagesByPeerId[userId]?.first {
                 if firstMessage.from.id == userId {
                     return firstMessage.from
                 } else {
@@ -28,8 +61,8 @@ struct PrivateMessagesView: View {
     
     var data: [(peer: OGSUser, lastMessage: OGSPrivateMessage)] {
         var result = [(peer: OGSUser, lastMessage: OGSPrivateMessage)]()
-        for peerId in ogs.privateMessagesActivePeerIds {
-            if let user = user(id: peerId), let lastMessage = ogs.privateMessagesByPeerId[peerId]?.last {
+        for peerId in activePeerIds {
+            if let user = user(id: peerId), let lastMessage = privateMessagesByPeerId[peerId]?.last {
                 result.append((peer: user, lastMessage: lastMessage))
             }
         }
@@ -37,12 +70,29 @@ struct PrivateMessagesView: View {
         return result
     }
 
+    private func hasUnreadMessage(
+        from peer: OGSUser,
+        lastMessage: OGSPrivateMessage
+    ) -> Bool {
+        if let unreadPeerIdsOverride {
+            return unreadPeerIdsOverride.contains(peer.id)
+        }
+        return userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0
+            < lastMessage.content.timestamp
+    }
+
     var body: some View {
         List {
             Section(footer: Text("Private messages are only stored for a few days, so please make sure to save any important information somewhere else.").font(.caption)) {
                 ForEach(data, id: \.peer.id) { peer, lastMessage in
                     NavigationLink(destination:
-                                    PrivateMessageLog(peer: peer)
+                                    PrivateMessageLog(
+                                        peer: peer,
+                                        messages: privateMessagesOverride == nil
+                                            ? nil
+                                            : privateMessagesByPeerId[peer.id],
+                                        marksThreadAsRead: marksThreadsAsRead
+                                    )
                                     .navigationBarTitle(peer.username)
                                     .navigationBarTitleDisplayMode(.inline)
                     ) {
@@ -56,7 +106,10 @@ struct PrivateMessagesView: View {
                                     .frame(width: 48, height: 48)
                                     .background(Color.gray)
                             }
-                            let hasUnread = userDefaults[.lastSeenPrivateMessageByOGSUserId]?[peer.id] ?? 0 < lastMessage.content.timestamp
+                            let hasUnread = hasUnreadMessage(
+                                from: peer,
+                                lastMessage: lastMessage
+                            )
                             VStack(alignment: .leading) {
                                 Text(peer.username)
                                     .foregroundColor(peer.uiColor)
@@ -75,16 +128,46 @@ struct PrivateMessagesView: View {
     }
 }
 
-struct PrivateMessagesView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationService.shared.main.rootView = .privateMessages
-        return NavigationView {
-            PrivateMessagesView()
-                .modifier(RootViewSwitchingMenu())
-                .environmentObject(OGSService.previewInstance(
-                    user: OGSUser(username: "hakhoa", id: 765826)
-                ))
-                .environmentObject(NavigationService.shared)
-        }
+#if DEBUG
+#Preview("Private messages — Populated inbox") {
+    let nav = NavigationService()
+    nav.main.rootView = .privateMessages
+    return NavigationStack {
+        PrivateMessagesView(
+            privateMessages: OGSPrivateMessage.sampleData,
+            unreadPeerIds: [314459, 955348],
+            marksThreadsAsRead: false
+        )
+            .modifier(RootViewSwitchingMenu())
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826),
+            privateMessages: []
+        )
+    )
+    .environmentObject(nav)
+    .environment(\.surroundAllowsRemoteActivity, false)
 }
+
+#Preview("Private messages — Empty inbox") {
+    let nav = NavigationService()
+    nav.main.rootView = .privateMessages
+    return NavigationStack {
+        PrivateMessagesView(
+            privateMessages: [],
+            unreadPeerIds: [],
+            marksThreadsAsRead: false
+        )
+            .modifier(RootViewSwitchingMenu())
+    }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(username: "hakhoa", id: 765826),
+            privateMessages: []
+        )
+    )
+    .environmentObject(nav)
+    .environment(\.surroundAllowsRemoteActivity, false)
+}
+#endif

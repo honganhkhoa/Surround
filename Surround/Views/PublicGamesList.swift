@@ -59,25 +59,31 @@ struct PublicGamesList: View {
     }
 }
 
-struct PublicGamesList_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationService.shared.main.rootView = .publicGames
-        return NavigationView {
-            PublicGamesList()
-                .modifier(RootViewSwitchingMenu())
-        }
-        .navigationViewStyle(StackNavigationViewStyle())
-        .environmentObject(
-            OGSService.previewInstance(
-                publicGames: [
-                    TestData.Ongoing19x19HandicappedWithNoInitialState,
-                    TestData.Scored15x17,
-                    TestData.Resigned9x9Japanese,
-                    TestData.StoneRemoval9x9
-                ]
-            )
-        )
-        .environmentObject(NavigationService.shared)
-        .colorScheme(.dark)
+#if DEBUG
+private func publicGamesPreview(games: [Game]) -> some View {
+    let nav = NavigationService()
+    nav.main.rootView = .publicGames
+    return NavigationStack {
+        PublicGamesList()
+            .modifier(RootViewSwitchingMenu())
     }
+    .environmentObject(OGSService.previewInstance(publicGames: games))
+    .environmentObject(nav)
 }
+
+#Preview("Public games — Loaded") {
+    publicGamesPreview(
+        games: [
+            TestData.Ongoing19x19HandicappedWithNoInitialState,
+            TestData.Scored15x17,
+            TestData.Resigned9x9Japanese,
+            TestData.StoneRemoval9x9,
+        ]
+    )
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Public games — Empty") {
+    publicGamesPreview(games: [])
+}
+#endif

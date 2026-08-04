@@ -155,20 +155,36 @@ struct WaitingGamesView: View {
     }
 }
 
-struct WaitingGamesView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            WaitingGamesView()
-                .navigationTitle("Waiting")
-                .navigationBarTitleDisplayMode(.inline)
-        }
-        .environmentObject(OGSService.previewInstance(
+#if DEBUG
+private func waitingGamesPreview(
+    openChallenges: [OGSSeekgraphChallenge],
+    automatchEntries: [OGSAutomatchEntry]
+) -> some View {
+    NavigationStack {
+        WaitingGamesView()
+            .navigationTitle("Waiting")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(
+        OGSService.previewInstance(
             user: OGSUser(
                 username: "#albatros",
                 id: 442873
             ),
-            openChallengesSent: [OGSChallengeSampleData.sampleOpenChallenge],
-            automatchEntries: [OGSAutomatchEntry.sampleEntry]
-        ))
-    }
+            openChallengesSent: openChallenges,
+            automatchEntries: automatchEntries
+        )
+    )
 }
+
+#Preview("Waiting games — Requests") {
+    waitingGamesPreview(
+        openChallenges: [OGSChallengeSampleData.sampleOpenChallenge],
+        automatchEntries: [OGSAutomatchEntry.sampleEntry]
+    )
+}
+
+#Preview("Waiting games — Empty") {
+    waitingGamesPreview(openChallenges: [], automatchEntries: [])
+}
+#endif

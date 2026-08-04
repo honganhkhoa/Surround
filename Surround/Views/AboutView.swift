@@ -141,20 +141,35 @@ struct AboutView: View {
     }
 }
 
-struct AboutView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationService.shared.main.rootView = .about
-        return Group {
-            NavigationView {
-                ThanksView()
-            }
-            NavigationView {
-                AboutView()
-                    .modifier(RootViewSwitchingMenu())
-            }
-        }
-        .environmentObject(OGSService.previewInstance(user: OGSUser(username: "user", id: 0)))
-        .environmentObject(NavigationService.shared)
-        
+#if DEBUG
+#Preview("Acknowledgements") {
+    let nav = NavigationService()
+    nav.main.rootView = .about
+    return NavigationStack {
+        ThanksView()
     }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(username: "user", id: 0)
+        )
+    )
+    .environmentObject(nav)
+    .environmentObject(SurroundService.previewInstance())
 }
+
+#Preview("About") {
+    let nav = NavigationService()
+    nav.main.rootView = .about
+    return NavigationStack {
+        AboutView()
+            .modifier(RootViewSwitchingMenu())
+    }
+    .environmentObject(
+        OGSService.previewInstance(
+            user: OGSUser(username: "user", id: 0)
+        )
+    )
+    .environmentObject(nav)
+    .environmentObject(SurroundService.previewInstance())
+}
+#endif

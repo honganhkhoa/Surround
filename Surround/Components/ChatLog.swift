@@ -217,23 +217,33 @@ struct NewChatInput: View {
     }
 }
 
-struct ChatLog_Previews: PreviewProvider {
-    static var previews: some View {
-        let ogs = OGSService.previewInstance(
-            user: OGSUser(username: "artem92", id: 655950)
-        )
-        let game = TestData.EuropeanChampionshipWithChat
-        game.ogs = ogs
-        return Group {
-            NewChatInput(game: game)
-                .previewLayout(.fixed(width: 350, height: 100))
-                .environmentObject(ogs)
-            ChatLog(game: game)
-                .previewLayout(.fixed(width: 350, height: 400))
-                .environmentObject(ogs)
-            ChatLog(game: game)
-                .previewLayout(.fixed(width: 350, height: 400))
-                .environmentObject(OGSService.previewInstance())
-        }
-    }
+#if DEBUG
+#Preview("New message input", traits: .fixedLayout(width: 350, height: 100)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(game: game)
+        .environmentObject(ogs)
 }
+
+#Preview("Game chat", traits: .fixedLayout(width: 350, height: 400)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return ChatLog(game: game)
+        .environmentObject(ogs)
+}
+
+#Preview("Game chat — Signed out", traits: .fixedLayout(width: 350, height: 400)) {
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    return ChatLog(game: game)
+        .environmentObject(OGSService.previewInstance())
+}
+#endif
