@@ -7,6 +7,11 @@
 
 import Foundation
 
+let defaultGameName = String(
+    localized: "Friendly Match",
+    comment: "Default game name"
+)
+
 protocol OGSChallenge: Decodable, Hashable {
     associatedtype GameDetail: OGSChallengeGameDetail
     
@@ -689,6 +694,41 @@ struct OGSChallengeTemplate: OGSChallenge, Encodable {
         try container.encode(game, forKey: .game)
         try container.encode(false, forKey: .agaRanked)
         try container.encode(rengoAutoStart ?? 0, forKey: .rengoAutoStart)
+    }
+}
+
+extension OGSChallengeTemplate {
+    static func rematch(for game: Game) -> OGSChallengeTemplate? {
+        guard game.gamePhase == .finished,
+              game.isUserPlaying,
+              !game.rengo,
+              let gameData = game.gameData,
+              let userColor = game.userStoneColor,
+              let opponent = game.currentPlayer(with: userColor.opponentColor()) else {
+            return nil
+        }
+
+        var challenge = OGSChallengeTemplate(
+            game: .init(
+                width: gameData.width,
+                height: gameData.height,
+                ranked: gameData.ranked,
+                isPrivate: gameData.private ?? false,
+                komi: gameData.komi,
+                komiAuto: "custom",
+                handicap: gameData.handicap,
+                disableAnalysis: gameData.disableAnalysis,
+                name: defaultGameName,
+                rules: gameData.rules,
+                timeControl: gameData.timeControl,
+                initialState: nil,
+                rengo: false
+            )
+        )
+        challenge.challenger = game.ogs?.user
+        challenge.challenged = opponent
+        challenge.challengerColor = userColor
+        return challenge
     }
 }
 

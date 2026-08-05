@@ -8,6 +8,37 @@
 import SwiftUI
 import Combine
 
+private struct RematchPresentation: Identifiable {
+    let gameID: GameID
+    let challenge: OGSChallengeTemplate
+
+    var id: GameID { gameID }
+}
+
+private struct RematchChallengeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let challenge: OGSChallengeTemplate
+
+    var body: some View {
+        NavigationStack {
+            CustomGameForm(
+                initialChallenge: challenge,
+                mode: .rematch
+            )
+            .navigationTitle("Rematch")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct GameControlRow: View {
     @EnvironmentObject var ogs: OGSService
     @ObservedObject var game: Game
@@ -23,6 +54,7 @@ struct GameControlRow: View {
     @State var showingResumeFromStoneRemovalAlert = false
     @State var showingResignAlert = false
     @State var showingCancelAlert = false
+    @State private var rematchPresentation: RematchPresentation?
     
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
@@ -190,6 +222,16 @@ struct GameControlRow: View {
                                 Text("Clear estimates")
                                     .minimumScaleFactor(0.7)
                             }
+                        } else if let rematch = OGSChallengeTemplate.rematch(for: game) {
+                            Button("Rematch") {
+                                rematchPresentation = RematchPresentation(
+                                    gameID: game.ID,
+                                    challenge: rematch
+                                )
+                            }
+                            .accessibilityIdentifier(
+                                SurroundUITestContract.AccessibilityID.gameRematch
+                            )
                         } else if isUserTurnToPlay {
                             if let pendingMove = pendingMove.wrappedValue {
                                 Button(action: { submitMove(move: pendingMove)}) {
@@ -336,6 +378,9 @@ struct GameControlRow: View {
                     }
                 }
             }
+        }
+        .sheet(item: $rematchPresentation) { presentation in
+            RematchChallengeSheet(challenge: presentation.challenge)
         }
     }
 }

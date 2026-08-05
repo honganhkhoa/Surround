@@ -197,6 +197,10 @@ struct OGSGame: Decodable {
     var gameName: String
     var handicap: Int
     var ranked: Bool
+    // The REST payload declares this required, but the Goban engine config
+    // marks it optional, so game payloads may omit it. Every official client
+    // read treats absence as public.
+    var `private`: Bool?
     var rules: OGSRule
     var initialPlayer: StoneColor
     var initialState: InitialState

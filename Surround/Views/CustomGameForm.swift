@@ -7,8 +7,6 @@ import SwiftUI
 import URLImage
 import Combine
 
-let defaultGameName = String(localized: "Friendly Match", comment: "Default game name")
-
 struct CustomGameForm: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -17,6 +15,7 @@ struct CustomGameForm: View {
     
     enum Mode {
         case createChallenge
+        case rematch
         case createPreferredSetting
         case editPreferredSetting(original: OGSChallengeTemplate)
     }
@@ -302,11 +301,13 @@ struct CustomGameForm: View {
     var opponentOptions: some View {
         GroupBox(label: Text("Opponent")) {
             if !isPreferredSettingMode {
-                Picker(selection: $isOpen.animation(), label: Text("Is open")) {
-                    Text("Open", comment: "Opponent section of NewGameView, 'Open' here means anyone").tag(true)
-                    Text("vs. Friend", comment: "Opponent section of NewGameView").tag(false)
-                }.pickerStyle(SegmentedPickerStyle())
-                if isOpen {
+                if !isRematchMode {
+                    Picker(selection: $isOpen.animation(), label: Text("Is open")) {
+                        Text("Open", comment: "Opponent section of NewGameView, 'Open' here means anyone").tag(true)
+                        Text("vs. Friend", comment: "Opponent section of NewGameView").tag(false)
+                    }.pickerStyle(SegmentedPickerStyle())
+                }
+                if isOpen && !isRematchMode {
                     Text("Create and show a challenge publicly, then wait for other players to accept.")
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
@@ -318,36 +319,15 @@ struct CustomGameForm: View {
                         .leadingAlignedInScrollView()
                     Spacer().frame(height: 10)
                     Divider()
-                    NavigationLink(destination: UserSelectionView(user: $opponent)) {
-                        HStack {
-                            if let opponent = opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
-                                URLImage(url: opponentIconURL) { $0.resizable() }
-                                    .frame(width: 64, height: 64)
-                                    .background(Color.gray)
-                                    .cornerRadius(10)
-                            } else {
-                                Image(systemName: "person.crop.square")
-                                    .font(.system(size: 64))
-                                    .frame(width: 64, height: 64)
-                                    .cornerRadius(10)
-                            }
-                            if let opponent = opponent {
-                                VStack(alignment: .leading) {
-                                    Text(verbatim: opponent.username).bold()
-                                    if !Setting(.hidesRank).wrappedValue {
-                                        Text(verbatim: "[\(opponent.formattedRank)]").font(.subheadline)
-                                    }
-                                }
-                                .foregroundColor(opponent.uiColor)
-                            } else {
-                                HStack(spacing: 4) {
-                                    Text("Select your opponent ")
-                                    Image(systemName: "chevron.forward")
-                                }
-                                .font(.subheadline)
-                                .bold()
-                            }
-                            Spacer()
+                    if isRematchMode {
+                        selectedOpponentRow
+                            .accessibilityIdentifier(
+                                SurroundUITestContract.AccessibilityID
+                                    .gameRematchOpponent
+                            )
+                    } else {
+                        NavigationLink(destination: UserSelectionView(user: $opponent)) {
+                            selectedOpponentRow
                         }
                     }
                 }
@@ -391,6 +371,39 @@ struct CustomGameForm: View {
         }
         .onChange(of: minRank) { _, newValue in
             maxRank = max(maxRank, newValue)
+        }
+    }
+
+    var selectedOpponentRow: some View {
+        HStack {
+            if let opponent = opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
+                URLImage(url: opponentIconURL) { $0.resizable() }
+                    .frame(width: 64, height: 64)
+                    .background(Color.gray)
+                    .cornerRadius(10)
+            } else {
+                Image(systemName: "person.crop.square")
+                    .font(.system(size: 64))
+                    .frame(width: 64, height: 64)
+                    .cornerRadius(10)
+            }
+            if let opponent = opponent {
+                VStack(alignment: .leading) {
+                    Text(verbatim: opponent.username).bold()
+                    if !Setting(.hidesRank).wrappedValue {
+                        Text(verbatim: "[\(opponent.formattedRank)]").font(.subheadline)
+                    }
+                }
+                .foregroundColor(opponent.uiColor)
+            } else {
+                HStack(spacing: 4) {
+                    Text("Select your opponent ")
+                    Image(systemName: "chevron.forward")
+                }
+                .font(.subheadline)
+                .bold()
+            }
+            Spacer()
         }
     }
     
@@ -620,7 +633,16 @@ struct CustomGameForm: View {
     }
     
     var isChallengeCreationMode: Bool {
-        if case .createChallenge = mode {
+        switch mode {
+        case .createChallenge, .rematch:
+            true
+        case .createPreferredSetting, .editPreferredSetting:
+            false
+        }
+    }
+
+    var isRematchMode: Bool {
+        if case .rematch = mode {
             return true
         }
         return false
@@ -644,7 +666,13 @@ struct CustomGameForm: View {
                 ProgressView()
             } else {
                 if isChallengeCreationMode {
-                    MainActionButton(label: String(localized: "Create challenge"), disabled: createButtonDisabled, action: createChallenge)
+                    MainActionButton(
+                        label: isRematchMode
+                            ? String(localized: "Send challenge")
+                            : String(localized: "Create challenge"),
+                        disabled: createButtonDisabled,
+                        action: createChallenge
+                    )
                 }
                 if !isOpen && opponent == nil {
                     Text("You need to choose an opponent or make the challenge open.")
@@ -662,7 +690,11 @@ struct CustomGameForm: View {
                 receiveCompletion: { _ in
                     self.challengeCreatingCancellable = nil
                 }, receiveValue: { _ in
-                    nav.home.showingNewGameView = false
+                    if isRematchMode {
+                        dismiss()
+                    } else {
+                        nav.home.showingNewGameView = false
+                    }
                 })
         }
     }

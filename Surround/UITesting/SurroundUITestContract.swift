@@ -310,6 +310,8 @@ enum SurroundUITestContract {
         static let gameDisplayModePicker = "game.displayMode"
         static let gameAnalyzeToggle = "game.analyze"
         static let gameOptions = "game.options"
+        static let gameRematch = "game.rematch"
+        static let gameRematchOpponent = "game.rematch.opponent"
         static let gameZenEnter = "game.zen.enter"
         static let gameZenExit = "game.zen.exit"
 

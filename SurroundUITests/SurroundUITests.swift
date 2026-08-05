@@ -192,4 +192,32 @@ final class SurroundUITests: XCTestCase {
         )
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
     }
+
+    func testFinishedGameOffersRematchEditor() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameHistory.rawValue,
+        ])
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeHistoryGame(
+                SurroundUITestContract.screenshotHistoryGameIDs[0]
+            ),
+            in: app
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameRematch,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.screenCustomGame,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameRematchOpponent,
+            in: app
+        )
+    }
 }
