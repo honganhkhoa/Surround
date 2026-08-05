@@ -195,6 +195,7 @@ enum RootView: String, CaseIterable, Identifiable {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenBrowser)
+                .navigationTitle("Web version")
             } else {
                 OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/overview")!)
             }

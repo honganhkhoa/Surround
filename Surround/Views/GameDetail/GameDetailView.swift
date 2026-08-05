@@ -203,6 +203,19 @@ struct GameDetailView: View {
                 }
             }
         }
+        #if targetEnvironment(macCatalyst)
+        let trimmedTitle = title?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) ?? ""
+        let navigationTitle = trimmedTitle.isEmpty
+            ? String(
+                localized: "Game",
+                comment: "Fallback game window title"
+            )
+            : trimmedTitle
+        #else
+        let navigationTitle = navigationBarHidden ? "" : (title ?? "")
+        #endif
         
         let result = Group {
             if compactLayout {
@@ -243,11 +256,9 @@ struct GameDetailView: View {
                 }
             }
         }
-        .navigationTitle(
-            navigationBarHidden
-            ? "" :
-                (title ?? "")
-        )
+        // Catalyst keeps this useful as the Mac window title even when Zen
+        // mode hides the in-window navigation chrome.
+        .navigationTitle(navigationTitle)
         .navigationBarHidden(navigationBarHidden && !compactLayout)
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)

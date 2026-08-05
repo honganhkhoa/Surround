@@ -397,6 +397,7 @@
 		AE4100033C00000000000003 /* AppStoreScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = AppStoreScreenshots.xctestplan; sourceTree = "<group>"; };
 		AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityScreenshotTests.swift; sourceTree = "<group>"; };
 		AE4200033C00000000000003 /* CompatibilityScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = CompatibilityScreenshots.xctestplan; sourceTree = "<group>"; };
+		AE4300033C00000000000003 /* DesktopLayoutScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DesktopLayoutScreenshots.xctestplan; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
@@ -624,6 +625,7 @@
 			children = (
 				AE4100033C00000000000003 /* AppStoreScreenshots.xctestplan */,
 				AE4200033C00000000000003 /* CompatibilityScreenshots.xctestplan */,
+				AE4300033C00000000000003 /* DesktopLayoutScreenshots.xctestplan */,
 				BC6493F92538237D002B2200 /* SurroundWidgetsExtension.entitlements */,
 				BC042AF124AB2CF50050B2D1 /* Surround */,
 				BC64937D25380A9F002B2200 /* SurroundWidgets */,

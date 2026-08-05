@@ -402,51 +402,433 @@ private struct CompatibilityScreenshotReadinessModifier: ViewModifier {
 #if targetEnvironment(macCatalyst)
 private struct CatalystUITestWindowPositioner: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
-        PositioningView()
+        PositioningView(frame: .zero)
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {}
 
     private final class PositioningView: UIView {
+        private var effectiveGeometryObservation: NSKeyValueObservation?
+        private var ownsWindowScene = false
+        private var geometryUpdateCompleted = false
+        private var geometryRequestInFlight = false
+        private var geometryUpdateAttempts = 0
+        private var geometryRetryScheduled = false
+        private var geometryRetryCount = 0
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            accessibilityIdentifier = SurroundUITestContract.AccessibilityID
+                .catalystWindowGeometry
+            accessibilityLabel = "Catalyst window content size"
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
         override func didMoveToWindow() {
             super.didMoveToWindow()
+
+            effectiveGeometryObservation?.invalidate()
+            effectiveGeometryObservation = nil
+            ownsWindowScene = false
+            updateAccessibilityGeometry()
             guard let windowScene = window?.windowScene else { return }
 
-            DispatchQueue.main.async {
-                guard OfflineUITestWindowCoordinator.claim(windowScene) else {
+            effectiveGeometryObservation = windowScene.observe(
+                \.effectiveGeometry,
+                options: [.initial, .new]
+            ) { [weak self, weak windowScene] _, _ in
+                DispatchQueue.main.async {
+                    guard let self,
+                          let windowScene,
+                          self.window?.windowScene === windowScene else {
+                        return
+                    }
+                    self.updateAccessibilityGeometry()
+                }
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      self.window?.windowScene === windowScene else {
+                    return
+                }
+                let claim = OfflineUITestWindowCoordinator.claim(windowScene)
+                switch claim {
+                case .rejected:
                     UIApplication.shared.requestSceneSessionDestruction(
                         windowScene.session,
                         options: nil
                     )
                     return
+                case .freshDefault:
+                    accessibilityIdentifier = SurroundUITestContract
+                        .AccessibilityID.catalystFreshWindowGeometry
+                case .primary:
+                    break
                 }
 
-                for session in UIApplication.shared.openSessions
-                    where session.persistentIdentifier != windowScene.session.persistentIdentifier {
-                    UIApplication.shared.requestSceneSessionDestruction(session, options: nil)
+                if claim == .primary,
+                   SurroundUITestContract.shouldUseCatalystDefaultWindowSize {
+                    OfflineUITestWindowCoordinator.openFreshDefaultScene(
+                        from: windowScene
+                    )
+                } else {
+                    for session in UIApplication.shared.openSessions
+                        where session.persistentIdentifier
+                            != windowScene.session.persistentIdentifier {
+                        UIApplication.shared.requestSceneSessionDestruction(
+                            session,
+                            options: nil
+                        )
+                    }
                 }
 
-                guard windowScene.activationState != .unattached else { return }
-
-                let preferences = UIWindowScene.GeometryPreferences.Mac(
-                    systemFrame: CGRect(x: 100, y: 100, width: 1200, height: 760)
-                )
-                windowScene.requestGeometryUpdate(preferences)
+                isAccessibilityElement = true
+                ownsWindowScene = true
+                updateAccessibilityGeometry()
+                setNeedsLayout()
+                scheduleGeometryUpdateIfReady()
             }
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            updateAccessibilityGeometry()
+            scheduleGeometryUpdateIfReady()
+        }
+
+        private func scheduleGeometryUpdateIfReady() {
+            guard ownsWindowScene,
+                  !geometryRequestInFlight,
+                  !geometryRetryScheduled,
+                  geometryUpdateAttempts < 3,
+                  let window,
+                  bounds.width > 0,
+                  bounds.height > 0,
+                  window.windowScene?.activationState != .unattached else {
+                return
+            }
+
+            guard let contentSize = requestedContentSize else {
+                geometryUpdateCompleted = true
+                return
+            }
+            if geometryUpdateCompleted,
+               contentSizeApproximatelyMatches(bounds.size, contentSize) {
+                return
+            }
+
+            geometryUpdateCompleted = false
+            geometryRequestInFlight = true
+            DispatchQueue.main.async { [weak self] in
+                self?.requestGeometryUpdate()
+            }
+        }
+
+        private func requestGeometryUpdate() {
+            guard let window,
+                  let windowScene = window.windowScene else {
+                retryGeometryUpdate()
+                return
+            }
+
+            guard windowScene.activationState == .foregroundActive else {
+                retryGeometryUpdate()
+                return
+            }
+
+            guard !windowScene.isFullScreen else {
+                geometryRequestInFlight = false
+                return
+            }
+
+            guard let contentSize = requestedContentSize else {
+                geometryRequestInFlight = false
+                geometryUpdateCompleted = true
+                return
+            }
+            let currentSystemFrame = windowScene.effectiveGeometry.systemFrame
+            let currentContentSize = bounds.size
+            guard !currentSystemFrame.isNull,
+                  !currentSystemFrame.isInfinite,
+                  currentSystemFrame.width.isFinite,
+                  currentSystemFrame.height.isFinite,
+                  currentSystemFrame.width > 0,
+                  currentSystemFrame.height > 0,
+                  currentContentSize.width.isFinite,
+                  currentContentSize.height.isFinite,
+                  currentContentSize.width > 0,
+                  currentContentSize.height > 0 else {
+                retryGeometryUpdate()
+                return
+            }
+
+            if contentSizeApproximatelyMatches(
+                currentContentSize,
+                contentSize
+            ) {
+                updateAccessibilityGeometry()
+                geometryRequestInFlight = false
+                geometryUpdateCompleted = true
+                return
+            }
+
+            let contentToSystemScale =
+                currentSystemFrame.width / currentContentSize.width
+            guard contentToSystemScale.isFinite,
+                  contentToSystemScale > 0 else {
+                retryGeometryUpdate()
+                return
+            }
+            let chromeSize = CGSize(
+                width: max(
+                    0,
+                    currentSystemFrame.width
+                        - currentContentSize.width * contentToSystemScale
+                ),
+                height: max(
+                    0,
+                    currentSystemFrame.height
+                        - currentContentSize.height * contentToSystemScale
+                )
+            )
+            let targetSystemSize = CGSize(
+                width: contentSize.width * contentToSystemScale
+                    + chromeSize.width,
+                height: contentSize.height * contentToSystemScale
+                    + chromeSize.height
+            )
+            let targetSystemFrame = CGRect(
+                origin: currentSystemFrame.origin,
+                size: targetSystemSize
+            )
+            if let sizeRestrictions = windowScene.sizeRestrictions {
+                print(
+                    "Offline UI-test window size restrictions: "
+                        + "minimum \(sizeRestrictions.minimumSize); "
+                        + "maximum \(sizeRestrictions.maximumSize)."
+                )
+            }
+            print(
+                "Offline UI-test window geometry request: content "
+                    + "\(Int(currentContentSize.width))x"
+                    + "\(Int(currentContentSize.height)) -> "
+                    + "\(Int(contentSize.width))x\(Int(contentSize.height)); "
+                    + "system \(currentSystemFrame) -> \(targetSystemFrame)."
+            )
+            let preferences = UIWindowScene.GeometryPreferences.Mac(
+                systemFrame: targetSystemFrame
+            )
+            geometryUpdateAttempts += 1
+            let requestAttempt = geometryUpdateAttempts
+            windowScene.requestGeometryUpdate(preferences) { [weak self] error in
+                guard let self,
+                      geometryUpdateAttempts == requestAttempt else {
+                    return
+                }
+                print(
+                    "Offline UI-test window geometry update failed: "
+                        + error.localizedDescription
+                )
+                retryGeometryUpdate()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                [weak self] in
+                guard let self,
+                      geometryRequestInFlight,
+                      geometryUpdateAttempts == requestAttempt,
+                      self.window != nil else { return }
+                let updatedContentSize = bounds.size
+                updateAccessibilityGeometry()
+                guard contentSizeApproximatelyMatches(
+                    updatedContentSize,
+                    contentSize
+                ) else {
+                    print(
+                        "Offline UI-test window geometry update did not "
+                            + "reach \(Int(contentSize.width))x"
+                            + "\(Int(contentSize.height)); content is "
+                            + "\(Int(updatedContentSize.width))x"
+                            + "\(Int(updatedContentSize.height))."
+                    )
+                    retryGeometryUpdate()
+                    return
+                }
+                geometryRequestInFlight = false
+                geometryUpdateCompleted = true
+            }
+        }
+
+        private func retryGeometryUpdate() {
+            geometryRequestInFlight = false
+            geometryUpdateCompleted = false
+            guard geometryUpdateAttempts < 3,
+                  !geometryRetryScheduled,
+                  geometryRetryCount < 30 else {
+                return
+            }
+
+            geometryRetryCount += 1
+            geometryRetryScheduled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                [weak self] in
+                guard let self else { return }
+                geometryRetryScheduled = false
+                setNeedsLayout()
+                scheduleGeometryUpdateIfReady()
+            }
+        }
+
+        private func updateAccessibilityGeometry() {
+            let contentSize = bounds.size
+            guard window != nil,
+                  contentSize.width.isFinite,
+                  contentSize.height.isFinite,
+                  contentSize.width > 0,
+                  contentSize.height > 0 else {
+                accessibilityValue = "unavailable"
+                return
+            }
+
+            let contentGeometry = formattedGeometry(contentSize)
+            let windowGeometry = formattedGeometry(window?.bounds.size)
+            let systemGeometry = formattedGeometry(
+                window?.windowScene?.effectiveGeometry.systemFrame.size
+            )
+            let presentation = window?.windowScene?.isFullScreen == true
+                ? "full-screen"
+                : "windowed"
+            let geometryComponents = [
+                contentGeometry,
+                "window-\(windowGeometry)",
+                "system-\(systemGeometry)",
+                presentation,
+            ]
+            accessibilityValue = geometryComponents.joined(separator: "|")
+        }
+
+        private func formattedGeometry(_ size: CGSize?) -> String {
+            guard let size else { return "unavailable" }
+            return [
+                Int(size.width.rounded()),
+                Int(size.height.rounded()),
+            ]
+                .map(String.init)
+                .joined(separator: "x")
+        }
+
+        private func contentSizeApproximatelyMatches(
+            _ first: CGSize,
+            _ second: CGSize
+        ) -> Bool {
+            abs(first.width - second.width) <= 0.5
+                && abs(first.height - second.height) <= 0.5
+        }
+
+        private var requestedContentSize: CGSize? {
+            if SurroundUITestContract.shouldUseCatalystDefaultWindowSize {
+                return nil
+            }
+            return SurroundUITestContract.catalystWindowSize
+                ?? CGSize(width: 1_200, height: 760)
+        }
+
+        deinit {
+            effectiveGeometryObservation?.invalidate()
         }
     }
 }
 
 private enum OfflineUITestWindowCoordinator {
-    private static var claimedSessionIdentifier: String?
+    enum Claim: Equatable {
+        case primary
+        case freshDefault
+        case rejected
+    }
 
-    static func claim(_ windowScene: UIWindowScene) -> Bool {
+    private static var claimedSessionIdentifier: String?
+    private static var defaultSizeBootstrapSessionIdentifier: String?
+    private static var defaultSizeBootstrapSessionIdentifiers = Set<String>()
+    private static var freshDefaultRequestStarted = false
+    private static var freshDefaultSessionIdentifier: String?
+
+    static func claim(_ windowScene: UIWindowScene) -> Claim {
         let sessionIdentifier = windowScene.session.persistentIdentifier
+        if SurroundUITestContract.shouldUseCatalystDefaultWindowSize {
+            if let freshDefaultSessionIdentifier {
+                return freshDefaultSessionIdentifier == sessionIdentifier
+                    ? .freshDefault
+                    : .rejected
+            }
+            if let defaultSizeBootstrapSessionIdentifier {
+                if defaultSizeBootstrapSessionIdentifier
+                    == sessionIdentifier {
+                    return .primary
+                }
+
+                guard freshDefaultRequestStarted,
+                      !defaultSizeBootstrapSessionIdentifiers.contains(
+                        sessionIdentifier
+                      ) else {
+                    return .rejected
+                }
+
+                // A sessionless activation request creates exactly one fresh
+                // WindowGroup scene after the restored bootstrap sessions.
+                freshDefaultSessionIdentifier = sessionIdentifier
+                claimedSessionIdentifier = sessionIdentifier
+                return .freshDefault
+            }
+
+            defaultSizeBootstrapSessionIdentifier = sessionIdentifier
+            claimedSessionIdentifier = sessionIdentifier
+            return .primary
+        }
         if let claimedSessionIdentifier {
             return claimedSessionIdentifier == sessionIdentifier
+                ? .primary
+                : .rejected
         } else {
             claimedSessionIdentifier = sessionIdentifier
-            return true
+            return .primary
+        }
+    }
+
+    static func openFreshDefaultScene(from bootstrapScene: UIWindowScene) {
+        guard SurroundUITestContract.shouldUseCatalystDefaultWindowSize,
+              defaultSizeBootstrapSessionIdentifier
+                == bootstrapScene.session.persistentIdentifier,
+              !freshDefaultRequestStarted else {
+            return
+        }
+
+        let openSessions = UIApplication.shared.openSessions
+        defaultSizeBootstrapSessionIdentifiers = Set(
+            openSessions.map(\.persistentIdentifier)
+        )
+        freshDefaultRequestStarted = true
+
+        for session in openSessions
+            where session.persistentIdentifier
+                != bootstrapScene.session.persistentIdentifier {
+            UIApplication.shared.requestSceneSessionDestruction(
+                session,
+                options: nil
+            )
+        }
+
+        UIApplication.shared.activateSceneSession(
+            for: UISceneSessionActivationRequest()
+        ) { error in
+            print(
+                "Offline UI-test fresh default scene activation failed: "
+                    + error.localizedDescription
+            )
         }
     }
 }

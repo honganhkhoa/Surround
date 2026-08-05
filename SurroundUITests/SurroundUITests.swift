@@ -39,13 +39,16 @@ final class SurroundUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launchApp() -> XCUIApplication {
+    private func launchApp(
+        additionalLaunchArguments: [String] = []
+    ) -> XCUIApplication {
         #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation = .landscapeLeft
         #endif
 
         let app = XCUIApplication()
         app.launchArguments = [SurroundUITestContract.launchArgument]
+            + additionalLaunchArguments
         app.launch()
         #if targetEnvironment(macCatalyst)
         app.activate()
@@ -134,12 +137,19 @@ final class SurroundUITests: XCTestCase {
             "Top-level navigation requires the regular-width iPad or Mac layout."
         )
 
-        let app = launchApp()
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
 
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationPublicGames, in: app)
         element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationMessages, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
         element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)

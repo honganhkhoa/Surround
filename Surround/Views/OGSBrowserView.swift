@@ -23,6 +23,15 @@ struct OGSBrowserView: View {
     @State var requestedURL: URL? = nil
     @State var hasError = false
 
+    private var resolvedTitle: String {
+        let trimmedTitle = title?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) ?? ""
+        return trimmedTitle.isEmpty
+            ? String(localized: "Web version")
+            : trimmedTitle
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if showsURLBar {
@@ -46,7 +55,7 @@ struct OGSBrowserView: View {
                 AnyView(Button(action: { webView?.reload() }) {
                     Image(systemName: "arrow.clockwise")
                 }))
-        .navigationTitle(title ?? "")
+        .navigationTitle(resolvedTitle)
         .navigationDestination(isPresented: $showsUnsupportedGoogleLogin) {
             UnsupportedGoogleLoginView()
         }

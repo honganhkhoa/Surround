@@ -49,7 +49,12 @@ final class AppStoreScreenshotTests: XCTestCase {
         appStoreWidgetProofToken = UUID().uuidString
     }
 
-    func testAppStoreScreenshots() {
+    func testAppStoreScreenshots() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "App Store screenshot capture requires an iOS Simulator because it drives SpringBoard and the Home Screen widget."
+        )
+        #else
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
 
         let gameApp = launchApp()
@@ -234,6 +239,7 @@ final class AppStoreScreenshotTests: XCTestCase {
             isPhone ? expectedPhoneSceneNames : expectedPadSceneNames,
             "The screenshot journey must capture exactly ten ordered App Store scenes."
         )
+        #endif
     }
 
     private func launchApp(interfaceStyle: InterfaceStyle = .light) -> XCUIApplication {
@@ -505,7 +511,9 @@ final class AppStoreScreenshotTests: XCTestCase {
             ? .portrait
             : .landscapeRight
         #endif
+        #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.press(.home)
+        #endif
 
         let springboard = XCUIApplication(
             bundleIdentifier: "com.apple.springboard"
@@ -515,7 +523,9 @@ final class AppStoreScreenshotTests: XCTestCase {
             "Expected SpringBoard before capturing \(sceneName)."
         )
         for _ in 0..<3 where homeScreenPage(in: springboard) == nil {
+            #if !targetEnvironment(macCatalyst)
             XCUIDevice.shared.press(.home)
+            #endif
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.75))
         }
 
@@ -1205,13 +1215,17 @@ final class AppStoreScreenshotTests: XCTestCase {
             if !waitUntil(timeout: 5, condition: {
                 !doneButton.exists
             }) {
+                #if !targetEnvironment(macCatalyst)
                 XCUIDevice.shared.press(.home)
+                #endif
                 _ = waitUntil(timeout: 5) {
                     !doneButton.exists
                 }
             }
         } else {
+            #if !targetEnvironment(macCatalyst)
             XCUIDevice.shared.press(.home)
+            #endif
             _ = waitUntil(timeout: 5) {
                 !doneButton.exists
             }

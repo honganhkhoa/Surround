@@ -163,6 +163,9 @@ struct MainView: View {
                             RootView.privateMessages.label
                         }
                     }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.navigationMessages
+                    )
                 }
                 TabSection("Surround") {
                     Tab(value: RootView.settings) {

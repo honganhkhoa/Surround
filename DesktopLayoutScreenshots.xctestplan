@@ -1,0 +1,36 @@
+{
+  "configurations" : [
+    {
+      "id" : "DDB3B7C9-8744-4A7F-A0B6-72B7A4878ED7",
+      "name" : "en-US",
+      "options" : {
+        "language" : "en",
+        "region" : "US"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Surround.xcodeproj",
+      "identifier" : "BC042AEE24AB2CF40050B2D1",
+      "name" : "Surround"
+    },
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : [
+        "CompatibilityScreenshotTests/testMacDesktopLayoutScreenshots()",
+        "CompatibilityScreenshotTests/testMacWindowSizingContract()"
+      ],
+      "target" : {
+        "containerPath" : "container:Surround.xcodeproj",
+        "identifier" : "BC042B0A24AB2CFA0050B2D1",
+        "name" : "SurroundUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

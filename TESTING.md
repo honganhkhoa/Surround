@@ -247,11 +247,34 @@ The runner requires Xcode 26 or newer, installed iOS 18.0 and iOS 26.0 simulator
 
 It rejects a changed source tree between captures, missing or duplicate scenes, mismatched dimensions, incorrect orientation, alpha channels, and widget screenshots whose frame geometry does not match the requested family. Review `index.html` for clipping, overlap, missing controls, unreadable content, broken navigation, and incorrect adaptive or widget layout; the images are intentionally not required to be pixel-identical across OS versions. The runner removes each isolated widget before adding the next family.
 
+## Mac desktop layout screenshot capture
+
+The shared `DesktopLayoutScreenshots` scheme and test plan capture a deterministic desktop layout matrix from a signed local Mac Catalyst session. Run it from an administrator account on an unlocked Mac UI session. When macOS asks to **Enable UI Automation**, authenticate locally before the prompt times out, then rerun the command if needed:
+
+```sh
+desktop_layout_output=".build/DesktopLayoutScreenshots-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$desktop_layout_output"
+xcodebuild test \
+  -scheme DesktopLayoutScreenshots \
+  -project Surround.xcodeproj \
+  -testPlan DesktopLayoutScreenshots \
+  -configuration Debug \
+  -destination 'platform=macOS,variant=Mac Catalyst,name=My Mac' \
+  -resultBundlePath "$desktop_layout_output/DesktopLayoutScreenshots.xcresult"
+xcrun xcresulttool export attachments \
+  --path "$desktop_layout_output/DesktopLayoutScreenshots.xcresult" \
+  --output-path "$desktop_layout_output/attachments"
+```
+
+The four fixed profiles are logical UIKit root-content sizes: narrow `900x600`, default `1200x760`, wide `1440x760`, and tall `1000x900`. The test captures Home, Public Games, Messages, Settings, About, the browser, and the active game at each size, then captures Home and the active game in the Mac's native full screen. That produces 28 fixed-size and two full-screen screenshots. Fixed-size window attachments include normal Mac titlebar chrome, so their total raster dimensions are larger than the requested content size.
+
+The plan also runs a focused sizing contract without adding an attachment. It replaces the restored launch scene with a fresh `WindowGroup` scene and leaves the Debug geometry override disabled. The contract requires the SwiftUI root to settle at exactly `1200x760`, while `UIWindow.bounds`, `UIWindowScene.effectiveGeometry.systemFrame`, and XCTest's outer application-window frame must report the same settled outer size. The test then requests `800x500` and requires the usable root content to clamp to exactly `900x600`.
+
+Every launch uses the Debug-only offline fixture root, rejecting HTTP transport, and a no-op WebSocket, so the captures never contact OGS. The browser capture is intentionally the offline placeholder rather than live `WKWebView` content; verify the production browser separately during manual review. A passing run proves capture completeness, stable requested geometry and restoration, the fresh-window and minimum-size contracts, and the expected scene-specific window titles. It does not certify visual quality: review the exported images for clipping, excessive whitespace, weak hierarchy, and poor adaptive layout. Keep the result bundle and exported screenshot attachments together under the timestamped gitignored `.build/DesktopLayoutScreenshots-*` directory.
+
 ## Signed local Mac Catalyst UI tests
 
-Mac Catalyst UI automation needs a signed build and an unlocked Mac UI session.
-Select the **Surround** scheme and **My Mac (Mac Catalyst)** in Xcode, then run
-`SurroundUITests`, or use:
+Mac Catalyst UI automation needs a signed build, an administrator account, an unlocked Mac UI session, and local authentication when macOS asks to **Enable UI Automation**. The authorization is cached for eight hours. Select the **Surround** scheme and **My Mac (Mac Catalyst)** in Xcode, then run `SurroundUITests`, or use:
 
 ```sh
 xcodebuild test \

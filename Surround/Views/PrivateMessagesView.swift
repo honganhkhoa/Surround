@@ -125,6 +125,9 @@ struct PrivateMessagesView: View {
             }
         }
         .navigationBarTitle("Private messages")
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.screenMessages
+        )
     }
 }
 

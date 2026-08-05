@@ -50,9 +50,15 @@ final class CompatibilityScreenshotTests: XCTestCase {
         let parkingPage: Int
     }
 
+    private struct CatalystWindowProfile {
+        let name: String
+        let size: CGSize
+    }
+
     private var capturedSceneNames = [String]()
     private var smallWidgetSize: CGSize?
     private var compatibilityWidgetProofToken = ""
+    private var activeApp: XCUIApplication?
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -60,9 +66,21 @@ final class CompatibilityScreenshotTests: XCTestCase {
         capturedSceneNames = []
         smallWidgetSize = nil
         compatibilityWidgetProofToken = UUID().uuidString
+        activeApp = nil
     }
 
-    func testCompatibilityScreenshots() {
+    override func tearDownWithError() throws {
+        activeApp?.terminate()
+        activeApp = nil
+        try super.tearDownWithError()
+    }
+
+    func testCompatibilityScreenshots() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "Compatibility screenshot capture requires an iOS Simulator because it drives SpringBoard and Home Screen widgets."
+        )
+        #else
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let nativeScenes = SurroundUITestContract.CompatibilityScene.allCases
             .filter { isPhone || $0 != .gameChat }
@@ -94,11 +112,171 @@ final class CompatibilityScreenshotTests: XCTestCase {
             isPhone ? 32 : 31,
             "Compatibility capture produced an unexpected scene count."
         )
+        #endif
+    }
+
+    func testMacDesktopLayoutScreenshots() throws {
+        #if targetEnvironment(macCatalyst)
+        let defaultSize = CGSize(width: 1_200, height: 760)
+        let profiles = [
+            CatalystWindowProfile(
+                name: "900x600",
+                size: CGSize(width: 900, height: 600)
+            ),
+            CatalystWindowProfile(
+                name: "1200x760",
+                size: CGSize(width: 1_200, height: 760)
+            ),
+            CatalystWindowProfile(
+                name: "1440x760",
+                size: CGSize(width: 1_440, height: 760)
+            ),
+            CatalystWindowProfile(
+                name: "1000x900",
+                size: CGSize(width: 1_000, height: 900)
+            ),
+        ]
+        let scenes: [SurroundUITestContract.CompatibilityScene] = [
+            .home,
+            .publicGames,
+            .messagesInbox,
+            .settings,
+            .about,
+            .browser,
+            .activeGameBoard,
+        ]
+        var expectedNames = [String]()
+
+        for profile in profiles {
+            for scene in scenes {
+                let captureName = [
+                    "mac",
+                    profile.name,
+                    scene.rawValue,
+                ].joined(separator: "-")
+                expectedNames.append(captureName)
+
+                let app = launchApp(
+                    for: scene,
+                    catalystWindowSize: profile.size
+                )
+
+                let appWindow = stableAppWindow(
+                    in: app,
+                    requestedSize: profile.size,
+                    captureName: captureName
+                )
+                assertExpectedWindowTitle(
+                    appWindow,
+                    in: app,
+                    scene: scene,
+                    captureName: captureName
+                )
+                keepWindowScreenshot(
+                    captureName,
+                    appWindow: appWindow
+                )
+                app.terminate()
+            }
+        }
+
+        for scene in [
+            SurroundUITestContract.CompatibilityScene.home,
+            .activeGameBoard,
+        ] {
+            let captureName = "mac-native-full-screen-\(scene.rawValue)"
+            expectedNames.append(captureName)
+
+            let app = launchApp(
+                for: scene,
+                catalystWindowSize: defaultSize
+            )
+
+            let appWindow = stableAppWindow(
+                in: app,
+                requestedSize: defaultSize,
+                captureName: captureName
+            )
+            assertExpectedWindowTitle(
+                appWindow,
+                in: app,
+                scene: scene,
+                captureName: captureName
+            )
+            enterNativeFullScreen(
+                appWindow,
+                in: app,
+                captureName: captureName
+            )
+            assertExpectedWindowTitle(
+                appWindow,
+                in: app,
+                scene: scene,
+                captureName: captureName
+            )
+            keepWindowScreenshot(
+                captureName,
+                appWindow: appWindow
+            )
+            exitNativeFullScreen(
+                appWindow,
+                in: app,
+                requestedSize: defaultSize,
+                captureName: captureName
+            )
+            app.terminate()
+        }
+
+        // The fixed game captures exercise the normal navigation title. This
+        // additional assertion protects the Catalyst title while Zen mode
+        // hides the in-window navigation chrome without adding a 31st image.
+        let zenApp = launchApp(
+            for: .zenMode,
+            catalystWindowSize: defaultSize
+        )
+        let zenWindow = stableAppWindow(
+            in: zenApp,
+            requestedSize: defaultSize,
+            captureName: "mac-title-zen-mode"
+        )
+        assertExpectedWindowTitle(
+            zenWindow,
+            in: zenApp,
+            scene: .zenMode,
+            captureName: "mac-title-zen-mode"
+        )
+        zenApp.terminate()
+
+        XCTAssertEqual(
+            capturedSceneNames,
+            expectedNames,
+            "Mac layout capture must keep every requested scene exactly once and in matrix order."
+        )
+        #else
+        throw XCTSkip(
+            "The explicit window-size screenshot matrix requires Mac Catalyst."
+        )
+        #endif
+    }
+
+    func testMacWindowSizingContract() throws {
+        #if targetEnvironment(macCatalyst)
+        assertCatalystWindowSizeContract(
+            defaultSize: CGSize(width: 1_200, height: 760),
+            minimumSize: CGSize(width: 900, height: 600)
+        )
+        #else
+        throw XCTSkip(
+            "The explicit window-size contract requires Mac Catalyst."
+        )
+        #endif
     }
 
     private func launchApp(
         for scene: SurroundUITestContract.CompatibilityScene,
-        widgetProofToken: String? = nil
+        widgetProofToken: String? = nil,
+        catalystWindowSize: CGSize? = nil,
+        useCatalystDefaultWindowSize: Bool = false
     ) -> XCUIApplication {
         setCaptureOrientation()
 
@@ -118,8 +296,28 @@ final class CompatibilityScreenshotTests: XCTestCase {
                 widgetProofToken,
             ]
         }
+        if let catalystWindowSize {
+            launchArguments += [
+                SurroundUITestContract.catalystWindowSizeLaunchArgument,
+                "\(Int(catalystWindowSize.width))x\(Int(catalystWindowSize.height))",
+            ]
+        }
+        if useCatalystDefaultWindowSize {
+            precondition(
+                catalystWindowSize == nil,
+                "The Catalyst default-size check cannot also request a size."
+            )
+            launchArguments += [
+                SurroundUITestContract
+                    .catalystDefaultWindowSizeLaunchArgument,
+            ]
+        }
         app.launchArguments = launchArguments
         app.launch()
+        activeApp = app
+        #if targetEnvironment(macCatalyst)
+        app.activate()
+        #endif
         element(
             SurroundUITestContract.AccessibilityID.compatibilityScreen(scene),
             in: app
@@ -127,6 +325,60 @@ final class CompatibilityScreenshotTests: XCTestCase {
         waitForSceneContent(scene, in: app)
         return app
     }
+
+    #if targetEnvironment(macCatalyst)
+    private func assertCatalystWindowSizeContract(
+        defaultSize: CGSize,
+        minimumSize: CGSize
+    ) {
+        let defaultApp = launchApp(
+            for: .home,
+            useCatalystDefaultWindowSize: true
+        )
+        // `.defaultSize` applies to a newly created scene, while a relaunch
+        // correctly restores the user's latest geometry. The Debug fixture
+        // replaces its restored bootstrap with a fresh WindowGroup scene and
+        // marks only that scene's geometry probe. Require one root-content
+        // outcome and corroborate its outer size through UIWindow bounds,
+        // effectiveGeometry.systemFrame, and XCTest's application-window frame.
+        _ = stableAppWindow(
+            in: defaultApp,
+            requestedSize: defaultSize,
+            captureName: "mac-default-window-size-contract",
+            geometryIdentifier: SurroundUITestContract.AccessibilityID
+                .catalystFreshWindowGeometry,
+            geometryMatches: { value, outerFrame in
+                let rootGeometry = self.catalystWindowGeometryValue(
+                    for: defaultSize
+                )
+                let outerGeometry = self.catalystWindowGeometryValue(
+                    for: outerFrame.size
+                )
+                return value == [
+                    rootGeometry,
+                    "window-\(outerGeometry)",
+                    "system-\(outerGeometry)",
+                    "windowed",
+                ].joined(separator: "|")
+            },
+            requiredStableFrameCount: 10
+        )
+        defaultApp.terminate()
+
+        let belowMinimumSize = CGSize(width: 800, height: 500)
+        let minimumApp = launchApp(
+            for: .home,
+            catalystWindowSize: belowMinimumSize
+        )
+        _ = stableAppWindow(
+            in: minimumApp,
+            requestedSize: minimumSize,
+            captureName: "mac-minimum-window-size-contract",
+            requiredStableFrameCount: 10
+        )
+        minimumApp.terminate()
+    }
+    #endif
 
     private func waitForSceneContent(
         _ scene: SurroundUITestContract.CompatibilityScene,
@@ -304,6 +556,312 @@ final class CompatibilityScreenshotTests: XCTestCase {
         capturedSceneNames.append(name)
     }
 
+    private func stableAppWindow(
+        in app: XCUIApplication,
+        requestedSize: CGSize,
+        captureName: String,
+        geometryIdentifier: String = SurroundUITestContract.AccessibilityID
+            .catalystWindowGeometry,
+        geometryMatches: ((String, CGRect) -> Bool)? = nil,
+        requiredStableFrameCount: Int = 3,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let appWindow = app.windows.firstMatch
+        XCTAssertTrue(
+            appWindow.waitForExistence(timeout: 15),
+            "Expected an application window before capturing \(captureName).",
+            file: file,
+            line: line
+        )
+        let geometryProbe = catalystWindowGeometryProbe(
+            in: appWindow,
+            identifier: geometryIdentifier
+        )
+        XCTAssertTrue(
+            geometryProbe.waitForExistence(timeout: 15),
+            "Expected the Catalyst content-geometry probe before capturing \(captureName).",
+            file: file,
+            line: line
+        )
+        let expectedGeometry = catalystWindowGeometryValue(
+            for: requestedSize
+        )
+
+        let stableFrame = waitForStableWindowFrame(
+            appWindow,
+            timeout: 20,
+            requiredMatchingFrameCount: requiredStableFrameCount
+        ) { currentFrame in
+            let geometryValue = geometryProbe.value as? String
+                ?? "unavailable"
+            if let geometryMatches {
+                return geometryMatches(geometryValue, currentFrame)
+            }
+            return self.catalystWindowGeometryValue(of: geometryProbe)
+                == expectedGeometry
+        }
+        if stableFrame == nil {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – unstable window \(captureName)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertNotNil(
+            stableFrame,
+            "Expected \(captureName) geometry to settle for the \(expectedGeometry) contract; probe was '\(geometryProbe.value as? String ?? "unavailable")' and the last outer frame was \(appWindow.frame).",
+            file: file,
+            line: line
+        )
+        return appWindow
+    }
+
+    private func waitForStableWindowFrame(
+        _ appWindow: XCUIElement,
+        timeout: TimeInterval,
+        requiredMatchingFrameCount: Int = 3,
+        matching condition: (CGRect) -> Bool
+    ) -> CGRect? {
+        var previousFrame: CGRect?
+        var matchingFrameCount = 0
+
+        let settled = waitUntil(timeout: timeout) {
+            let currentFrame = appWindow.frame
+            guard condition(currentFrame) else {
+                previousFrame = currentFrame
+                matchingFrameCount = 0
+                return false
+            }
+
+            if let previousFrame,
+               framesApproximatelyEqual(previousFrame, currentFrame) {
+                matchingFrameCount += 1
+            } else {
+                matchingFrameCount = 1
+            }
+            previousFrame = currentFrame
+            return matchingFrameCount >= requiredMatchingFrameCount
+        }
+        return settled ? previousFrame : nil
+    }
+
+    private func framesApproximatelyEqual(
+        _ first: CGRect,
+        _ second: CGRect,
+        tolerance: CGFloat = 0.5
+    ) -> Bool {
+        abs(first.minX - second.minX) <= tolerance
+            && abs(first.minY - second.minY) <= tolerance
+            && abs(first.width - second.width) <= tolerance
+            && abs(first.height - second.height) <= tolerance
+    }
+
+    private func catalystWindowGeometryProbe(
+        in appWindow: XCUIElement,
+        identifier: String = SurroundUITestContract.AccessibilityID
+            .catalystWindowGeometry
+    ) -> XCUIElement {
+        appWindow.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+    }
+
+    private func catalystWindowGeometryValue(
+        of geometryProbe: XCUIElement
+    ) -> String {
+        let rawValue = geometryProbe.value as? String ?? "unavailable"
+        return rawValue.split(separator: "|", maxSplits: 1)
+            .first
+            .map(String.init)
+            ?? "unavailable"
+    }
+
+    private func catalystWindowGeometryValue(for size: CGSize) -> String {
+        "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+    }
+
+    private func catalystWindowIsFullScreen(
+        _ geometryProbe: XCUIElement
+    ) -> Bool {
+        (geometryProbe.value as? String)?.hasSuffix("|full-screen") == true
+    }
+
+    private func assertExpectedWindowTitle(
+        _ appWindow: XCUIElement,
+        in app: XCUIApplication,
+        scene: SurroundUITestContract.CompatibilityScene,
+        captureName: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let expectedTitle: String
+        switch scene {
+        case .home:
+            expectedTitle = "Active games"
+        case .publicGames:
+            expectedTitle = "Public live games"
+        case .messagesInbox:
+            expectedTitle = "Private messages"
+        case .settings:
+            expectedTitle = "Settings"
+        case .about:
+            expectedTitle = "About"
+        case .browser:
+            expectedTitle = "Web version"
+        case .activeGameBoard, .zenMode:
+            expectedTitle = "vs CopperKoi [4k]"
+        default:
+            XCTFail(
+                "No desktop window-title contract exists for \(scene.rawValue).",
+                file: file,
+                line: line
+            )
+            return
+        }
+        var title = ""
+        let foundExpectedTitle = waitUntil(timeout: 10) {
+            title = appWindow.title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            return title == expectedTitle
+        }
+        if !foundExpectedTitle {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – unexpected window title \(captureName)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(
+            foundExpectedTitle,
+            "Expected \(captureName) to have window title '\(expectedTitle)'; found '\(title)'.",
+            file: file,
+            line: line
+        )
+    }
+
+    private func keepWindowScreenshot(
+        _ name: String,
+        appWindow: XCUIElement
+    ) {
+        let attachment = XCTAttachment(
+            screenshot: appWindow.screenshot(),
+            quality: .original
+        )
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        capturedSceneNames.append(name)
+    }
+
+    #if targetEnvironment(macCatalyst)
+    private func enterNativeFullScreen(
+        _ appWindow: XCUIElement,
+        in app: XCUIApplication,
+        captureName: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let fullScreenButton = appWindow.buttons[
+            XCUIIdentifierFullScreenWindow
+        ]
+        let appeared = fullScreenButton.waitForExistence(timeout: 10)
+        XCTAssertTrue(
+            appeared && fullScreenButton.isHittable,
+            "Expected the native full-screen control for \(captureName).",
+            file: file,
+            line: line
+        )
+        guard appeared && fullScreenButton.isHittable else { return }
+
+        fullScreenButton.click()
+        registerFullScreenRestoration(
+            appWindow,
+            in: app
+        )
+        let geometryProbe = catalystWindowGeometryProbe(in: appWindow)
+        let stableFullScreenFrame = waitForStableWindowFrame(
+            appWindow,
+            timeout: 20
+        ) { _ in
+            self.catalystWindowIsFullScreen(geometryProbe)
+        }
+        if stableFullScreenFrame == nil {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – full-screen transition \(captureName)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertNotNil(
+            stableFullScreenFrame,
+            "Expected \(captureName) to settle in native full screen; probe was '\(geometryProbe.value as? String ?? "unavailable")' and the last frame was \(appWindow.frame).",
+            file: file,
+            line: line
+        )
+    }
+
+    private func exitNativeFullScreen(
+        _ appWindow: XCUIElement,
+        in app: XCUIApplication,
+        requestedSize: CGSize,
+        captureName: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        // The native titlebar controls disappear once the window enters its
+        // full-screen Space, so use the standard macOS toggle to restore it.
+        app.typeKey("f", modifierFlags: [.control, .command])
+        let geometryProbe = catalystWindowGeometryProbe(in: appWindow)
+        let expectedGeometry = catalystWindowGeometryValue(
+            for: requestedSize
+        )
+        let restoredFrame = waitForStableWindowFrame(
+            appWindow,
+            timeout: 20
+        ) { _ in
+            !self.catalystWindowIsFullScreen(geometryProbe)
+                && self.catalystWindowGeometryValue(of: geometryProbe)
+                    == expectedGeometry
+        }
+        if restoredFrame == nil {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – full-screen restore \(captureName)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertNotNil(
+            restoredFrame,
+            "Expected \(captureName) content to restore to \(expectedGeometry); probe was '\(catalystWindowGeometryValue(of: geometryProbe))' and the last outer frame was \(appWindow.frame).",
+            file: file,
+            line: line
+        )
+    }
+
+    private func registerFullScreenRestoration(
+        _ appWindow: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        addTeardownBlock { [weak self] in
+            guard let self,
+                  app.state != .notRunning else { return }
+            let geometryProbe = self.catalystWindowGeometryProbe(
+                in: appWindow
+            )
+            guard geometryProbe.exists,
+                  self.catalystWindowIsFullScreen(geometryProbe) else { return }
+
+            app.activate()
+            app.typeKey("f", modifierFlags: [.control, .command])
+            _ = self.waitUntil(timeout: 10) {
+                !self.catalystWindowIsFullScreen(geometryProbe)
+            }
+        }
+    }
+    #endif
+
     private func setCaptureOrientation() {
         #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation =
@@ -317,7 +875,9 @@ final class CompatibilityScreenshotTests: XCTestCase {
 
     private func captureWidgetFamilies() {
         setCaptureOrientation()
+        #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.press(.home)
+        #endif
 
         let springboard = XCUIApplication(
             bundleIdentifier: "com.apple.springboard"
@@ -327,7 +887,9 @@ final class CompatibilityScreenshotTests: XCTestCase {
             "Expected SpringBoard before capturing widgets."
         )
         for _ in 0..<3 where homeScreenPage(in: springboard) == nil {
+            #if !targetEnvironment(macCatalyst)
             XCUIDevice.shared.press(.home)
+            #endif
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.75))
         }
 
@@ -1441,13 +2003,17 @@ final class CompatibilityScreenshotTests: XCTestCase {
             if !waitUntil(timeout: 5, condition: {
                 !doneButton.exists
             }) {
+                #if !targetEnvironment(macCatalyst)
                 XCUIDevice.shared.press(.home)
+                #endif
                 _ = waitUntil(timeout: 5) {
                     !doneButton.exists
                 }
             }
         } else {
+            #if !targetEnvironment(macCatalyst)
             XCUIDevice.shared.press(.home)
+            #endif
             _ = waitUntil(timeout: 5) {
                 !doneButton.exists
             }

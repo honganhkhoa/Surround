@@ -17,6 +17,10 @@ enum SurroundUITestContract {
         "--surround-compatibility-scene"
     static let compatibilityWidgetProofTokenLaunchArgument =
         "--surround-compatibility-widget-proof-token"
+    static let catalystWindowSizeLaunchArgument =
+        "--surround-catalyst-window-size"
+    static let catalystDefaultWindowSizeLaunchArgument =
+        "--surround-catalyst-default-window-size"
     static let appStoreScreenshotWidgetProofTokenLaunchArgument =
         "--surround-app-store-screenshot-widget-proof-token"
     static let screenshotWidgetFixtureCleanupLaunchArgument =
@@ -134,6 +138,41 @@ enum SurroundUITestContract {
         return scene
     }
 
+    static var catalystWindowSize: CGSize? {
+        guard isEnabled else { return nil }
+
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(
+            of: catalystWindowSizeLaunchArgument
+        ) else {
+            return nil
+        }
+        guard arguments.indices.contains(argumentIndex + 1) else {
+            preconditionFailure(
+                "\(catalystWindowSizeLaunchArgument) requires WIDTHxHEIGHT."
+            )
+        }
+
+        let components = arguments[argumentIndex + 1].split(separator: "x")
+        guard components.count == 2,
+              let width = Double(components[0]),
+              let height = Double(components[1]),
+              width > 0,
+              height > 0 else {
+            preconditionFailure(
+                "Invalid Catalyst window size: \(arguments[argumentIndex + 1])."
+            )
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    static var shouldUseCatalystDefaultWindowSize: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                catalystDefaultWindowSizeLaunchArgument
+            )
+    }
+
     static var compatibilityWidgetProofToken: String? {
         guard isCapturingCompatibilityScreenshots else {
             return nil
@@ -189,14 +228,20 @@ enum SurroundUITestContract {
     #endif
 
     enum AccessibilityID {
+        static let catalystWindowGeometry = "window.catalyst.geometry"
+        static let catalystFreshWindowGeometry =
+            "window.catalyst.geometry.fresh-default"
+
         static let navigationHome = "navigation.home"
         static let navigationPublicGames = "navigation.publicGames"
+        static let navigationMessages = "navigation.messages"
         static let navigationSettings = "navigation.settings"
         static let navigationAbout = "navigation.about"
         static let navigationBrowser = "navigation.browser"
 
         static let screenHome = "screen.home"
         static let screenPublicGames = "screen.publicGames"
+        static let screenMessages = "screen.messages"
         static let screenSettings = "screen.settings"
         static let screenAbout = "screen.about"
         static let screenBrowser = "screen.browser"
