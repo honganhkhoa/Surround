@@ -6465,6 +6465,47 @@
         }
       }
     },
+    "Cancel undo" : {
+      "comment" : "Button to withdraw the user's own pending undo request",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler la demande de reprise"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待った要請を取り消す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무르기 요청 취소"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Huỷ yêu cầu đi lại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤回悔棋请求"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤回悔棋要求"
+          }
+        }
+      }
+    },
     "Cancellation" : {
       "comment" : "HistoryGameCell game outcome",
       "localizations" : {
@@ -13045,6 +13086,47 @@
         }
       }
     },
+    "Reject undo" : {
+      "comment" : "Button to reject the opponent's pending undo request",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser la reprise"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待った要請を拒否"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무르기 요청 거절"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Từ chối yêu cầu đi lại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒绝悔棋"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒絕悔棋"
+          }
+        }
+      }
+    },
     "Rengo" : {
       "localizations" : {
         "fr" : {
@@ -16781,8 +16863,8 @@
         }
       }
     },
-    "Undo request" : {
-      "comment" : "Game - when undo received",
+    "game.undo.request.received" : {
+      "comment" : "Game status when the opponent requested an undo",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16828,9 +16910,15 @@
         }
       }
     },
-    "Undo requested" : {
-      "comment" : "Game - after undo requested",
+    "game.undo.request.sent" : {
+      "comment" : "Game status after the user requested an undo",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo requested"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",

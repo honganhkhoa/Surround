@@ -52,17 +52,101 @@ class MoveTree: ObservableObject {
         }
         indexByBoardPosition.removeValue(forKey: identifier)
     }
+
+    /// Converts an authoritative continuation into an analysis variation.
+    ///
+    /// The positions and their parent/child relationships stay intact so the
+    /// undone line remains available in analysis. Inserting an empty main slot
+    /// at every affected move number lets a later official continuation occupy
+    /// index zero without deleting the preserved line.
+    func demoteMainBranch(startingAt position: BoardPosition) {
+        guard position !== initialPosition,
+              indexByBoardPosition[ObjectIdentifier(position)] == 0 else {
+            return
+        }
+
+        var mainBranchPositions = [BoardPosition]()
+        var branchPosition: BoardPosition? = position
+        while let currentPosition = branchPosition,
+              indexByBoardPosition[ObjectIdentifier(currentPosition)] == 0 {
+            mainBranchPositions.append(currentPosition)
+
+            let nextPosition = positionsByLastMoveNumber[currentPosition.lastMoveNumber + 1]?
+                .first ?? nil
+            if nextPosition?.previousPosition === currentPosition {
+                branchPosition = nextPosition
+            } else {
+                branchPosition = nil
+            }
+        }
+
+        for mainBranchPosition in mainBranchPositions {
+            let moveNumber = mainBranchPosition.lastMoveNumber
+            guard var positions = positionsByLastMoveNumber[moveNumber],
+                  let firstPosition = positions.first ?? nil,
+                  firstPosition === mainBranchPosition else {
+                continue
+            }
+            positions.insert(nil, at: 0)
+            positionsByLastMoveNumber[moveNumber] = positions
+            for (index, position) in positions.enumerated() {
+                if let position {
+                    indexByBoardPosition[ObjectIdentifier(position)] = index
+                }
+            }
+        }
+
+        calculateLevels()
+    }
     
     func register(newPosition: BoardPosition, fromPosition: BoardPosition, mainBranch: Bool) -> BoardPosition {
         if let fromIndex = indexByBoardPosition[ObjectIdentifier(fromPosition)] {
             if let existingPositions = positionsByLastMoveNumber[newPosition.lastMoveNumber] {
                 if mainBranch {
-                    if let existingPosition = existingPositions[0] {
+                    if let existingPosition = existingPositions.first ?? nil {
                         if existingPosition.hasTheSamePosition(with: newPosition) {
                             return existingPosition
                         } else {
                             self.removeData(forPosition: existingPosition)
                         }
+                    } else {
+                        var updatedPositions = existingPositions
+                        if let promotedIndex = updatedPositions.firstIndex(where: {
+                            $0?.previousPosition === fromPosition
+                                && $0?.lastMove == newPosition.lastMove
+                                && ($0?.hasTheSamePosition(with: newPosition) ?? false)
+                        }), let promotedPosition = updatedPositions[promotedIndex] {
+                            updatedPositions.remove(at: promotedIndex)
+                            updatedPositions[0] = promotedPosition
+                            positionsByLastMoveNumber[newPosition.lastMoveNumber] = updatedPositions
+                            for (index, position) in updatedPositions.enumerated() {
+                                if let position {
+                                    indexByBoardPosition[ObjectIdentifier(position)] = index
+                                }
+                            }
+                            let fromPositionIdentifier = ObjectIdentifier(fromPosition)
+                            if var nextPositions = nextPositionsByPosition[fromPositionIdentifier] {
+                                nextPositions.removeAll { $0 === promotedPosition }
+                                nextPositions.insert(promotedPosition, at: 0)
+                                nextPositionsByPosition[fromPositionIdentifier] = nextPositions
+                            } else {
+                                nextPositionsByPosition[fromPositionIdentifier] = [promotedPosition]
+                            }
+                            calculateLevels()
+                            return promotedPosition
+                        }
+
+                        updatedPositions[0] = newPosition
+                        positionsByLastMoveNumber[newPosition.lastMoveNumber] = updatedPositions
+                        indexByBoardPosition[ObjectIdentifier(newPosition)] = 0
+                        let fromPositionIdentifier = ObjectIdentifier(fromPosition)
+                        if nextPositionsByPosition[fromPositionIdentifier] == nil {
+                            nextPositionsByPosition[fromPositionIdentifier] = [newPosition]
+                        } else {
+                            nextPositionsByPosition[fromPositionIdentifier]?.insert(newPosition, at: 0)
+                        }
+                        calculateLevels()
+                        return newPosition
                     }
                     positionsByLastMoveNumber[newPosition.lastMoveNumber]?[0] = newPosition
                     indexByBoardPosition[ObjectIdentifier(newPosition)] = 0
@@ -160,6 +244,16 @@ class MoveTree: ObservableObject {
     
     func calculateLevels() {
         maxLevel = 0
+        levelByBoardPosition.removeAll(keepingCapacity: true)
+        for positions in positionsByLastMoveNumber.values {
+            for (index, position) in positions.enumerated() {
+                guard let position else {
+                    continue
+                }
+                levelByBoardPosition[ObjectIdentifier(position)] = index
+                maxLevel = max(maxLevel, index)
+            }
+        }
         for lastMoveNumber in moveNumberRange.reversed() {
             if let position = positionsByLastMoveNumber[lastMoveNumber]?[0] {
                 if let nextPositions = nextPositionsByPosition[ObjectIdentifier(position)], nextPositions.count > 0 {

@@ -4,6 +4,7 @@
 //
 
 import XCTest
+import DictionaryCoding
 
 final class OGSServiceEventTests: XCTestCase {
     private class FakeWebsocket: OGSWebsocketProtocol {
@@ -24,6 +25,7 @@ final class OGSServiceEventTests: XCTestCase {
         var emissions = [Emission]()
         var gamelistResults: [[String: Any]]?
         private(set) var closeThenReconnectCount = 0
+        var onCloseThenReconnect: (() -> Void)?
 
         func connect() {
             openSocket()
@@ -66,6 +68,7 @@ final class OGSServiceEventTests: XCTestCase {
         func reconnectIfNeeded() {}
         func closeThenReconnect() {
             closeThenReconnectCount += 1
+            onCloseThenReconnect?()
             dropSocket()
         }
 
@@ -108,7 +111,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
 
         socket.deliver(name: "game/42/undo_requested", data: 1)
-        XCTAssertEqual(game.undoRequested, 1)
+        XCTAssertEqual(game.undoRequest, OGSUndoRequest(moveNumber: 1))
 
         socket.deliver(name: "game/42/undo_accepted", data: 1)
         XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
@@ -119,6 +122,246 @@ final class OGSServiceEventTests: XCTestCase {
         socket.dropSocket()
         socket.openSocket(authenticate: true)
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 2)
+    }
+
+    func testUndoRequestEventsSupportObjectStringAndCancellation() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 142))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+
+        socket.deliver(name: "game/142/undo_requested", data: "7")
+        XCTAssertEqual(game.undoRequest, OGSUndoRequest(moveNumber: 7))
+
+        socket.deliver(
+            name: "game/142/undo_requested",
+            data: [
+                "move_number": "8",
+                "requested_by": 123,
+                "undo_move_count": 0,
+            ]
+        )
+        XCTAssertEqual(
+            game.undoRequest,
+            OGSUndoRequest(moveNumber: 8, requestedBy: 123, moveCount: 1)
+        )
+
+        socket.deliver(name: "game/142/undo_requested", data: true)
+        XCTAssertEqual(
+            game.undoRequest,
+            OGSUndoRequest(moveNumber: 8, requestedBy: 123, moveCount: 1)
+        )
+
+        socket.deliver(
+            name: "game/142/undo_requested",
+            data: ["move_number": "not-a-move"]
+        )
+        XCTAssertEqual(
+            game.undoRequest,
+            OGSUndoRequest(moveNumber: 8, requestedBy: 123, moveCount: 1)
+        )
+
+        socket.deliver(name: "game/142/undo_canceled")
+        XCTAssertNil(game.undoRequest)
+    }
+
+    func testUndoAcceptedUsesPositiveObjectMoveCount() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 143))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(0, 0))
+        try game.makeMove(move: .placeStone(1, 0))
+        let requesterID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/143/undo_requested",
+            data: [
+                "move_number": 2,
+                "requested_by": requesterID,
+                "undo_move_count": 1,
+            ]
+        )
+        socket.deliver(
+            name: "game/143/undo_accepted",
+            data: ["move_number": 2, "undo_move_count": 2]
+        )
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertNil(game.currentPosition.lastMove)
+        XCTAssertNil(game.undoRequest)
+    }
+
+    func testLegacyUndoAcceptedFallsBackToRequestedMoveCount() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 150))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(0, 0))
+        try game.makeMove(move: .placeStone(1, 0))
+
+        socket.deliver(
+            name: "game/150/undo_requested",
+            data: ["move_number": 2, "undo_move_count": 2]
+        )
+        socket.deliver(name: "game/150/undo_accepted", data: 2)
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertNil(game.undoRequest)
+    }
+
+    func testUndoAcceptedWithoutPendingRequestResynchronizesOnlyThatGame() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 144))
+        let otherGame = Game(ogsGame: try makeEmptyGameData(id: 244))
+        game.ogs = service
+        otherGame.ogs = service
+        let ownerID = UUID()
+        service.connect(to: game, withChat: true, owner: .explicit(ownerID))
+        service.connect(to: otherGame, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(0, 0))
+        try game.makeMove(move: .placeStone(1, 0))
+        let staleBranchRoot = try XCTUnwrap(game.positionByLastMoveNumber[1])
+        let staleFinalPosition = game.currentPosition
+        socket.emissions.removeAll()
+        let reconnectCount = socket.closeThenReconnectCount
+
+        socket.deliver(
+            name: "game/144/undo_accepted",
+            data: ["move_number": 2, "undo_move_count": 2]
+        )
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(game.currentPosition.lastMove, .placeStone(1, 0))
+        XCTAssertNil(game.undoRequest)
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "chat/part", "game/connect", "chat/join"]
+        )
+        XCTAssertEqual(socket.closeThenReconnectCount, reconnectCount)
+        XCTAssertEqual(
+            (socket.emissions[0].data as? [String: Any])?["game_id"] as? Int,
+            144
+        )
+        XCTAssertEqual(
+            (socket.emissions[2].data as? [String: Any])?["game_id"] as? Int,
+            144
+        )
+        XCTAssertEqual(
+            (socket.emissions[2].data as? [String: Any])?["chat"] as? Bool,
+            true
+        )
+
+        socket.emissions.removeAll()
+        socket.deliver(
+            name: "game/144/undo_accepted",
+            data: ["move_number": 2, "undo_move_count": 2]
+        )
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        socket.deliver(
+            name: "game/144/gamedata",
+            data: try makeEmptyGameDataPayload(id: 144)
+        )
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertNil(game.positionByLastMoveNumber[1])
+        XCTAssertNil(game.positionByLastMoveNumber[2])
+        XCTAssertNil(game.moveTree.positionsByLastMoveNumber[1]?[0])
+        XCTAssertTrue(game.moveTree.positionsByLastMoveNumber[1]?[1] === staleBranchRoot)
+        XCTAssertTrue(
+            game.moveTree.variation(to: staleFinalPosition)?.basePosition === game.initialPosition
+        )
+
+        socket.deliver(name: "game/244/phase", data: "stone removal")
+        XCTAssertEqual(otherGame.gamePhase, .stoneRemoval)
+
+        socket.emissions.removeAll()
+        service.releaseConnection(gameID: 144, owner: .explicit(ownerID))
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+    }
+
+    func testUndoResynchronizationTimeoutFallsBackToSocketReconnect() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            installsObservers: false,
+            undoResynchronizationTimeout: 0
+        )
+        let game = Game(ogsGame: try makeEmptyGameData(id: 245))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(0, 0))
+        socket.emissions.removeAll()
+        let fallback = expectation(description: "Undo recovery falls back to socket reconnect")
+        socket.onCloseThenReconnect = { fallback.fulfill() }
+
+        socket.deliver(
+            name: "game/245/undo_accepted",
+            data: ["move_number": 1, "undo_move_count": 1]
+        )
+
+        wait(for: [fallback], timeout: 1)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "game/connect"]
+        )
+        XCTAssertEqual(socket.closeThenReconnectCount, 1)
+    }
+
+    func testUndoCommandsUseCurrentMoveNumber() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 145))
+        try game.makeMove(move: .placeStone(0, 0))
+
+        service.requestUndo(game: game)
+        service.acceptUndo(game: game)
+        service.cancelUndo(game: game)
+
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/undo/request", "game/undo/accept", "game/undo/cancel"]
+        )
+        for emission in socket.emissions {
+            let payload = try XCTUnwrap(emission.data as? [String: Any])
+            XCTAssertEqual(payload["game_id"] as? Int, 145)
+            XCTAssertEqual(payload["move_number"] as? Int, 1)
+        }
+    }
+
+    func testInitialGameDataDecodesLegacyAndObjectUndoRequests() throws {
+        XCTAssertEqual(
+            try makeEmptyGameData(id: 146, undoRequested: 4).undoRequested,
+            OGSUndoRequest(moveNumber: 4)
+        )
+        XCTAssertEqual(
+            try makeEmptyGameData(id: 147, undoRequested: "5").undoRequested,
+            OGSUndoRequest(moveNumber: 5)
+        )
+        XCTAssertEqual(
+            try makeEmptyGameData(
+                id: 148,
+                undoRequested: [
+                    "move_number": "6",
+                    "requested_by": 321,
+                    "undo_move_count": 2,
+                ]
+            ).undoRequested,
+            OGSUndoRequest(moveNumber: 6, requestedBy: 321, moveCount: 2)
+        )
+        XCTAssertEqual(
+            try makeEmptyGameData(
+                id: 149,
+                undoRequested: ["move_number": 7, "undo_move_count": -3]
+            ).undoRequested,
+            OGSUndoRequest(moveNumber: 7, moveCount: 1)
+        )
     }
 
     func testReleasedFinishedGameDoesNotConnectWhenSocketOpens() throws {
@@ -630,7 +873,8 @@ final class OGSServiceEventTests: XCTestCase {
 
     private func makeService(
         socket: OGSWebsocketProtocol,
-        installsObservers: Bool = true
+        installsObservers: Bool = true,
+        undoResynchronizationTimeout: TimeInterval = 15
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -643,7 +887,8 @@ final class OGSServiceEventTests: XCTestCase {
             usesSurroundOverviewService: false,
             enablesAppSideEffects: false,
             startsTimers: false,
-            installsObservers: installsObservers
+            installsObservers: installsObservers,
+            undoResynchronizationTimeout: undoResynchronizationTimeout
         )
     }
 
@@ -700,7 +945,28 @@ final class OGSServiceEventTests: XCTestCase {
         ]
     }
 
-    private func makeEmptyGameData(id: Int, phase: String = "play") throws -> OGSGame {
+    private func makeEmptyGameData(
+        id: Int,
+        phase: String = "play",
+        undoRequested: Any? = nil
+    ) throws -> OGSGame {
+        let object = try makeEmptyGameDataPayload(
+            id: id,
+            phase: phase,
+            undoRequested: undoRequested
+        )
+        // Socket `gamedata` and overview payloads both use this decoder in
+        // production, including its nested snake-case key conversion.
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(OGSGame.self, from: object)
+    }
+
+    private func makeEmptyGameDataPayload(
+        id: Int,
+        phase: String = "play",
+        undoRequested: Any? = nil
+    ) throws -> [String: Any] {
         let bundle = Bundle(for: OGSServiceEventTests.self)
         let url = try XCTUnwrap(bundle.url(forResource: "game-25076729", withExtension: "json"))
         let data = try Data(contentsOf: url)
@@ -713,10 +979,12 @@ final class OGSServiceEventTests: XCTestCase {
         object["phase"] = phase
         object["outcome"] = NSNull()
         object["winner"] = NSNull()
-        let fixture = try JSONSerialization.data(withJSONObject: object)
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(OGSGame.self, from: fixture)
+        if let undoRequested {
+            object["undo_requested"] = undoRequested
+        } else {
+            object.removeValue(forKey: "undo_requested")
+        }
+        return object
     }
 
     private func makeUIConfig(jwt: String, userID: Int) throws -> OGSUIConfig {

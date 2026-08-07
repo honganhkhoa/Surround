@@ -122,14 +122,39 @@ struct GameControlRow: View {
     
     var statusText: some View {
         Group {
-            if game.undoacceptable {
+            if game.canAcceptUndo || game.canCancelUndo {
                 Menu {
-                    Button(action: { ogs.acceptUndo(game: game, moveNumber: game.undoRequested!) }) {
-                        Label("Accept undo", systemImage: "arrow.uturn.left")
+                    if game.canAcceptUndo {
+                        Button(action: { ogs.acceptUndo(game: game) }) {
+                            Label("Accept undo", systemImage: "arrow.uturn.left")
+                        }
+                        Button(action: { ogs.cancelUndo(game: game) }) {
+                            Label(
+                                String(
+                                    localized: "Reject undo",
+                                    comment: "Button to reject the opponent's pending undo request"
+                                ),
+                                systemImage: "xmark"
+                            )
+                        }
+                    } else if game.canCancelUndo {
+                        Button(action: { ogs.cancelUndo(game: game) }) {
+                            Label(
+                                String(
+                                    localized: "Cancel undo",
+                                    comment: "Button to withdraw the user's own pending undo request"
+                                ),
+                                systemImage: "xmark"
+                            )
+                        }
                     }
                 }
                 label: {
-                    Text(verbatim: "\(game.status) ▾").font(Font.title2.bold())
+                    Text(verbatim: "\(game.status) ▾")
+                        .font(Font.title2.bold())
+                        .lineLimit(1)
+                        .allowsTightening(true)
+                        .minimumScaleFactor(0.7)
                 }
             } else {
                 Text(game.status).font(Font.title2.bold())
@@ -153,10 +178,10 @@ struct GameControlRow: View {
                 }
                 if game.isUserPlaying {
                     if game.gamePhase == .play {
-                        if !game.rengo {
+                        if !game.rengo && game.undoRequest == nil {
                             Button(action: { ogs.requestUndo(game: game) }) {
                                 Label("Request undo", systemImage: "arrow.uturn.left")
-                            }.disabled(!game.undoable)
+                            }.disabled(!game.undoable || pendingMove.wrappedValue != nil)
                         }
                         if game.pauseControl?.userPauseDetail == nil {
                             Button(action: { ogs.pause(game: game) }) {
@@ -234,8 +259,10 @@ struct GameControlRow: View {
                             )
                         } else if isUserTurnToPlay {
                             if let pendingMove = pendingMove.wrappedValue {
-                                Button(action: { submitMove(move: pendingMove)}) {
-                                    Text("Submit move")
+                                if !game.hasCurrentUndoRequest {
+                                    Button(action: { submitMove(move: pendingMove)}) {
+                                        Text("Submit move")
+                                    }
                                 }
                             } else if !isHandicapPlacement {
                                 Button(action: { self.showingPassAlert = true }) {

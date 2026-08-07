@@ -114,7 +114,8 @@ struct SingleGameView: View {
                     newPosition: $pendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
                     stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints,
-                    highlightCoordinates: hoveredCoordinates
+                    highlightCoordinates: hoveredCoordinates,
+                    undoRequestCoordinates: game.undoRequestCoordinates
                 )
             }
             #if DEBUG && MAIN_APP

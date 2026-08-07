@@ -87,6 +87,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         position = newPosition!
                         latestPlayerUpdate = move.extra?.playerUpdate
                     }
+                    reconcileAuthoritativeMainBranch(endingAt: position)
                     currentPosition = position
                 } catch {
                     print(error)
@@ -99,7 +100,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 pauseControl = data.pauseControl
                 clock = data.clock
                 
-                undoRequested = data.undoRequested
+                undoRequest = data.undoRequested
 
                 autoScoringDone = data.autoScoringDone
                 // Put this at the end since it will trigger score computing
@@ -137,7 +138,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
         }
     }
-    @Published var undoRequested: Int?
+    @Published var undoRequest: OGSUndoRequest?
 //    var blackFormattedRank: String {
 //        return blackPlayer?.formattedRank() ?? "?"
 //    }
@@ -395,7 +396,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             if fromPosition === currentPosition && fromAnalyticsPosition == nil {
                 let registeredPosition = self.moveTree.register(newPosition: newPosition, fromPosition: self.currentPosition, mainBranch: true)
                 self.currentPosition = registeredPosition
-                self.undoRequested = nil
+                self.undoRequest = nil
                 return registeredPosition
             }
             if fromPosition === fromAnalyticsPosition {
@@ -407,21 +408,44 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     func undoMove(numbered moveNumber: Int) {
-        var position = currentPosition
-        var nextPosition: BoardPosition? = nil
-        while position.previousPosition != nil && position.lastMoveNumber >= moveNumber {
-            nextPosition = position
-            position = position.previousPosition!
-        }
-        if let nextPosition = nextPosition {
-            moveTree.removeData(forPosition: nextPosition)
-            var nextMoveNumber = nextPosition.lastMoveNumber
-            while positionByLastMoveNumber.removeValue(forKey: nextMoveNumber) != nil {
-                nextMoveNumber += 1
+        let count = max(0, currentPosition.lastMoveNumber - moveNumber + 1)
+        undoLastMoves(count: count)
+    }
+
+    func undoLastMoves(count: Int) {
+        var retainedPosition = currentPosition
+        var discardedBranchRoot: BoardPosition?
+
+        for _ in 0..<max(0, count) {
+            guard let previousPosition = retainedPosition.previousPosition else {
+                break
             }
+            discardedBranchRoot = retainedPosition
+            retainedPosition = previousPosition
         }
-        currentPosition = position
-        self.undoRequested = nil
+
+        if let discardedBranchRoot {
+            moveTree.demoteMainBranch(startingAt: discardedBranchRoot)
+            removeAuthoritativePositions(after: retainedPosition.lastMoveNumber)
+            currentPosition = retainedPosition
+        }
+        undoRequest = nil
+    }
+
+    private func reconcileAuthoritativeMainBranch(endingAt position: BoardPosition) {
+        let nextMoveNumber = position.lastMoveNumber + 1
+        let staleMainBranchPosition = moveTree.positionsByLastMoveNumber[nextMoveNumber]?.first ?? nil
+        if let staleMainBranchPosition {
+            moveTree.demoteMainBranch(startingAt: staleMainBranchPosition)
+        }
+        removeAuthoritativePositions(after: position.lastMoveNumber)
+    }
+
+    private func removeAuthoritativePositions(after lastMoveNumber: Int) {
+        let staleMoveNumbers = positionByLastMoveNumber.keys.filter { $0 > lastMoveNumber }
+        for moveNumber in staleMoveNumbers {
+            positionByLastMoveNumber.removeValue(forKey: moveNumber)
+        }
     }
     
     func computeScore() -> GameScores? {
@@ -682,11 +706,28 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             if gamePhase == .stoneRemoval {
                 return String(localized: "Stone Removal Phase", comment: "Game")
             }
-            if undoRequested != nil {
-                if isUserTurn{
-                    return String(localized: "Undo request", comment: "Game - when undo received")
+            if hasCurrentUndoRequest, let undoRequest {
+                let requestedByUser: Bool
+                if let requestedBy = undoRequest.requestedBy {
+                    requestedByUser = requestedBy == ogs?.user?.id
                 } else {
-                    return String(localized: "Undo requested", comment: "Game - after undo requested")
+                    // Legacy requests do not identify the requester. Before requests
+                    // were allowed on either turn, the requester was not the player to move.
+                    requestedByUser = !isUserTurn
+                }
+
+                if requestedByUser {
+                    return String(
+                        localized: "game.undo.request.sent",
+                        defaultValue: "Undo requested",
+                        comment: "Game status after the user requested an undo"
+                    )
+                } else {
+                    return String(
+                        localized: "game.undo.request.received",
+                        defaultValue: "Undo requested",
+                        comment: "Game status when the opponent requested an undo"
+                    )
                 }
             }
             if isUserPlaying {
@@ -730,21 +771,64 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             return false
         }
         
-        var minimumLastMove = 0
-        if let handicap = gameData?.handicap {
-            if gameData?.freeHandicapPlacement ?? false {
-                minimumLastMove = handicap
-            }
-        }
-        
-        return !isUserTurn && undoRequested == nil && currentPosition.lastMoveNumber > minimumLastMove
+        return undoRequest == nil && currentPosition.lastMoveNumber > initialPosition.lastMoveNumber
     }
 
-    var undoacceptable: Bool {
-        guard let undoRequested = undoRequested else {
+    var hasCurrentUndoRequest: Bool {
+        undoRequest?.moveNumber == currentPosition.lastMoveNumber
+    }
+
+    var canAcceptUndo: Bool {
+        guard !rengo,
+              isUserPlaying,
+              gamePhase == .play,
+              gameData?.outcome == nil,
+              hasCurrentUndoRequest,
+              let undoRequest,
+              let user = ogs?.user else {
             return false
         }
-        return isUserTurn && undoRequested == currentPosition.lastMoveNumber
+
+        if let requestedBy = undoRequest.requestedBy {
+            return requestedBy != user.id
+        }
+        return isUserTurn
+    }
+
+    var canCancelUndo: Bool {
+        guard !rengo,
+              isUserPlaying,
+              gamePhase == .play,
+              gameData?.outcome == nil,
+              hasCurrentUndoRequest,
+              let requestedBy = undoRequest?.requestedBy,
+              let user = ogs?.user else {
+            return false
+        }
+        return requestedBy == user.id
+    }
+
+    var undoRequestCoordinates: [[Int]] {
+        guard hasCurrentUndoRequest,
+              let undoRequest,
+              var position = positionByLastMoveNumber[undoRequest.moveNumber] else {
+            return []
+        }
+
+        var coordinates = [[Int]]()
+        var remainingMoveCount = undoRequest.moveCount
+        while remainingMoveCount > 0 {
+            if case .placeStone(let row, let column) = position.lastMove,
+               case .hasStone = currentPosition[row, column] {
+                coordinates.append([row, column])
+            }
+            remainingMoveCount -= 1
+            guard let previousPosition = position.previousPosition else {
+                break
+            }
+            position = previousPosition
+        }
+        return coordinates
     }
     
     private var lastSeenChatId: String? = nil

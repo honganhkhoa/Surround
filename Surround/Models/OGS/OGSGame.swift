@@ -155,6 +155,143 @@ struct OGSMove: Decodable {
     }
 }
 
+struct OGSUndoRequest: Decodable, Equatable {
+    let moveNumber: Int
+    let requestedBy: Int?
+    let moveCount: Int
+
+    init(moveNumber: Int, requestedBy: Int? = nil, moveCount: Int = 1) {
+        self.moveNumber = moveNumber
+        self.requestedBy = requestedBy
+        self.moveCount = max(1, moveCount)
+    }
+
+    init?(payload: Any) {
+        if let moveNumber = Self.integer(from: payload) {
+            self.init(moveNumber: moveNumber)
+            return
+        }
+
+        guard let payload = payload as? [String: Any],
+              let moveNumberValue = payload["move_number"],
+              let moveNumber = Self.integer(from: moveNumberValue) else {
+            return nil
+        }
+
+        self.init(
+            moveNumber: moveNumber,
+            requestedBy: Self.strictInteger(from: payload["requested_by"]),
+            moveCount: Self.strictInteger(from: payload["undo_move_count"]) ?? 1
+        )
+    }
+
+    static func positiveMoveCount(from payload: Any?) -> Int? {
+        guard let payload = payload as? [String: Any],
+              let moveCount = strictInteger(from: payload["undo_move_count"]),
+              moveCount > 0 else {
+            return nil
+        }
+        return moveCount
+    }
+
+    private struct FlexibleCodingKey: CodingKey {
+        let stringValue: String
+        let intValue: Int? = nil
+
+        init(_ stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(stringValue: String) {
+            self.init(stringValue)
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let singleValueContainer = try decoder.singleValueContainer()
+        if let moveNumber = try? singleValueContainer.decode(Int.self) {
+            self.init(moveNumber: moveNumber)
+            return
+        }
+        if let string = try? singleValueContainer.decode(String.self),
+           let moveNumber = Self.integer(from: string) {
+            self.init(moveNumber: moveNumber)
+            return
+        }
+
+        let container = try decoder.container(keyedBy: FlexibleCodingKey.self)
+        guard let moveNumber = Self.decodeInteger(
+            from: container,
+            keys: ["moveNumber", "move_number"],
+            allowsNumericPrefix: true
+        ) else {
+            throw DecodingError.dataCorruptedError(
+                in: singleValueContainer,
+                debugDescription: "Undo request has no valid move number"
+            )
+        }
+
+        let requestedBy = Self.decodeInteger(
+            from: container,
+            keys: ["requestedBy", "requested_by"]
+        )
+        let moveCount = Self.decodeInteger(
+            from: container,
+            keys: ["undoMoveCount", "undo_move_count"]
+        ) ?? 1
+        self.init(moveNumber: moveNumber, requestedBy: requestedBy, moveCount: moveCount)
+    }
+
+    private static func decodeInteger(
+        from container: KeyedDecodingContainer<FlexibleCodingKey>,
+        keys: [String],
+        allowsNumericPrefix: Bool = false
+    ) -> Int? {
+        for keyName in keys {
+            let key = FlexibleCodingKey(keyName)
+            if let value = try? container.decode(Int.self, forKey: key) {
+                return value
+            }
+            if allowsNumericPrefix,
+               let string = try? container.decode(String.self, forKey: key),
+               let value = integer(from: string) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private static func strictInteger(from value: Any?) -> Int? {
+        guard let value else {
+            return nil
+        }
+        // JSON booleans bridge through NSNumber and otherwise cast to Int as 0/1.
+        if let number = value as? NSNumber,
+           CFGetTypeID(number) == CFBooleanGetTypeID() {
+            return nil
+        }
+        return value as? Int
+    }
+
+    private static func integer(from value: Any) -> Int? {
+        if let value = strictInteger(from: value) {
+            return value
+        }
+        guard let value = value as? String else {
+            return nil
+        }
+
+        let scanner = Scanner(string: value)
+        scanner.charactersToBeSkipped = .whitespacesAndNewlines
+        var parsedValue = 0
+        return scanner.scanInt(&parsedValue) ? parsedValue : nil
+    }
+}
+
 struct OGSGame: Decodable {
     struct InitialState: Codable, Hashable {
         var black: String
@@ -229,7 +366,7 @@ struct OGSGame: Decodable {
     var agaHandicapScoring: Bool
     var autoScoringDone: Bool?
     
-    var undoRequested: Int?
+    var undoRequested: OGSUndoRequest?
     var phase: OGSGamePhase
     
     var tournamentId: Int?

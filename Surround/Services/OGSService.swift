@@ -256,6 +256,7 @@ class OGSService: ObservableObject {
     private var ogsRoot: String { environment.rootURL.absoluteString }
 
     private let httpClient: OGSHTTPClient
+    private let undoResynchronizationTimeout: TimeInterval
 
     /// Account-scoped configuration, session metadata, caches, and read state.
     let preferences: UserDefaults
@@ -317,6 +318,8 @@ class OGSService: ObservableObject {
     private var desiredGameConnections = [Int: DesiredGameConnection]()
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
+    private var gamesResynchronizingAfterUndo = Set<Int>()
+    private var undoResynchronizationTimeouts = [Int: DispatchWorkItem]()
     private var publicGameConnectionIDs = Set<Int>()
     private let authenticationGenerationLock = NSLock()
     private var authenticationGenerationStorage: UInt = 0
@@ -542,6 +545,8 @@ class OGSService: ObservableObject {
     ///   - installsObservers: Installs the debounced model observers and runs
     ///     the initial login check. Set this false for synchronous previews or
     ///     narrowly scoped tests that must not initiate follow-up requests.
+    ///   - undoResynchronizationTimeout: Time to wait for authoritative game
+    ///     data after a targeted Undo recovery before reconnecting the socket.
     ///   - remoteSettings: Store for this identity's OGS remote settings. When
     ///     omitted, a store scoped to `preferences` is created automatically.
     ///   - initialState: Optional synchronous state for previews or injected
@@ -556,11 +561,13 @@ class OGSService: ObservableObject {
         enablesAppSideEffects: Bool = false,
         startsTimers: Bool = false,
         installsObservers: Bool = true,
+        undoResynchronizationTimeout: TimeInterval = 15,
         remoteSettings: OGSRemoteSetting? = nil,
         initialState: BootstrapState? = nil
     ) {
         self.environment = environment
         self.httpClient = httpClient
+        self.undoResynchronizationTimeout = undoResynchronizationTimeout
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
         self.ogsWebsocket = ogsWebsocket
@@ -736,6 +743,7 @@ class OGSService: ObservableObject {
         case "gamedata":
             if let gameData = data as? [String: Any], let ogsGame = try? dictionaryDecoder.decode(OGSGame.self, from: gameData) {
                 connectedGame.gameData = ogsGame
+                finishUndoResynchronization(gameID: ogsGameId)
             } else {
                 print("Error parsing game: \(data ?? "")")
             }
@@ -780,13 +788,20 @@ class OGSService: ObservableObject {
                 }
             }
         case "undo_accepted":
-            if let moveNumber = data as? Int {
-                connectedGame.undoMove(numbered: moveNumber)
+            guard let undoRequest = connectedGame.undoRequest else {
+                resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: ogsGameId)
+                return
             }
+            let moveCount = OGSUndoRequest.positiveMoveCount(from: data) ?? undoRequest.moveCount
+            connectedGame.undoLastMoves(count: moveCount)
         case "undo_requested":
-            if let moveNumber = data as? Int {
-                connectedGame.undoRequested = moveNumber
+            if let data, let undoRequest = OGSUndoRequest(payload: data) {
+                connectedGame.undoRequest = undoRequest
+            } else {
+                print("Invalid undo request for game \(ogsGameId): \(data ?? "")")
             }
+        case "undo_canceled":
+            connectedGame.undoRequest = nil
         case "removed_stones":
             if let removedStoneData = data as? [String: Any] {
                 if let removedString = removedStoneData["all_removed"] as? String {
@@ -1681,6 +1696,7 @@ class OGSService: ObservableObject {
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {
         desiredGameConnections.removeAll()
+        cancelAllUndoResynchronizations()
         publicGameConnectionIDs.removeAll()
 
         for cancellable in gameDetailCancellable.values {
@@ -1713,6 +1729,7 @@ class OGSService: ObservableObject {
         // callback that follows will then see the remaining owners, if any.
         if desired.chatByOwner.isEmpty {
             desiredGameConnections[gameID] = nil
+            finishUndoResynchronization(gameID: gameID)
             gameDetailCancellable.removeValue(forKey: gameID)?.cancel()
             disconnectActualGame(gameID: gameID)
         } else {
@@ -1721,6 +1738,52 @@ class OGSService: ObservableObject {
             // leaves while a board-only owner remains.
             connectIfReady(gameID: gameID)
         }
+    }
+
+    /// Requests a fresh authoritative snapshot for one game without disturbing
+    /// the shared WebSocket or any other game subscriptions. Duplicate Undo
+    /// acceptance events are coalesced until the replacement `gamedata` arrives.
+    private func resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: Int) {
+        guard desiredGameConnections[gameID] != nil,
+              gamesResynchronizingAfterUndo.insert(gameID).inserted else {
+            return
+        }
+
+        print("Undo accepted for game \(gameID), but no undo was requested; resynchronizing the game")
+        disconnectActualGame(gameID: gameID)
+        connectIfReady(gameID: gameID)
+
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self,
+                  self.gamesResynchronizingAfterUndo.remove(gameID) != nil else {
+                return
+            }
+            self.undoResynchronizationTimeouts.removeValue(forKey: gameID)
+            print("Undo resynchronization timed out for game \(gameID); reconnecting the socket")
+            if self.ogsWebsocket.opened {
+                self.ogsWebsocket.closeThenReconnect()
+            } else {
+                self.ogsWebsocket.reconnectIfNeeded()
+            }
+        }
+        undoResynchronizationTimeouts[gameID] = timeout
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + undoResynchronizationTimeout,
+            execute: timeout
+        )
+    }
+
+    private func finishUndoResynchronization(gameID: Int) {
+        gamesResynchronizingAfterUndo.remove(gameID)
+        undoResynchronizationTimeouts.removeValue(forKey: gameID)?.cancel()
+    }
+
+    private func cancelAllUndoResynchronizations() {
+        gamesResynchronizingAfterUndo.removeAll()
+        for timeout in undoResynchronizationTimeouts.values {
+            timeout.cancel()
+        }
+        undoResynchronizationTimeouts.removeAll()
     }
 
     private func disconnectActualGame(gameID: Int) {
@@ -1926,9 +1989,15 @@ class OGSService: ObservableObject {
         }
     }
     
-    func acceptUndo(game: Game, moveNumber: Int) {
+    func acceptUndo(game: Game) {
         if let ogsID = game.ogsID {
-            self.ogsWebsocket.emit(command: "game/undo/accept", data: ["game_id": ogsID, "move_number": moveNumber])
+            self.ogsWebsocket.emit(command: "game/undo/accept", data: ["game_id": ogsID, "move_number": game.currentPosition.lastMoveNumber])
+        }
+    }
+
+    func cancelUndo(game: Game) {
+        if let ogsID = game.ogsID {
+            self.ogsWebsocket.emit(command: "game/undo/cancel", data: ["game_id": ogsID, "move_number": game.currentPosition.lastMoveNumber])
         }
     }
     

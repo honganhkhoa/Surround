@@ -203,6 +203,7 @@ struct Stones: View {
     var variation: Variation?
     var geometry: GeometryProxy
     var isLastMovePending = false
+    var undoRequestCoordinates: [[Int]] = []
 
     var body: some View {
         let width = boardPosition.width
@@ -282,6 +283,20 @@ struct Stones: View {
         }
         
         let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1 : 0.5)
+        let undoMarkerCoordinates = undoRequestCoordinates.filter { coordinate in
+            guard coordinate.count == 2 else {
+                return false
+            }
+            let row = coordinate[0]
+            let column = coordinate[1]
+            guard row >= 0, row < height, column >= 0, column < width else {
+                return false
+            }
+            if case .hasStone = boardPosition[row, column] {
+                return true
+            }
+            return false
+        }
         
         return ZStack {
             if drawsShadow {
@@ -314,7 +329,8 @@ struct Stones: View {
                 VariationNumberings(variation: variation, cellSize: size)
             } else if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
                 if case .hasStone(let lastColor) = boardPosition[lastRow, lastColumn] {
-                    if boardPosition.estimatedScores == nil {
+                    if boardPosition.estimatedScores == nil
+                        && !undoMarkerCoordinates.contains([lastRow, lastColumn]) {
                         if isLastMovePending {
                             Path { path in
                                 let centerX = CGFloat(lastColumn) * size + size / 2
@@ -335,6 +351,26 @@ struct Stones: View {
                             }
                             .stroke(lastColor == .white ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
                         }
+                    }
+                }
+            }
+
+            if variation == nil {
+                ForEach(Array(undoMarkerCoordinates.enumerated()), id: \.offset) { _, coordinate in
+                    let row = coordinate[0]
+                    let column = coordinate[1]
+                    if case .hasStone(let stoneColor) = boardPosition[row, column] {
+                        Text(verbatim: "↶")
+                            .font(.system(size: size * 0.65, weight: .bold))
+                            .foregroundColor(stoneColor == .black ? .white : .black)
+                            .minimumScaleFactor(0.2)
+                            .frame(width: size, height: size)
+                            .position(
+                                x: (CGFloat(column) + 0.5) * size,
+                                y: (CGFloat(row) + 0.5) * size
+                            )
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
                 }
             }
@@ -505,6 +541,7 @@ struct BoardView: View {
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
     var cornerRadius: CGFloat = 0.0
     var highlightCoordinates: [[Int]] = []
+    var undoRequestCoordinates: [[Int]] = []
     
     var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
@@ -543,7 +580,13 @@ struct BoardView: View {
                         newMove.wrappedValue = nil
                     }
                 }
-                Stones(boardPosition: displayedPosition, variation: variation, geometry: boardGeometry, isLastMovePending: newMove.wrappedValue != nil)
+                Stones(
+                    boardPosition: displayedPosition,
+                    variation: variation,
+                    geometry: boardGeometry,
+                    isLastMovePending: newMove.wrappedValue != nil,
+                    undoRequestCoordinates: undoRequestCoordinates
+                )
                 MarkerOverlay(boardPosition: boardPosition, geometry: boardGeometry, highlightCoordinates: highlightCoordinates)
                 if stoneRemovable {
                     StoneRemovalOverlay(
@@ -595,10 +638,19 @@ struct BoardView: View {
     )
 }
 
-#Preview("9×9 with coordinates", traits: .fixedLayout(width: 375, height: 375)) {
+#Preview("9×9 Undo request with coordinates", traits: .fixedLayout(width: 200, height: 200)) {
+    let game = {
+        let game = TestData.Resigned9x9Japanese
+        game.undoRequest = OGSUndoRequest(
+            moveNumber: game.currentPosition.lastMoveNumber,
+            moveCount: 2
+        )
+        return game
+    }()
     BoardView(
-        boardPosition: TestData.Resigned9x9Japanese.currentPosition,
-        showsCoordinate: true
+        boardPosition: game.currentPosition,
+        showsCoordinate: true,
+        undoRequestCoordinates: game.undoRequestCoordinates
     )
 }
 
