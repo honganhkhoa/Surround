@@ -303,7 +303,7 @@ class OGSService: ObservableObject {
     ///
     /// This is deliberately separate from `connectedGames`, which represents
     /// subscriptions on the currently open socket. A socket close clears only
-    /// actual subscriptions; release and authentication changes clear intent.
+    /// actual subscriptions; release and account identity changes clear intent.
     /// Reconnection therefore cannot resurrect a game that no longer has an
     /// owner.
     private struct DesiredGameConnection {
@@ -324,7 +324,7 @@ class OGSService: ObservableObject {
     private let authenticationGenerationLock = NSLock()
     private var authenticationGenerationStorage: UInt = 0
 
-    /// Authentication can change on the UI thread while detail responses are
+    /// Account identity can change on the UI thread while detail responses are
     /// decoded on a background queue. Keep the generation snapshot synchronized
     /// so stale-response checks do not introduce a data race of their own.
     private var authenticationGeneration: UInt {
@@ -662,6 +662,16 @@ class OGSService: ObservableObject {
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
             }
+        case "user/jwt":
+            // OGS rotates this token independently of the account identity.
+            // Keep it for the next natural socket authentication without
+            // disturbing the live connection or its game/chat subscriptions.
+            if let update = data as? OGSWebsocketJWTUpdate,
+               var config = preferences[.ogsUIConfig],
+               update.authenticatedUserID == config.user.id {
+                config.userJwt = update.userJwt
+                preferences[.ogsUIConfig] = config
+            }
         case "net/pong":
             if let data = data as? [String: Double],
                let clientTime = data["client"],
@@ -867,8 +877,8 @@ class OGSService: ObservableObject {
         }
         set {
             let previousConfig = preferences[.ogsUIConfig]
-            let authenticationChanged = newValue?.userJwt != previousConfig?.userJwt
-            if authenticationChanged {
+            let accountIdentityChanged = newValue?.user.id != previousConfig?.user.id
+            if accountIdentityChanged {
                 advanceAuthenticationGeneration()
                 // An in-place account change is equivalent to destroying every
                 // game controller in the official client. Remove intent before
@@ -888,7 +898,7 @@ class OGSService: ObservableObject {
             preferences[.ogsUIConfig] = newValue
             self.updateSessionId()
             checkLoginStatus()
-            if authenticationChanged {
+            if accountIdentityChanged {
                 // Reconnect after storing the config so the new socket sends
                 // the matching JWT instead of authenticating anonymously or
                 // with the previous account.

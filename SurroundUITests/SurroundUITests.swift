@@ -131,6 +131,23 @@ final class SurroundUITests: XCTestCase {
         #endif
     }
 
+    private func scrollIntoTappableArea(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        for _ in 0..<4 {
+            #if targetEnvironment(macCatalyst)
+            let overlapsTabBar = false
+            #else
+            let overlapsTabBar = element.frame.maxY > app.frame.maxY - 100
+            #endif
+            guard !element.isHittable || overlapsTabBar else {
+                return
+            }
+            app.swipeUp()
+        }
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,
@@ -172,6 +189,62 @@ final class SurroundUITests: XCTestCase {
         element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
         element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
         element(SurroundUITestContract.AccessibilityID.gameOptions, in: app)
+    }
+
+    func testHomeHistoryRetryRecoversAndKeepsNavigationAvailable() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.homeHistoryFailsOnceLaunchArgument,
+        ])
+
+        let error = element(
+            SurroundUITestContract.AccessibilityID.homeHistoryError,
+            in: app
+        )
+        let retry = element(
+            SurroundUITestContract.AccessibilityID.homeHistoryRetry,
+            in: app,
+            matching: .button
+        )
+        // XCTest can call an element hittable while its frame still overlaps
+        // the tab bar. Move Retry only when it is obscured or in that zone.
+        scrollIntoTappableArea(retry, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.homeHistoryRetry,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.homeHistoryGame(
+                SurroundUITestContract.homeHistoryRetryFixtureGameID
+            ),
+            in: app
+        )
+        let errorDisappeared = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: error
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [errorDisappeared], timeout: 10),
+            .completed,
+            "Expected the history error to disappear after Retry succeeds."
+        )
+
+        let viewAll = element(
+            SurroundUITestContract.AccessibilityID.homeHistoryViewAll,
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(viewAll, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.homeHistoryViewAll,
+            in: app,
+            matching: .button
+        )
+        element(SurroundUITestContract.AccessibilityID.screenGameHistory, in: app)
+        element(
+            SurroundUITestContract.AccessibilityID.gameHistoryEmpty,
+            in: app
+        )
     }
 
     func testZenModeRoundTrip() {

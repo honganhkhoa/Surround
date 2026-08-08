@@ -34,6 +34,13 @@ private struct HomeGameRow: Identifiable {
     }
 }
 
+private enum RecentFinishedGamesLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case failed
+}
+
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
@@ -48,10 +55,15 @@ struct HomeView: View {
 
     @State var recentFinishedGames: [Game] = []
     @State var recentFinishedCancellable: AnyCancellable?
-    @State var isLoadingRecentFinished = false
+    @State private var recentFinishedLoadState: RecentFinishedGamesLoadState
+    @State private var recentFinishedRequestID: UUID?
+    @State private var hasSimulatedRecentFinishedGamesFailure = false
     
     init(previewGames: [Game] = []) {
         _recentFinishedGames = State(initialValue: previewGames)
+        _recentFinishedLoadState = State(
+            initialValue: previewGames.isEmpty ? .idle : .loaded
+        )
         #if os(iOS)
         if SurroundUITestContract.isCapturingAppStoreScreenshots {
             _displayMode = State(initialValue: .compact)
@@ -101,25 +113,53 @@ struct HomeView: View {
     /// it ends rather than only after a relaunch. Only guards against
     /// overlapping requests, not against refetching.
     func loadRecentFinishedGames() {
+        guard recentFinishedLoadState != .loading else {
+            return
+        }
         guard allowsRemoteActivity else {
+            recentFinishedLoadState = .loading
             #if DEBUG && MAIN_APP
-            // Screenshot UI tests carry a complete, already-hydrated history
-            // snapshot. Install it directly so this path remains offline without
-            // losing the history section that the screenshot journey verifies.
+            if SurroundUITestContract.simulatesHomeHistoryFailureOnce
+                && !hasSimulatedRecentFinishedGamesFailure {
+                hasSimulatedRecentFinishedGamesFailure = true
+                recentFinishedGames = []
+                recentFinishedLoadState = .failed
+                recentFinishedRequestID = nil
+                return
+            }
+            // Offline UI tests can carry a complete, already-hydrated history
+            // snapshot. Install it directly so this path remains deterministic
+            // without losing the history section that the fixtures verify.
             if SurroundUITestContract.isEnabled {
-                recentFinishedGames = Array(
-                    ogs.offlineUITestFinishedGames.prefix(10)
-                )
+                if SurroundUITestContract.simulatesHomeHistoryFailureOnce {
+                    let retryFixture = TestData.Scored19x19Korean
+                    precondition(
+                        retryFixture.ogsID
+                            == SurroundUITestContract
+                                .homeHistoryRetryFixtureGameID
+                    )
+                    recentFinishedGames = [retryFixture]
+                } else {
+                    recentFinishedGames = Array(
+                        ogs.offlineUITestFinishedGames.prefix(10)
+                    )
+                }
             }
             #endif
+            recentFinishedLoadState = .loaded
+            recentFinishedRequestID = nil
             return
         }
-        guard ogs.isLoggedIn,
-              let playerId = ogs.user?.id,
-              !isLoadingRecentFinished else {
+        guard ogs.isLoggedIn else {
             return
         }
-        isLoadingRecentFinished = true
+        guard let playerId = ogs.user?.id else {
+            recentFinishedLoadState = .failed
+            return
+        }
+        let requestID = UUID()
+        recentFinishedLoadState = .loading
+        recentFinishedRequestID = requestID
         let reusableGames = Dictionary(
             recentFinishedGames.compactMap { game in game.ogsID.map { ($0, game) } },
             uniquingKeysWith: { first, _ in first }
@@ -132,18 +172,34 @@ struct HomeView: View {
         )
             .receive(on: RunLoop.main)
             .sink(
-                receiveCompletion: { _ in
-                    isLoadingRecentFinished = false
+                receiveCompletion: { completion in
+                    guard recentFinishedRequestID == requestID else {
+                        return
+                    }
+                    recentFinishedRequestID = nil
                     recentFinishedCancellable = nil
+                    guard ogs.user?.id == playerId else {
+                        return
+                    }
+                    switch completion {
+                    case .finished:
+                        if recentFinishedLoadState == .loading {
+                            recentFinishedLoadState = .loaded
+                        }
+                    case .failure:
+                        recentFinishedLoadState = .failed
+                    }
                 },
                 receiveValue: { result in
                     // Drop a response that belongs to whoever was signed in when
                     // the request went out — otherwise a user switch mid-flight
                     // installs the previous account's history.
-                    guard ogs.user?.id == playerId else {
+                    guard recentFinishedRequestID == requestID,
+                          ogs.user?.id == playerId else {
                         return
                     }
                     recentFinishedGames = result.games
+                    recentFinishedLoadState = .loaded
                 }
             )
     }
@@ -152,7 +208,8 @@ struct HomeView: View {
     func resetRecentFinishedGames() {
         recentFinishedCancellable?.cancel()
         recentFinishedCancellable = nil
-        isLoadingRecentFinished = false
+        recentFinishedRequestID = nil
+        recentFinishedLoadState = .idle
         recentFinishedGames = []
         loadRecentFinishedGames()
     }
@@ -301,43 +358,74 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                             }
                         }
-                        if recentFinishedGames.count > 0 {
-                            Section(header: sectionHeader(title: String(localized: "Game history", comment: "Homeview"))) {
-                                ForEach(
-                                    recentFinishedGames.map {
-                                        HomeGameRow(game: $0, context: .history)
-                                    }
-                                ) { row in
-                                    HistoryGameCell(game: row.game) {
-                                        showGameDetail(game: row.game, showsCarousel: false)
-                                    }
-                                    .accessibilityIdentifier(
-                                        SurroundUITestContract.AccessibilityID.homeHistoryGame(row.game)
-                                    )
-                                    .padding(.horizontal)
+                        Section(header: sectionHeader(title: String(localized: "Game history", comment: "Homeview"))) {
+                            ForEach(
+                                recentFinishedGames.map {
+                                    HomeGameRow(game: $0, context: .history)
                                 }
-                                Button(action: { nav.home.showingGameHistory = true }) {
-                                    HStack {
-                                        Spacer()
-                                        Text("View full history", comment: "Homeview")
-                                            .font(.body.bold())
-                                        Image(systemName: "chevron.right")
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 12)
-                                    .contentShape(Rectangle())
+                            ) { row in
+                                HistoryGameCell(game: row.game) {
+                                    showGameDetail(game: row.game, showsCarousel: false)
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundColor(.accentColor)
+                                .accessibilityIdentifier(
+                                    SurroundUITestContract.AccessibilityID.homeHistoryGame(row.game)
+                                )
                                 .padding(.horizontal)
-                                .padding(.bottom, 8)
                             }
+                            if let recentFinishedGamesStatus {
+                                GameHistoryLoadStatusView(
+                                    status: recentFinishedGamesStatus,
+                                    accessibilityIdentifiers: .init(
+                                        loading: SurroundUITestContract
+                                            .AccessibilityID.homeHistoryLoading,
+                                        error: SurroundUITestContract
+                                            .AccessibilityID.homeHistoryError,
+                                        retry: SurroundUITestContract
+                                            .AccessibilityID.homeHistoryRetry,
+                                        empty: SurroundUITestContract
+                                            .AccessibilityID.homeHistoryEmpty
+                                    ),
+                                    emptyVerticalPadding: 30,
+                                    retry: loadRecentFinishedGames
+                                )
+                            }
+                            Button(action: { nav.home.showingGameHistory = true }) {
+                                HStack {
+                                    Spacer()
+                                    Text("View full history", comment: "Homeview")
+                                        .font(.body.bold())
+                                    Image(systemName: "chevron.right")
+                                    Spacer()
+                                }
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .accessibilityIdentifier(
+                                SurroundUITestContract.AccessibilityID.homeHistoryViewAll
+                            )
+                            .buttonStyle(.plain)
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
                         }
                         Spacer()
                     }
                     .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
                 }
             }
+        }
+    }
+
+    private var recentFinishedGamesStatus: GameHistoryLoadStatus? {
+        switch recentFinishedLoadState {
+        case .idle, .loading:
+            return recentFinishedGames.isEmpty ? .loading : nil
+        case .failed:
+            return .failed
+        case .loaded where recentFinishedGames.isEmpty:
+            return .empty
+        default:
+            return nil
         }
     }
 

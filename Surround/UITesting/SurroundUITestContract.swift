@@ -25,11 +25,14 @@ enum SurroundUITestContract {
         "--surround-app-store-screenshot-widget-proof-token"
     static let screenshotWidgetFixtureCleanupLaunchArgument =
         "--clear-app-store-screenshot-widget-fixture"
+    static let homeHistoryFailsOnceLaunchArgument =
+        "--surround-home-history-fails-once"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
+    static let homeHistoryRetryFixtureGameID = 18_759_438
     static let screenshotPrimaryGameID = 68_301_595
     static let screenshotFixtureGameIDs = [
         screenshotPrimaryGameID,
@@ -111,6 +114,13 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 compatibilityScreenshotLaunchArgument
+            )
+    }
+
+    static var simulatesHomeHistoryFailureOnce: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                homeHistoryFailsOnceLaunchArgument
             )
     }
 
@@ -240,6 +250,7 @@ enum SurroundUITestContract {
         static let navigationBrowser = "navigation.browser"
 
         static let screenHome = "screen.home"
+        static let screenGameHistory = "screen.gameHistory"
         static let screenPublicGames = "screen.publicGames"
         static let screenMessages = "screen.messages"
         static let screenSettings = "screen.settings"
@@ -271,6 +282,17 @@ enum SurroundUITestContract {
             homeHistoryGame(ogsID(for: game))
         }
         #endif
+
+        static let homeHistoryLoading = "home.history.loading"
+        static let homeHistoryError = "home.history.error"
+        static let homeHistoryRetry = "home.history.retry"
+        static let homeHistoryEmpty = "home.history.empty"
+        static let homeHistoryViewAll = "home.history.viewAll"
+
+        static let gameHistoryLoading = "gameHistory.loading"
+        static let gameHistoryError = "gameHistory.error"
+        static let gameHistoryRetry = "gameHistory.retry"
+        static let gameHistoryEmpty = "gameHistory.empty"
 
         static let homeNewGame = "home.newGame"
         static let homePreferredSettings = "home.preferredSettings"

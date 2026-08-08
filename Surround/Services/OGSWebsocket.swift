@@ -109,6 +109,15 @@ enum OGSWebsocketFrame {
     case event(name: String, data: Any?)
 }
 
+/// A pushed JWT paired with the account that authenticated its transport.
+///
+/// The identity snapshot prevents a frame already queued by an old socket from
+/// overwriting the configuration after an in-place account switch.
+struct OGSWebsocketJWTUpdate {
+    let userJwt: String
+    let authenticatedUserID: Int?
+}
+
 /// Failures encountered while validating the JSON-compatible frame shape.
 enum OGSWebsocketFrameCodecError: Error {
     case invalidJSONObject
@@ -124,9 +133,9 @@ enum OGSWebsocketFrameCodecError: Error {
 /// be accepted by `JSONSerialization`, and incoming JSON `null` payloads are
 /// exposed as `nil`.
 ///
-/// Redaction is recursive but key-based. It protects known JWT, password,
-/// token, CSRF, authorization, cookie, and session fields; it cannot guarantee
-/// removal of secrets stored under unusual keys or as bare array values.
+/// Redaction is recursive and protects known JWT, password, token, CSRF,
+/// authorization, cookie, and session fields. The scalar payload of the
+/// `user/jwt` event is also redacted before the frame reaches a logger.
 enum OGSWebsocketFrameCodec {
     /// Encodes a command as `[command, data]` or `[command, data, callbackID]`.
     static func encode(command: String, data: Any, callbackID: Int? = nil) throws -> String {
@@ -168,7 +177,8 @@ enum OGSWebsocketFrameCodec {
 
     /// Encodes a log-only representation with known credential fields removed.
     static func redactedDescription(command: String, data: Any, callbackID: Int?) -> String {
-        (try? encode(command: command, data: redact(data), callbackID: callbackID))
+        let redactedData = isSensitiveScalarPayloadEvent(command) ? "<redacted>" : redact(data)
+        return (try? encode(command: command, data: redactedData, callbackID: callbackID))
             ?? "[\"\(command)\",\"<unprintable>\"]"
     }
 
@@ -176,9 +186,14 @@ enum OGSWebsocketFrameCodec {
     static func redactedDescription(ofJSON message: String) -> String {
         guard
             let data = message.data(using: .utf8),
-            let object = try? JSONSerialization.jsonObject(with: data),
-            JSONSerialization.isValidJSONObject(redact(object)),
-            let redactedData = try? JSONSerialization.data(withJSONObject: redact(object)),
+            let object = try? JSONSerialization.jsonObject(with: data)
+        else {
+            return "<unparseable websocket frame>"
+        }
+        let redactedObject = redactFrame(object)
+        guard
+            JSONSerialization.isValidJSONObject(redactedObject),
+            let redactedData = try? JSONSerialization.data(withJSONObject: redactedObject),
             let result = String(data: redactedData, encoding: .utf8)
         else {
             return "<unparseable websocket frame>"
@@ -188,6 +203,21 @@ enum OGSWebsocketFrameCodec {
 
     private static func optionalJSONValue(_ value: Any) -> Any? {
         value is NSNull ? nil : value
+    }
+
+    private static func redactFrame(_ value: Any) -> Any {
+        guard var components = value as? [Any],
+              let eventName = components.first as? String else {
+            return redact(value)
+        }
+        if components.indices.contains(1), isSensitiveScalarPayloadEvent(eventName) {
+            components[1] = "<redacted>"
+        }
+        return redact(components)
+    }
+
+    private static func isSensitiveScalarPayloadEvent(_ eventName: String) -> Bool {
+        eventName.lowercased() == "user/jwt"
     }
 
     private static func redact(_ value: Any) -> Any {
@@ -215,7 +245,7 @@ enum OGSWebsocketFrameCodec {
 
     private static func isSensitive(key: String) -> Bool {
         let normalized = key.lowercased()
-        return normalized == "jwt"
+        return normalized.contains("jwt")
             || normalized.contains("password")
             || normalized.contains("token")
             || normalized.contains("csrf")
@@ -459,6 +489,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     private var anonymousConfigRequestInFlight = false
     private var pingCancellable: Cancellable?
     private var isClosed = false
+    private var authenticatedUserID: Int?
 
     var drift = 0.0
     var latency = 0.0
@@ -548,6 +579,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
             self.transport = nil
             self.opened = false
             self.authenticated = false
+            self.authenticatedUserID = nil
             self.anonymousConfigRequestInFlight = false
             self.onConnectTasks = []
             self.failPendingCallbacks(reason: "WebSocket was closed")
@@ -570,6 +602,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         guard !isClosed else { return }
         let config = authenticationConfigProvider() ?? anonymousUIConfig
         if let config {
+            authenticatedUserID = config.user.id
             emit(command: "authenticate", data: ["jwt": config.userJwt])
             if config.user.anonymous == false {
                 emit(command: "automatch/list")
@@ -717,7 +750,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     func websocketTransport(_ transport: OGSWebsocketTransport, didReceive message: String) {
         guard transport === self.transport else { return }
         log("Received string: \(OGSWebsocketFrameCodec.redactedDescription(ofJSON: message))")
-        processServerMessage(message)
+        processServerMessage(message, from: transport)
     }
 
     func websocketTransport(
@@ -736,6 +769,13 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     // MARK: - Message dispatch
 
     func processServerMessage(_ message: String) {
+        processServerMessage(message, from: nil)
+    }
+
+    private func processServerMessage(
+        _ message: String,
+        from sourceTransport: OGSWebsocketTransport?
+    ) {
         let frame: OGSWebsocketFrame
         do {
             frame = try OGSWebsocketFrameCodec.decode(message)
@@ -745,11 +785,24 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         }
 
         scheduler.async {
+            if let sourceTransport, sourceTransport !== self.transport {
+                return
+            }
             switch frame {
             case .callback(let id, let data, let error):
                 self.completeCallback(id: id, data: data, error: error)
             case .event(let name, let data):
-                self.serverEventCallback?(name, data)
+                if name.lowercased() == "user/jwt", let userJwt = data as? String {
+                    self.serverEventCallback?(
+                        name,
+                        OGSWebsocketJWTUpdate(
+                            userJwt: userJwt,
+                            authenticatedUserID: self.authenticatedUserID
+                        )
+                    )
+                } else {
+                    self.serverEventCallback?(name, data)
+                }
             }
         }
     }
@@ -782,6 +835,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         pingCancellable = nil
         opened = false
         authenticated = false
+        authenticatedUserID = nil
         transport?.delegate = nil
         transport?.disconnect()
         transport = nil
@@ -828,6 +882,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
 
         opened = false
         authenticated = false
+        authenticatedUserID = nil
         let transport = transportFactory()
         self.transport = transport
         transport.delegate = self

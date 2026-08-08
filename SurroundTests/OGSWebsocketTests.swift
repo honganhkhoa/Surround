@@ -154,6 +154,23 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertThrowsError(try OGSWebsocketFrameCodec.decode("[]"))
     }
 
+    func testFrameCodecRedactsPushedJWTScalarAndUserJWTKeys() {
+        let scalarSecret = "scalar-jwt-secret"
+        let scalar = OGSWebsocketFrameCodec.redactedDescription(
+            ofJSON: #"["user/jwt","scalar-jwt-secret"]"#
+        )
+        XCTAssertFalse(scalar.contains(scalarSecret))
+        XCTAssertTrue(scalar.contains("<redacted>"))
+
+        let keyedSecret = "keyed-jwt-secret"
+        let keyed = OGSWebsocketFrameCodec.redactedDescription(
+            ofJSON: #"["ui/config",{"user_jwt":"keyed-jwt-secret","safe":"visible"}]"#
+        )
+        XCTAssertFalse(keyed.contains(keyedSecret))
+        XCTAssertTrue(keyed.contains("<redacted>"))
+        XCTAssertTrue(keyed.contains("visible"))
+    }
+
     func testConnectUsesInjectedOriginAuthenticatesAndNeverLogsJWT() throws {
         let scheduler = Scheduler()
         let factory = TransportFactory()
@@ -245,6 +262,34 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertEqual(timeoutCount, 1)
     }
 
+    func testPushedJWTIncludesTheTransportAuthenticationIdentity() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: {
+                try? self.makeConfig(jwt: "authenticated-jwt", anonymous: false)
+            },
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            logger: { _ in }
+        )
+        var receivedUpdate: OGSWebsocketJWTUpdate?
+        socket.serverEventCallback = { name, data in
+            if name == "user/jwt" {
+                receivedUpdate = data as? OGSWebsocketJWTUpdate
+            }
+        }
+
+        socket.connect()
+        let transport = try XCTUnwrap(factory.transports.first)
+        transport.open()
+        transport.receive(#"["user/jwt","pushed-jwt"]"#)
+
+        XCTAssertEqual(receivedUpdate?.userJwt, "pushed-jwt")
+        XCTAssertEqual(receivedUpdate?.authenticatedUserID, 1)
+    }
+
     func testFailureReconnectsAndCloseCancelsAllWorkWithoutRestarting() throws {
         let scheduler = Scheduler()
         let factory = TransportFactory()
@@ -293,6 +338,40 @@ final class OGSWebsocketTests: XCTestCase {
         socket.closeThenReconnect()
         XCTAssertEqual(factory.transports.count, 2)
         XCTAssertEqual(socket.status, .disconnected)
+    }
+
+    func testNaturalReconnectAuthenticatesWithFreshestProviderToken() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        var config = try makeConfig(jwt: "old-test-jwt", anonymous: false)
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: { config },
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            logger: { _ in }
+        )
+
+        socket.connect()
+        let firstTransport = try XCTUnwrap(factory.transports.first)
+        firstTransport.open()
+        XCTAssertTrue(firstTransport.sentMessages.contains { $0.contains("old-test-jwt") })
+
+        config = try makeConfig(jwt: "fresh-test-jwt", anonymous: false)
+        firstTransport.fail()
+        XCTAssertTrue(scheduler.runNext(after: 1))
+        let secondTransport = try XCTUnwrap(factory.transports.last)
+        secondTransport.open()
+
+        let authentication = try XCTUnwrap(secondTransport.sentMessages.first)
+        let frame = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(authentication.utf8)) as? [Any]
+        )
+        XCTAssertEqual(frame[0] as? String, "authenticate")
+        XCTAssertEqual(
+            (frame[1] as? [String: String])?["jwt"],
+            "fresh-test-jwt"
+        )
     }
 
     func testAnonymousConfigLoaderReceivesTheInjectedRoot() throws {

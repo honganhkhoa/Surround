@@ -10,6 +10,75 @@
 import SwiftUI
 import Combine
 
+enum GameHistoryLoadStatus {
+    case loading
+    case failed
+    case empty
+}
+
+struct GameHistoryLoadStatusView: View {
+    struct AccessibilityIdentifiers {
+        let loading: String
+        let error: String
+        let retry: String
+        let empty: String
+    }
+
+    let status: GameHistoryLoadStatus
+    let accessibilityIdentifiers: AccessibilityIdentifiers
+    let emptyVerticalPadding: CGFloat
+    let retry: () -> Void
+
+    init(
+        status: GameHistoryLoadStatus,
+        accessibilityIdentifiers: AccessibilityIdentifiers,
+        emptyVerticalPadding: CGFloat = 40,
+        retry: @escaping () -> Void
+    ) {
+        self.status = status
+        self.accessibilityIdentifiers = accessibilityIdentifiers
+        self.emptyVerticalPadding = emptyVerticalPadding
+        self.retry = retry
+    }
+
+    @ViewBuilder
+    var body: some View {
+        switch status {
+        case .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding()
+                .accessibilityIdentifier(accessibilityIdentifiers.loading)
+        case .failed:
+            VStack(spacing: 10) {
+                Text(
+                    "Couldn’t load game history",
+                    comment: "GameHistoryView loading error"
+                )
+                .foregroundColor(.secondary)
+                .accessibilityIdentifier(accessibilityIdentifiers.error)
+                Button(action: retry) {
+                    Text(
+                        "Try Again",
+                        comment: "GameHistoryView retry loading"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier(accessibilityIdentifiers.retry)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+        case .empty:
+            Text("No finished games yet")
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, emptyVerticalPadding)
+                .accessibilityIdentifier(accessibilityIdentifiers.empty)
+        }
+    }
+}
+
 struct GameHistoryView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
@@ -42,37 +111,28 @@ struct GameHistoryView: View {
                         }
                     }
                 }
-                if pagination.isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                }
-                if pagination.lastRequestFailed && !pagination.isLoading {
-                    VStack(spacing: 10) {
-                        Text("Couldn’t load game history", comment: "GameHistoryView loading error")
-                            .foregroundColor(.secondary)
-                        Button {
-                            loadNextPage()
-                        } label: {
-                            Text("Try Again", comment: "GameHistoryView retry loading")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                }
-                if pagination.loadedOnce
-                    && pagination.games.isEmpty
-                    && !pagination.isLoading
-                    && !pagination.lastRequestFailed {
-                    Text("No finished games yet")
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                if let loadStatus {
+                    GameHistoryLoadStatusView(
+                        status: loadStatus,
+                        accessibilityIdentifiers: .init(
+                            loading: SurroundUITestContract.AccessibilityID
+                                .gameHistoryLoading,
+                            error: SurroundUITestContract.AccessibilityID
+                                .gameHistoryError,
+                            retry: SurroundUITestContract.AccessibilityID
+                                .gameHistoryRetry,
+                            empty: SurroundUITestContract.AccessibilityID
+                                .gameHistoryEmpty
+                        ),
+                        retry: loadNextPage
+                    )
                 }
             }
             .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
         }
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.screenGameHistory
+        )
         .navigationDestination(isPresented: Binding(
             get: { nav.gameHistory.activeGame != nil },
             set: { if !$0 { nav.gameHistory.activeGame = nil } }
@@ -91,6 +151,19 @@ struct GameHistoryView: View {
             resetPages(playerID: newPlayerID)
         }
         .navigationTitle(Text("Game history"))
+    }
+
+    private var loadStatus: GameHistoryLoadStatus? {
+        if pagination.isLoading {
+            return .loading
+        }
+        if pagination.lastRequestFailed {
+            return .failed
+        }
+        if pagination.loadedOnce && pagination.games.isEmpty {
+            return .empty
+        }
+        return nil
     }
 
     private func loadNextPage() {

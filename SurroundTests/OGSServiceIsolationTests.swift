@@ -401,6 +401,68 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertNil(query["ended__isnull"])
     }
 
+    func testHydratedFinishedGamesSurviveSameUserJWTRotation() throws {
+        let gameID = 62
+        FinishedGameCache.shared.clear()
+        defer { FinishedGameCache.shared.clear() }
+        _ = try installGameDetailResponse(gameID: gameID)
+        let response = try JSONSerialization.data(withJSONObject: [
+            "count": 1,
+            "next": NSNull(),
+            "previous": NSNull(),
+            "results": [
+                makeHistoryResult(id: gameID, blackID: 101, whiteID: 201),
+            ],
+        ])
+        let responseGate = DispatchSemaphore(value: 0)
+        let requestStarted = expectation(description: "history detail request started")
+
+        StubURLProtocol.lock.lock()
+        StubURLProtocol.gameHistoryBody = response
+        StubURLProtocol.gameDetailGate = responseGate
+        StubURLProtocol.gameDetailStarted = { requestStarted.fulfill() }
+        StubURLProtocol.lock.unlock()
+
+        let socket = StubWebsocket()
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "same-user-jwt-history"
+        )
+        service.ogsUIConfig = try makeUIConfig(jwt: "old-test-jwt", userID: 101)
+        let reconnectCountBeforeRotation = socket.reconnectCount
+        let completed = expectation(description: "hydrated history delivered")
+        var receivedGames = [Game]()
+        var receivedError: Error?
+
+        service.fetchHydratedFinishedGames(
+            playerId: 101,
+            page: 1,
+            pageSize: 10
+        )
+        .sink(
+            receiveCompletion: {
+                if case .failure(let error) = $0 {
+                    receivedError = error
+                }
+                completed.fulfill()
+            },
+            receiveValue: { receivedGames = $0.games }
+        )
+        .store(in: &cancellables)
+
+        wait(for: [requestStarted], timeout: 5)
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-test-jwt", userID: 101)
+        responseGate.signal()
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertNil(receivedError)
+        XCTAssertEqual(receivedGames.compactMap(\.ogsID), [gameID])
+        XCTAssertEqual(receivedGames.first?.gameData?.gameId, gameID)
+        XCTAssertEqual(socket.reconnectCount, reconnectCountBeforeRotation)
+    }
+
     func testFinishedGameDetailLoadingIsBoundedAtomicAndOrdered() throws {
         let gameIDs = [701, 702, 703, 704]
         let games = gameIDs.map(makeHistoryGame(id:))

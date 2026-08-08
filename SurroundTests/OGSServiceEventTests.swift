@@ -698,9 +698,9 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(canonicalGame.gamePhase, .stoneRemoval)
     }
 
-    func testAuthenticationChangeInvalidatesFinishedGameAndChatIntent() throws {
+    func testAccountIdentityChangeInvalidatesFinishedGameAndChatIntent() throws {
         let socket = FakeWebsocket()
-        let service = makeService(socket: socket)
+        let service = makeService(socket: socket, installsObservers: false)
         service.ogsUIConfig = try makeUIConfig(jwt: "old-test-jwt", userID: 1)
         socket.openSocket(authenticate: true)
 
@@ -720,6 +720,74 @@ final class OGSServiceEventTests: XCTestCase {
         socket.openSocket(authenticate: true)
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
         XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testSameUserJWTRotationPreservesFinishedGameAndChatIntent() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        service.ogsUIConfig = try makeUIConfig(jwt: "old-test-jwt", userID: 1)
+        socket.openSocket(authenticate: true)
+
+        let game = Game(ogsGame: try makeEmptyGameData(id: 48, phase: "finished"))
+        game.ogs = service
+        service.connect(to: game, withChat: true, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let reconnectCountBeforeRotation = socket.closeThenReconnectCount
+
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-test-jwt", userID: 1)
+
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/disconnect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/part" })
+        XCTAssertEqual(socket.closeThenReconnectCount, reconnectCountBeforeRotation)
+        XCTAssertEqual(service.ogsUIConfig?.userJwt, "new-test-jwt")
+
+        socket.dropSocket()
+        socket.emissions.removeAll()
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "chat/join" }.count, 1)
+    }
+
+    func testPushedUserJWTUpdatesConfigWithoutReconnecting() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        service.ogsUIConfig = try makeUIConfig(jwt: "old-test-jwt", userID: 1)
+        let reconnectCountBeforePush = socket.closeThenReconnectCount
+
+        socket.deliver(
+            name: "user/jwt",
+            data: OGSWebsocketJWTUpdate(
+                userJwt: "pushed-test-jwt",
+                authenticatedUserID: 1
+            )
+        )
+
+        XCTAssertEqual(service.ogsUIConfig?.userJwt, "pushed-test-jwt")
+        XCTAssertEqual(
+            socket.authenticationConfigProvider()?.userJwt,
+            "pushed-test-jwt"
+        )
+        XCTAssertEqual(socket.closeThenReconnectCount, reconnectCountBeforePush)
+    }
+
+    func testPushedJWTFromPreviousAccountDoesNotOverwriteCurrentConfig() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        service.ogsUIConfig = try makeUIConfig(jwt: "old-account-jwt", userID: 1)
+        service.ogsUIConfig = try makeUIConfig(jwt: "current-account-jwt", userID: 2)
+        let reconnectCountAfterSwitch = socket.closeThenReconnectCount
+
+        socket.deliver(
+            name: "user/jwt",
+            data: OGSWebsocketJWTUpdate(
+                userJwt: "late-old-account-jwt",
+                authenticatedUserID: 1
+            )
+        )
+
+        XCTAssertEqual(service.ogsUIConfig?.user.id, 2)
+        XCTAssertEqual(service.ogsUIConfig?.userJwt, "current-account-jwt")
+        XCTAssertEqual(socket.closeThenReconnectCount, reconnectCountAfterSwitch)
     }
 
     func testMalformedAndUnknownGameEventsAreIgnored() throws {
