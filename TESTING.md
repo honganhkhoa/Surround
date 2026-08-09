@@ -127,14 +127,14 @@ output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
   --locale en-US
 ```
 
-`--locale` is repeatable. When it is omitted, the runner captures all seven supported localizations.
+`--locale` is repeatable. When it is omitted, the runner captures all nine supported localizations.
 
 The output path must not already exist. Reusable build products default to the gitignored `.build/AppStoreScreenshotDerivedData` directory; pass `--derived-data` only to put that cache elsewhere. The runner:
 
 - uses the pinned iOS 26.5 runtime by default and fails if it is unavailable unless `APP_STORE_IOS_RUNTIME` deliberately selects another installed runtime;
 - selects an accepted 6.9-inch iPhone and 13-inch iPad from that runtime as device-type templates without booting or modifying them, then creates fresh disposable simulators for capture;
 - pins the status bar for repeatable output;
-- runs the selected test-plan configurations (`en-US`, `fr-FR`, `ja-JP`, `vi-VN`, `zh-Hans-CN`, `zh-Hant-TW`, and `ko-KR` by default);
+- runs the selected test-plan configurations (`en-US`, `fr-FR`, `de-DE`, `ja-JP`, `vi-VN`, `th-TH`, `zh-Hans-CN`, `zh-Hant-TW`, and `ko-KR` by default);
 - captures ten portrait iPhone scenes and ten landscape iPad scenes per locale;
 - keeps the iPad app sidebar visible except in Zen mode (the Home Screen widget is captured from SpringBoard);
 - exports named XCTest attachments and uses Image I/O to bake attachment orientation into the pixel raster;
@@ -142,7 +142,7 @@ The output path must not already exist. Reusable build products default to the g
 - validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
 - deletes the disposable simulators during teardown, including after a failed capture, without changing the template simulators.
 
-The complete seven-locale run produces 140 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. The capture command remains useful on its own; the reviewed App Store Connect publishing workflow below invokes it automatically.
+The complete nine-locale run produces 180 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. The capture command remains useful on its own; the reviewed App Store Connect publishing workflow below invokes it automatically.
 
 To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 26.5 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
 
@@ -156,8 +156,10 @@ The public locale contract maps these App Store locales to screenshot test-plan 
 | --- | --- |
 | `en-US` | `en-US` |
 | `fr-FR` | `fr-FR` |
+| `de-DE` | `de-DE` |
 | `ja` | `ja-JP` |
 | `vi` | `vi-VN` |
+| `th` | `th-TH` |
 | `zh-Hans` | `zh-Hans-CN` |
 | `zh-Hant` | `zh-Hant-TW` |
 | `ko` | `ko-KR` |
@@ -170,7 +172,7 @@ Initialize a private package for a version from the public repository root:
   --output ../AppStoreReleases/2.1
 ```
 
-The generated `release.json` references one `localizations/<locale>/whats-new.txt` file for each locale. Fill all seven release-note files. A localization may also patch version-scoped `description`, `keywords`, `promotionalText`, `supportUrl`, and `marketingUrl`, or app-wide `name`, `subtitle`, and `privacyPolicyUrl`. Long descriptions and promotional text can use `descriptionFile` and `promotionalTextFile`. The top-level optional `copyright` patches the version-wide value. Omitted fields remain unchanged; an explicit `null` clears only fields whose schema permits clearing. For a locale absent from the released source version, `prepare` requires effective non-empty values for `description`, `keywords`, `supportUrl`, `name`, `subtitle`, and `privacyPolicyUrl`; explicit release-package values take precedence, while values already present in the reviewed target draft are accepted as fallback. The localized name must contain 2–30 characters, and the privacy policy URL must be an absolute HTTP(S) URL. Validation applies Apple's field limits, including the 100-byte UTF-8 keywords limit.
+The generated `release.json` references one `localizations/<locale>/whats-new.txt` file for each locale. Fill all nine release-note files. A localization may also patch version-scoped `description`, `keywords`, `promotionalText`, `supportUrl`, and `marketingUrl`, or app-wide `name`, `subtitle`, and `privacyPolicyUrl`. Long descriptions and promotional text can use `descriptionFile` and `promotionalTextFile`. The top-level optional `copyright` patches the version-wide value. Omitted fields remain unchanged; an explicit `null` clears only fields whose schema permits clearing. For a locale absent from the released source version, `prepare` requires effective non-empty values for `description`, `keywords`, `supportUrl`, `name`, `subtitle`, and `privacyPolicyUrl`; explicit release-package values take precedence, while values already present in the reviewed target draft are accepted as fallback. The localized name must contain 2–30 characters, and the privacy policy URL must be an absolute HTTP(S) URL. Validation applies Apple's field limits, including the 100-byte UTF-8 keywords limit.
 
 Run the offline validation before using API credentials:
 
@@ -196,7 +198,7 @@ Prepare the release:
   --release ../AppStoreReleases/2.1/release.json
 ```
 
-Preparation validates locally, takes a read-only snapshot of the target listing, preflights version state and first-time-localization metadata, then captures and validates all 140 screenshots. It creates a unique gitignored `.build/AppStoreRelease-*` artifact with the source snapshot, normalized release, screenshot gallery, metadata diff, and `publish-manifest.json`. Inspect both the capture's `index.html` and the artifact's `review.html` before publishing.
+Preparation validates locally, takes a read-only snapshot of the target listing, preflights version state and first-time-localization metadata, then captures and validates all 180 screenshots. It creates a unique gitignored `.build/AppStoreRelease-*` artifact with the source snapshot, normalized release, screenshot gallery, metadata diff, and `publish-manifest.json`. Inspect both the capture's `index.html` and the artifact's `review.html` before publishing.
 
 Publishing is deliberately a separate, explicit command:
 

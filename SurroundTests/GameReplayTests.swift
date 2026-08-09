@@ -6,6 +6,25 @@
 import XCTest
 
 final class GameReplayTests: XCTestCase {
+    func testEstimatedScoreStatusDistinguishesLeadsAndEvenScore() {
+        let game = Game(width: 2, height: 1, blackName: "black", whiteName: "white", gameId: .OGS(1))
+
+        game.currentPosition.estimatedScores = [[.hasStone(.black), .hasStone(.black)]]
+        XCTAssertEqual(game.status, String(localized: "Black by \(2.0, specifier: "%.1f")"))
+
+        game.currentPosition.estimatedScores = [[.hasStone(.white), .hasStone(.white)]]
+        XCTAssertEqual(game.status, String(localized: "White by \(2.0, specifier: "%.1f")"))
+
+        game.currentPosition.estimatedScores = [[.hasStone(.black), .hasStone(.white)]]
+        XCTAssertEqual(
+            game.status,
+            String(
+                localized: "Even",
+                comment: "Estimated score is tied; the game has not necessarily ended"
+            )
+        )
+    }
+
     func testFinishedGameFixtureReplaysMovesPassesAndScoringState() throws {
         let gameData = try loadGameFixture(id: 18_759_438)
         let game = Game(ogsGame: gameData)

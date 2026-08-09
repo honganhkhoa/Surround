@@ -198,36 +198,41 @@ struct HistoryGameCell: View {
                         .opacity(0.85)
                         .frame(width: geometry.size.height, height: geometry.size.height, alignment: .center)
                     VStack(alignment: .leading, spacing: 4) {
-                        if userResultText != nil || opponent != nil {
-                            HStack(spacing: 6) {
+                        if userResultText != nil || outcomeText != nil {
+                            HStack(spacing: 4) {
                                 if let userResultText, let userResultColor {
                                     Text(userResultText)
                                         .bold()
                                         .foregroundStyle(userResultColor)
+                                        .fixedSize(horizontal: true, vertical: false)
                                 }
-                                if let opponentStoneColor, let opponent {
-                                    Text("vs.", comment: "HistoryGameCell result versus opponent")
-                                    Stone(color: opponentStoneColor, shadowRadius: 1)
-                                        .frame(width: 15, height: 15)
-                                    HStack(spacing: 2) {
-                                        Text(verbatim: opponent.usernameAndRank)
-                                            .bold()
-                                            .lineLimit(1)
-                                            .foregroundColor(opponent.uiColor)
-                                        if let opponentRengoTeamSize, opponentRengoTeamSize > 1 {
-                                            Text(verbatim: " + \(opponentRengoTeamSize - 1)×")
-                                            Image(systemName: "person.fill")
-                                        }
-                                    }
+                                if let outcomeText {
+                                    Text(verbatim: userResultText == nil ? outcomeText : "(\(outcomeText))")
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                 }
                             }
                             .font(.subheadline)
                         }
-                        if let outcomeText {
-                            Text(outcomeText)
-                                .font(.subheadline)
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
+                        if let opponentStoneColor, let opponent {
+                            HStack(spacing: 6) {
+                                Text("vs.", comment: "HistoryGameCell result versus opponent")
+                                    .fixedSize(horizontal: true, vertical: false)
+                                Stone(color: opponentStoneColor, shadowRadius: 1)
+                                    .frame(width: 15, height: 15)
+                                HStack(spacing: 2) {
+                                    Text(verbatim: opponent.usernameAndRank)
+                                        .bold()
+                                        .lineLimit(1)
+                                        .foregroundColor(opponent.uiColor)
+                                    if let opponentRengoTeamSize, opponentRengoTeamSize > 1 {
+                                        Text(verbatim: " + \(opponentRengoTeamSize - 1)×")
+                                        Image(systemName: "person.fill")
+                                    }
+                                }
+                            }
+                            .font(.subheadline)
+                            .lineLimit(1)
                         }
                         if handicapStones > 0 {
                             Text("\(handicapStones) handicap stones", comment: "HistoryGameCell - vary for plural")

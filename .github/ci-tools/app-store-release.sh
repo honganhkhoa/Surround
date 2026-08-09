@@ -570,7 +570,7 @@ command_prepare() {
     capture_arguments+=(--locale "$screenshot_configuration")
   done < <(jq -r '.localizations[].screenshotConfiguration' "$locale_configuration_path")
 
-  echo "Capturing the seven-localization App Store screenshot matrix..."
+  echo "Capturing the configured App Store localization matrix..."
   "$screenshot_capture_script" \
     --output "$capture_path" \
     --derived-data "$screenshot_derived_data_path" \

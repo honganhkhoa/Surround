@@ -699,8 +699,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             let difference = whiteScore + (gameData?.komi ?? 0) - blackScore
             if difference > 0 {
                 return String(localized: "White by \(difference, specifier: "%.1f")")
-            } else {
+            } else if difference < 0 {
                 return String(localized: "Black by \(-difference, specifier: "%.1f")")
+            } else {
+                return String(
+                    localized: "Even",
+                    comment: "Estimated score is tied; the game has not necessarily ended"
+                )
             }
         } else {
             if gamePhase == .stoneRemoval {

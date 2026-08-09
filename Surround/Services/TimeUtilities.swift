@@ -44,20 +44,26 @@ class TimeUtilities {
     
     func formatTimeLeft(
         timeLeft: Int,
-        locale: Locale? = nil
+        locale: Locale? = nil,
+        baseBundle: Bundle = .main
     ) -> String {
         return formatTimeLeft(
             timeLeft: TimeInterval(timeLeft),
-            locale: locale
+            locale: locale,
+            baseBundle: baseBundle
         )
     }
     
     func formatTimeLeft(
         timeLeft: TimeInterval,
-        locale: Locale? = nil
+        locale: Locale? = nil,
+        baseBundle: Bundle = .main
     ) -> String {
         let resolvedLocale = locale ?? .current
-        let resolvedBundle = LocalizationBundleResolver.bundle(for: locale)
+        let resolvedBundle = LocalizationBundleResolver.bundle(
+            for: locale,
+            in: baseBundle
+        )
         var secondsLeft = max(Int(timeLeft), 0)
         let daysLeft = secondsLeft / 86400
         secondsLeft -= daysLeft * 86400

@@ -8,20 +8,23 @@ import XCTest
 final class TimeUtilitiesTests: XCTestCase {
     private let supportedLocalizations = [
         "en",
+        "de",
         "fr",
         "ja",
         "vi",
         "zh-Hans",
         "zh-Hant",
         "ko",
+        "th",
     ]
 
     // The catalog abbreviates some English forms ("5 days left" ships as "5 days",
     // "%lldh left" pluralizes), and the unit-test bundle can only resolve the
     // source-language fallback. Expectations for those strings are therefore built
     // through String(localized:) with the same templates the code uses, so they
-    // hold both here and in the shipping app. The bare minute/second and
-    // hour/minute forms are source-language identical and asserted literally.
+    // hold both here and in the shipping app. The locale-specific regression
+    // below explicitly supplies the hosted app bundle. The bare minute/second
+    // and hour/minute forms are source-language identical and asserted literally.
 
     func testUnderAnHourUsesMinutesAndSeconds() {
         XCTAssertEqual(timeString(timeLeft: -5), "00:00")
@@ -47,6 +50,31 @@ final class TimeUtilitiesTests: XCTestCase {
         XCTAssertEqual(timeString(timeLeft: 10 * 86400 + 5 * 3600), daysAndHours(10, 5))
     }
 
+    func testThaiComposedTimeDoesNotRepeatLeftMarker() throws {
+        let thai = Locale(identifier: "th-TH")
+        let appBundle = try XCTUnwrap(
+            hostedAppBundle(),
+            "Unable to locate the host app bundle containing the Thai localization"
+        )
+
+        XCTAssertEqual(
+            TimeUtilities.shared.formatTimeLeft(
+                timeLeft: 3 * 86400 + 5 * 3600,
+                locale: thai,
+                baseBundle: appBundle
+            ),
+            "3 วัน 5 ชม."
+        )
+        XCTAssertEqual(
+            TimeUtilities.shared.formatTimeLeft(
+                timeLeft: 86400,
+                locale: thai,
+                baseBundle: appBundle
+            ),
+            "24 ชม."
+        )
+    }
+
     func testTimeIntervalOverloadTruncatesFractionalSeconds() {
         XCTAssertEqual(timeString(timeLeft: TimeInterval(61.9)), "01:01")
         XCTAssertEqual(timeString(timeLeft: TimeInterval(-0.5)), "00:00")
@@ -60,10 +88,13 @@ final class TimeUtilitiesTests: XCTestCase {
         XCTAssertEqual(preferredLocalization(for: "zh_HK"), "zh-Hant")
     }
 
-    func testPreferredLocalizationMatchesKoreanAndExistingLanguages() {
+    func testPreferredLocalizationMatchesSupportedLanguages() {
+        XCTAssertEqual(preferredLocalization(for: "de-DE"), "de")
+        XCTAssertEqual(preferredLocalization(for: "de-AT"), "de")
         XCTAssertEqual(preferredLocalization(for: "ko-KR"), "ko")
         XCTAssertEqual(preferredLocalization(for: "fr-CA"), "fr")
         XCTAssertEqual(preferredLocalization(for: "ja-JP"), "ja")
+        XCTAssertEqual(preferredLocalization(for: "th-TH"), "th")
         XCTAssertEqual(preferredLocalization(for: "vi-VN"), "vi")
     }
 
@@ -81,6 +112,20 @@ final class TimeUtilitiesTests: XCTestCase {
 
     private func daysAndHours(_ days: Int, _ hours: Int) -> String {
         String(localized: "\(daysLeft(days)) \(hoursLeft(hours))")
+    }
+
+    private func hostedAppBundle() -> Bundle? {
+        let testBundleURL = Bundle(for: TimeUtilitiesTests.self).bundleURL
+        let candidateURLs = [
+            // Installed hosted tests live at Surround.app/PlugIns/SurroundTests.xctest.
+            testBundleURL.deletingLastPathComponent().deletingLastPathComponent(),
+            // Build products keep Surround.app beside SurroundTests.xctest.
+            testBundleURL.deletingLastPathComponent().appendingPathComponent("Surround.app"),
+        ]
+
+        return candidateURLs
+            .compactMap { Bundle(url: $0) }
+            .first { $0.localizations.contains("th") }
     }
 
     private func preferredLocalization(for localeIdentifier: String) -> String? {

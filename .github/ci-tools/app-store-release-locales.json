@@ -12,12 +12,20 @@
       "screenshotConfiguration": "fr-FR"
     },
     {
+      "appStoreLocale": "de-DE",
+      "screenshotConfiguration": "de-DE"
+    },
+    {
       "appStoreLocale": "ja",
       "screenshotConfiguration": "ja-JP"
     },
     {
       "appStoreLocale": "vi",
       "screenshotConfiguration": "vi-VN"
+    },
+    {
+      "appStoreLocale": "th",
+      "screenshotConfiguration": "th-TH"
     },
     {
       "appStoreLocale": "zh-Hans",

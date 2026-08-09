@@ -17,6 +17,14 @@
       }
     },
     {
+      "id" : "110730B3-98ED-46B1-BCDF-42E53BC43D67",
+      "name" : "de-DE",
+      "options" : {
+        "language" : "de",
+        "region" : "DE"
+      }
+    },
+    {
       "id" : "A8765198-DA5E-4D40-82D3-7E807E53FD54",
       "name" : "ja-JP",
       "options" : {
@@ -30,6 +38,14 @@
       "options" : {
         "language" : "vi",
         "region" : "VN"
+      }
+    },
+    {
+      "id" : "0E97B4A9-5D74-4685-A4BB-1332CFE5BFEB",
+      "name" : "th-TH",
+      "options" : {
+        "language" : "th",
+        "region" : "TH"
       }
     },
     {
