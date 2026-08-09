@@ -119,6 +119,27 @@ struct GameControlRow: View {
         game.currentPosition.estimatedScores = nil
         game.objectWillChange.send()
     }
+
+    private var rematchChallenge: OGSChallengeTemplate? {
+        guard ogsRequestCancellable == nil,
+              game.currentPosition.estimatedScores == nil,
+              game.userStoneColor != nil else {
+            return nil
+        }
+        return OGSChallengeTemplate.rematch(for: game)
+    }
+
+    private var nextGameCount: Int? {
+        guard game.isUserPlaying,
+              let gameSpeed = game.gameData?.timeControl.speed else {
+            return nil
+        }
+
+        let gamesWaiting = gameSpeed == .correspondence
+            ? ogs.sortedActiveCorrespondenceGamesOnUserTurn.count
+            : ogs.liveGames.filter { ogs.isOnUserTurn(game: $0) }.count
+        return gamesWaiting > 0 ? gamesWaiting : nil
+    }
     
     var statusText: some View {
         Group {
@@ -168,6 +189,20 @@ struct GameControlRow: View {
     var actionsMenu: some View {
         Menu {
             Section {
+                if rematchChallenge != nil,
+                   let goToNextGame,
+                   let gamesWaiting = nextGameCount {
+                    Button(action: goToNextGame) {
+                        Label {
+                            Text("Next") + Text(verbatim: " (\(gamesWaiting))")
+                        } icon: {
+                            Image(systemName: "arrow.right")
+                        }
+                    }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.gameNext
+                    )
+                }
                 if game.gamePhase == .play {
                     Button(action: { self.estimateTerritory() }) {
                         Label("Estimate score", systemImage: "dot.squareshape.split.2x2")
@@ -209,7 +244,7 @@ struct GameControlRow: View {
                     Label("Open in browser", systemImage: "safari")
                 }
             }
-            if game.isUserPlaying {
+            if game.isUserPlaying && game.gamePhase != .finished {
                 Section {
                     if game.canBeCancelled {
                         Button(action: { self.showingCancelAlert = true }) {
@@ -219,6 +254,9 @@ struct GameControlRow: View {
                         Button(role: .destructive, action: { self.showingResignAlert = true }) {
                             Label("Resign", systemImage: "flag")
                         }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.gameResign
+                        )
                     }
                 }
             }
@@ -229,6 +267,9 @@ struct GameControlRow: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .hoverEffect(.highlight)
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameActionsMenu
+        )
     }
     
     var mainActionButton: some View {
@@ -247,7 +288,7 @@ struct GameControlRow: View {
                                 Text("Clear estimates")
                                     .minimumScaleFactor(0.7)
                             }
-                        } else if let rematch = OGSChallengeTemplate.rematch(for: game) {
+                        } else if let rematch = rematchChallenge {
                             Button("Rematch") {
                                 rematchPresentation = RematchPresentation(
                                     gameID: game.ID,
@@ -274,19 +315,17 @@ struct GameControlRow: View {
                                 Text("Accept removed stones", comment: "Displayed next to Stone Removal Phase - keep short. eg: 'Accept'")
                             }
                         } else if game.isUserPlaying {
-                            if let goToNextGame = goToNextGame, let gameSpeed = game.gameData?.timeControl.speed {
-                                let gamesWaiting = gameSpeed == .correspondence ?
-                                    ogs.sortedActiveCorrespondenceGamesOnUserTurn.count :
-                                    ogs.liveGames.filter { ogs.isOnUserTurn(game: $0) }.count
-                                if gamesWaiting > 0 {
-                                    Button(action: goToNextGame) {
-                                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                            Text("Next")
-                                            Text(verbatim: "(\(gamesWaiting))")
-                                                .font(Font.caption2.bold())
-                                        }
+                            if let goToNextGame, let gamesWaiting = nextGameCount {
+                                Button(action: goToNextGame) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                        Text("Next")
+                                        Text(verbatim: "(\(gamesWaiting))")
+                                            .font(Font.caption2.bold())
                                     }
                                 }
+                                .accessibilityIdentifier(
+                                    SurroundUITestContract.AccessibilityID.gameNext
+                                )
                             }
                         }
                     }

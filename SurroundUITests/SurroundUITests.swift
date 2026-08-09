@@ -189,6 +189,14 @@ final class SurroundUITests: XCTestCase {
         element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
         element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
         element(SurroundUITestContract.AccessibilityID.gameOptions, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.gameActionsMenu,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameResign,
+            in: app
+        )
     }
 
     func testHomeHistoryRetryRecoversAndKeepsNavigationAvailable() {
@@ -290,6 +298,53 @@ final class SurroundUITests: XCTestCase {
         )
         element(
             SurroundUITestContract.AccessibilityID.gameRematchOpponent,
+            in: app
+        )
+    }
+
+    func testFinishedGameKeepsNextInActionsMenu() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameHistory.rawValue,
+        ])
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeHistoryGame(
+                SurroundUITestContract.screenshotHistoryGameIDs[0]
+            ),
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameRematch,
+            in: app,
+            matching: .button
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameActionsMenu,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameNext,
+            in: app
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID.gameResign
+                )
+                .firstMatch
+                .exists,
+            "Finished game actions should not offer Resign."
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameNext,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(
+                SurroundUITestContract.screenshotPrimaryGameID
+            ),
             in: app
         )
     }

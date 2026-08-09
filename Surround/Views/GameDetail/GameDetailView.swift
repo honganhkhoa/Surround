@@ -91,14 +91,19 @@ struct GameDetailView: View {
     }
         
     func goToNextGame() {
-        if let currentIndex = activeGames.firstIndex(where: { game in game.ID == currentGame?.ID }) {
-            for game in activeGames[currentIndex.advanced(by: 1)..<activeGames.endIndex] + activeGames[activeGames.startIndex..<currentIndex] {
-                if game.clock?.currentPlayerId == ogs.user?.id {
-                    withAnimation {
-                        currentGame = game
-                    }
-                    break
-                }
+        let candidates: [Game]
+        if let currentIndex = activeGames.firstIndex(where: {
+            $0.ID == currentGame?.ID
+        }) {
+            candidates = Array(activeGames.dropFirst(currentIndex + 1))
+                + Array(activeGames.prefix(currentIndex))
+        } else {
+            candidates = activeGames
+        }
+
+        if let nextGame = candidates.first(where: ogs.isOnUserTurn) {
+            withAnimation {
+                currentGame = nextGame
             }
         }
     }
