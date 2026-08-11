@@ -72,13 +72,14 @@ final class ASCReleaseCoreTests: XCTestCase {
         }
     }
 
-    func testKeywordsLimitAccepts100MultibyteSwiftCharacters() throws {
+    func testKeywordsLimitAccepts100MultibyteUTF16CodeUnits() throws {
         try withTemporaryDirectory { directory in
             let configURL = directory.appendingPathComponent("locales.json")
             try writeSingleLocaleConfig(to: configURL)
             try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
             let keywords = String(repeating: "界", count: 100)
             XCTAssertEqual(keywords.count, 100)
+            XCTAssertEqual(keywords.utf16.count, 100)
             XCTAssertEqual(keywords.utf8.count, 300)
             let releaseURL = directory.appendingPathComponent("release.json")
             try FileIO.writeJSONValue(.object([
@@ -99,14 +100,15 @@ final class ASCReleaseCoreTests: XCTestCase {
         }
     }
 
-    func testKeywordsLimitCountsExtendedGraphemeClusters() throws {
+    func testKeywordsLimitAccepts100UTF16CodeUnitsAcrossThaiCombiningSequences() throws {
         try withTemporaryDirectory { directory in
             let configURL = directory.appendingPathComponent("locales.json")
             try writeSingleLocaleConfig(to: configURL)
             try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
-            let keywords = String(repeating: "กำ", count: 100)
-            XCTAssertEqual(keywords.count, 100)
-            XCTAssertEqual(keywords.unicodeScalars.count, 200)
+            let keywords = String(repeating: "กำ", count: 50)
+            XCTAssertEqual(keywords.count, 50)
+            XCTAssertEqual(keywords.unicodeScalars.count, 100)
+            XCTAssertEqual(keywords.utf16.count, 100)
             let releaseURL = directory.appendingPathComponent("release.json")
             try FileIO.writeJSONValue(.object([
                 "version": .string("2.1"),
@@ -126,13 +128,15 @@ final class ASCReleaseCoreTests: XCTestCase {
         }
     }
 
-    func testKeywordsLimitRejects101SwiftCharacters() throws {
+    func testKeywordsLimitRejects102UTF16CodeUnitsAcrossThaiCombiningSequences() throws {
         try withTemporaryDirectory { directory in
             let configURL = directory.appendingPathComponent("locales.json")
             try writeSingleLocaleConfig(to: configURL)
             try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
-            let keywords = String(repeating: "界", count: 101)
-            XCTAssertEqual(keywords.count, 101)
+            let keywords = String(repeating: "กำ", count: 51)
+            XCTAssertEqual(keywords.count, 51)
+            XCTAssertEqual(keywords.unicodeScalars.count, 102)
+            XCTAssertEqual(keywords.utf16.count, 102)
             let releaseURL = directory.appendingPathComponent("release.json")
             try FileIO.writeJSONValue(.object([
                 "version": .string("2.1"),
@@ -148,7 +152,35 @@ final class ASCReleaseCoreTests: XCTestCase {
                 releaseURL: releaseURL,
                 configurationURL: configURL
             )) { error in
-                XCTAssertTrue(error.localizedDescription.contains("101 characters; maximum is 100"))
+                XCTAssertTrue(error.localizedDescription.contains("102 UTF-16 code units; maximum is 100"))
+            }
+        }
+    }
+
+    func testKeywordsLimitRejects101UTF16CodeUnits() throws {
+        try withTemporaryDirectory { directory in
+            let configURL = directory.appendingPathComponent("locales.json")
+            try writeSingleLocaleConfig(to: configURL)
+            try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
+            let keywords = String(repeating: "界", count: 101)
+            XCTAssertEqual(keywords.count, 101)
+            XCTAssertEqual(keywords.utf16.count, 101)
+            let releaseURL = directory.appendingPathComponent("release.json")
+            try FileIO.writeJSONValue(.object([
+                "version": .string("2.1"),
+                "localizations": .object([
+                    "en-US": .object([
+                        "whatsNewFile": .string("notes.txt"),
+                        "keywords": .string(keywords),
+                    ]),
+                ]),
+            ]), to: releaseURL)
+
+            XCTAssertThrowsError(try ReleaseValidator.normalize(
+                releaseURL: releaseURL,
+                configurationURL: configURL
+            )) { error in
+                XCTAssertTrue(error.localizedDescription.contains("101 UTF-16 code units; maximum is 100"))
             }
         }
     }

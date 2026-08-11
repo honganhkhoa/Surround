@@ -105,10 +105,11 @@ For a repeatable release package, specify the first three under `versionMetadata
 three under `appMetadata`. The localized name must contain 2–30 characters, and the privacy
 policy must be an absolute HTTP(S) URL.
 
-Validation includes Apple field limits, including the 100-character keyword limit counted with
-Swift `String.count`. The capture metadata must list exactly the configured screenshot locales,
-devices, scenes, and expected total count. PNG count and portrait-iPhone/landscape-iPad orientation
-are independently
+Validation includes Apple field limits, including the 100-character keyword limit measured
+conservatively with Swift's UTF-16 view. This matches App Store Connect's treatment of combining
+marks in localized keywords. The capture metadata must list exactly the configured screenshot
+locales, devices, scenes, and expected total count. PNG count and portrait-iPhone/landscape-iPad
+orientation are independently
 checked before a manifest can be built. ImageIO must fully decode every single-frame PNG at one
 of the family's configured pixel sizes, with no alpha channel and neutral orientation metadata (`1`).
 Manifest verification repeats these checks so a file or metadata-only rotation cannot change
