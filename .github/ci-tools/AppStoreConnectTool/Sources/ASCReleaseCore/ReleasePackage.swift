@@ -355,11 +355,6 @@ public enum ReleaseValidator {
         if field == "name", string.count < 2 {
             throw ReleaseToolError.validation("name\(context) must contain at least 2 characters")
         }
-        if field == "keywords", string.lengthOfBytes(using: .utf8) > 100 {
-            throw ReleaseToolError.validation(
-                "keywords\(context) is \(string.lengthOfBytes(using: .utf8)) UTF-8 bytes; maximum is 100"
-            )
-        }
         if let limit = characterLimits[field], string.count > limit {
             throw ReleaseToolError.validation(
                 "\(field)\(context) is \(string.count) characters; maximum is \(limit)"

@@ -72,26 +72,83 @@ final class ASCReleaseCoreTests: XCTestCase {
         }
     }
 
-    func testKeywordsLimitUsesUTF8Bytes() throws {
+    func testKeywordsLimitAccepts100MultibyteSwiftCharacters() throws {
         try withTemporaryDirectory { directory in
             let configURL = directory.appendingPathComponent("locales.json")
             try writeSingleLocaleConfig(to: configURL)
             try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
+            let keywords = String(repeating: "界", count: 100)
+            XCTAssertEqual(keywords.count, 100)
+            XCTAssertEqual(keywords.utf8.count, 300)
             let releaseURL = directory.appendingPathComponent("release.json")
             try FileIO.writeJSONValue(.object([
                 "version": .string("2.1"),
                 "localizations": .object([
                     "en-US": .object([
                         "whatsNewFile": .string("notes.txt"),
-                        "keywords": .string(String(repeating: "界", count: 34)),
+                        "keywords": .string(keywords),
                     ]),
                 ]),
             ]), to: releaseURL)
+
+            let normalized = try ReleaseValidator.normalize(
+                releaseURL: releaseURL,
+                configurationURL: configURL
+            )
+            XCTAssertEqual(normalized.localizations[0].versionMetadata["keywords"], .string(keywords))
+        }
+    }
+
+    func testKeywordsLimitCountsExtendedGraphemeClusters() throws {
+        try withTemporaryDirectory { directory in
+            let configURL = directory.appendingPathComponent("locales.json")
+            try writeSingleLocaleConfig(to: configURL)
+            try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
+            let keywords = String(repeating: "กำ", count: 100)
+            XCTAssertEqual(keywords.count, 100)
+            XCTAssertEqual(keywords.unicodeScalars.count, 200)
+            let releaseURL = directory.appendingPathComponent("release.json")
+            try FileIO.writeJSONValue(.object([
+                "version": .string("2.1"),
+                "localizations": .object([
+                    "en-US": .object([
+                        "whatsNewFile": .string("notes.txt"),
+                        "keywords": .string(keywords),
+                    ]),
+                ]),
+            ]), to: releaseURL)
+
+            let normalized = try ReleaseValidator.normalize(
+                releaseURL: releaseURL,
+                configurationURL: configURL
+            )
+            XCTAssertEqual(normalized.localizations[0].versionMetadata["keywords"], .string(keywords))
+        }
+    }
+
+    func testKeywordsLimitRejects101SwiftCharacters() throws {
+        try withTemporaryDirectory { directory in
+            let configURL = directory.appendingPathComponent("locales.json")
+            try writeSingleLocaleConfig(to: configURL)
+            try FileIO.write(data: Data("Notes".utf8), to: directory.appendingPathComponent("notes.txt"))
+            let keywords = String(repeating: "界", count: 101)
+            XCTAssertEqual(keywords.count, 101)
+            let releaseURL = directory.appendingPathComponent("release.json")
+            try FileIO.writeJSONValue(.object([
+                "version": .string("2.1"),
+                "localizations": .object([
+                    "en-US": .object([
+                        "whatsNewFile": .string("notes.txt"),
+                        "keywords": .string(keywords),
+                    ]),
+                ]),
+            ]), to: releaseURL)
+
             XCTAssertThrowsError(try ReleaseValidator.normalize(
                 releaseURL: releaseURL,
                 configurationURL: configURL
             )) { error in
-                XCTAssertTrue(error.localizedDescription.contains("UTF-8 bytes"))
+                XCTAssertTrue(error.localizedDescription.contains("101 characters; maximum is 100"))
             }
         }
     }
