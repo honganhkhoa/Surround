@@ -3,6 +3,7 @@
 //  SurroundTests
 //
 
+import Combine
 import XCTest
 
 final class GameReplayTests: XCTestCase {
@@ -144,6 +145,200 @@ final class GameReplayTests: XCTestCase {
         XCTAssertEqual(variation.moves, [.placeStone(2, 2), .placeStone(2, 1)])
         XCTAssertEqual(variation.nonDuplicatingMoveCoordinatesByLabel[1], [2, 2])
         XCTAssertEqual(variation.nonDuplicatingMoveCoordinatesByLabel[2], [2, 1])
+    }
+
+    func testMoveTreeNavigationUsesNearestForkAndDisplayedLevels() throws {
+        let game = Game(width: 5, height: 5, blackName: "black", whiteName: "white", gameId: .OGS(7))
+        let mainPosition1 = try game.makeMove(move: .placeStone(0, 0))
+        let mainPosition2 = try game.makeMove(move: .placeStone(0, 1))
+        let mainPosition3 = try game.makeMove(move: .placeStone(0, 2))
+
+        let unaryBranch = try game.makeMove(
+            move: .placeStone(4, 4),
+            fromAnalyticsPosition: mainPosition3
+        )
+        let unaryBranchContinuation = try game.makeMove(
+            move: .placeStone(4, 3),
+            fromAnalyticsPosition: unaryBranch
+        )
+        let staleChild = BoardPosition(
+            fromPreviousPosition: mainPosition3,
+            lastMove: .pass
+        )
+        game.moveTree.nextPositionsByPosition[
+            ObjectIdentifier(mainPosition3),
+            default: []
+        ].append(contentsOf: [unaryBranch, staleChild])
+        XCTAssertNil(
+            game.moveTree.nearestParentWithMultipleChildren(for: staleChild)
+        )
+        XCTAssertNil(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: unaryBranchContinuation
+            )
+        )
+        XCTAssertTrue(game.moveTree.canRemoveBranch(startingAt: unaryBranch))
+        XCTAssertFalse(game.moveTree.canRemoveBranch(startingAt: mainPosition2))
+
+        let firstBranch = try game.makeMove(
+            move: .placeStone(2, 2),
+            fromAnalyticsPosition: mainPosition1
+        )
+        let firstBranchContinuation = try game.makeMove(
+            move: .placeStone(2, 3),
+            fromAnalyticsPosition: firstBranch
+        )
+        let secondBranch = try game.makeMove(
+            move: .placeStone(3, 2),
+            fromAnalyticsPosition: mainPosition1
+        )
+
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: firstBranchContinuation
+            ) === mainPosition1
+        )
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: mainPosition2
+            ) === mainPosition1
+        )
+
+        XCTAssertNil(game.moveTree.adjacentBranch(from: mainPosition2, direction: .previous))
+        XCTAssertTrue(
+            game.moveTree.adjacentBranch(from: mainPosition2, direction: .next) === firstBranch
+        )
+        XCTAssertTrue(
+            game.moveTree.adjacentBranch(from: firstBranch, direction: .previous) === mainPosition2
+        )
+        XCTAssertTrue(
+            game.moveTree.adjacentBranch(from: firstBranch, direction: .next) === secondBranch
+        )
+        XCTAssertTrue(
+            game.moveTree.adjacentBranch(from: secondBranch, direction: .previous) === firstBranch
+        )
+        XCTAssertNil(game.moveTree.adjacentBranch(from: secondBranch, direction: .next))
+
+        let nestedSibling = try game.makeMove(
+            move: .placeStone(3, 3),
+            fromAnalyticsPosition: firstBranch
+        )
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: firstBranchContinuation
+            ) === firstBranch
+        )
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: firstBranch
+            ) === mainPosition1
+        )
+        XCTAssertTrue(
+            game.moveTree.removeBranch(startingAt: nestedSibling) === firstBranch
+        )
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: firstBranchContinuation
+            ) === mainPosition1
+        )
+
+        let passBranch = try game.makeMove(move: .pass, fromAnalyticsPosition: mainPosition1)
+        let passContinuation = try game.makeMove(move: .pass, fromAnalyticsPosition: passBranch)
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: passContinuation
+            ) === mainPosition1
+        )
+
+        let rootBranch = try game.makeMove(
+            move: .placeStone(4, 0),
+            fromAnalyticsPosition: game.initialPosition
+        )
+        XCTAssertTrue(
+            game.moveTree.nearestParentWithMultipleChildren(
+                for: rootBranch
+            ) === game.initialPosition
+        )
+    }
+
+    func testRemoveBranchDeletesSubtreeAndPreservesMainAndSiblingBranches() throws {
+        let game = Game(width: 5, height: 5, blackName: "black", whiteName: "white", gameId: .OGS(8))
+        let mainPosition1 = try game.makeMove(move: .placeStone(0, 0))
+        let mainPosition2 = try game.makeMove(move: .placeStone(0, 1))
+        let mainPosition3 = try game.makeMove(move: .placeStone(0, 2))
+
+        let removedPosition2 = try game.makeMove(
+            move: .placeStone(2, 2),
+            fromAnalyticsPosition: mainPosition1
+        )
+        let removedPosition3 = try game.makeMove(
+            move: .placeStone(2, 3),
+            fromAnalyticsPosition: removedPosition2
+        )
+        let removedPosition4 = try game.makeMove(
+            move: .placeStone(3, 3),
+            fromAnalyticsPosition: removedPosition3
+        )
+        let removedPosition5 = try game.makeMove(
+            move: .placeStone(4, 4),
+            fromAnalyticsPosition: removedPosition4
+        )
+        let siblingPosition2 = try game.makeMove(
+            move: .placeStone(3, 2),
+            fromAnalyticsPosition: mainPosition1
+        )
+        let siblingPosition3 = try game.makeMove(
+            move: .placeStone(3, 3),
+            fromAnalyticsPosition: siblingPosition2
+        )
+        let siblingPosition4 = try game.makeMove(
+            move: .placeStone(4, 3),
+            fromAnalyticsPosition: siblingPosition3
+        )
+
+        var publicationCount = 0
+        let observation = game.moveTree.objectWillChange.sink {
+            publicationCount += 1
+        }
+
+        XCTAssertNil(game.moveTree.removeBranch(startingAt: game.initialPosition))
+        XCTAssertNil(game.moveTree.removeBranch(startingAt: mainPosition2))
+        XCTAssertEqual(publicationCount, 0)
+
+        let parentPosition = game.moveTree.removeBranch(startingAt: removedPosition2)
+
+        XCTAssertTrue(parentPosition === mainPosition1)
+        XCTAssertEqual(publicationCount, 1)
+        XCTAssertTrue(game.moveTree.positionsByLastMoveNumber[2]?[0] === mainPosition2)
+        XCTAssertTrue(game.moveTree.positionsByLastMoveNumber[2]?[1] === siblingPosition2)
+        XCTAssertTrue(game.moveTree.positionsByLastMoveNumber[3]?[0] === mainPosition3)
+        XCTAssertTrue(game.moveTree.positionsByLastMoveNumber[3]?[1] === siblingPosition3)
+        XCTAssertNil(game.moveTree.indexByBoardPosition[ObjectIdentifier(removedPosition2)])
+        XCTAssertNil(game.moveTree.indexByBoardPosition[ObjectIdentifier(removedPosition3)])
+        XCTAssertNil(game.moveTree.indexByBoardPosition[ObjectIdentifier(removedPosition4)])
+        XCTAssertNil(game.moveTree.indexByBoardPosition[ObjectIdentifier(removedPosition5)])
+        XCTAssertNil(game.moveTree.positionsByLastMoveNumber[5])
+        XCTAssertEqual(game.moveTree.indexByBoardPosition[ObjectIdentifier(siblingPosition2)], 1)
+        XCTAssertEqual(game.moveTree.levelByBoardPosition[ObjectIdentifier(siblingPosition2)], 1)
+        XCTAssertEqual(game.moveTree.largestLastMoveNumber, 4)
+        XCTAssertEqual(game.moveTree.moveNumberRange, 0..<5)
+        XCTAssertEqual(game.moveTree.maxLevel, 1)
+
+        let mainChildren = try XCTUnwrap(
+            game.moveTree.nextPositionsByPosition[ObjectIdentifier(mainPosition1)]
+        )
+        XCTAssertTrue(mainChildren.contains { $0 === mainPosition2 })
+        XCTAssertTrue(mainChildren.contains { $0 === siblingPosition2 })
+        XCTAssertFalse(mainChildren.contains { $0 === removedPosition2 })
+        XCTAssertTrue(
+            game.moveTree.nextPositionsByPosition[ObjectIdentifier(siblingPosition2)]?.first
+                === siblingPosition3
+        )
+        XCTAssertTrue(
+            game.moveTree.nextPositionsByPosition[ObjectIdentifier(siblingPosition3)]?.first
+                === siblingPosition4
+        )
+        withExtendedLifetime(observation) {}
     }
 
     func testUndoLastMovesDemotesTwoMovesClampsAtRootAndClearsRequest() throws {

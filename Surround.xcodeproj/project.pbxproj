@@ -34,6 +34,7 @@
 		AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
 		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
+		AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1000023D00000000000002 /* AnalyzeControlBar.swift */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
 		BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */; };
 		BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
@@ -461,6 +462,7 @@
 		BC463B0026624D3500D40D3A /* puzzle-2630.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "puzzle-2630.json"; sourceTree = "<group>"; };
 		BC463B0326624D5D00D40D3A /* PuzzleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuzzleTests.swift; sourceTree = "<group>"; };
 		BC463B0C266353D700D40D3A /* SingleGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleGameView.swift; sourceTree = "<group>"; };
+		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
 		BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBrowserView.swift; sourceTree = "<group>"; };
@@ -860,6 +862,7 @@
 		BC463B0B266353B400D40D3A /* GameDetail */ = {
 			isa = PBXGroup;
 			children = (
+				AF1000023D00000000000002 /* AnalyzeControlBar.swift */,
 				BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */,
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
@@ -1277,6 +1280,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,

@@ -235,6 +235,13 @@ struct SingleGameView: View {
             AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
         }
     }
+
+    var analyzeControlBar: some View {
+        AnalyzeControlBar(
+            moveTree: game.moveTree,
+            selectedPosition: $analyticsPosition
+        )
+    }
     
     var compactBody: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -245,6 +252,9 @@ struct SingleGameView: View {
                 chatLog
             case .analyze:
                 analyzeTree
+            }
+            if compactDisplayMode == .analyze && !attachedKeyboardVisible {
+                analyzeControlBar
             }
             if !attachedKeyboardVisible && compactDisplayMode != .analyze {
                 Spacer(minLength: 10).frame(maxHeight: 15)
@@ -530,6 +540,7 @@ struct SingleGameView: View {
                             regularVerticalBody
                         }
                         if analyzeMode.wrappedValue && !attachedKeyboardVisible {
+                            analyzeControlBar
                             AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
                                 .frame(maxHeight: 240)
                         }

@@ -8,6 +8,11 @@
 import Foundation
 
 class MoveTree: ObservableObject {
+    enum BranchDirection {
+        case previous
+        case next
+    }
+
     var initialPosition: BoardPosition
     var largestLastMoveNumber: Int
     var positionsByLastMoveNumber: [Int: [BoardPosition?]] = [:]
@@ -51,6 +56,161 @@ class MoveTree: ObservableObject {
             }
         }
         indexByBoardPosition.removeValue(forKey: identifier)
+    }
+
+    /// Returns the nearest ancestor with at least two distinct, currently
+    /// registered direct children.
+    func nearestParentWithMultipleChildren(
+        for position: BoardPosition
+    ) -> BoardPosition? {
+        guard indexByBoardPosition[ObjectIdentifier(position)] != nil else {
+            return nil
+        }
+
+        var ancestor = position.previousPosition
+        while let currentAncestor = ancestor {
+            let ancestorIdentifier = ObjectIdentifier(currentAncestor)
+            guard indexByBoardPosition[ancestorIdentifier] != nil else {
+                return nil
+            }
+
+            var childIdentifiers = Set<ObjectIdentifier>()
+            for child in nextPositionsByPosition[ancestorIdentifier] ?? [] {
+                let childIdentifier = ObjectIdentifier(child)
+                guard child.previousPosition === currentAncestor,
+                      indexByBoardPosition[childIdentifier] != nil else {
+                    continue
+                }
+                childIdentifiers.insert(childIdentifier)
+            }
+            if childIdentifiers.count > 1 {
+                return currentAncestor
+            }
+            ancestor = currentAncestor.previousPosition
+        }
+        return nil
+    }
+
+    func adjacentBranch(
+        from position: BoardPosition,
+        direction: BranchDirection
+    ) -> BoardPosition? {
+        let positionIdentifier = ObjectIdentifier(position)
+        guard indexByBoardPosition[positionIdentifier] != nil,
+              let currentLevel = levelByBoardPosition[positionIdentifier],
+              let positions = positionsByLastMoveNumber[position.lastMoveNumber] else {
+            return nil
+        }
+
+        let candidates = positions.compactMap { candidate -> (position: BoardPosition, level: Int)? in
+            guard let candidate, candidate !== position,
+                  let level = levelByBoardPosition[ObjectIdentifier(candidate)] else {
+                return nil
+            }
+            return (candidate, level)
+        }
+
+        switch direction {
+        case .previous:
+            return candidates
+                .filter { $0.level < currentLevel }
+                .max { $0.level < $1.level }?
+                .position
+        case .next:
+            return candidates
+                .filter { $0.level > currentLevel }
+                .min { $0.level < $1.level }?
+                .position
+        }
+    }
+
+    func canRemoveBranch(startingAt position: BoardPosition) -> Bool {
+        position !== initialPosition
+            && (indexByBoardPosition[ObjectIdentifier(position)] ?? 0) > 0
+            && position.previousPosition.map {
+                indexByBoardPosition[ObjectIdentifier($0)] != nil
+            } == true
+    }
+
+    @discardableResult
+    func removeBranch(startingAt position: BoardPosition) -> BoardPosition? {
+        guard canRemoveBranch(startingAt: position),
+              let parentPosition = position.previousPosition,
+              indexByBoardPosition[ObjectIdentifier(parentPosition)] != nil else {
+            return nil
+        }
+
+        var subtreePositions = [BoardPosition]()
+        var positionsToVisit = [position]
+        var subtreeIdentifiers = Set<ObjectIdentifier>()
+        while let currentPosition = positionsToVisit.popLast() {
+            let currentIdentifier = ObjectIdentifier(currentPosition)
+            guard subtreeIdentifiers.insert(currentIdentifier).inserted else {
+                continue
+            }
+            subtreePositions.append(currentPosition)
+            positionsToVisit.append(contentsOf: nextPositionsByPosition[currentIdentifier] ?? [])
+        }
+
+        guard subtreePositions.allSatisfy({
+            guard let index = indexByBoardPosition[ObjectIdentifier($0)] else {
+                return false
+            }
+            return index > 0
+        }) else {
+            return nil
+        }
+
+        objectWillChange.send()
+
+        for identifier in Array(nextPositionsByPosition.keys) {
+            guard var nextPositions = nextPositionsByPosition[identifier] else {
+                continue
+            }
+            nextPositions.removeAll { subtreeIdentifiers.contains(ObjectIdentifier($0)) }
+            if nextPositions.isEmpty {
+                nextPositionsByPosition.removeValue(forKey: identifier)
+            } else {
+                nextPositionsByPosition[identifier] = nextPositions
+            }
+        }
+
+        for identifier in subtreeIdentifiers {
+            nextPositionsByPosition.removeValue(forKey: identifier)
+            levelByBoardPosition.removeValue(forKey: identifier)
+            indexByBoardPosition.removeValue(forKey: identifier)
+        }
+
+        let affectedMoveNumbers = Set(subtreePositions.map(\.lastMoveNumber))
+        for moveNumber in affectedMoveNumbers {
+            guard let existingPositions = positionsByLastMoveNumber[moveNumber] else {
+                continue
+            }
+            let remainingPositions = existingPositions.filter { candidate in
+                guard let candidate else {
+                    return true
+                }
+                return !subtreeIdentifiers.contains(ObjectIdentifier(candidate))
+            }
+            if remainingPositions.compactMap({ $0 }).isEmpty {
+                positionsByLastMoveNumber.removeValue(forKey: moveNumber)
+            } else {
+                positionsByLastMoveNumber[moveNumber] = remainingPositions
+                for (index, remainingPosition) in remainingPositions.enumerated() {
+                    if let remainingPosition {
+                        indexByBoardPosition[ObjectIdentifier(remainingPosition)] = index
+                    }
+                }
+            }
+        }
+
+        largestLastMoveNumber = positionsByLastMoveNumber
+            .filter { $0.value.contains(where: { $0 != nil }) }
+            .keys
+            .max()
+            ?? initialPosition.lastMoveNumber
+        calculateLevels()
+        return parentPosition
     }
 
     /// Converts an authoritative continuation into an analysis variation.
