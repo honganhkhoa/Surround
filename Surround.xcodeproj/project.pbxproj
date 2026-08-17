@@ -35,6 +35,12 @@
 		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
 		AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1000023D00000000000002 /* AnalyzeControlBar.swift */; };
+		AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
+		AF2000023E00000000000002 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
+		AF2000033E00000000000003 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
+		AF2000043E00000000000004 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
+		AF2000053E00000000000005 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
+		AF3000013F00000000000001 /* ConditionalMovesPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3000023F00000000000002 /* ConditionalMovesPopover.swift */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
 		BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */; };
 		BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
@@ -381,6 +387,8 @@
 		AE10000239A0000000000002 /* OGSModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSModelDecodingTests.swift; sourceTree = "<group>"; };
 		AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBehaviorTests.swift; sourceTree = "<group>"; };
 		AE10000439A0000000000004 /* GameReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameReplayTests.swift; sourceTree = "<group>"; };
+		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
+		AF3000023F00000000000002 /* ConditionalMovesPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalMovesPopover.swift; sourceTree = "<group>"; };
 		AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceIsolationTests.swift; sourceTree = "<group>"; };
 		AE10000639A0000000000006 /* OGSServiceEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceEventTests.swift; sourceTree = "<group>"; };
 		AE10000739A0000000000007 /* OGSWebsocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocketTests.swift; sourceTree = "<group>"; };
@@ -783,6 +791,7 @@
 		BC042B3324AB2DD00050B2D1 /* OGS */ = {
 			isa = PBXGroup;
 			children = (
+				AF2000063E00000000000006 /* OGSConditionalMoves.swift */,
 				BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */,
 				BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */,
 				BC042B3624AB2DD00050B2D1 /* OGSGame.swift */,
@@ -815,6 +824,7 @@
 		BC042B3E24AB2DD10050B2D1 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AF3000023F00000000000002 /* ConditionalMovesPopover.swift */,
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
 				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
@@ -1280,6 +1290,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
@@ -1352,6 +1363,7 @@
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				BC3ECFC72B9EAE5500F4E546 /* PreferredSettingsView.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
+				AF3000013F00000000000001 /* ConditionalMovesPopover.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
 				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */,
@@ -1363,6 +1375,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF2000023E00000000000002 /* OGSConditionalMoves.swift in Sources */,
 				AE20000139A0000000000001 /* TimeControlTests.swift in Sources */,
 				AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */,
 				AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */,
@@ -1426,6 +1439,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF2000033E00000000000003 /* OGSConditionalMoves.swift in Sources */,
 				BC285B322557FAEB005378F9 /* NotificationViewController.swift in Sources */,
 				BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
 				BC285B5D2557FCAC005378F9 /* OGSUser.swift in Sources */,
@@ -1464,6 +1478,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF2000043E00000000000004 /* OGSConditionalMoves.swift in Sources */,
 				AE31000A3A0000000000000A /* SurroundUITestContract.swift in Sources */,
 				BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */,
 				BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */,
@@ -1503,6 +1518,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF2000053E00000000000005 /* OGSConditionalMoves.swift in Sources */,
 				BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */,
 				BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */,
 				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,

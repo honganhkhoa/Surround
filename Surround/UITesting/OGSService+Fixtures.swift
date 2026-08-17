@@ -1395,6 +1395,43 @@ extension OGSService {
             from: AppStoreScreenshotProfileData.cobaltFoxOpening,
             clock: cobaltFoxClock
         )
+        precondition(
+            waitingGame1.ogsID
+                == SurroundUITestContract.conditionalMovesFixtureGameID
+                && waitingGame1.currentPosition.lastMoveNumber
+                    == SurroundUITestContract
+                        .conditionalMovesFixtureRootMoveNumber
+                && waitingGame1.clock?.currentPlayerId != fixtureUser.id,
+            "Conditional-move previews require an opponent-turn game at the official root."
+        )
+        let conditionalMovePlan = try! ConditionalMovePlan(
+            gameID: SurroundUITestContract.conditionalMovesFixtureGameID,
+            ownerID: fixtureUser.id,
+            rootMoveNumber:
+                SurroundUITestContract.conditionalMovesFixtureRootMoveNumber,
+            paths: [
+                [.pass, .placeStone(11, 11)],
+                [
+                    .placeStone(9, 9),
+                    .placeStone(9, 10),
+                    .placeStone(8, 9),
+                    .placeStone(8, 10),
+                ],
+                [
+                    .placeStone(9, 9),
+                    .placeStone(9, 10),
+                    .placeStone(10, 9),
+                    .placeStone(10, 10),
+                ],
+            ]
+        )
+        precondition(
+            waitingGame1.setConditionalMovePlan(
+                conditionalMovePlan,
+                expectedOwnerID: fixtureUser.id
+            ) && waitingGame1.conditionalMoveBranches.count == 3,
+            "The screenshot fixture must expose three conditional branches."
+        )
         let additionalYourMoveGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.indigoCraneOpening,
             clock: indigoCraneClock

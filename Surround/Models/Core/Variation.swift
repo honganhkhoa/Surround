@@ -13,7 +13,7 @@ struct Variation {
     var moves: [Move]
     var nonDuplicatingMoveCoordinatesByLabel: [Int: [Int]]
     
-    private init(position: BoardPosition, basePosition: BoardPosition, moves: [Move]) {
+    init(position: BoardPosition, basePosition: BoardPosition, moves: [Move]) {
         self.position = position
         self.basePosition = basePosition
         self.moves = moves
@@ -32,7 +32,10 @@ struct Variation {
     init(position: BoardPosition, basePosition: BoardPosition) {
         var moves = [Move]()
         var currentPosition = position
-        while !currentPosition.hasTheSamePosition(with: basePosition) {
+        // Board equality is not path identity. In particular, pass moves (and
+        // legal self-captures) can leave the stones unchanged, so stopping on
+        // equal board contents would truncate the variation.
+        while currentPosition !== basePosition {
             if let lastMove = currentPosition.lastMove {
                 moves.insert(lastMove, at: 0)
                 if currentPosition.previousPosition != nil {
@@ -47,10 +50,17 @@ struct Variation {
         self.init(position: position, basePosition: basePosition, moves: moves)
     }
     
-    init(basePosition: BoardPosition, moves: [Move]) throws {
+    init(
+        basePosition: BoardPosition,
+        moves: [Move],
+        allowsSelfCapture: Bool = false
+    ) throws {
         var position = basePosition
         for move in moves {
-            position = try position.makeMove(move: move)
+            position = try position.makeMove(
+                move: move,
+                allowsSelfCapture: allowsSelfCapture
+            )
         }
         self.init(position: position, basePosition: basePosition, moves: moves)
     }

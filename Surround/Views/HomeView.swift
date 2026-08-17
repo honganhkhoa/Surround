@@ -300,13 +300,17 @@ struct HomeView: View {
                                 ForEach(
                                     ogs.liveGames.map { HomeGameRow(game: $0, context: .live) }
                                 ) { row in
-                                    Button(action: { showGameDetail(game: row.game) }) {
-                                        GameCell(game: row.game, displayMode: displayMode)
-                                    }
-                                    .accessibilityIdentifier(
-                                        SurroundUITestContract.AccessibilityID.homeGame(row.game)
+                                    GameCell(
+                                        game: row.game,
+                                        displayMode: displayMode,
+                                        opensGame: {
+                                            showGameDetail(game: row.game)
+                                        },
+                                        showsConditionalMoves: true,
+                                        navigationAccessibilityIdentifier:
+                                            SurroundUITestContract
+                                                .AccessibilityID.homeGame(row.game)
                                     )
-                                    .buttonStyle(.plain)
                                     .padding(.vertical, displayMode == .full ? nil : 0)
                                     .padding(.horizontal)
                                 }
@@ -318,13 +322,17 @@ struct HomeView: View {
                                     HomeGameRow(game: $0, context: .userTurn)
                                 }
                             ) { row in
-                                Button(action: { showGameDetail(game: row.game) }) {
-                                    GameCell(game: row.game, displayMode: displayMode)
-                                }
-                                .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(row.game)
+                                GameCell(
+                                    game: row.game,
+                                    displayMode: displayMode,
+                                    opensGame: {
+                                        showGameDetail(game: row.game)
+                                    },
+                                    showsConditionalMoves: true,
+                                    navigationAccessibilityIdentifier:
+                                        SurroundUITestContract
+                                            .AccessibilityID.homeGame(row.game)
                                 )
-                                .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }
@@ -341,13 +349,17 @@ struct HomeView: View {
                                     HomeGameRow(game: $0, context: .opponentTurn)
                                 }
                             ) { row in
-                                Button(action: { showGameDetail(game: row.game) }) {
-                                    GameCell(game: row.game, displayMode: displayMode)
-                                }
-                                .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeGame(row.game)
+                                GameCell(
+                                    game: row.game,
+                                    displayMode: displayMode,
+                                    opensGame: {
+                                        showGameDetail(game: row.game)
+                                    },
+                                    showsConditionalMoves: true,
+                                    navigationAccessibilityIdentifier:
+                                        SurroundUITestContract
+                                            .AccessibilityID.homeGame(row.game)
                                 )
-                                .buttonStyle(.plain)
                                 .padding(.vertical, displayMode == .full ? nil : 0)
                                 .padding(.horizontal)
                             }

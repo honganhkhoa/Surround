@@ -34,6 +34,17 @@ enum SurroundUITestContract {
     static let fixtureGameID = 26_268_404
     static let homeHistoryRetryFixtureGameID = 18_759_438
     static let screenshotPrimaryGameID = 68_301_595
+    static let conditionalMovesFixtureGameID = 62_050_416
+    static let conditionalMovesFixtureRootMoveNumber = 60
+    static let conditionalMovesFixturePaths = [
+        ["..", "ll"],
+        ["jj", "kj", "ji", "ki"],
+        ["jj", "kj", "jk", "kk"],
+    ]
+    static let conditionalMovesFixtureBranchIDs =
+        conditionalMovesFixturePaths.map {
+            "\(conditionalMovesFixtureRootMoveNumber):\($0.joined())"
+        }
     static let screenshotFixtureGameIDs = [
         screenshotPrimaryGameID,
         18_759_438,
@@ -267,6 +278,10 @@ enum SurroundUITestContract {
             "home.game.\(id)"
         }
 
+        static func homeGamePlayerInfo(_ id: Int) -> String {
+            "\(homeGame(id)).playerInfo"
+        }
+
         #if MAIN_APP
         static func homeGame(_ game: Game) -> String {
             homeGame(ogsID(for: game))
@@ -329,6 +344,23 @@ enum SurroundUITestContract {
         #endif
 
         static let gameBoard = "game.board"
+        static func homeConditionalButton(_ id: Int) -> String {
+            "home.game.\(id).conditional.button"
+        }
+        static func homeConditionalPopover(_ id: Int) -> String {
+            "home.game.\(id).conditional.popover"
+        }
+        static func homeConditionalVariation(
+            _ id: Int,
+            branchID: String
+        ) -> String {
+            "home.game.\(id).conditional.variation.\(branchID)"
+        }
+        static let gameConditionalButton = "game.conditional.button"
+        static let gameConditionalPopover = "game.conditional.popover"
+        static func gameConditionalVariation(_ branchID: String) -> String {
+            "game.conditional.variation.\(branchID)"
+        }
         static let gameDisplayModePicker = "game.displayMode"
         static let gameAnalyzeToggle = "game.analyze"
         static let gameAnalyzeControlBar = "game.analyze.controls"

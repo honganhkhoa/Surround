@@ -35,19 +35,28 @@ struct AnalyzeTreeSlice: View {
                 ForEach(Array((moveTree.positionsByLastMoveNumber[lastMoveNumber] ?? []).enumerated()), id: \.0) { _, position in
                     if let position = position {
                         if let lastMoveColor = position.lastMoveColor, let level = moveTree.levelByBoardPosition[ObjectIdentifier(position)] {
+                            let isConditionalVariation = moveTree
+                                .isConditionalVariationPosition(position)
                             if let previousPosition = position.previousPosition, let previousLevel = moveTree.levelByBoardPosition[ObjectIdentifier(previousPosition)] {
+                                let currentY: CGFloat = CGFloat(level) * 40 + 15
+                                let previousY: CGFloat = CGFloat(previousLevel) * 40 + 15
                                 Path { path in
-                                    path.move(to: CGPoint(x: 15, y: CGFloat(level) * 40 + 15))
+                                    path.move(to: CGPoint(x: 15, y: currentY))
                                     path.addCurve(
-                                        to: CGPoint(x: -25, y: CGFloat(previousLevel) * 40 + 15),
-                                        control1:CGPoint(x: -10, y: CGFloat(level) * 40 + 15),
-                                        control2:CGPoint(x: -25, y: CGFloat(previousLevel) * 40 + 15)
+                                        to: CGPoint(x: -25, y: previousY),
+                                        control1: CGPoint(x: -10, y: currentY),
+                                        control2: CGPoint(x: -25, y: previousY)
                                     )
                                 }.stroke(Color(.label))
                             }
+                            if isConditionalVariation {
+                                Color.conditionalMoveHighlight.frame(width: 40, height: 40)
+                                    .cornerRadius(20)
+                                    .position(x: 15, y: CGFloat(level) * 40 + 15)
+                            }
                             if isSelected(position) {
-                                Color(UIColor.systemTeal).frame(width: 38, height: 38)
-                                    .cornerRadius(19)
+                                Color(UIColor.systemTeal).frame(width: 36, height: 36)
+                                    .cornerRadius(18)
                                     .position(x: 15, y: CGFloat(level) * 40 + 15)
                             }
                             
@@ -64,6 +73,10 @@ struct AnalyzeTreeSlice: View {
                                 .accessibilityAddTraits(.isButton)
                                 .accessibilityAddTraits(
                                     isSelected(position) ? .isSelected : []
+                                )
+                                .accessibilityValue(
+                                    Text("Conditional"),
+                                    isEnabled: isConditionalVariation
                                 )
                                 .accessibilityIdentifier(
                                     accessibilityIdentifier(for: position)
@@ -257,6 +270,17 @@ private struct AnalyzeTreePreviewState {
     }
 }
 
+private struct ConditionalAnalyzeTreePreviewState {
+    let game: Game
+    var selectedPosition: BoardPosition?
+
+    init() {
+        let game = Game.conditionalMovesPreviewFixture()
+        self.game = game
+        selectedPosition = game.conditionalMoveBranches.last?.position
+    }
+}
+
 #Preview("Analysis tree — Light", traits: .fixedLayout(width: 390, height: 300)) {
     @Previewable @State var preview = AnalyzeTreePreviewState()
 
@@ -274,5 +298,14 @@ private struct AnalyzeTreePreviewState {
         selectedPosition: $preview.selectedPosition
     )
         .colorScheme(.dark)
+}
+
+#Preview("Analysis tree — Conditional", traits: .fixedLayout(width: 390, height: 300)) {
+    @Previewable @State var preview = ConditionalAnalyzeTreePreviewState()
+
+    AnalyzeTreeView(
+        game: preview.game,
+        selectedPosition: $preview.selectedPosition
+    )
 }
 #endif

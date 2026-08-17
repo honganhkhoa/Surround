@@ -136,6 +136,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var currentPosition: BoardPosition {
         didSet {
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
+            refreshConditionalMoveBranches()
         }
     }
     @Published var undoRequest: OGSUndoRequest?
@@ -146,6 +147,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
 //        return whitePlayer?.formattedRank() ?? "?"
 //    }
     @Published var moveTree: MoveTree
+    @Published private(set) var conditionalMovePlan: ConditionalMovePlan?
+    @Published private(set) var conditionalMoveBranches = [ConditionalMoveBranch]()
     var initialPosition: BoardPosition
     var ID: GameID
     var ogsURL: URL? {
@@ -233,6 +236,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var toggleRemovedStoneCancellable: AnyCancellable?
     @Published var gamePhase: OGSGamePhase? {
         didSet {
+            if gamePhase == .play {
+                refreshConditionalMoveBranches()
+            } else {
+                clearConditionalMoves()
+            }
             if gamePhase == .stoneRemoval {
                 if !(autoScoringDone ?? false) && isUserPlaying {
                     // Doing score estimating
@@ -413,6 +421,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
 
     func undoLastMoves(count: Int) {
+        if count > 0 {
+            clearConditionalMoves()
+        }
         var retainedPosition = currentPosition
         var discardedBranchRoot: BoardPosition?
 
@@ -445,6 +456,160 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         let staleMoveNumbers = positionByLastMoveNumber.keys.filter { $0 > lastMoveNumber }
         for moveNumber in staleMoveNumbers {
             positionByLastMoveNumber.removeValue(forKey: moveNumber)
+        }
+    }
+
+    /// Installs a validated domain plan. This is also the intended deterministic
+    /// fixture seam; production socket events enter through
+    /// `applyConditionalMoves(_:expectedOwnerID:)` below.
+    @discardableResult
+    func setConditionalMovePlan(
+        _ plan: ConditionalMovePlan,
+        expectedOwnerID: Int? = nil
+    ) -> Bool {
+        guard plan.gameID == ogsID,
+              plan.rootMoveNumber >= initialPosition.lastMoveNumber else {
+            return false
+        }
+        if let expectedOwnerID,
+           let ownerID = plan.ownerID,
+           ownerID != expectedOwnerID {
+            return false
+        }
+        guard let validatedPlan = plan.validated(width: width, height: height) else {
+            return false
+        }
+        // An explicitly empty root is an authoritative clear. A nonempty
+        // domain plan whose every branch fails validation is malformed, not a
+        // clear operation, so keep the last known-good plan instead.
+        guard plan.root.children.isEmpty
+                || !validatedPlan.root.children.isEmpty else {
+            return false
+        }
+        guard !validatedPlan.root.children.isEmpty else {
+            clearConditionalMoves()
+            return true
+        }
+
+        switch conditionalMoveProjection(for: validatedPlan) {
+        case .rejected:
+            return false
+        case .deferred:
+            moveTree.clearConditionalVariations()
+            conditionalMovePlan = validatedPlan
+            conditionalMoveBranches = []
+            return true
+        case .applied(let branches):
+            conditionalMovePlan = validatedPlan
+            conditionalMoveBranches = branches
+            return true
+        }
+    }
+
+    /// Applies one OGS socket update after checking its routed game and owner.
+    /// A nullable or empty root is the server's clear operation.
+    @discardableResult
+    func applyConditionalMoves(
+        _ update: OGSConditionalMovesUpdate,
+        expectedOwnerID: Int
+    ) -> Bool {
+        guard let gameID = ogsID,
+              update.gameID == nil || update.gameID == gameID,
+              update.playerID == nil || update.playerID == expectedOwnerID,
+              update.rootMoveNumber >= initialPosition.lastMoveNumber else {
+            return false
+        }
+
+        guard let wireRoot = update.root else {
+            clearConditionalMoves()
+            return true
+        }
+        guard let root = ConditionalMoveNode.decodedRoot(
+            wireNode: wireRoot
+        ) else {
+            return false
+        }
+        guard wireRoot.children.isEmpty || !root.children.isEmpty else {
+            return false
+        }
+
+        return setConditionalMovePlan(
+            ConditionalMovePlan(
+                gameID: gameID,
+                ownerID: update.playerID ?? expectedOwnerID,
+                rootMoveNumber: update.rootMoveNumber,
+                root: root
+            ),
+            expectedOwnerID: expectedOwnerID
+        )
+    }
+
+    func clearConditionalMoves() {
+        moveTree.clearConditionalVariations()
+        conditionalMovePlan = nil
+        conditionalMoveBranches = []
+    }
+
+    private enum ConditionalMoveProjectionResult {
+        case applied([ConditionalMoveBranch])
+        case deferred
+        case rejected
+    }
+
+    private func conditionalMoveProjection(
+        for plan: ConditionalMovePlan
+    ) -> ConditionalMoveProjectionResult {
+        guard gamePhase == .play,
+              !rengo,
+              plan.rootMoveNumber == currentPosition.lastMoveNumber,
+              let basePosition = positionByLastMoveNumber[
+                plan.rootMoveNumber
+              ],
+              basePosition === currentPosition else {
+            return .deferred
+        }
+
+        let paths = plan.orderedPaths()
+        let replacementResult = moveTree.replaceConditionalVariations(
+            from: basePosition,
+            paths: paths,
+            allowsSelfCapture: gameData?.allowSelfCapture ?? false
+        )
+        guard case .applied(let terminalPositions) = replacementResult else {
+            return .rejected
+        }
+        return .applied(paths.compactMap { path in
+            guard let terminalPosition = terminalPositions[path.variationID] else {
+                return nil
+            }
+            return ConditionalMoveBranch(
+                variationID: path.variationID,
+                position: terminalPosition,
+                variation: Variation(
+                    position: terminalPosition,
+                    basePosition: basePosition,
+                    moves: path.moves
+                ),
+                moves: path.moves
+            )
+        })
+    }
+
+    private func refreshConditionalMoveBranches() {
+        guard let conditionalMovePlan else {
+            moveTree.clearConditionalVariations()
+            conditionalMoveBranches = []
+            return
+        }
+
+        switch conditionalMoveProjection(for: conditionalMovePlan) {
+        case .applied(let branches):
+            conditionalMoveBranches = branches
+        case .deferred:
+            moveTree.clearConditionalVariations()
+            conditionalMoveBranches = []
+        case .rejected:
+            break
         }
     }
     

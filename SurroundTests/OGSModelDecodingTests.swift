@@ -11,6 +11,7 @@ final class OGSModelDecodingTests: XCTestCase {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }()
+    private let conditionalMovesDecoder = JSONDecoder()
 
     func testMoveDecodesMinimalPassAndFullPlayerUpdateShapes() throws {
         let minimal = try decoder.decode(OGSMove.self, from: Data("[3,4]".utf8))
@@ -147,5 +148,169 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertEqual(user.ratings?[.overall_9x9]?.deviation, 130)
         XCTAssertEqual(user.ratings?[.live_19x19]?.volatility, 0.05)
         XCTAssertNil(user.ratings?[.blitz_overall])
+    }
+
+    func testConditionalMovesDecodesRuntimeTreeAndProtocolAlias() throws {
+        let runtimePayload = #"""
+        {
+          "game_id": 42,
+          "player_id": 7,
+          "move_number": 60,
+          "moves": [null, {
+            "..": ["ll", {}],
+            "jj": ["kj", {
+              "ji": ["ki", {}],
+              "jk": ["kk", {}]
+            }]
+          }]
+        }
+        """#
+        let update = try conditionalMovesDecoder.decode(
+            OGSConditionalMovesUpdate.self,
+            from: Data(runtimePayload.utf8)
+        )
+
+        XCTAssertEqual(update.gameID, 42)
+        XCTAssertEqual(update.playerID, 7)
+        XCTAssertEqual(update.rootMoveNumber, 60)
+        XCTAssertNil(update.root?.response)
+        XCTAssertEqual(update.root?.children[".."]?.response, "ll")
+        XCTAssertEqual(update.root?.children["jj"]?.response, "kj")
+        XCTAssertEqual(update.root?.children["jj"]?.children["ji"]?.response, "ki")
+        XCTAssertEqual(update.root?.children["jj"]?.children["jk"]?.response, "kk")
+        let encodedRoot = try JSONEncoder().encode(XCTUnwrap(update.root))
+        XCTAssertEqual(
+            try JSONDecoder().decode(
+                OGSConditionalMoveWireNode.self,
+                from: encodedRoot
+            ),
+            update.root
+        )
+
+        let aliasPayload = runtimePayload.replacingOccurrences(
+            of: "\"moves\"",
+            with: "\"conditional_moves\""
+        )
+        XCTAssertEqual(
+            try conditionalMovesDecoder.decode(
+                OGSConditionalMovesUpdate.self,
+                from: Data(aliasPayload.utf8)
+            ),
+            update
+        )
+    }
+
+    func testConditionalMovesPreservesOpponentOnlyTerminalLeaf() throws {
+        let update = try conditionalMovesDecoder.decode(
+            OGSConditionalMovesUpdate.self,
+            from: Data(
+                #"{"game_id":42,"player_id":7,"move_number":0,"moves":[null,{"aa":[null,{}]}]}"#.utf8
+            )
+        )
+        let wireRoot = try XCTUnwrap(update.root)
+        XCTAssertNil(wireRoot.children["aa"]?.response)
+        XCTAssertTrue(wireRoot.children["aa"]?.children.isEmpty == true)
+
+        let decodedRoot = try XCTUnwrap(
+            ConditionalMoveNode.decodedRoot(
+                wireNode: wireRoot
+            )
+        )
+        let validatedPlan = try XCTUnwrap(
+            ConditionalMovePlan(
+                gameID: 42,
+                ownerID: 7,
+                rootMoveNumber: 0,
+                root: decodedRoot
+            ).validated(width: 9, height: 9)
+        )
+
+        XCTAssertEqual(
+            validatedPlan.orderedPaths().map(\.moves),
+            [[.placeStone(0, 0)]]
+        )
+    }
+
+    func testConditionalMovesDistinguishesClearAndRejectsAmbiguousEnvelope() throws {
+        let nullUpdate = try conditionalMovesDecoder.decode(
+            OGSConditionalMovesUpdate.self,
+            from: Data(#"{"move_number":12,"moves":null}"#.utf8)
+        )
+        XCTAssertNil(nullUpdate.root)
+
+        let emptyUpdate = try conditionalMovesDecoder.decode(
+            OGSConditionalMovesUpdate.self,
+            from: Data(#"{"move_number":12,"conditional_moves":[null,{}]}"#.utf8)
+        )
+        XCTAssertNotNil(emptyUpdate.root)
+        XCTAssertTrue(emptyUpdate.root?.children.isEmpty == true)
+
+        XCTAssertThrowsError(
+            try conditionalMovesDecoder.decode(
+                OGSConditionalMovesUpdate.self,
+                from: Data(#"{"move_number":12}"#.utf8)
+            )
+        )
+        XCTAssertThrowsError(
+            try conditionalMovesDecoder.decode(
+                OGSConditionalMovesUpdate.self,
+                from: Data(
+                    #"{"move_number":12,"moves":[null,{}],"conditional_moves":[null,{"aa":["bb",{}]}]}"#.utf8
+                )
+            )
+        )
+        XCTAssertThrowsError(
+            try conditionalMovesDecoder.decode(
+                OGSConditionalMovesUpdate.self,
+                from: Data(#"{"move_number":-1,"moves":[null,{}]}"#.utf8)
+            )
+        )
+    }
+
+    func testConditionalMovesDropsMalformedBranchesWithoutLosingValidSiblings() throws {
+        let payload = #"""
+        {
+          "move_number": 0,
+          "moves": [null, {
+            "aa": ["bb", {}],
+            "cc": ["DD", {}],
+            "dd": [null, {"ee": ["ff"]}],
+            "ee": ["ff", {"gg": ["hh"]}]
+          }]
+        }
+        """#
+        let update = try conditionalMovesDecoder.decode(
+            OGSConditionalMovesUpdate.self,
+            from: Data(payload.utf8)
+        )
+        let wireRoot = try XCTUnwrap(update.root)
+        let decodedRoot = try XCTUnwrap(
+            ConditionalMoveNode.decodedRoot(
+                wireNode: wireRoot
+            )
+        )
+        let root = try XCTUnwrap(
+            ConditionalMovePlan(
+                gameID: 1,
+                ownerID: nil,
+                rootMoveNumber: 0,
+                root: decodedRoot
+            ).validated(width: 9, height: 9)
+        ).root
+
+        XCTAssertNotNil(root.children[.placeStone(0, 0)])
+        XCTAssertNil(root.children[.placeStone(2, 2)])
+        XCTAssertNil(root.children[.placeStone(3, 3)])
+        XCTAssertEqual(root.children[.placeStone(4, 4)]?.response, .placeStone(5, 5))
+        XCTAssertTrue(root.children[.placeStone(4, 4)]?.children.isEmpty == true)
+
+        XCTAssertThrowsError(
+            try conditionalMovesDecoder.decode(
+                OGSConditionalMovesUpdate.self,
+                from: Data(
+                    #"{"move_number":0,"moves":[null,{"aa":["bb"]}]}"#.utf8
+                )
+            )
+        )
     }
 }

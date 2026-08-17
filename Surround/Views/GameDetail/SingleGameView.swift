@@ -134,6 +134,18 @@ struct SingleGameView: View {
     var userColor: StoneColor {
         return game.userStoneColor ?? .white
     }
+
+    private func showConditionalVariation(
+        _ branch: ConditionalMoveBranch
+    ) {
+        analyticsPosition = branch.position
+        withAnimation {
+            if compact {
+                compactDisplayMode = .analyze
+            }
+            analyzeMode.wrappedValue = true
+        }
+    }
     
     var topLeftPlayerColor: StoneColor {
         if game.isUserPlaying {
@@ -192,6 +204,7 @@ struct SingleGameView: View {
                 topLeftPlayerColor: topLeftPlayerColor,
                 reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
                 showsPlayersName: !game.isUserPlaying,
+                onSelectConditionalVariation: showConditionalVariation,
                 showCompactModeSwitcher: $showCompactModeSwitcher
             )
             if showCompactModeSwitcher {
@@ -302,8 +315,10 @@ struct SingleGameView: View {
         .onChange(of: compactDisplayMode) { _, newValue in
             withAnimation {
                 shouldHideActiveGamesCarousel.wrappedValue = newValue != .playerInfo
-                if newValue == .analyze {
+                if newValue == .analyze, analyticsPosition == nil {
                     analyticsPosition = game.currentPosition
+                } else if newValue != .analyze {
+                    analyticsPosition = nil
                 }
             }
             analyzeMode.wrappedValue = newValue == .analyze
@@ -327,7 +342,9 @@ struct SingleGameView: View {
                             topLeftPlayerColor: topLeftPlayerColor,
                             playerIconSize: 80,
                             playerIconsOffset: 25,
-                            showsPlayersName: true
+                            showsPlayersName: true,
+                            onSelectConditionalVariation:
+                                showConditionalVariation
                         )
                         if !analyzeMode.wrappedValue {
                             Spacer(minLength: 15).frame(maxHeight: 15)
@@ -377,7 +394,9 @@ struct SingleGameView: View {
                             topLeftPlayerColor: topLeftPlayerColor,
                             playerIconSize: 80,
                             playerIconsOffset: playerIconsOffset,
-                            showsPlayersName: true
+                            showsPlayersName: true,
+                            onSelectConditionalVariation:
+                                showConditionalVariation
                         )
                     }
                     HStack(alignment: .top, spacing: 15) {
@@ -388,7 +407,9 @@ struct SingleGameView: View {
                                     topLeftPlayerColor: topLeftPlayerColor,
                                     playerIconSize: 80,
                                     playerIconsOffset: playerIconsOffset,
-                                    showsPlayersName: true
+                                    showsPlayersName: true,
+                                    onSelectConditionalVariation:
+                                        showConditionalVariation
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
                             if !analyzeMode.wrappedValue {
@@ -598,8 +619,16 @@ struct SingleGameView: View {
             self.stonePlacingPlayer = nil
         }
         .onChange(of: analyzeMode.wrappedValue) { _, newValue in
-            if newValue {
+            if newValue, analyticsPosition == nil {
                 analyticsPosition = game.currentPosition
+            } else if !newValue {
+                analyticsPosition = nil
+            }
+        }
+        .onChange(of: game.conditionalMoveBranches.map(\.id)) {
+            if let analyticsPosition,
+               !game.moveTree.contains(analyticsPosition) {
+                self.analyticsPosition = game.currentPosition
             }
         }
     }

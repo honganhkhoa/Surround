@@ -13,6 +13,17 @@ class MoveTree: ObservableObject {
         case next
     }
 
+    enum ConditionalVariationReplacementResult {
+        case applied([ConditionalVariationID: BoardPosition])
+        case rejected
+    }
+
+    private enum PositionSource: Hashable {
+        case main
+        case analysis
+        case conditional(ConditionalVariationID)
+    }
+
     var initialPosition: BoardPosition
     var largestLastMoveNumber: Int
     var positionsByLastMoveNumber: [Int: [BoardPosition?]] = [:]
@@ -23,6 +34,11 @@ class MoveTree: ObservableObject {
     var indexByBoardPosition: [ObjectIdentifier: Int] = [:]
     var nextPositionsByPosition: [ObjectIdentifier: [BoardPosition]] = [:]
     var maxLevel = 0
+
+    private var sourcesByBoardPosition =
+        [ObjectIdentifier: Set<PositionSource>]()
+    private var positionsByConditionalVariation =
+        [ConditionalVariationID: [BoardPosition]]()
     
     init(position: BoardPosition) {
         initialPosition = position
@@ -30,32 +46,153 @@ class MoveTree: ObservableObject {
         positionsByLastMoveNumber[initialPosition.lastMoveNumber] = [initialPosition]
         levelByBoardPosition[ObjectIdentifier(initialPosition)] = 0
         indexByBoardPosition[ObjectIdentifier(initialPosition)] = 0
+        sourcesByBoardPosition[ObjectIdentifier(initialPosition)] = [.main]
+    }
+
+    func contains(_ position: BoardPosition) -> Bool {
+        indexByBoardPosition[ObjectIdentifier(position)] != nil
+    }
+
+    func isConditionalMovePosition(_ position: BoardPosition) -> Bool {
+        !conditionalVariationIDs(for: position).isEmpty
+    }
+
+    /// Returns whether this position is the endpoint represented by a
+    /// conditional-variation preview. Intermediate path positions retain
+    /// conditional provenance, but are not themselves variation endpoints.
+    func isConditionalVariationPosition(_ position: BoardPosition) -> Bool {
+        conditionalVariationIDs(for: position).contains { variationID in
+            positionsByConditionalVariation[variationID]?.last === position
+        }
+    }
+
+    func conditionalVariationIDs(
+        for position: BoardPosition
+    ) -> Set<ConditionalVariationID> {
+        Set((sourcesByBoardPosition[ObjectIdentifier(position)] ?? []).compactMap {
+            guard case .conditional(let variationID) = $0 else {
+                return nil
+            }
+            return variationID
+        })
     }
     
-    func removeData(forPosition position: BoardPosition) {
-        let identifier = ObjectIdentifier(position)
-        levelByBoardPosition.removeValue(forKey: identifier)
-        if let nextPositions = nextPositionsByPosition[identifier] {
-            for nextPosition in nextPositions {
-                self.removeData(forPosition: nextPosition)
+    private func subtreePositions(startingAt position: BoardPosition) -> [BoardPosition] {
+        var result = [BoardPosition]()
+        var positionsToVisit = [position]
+        var visited = Set<ObjectIdentifier>()
+        while let currentPosition = positionsToVisit.popLast() {
+            let identifier = ObjectIdentifier(currentPosition)
+            guard visited.insert(identifier).inserted,
+                  indexByBoardPosition[identifier] != nil else {
+                continue
+            }
+            result.append(currentPosition)
+            positionsToVisit.append(
+                contentsOf: nextPositionsByPosition[identifier] ?? []
+            )
+        }
+        return result
+    }
+
+    private func removeRegisteredPositions(
+        _ positions: [BoardPosition],
+        recalculatesLevels: Bool = true
+    ) {
+        let positionsByIdentifier = Dictionary(
+            uniqueKeysWithValues: positions.map {
+                (ObjectIdentifier($0), $0)
+            }
+        )
+        let identifiers = Set(positionsByIdentifier.keys)
+        guard !identifiers.isEmpty else {
+            return
+        }
+
+        // A structural removal invalidates any active conditional projection
+        // that used one of the removed nodes. Clear that variation's source
+        // from its retained prefix as well; the next projection refresh can
+        // then install the authoritative path again if it is still valid.
+        let affectedVariationIDs = positionsByConditionalVariation.compactMap {
+            variationID, projectedPositions in
+            projectedPositions.contains {
+                identifiers.contains(ObjectIdentifier($0))
+            } ? variationID : nil
+        }
+        for variationID in affectedVariationIDs {
+            for projectedPosition in
+                positionsByConditionalVariation[variationID] ?? [] {
+                let identifier = ObjectIdentifier(projectedPosition)
+                sourcesByBoardPosition[identifier]?.remove(
+                    .conditional(variationID)
+                )
+                if sourcesByBoardPosition[identifier]?.isEmpty == true {
+                    sourcesByBoardPosition.removeValue(forKey: identifier)
+                }
+            }
+            positionsByConditionalVariation.removeValue(forKey: variationID)
+        }
+
+        for identifier in Array(nextPositionsByPosition.keys) {
+            guard var nextPositions = nextPositionsByPosition[identifier] else {
+                continue
+            }
+            nextPositions.removeAll {
+                identifiers.contains(ObjectIdentifier($0))
+            }
+            if nextPositions.isEmpty {
+                nextPositionsByPosition.removeValue(forKey: identifier)
+            } else {
+                nextPositionsByPosition[identifier] = nextPositions
             }
         }
-        nextPositionsByPosition.removeValue(forKey: identifier)
-        if let index = indexByBoardPosition[identifier] {
-            positionsByLastMoveNumber[position.lastMoveNumber]?.remove(at: index)
-            if let positions = positionsByLastMoveNumber[position.lastMoveNumber] {
-                if positions.count == 0 {
-                    positionsByLastMoveNumber.removeValue(forKey: position.lastMoveNumber)
-                } else {
-                    for (index, position) in positions.enumerated() {
-                        if let position = position {
-                            indexByBoardPosition[ObjectIdentifier(position)] = index
-                        }
+
+        for identifier in identifiers {
+            nextPositionsByPosition.removeValue(forKey: identifier)
+            levelByBoardPosition.removeValue(forKey: identifier)
+            indexByBoardPosition.removeValue(forKey: identifier)
+            sourcesByBoardPosition.removeValue(forKey: identifier)
+        }
+
+        let affectedMoveNumbers = Set(positions.map(\.lastMoveNumber))
+        for moveNumber in affectedMoveNumbers {
+            guard let existingPositions = positionsByLastMoveNumber[moveNumber] else {
+                continue
+            }
+            let removedMainPosition = existingPositions.first.flatMap { $0 }.map {
+                identifiers.contains(ObjectIdentifier($0))
+            } == true
+            var remainingPositions = existingPositions.filter { candidate in
+                guard let candidate else {
+                    return true
+                }
+                return !identifiers.contains(ObjectIdentifier(candidate))
+            }
+            if removedMainPosition,
+               remainingPositions.contains(where: { $0 != nil }),
+               remainingPositions.first.flatMap({ $0 }) != nil {
+                remainingPositions.insert(nil, at: 0)
+            }
+            if remainingPositions.compactMap({ $0 }).isEmpty {
+                positionsByLastMoveNumber.removeValue(forKey: moveNumber)
+            } else {
+                positionsByLastMoveNumber[moveNumber] = remainingPositions
+                for (index, remainingPosition) in remainingPositions.enumerated() {
+                    if let remainingPosition {
+                        indexByBoardPosition[ObjectIdentifier(remainingPosition)] = index
                     }
                 }
             }
         }
-        indexByBoardPosition.removeValue(forKey: identifier)
+
+        largestLastMoveNumber = positionsByLastMoveNumber
+            .filter { $0.value.contains(where: { $0 != nil }) }
+            .keys
+            .max()
+            ?? initialPosition.lastMoveNumber
+        if recalculatesLevels {
+            calculateLevels()
+        }
     }
 
     /// Returns the nearest ancestor with at least two distinct, currently
@@ -130,6 +267,9 @@ class MoveTree: ObservableObject {
             && position.previousPosition.map {
                 indexByBoardPosition[ObjectIdentifier($0)] != nil
             } == true
+            && !subtreePositions(startingAt: position).contains {
+                isConditionalMovePosition($0)
+            }
     }
 
     @discardableResult
@@ -140,76 +280,19 @@ class MoveTree: ObservableObject {
             return nil
         }
 
-        var subtreePositions = [BoardPosition]()
-        var positionsToVisit = [position]
-        var subtreeIdentifiers = Set<ObjectIdentifier>()
-        while let currentPosition = positionsToVisit.popLast() {
-            let currentIdentifier = ObjectIdentifier(currentPosition)
-            guard subtreeIdentifiers.insert(currentIdentifier).inserted else {
-                continue
-            }
-            subtreePositions.append(currentPosition)
-            positionsToVisit.append(contentsOf: nextPositionsByPosition[currentIdentifier] ?? [])
-        }
+        let subtreePositions = subtreePositions(startingAt: position)
 
         guard subtreePositions.allSatisfy({
             guard let index = indexByBoardPosition[ObjectIdentifier($0)] else {
                 return false
             }
-            return index > 0
+            return index > 0 && !isConditionalMovePosition($0)
         }) else {
             return nil
         }
 
         objectWillChange.send()
-
-        for identifier in Array(nextPositionsByPosition.keys) {
-            guard var nextPositions = nextPositionsByPosition[identifier] else {
-                continue
-            }
-            nextPositions.removeAll { subtreeIdentifiers.contains(ObjectIdentifier($0)) }
-            if nextPositions.isEmpty {
-                nextPositionsByPosition.removeValue(forKey: identifier)
-            } else {
-                nextPositionsByPosition[identifier] = nextPositions
-            }
-        }
-
-        for identifier in subtreeIdentifiers {
-            nextPositionsByPosition.removeValue(forKey: identifier)
-            levelByBoardPosition.removeValue(forKey: identifier)
-            indexByBoardPosition.removeValue(forKey: identifier)
-        }
-
-        let affectedMoveNumbers = Set(subtreePositions.map(\.lastMoveNumber))
-        for moveNumber in affectedMoveNumbers {
-            guard let existingPositions = positionsByLastMoveNumber[moveNumber] else {
-                continue
-            }
-            let remainingPositions = existingPositions.filter { candidate in
-                guard let candidate else {
-                    return true
-                }
-                return !subtreeIdentifiers.contains(ObjectIdentifier(candidate))
-            }
-            if remainingPositions.compactMap({ $0 }).isEmpty {
-                positionsByLastMoveNumber.removeValue(forKey: moveNumber)
-            } else {
-                positionsByLastMoveNumber[moveNumber] = remainingPositions
-                for (index, remainingPosition) in remainingPositions.enumerated() {
-                    if let remainingPosition {
-                        indexByBoardPosition[ObjectIdentifier(remainingPosition)] = index
-                    }
-                }
-            }
-        }
-
-        largestLastMoveNumber = positionsByLastMoveNumber
-            .filter { $0.value.contains(where: { $0 != nil }) }
-            .keys
-            .max()
-            ?? initialPosition.lastMoveNumber
-        calculateLevels()
+        removeRegisteredPositions(subtreePositions)
         return parentPosition
     }
 
@@ -249,6 +332,9 @@ class MoveTree: ObservableObject {
             }
             positions.insert(nil, at: 0)
             positionsByLastMoveNumber[moveNumber] = positions
+            let identifier = ObjectIdentifier(mainBranchPosition)
+            sourcesByBoardPosition[identifier]?.remove(.main)
+            sourcesByBoardPosition[identifier, default: []].insert(.analysis)
             for (index, position) in positions.enumerated() {
                 if let position {
                     indexByBoardPosition[ObjectIdentifier(position)] = index
@@ -259,110 +345,394 @@ class MoveTree: ObservableObject {
         calculateLevels()
     }
     
-    func register(newPosition: BoardPosition, fromPosition: BoardPosition, mainBranch: Bool) -> BoardPosition {
-        if let fromIndex = indexByBoardPosition[ObjectIdentifier(fromPosition)] {
-            if let existingPositions = positionsByLastMoveNumber[newPosition.lastMoveNumber] {
-                if mainBranch {
-                    if let existingPosition = existingPositions.first ?? nil {
-                        if existingPosition.hasTheSamePosition(with: newPosition) {
-                            return existingPosition
-                        } else {
-                            self.removeData(forPosition: existingPosition)
-                        }
-                    } else {
-                        var updatedPositions = existingPositions
-                        if let promotedIndex = updatedPositions.firstIndex(where: {
-                            $0?.previousPosition === fromPosition
-                                && $0?.lastMove == newPosition.lastMove
-                                && ($0?.hasTheSamePosition(with: newPosition) ?? false)
-                        }), let promotedPosition = updatedPositions[promotedIndex] {
-                            updatedPositions.remove(at: promotedIndex)
-                            updatedPositions[0] = promotedPosition
-                            positionsByLastMoveNumber[newPosition.lastMoveNumber] = updatedPositions
-                            for (index, position) in updatedPositions.enumerated() {
-                                if let position {
-                                    indexByBoardPosition[ObjectIdentifier(position)] = index
-                                }
-                            }
-                            let fromPositionIdentifier = ObjectIdentifier(fromPosition)
-                            if var nextPositions = nextPositionsByPosition[fromPositionIdentifier] {
-                                nextPositions.removeAll { $0 === promotedPosition }
-                                nextPositions.insert(promotedPosition, at: 0)
-                                nextPositionsByPosition[fromPositionIdentifier] = nextPositions
-                            } else {
-                                nextPositionsByPosition[fromPositionIdentifier] = [promotedPosition]
-                            }
-                            calculateLevels()
-                            return promotedPosition
-                        }
+    private func matches(
+        _ existingPosition: BoardPosition,
+        newPosition: BoardPosition,
+        fromPosition: BoardPosition
+    ) -> Bool {
+        existingPosition.previousPosition === fromPosition
+            && existingPosition.lastMove == newPosition.lastMove
+            && existingPosition.hasTheSamePosition(with: newPosition)
+    }
 
-                        updatedPositions[0] = newPosition
-                        positionsByLastMoveNumber[newPosition.lastMoveNumber] = updatedPositions
-                        indexByBoardPosition[ObjectIdentifier(newPosition)] = 0
-                        let fromPositionIdentifier = ObjectIdentifier(fromPosition)
-                        if nextPositionsByPosition[fromPositionIdentifier] == nil {
-                            nextPositionsByPosition[fromPositionIdentifier] = [newPosition]
-                        } else {
-                            nextPositionsByPosition[fromPositionIdentifier]?.insert(newPosition, at: 0)
-                        }
-                        calculateLevels()
-                        return newPosition
-                    }
-                    positionsByLastMoveNumber[newPosition.lastMoveNumber]?[0] = newPosition
-                    indexByBoardPosition[ObjectIdentifier(newPosition)] = 0
-                    levelByBoardPosition[ObjectIdentifier(newPosition)] = 0
-                    return newPosition
-                } else {
-                    for existingPosition in existingPositions {
-                        if existingPosition?.hasTheSamePosition(with: newPosition) ?? false {
-                            if existingPosition?.previousPosition === fromPosition {
-                                return existingPosition!
-                            }
-                        }
-                    }
-                    var index = 0
-                    while index < existingPositions.count {
-                        if let existingPosition = existingPositions[index] {
-                            if let previousPosition = existingPosition.previousPosition {
-                                if let previousIndex = indexByBoardPosition[ObjectIdentifier(previousPosition)] {
-                                    if previousIndex > fromIndex {
-                                        break
-                                    }
-                                }
-                            }
-                        }
-                        index += 1
-                    }
-                    positionsByLastMoveNumber[newPosition.lastMoveNumber]?.insert(newPosition, at: index)
-                    indexByBoardPosition[ObjectIdentifier(newPosition)] = index
-                    if let positions = positionsByLastMoveNumber[newPosition.lastMoveNumber] {
-                        for newIndex in (index+1)..<positions.count {
-                            indexByBoardPosition[ObjectIdentifier(positions[newIndex]!)] = newIndex
-                        }
-                    }
-                }
-            } else {
-                if mainBranch {
-                    positionsByLastMoveNumber[newPosition.lastMoveNumber] = [newPosition]
-                    indexByBoardPosition[ObjectIdentifier(newPosition)] = 0
-                    levelByBoardPosition[ObjectIdentifier(newPosition)] = 0
-                } else {
-                    positionsByLastMoveNumber[newPosition.lastMoveNumber] = [nil, newPosition]
-                    indexByBoardPosition[ObjectIdentifier(newPosition)] = 1
-                    levelByBoardPosition[ObjectIdentifier(newPosition)] = 1
-                    maxLevel = max(maxLevel, 1)
-                }
-                largestLastMoveNumber = max(largestLastMoveNumber, newPosition.lastMoveNumber)
+    private func addSource(
+        _ source: PositionSource,
+        to position: BoardPosition
+    ) {
+        sourcesByBoardPosition[ObjectIdentifier(position), default: []]
+            .insert(source)
+    }
+
+    private func retainAnalysisLineage(from position: BoardPosition) {
+        var retainedPosition: BoardPosition? = position
+        while let currentPosition = retainedPosition,
+              currentPosition !== initialPosition {
+            let identifier = ObjectIdentifier(currentPosition)
+            guard let index = indexByBoardPosition[identifier], index > 0 else {
+                break
             }
-            let fromPositionIdentifier = ObjectIdentifier(fromPosition)
-            if nextPositionsByPosition[fromPositionIdentifier] == nil {
-                nextPositionsByPosition[fromPositionIdentifier] = [newPosition]
-            } else {
-                nextPositionsByPosition[fromPositionIdentifier]?.append(newPosition)
+            sourcesByBoardPosition[identifier, default: []].insert(.analysis)
+            retainedPosition = currentPosition.previousPosition
+        }
+    }
+
+    private func updateChildOrder(
+        _ position: BoardPosition,
+        from fromPosition: BoardPosition,
+        mainBranch: Bool
+    ) {
+        let fromIdentifier = ObjectIdentifier(fromPosition)
+        var nextPositions = nextPositionsByPosition[fromIdentifier] ?? []
+        nextPositions.removeAll { $0 === position }
+        if mainBranch {
+            nextPositions.insert(position, at: 0)
+        } else {
+            nextPositions.append(position)
+        }
+        nextPositionsByPosition[fromIdentifier] = nextPositions
+    }
+
+    private func reindexPositions(at moveNumber: Int) {
+        for (index, position) in
+            (positionsByLastMoveNumber[moveNumber] ?? []).enumerated() {
+            if let position {
+                indexByBoardPosition[ObjectIdentifier(position)] = index
             }
-            self.calculateLevels()
+        }
+    }
+
+    private func register(
+        newPosition: BoardPosition,
+        fromPosition: BoardPosition,
+        source: PositionSource,
+        mainBranch: Bool,
+        recalculatesLevels: Bool
+    ) -> BoardPosition {
+        let fromIdentifier = ObjectIdentifier(fromPosition)
+        guard let fromIndex = indexByBoardPosition[fromIdentifier] else {
+            return newPosition
+        }
+
+        if case .analysis = source {
+            retainAnalysisLineage(from: fromPosition)
+        }
+
+        let moveNumber = newPosition.lastMoveNumber
+        if mainBranch {
+            if let existingMainPosition =
+                positionsByLastMoveNumber[moveNumber]?.first ?? nil {
+                if matches(
+                    existingMainPosition,
+                    newPosition: newPosition,
+                    fromPosition: fromPosition
+                ) {
+                    addSource(source, to: existingMainPosition)
+                    return existingMainPosition
+                }
+                removeRegisteredPositions(
+                    subtreePositions(startingAt: existingMainPosition),
+                    recalculatesLevels: false
+                )
+            }
+
+            var positions = positionsByLastMoveNumber[moveNumber] ?? []
+            if let promotedIndex = positions.firstIndex(where: {
+                guard let position = $0 else { return false }
+                return matches(
+                    position,
+                    newPosition: newPosition,
+                    fromPosition: fromPosition
+                )
+            }), let promotedPosition = positions[promotedIndex] {
+                positions.remove(at: promotedIndex)
+                if positions.isEmpty {
+                    positions = [promotedPosition]
+                } else if positions[0] == nil {
+                    positions[0] = promotedPosition
+                } else {
+                    positions.insert(promotedPosition, at: 0)
+                }
+                positionsByLastMoveNumber[moveNumber] = positions
+                reindexPositions(at: moveNumber)
+                updateChildOrder(
+                    promotedPosition,
+                    from: fromPosition,
+                    mainBranch: true
+                )
+                addSource(source, to: promotedPosition)
+                if recalculatesLevels {
+                    calculateLevels()
+                }
+                return promotedPosition
+            }
+
+            if positions.isEmpty {
+                positions = [newPosition]
+            } else if positions[0] == nil {
+                positions[0] = newPosition
+            } else {
+                positions.insert(newPosition, at: 0)
+            }
+            positionsByLastMoveNumber[moveNumber] = positions
+            reindexPositions(at: moveNumber)
+            updateChildOrder(
+                newPosition,
+                from: fromPosition,
+                mainBranch: true
+            )
+            addSource(source, to: newPosition)
+        } else {
+            var positions = positionsByLastMoveNumber[moveNumber]
+                ?? [nil]
+            if let existingPosition = positions.compactMap({ $0 }).first(where: {
+                matches(
+                    $0,
+                    newPosition: newPosition,
+                    fromPosition: fromPosition
+                )
+            }) {
+                addSource(source, to: existingPosition)
+                return existingPosition
+            }
+
+            var insertionIndex = 0
+            while insertionIndex < positions.count {
+                if let existingPosition = positions[insertionIndex],
+                   let previousPosition = existingPosition.previousPosition,
+                   let previousIndex = indexByBoardPosition[
+                    ObjectIdentifier(previousPosition)
+                   ], previousIndex > fromIndex {
+                    break
+                }
+                insertionIndex += 1
+            }
+            positions.insert(newPosition, at: insertionIndex)
+            positionsByLastMoveNumber[moveNumber] = positions
+            reindexPositions(at: moveNumber)
+            updateChildOrder(
+                newPosition,
+                from: fromPosition,
+                mainBranch: false
+            )
+            addSource(source, to: newPosition)
+        }
+
+        largestLastMoveNumber = max(largestLastMoveNumber, moveNumber)
+        if recalculatesLevels {
+            calculateLevels()
         }
         return newPosition
+    }
+
+    func register(
+        newPosition: BoardPosition,
+        fromPosition: BoardPosition,
+        mainBranch: Bool
+    ) -> BoardPosition {
+        register(
+            newPosition: newPosition,
+            fromPosition: fromPosition,
+            source: mainBranch ? .main : .analysis,
+            mainBranch: mainBranch,
+            recalculatesLevels: true
+        )
+    }
+
+    /// Reconciles conditional paths into canonical move-tree nodes.
+    ///
+    /// Existing identical projections are reused without replay. Each changed
+    /// path is replayed exactly once before its detached legal positions are
+    /// registered, preserving object identity for retained paths and shared
+    /// prefixes. Paths that fail Go-rule validation are omitted when a legal
+    /// sibling remains; if every nonempty path fails, the replacement is
+    /// rejected before the existing projection is mutated.
+    @discardableResult
+    func replaceConditionalVariations(
+        from basePosition: BoardPosition,
+        paths: [ConditionalMovePath],
+        allowsSelfCapture: Bool
+    ) -> ConditionalVariationReplacementResult {
+        guard contains(basePosition) else {
+            return .rejected
+        }
+
+        var desiredPaths = [ConditionalMovePath]()
+        var seenPathIDs = Set<ConditionalVariationID>()
+        for path in paths.sorted(by: { $0.id < $1.id }) {
+            guard path.rootMoveNumber == basePosition.lastMoveNumber,
+                  !path.moves.isEmpty,
+                  seenPathIDs.insert(path.variationID).inserted else {
+                continue
+            }
+            desiredPaths.append(path)
+        }
+        guard paths.isEmpty || !desiredPaths.isEmpty else {
+            return .rejected
+        }
+
+        func isIntactProjection(
+            _ positions: [BoardPosition],
+            for path: ConditionalMovePath
+        ) -> Bool {
+            guard positions.count == path.moves.count else {
+                return false
+            }
+            var previousPosition = basePosition
+            for (index, position) in positions.enumerated() {
+                guard contains(position),
+                      position.previousPosition === previousPosition,
+                      position.lastMove == path.moves[index],
+                      conditionalVariationIDs(for: position).contains(
+                        path.variationID
+                      ) else {
+                    return false
+                }
+                previousPosition = position
+            }
+            return true
+        }
+
+        let previousProjection = positionsByConditionalVariation
+        var replacementProjection =
+            [ConditionalVariationID: [BoardPosition]]()
+        var pathsToReplay = [ConditionalMovePath]()
+        for path in desiredPaths {
+            if let positions = previousProjection[path.variationID],
+               isIntactProjection(positions, for: path) {
+                replacementProjection[path.variationID] = positions
+            } else {
+                pathsToReplay.append(path)
+            }
+        }
+
+        if pathsToReplay.isEmpty,
+           Set(replacementProjection.keys) == Set(previousProjection.keys) {
+            return .applied(Dictionary(
+                uniqueKeysWithValues: replacementProjection.compactMap {
+                    variationID, positions in
+                    positions.last.map { (variationID, $0) }
+                }
+            ))
+        }
+
+        var replayedPaths = [(
+            path: ConditionalMovePath,
+            positions: [BoardPosition]
+        )]()
+        for path in pathsToReplay {
+            var replayedPosition = basePosition
+            var replayedPositions = [BoardPosition]()
+            for move in path.moves {
+                guard let nextPosition = try? replayedPosition.makeMove(
+                    move: move,
+                    allowsSelfCapture: allowsSelfCapture
+                ) else {
+                    replayedPositions = []
+                    break
+                }
+                replayedPositions.append(nextPosition)
+                replayedPosition = nextPosition
+            }
+            guard replayedPositions.count == path.moves.count else {
+                continue
+            }
+            replayedPaths.append((path: path, positions: replayedPositions))
+        }
+
+        // A nonempty authoritative plan is not a clear operation. If none of
+        // its structurally valid paths can be played, leave the previous
+        // projection untouched so the caller can also retain its known-good
+        // plan. Mixed updates still proceed with their legal siblings.
+        guard desiredPaths.isEmpty
+                || !replacementProjection.isEmpty
+                || !replayedPaths.isEmpty else {
+            return .rejected
+        }
+
+        objectWillChange.send()
+
+        for replayedPath in replayedPaths {
+            var previousPosition = basePosition
+            var registeredPositions = [BoardPosition]()
+            for candidatePosition in replayedPath.positions {
+                // Reattach the detached replay to the canonical prefix before
+                // registration. If an equivalent node already exists,
+                // `register` returns that canonical instance instead.
+                candidatePosition.previousPosition = previousPosition
+                let registeredPosition = register(
+                    newPosition: candidatePosition,
+                    fromPosition: previousPosition,
+                    source: .conditional(replayedPath.path.variationID),
+                    mainBranch: false,
+                    recalculatesLevels: false
+                )
+                registeredPositions.append(registeredPosition)
+                previousPosition = registeredPosition
+            }
+            replacementProjection[replayedPath.path.variationID] =
+                registeredPositions
+        }
+
+        for (variationID, previousPositions) in previousProjection {
+            let replacementIdentifiers = Set(
+                (replacementProjection[variationID] ?? []).map {
+                    ObjectIdentifier($0)
+                }
+            )
+            for position in previousPositions where
+                !replacementIdentifiers.contains(ObjectIdentifier(position)) {
+                let identifier = ObjectIdentifier(position)
+                sourcesByBoardPosition[identifier]?.remove(
+                    .conditional(variationID)
+                )
+                if sourcesByBoardPosition[identifier]?.isEmpty == true {
+                    sourcesByBoardPosition.removeValue(forKey: identifier)
+                }
+            }
+        }
+        positionsByConditionalVariation = replacementProjection
+
+        let orphanCandidates = previousProjection.values
+            .flatMap { $0 }
+            .sorted { $0.lastMoveNumber > $1.lastMoveNumber }
+        var visitedOrphans = Set<ObjectIdentifier>()
+        for position in orphanCandidates {
+            let identifier = ObjectIdentifier(position)
+            guard visitedOrphans.insert(identifier).inserted,
+                  let index = indexByBoardPosition[identifier], index > 0,
+                  sourcesByBoardPosition[identifier]?.isEmpty ?? true else {
+                continue
+            }
+            let hasRegisteredChild =
+                (nextPositionsByPosition[identifier] ?? []).contains {
+                    contains($0)
+                }
+            if !hasRegisteredChild {
+                removeRegisteredPositions(
+                    [position],
+                    recalculatesLevels: false
+                )
+            }
+        }
+
+        calculateLevels()
+        return .applied(Dictionary(
+            uniqueKeysWithValues: replacementProjection.compactMap {
+                variationID, positions in
+                positions.last.map { (variationID, $0) }
+            }
+        ))
+    }
+
+    func clearConditionalVariations() {
+        guard !positionsByConditionalVariation.isEmpty else {
+            return
+        }
+        _ = replaceConditionalVariations(
+            from: initialPosition,
+            paths: [],
+            allowsSelfCapture: false
+        )
     }
     
     func calculateLevelsFromPosition(_ position: BoardPosition) {

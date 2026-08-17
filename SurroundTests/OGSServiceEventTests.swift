@@ -124,6 +124,311 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 2)
     }
 
+    func testConditionalMovesEventRoutesRuntimePayloadAndSurvivesReconnectAndGameData() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 120))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(4, 4))
+        let playerID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/120/conditional_moves",
+            data: [
+                "game_id": 120,
+                "player_id": playerID,
+                "move_number": 1,
+                "moves": twoBranchConditionalMovesRoot(),
+            ]
+        )
+
+        XCTAssertEqual(game.conditionalMovePlan?.gameID, 120)
+        XCTAssertEqual(game.conditionalMovePlan?.ownerID, playerID)
+        XCTAssertEqual(game.conditionalMovePlan?.rootMoveNumber, 1)
+        XCTAssertEqual(
+            game.conditionalMoveBranches.map(\.id),
+            ["1:..cc", "1:aabb"]
+        )
+
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+
+        XCTAssertNotNil(game.conditionalMovePlan)
+        XCTAssertEqual(
+            game.conditionalMoveBranches.map(\.id),
+            ["1:..cc", "1:aabb"]
+        )
+
+        var gameData = try makeEmptyGameDataPayload(id: 120)
+        gameData["moves"] = [[4, 4, 0]]
+        socket.deliver(name: "game/120/gamedata", data: gameData)
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertNotNil(game.conditionalMovePlan)
+        XCTAssertEqual(
+            game.conditionalMoveBranches.map(\.id),
+            ["1:..cc", "1:aabb"]
+        )
+    }
+
+    func testConditionalMovesEventBeforeGameDataRetainsPlanUntilRootHydrates() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let hydrationData = try makeEmptyGameData(id: 124)
+        let game = Game(
+            width: 5,
+            height: 5,
+            blackName: hydrationData.players.black.username,
+            whiteName: hydrationData.players.white.username,
+            gameId: .OGS(124)
+        )
+        game.blackPlayer = hydrationData.players.black
+        game.whitePlayer = hydrationData.players.white
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        let playerID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/124/conditional_moves",
+            data: [
+                "game_id": 124,
+                "player_id": playerID,
+                "move_number": 1,
+                "moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+
+        XCTAssertNil(game.gameData)
+        XCTAssertEqual(game.conditionalMovePlan?.rootMoveNumber, 1)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
+
+        var gameData = try makeEmptyGameDataPayload(id: 124)
+        gameData["moves"] = [[4, 4, 0]]
+        socket.deliver(name: "game/124/gamedata", data: gameData)
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertEqual(game.conditionalMovePlan?.rootMoveNumber, 1)
+        XCTAssertEqual(game.conditionalMoveBranches.map(\.id), ["1:aabb"])
+    }
+
+    func testConditionalMovesEventAcceptsProtocolAliasAndExplicitClearForms() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 121))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        let playerID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/121/conditional_moves",
+            data: [
+                "game_id": 121,
+                "player_id": playerID,
+                "move_number": 0,
+                "conditional_moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+        XCTAssertEqual(game.conditionalMoveBranches.map(\.id), ["0:aabb"])
+
+        socket.deliver(
+            name: "game/121/conditional_moves",
+            data: [
+                "game_id": 121,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": NSNull(),
+            ]
+        )
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
+
+        socket.deliver(
+            name: "game/121/conditional_moves",
+            data: [
+                "game_id": 121,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+        XCTAssertNotNil(game.conditionalMovePlan)
+
+        socket.deliver(
+            name: "game/121/conditional_moves",
+            data: [
+                "game_id": 121,
+                "player_id": playerID,
+                "move_number": 0,
+                "conditional_moves": [NSNull(), [String: Any]()],
+            ]
+        )
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
+
+        socket.deliver(
+            name: "game/121/conditional_moves",
+            data: [
+                "game_id": 121,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+        XCTAssertNotNil(game.conditionalMovePlan)
+        socket.deliver(name: "game/121/phase", data: "finished")
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
+    }
+
+    func testConditionalMovesEventRejectsWrongGameAndOwnerWithoutReplacingPlan() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 122))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        let playerID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+        let installedPlan = try XCTUnwrap(game.conditionalMovePlan)
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 999,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": NSNull(),
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+
+        // Both wire moves are valid, but the response repeats the occupied
+        // opponent point. The all-illegal update must be transactional.
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": [
+                    NSNull(),
+                    ["cc": ["cc", [String: Any]()] as [Any]],
+                ] as [Any],
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+        XCTAssertEqual(game.conditionalMoveBranches.map(\.id), ["0:aabb"])
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": ["aa", [String: Any]()],
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": try XCTUnwrap(game.whiteId),
+                "move_number": 0,
+                "moves": NSNull(),
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+
+        socket.deliver(
+            name: "game/999/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": NSNull(),
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": [
+                    NSNull(),
+                    ["zz": ["AA", [String: Any]()] as [Any]],
+                ] as [Any],
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+
+        socket.deliver(
+            name: "game/122/conditional_moves",
+            data: [
+                "game_id": 122,
+                "player_id": playerID,
+                "move_number": 0,
+                "moves": [
+                    NSNull(),
+                    ["aa": ["bb"] as [Any]],
+                ] as [Any],
+            ]
+        )
+        XCTAssertEqual(game.conditionalMovePlan, installedPlan)
+    }
+
+    func testAcceptedUndoClearsConditionalMoves() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 123))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(4, 4))
+        let playerID = try XCTUnwrap(game.blackId)
+
+        socket.deliver(
+            name: "game/123/conditional_moves",
+            data: [
+                "game_id": 123,
+                "player_id": playerID,
+                "move_number": 1,
+                "moves": oneBranchConditionalMovesRoot(),
+            ]
+        )
+        XCTAssertNotNil(game.conditionalMovePlan)
+
+        socket.deliver(
+            name: "game/123/undo_requested",
+            data: ["move_number": 1, "undo_move_count": 1]
+        )
+        socket.deliver(
+            name: "game/123/undo_accepted",
+            data: ["move_number": 1, "undo_move_count": 1]
+        )
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
+    }
+
     func testUndoRequestEventsSupportObjectStringAndCancellation() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
@@ -707,11 +1012,24 @@ final class OGSServiceEventTests: XCTestCase {
         let game = Game(ogsGame: try makeEmptyGameData(id: 47, phase: "finished"))
         game.ogs = service
         service.connect(to: game, withChat: true, owner: .explicit(UUID()))
+        XCTAssertTrue(
+            game.setConditionalMovePlan(
+                try ConditionalMovePlan(
+                    gameID: 47,
+                    ownerID: 1,
+                    rootMoveNumber: 0,
+                    paths: [[.placeStone(0, 0), .placeStone(1, 1)]]
+                )
+            )
+        )
+        XCTAssertNotNil(game.conditionalMovePlan)
         socket.emissions.removeAll()
         let reconnectCountBeforeChange = socket.closeThenReconnectCount
 
         service.ogsUIConfig = try makeUIConfig(jwt: "new-test-jwt", userID: 2)
 
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/disconnect" }.count, 1)
         XCTAssertEqual(socket.emissions.filter { $0.command == "chat/part" }.count, 1)
         XCTAssertEqual(socket.closeThenReconnectCount, reconnectCountBeforeChange + 1)
@@ -968,6 +1286,25 @@ final class OGSServiceEventTests: XCTestCase {
             "height": 5,
             "black": ["id": 1, "username": "black"],
             "white": ["id": 2, "username": "white"],
+        ]
+    }
+
+    private func oneBranchConditionalMovesRoot() -> [Any] {
+        [
+            NSNull(),
+            [
+                "aa": ["bb", [String: Any]()] as [Any],
+            ],
+        ]
+    }
+
+    private func twoBranchConditionalMovesRoot() -> [Any] {
+        [
+            NSNull(),
+            [
+                "..": ["cc", [String: Any]()] as [Any],
+                "aa": ["bb", [String: Any]()] as [Any],
+            ],
         ]
     }
 

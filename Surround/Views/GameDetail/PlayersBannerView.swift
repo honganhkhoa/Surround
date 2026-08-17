@@ -138,6 +138,7 @@ struct PlayersBannerView: View {
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
+    var onSelectConditionalVariation: ((ConditionalMoveBranch) -> Void)?
     @State var speechSynthesizer: AVSpeechSynthesizer?
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
@@ -150,6 +151,14 @@ struct PlayersBannerView: View {
     
     var shouldShowNamesOutOfColumn: Bool {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
+    }
+
+    private func showsConditionalMovesButton(
+        for color: StoneColor
+    ) -> Bool {
+        onSelectConditionalVariation != nil
+            && color == game.userStoneColor
+            && !game.conditionalMoveBranches.isEmpty
     }
 
     func singlePlayerIcon(color: StoneColor) -> some View {
@@ -295,6 +304,20 @@ struct PlayersBannerView: View {
             }
             return AnyView(EmptyView())
         }()
+        let clockStatusColumn = VStack(
+            alignment: leftSide ? .leading : .trailing,
+            spacing: 2
+        ) {
+            clockStatus
+            if showsConditionalMovesButton(for: color),
+               let onSelectConditionalVariation {
+                ConditionalMovesButton(
+                    game: game,
+                    context: .gameDetail,
+                    onSelect: onSelectConditionalVariation
+                )
+            }
+        }
         
         return VStack(alignment: leftSide ? .leading : .trailing) {
             if showsPlayersName && !shouldShowNamesOutOfColumn {
@@ -302,7 +325,7 @@ struct PlayersBannerView: View {
             }
             HStack {
                 if !leftSide {
-                    clockStatus
+                    clockStatusColumn
                 }
                 VStack(alignment: .trailing) {
                     if let timeUntilAutoResign = timeUntilAutoResign {
@@ -325,7 +348,7 @@ struct PlayersBannerView: View {
                     }
                 }
                 if leftSide {
-                    clockStatus
+                    clockStatusColumn
                 }
             }
         }
@@ -719,6 +742,21 @@ private extension OGSGame {
 
     PlayersBannerView(game: game, showsPlayersName: true)
         .environmentObject(ogs)
+}
+
+#Preview("Conditional moves", traits: .fixedLayout(width: 390, height: 250)) {
+    let game = Game.conditionalMovesPreviewFixture()
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: [game]
+    )
+
+    PlayersBannerView(
+        game: game,
+        showsPlayersName: true,
+        onSelectConditionalVariation: { _ in }
+    )
+    .environmentObject(ogs)
 }
 
 #Preview("Stone removal", traits: .fixedLayout(width: 500, height: 300)) {

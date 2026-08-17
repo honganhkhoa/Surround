@@ -9364,6 +9364,165 @@
         }
       }
     },
+    "Conditional" : {
+      "comment" : "VoiceOver value identifying an Analyze tree node as the endpoint of a saved conditional-move variation.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedingt"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conditionnel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先回り"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건부"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตามเงื่อนไข"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có điều kiện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預測"
+          }
+        }
+      }
+    },
+    "Conditional moves" : {
+      "comment" : "VoiceOver label for the button that opens saved conditional-move variations and for the resulting popover.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedingte Züge"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coups conditionnels"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先回り着手"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건부 착수"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การเดินหมากแบบมีเงื่อนไข"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các nước đi có điều kiện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件落子"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預測落子"
+          }
+        }
+      }
+    },
+    "Conditional variation %lld of %lld" : {
+      "comment" : "VoiceOver label for one board in the conditional-moves popover. The first number is the variation's one-based position and the second is the total number of variations.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedingte Variante %1$lld von %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variation conditionnelle %1$lld sur %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先回り着手の変化図 %1$lld／%2$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건부 착수 변화도 %1$lld번째(총 %2$lld개)"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แนวทางการเดินหมากแบบมีเงื่อนไขที่ %1$lld จากทั้งหมด %2$lld แนวทาง"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biến thể nước đi có điều kiện thứ %1$lld trên tổng số %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件落子变化，第 %1$lld 个，共 %2$lld 个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預測落子變化，第 %1$lld 個，共 %2$lld 個"
+          }
+        }
+      }
+    },
     "Connected" : {
       "comment" : "Connection status",
       "localizations" : {
@@ -11680,7 +11839,7 @@
       }
     },
     "Game" : {
-      "comment" : "Fallback game window title",
+      "comment" : "Fallback game title or accessibility label when no game or player names are available",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19049,6 +19208,59 @@
         }
       }
     },
+    "Show in Analyze mode" : {
+      "comment" : "VoiceOver hint for selecting a conditional variation board from the game-detail popover.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Analysemodus anzeigen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher en mode Analyse"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討モードで表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "분석 모드에서 보기"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แสดงในโหมดวิเคราะห์"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiển thị trong chế độ Phân tích"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在分析模式中显示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在分析模式中顯示"
+          }
+        }
+      }
+    },
     "Sign in to your Account" : {
       "localizations" : {
         "de" : {
@@ -22913,7 +23125,7 @@
       }
     },
     "vs." : {
-      "comment" : "HistoryGameCell result versus opponent",
+      "comment" : "Versus separator in game summaries and accessibility labels",
       "localizations" : {
         "de" : {
           "stringUnit" : {

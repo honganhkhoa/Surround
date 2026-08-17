@@ -798,6 +798,7 @@ class OGSService: ObservableObject {
                 }
             }
         case "undo_accepted":
+            connectedGame.clearConditionalMoves()
             guard let undoRequest = connectedGame.undoRequest else {
                 resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: ogsGameId)
                 return
@@ -831,6 +832,24 @@ class OGSService: ObservableObject {
                 if let _ = self.activeGames[ogsGameId] {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+            }
+        case "conditional_moves":
+            guard let currentUserID = user?.id,
+                  connectedGame.isUserPlaying,
+                  !(connectedGame.rengo),
+                  let payload = data as? [String: Any] else {
+                return
+            }
+            do {
+                let update = try OGSConditionalMovesUpdate(payload: payload)
+                if !connectedGame.applyConditionalMoves(
+                    update,
+                    expectedOwnerID: currentUserID
+                ) {
+                    print("Ignoring invalid conditional moves for game \(ogsGameId)")
+                }
+            } catch {
+                print("Error parsing conditional moves for game \(ogsGameId): \(error)")
             }
         case "auto_resign":
             if let autoResignData = data as? [String: Any] {
@@ -1666,6 +1685,10 @@ class OGSService: ObservableObject {
     func updateActiveGames(withShortGameData gameData: [String: Any]) {
         if let gameId = gameData["id"] as? Int {
             if gameData["phase"] as? String == OGSGamePhase.finished.rawValue {
+                let finishingGame = self.activeGames[gameId]
+                    ?? self.desiredGameConnections[gameId]?.game
+                    ?? self.connectedGames[gameId]
+                finishingGame?.gamePhase = .finished
                 self.activeGames.removeValue(forKey: gameId)
                 releaseConnection(gameID: gameId, owner: .activeGames)
                 // Keep the presentation projections in lockstep with the source
@@ -1705,6 +1728,19 @@ class OGSService: ObservableObject {
     /// Invalidates all model and chat subscriptions owned by the previous
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {
+        var invalidatedGameIDs = Set<ObjectIdentifier>()
+        let invalidate: (Game) -> Void = { game in
+            guard invalidatedGameIDs.insert(ObjectIdentifier(game)).inserted else {
+                return
+            }
+            game.clearConditionalMoves()
+        }
+        desiredGameConnections.values.map(\.game).forEach(invalidate)
+        connectedGames.values.forEach(invalidate)
+        activeGames.values.forEach(invalidate)
+        publicGames.values.forEach(invalidate)
+        finishedGamesSnapshot?.forEach(invalidate)
+
         desiredGameConnections.removeAll()
         cancelAllUndoResynchronizations()
         publicGameConnectionIDs.removeAll()

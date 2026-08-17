@@ -40,10 +40,11 @@ final class SurroundUITests: XCTestCase {
     }
 
     private func launchApp(
-        additionalLaunchArguments: [String] = []
+        additionalLaunchArguments: [String] = [],
+        orientation: UIDeviceOrientation = .landscapeLeft
     ) -> XCUIApplication {
         #if !targetEnvironment(macCatalyst)
-        XCUIDevice.shared.orientation = .landscapeLeft
+        XCUIDevice.shared.orientation = orientation
         #endif
 
         let app = XCUIApplication()
@@ -288,6 +289,53 @@ final class SurroundUITests: XCTestCase {
         }
     }
 
+    @discardableResult
+    private func elementAfterScrolling(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching elementType: XCUIElement.ElementType = .any,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let candidate = app.descendants(matching: elementType)
+            .matching(identifier: identifier)
+            .firstMatch
+        for _ in 0..<8 where !candidate.exists {
+            app.swipeUp()
+        }
+        return element(
+            identifier,
+            in: app,
+            matching: elementType,
+            file: file,
+            line: line
+        )
+    }
+
+    private func keepScreenshot(_ name: String, in app: XCUIApplication) {
+        let attachment = XCTAttachment(
+            screenshot: XCUIScreen.main.screenshot(),
+            quality: .original
+        )
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func dismissPopover(in app: XCUIApplication) {
+        #if targetEnvironment(macCatalyst)
+        let outside = app.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.02, dy: 0.98)
+        )
+        outside.click()
+        #else
+        let outside = app.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.02, dy: 0.12)
+        )
+        outside.tap()
+        #endif
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,
@@ -325,7 +373,15 @@ final class SurroundUITests: XCTestCase {
         let app = launchApp()
         let gameID = SurroundUITestContract.fixtureGameID
 
-        tap(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
+        element(
+            SurroundUITestContract.AccessibilityID.homeGame(gameID),
+            in: app,
+            matching: .button
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.homeGamePlayerInfo(gameID),
+            in: app
+        )
         element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
         element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
         element(SurroundUITestContract.AccessibilityID.gameOptions, in: app)
@@ -412,6 +468,152 @@ final class SurroundUITests: XCTestCase {
             in: app
         )
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+    }
+
+    func testConditionalVariationsOpenAndJumpToAnalyze() {
+        #if targetEnvironment(macCatalyst)
+        let orientation = UIDeviceOrientation.landscapeRight
+        let idiom = "catalyst"
+        let expectedVariationBoardSize: CGFloat = 200
+        #else
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let orientation: UIDeviceOrientation = isPhone
+            ? .portrait : .landscapeRight
+        let idiom = isPhone ? "iphone" : "ipad"
+        let expectedVariationBoardSize: CGFloat = isPhone ? 160 : 200
+        #endif
+        let gameID = SurroundUITestContract.conditionalMovesFixtureGameID
+        let app = launchApp(
+            additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.home.rawValue,
+            ],
+            orientation: orientation
+        )
+
+        let homeButton = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalButton(gameID),
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(homeButton.label, "Conditional moves")
+        scrollIntoTappableArea(homeButton, in: app)
+        tap(homeButton, description: "Home Conditional button", in: app)
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .gameDetail(gameID)
+                )
+                .firstMatch.exists,
+            "Opening conditional variations must not open Game Detail."
+        )
+        let homePopover = element(
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalPopover(gameID),
+            in: app
+        )
+        for branchID in SurroundUITestContract
+            .conditionalMovesFixtureBranchIDs {
+            let variation = element(
+                SurroundUITestContract.AccessibilityID
+                    .homeConditionalVariation(
+                        gameID,
+                        branchID: branchID
+                    ),
+                in: app
+            )
+            XCTAssertEqual(
+                variation.frame.width,
+                expectedVariationBoardSize,
+                accuracy: 4
+            )
+            XCTAssertEqual(
+                variation.frame.height,
+                expectedVariationBoardSize,
+                accuracy: 4
+            )
+        }
+        keepScreenshot("conditional-popover-home-\(idiom)", in: app)
+
+        dismissPopover(in: app)
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: homePopover
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [dismissed], timeout: 10),
+            .completed,
+            "Expected the Home conditional popover to dismiss."
+        )
+
+        let gameButton = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(gameID),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(gameButton, in: app)
+        tap(gameButton, description: "conditional fixture board", in: app)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(gameID),
+            in: app
+        )
+
+        let detailButton = element(
+            SurroundUITestContract.AccessibilityID.gameConditionalButton,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(detailButton.label, "Conditional moves")
+        tap(
+            detailButton,
+            description: "Game Detail Conditional moves button",
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameConditionalPopover,
+            in: app
+        )
+        let selectedPath = SurroundUITestContract
+            .conditionalMovesFixturePaths[1]
+        tap(
+            SurroundUITestContract.AccessibilityID.gameConditionalVariation(
+                SurroundUITestContract.conditionalMovesFixtureBranchIDs[1]
+            ),
+            in: app,
+            matching: .button
+        )
+
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        let selectedNodeIdentifier = SurroundUITestContract.AccessibilityID
+            .gameAnalysisPosition(
+                baseMoveNumber: SurroundUITestContract
+                    .conditionalMovesFixtureRootMoveNumber,
+                movePath: selectedPath
+            )
+        assertSelected(selectedNodeIdentifier, in: app)
+        let selectedNode = element(selectedNodeIdentifier, in: app)
+        XCTAssertTrue(
+            String(describing: selectedNode.value).contains("Conditional"),
+            "Expected the selected Analyze node to expose its conditional state."
+        )
+        let sharedPrefixNodeIdentifier = SurroundUITestContract.AccessibilityID
+            .gameAnalysisPosition(
+                baseMoveNumber: SurroundUITestContract
+                    .conditionalMovesFixtureRootMoveNumber,
+                movePath: Array(selectedPath.prefix(2))
+            )
+        let sharedPrefixNode = element(sharedPrefixNodeIdentifier, in: app)
+        XCTAssertFalse(
+            String(describing: sharedPrefixNode.value).contains("Conditional"),
+            "Expected an intermediate path node not to be marked as a conditional variation."
+        )
+        keepScreenshot("conditional-analyze-detail-\(idiom)", in: app)
     }
 
     func testAnalyzeControlBarNavigatesAndDeletesBranch() {
