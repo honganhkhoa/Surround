@@ -43,6 +43,7 @@ enum SurroundUITestContract {
         ["jj", "kj", "ji", "ki"],
         ["jj", "kj", "jk", "kk"],
     ]
+    static let conditionalMovesFixtureConflictingPath = ["jj", "lj"]
     static let conditionalMovesFixtureBranchIDs =
         conditionalMovesFixturePaths.map {
             "\(conditionalMovesFixtureRootMoveNumber):\($0.joined())"

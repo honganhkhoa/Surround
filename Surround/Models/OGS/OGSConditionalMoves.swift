@@ -273,6 +273,59 @@ struct ConditionalMoveNode: Equatable {
         children[opponentMove] = child
     }
 
+    /// Merges a complete opponent/response path using the same conflict
+    /// semantics as Goban's conditional-move planner. Matching responses keep
+    /// and recursively merge their alternatives; a different response replaces
+    /// the existing response subtree for that opponent move.
+    fileprivate mutating func mergeCompleteVariation(
+        path: ArraySlice<Move>
+    ) {
+        guard let opponentMove = path.first,
+              let response = path.dropFirst().first else {
+            return
+        }
+
+        let existingChild = children[opponentMove]
+        var child: ConditionalMoveNode
+        if existingChild?.response == response {
+            child = existingChild!
+        } else {
+            child = ConditionalMoveNode(response: response)
+        }
+
+        let remainingPath = path.dropFirst(2)
+        if !remainingPath.isEmpty {
+            child.mergeCompleteVariation(path: remainingPath)
+        }
+        children[opponentMove] = child
+    }
+
+    /// Classifies the effect of merging a complete path without constructing
+    /// the resulting tree.
+    fileprivate func additionEffect(
+        byMergingCompleteVariation path: ArraySlice<Move>
+    ) -> ConditionalMoveAdditionEffect? {
+        guard let opponentMove = path.first,
+              let response = path.dropFirst().first else {
+            return nil
+        }
+        guard let existingChild = children[opponentMove] else {
+            return .addsVariation
+        }
+
+        guard existingChild.response == response else {
+            return .replacesExistingVariations
+        }
+
+        let remainingPath = path.dropFirst(2)
+        guard !remainingPath.isEmpty else {
+            return .noChange
+        }
+        return existingChild.additionEffect(
+            byMergingCompleteVariation: remainingPath
+        )
+    }
+
     fileprivate var wireNode: OGSConditionalMoveWireNode {
         OGSConditionalMoveWireNode(
             response: response?.toOGSString(),
@@ -289,6 +342,12 @@ enum ConditionalMovePlanError: Error, Equatable {
     case emptyPath
     case conflictingResponse(Move)
     case missingResponse(Move)
+}
+
+enum ConditionalMoveAdditionEffect: Equatable {
+    case noChange
+    case addsVariation
+    case replacesExistingVariations
 }
 
 struct ConditionalMovePlan: Equatable {
@@ -414,6 +473,77 @@ extension ConditionalMovePlan {
                 moves: moves
             )
         }
+    }
+
+    /// Classifies a complete analyzed variation in time proportional to its
+    /// path, without copying or rebuilding the conditional-move tree.
+    func additionEffect(
+        byAddingCompleteVariation moves: [Move]
+    ) -> ConditionalMoveAdditionEffect? {
+        guard moves.count >= 2, moves.count.isMultiple(of: 2) else {
+            return nil
+        }
+        return root.additionEffect(
+            byMergingCompleteVariation: moves[...]
+        )
+    }
+
+    /// Returns a full replacement plan after merging one complete analyzed
+    /// variation, or `nil` when the path is incomplete or already represented.
+    func addingCompleteVariation(
+        _ moves: [Move],
+        ownerID: Int
+    ) -> ConditionalMovePlan? {
+        guard let effect = additionEffect(
+            byAddingCompleteVariation: moves
+        ), effect != .noChange else {
+            return nil
+        }
+
+        var mergedRoot = root
+        mergedRoot.mergeCompleteVariation(path: moves[...])
+        return ConditionalMovePlan(
+            gameID: gameID,
+            ownerID: ownerID,
+            rootMoveNumber: rootMoveNumber,
+            root: mergedRoot
+        )
+    }
+
+    /// Returns a full replacement plan with the requested root-to-leaf
+    /// variations removed. Rebuilding from the retained leaves naturally
+    /// prunes prefixes no longer used by another registered variation.
+    func removingVariations(
+        _ variationIDs: Set<ConditionalVariationID>,
+        ownerID: Int
+    ) -> ConditionalMovePlan? {
+        guard !variationIDs.isEmpty,
+              variationIDs.allSatisfy({
+                  $0.rootMoveNumber == rootMoveNumber
+              }) else {
+            return nil
+        }
+
+        let paths = orderedPaths()
+        let retainedPaths = paths.filter {
+            !variationIDs.contains($0.variationID)
+        }
+        guard retainedPaths.count != paths.count else {
+            return nil
+        }
+
+        var replacementRoot = ConditionalMoveNode(response: nil)
+        for path in retainedPaths {
+            guard (try? replacementRoot.insert(path: path.moves[...])) != nil else {
+                return nil
+            }
+        }
+        return ConditionalMovePlan(
+            gameID: gameID,
+            ownerID: ownerID,
+            rootMoveNumber: rootMoveNumber,
+            root: replacementRoot
+        )
     }
 }
 

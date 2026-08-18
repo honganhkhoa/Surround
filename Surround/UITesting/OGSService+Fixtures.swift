@@ -1444,6 +1444,27 @@ extension OGSService {
             ) && waitingGame1.conditionalMoveBranches.count == 3,
             "The screenshot fixture must expose three conditional branches."
         )
+        let conflictingConditionalPosition = addAnalysisVariation(
+            to: waitingGame1,
+            fromMoveNumber:
+                SurroundUITestContract.conditionalMovesFixtureRootMoveNumber,
+            coordinates: ["K10", "M10"]
+        )
+        let conflictingConditionalMoves = waitingGame1.moveTree
+            .variation(to: conflictingConditionalPosition)?
+            .moves ?? []
+        precondition(
+            conflictingConditionalMoves.map { $0.toOGSString() }
+                == SurroundUITestContract
+                    .conditionalMovesFixtureConflictingPath,
+            "The conditional-move fixture must expose its conflicting analysis path."
+        )
+        precondition(
+            conditionalMovePlan.additionEffect(
+                byAddingCompleteVariation: conflictingConditionalMoves
+            ) == .replacesExistingVariations,
+            "The alternate response must replace the existing conditional variations."
+        )
         let additionalYourMoveGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.indigoCraneOpening,
             clock: indigoCraneClock

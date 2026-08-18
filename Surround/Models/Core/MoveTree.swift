@@ -76,6 +76,16 @@ class MoveTree: ObservableObject {
             return variationID
         })
     }
+
+    /// Returns every conditional variation whose projected path enters the
+    /// registered subtree rooted at `position`.
+    func conditionalVariationIDs(
+        inSubtreeStartingAt position: BoardPosition
+    ) -> Set<ConditionalVariationID> {
+        Set(subtreePositions(startingAt: position).flatMap {
+            conditionalVariationIDs(for: $0)
+        })
+    }
     
     private func subtreePositions(startingAt position: BoardPosition) -> [BoardPosition] {
         var result = [BoardPosition]()
@@ -261,15 +271,24 @@ class MoveTree: ObservableObject {
         }
     }
 
-    func canRemoveBranch(startingAt position: BoardPosition) -> Bool {
+    /// Structural branch-deletion eligibility without considering conditional
+    /// provenance. Callers coordinating a server-side conditional update use
+    /// this before asking `removeBranch` to perform the final local deletion.
+    func canStructurallyRemoveBranch(
+        startingAt position: BoardPosition
+    ) -> Bool {
         position !== initialPosition
             && (indexByBoardPosition[ObjectIdentifier(position)] ?? 0) > 0
             && position.previousPosition.map {
                 indexByBoardPosition[ObjectIdentifier($0)] != nil
             } == true
-            && !subtreePositions(startingAt: position).contains {
-                isConditionalMovePosition($0)
-            }
+    }
+
+    func canRemoveBranch(startingAt position: BoardPosition) -> Bool {
+        canStructurallyRemoveBranch(startingAt: position)
+            && conditionalVariationIDs(
+                inSubtreeStartingAt: position
+            ).isEmpty
     }
 
     @discardableResult
@@ -359,8 +378,14 @@ class MoveTree: ObservableObject {
         _ source: PositionSource,
         to position: BoardPosition
     ) {
-        sourcesByBoardPosition[ObjectIdentifier(position), default: []]
-            .insert(source)
+        let identifier = ObjectIdentifier(position)
+        sourcesByBoardPosition[identifier, default: []].insert(source)
+        if case .conditional = source {
+            // Conditional projections are also durable analysis lines. Removing
+            // their conditional provenance should only remove the highlight;
+            // the projected branch remains available in Analyze mode.
+            sourcesByBoardPosition[identifier, default: []].insert(.analysis)
+        }
     }
 
     private func retainAnalysisLineage(from position: BoardPosition) {
@@ -691,29 +716,6 @@ class MoveTree: ObservableObject {
             }
         }
         positionsByConditionalVariation = replacementProjection
-
-        let orphanCandidates = previousProjection.values
-            .flatMap { $0 }
-            .sorted { $0.lastMoveNumber > $1.lastMoveNumber }
-        var visitedOrphans = Set<ObjectIdentifier>()
-        for position in orphanCandidates {
-            let identifier = ObjectIdentifier(position)
-            guard visitedOrphans.insert(identifier).inserted,
-                  let index = indexByBoardPosition[identifier], index > 0,
-                  sourcesByBoardPosition[identifier]?.isEmpty ?? true else {
-                continue
-            }
-            let hasRegisteredChild =
-                (nextPositionsByPosition[identifier] ?? []).contains {
-                    contains($0)
-                }
-            if !hasRegisteredChild {
-                removeRegisteredPositions(
-                    [position],
-                    recalculatesLevels: false
-                )
-            }
-        }
 
         calculateLevels()
         return .applied(Dictionary(

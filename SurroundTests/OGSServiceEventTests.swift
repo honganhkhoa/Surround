@@ -5,12 +5,14 @@
 
 import XCTest
 import DictionaryCoding
+import Combine
 
 final class OGSServiceEventTests: XCTestCase {
     private class FakeWebsocket: OGSWebsocketProtocol {
         struct Emission {
             let command: String
             let data: Any
+            let hasResultCallback: Bool
         }
 
         var serverEventCallback: ((String, Any?) -> Void)?
@@ -73,7 +75,11 @@ final class OGSServiceEventTests: XCTestCase {
         }
 
         func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
-            emissions.append(.init(command: command, data: data))
+            emissions.append(.init(
+                command: command,
+                data: data,
+                hasResultCallback: resultCallback != nil
+            ))
             if command == "gamelist/query", let gamelistResults {
                 resultCallback?(["results": gamelistResults], nil)
             } else {
@@ -170,6 +176,126 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(
             game.conditionalMoveBranches.map(\.id),
             ["1:..cc", "1:aabb"]
+        )
+    }
+
+    func testConditionalMoveSubmissionSendsFullTreeWithoutCallbackAndWaitsForPush() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 125))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(4, 4))
+        let ownerID = try XCTUnwrap(game.blackId)
+        let plan = try ConditionalMovePlan(
+            gameID: 125,
+            ownerID: ownerID,
+            rootMoveNumber: 1,
+            paths: [[.placeStone(0, 0), .placeStone(1, 1)]]
+        )
+        let completed = expectation(description: "conditional moves acknowledged")
+        var completionResult: Result<Void, Error>?
+        let cancellable = service.submitConditionalMovePlan(plan, for: game).sink(
+            receiveCompletion: { completion in
+                switch completion {
+                case .finished:
+                    completionResult = .success(())
+                case .failure(let error):
+                    completionResult = .failure(error)
+                }
+                completed.fulfill()
+            },
+            receiveValue: {}
+        )
+
+        let emitted = expectation(description: "conditional command emitted")
+        DispatchQueue.main.async { emitted.fulfill() }
+        wait(for: [emitted], timeout: 1)
+
+        let emission = try XCTUnwrap(
+            socket.emissions.last { $0.command == "game/conditional_moves/set" }
+        )
+        XCTAssertFalse(emission.hasResultCallback)
+        let payload = try XCTUnwrap(emission.data as? [String: Any])
+        XCTAssertEqual(payload["game_id"] as? Int, 125)
+        XCTAssertEqual(payload["move_number"] as? Int, 1)
+        let root = try XCTUnwrap(payload["conditional_moves"] as? [Any])
+        XCTAssertEqual(root.count, 2)
+        XCTAssertTrue(root[0] is NSNull)
+        let children = try XCTUnwrap(root[1] as? [String: Any])
+        let firstReply = try XCTUnwrap(children["aa"] as? [Any])
+        XCTAssertEqual(firstReply[0] as? String, "bb")
+        XCTAssertNil(game.conditionalMovePlan)
+        XCTAssertTrue(service.isConditionalMoveSubmissionPending(gameID: 125))
+
+        socket.deliver(
+            name: "game/125/conditional_moves",
+            data: [
+                "game_id": 125,
+                "player_id": ownerID,
+                "move_number": 1,
+                "moves": root,
+            ]
+        )
+
+        wait(for: [completed], timeout: 1)
+        withExtendedLifetime(cancellable) {}
+        if case .failure(let error) = completionResult {
+            XCTFail("Unexpected conditional update failure: \(error)")
+        }
+        XCTAssertEqual(game.conditionalMovePlan, plan)
+        XCTAssertFalse(service.isConditionalMoveSubmissionPending(gameID: 125))
+    }
+
+    func testOfflineConditionalMoveSubmissionEchoesAuthoritativeUpdate() throws {
+        let service = makeService(
+            socket: OGSOfflineNoOpWebsocket(),
+            conditionalMoveSubmissionTimeout: 1
+        )
+        let game = Game(ogsGame: try makeEmptyGameData(id: 126))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.connect(to: game, owner: .explicit(UUID()))
+        try game.makeMove(move: .placeStone(4, 4))
+        let ownerID = try XCTUnwrap(game.blackId)
+        let initialPlan = try ConditionalMovePlan(
+            gameID: 126,
+            ownerID: ownerID,
+            rootMoveNumber: 1,
+            paths: [
+                [.placeStone(0, 0), .placeStone(1, 1)],
+                [.placeStone(2, 2), .placeStone(3, 3)],
+            ]
+        )
+        XCTAssertTrue(
+            game.setConditionalMovePlan(initialPlan, expectedOwnerID: ownerID)
+        )
+        let removedBranch = try XCTUnwrap(game.conditionalMoveBranches.first)
+        let removedID = removedBranch.variationID
+        let replacement = try XCTUnwrap(
+            initialPlan.removingVariations([removedID], ownerID: ownerID)
+        )
+        let completed = expectation(description: "offline conditional echo")
+        var completionError: Error?
+        let cancellable = service.submitConditionalMovePlan(
+            replacement,
+            for: game
+        ).sink { completion in
+            if case .failure(let error) = completion {
+                completionError = error
+            }
+            completed.fulfill()
+        } receiveValue: {}
+
+        wait(for: [completed], timeout: 2)
+        withExtendedLifetime(cancellable) {}
+        XCTAssertNil(completionError)
+        XCTAssertEqual(game.conditionalMovePlan, replacement)
+        XCTAssertFalse(
+            game.moveTree.isConditionalVariationPosition(
+                removedBranch.position
+            )
         )
     }
 
@@ -1128,7 +1254,11 @@ final class OGSServiceEventTests: XCTestCase {
     func testMoveAcknowledgementErrorBecomesPublisherFailure() throws {
         final class RejectingWebsocket: FakeWebsocket {
             override func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
-                emissions.append(.init(command: command, data: data))
+                emissions.append(.init(
+                    command: command,
+                    data: data,
+                    hasResultCallback: resultCallback != nil
+                ))
                 resultCallback?(nil, ["move": "illegal move"])
             }
         }
@@ -1260,7 +1390,8 @@ final class OGSServiceEventTests: XCTestCase {
     private func makeService(
         socket: OGSWebsocketProtocol,
         installsObservers: Bool = true,
-        undoResynchronizationTimeout: TimeInterval = 15
+        undoResynchronizationTimeout: TimeInterval = 15,
+        conditionalMoveSubmissionTimeout: TimeInterval = 10
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -1274,7 +1405,8 @@ final class OGSServiceEventTests: XCTestCase {
             enablesAppSideEffects: false,
             startsTimers: false,
             installsObservers: installsObservers,
-            undoResynchronizationTimeout: undoResynchronizationTimeout
+            undoResynchronizationTimeout: undoResynchronizationTimeout,
+            conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout
         )
     }
 

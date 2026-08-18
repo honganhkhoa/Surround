@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AnalyzeTreeSlice: View {
-    var moveTree: MoveTree
+    @ObservedObject var moveTree: MoveTree
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
 
@@ -81,6 +81,9 @@ struct AnalyzeTreeSlice: View {
                                 .accessibilityIdentifier(
                                     accessibilityIdentifier(for: position)
                                 )
+                                // Recreate the platform accessibility element
+                                // after server-confirmed membership changes.
+                                .id(isConditionalVariation)
                         } else if lastMoveNumber == 0 {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))

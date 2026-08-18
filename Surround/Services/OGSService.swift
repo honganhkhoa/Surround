@@ -17,6 +17,9 @@ enum OGSServiceError: Error {
     case notLoggedIn
     case loginError(error: String)
     case staleAuthenticationContext
+    case conditionalMovesUpdateUnavailable
+    case conditionalMovesUpdateTimedOut
+    case conditionalMovesUpdateInterrupted
 }
 
 /// The decoded and sanitized pieces of `/api/v1/games/{id}` needed to turn a
@@ -188,6 +191,23 @@ final class OGSOfflineNoOpWebsocket: OGSWebsocketProtocol {
         data: Any,
         resultCallback: OGSWebsocketResultCallback?
     ) {
+        if command == "game/conditional_moves/set",
+           let payload = data as? [String: Any],
+           let gameID = payload["game_id"] as? Int,
+           let moveNumber = payload["move_number"] as? Int,
+           let root = payload["conditional_moves"] {
+            DispatchQueue.main.async { [weak self] in
+                self?.serverEventCallback?(
+                    "game/\(gameID)/conditional_moves",
+                    [
+                        "game_id": gameID,
+                        "move_number": moveNumber,
+                        "moves": root,
+                    ]
+                )
+            }
+            return
+        }
         resultCallback?(
             nil,
             [
@@ -210,6 +230,12 @@ extension OGSServiceError: LocalizedError {
             return error
         case .staleAuthenticationContext:
             return "Discarded a response from a previous account"
+        case .conditionalMovesUpdateUnavailable:
+            return "Conditional moves cannot be updated right now"
+        case .conditionalMovesUpdateTimedOut:
+            return "Updating conditional moves timed out"
+        case .conditionalMovesUpdateInterrupted:
+            return "Updating conditional moves was interrupted"
         }
     }
 }
@@ -257,6 +283,17 @@ class OGSService: ObservableObject {
 
     private let httpClient: OGSHTTPClient
     private let undoResynchronizationTimeout: TimeInterval
+    private let conditionalMoveSubmissionTimeout: TimeInterval
+
+    private struct PendingConditionalMoveSubmission {
+        let expectedPlan: ConditionalMovePlan
+        let promise: (Result<Void, Error>) -> Void
+        let timeout: DispatchWorkItem
+    }
+
+    private var pendingConditionalMoveSubmissions =
+        [Int: PendingConditionalMoveSubmission]()
+    @Published private(set) var conditionalMoveSubmissionGameIDs = Set<Int>()
 
     /// Account-scoped configuration, session metadata, caches, and read state.
     let preferences: UserDefaults
@@ -562,12 +599,14 @@ class OGSService: ObservableObject {
         startsTimers: Bool = false,
         installsObservers: Bool = true,
         undoResynchronizationTimeout: TimeInterval = 15,
+        conditionalMoveSubmissionTimeout: TimeInterval = 10,
         remoteSettings: OGSRemoteSetting? = nil,
         initialState: BootstrapState? = nil
     ) {
         self.environment = environment
         self.httpClient = httpClient
         self.undoResynchronizationTimeout = undoResynchronizationTimeout
+        self.conditionalMoveSubmissionTimeout = conditionalMoveSubmissionTimeout
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
         self.ogsWebsocket = ogsWebsocket
@@ -647,6 +686,9 @@ class OGSService: ObservableObject {
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
         switch eventName {
         case "surround/socketClosed":
+            failAllConditionalMoveSubmissions(
+                with: OGSServiceError.conditionalMovesUpdateInterrupted
+            )
             // The transport has gone away, so none of these subscriptions are
             // currently active. Keep only explicit desired state for reconnect.
             self.connectedGames.removeAll()
@@ -754,6 +796,10 @@ class OGSService: ObservableObject {
             if let gameData = data as? [String: Any], let ogsGame = try? dictionaryDecoder.decode(OGSGame.self, from: gameData) {
                 connectedGame.gameData = ogsGame
                 finishUndoResynchronization(gameID: ogsGameId)
+                failConditionalMoveSubmissionIfStale(
+                    gameID: ogsGameId,
+                    game: connectedGame
+                )
             } else {
                 print("Error parsing game: \(data ?? "")")
             }
@@ -775,6 +821,10 @@ class OGSService: ObservableObject {
                         if let _ = self.activeGames[ogsGameId] {
                             preferences[.latestOGSOverviewOutdated] = true
                         }
+                        failConditionalMoveSubmissionIfStale(
+                            gameID: ogsGameId,
+                            game: connectedGame
+                        )
                     }
                 }
             }
@@ -798,6 +848,10 @@ class OGSService: ObservableObject {
                 }
             }
         case "undo_accepted":
+            failConditionalMoveSubmission(
+                gameID: ogsGameId,
+                with: OGSServiceError.conditionalMovesUpdateInterrupted
+            )
             connectedGame.clearConditionalMoves()
             guard let undoRequest = connectedGame.undoRequest else {
                 resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: ogsGameId)
@@ -829,6 +883,10 @@ class OGSService: ObservableObject {
         case "phase":
             if let phase = OGSGamePhase(rawValue: data as? String ?? "") {
                 connectedGame.gamePhase = phase
+                failConditionalMoveSubmissionIfStale(
+                    gameID: ogsGameId,
+                    game: connectedGame
+                )
                 if let _ = self.activeGames[ogsGameId] {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
@@ -847,6 +905,11 @@ class OGSService: ObservableObject {
                     expectedOwnerID: currentUserID
                 ) {
                     print("Ignoring invalid conditional moves for game \(ogsGameId)")
+                } else {
+                    finishConditionalMoveSubmissionIfAcknowledged(
+                        gameID: ogsGameId,
+                        game: connectedGame
+                    )
                 }
             } catch {
                 print("Error parsing conditional moves for game \(ogsGameId): \(error)")
@@ -1688,6 +1751,10 @@ class OGSService: ObservableObject {
                 let finishingGame = self.activeGames[gameId]
                     ?? self.desiredGameConnections[gameId]?.game
                     ?? self.connectedGames[gameId]
+                failConditionalMoveSubmission(
+                    gameID: gameId,
+                    with: OGSServiceError.conditionalMovesUpdateInterrupted
+                )
                 finishingGame?.gamePhase = .finished
                 self.activeGames.removeValue(forKey: gameId)
                 releaseConnection(gameID: gameId, owner: .activeGames)
@@ -1728,6 +1795,9 @@ class OGSService: ObservableObject {
     /// Invalidates all model and chat subscriptions owned by the previous
     /// authentication context. This must run before closing the socket.
     private func invalidateAllGameConnections() {
+        failAllConditionalMoveSubmissions(
+            with: OGSServiceError.conditionalMovesUpdateInterrupted
+        )
         var invalidatedGameIDs = Set<ObjectIdentifier>()
         let invalidate: (Game) -> Void = { game in
             guard invalidatedGameIDs.insert(ObjectIdentifier(game)).inserted else {
@@ -1833,6 +1903,10 @@ class OGSService: ObservableObject {
     }
 
     private func disconnectActualGame(gameID: Int) {
+        failConditionalMoveSubmission(
+            gameID: gameID,
+            with: OGSServiceError.conditionalMovesUpdateInterrupted
+        )
         let wasConnected = connectedGames.removeValue(forKey: gameID) != nil
         let wasConnectedWithChat = connectedWithChat.removeValue(forKey: gameID) ?? false
 
@@ -1969,6 +2043,164 @@ class OGSService: ObservableObject {
         return nil
     }
     
+    func isConditionalMoveSubmissionPending(gameID: Int?) -> Bool {
+        guard let gameID else {
+            return false
+        }
+        return conditionalMoveSubmissionGameIDs.contains(gameID)
+    }
+
+    /// Sends a complete replacement tree and resolves only after the server's
+    /// authoritative conditional-moves push matches it. This command has no
+    /// request callback in the OGS protocol.
+    func submitConditionalMovePlan(
+        _ plan: ConditionalMovePlan,
+        for game: Game
+    ) -> AnyPublisher<Void, Error> {
+        Future<Void, Error> { [weak self, weak game] promise in
+            DispatchQueue.main.async {
+                guard let self, let game else {
+                    promise(.failure(
+                        OGSServiceError.conditionalMovesUpdateUnavailable
+                    ))
+                    return
+                }
+                self.beginConditionalMoveSubmission(
+                    plan,
+                    for: game,
+                    promise: promise
+                )
+            }
+        }
+        .eraseToAnyPublisher()
+    }
+
+    private func beginConditionalMoveSubmission(
+        _ plan: ConditionalMovePlan,
+        for game: Game,
+        promise: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard let gameID = game.ogsID,
+              let currentUserID = user?.id,
+              plan.gameID == gameID,
+              plan.ownerID == currentUserID,
+              plan.rootMoveNumber == game.currentPosition.lastMoveNumber,
+              game.gamePhase == .play,
+              game.gameData?.outcome == nil,
+              game.analysisAvailable,
+              game.isUserPlaying,
+              !game.rengo,
+              let userStoneColor = game.userStoneColor,
+              game.currentPosition.nextToMove
+                == userStoneColor.opponentColor(),
+              plan.validated(width: game.width, height: game.height) == plan,
+              ogsWebsocket.opened,
+              ogsWebsocket.authenticated,
+              connectedGames[gameID] === game,
+              pendingConditionalMoveSubmissions[gameID] == nil else {
+            promise(.failure(
+                OGSServiceError.conditionalMovesUpdateUnavailable
+            ))
+            return
+        }
+
+        let encodedRoot: Any
+        do {
+            encodedRoot = try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(plan.encodedRoot)
+            )
+        } catch {
+            promise(.failure(error))
+            return
+        }
+
+        let timeout = DispatchWorkItem { [weak self] in
+            self?.failConditionalMoveSubmission(
+                gameID: gameID,
+                with: OGSServiceError.conditionalMovesUpdateTimedOut
+            )
+        }
+        pendingConditionalMoveSubmissions[gameID] =
+            PendingConditionalMoveSubmission(
+                expectedPlan: plan,
+                promise: promise,
+                timeout: timeout
+            )
+        conditionalMoveSubmissionGameIDs.insert(gameID)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + conditionalMoveSubmissionTimeout,
+            execute: timeout
+        )
+
+        ogsWebsocket.emit(
+            command: "game/conditional_moves/set",
+            data: [
+                "game_id": gameID,
+                "move_number": plan.rootMoveNumber,
+                "conditional_moves": encodedRoot,
+            ]
+        )
+    }
+
+    private func finishConditionalMoveSubmissionIfAcknowledged(
+        gameID: Int,
+        game: Game
+    ) {
+        guard let submission = pendingConditionalMoveSubmissions[gameID] else {
+            return
+        }
+        let isAcknowledged = submission.expectedPlan.root.children.isEmpty
+            ? game.conditionalMovePlan == nil
+            : game.conditionalMovePlan == submission.expectedPlan
+        guard isAcknowledged else {
+            return
+        }
+        finishConditionalMoveSubmission(gameID: gameID, result: .success(()))
+    }
+
+    private func failConditionalMoveSubmissionIfStale(
+        gameID: Int,
+        game: Game
+    ) {
+        guard let submission = pendingConditionalMoveSubmissions[gameID],
+              submission.expectedPlan.rootMoveNumber
+                != game.currentPosition.lastMoveNumber
+                || game.gamePhase != .play else {
+            return
+        }
+        failConditionalMoveSubmission(
+            gameID: gameID,
+            with: OGSServiceError.conditionalMovesUpdateInterrupted
+        )
+    }
+
+    private func failConditionalMoveSubmission(
+        gameID: Int,
+        with error: Error
+    ) {
+        finishConditionalMoveSubmission(gameID: gameID, result: .failure(error))
+    }
+
+    private func failAllConditionalMoveSubmissions(with error: Error) {
+        for gameID in Array(pendingConditionalMoveSubmissions.keys) {
+            failConditionalMoveSubmission(gameID: gameID, with: error)
+        }
+    }
+
+    private func finishConditionalMoveSubmission(
+        gameID: Int,
+        result: Result<Void, Error>
+    ) {
+        guard let submission = pendingConditionalMoveSubmissions.removeValue(
+            forKey: gameID
+        ) else {
+            return
+        }
+        submission.timeout.cancel()
+        conditionalMoveSubmissionGameIDs.remove(gameID)
+        submission.promise(result)
+    }
+
     func submitMove(move: Move, forGame game: Game) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             guard let gameId = game.gameData?.gameId else {

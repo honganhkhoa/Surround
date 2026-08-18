@@ -552,6 +552,144 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         conditionalMoveBranches = []
     }
 
+    /// Builds the full conditional-move tree produced by adding the selected
+    /// analyzed variation.
+    func conditionalMovePlanByAddingVariation(
+        endingAt position: BoardPosition,
+        ownerID: Int
+    ) -> ConditionalMovePlan? {
+        guard canEditConditionalMoves(ownerID: ownerID),
+              moveTree.contains(position),
+              let variation = moveTree.variation(to: position),
+              variation.basePosition === currentPosition else {
+            return nil
+        }
+
+        let plan = conditionalMovePlan ?? ConditionalMovePlan(
+            gameID: ogsID!,
+            ownerID: ownerID,
+            rootMoveNumber: currentPosition.lastMoveNumber,
+            root: ConditionalMoveNode(response: nil)
+        )
+        return plan.addingCompleteVariation(
+            variation.moves,
+            ownerID: ownerID
+        )
+    }
+
+    /// Classifies an analyzed variation for menu presentation without
+    /// constructing the replacement conditional-move plan.
+    func conditionalMoveAdditionEffect(
+        endingAt position: BoardPosition,
+        ownerID: Int
+    ) -> ConditionalMoveAdditionEffect? {
+        guard canEditConditionalMoves(ownerID: ownerID),
+              moveTree.contains(position),
+              let variation = moveTree.variation(to: position),
+              variation.basePosition === currentPosition else {
+            return nil
+        }
+
+        let plan = conditionalMovePlan ?? ConditionalMovePlan(
+            gameID: ogsID!,
+            ownerID: ownerID,
+            rootMoveNumber: currentPosition.lastMoveNumber,
+            root: ConditionalMoveNode(response: nil)
+        )
+        return plan.additionEffect(
+            byAddingCompleteVariation: variation.moves
+        )
+    }
+
+    /// Builds the full replacement tree produced by removing the selected
+    /// displayed conditional variation.
+    func conditionalMovePlanByRemovingVariation(
+        endingAt position: BoardPosition,
+        ownerID: Int
+    ) -> ConditionalMovePlan? {
+        guard let branch = conditionalMoveBranches.first(where: {
+            $0.position === position
+        }) else {
+            return nil
+        }
+        return conditionalMovePlanByRemovingVariations(
+            [branch.variationID],
+            ownerID: ownerID
+        )
+    }
+
+    /// Returns whether the selected position identifies a removable
+    /// conditional variation, without rebuilding the retained plan.
+    func canRemoveConditionalMoveVariation(
+        endingAt position: BoardPosition,
+        ownerID: Int
+    ) -> Bool {
+        canEditConditionalMoves(ownerID: ownerID)
+            && conditionalMovePlan != nil
+            && conditionalMoveBranches.contains(where: {
+                $0.position === position
+            })
+    }
+
+    /// Returns whether every projected variation can be removed from the
+    /// current plan, without materializing that replacement plan.
+    func canRemoveConditionalMoveVariations(
+        _ variationIDs: Set<ConditionalVariationID>,
+        ownerID: Int
+    ) -> Bool {
+        guard !variationIDs.isEmpty,
+              canEditConditionalMoves(ownerID: ownerID),
+              conditionalMovePlan != nil else {
+            return false
+        }
+        let projectedVariationIDs = Set(
+            conditionalMoveBranches.map(\.variationID)
+        )
+        return variationIDs.isSubset(of: projectedVariationIDs)
+    }
+
+    /// Builds the replacement tree used by Delete Branch when the selected
+    /// subtree contains one or more registered conditional variations.
+    func conditionalMovePlanByRemovingVariations(
+        _ variationIDs: Set<ConditionalVariationID>,
+        ownerID: Int
+    ) -> ConditionalMovePlan? {
+        guard canRemoveConditionalMoveVariations(
+            variationIDs,
+            ownerID: ownerID
+        ),
+              let conditionalMovePlan else {
+            return nil
+        }
+        return conditionalMovePlan.removingVariations(
+            variationIDs,
+            ownerID: ownerID
+        )
+    }
+
+    private func canEditConditionalMoves(ownerID: Int) -> Bool {
+        guard let ogsID,
+              ogs?.user?.id == ownerID,
+              gamePhase == .play,
+              gameData?.outcome == nil,
+              analysisAvailable,
+              isUserPlaying,
+              !rengo,
+              let userStoneColor,
+              currentPosition.nextToMove == userStoneColor.opponentColor()
+        else {
+            return false
+        }
+
+        guard let conditionalMovePlan else {
+            return true
+        }
+        return conditionalMovePlan.gameID == ogsID
+            && conditionalMovePlan.ownerID == ownerID
+            && conditionalMovePlan.rootMoveNumber
+                == currentPosition.lastMoveNumber
+    }
+
     private enum ConditionalMoveProjectionResult {
         case applied([ConditionalMoveBranch])
         case deferred

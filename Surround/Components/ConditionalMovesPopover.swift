@@ -136,12 +136,12 @@ struct ConditionalMovesPopoverGrid: View {
     }
 
     private var popoverWidth: CGFloat {
-        boardSize * CGFloat(columnCount) + spacing * CGFloat(columnCount + 3)
+        boardSize * CGFloat(columnCount) + spacing * CGFloat(columnCount + 2)
     }
 
     private var popoverHeight: CGFloat {
         min(
-            boardSize * CGFloat(rowCount) + spacing * CGFloat(rowCount + 3),
+            boardSize * CGFloat(rowCount) + spacing * CGFloat(rowCount + 2),
             528
         )
     }
@@ -168,7 +168,7 @@ struct ConditionalMovesPopoverGrid: View {
                     )
                 }
             }
-            .padding(spacing * 2)
+            .padding(spacing * 1.5)
         }
         .frame(width: popoverWidth, height: popoverHeight)
         .accessibilityElement(children: .contain)

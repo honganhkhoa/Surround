@@ -10048,6 +10048,59 @@
         }
       }
     },
+    "Couldn’t update conditional moves" : {
+      "comment" : "Alert title shown when saving a conditional-move edit fails or times out.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedingte Züge konnten nicht aktualisiert werden"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de mettre à jour les coups conditionnels"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先回り着手を更新できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "조건부 착수를 업데이트할 수 없습니다"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถอัปเดตการเดินหมากแบบมีเงื่อนไขได้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể cập nhật các nước đi có điều kiện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更新条件落子"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法更新預測落子"
+          }
+        }
+      }
+    },
     "Create a game precisely as you want." : {
       "localizations" : {
         "de" : {
@@ -16905,6 +16958,59 @@
         }
       }
     },
+    "Please try again." : {
+      "comment" : "Message in an alert shown after saving a conditional-move edit fails.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versuche es bitte erneut."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veuillez réessayer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도해 주세요."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โปรดลองอีกครั้ง"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vui lòng thử lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請再試一次。"
+          }
+        }
+      }
+    },
     "Preferred Settings" : {
       "localizations" : {
         "de" : {
@@ -18004,6 +18110,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聯棋（%lld）"
+          }
+        }
+      }
+    },
+    "Replaces conflicting variations" : {
+      "comment" : "Warning subtitle shown beneath the Analyze overflow-menu action “Add to conditional moves” when registering the selected variation will replace saved variations because the same opponent move already has a different planned response.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt Varianten mit abweichenden Antworten"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace les variations incompatibles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "競合する変化図を置き換えます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "충돌하는 변화도를 대체합니다"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แทนที่แนวทางการเดินที่ขัดแย้งกัน"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay thế các biến thể xung đột"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换应手冲突的变化"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取代應手衝突的變化"
           }
         }
       }
@@ -21807,6 +21966,59 @@
         }
       }
     },
+    "This removes the selected move and every move after it in this branch. Conditional-move variations in this branch will also be removed." : {
+      "comment" : "Delete-branch confirmation when the selected subtree also contains registered conditional-move variations.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dadurch werden der ausgewählte Zug und alle nachfolgenden Züge in diesem Zweig gelöscht. Bedingte Zugvarianten in diesem Zweig werden ebenfalls entfernt."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette action supprime le coup sélectionné et tous les coups qui le suivent dans cette branche. Les variations de coups conditionnels de cette branche seront également supprimées."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した手と、この分岐でそれ以降に続くすべての手を削除します。この分岐に含まれる先回り着手の変化図も削除されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 수와 이 변화도에서 그 뒤에 이어지는 모든 수를 삭제합니다. 이 변화도에 포함된 조건부 착수 변화도도 함께 제거됩니다."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การดำเนินการนี้จะลบตาที่เลือกและทุกตาที่ตามมาในสายการเดินนี้ รวมถึงแนวทางการเดินหมากแบบมีเงื่อนไขในสายการเดินนี้ด้วย"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thao tác này sẽ xoá nước đi đã chọn và mọi nước đi tiếp theo trong nhánh này. Các biến thể nước đi có điều kiện trong nhánh này cũng sẽ bị xoá."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这会删除所选落子，以及该分支中之后的所有落子。该分支中的条件落子变化也会被移除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會刪除選取的落子，以及此分支中之後的所有落子。此分支中的預測落子變化也會被移除。"
+          }
+        }
+      }
+    },
     "This Widget display a summary of your correspondence games on online-go.com." : {
       "comment" : "Correspondence Games Widget description",
       "localizations" : {
@@ -23125,7 +23337,7 @@
       }
     },
     "vs." : {
-      "comment" : "Versus separator in game summaries and accessibility labels",
+      "comment" : "HistoryGameCell result versus opponent",
       "localizations" : {
         "de" : {
           "stringUnit" : {

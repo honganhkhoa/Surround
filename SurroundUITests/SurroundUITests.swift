@@ -97,13 +97,42 @@ final class SurroundUITests: XCTestCase {
         line: UInt = #line
     ) -> XCUIElement {
         #if targetEnvironment(macCatalyst)
-        return element(
-            catalystTitle,
-            in: app,
-            matching: .menuItem,
+        let menuItems = app.descendants(matching: .menuItem)
+        let exactTitleItem = menuItems
+            .matching(identifier: catalystTitle)
+            .firstMatch
+        if exactTitleItem.exists {
+            return exactTitleItem
+        }
+
+        let compatibleItem = menuItems.matching(
+            NSPredicate(
+                format: "identifier == %@ OR label == %@ OR title == %@ OR value == %@ OR identifier BEGINSWITH %@ OR label BEGINSWITH %@ OR title BEGINSWITH %@ OR value BEGINSWITH %@",
+                catalystTitle,
+                catalystTitle,
+                catalystTitle,
+                catalystTitle,
+                catalystTitle,
+                catalystTitle,
+                catalystTitle,
+                catalystTitle
+            )
+        ).firstMatch
+        let appeared = compatibleItem.waitForExistence(timeout: 10)
+        if !appeared {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – missing menu item \(catalystTitle)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(
+            appeared,
+            "Expected menu item titled \(catalystTitle)",
             file: file,
             line: line
         )
+        return compatibleItem
         #else
         return element(
             accessibilityIdentifier,
@@ -122,23 +151,69 @@ final class SurroundUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        #if targetEnvironment(macCatalyst)
         tap(
-            catalystTitle,
+            analyzeMenuItem(
+                accessibilityIdentifier,
+                catalystTitle: catalystTitle,
+                in: app,
+                file: file,
+                line: line
+            ),
+            description: catalystTitle,
             in: app,
-            matching: .menuItem,
             file: file,
             line: line
         )
-        #else
-        tap(
-            accessibilityIdentifier,
-            in: app,
-            matching: .button,
+    }
+
+    private func assertAnalyzeMenuSubtitle(
+        _ subtitle: String,
+        for menuItem: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let combinedMenuItemText = [
+            menuItem.identifier,
+            menuItem.label,
+            String(describing: menuItem.value),
+        ].joined(separator: " ")
+        if combinedMenuItemText.contains(subtitle) {
+            return
+        }
+
+        let subtitlePredicate = NSPredicate(
+            format: "label CONTAINS %@ OR title CONTAINS %@ OR identifier CONTAINS %@ OR value CONTAINS %@",
+            subtitle,
+            subtitle,
+            subtitle,
+            subtitle
+        )
+        let subtitleElement = menuItem.descendants(matching: .any)
+            .matching(subtitlePredicate)
+            .firstMatch
+        let appeared = subtitleElement.waitForExistence(timeout: 10)
+        if !appeared {
+            let hierarchy = XCTAttachment(
+                string: """
+                Menu item:
+                \(menuItem.debugDescription)
+
+                Application hierarchy:
+                \(app.debugDescription)
+                """
+            )
+            hierarchy.name =
+                "Accessibility hierarchy – missing menu subtitle \(subtitle)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(
+            appeared,
+            "Expected menu subtitle \(subtitle)",
             file: file,
             line: line
         )
-        #endif
     }
 
     private func tapAnalyzeDeleteConfirmation(
@@ -613,7 +688,159 @@ final class SurroundUITests: XCTestCase {
             String(describing: sharedPrefixNode.value).contains("Conditional"),
             "Expected an intermediate path node not to be marked as a conditional variation."
         )
+
+        let conflictingNodeIdentifier = SurroundUITestContract.AccessibilityID
+            .gameAnalysisPosition(
+                baseMoveNumber: SurroundUITestContract
+                    .conditionalMovesFixtureRootMoveNumber,
+                movePath: SurroundUITestContract
+                    .conditionalMovesFixtureConflictingPath
+            )
+        tap(conflictingNodeIdentifier, in: app)
+        assertSelected(conflictingNodeIdentifier, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        let replacingAddItem = analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional,
+            catalystTitle: "Add to conditional moves",
+            in: app
+        )
+        XCTAssertTrue(
+            replacingAddItem.isEnabled,
+            "Expected the conflicting analysis path to be addable."
+        )
+        assertAnalyzeMenuSubtitle(
+            "Replaces conflicting variations",
+            for: replacingAddItem,
+            in: app
+        )
+        dismissPopover(in: app)
+        tap(selectedNodeIdentifier, in: app)
+        assertSelected(selectedNodeIdentifier, in: app)
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        XCTAssertFalse(
+            analyzeMenuItem(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional,
+                catalystTitle: "Add to conditional moves",
+                in: app
+            ).isEnabled
+        )
+        XCTAssertTrue(
+            analyzeMenuItem(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional,
+                catalystTitle: "Remove from conditional moves",
+                in: app
+            ).isEnabled
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional,
+            catalystTitle: "Remove from conditional moves",
+            in: app
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        let addAfterRemoval = analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional,
+            catalystTitle: "Add to conditional moves",
+            in: app
+        )
+        let removedConditionalState = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"),
+            object: addAfterRemoval
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [removedConditionalState], timeout: 10),
+            .completed,
+            "Expected the server echo to remove the selected conditional variation."
+        )
+        XCTAssertFalse(
+            analyzeMenuItem(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional,
+                catalystTitle: "Remove from conditional moves",
+                in: app
+            ).isEnabled
+        )
+        dismissPopover(in: app)
+        XCTAssertFalse(
+            String(describing: element(selectedNodeIdentifier, in: app).value)
+                .contains("Conditional"),
+            "Expected the removed variation endpoint to lose its conditional accessibility value."
+        )
+        assertSelected(selectedNodeIdentifier, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional,
+            catalystTitle: "Add to conditional moves",
+            in: app
+        )
+        let restoredConditionalState = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                String(describing: selectedNode.value).contains("Conditional")
+            },
+            object: selectedNode
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [restoredConditionalState], timeout: 10),
+            .completed,
+            "Expected the server echo to restore the selected conditional variation."
+        )
         keepScreenshot("conditional-analyze-detail-\(idiom)", in: app)
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeDeleteBranch,
+            catalystTitle: "Delete branch",
+            in: app
+        )
+        let conditionalDeleteWarning =
+            "This removes the selected move and every move after it in this branch. "
+            + "Conditional-move variations in this branch will also be removed."
+        let conditionalDeleteWarningText = app.staticTexts
+            .matching(
+                NSPredicate(
+                    format: "label == %@",
+                    conditionalDeleteWarning
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(
+            conditionalDeleteWarningText.waitForExistence(
+                timeout: 10
+            ),
+            "Expected Delete branch to warn about registered conditional variations."
+        )
+        tapAnalyzeDeleteConfirmation(in: app)
+        let deleted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: selectedNode
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [deleted], timeout: 10),
+            .completed,
+            "Expected coordinated deletion to remove the selected branch after the server echo."
+        )
+        assertSelected(
+            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+                baseMoveNumber: SurroundUITestContract
+                    .conditionalMovesFixtureRootMoveNumber,
+                movePath: Array(selectedPath.dropLast())
+            ),
+            in: app
+        )
     }
 
     func testAnalyzeControlBarNavigatesAndDeletesBranch() {

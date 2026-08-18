@@ -644,6 +644,232 @@ final class GameReplayTests: XCTestCase {
         XCTAssertEqual(branch.position.nextToMove, .white)
     }
 
+    func testConditionalMovePlanEditorMergesConflictsAndRemovesLeaves() throws {
+        let ownerID = 7
+        let original = try ConditionalMovePlan(
+            gameID: 50,
+            ownerID: ownerID,
+            rootMoveNumber: 12,
+            paths: [
+                [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 3)],
+                [.pass, .placeStone(4, 4)],
+            ]
+        )
+
+        let mergedSibling = try XCTUnwrap(
+            original.addingCompleteVariation(
+                [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 3), .placeStone(3, 2)],
+                ownerID: ownerID
+            )
+        )
+        XCTAssertEqual(mergedSibling.orderedPaths().map(\.moves), [
+            [.pass, .placeStone(4, 4)],
+            [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 3)],
+            [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 3), .placeStone(3, 2)],
+        ])
+        XCTAssertNil(
+            mergedSibling.addingCompleteVariation(
+                [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 3)],
+                ownerID: ownerID
+            )
+        )
+
+        let replacement = try XCTUnwrap(
+            mergedSibling.addingCompleteVariation(
+                [.placeStone(0, 0), .placeStone(4, 0), .placeStone(0, 4), .placeStone(4, 4)],
+                ownerID: ownerID
+            )
+        )
+        XCTAssertEqual(replacement.orderedPaths().map(\.moves), [
+            [.pass, .placeStone(4, 4)],
+            [.placeStone(0, 0), .placeStone(4, 0), .placeStone(0, 4), .placeStone(4, 4)],
+        ])
+        XCTAssertNil(
+            replacement.addingCompleteVariation(
+                [.placeStone(3, 0)],
+                ownerID: ownerID
+            )
+        )
+
+        let passID = try XCTUnwrap(
+            replacement.orderedPaths().first { $0.moves.first == .pass }
+        ).variationID
+        let withoutPass = try XCTUnwrap(
+            replacement.removingVariations([passID], ownerID: ownerID)
+        )
+        XCTAssertEqual(withoutPass.orderedPaths().count, 1)
+        let lastID = try XCTUnwrap(withoutPass.orderedPaths().first).variationID
+        let empty = try XCTUnwrap(
+            withoutPass.removingVariations([lastID], ownerID: ownerID)
+        )
+        XCTAssertTrue(empty.root.children.isEmpty)
+    }
+
+    func testConditionalMovePlanClassifiesAdditionEffectWithoutRebuilding() throws {
+        let plan = try ConditionalMovePlan(
+            gameID: 50,
+            ownerID: 7,
+            rootMoveNumber: 12,
+            paths: [
+                [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 3)],
+                [.placeStone(0, 0), .placeStone(1, 1), .placeStone(2, 3), .placeStone(3, 2)],
+                [.pass],
+            ]
+        )
+
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(0, 0), .placeStone(1, 1),
+                .placeStone(2, 2), .placeStone(3, 3),
+            ]),
+            .noChange
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(0, 0), .placeStone(1, 1),
+            ]),
+            .noChange
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(0, 0), .placeStone(1, 1),
+                .placeStone(4, 0), .placeStone(0, 4),
+            ]),
+            .addsVariation
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(4, 4), .placeStone(4, 3),
+            ]),
+            .addsVariation
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(0, 0), .placeStone(4, 0),
+            ]),
+            .replacesExistingVariations
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .placeStone(0, 0), .placeStone(1, 1),
+                .placeStone(2, 2), .placeStone(4, 0),
+            ]),
+            .replacesExistingVariations
+        )
+        XCTAssertEqual(
+            plan.additionEffect(byAddingCompleteVariation: [
+                .pass, .placeStone(4, 4),
+            ]),
+            .replacesExistingVariations
+        )
+        XCTAssertNil(
+            plan.additionEffect(
+                byAddingCompleteVariation: [.placeStone(0, 0)]
+            )
+        )
+    }
+
+    func testDeleteBranchCoordinatesConditionalVariationsInItsSubtree() throws {
+        let game = Game(
+            width: 5,
+            height: 5,
+            blackName: "black",
+            whiteName: "white",
+            gameId: .OGS(52)
+        )
+        game.gamePhase = .play
+        let plan = try ConditionalMovePlan(
+            gameID: 52,
+            ownerID: 7,
+            rootMoveNumber: 0,
+            paths: [
+                [.placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 3), .placeStone(4, 4)],
+                [.placeStone(1, 1), .placeStone(2, 2), .placeStone(3, 2), .placeStone(4, 2)],
+                [.pass, .placeStone(0, 0)],
+            ]
+        )
+        XCTAssertTrue(game.setConditionalMovePlan(plan, expectedOwnerID: 7))
+
+        let sharedBranch = try XCTUnwrap(
+            game.conditionalMoveBranches.first {
+                $0.moves.first == .placeStone(1, 1)
+            }
+        )
+        let sharedPrefix = try XCTUnwrap(
+            moveTreePath(
+                from: game.currentPosition,
+                to: sharedBranch.position
+            ).first
+        )
+        let expectedIDs = Set(
+            game.conditionalMoveBranches
+                .filter { $0.moves.first == .placeStone(1, 1) }
+                .map(\.variationID)
+        )
+
+        XCTAssertEqual(
+            game.moveTree.conditionalVariationIDs(
+                inSubtreeStartingAt: sharedPrefix
+            ),
+            expectedIDs
+        )
+        XCTAssertTrue(
+            game.moveTree.canStructurallyRemoveBranch(startingAt: sharedPrefix)
+        )
+        XCTAssertFalse(game.moveTree.canRemoveBranch(startingAt: sharedPrefix))
+        XCTAssertNil(game.moveTree.removeBranch(startingAt: sharedPrefix))
+    }
+
+    func testConditionalMovePlanRemovalRejectsUnknownVariationIDs() throws {
+        let ownerID = 7
+        let owner = OGSUser(username: "white", id: ownerID)
+        let opponent = OGSUser(username: "black", id: 8)
+        let service = OGSService(
+            previewState: .init(user: owner, isLoggedIn: true)
+        )
+        let game = Game(
+            width: 5,
+            height: 5,
+            blackName: opponent.username,
+            whiteName: owner.username,
+            gameId: .OGS(54)
+        )
+        game.blackPlayer = opponent
+        game.whitePlayer = owner
+        game.ogs = service
+        game.gamePhase = .play
+
+        let plan = try ConditionalMovePlan(
+            gameID: 54,
+            ownerID: ownerID,
+            rootMoveNumber: 0,
+            paths: [[.placeStone(1, 1), .placeStone(2, 2)]]
+        )
+        XCTAssertTrue(
+            game.setConditionalMovePlan(plan, expectedOwnerID: ownerID)
+        )
+        let validID = try XCTUnwrap(
+            game.conditionalMoveBranches.first?.variationID
+        )
+        let fabricatedID = ConditionalVariationID(
+            rootMoveNumber: 0,
+            moves: [.placeStone(3, 3), .placeStone(4, 4)]
+        )
+
+        XCTAssertNotNil(
+            game.conditionalMovePlanByRemovingVariations(
+                [validID],
+                ownerID: ownerID
+            )
+        )
+        XCTAssertNil(
+            game.conditionalMovePlanByRemovingVariations(
+                [validID, fabricatedID],
+                ownerID: ownerID
+            )
+        )
+    }
+
     func testConditionalMovePlanRetainsBeforeHydrationAndOnlyProjectsAtLiveRoot() throws {
         let game = Game(
             width: 5,
@@ -970,7 +1196,7 @@ final class GameReplayTests: XCTestCase {
         )
     }
 
-    func testConditionalVariationRefreshIsIdempotentAndPrunesOnlyOldSuffix() throws {
+    func testConditionalVariationRefreshIsIdempotentAndRetainsOldSuffixAsAnalysis() throws {
         let game = Game(
             width: 5,
             height: 5,
@@ -1032,13 +1258,119 @@ final class GameReplayTests: XCTestCase {
 
         XCTAssertTrue(originalPath[0] === replacementPath[0])
         XCTAssertTrue(originalPath[1] === replacementPath[1])
-        XCTAssertFalse(game.moveTree.contains(originalPath[2]))
-        XCTAssertFalse(game.moveTree.contains(originalPath[3]))
+        XCTAssertTrue(game.moveTree.contains(originalPath[2]))
+        XCTAssertTrue(game.moveTree.contains(originalPath[3]))
+        XCTAssertFalse(
+            game.moveTree.isConditionalMovePosition(originalPath[2])
+        )
+        XCTAssertFalse(
+            game.moveTree.isConditionalMovePosition(originalPath[3])
+        )
+        XCTAssertTrue(
+            game.moveTree.canRemoveBranch(startingAt: originalPath[2])
+        )
         XCTAssertTrue(game.moveTree.contains(manualSibling))
         XCTAssertFalse(game.moveTree.isConditionalMovePosition(manualSibling))
     }
 
-    func testClearingConditionalVariationsPreservesManualOverlapAndExtension() throws {
+    func testRemovingSharedConditionalVariationRetainsItsBranchForAnalysis() throws {
+        let game = Game(
+            width: 5,
+            height: 5,
+            blackName: "black",
+            whiteName: "white",
+            gameId: .OGS(53)
+        )
+        game.gamePhase = .play
+        let ownerID = 7
+        let initialPlan = try ConditionalMovePlan(
+            gameID: 53,
+            ownerID: ownerID,
+            rootMoveNumber: 0,
+            paths: [
+                [
+                    .placeStone(1, 1),
+                    .placeStone(2, 2),
+                    .placeStone(3, 3),
+                    .placeStone(4, 4),
+                ],
+                [
+                    .placeStone(1, 1),
+                    .placeStone(2, 2),
+                    .placeStone(3, 2),
+                    .placeStone(4, 2),
+                ],
+            ]
+        )
+        XCTAssertTrue(
+            game.setConditionalMovePlan(
+                initialPlan,
+                expectedOwnerID: ownerID
+            )
+        )
+
+        let removedBranch = try XCTUnwrap(
+            game.conditionalMoveBranches.first {
+                $0.moves[2] == .placeStone(3, 3)
+            }
+        )
+        let retainedBranch = try XCTUnwrap(
+            game.conditionalMoveBranches.first {
+                $0.moves[2] == .placeStone(3, 2)
+            }
+        )
+        let removedPath = moveTreePath(
+            from: game.initialPosition,
+            to: removedBranch.position
+        )
+        let retainedPath = moveTreePath(
+            from: game.initialPosition,
+            to: retainedBranch.position
+        )
+        XCTAssertTrue(removedPath[0] === retainedPath[0])
+        XCTAssertTrue(removedPath[1] === retainedPath[1])
+
+        let reducedPlan = try XCTUnwrap(
+            initialPlan.removingVariations(
+                [removedBranch.variationID],
+                ownerID: ownerID
+            )
+        )
+        XCTAssertTrue(
+            game.setConditionalMovePlan(
+                reducedPlan,
+                expectedOwnerID: ownerID
+            )
+        )
+
+        XCTAssertEqual(
+            game.conditionalMoveBranches.map(\.variationID),
+            [retainedBranch.variationID]
+        )
+        for position in removedPath.dropFirst(2) {
+            XCTAssertTrue(game.moveTree.contains(position))
+            XCTAssertFalse(game.moveTree.isConditionalMovePosition(position))
+        }
+        XCTAssertTrue(
+            game.moveTree.isConditionalMovePosition(removedPath[0])
+        )
+        XCTAssertTrue(
+            game.moveTree.isConditionalMovePosition(removedPath[1])
+        )
+
+        XCTAssertTrue(
+            game.moveTree.canRemoveBranch(startingAt: removedPath[2])
+        )
+        XCTAssertTrue(
+            game.moveTree.removeBranch(startingAt: removedPath[2])
+                === removedPath[1]
+        )
+        XCTAssertFalse(game.moveTree.contains(removedPath[2]))
+        XCTAssertFalse(game.moveTree.contains(removedPath[3]))
+        XCTAssertTrue(game.moveTree.contains(retainedBranch.position))
+    }
+
+    func testClearingConditionalVariationsPreservesProjectedAnalysisBranches() throws {
         let game = Game(
             width: 5,
             height: 5,
@@ -1059,18 +1391,34 @@ final class GameReplayTests: XCTestCase {
             gameID: 48,
             ownerID: nil,
             rootMoveNumber: 0,
-            paths: [[.placeStone(1, 1), .placeStone(2, 2)]]
+            paths: [
+                [.placeStone(1, 1), .placeStone(2, 2)],
+                [.placeStone(0, 0), .placeStone(4, 4)],
+            ]
         )
 
         XCTAssertTrue(game.setConditionalMovePlan(plan))
-        let branch = try XCTUnwrap(game.conditionalMoveBranches.first)
-        XCTAssertTrue(branch.position === manualSecond)
+        let overlappingBranch = try XCTUnwrap(
+            game.conditionalMoveBranches.first {
+                $0.moves == [.placeStone(1, 1), .placeStone(2, 2)]
+            }
+        )
+        let projectedBranch = try XCTUnwrap(
+            game.conditionalMoveBranches.first {
+                $0.moves == [.placeStone(0, 0), .placeStone(4, 4)]
+            }
+        )
+        let projectedPath = moveTreePath(
+            from: game.initialPosition,
+            to: projectedBranch.position
+        )
+        XCTAssertTrue(overlappingBranch.position === manualSecond)
         XCTAssertFalse(game.moveTree.canRemoveBranch(startingAt: manualFirst))
         XCTAssertNil(game.moveTree.removeBranch(startingAt: manualFirst))
 
         let manualExtension = try game.makeMove(
             move: .placeStone(3, 3),
-            fromAnalyticsPosition: branch.position
+            fromAnalyticsPosition: overlappingBranch.position
         )
         game.clearConditionalMoves()
 
@@ -1080,9 +1428,16 @@ final class GameReplayTests: XCTestCase {
         XCTAssertFalse(game.moveTree.isConditionalMovePosition(manualFirst))
         XCTAssertFalse(game.moveTree.isConditionalMovePosition(manualSecond))
         XCTAssertTrue(game.moveTree.canRemoveBranch(startingAt: manualFirst))
+        for position in projectedPath {
+            XCTAssertTrue(game.moveTree.contains(position))
+            XCTAssertFalse(game.moveTree.isConditionalMovePosition(position))
+        }
+        XCTAssertTrue(
+            game.moveTree.canRemoveBranch(startingAt: projectedPath[0])
+        )
     }
 
-    func testAuthoritativeMovePromotesConditionalNodeAndCleansItsFuture() throws {
+    func testAuthoritativeMovePromotesConditionalNodeAndRetainsItsFutureAsAnalysis() throws {
         let game = Game(
             width: 5,
             height: 5,
@@ -1124,8 +1479,13 @@ final class GameReplayTests: XCTestCase {
         XCTAssertFalse(
             game.moveTree.isConditionalMovePosition(projectedPath[0])
         )
-        XCTAssertFalse(game.moveTree.contains(projectedPath[1]))
-        XCTAssertFalse(game.moveTree.contains(projectedPath[3]))
+        for position in projectedPath.dropFirst() {
+            XCTAssertTrue(game.moveTree.contains(position))
+            XCTAssertFalse(game.moveTree.isConditionalMovePosition(position))
+        }
+        XCTAssertTrue(
+            game.moveTree.canRemoveBranch(startingAt: projectedPath[1])
+        )
         XCTAssertTrue(game.conditionalMoveBranches.isEmpty)
         XCTAssertNotNil(game.conditionalMovePlan)
     }

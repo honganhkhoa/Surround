@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFAudio
+import Combine
 
 struct SingleGameView: View {
     var compact: Bool
@@ -43,6 +44,8 @@ struct SingleGameView: View {
     @State var analyticsPendingPosition: BoardPosition? = nil
     
     @State var stonePlacingPlayer: AVAudioPlayer? = nil
+    @State private var conditionalMoveSubmissionCancellable: AnyCancellable?
+    @State private var showingConditionalMoveSubmissionError = false
     
     @Namespace var animation
     
@@ -50,6 +53,14 @@ struct SingleGameView: View {
         case playerInfo
         case chat
         case analyze
+    }
+
+    private struct AnalyzeControlBarConditionalState {
+        var canAdd = false
+        var addReplacesVariations = false
+        var canRemove = false
+        var canDeleteBranch = false
+        var deletesVariations = false
     }
     
     var controlRow: some View {
@@ -250,11 +261,177 @@ struct SingleGameView: View {
     }
 
     var analyzeControlBar: some View {
-        AnalyzeControlBar(
+        let state = analyzeControlBarConditionalState
+        return AnalyzeControlBar(
             moveTree: game.moveTree,
             selectedPosition: $analyticsPosition,
-            analysisAvailable: game.analysisAvailable
+            analysisAvailable: game.analysisAvailable,
+            canAddConditionalMoves: state.canAdd,
+            addReplacesConditionalVariations:
+                state.addReplacesVariations,
+            canRemoveConditionalMoves: state.canRemove,
+            canDeleteSelectedBranch: state.canDeleteBranch,
+            deletesConditionalVariations:
+                state.deletesVariations,
+            addToConditionalMoves: addSelectedVariationToConditionalMoves,
+            removeFromConditionalMoves:
+                removeSelectedVariationFromConditionalMoves,
+            deleteBranch: deleteAnalysisBranch
         )
+    }
+
+    private var conditionalMoveSubmissionPending: Bool {
+        ogs.isConditionalMoveSubmissionPending(gameID: game.ogsID)
+    }
+
+    private var analyzeControlBarConditionalState:
+        AnalyzeControlBarConditionalState {
+        var state = AnalyzeControlBarConditionalState()
+        guard game.analysisAvailable, let analyticsPosition else {
+            return state
+        }
+
+        guard !conditionalMoveSubmissionPending else {
+            return state
+        }
+
+        let canStructurallyDelete =
+            game.moveTree.canStructurallyRemoveBranch(
+                startingAt: analyticsPosition
+            )
+        var selectedVariationIDs = Set<ConditionalVariationID>()
+        if canStructurallyDelete {
+            selectedVariationIDs =
+                game.moveTree.conditionalVariationIDs(
+                    inSubtreeStartingAt: analyticsPosition
+                )
+            state.deletesVariations = !selectedVariationIDs.isEmpty
+            if selectedVariationIDs.isEmpty {
+                state.canDeleteBranch = true
+            }
+        }
+
+        guard let ownerID = ogs.user?.id else {
+            return state
+        }
+
+        let additionEffect = game.conditionalMoveAdditionEffect(
+            endingAt: analyticsPosition,
+            ownerID: ownerID
+        )
+        state.canAdd = additionEffect == .addsVariation
+            || additionEffect == .replacesExistingVariations
+        state.addReplacesVariations =
+            additionEffect == .replacesExistingVariations
+        state.canRemove = game.canRemoveConditionalMoveVariation(
+            endingAt: analyticsPosition,
+            ownerID: ownerID
+        )
+        if canStructurallyDelete && !selectedVariationIDs.isEmpty {
+            state.canDeleteBranch =
+                game.canRemoveConditionalMoveVariations(
+                    selectedVariationIDs,
+                    ownerID: ownerID
+                )
+        }
+        return state
+    }
+
+    private func addSelectedVariationToConditionalMoves() {
+        guard !conditionalMoveSubmissionPending,
+              let analyticsPosition,
+              let ownerID = ogs.user?.id,
+              let plan = game.conditionalMovePlanByAddingVariation(
+                endingAt: analyticsPosition,
+                ownerID: ownerID
+              ) else {
+            return
+        }
+        submitConditionalMovePlan(plan)
+    }
+
+    private func removeSelectedVariationFromConditionalMoves() {
+        guard !conditionalMoveSubmissionPending,
+              let analyticsPosition,
+              let ownerID = ogs.user?.id,
+              let plan = game.conditionalMovePlanByRemovingVariation(
+                endingAt: analyticsPosition,
+                ownerID: ownerID
+              ) else {
+            return
+        }
+        submitConditionalMovePlan(plan)
+    }
+
+    private func deleteAnalysisBranch(startingAt position: BoardPosition) {
+        guard let parentPosition = position.previousPosition,
+              game.moveTree.canStructurallyRemoveBranch(
+                startingAt: position
+              ) else {
+            return
+        }
+
+        let variationIDs = game.moveTree.conditionalVariationIDs(
+            inSubtreeStartingAt: position
+        )
+        guard !variationIDs.isEmpty else {
+            completeAnalysisBranchDeletion(
+                startingAt: position,
+                parentPosition: parentPosition
+            )
+            return
+        }
+        guard let ownerID = ogs.user?.id,
+              let plan = game.conditionalMovePlanByRemovingVariations(
+                variationIDs,
+                ownerID: ownerID
+              ) else {
+            showingConditionalMoveSubmissionError = true
+            return
+        }
+        submitConditionalMovePlan(plan) {
+            completeAnalysisBranchDeletion(
+                startingAt: position,
+                parentPosition: parentPosition,
+                reportsConditionalMoveFailure: true
+            )
+        }
+    }
+
+    private func completeAnalysisBranchDeletion(
+        startingAt position: BoardPosition,
+        parentPosition: BoardPosition,
+        reportsConditionalMoveFailure: Bool = false
+    ) {
+        if game.moveTree.contains(position) {
+            guard let destination = game.moveTree.removeBranch(
+                startingAt: position
+            ) else {
+                if reportsConditionalMoveFailure {
+                    showingConditionalMoveSubmissionError = true
+                }
+                return
+            }
+            analyticsPosition = destination
+        } else if game.moveTree.contains(parentPosition) {
+            analyticsPosition = parentPosition
+        }
+    }
+
+    private func submitConditionalMovePlan(
+        _ plan: ConditionalMovePlan,
+        onSuccess: (() -> Void)? = nil
+    ) {
+        conditionalMoveSubmissionCancellable = ogs
+            .submitConditionalMovePlan(plan, for: game)
+            .sink { completion in
+                if case .failure = completion {
+                    showingConditionalMoveSubmissionError = true
+                }
+                conditionalMoveSubmissionCancellable = nil
+            } receiveValue: {
+                onSuccess?()
+            }
     }
     
     var compactBody: some View {
@@ -631,6 +808,12 @@ struct SingleGameView: View {
                !game.moveTree.contains(analyticsPosition) {
                 self.analyticsPosition = game.currentPosition
             }
+        }
+        .alert(
+            "Couldn’t update conditional moves",
+            isPresented: $showingConditionalMoveSubmissionError
+        ) {} message: {
+            Text("Please try again.")
         }
     }
 }

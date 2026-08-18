@@ -9,6 +9,14 @@ struct AnalyzeControlBar: View {
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
     var analysisAvailable: Bool
+    var canAddConditionalMoves: Bool
+    var addReplacesConditionalVariations: Bool
+    var canRemoveConditionalMoves: Bool
+    var canDeleteSelectedBranch: Bool
+    var deletesConditionalVariations: Bool
+    var addToConditionalMoves: () -> Void
+    var removeFromConditionalMoves: () -> Void
+    var deleteBranch: (BoardPosition) -> Void
 
     @State private var preferredNextPositionByPosition =
         [ObjectIdentifier: BoardPosition]()
@@ -85,13 +93,6 @@ struct AnalyzeControlBar: View {
         )
     }
 
-    private var canDeleteBranch: Bool {
-        guard let selectedPosition else {
-            return false
-        }
-        return moveTree.canRemoveBranch(startingAt: selectedPosition)
-    }
-
     var body: some View {
         HStack(spacing: 2) {
             if analysisAvailable {
@@ -150,6 +151,11 @@ struct AnalyzeControlBar: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
         )
+        .onReceive(moveTree.objectWillChange) {
+            DispatchQueue.main.async {
+                prunePreferredNextPositions()
+            }
+        }
         .confirmationDialog(
             "Delete branch?",
             isPresented: $showingDeleteConfirmation,
@@ -163,7 +169,11 @@ struct AnalyzeControlBar: View {
             )
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the selected move and every move after it in this branch.")
+            if deletesConditionalVariations {
+                Text("This removes the selected move and every move after it in this branch. Conditional-move variations in this branch will also be removed.")
+            } else {
+                Text("This removes the selected move and every move after it in this branch.")
+            }
         }
     }
 
@@ -178,24 +188,33 @@ struct AnalyzeControlBar: View {
                     SurroundUITestContract.AccessibilityID.gameAnalyzeShare
                 )
 
-                Button(action: {}) {
+                Button(action: addToConditionalMoves) {
                     Label(
                         "Add to conditional moves",
-                        systemImage: "plus.circle"
+                        image: "custom.envelope.and.arrow.trianglehead.branch.badge.plus"
                     )
+                    if addReplacesConditionalVariations {
+                        Text("Replaces conflicting variations")
+                    }
                 }
-                .disabled(true)
+                .disabled(!canAddConditionalMoves)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional
                 )
+                .accessibilityLabel(
+                    Text("Add to conditional moves")
+                        + Text(verbatim: ", ")
+                        + Text("Replaces conflicting variations"),
+                    isEnabled: addReplacesConditionalVariations
+                )
 
-                Button(action: {}) {
+                Button(action: removeFromConditionalMoves) {
                     Label(
                         "Remove from conditional moves",
-                        systemImage: "minus.circle"
+                        image: "custom.envelope.and.arrow.trianglehead.branch.badge.minus"
                     )
                 }
-                .disabled(true)
+                .disabled(!canRemoveConditionalMoves)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional
                 )
@@ -207,7 +226,7 @@ struct AnalyzeControlBar: View {
                 } label: {
                     Label("Delete branch", systemImage: "trash")
                 }
-                .disabled(!canDeleteBranch)
+                .disabled(!canDeleteSelectedBranch)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameAnalyzeDeleteBranch
                 )
@@ -253,17 +272,25 @@ struct AnalyzeControlBar: View {
     }
 
     private func deleteSelectedBranch() {
-        guard let selectedPosition,
-              let parentPosition = moveTree.removeBranch(
-                startingAt: selectedPosition
-              ) else {
+        guard let selectedPosition else {
             return
         }
+        deleteBranch(selectedPosition)
+    }
 
-        preferredNextPositionByPosition = preferredNextPositionByPosition
-            .filter { _, position in
-                moveTree.indexByBoardPosition[ObjectIdentifier(position)] != nil
-            }
-        self.selectedPosition = parentPosition
+    private func prunePreferredNextPositions() {
+        let registeredPositionIdentifiers = Set(
+            moveTree.indexByBoardPosition.keys
+        )
+        let retainedPreferences = preferredNextPositionByPosition.filter {
+            identifier, position in
+            registeredPositionIdentifiers.contains(identifier)
+                && registeredPositionIdentifiers.contains(
+                    ObjectIdentifier(position)
+                )
+        }
+        if retainedPreferences.count != preferredNextPositionByPosition.count {
+            preferredNextPositionByPosition = retainedPreferences
+        }
     }
 }
