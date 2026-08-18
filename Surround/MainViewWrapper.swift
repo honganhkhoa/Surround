@@ -173,9 +173,18 @@ private struct CompatibilityScreenshotRootView: View {
     }
 
     private var finishedGame: Game {
-        guard let game = ogs.offlineUITestFinishedGames.first else {
+        let targetGameID = SurroundUITestContract.screenshotHistoryGameIDs[0]
+        guard let game = ogs.offlineUITestFinishedGames.first(where: {
+            $0.ogsID == targetGameID
+        }) else {
             preconditionFailure(
-                "The compatibility fixture is missing its finished game."
+                "The compatibility fixture is missing finished game \(targetGameID)."
+            )
+        }
+        if SurroundUITestContract.simulatesAnalysisDisabled {
+            precondition(
+                game.gameData?.disableAnalysis == true,
+                "The finished playback fixture must disable analysis."
             )
         }
         return game

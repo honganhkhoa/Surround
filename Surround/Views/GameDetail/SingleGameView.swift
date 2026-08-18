@@ -252,7 +252,8 @@ struct SingleGameView: View {
     var analyzeControlBar: some View {
         AnalyzeControlBar(
             moveTree: game.moveTree,
-            selectedPosition: $analyticsPosition
+            selectedPosition: $analyticsPosition,
+            analysisAvailable: game.analysisAvailable
         )
     }
     

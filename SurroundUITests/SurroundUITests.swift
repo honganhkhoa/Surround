@@ -785,6 +785,73 @@ final class SurroundUITests: XCTestCase {
         assertSelected(parentIdentifier, in: app)
     }
 
+    func testPlaybackControlBarOnlyShowsPreviousAndNext() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+            SurroundUITestContract.analysisDisabledLaunchArgument,
+        ])
+
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeNext,
+            in: app,
+            matching: .button
+        )
+
+        for hiddenIdentifier in [
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            SurroundUITestContract.AccessibilityID.gameAnalyzePreviousBranch,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeNextBranch,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeBackToFork,
+        ] {
+            XCTAssertFalse(
+                app.descendants(matching: .any)[hiddenIdentifier].exists,
+                "Expected Playback mode to hide \(hiddenIdentifier)."
+            )
+        }
+    }
+
+    func testFinishedAnalysisDisabledGameShowsFullAnalyzeControlBar() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.finishedGamePlayback.rawValue,
+            SurroundUITestContract.analysisDisabledLaunchArgument,
+        ])
+
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        for visibleIdentifier in [
+            SurroundUITestContract.AccessibilityID.gameAnalyzePreviousBranch,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeNextBranch,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeBackToFork,
+            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeNext,
+        ] {
+            element(
+                visibleIdentifier,
+                in: app,
+                matching: .button
+            )
+        }
+    }
+
     func testFinishedGameOffersRematchEditor() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,

@@ -8,6 +8,7 @@ import SwiftUI
 struct AnalyzeControlBar: View {
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
+    var analysisAvailable: Bool
 
     @State private var preferredNextPositionByPosition =
         [ObjectIdentifier: BoardPosition]()
@@ -93,29 +94,33 @@ struct AnalyzeControlBar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            actionsMenu
+            if analysisAvailable {
+                actionsMenu
+            }
             Spacer(minLength: 8)
-            controlButton(
-                "Previous branch",
-                systemImage: "arrow.up",
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameAnalyzePreviousBranch,
-                destination: previousBranch
-            )
-            controlButton(
-                "Next branch",
-                systemImage: "arrow.down",
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameAnalyzeNextBranch,
-                destination: nextBranch
-            )
-            controlButton(
-                "Back to fork",
-                systemImage: "arrow.turn.left.up",
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameAnalyzeBackToFork,
-                destination: nearestForkDestination
-            )
+            if analysisAvailable {
+                controlButton(
+                    "Previous branch",
+                    systemImage: "arrow.up",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzePreviousBranch,
+                    destination: previousBranch
+                )
+                controlButton(
+                    "Next branch",
+                    systemImage: "arrow.down",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeNextBranch,
+                    destination: nextBranch
+                )
+                controlButton(
+                    "Back to fork",
+                    systemImage: "arrow.turn.left.up",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeBackToFork,
+                    destination: nearestForkDestination
+                )
+            }
             controlButton(
                 "Previous",
                 systemImage: "chevron.left",

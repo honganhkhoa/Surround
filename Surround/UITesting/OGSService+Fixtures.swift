@@ -1186,6 +1186,7 @@ extension OGSService {
         func makeFixtureGame(
             from fixture: AppStoreScreenshotProfileGame,
             clock: AppStoreScreenshotActiveClockFixture,
+            disableAnalysis: Bool = false,
             prefixMoveCount: Int? = nil
         ) -> Game {
             guard var gameData = TestData.Ongoing19x19wBot2.gameData else {
@@ -1210,6 +1211,7 @@ extension OGSService {
             gameData.phase = .play
             gameData.outcome = nil
             gameData.winner = nil
+            gameData.disableAnalysis = disableAnalysis
 
             gameData.timeControl = TimeControlSystem
                 .Simple(perMove: clock.secondsPerMove)
@@ -1344,38 +1346,48 @@ extension OGSService {
         )
         let fixtureGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.copperKoiOpening,
-            clock: copperKoiClock
+            clock: copperKoiClock,
+            disableAnalysis: SurroundUITestContract.simulatesAnalysisDisabled
         )
         precondition(
             fixtureGame.ogsID == SurroundUITestContract.screenshotPrimaryGameID
         )
-        let analysisBaseMoveNumber =
-            SurroundUITestContract.screenshotAnalysisBaseMoveNumber
-        addAnalysisVariation(
-            to: fixtureGame,
-            fromMoveNumber: analysisBaseMoveNumber,
-            coordinates: ["C14", "C12"]
-        )
-        addAnalysisVariation(
-            to: fixtureGame,
-            fromMoveNumber: analysisBaseMoveNumber,
-            coordinates: ["B6", "B7", "B5", "C8"]
-        )
-        let selectedAnalysisPosition = addAnalysisVariation(
-            to: fixtureGame,
-            fromMoveNumber: analysisBaseMoveNumber,
-            coordinates: ["B6", "B7", "B5", "C14", "F17"]
-        )
-        precondition(
-            selectedAnalysisPosition.lastMoveNumber
-                == SurroundUITestContract.screenshotAnalysisSelectedMoveNumber
-        )
-        precondition(
-            selectedAnalysisPosition.lastMove == .placeStone(
-                SurroundUITestContract.screenshotAnalysisSelectedRow,
-                SurroundUITestContract.screenshotAnalysisSelectedColumn
+        if SurroundUITestContract.simulatesAnalysisDisabled {
+            precondition(
+                fixtureGame.positionByLastMoveNumber[
+                    SurroundUITestContract.screenshotAnalysisSelectedMoveNumber
+                ] != nil,
+                "The playback fixture must include its selected main-line move."
             )
-        )
+        } else {
+            let analysisBaseMoveNumber =
+                SurroundUITestContract.screenshotAnalysisBaseMoveNumber
+            addAnalysisVariation(
+                to: fixtureGame,
+                fromMoveNumber: analysisBaseMoveNumber,
+                coordinates: ["C14", "C12"]
+            )
+            addAnalysisVariation(
+                to: fixtureGame,
+                fromMoveNumber: analysisBaseMoveNumber,
+                coordinates: ["B6", "B7", "B5", "C8"]
+            )
+            let selectedAnalysisPosition = addAnalysisVariation(
+                to: fixtureGame,
+                fromMoveNumber: analysisBaseMoveNumber,
+                coordinates: ["B6", "B7", "B5", "C14", "F17"]
+            )
+            precondition(
+                selectedAnalysisPosition.lastMoveNumber
+                    == SurroundUITestContract.screenshotAnalysisSelectedMoveNumber
+            )
+            precondition(
+                selectedAnalysisPosition.lastMove == .placeStone(
+                    SurroundUITestContract.screenshotAnalysisSelectedRow,
+                    SurroundUITestContract.screenshotAnalysisSelectedColumn
+                )
+            )
+        }
         fixtureGame.chatLog = [
             makeChatLine(
                 id: "app-store-chat-1",
@@ -1589,6 +1601,10 @@ extension OGSService {
             gameData.phase = .finished
             gameData.outcome = fixture.outcome
             gameData.winner = fixture.winnerID
+            if SurroundUITestContract.simulatesAnalysisDisabled,
+               fixture.id == SurroundUITestContract.screenshotHistoryGameIDs[0] {
+                gameData.disableAnalysis = true
+            }
 
             let nextPlayerColor: StoneColor = gameData.moves.count.isMultiple(of: 2)
                 ? .black

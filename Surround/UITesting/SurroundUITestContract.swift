@@ -27,6 +27,8 @@ enum SurroundUITestContract {
         "--clear-app-store-screenshot-widget-fixture"
     static let homeHistoryFailsOnceLaunchArgument =
         "--surround-home-history-fails-once"
+    static let analysisDisabledLaunchArgument =
+        "--surround-analysis-disabled"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -132,6 +134,13 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 homeHistoryFailsOnceLaunchArgument
+            )
+    }
+
+    static var simulatesAnalysisDisabled: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                analysisDisabledLaunchArgument
             )
     }
 

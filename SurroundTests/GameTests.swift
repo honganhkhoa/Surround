@@ -77,6 +77,38 @@ class GameTests: XCTestCase {
             weakGame?.ogs = nil
         }
     }
+
+    func testAnalysisAvailabilityRespectsDisabledSettingUntilGameFinishes() throws {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.disableAnalysis = true
+
+        let participant = try XCTUnwrap(game.blackPlayer)
+        let participantService = OGSService.previewInstance(user: participant)
+        withExtendedLifetime(participantService) {
+            game.ogs = participantService
+
+            game.gamePhase = .play
+            XCTAssertTrue(game.isUserPlaying)
+            XCTAssertFalse(game.analysisAvailable)
+
+            game.autoScoringDone = true
+            game.gamePhase = .stoneRemoval
+            XCTAssertFalse(game.analysisAvailable)
+
+            game.gamePhase = .finished
+            XCTAssertTrue(game.analysisAvailable)
+        }
+
+        let spectatorService = OGSService.previewInstance(
+            user: OGSUser(username: "Spectator", id: -1)
+        )
+        withExtendedLifetime(spectatorService) {
+            game.ogs = spectatorService
+            game.gamePhase = .play
+            XCTAssertFalse(game.isUserPlaying)
+            XCTAssertTrue(game.analysisAvailable)
+        }
+    }
     
     static func sampleGame(ogsId: Int) -> Game {
         let fileURL = Bundle(for: GameTests.self).url(forResource: "game-\(ogsId)", withExtension: "json")!
