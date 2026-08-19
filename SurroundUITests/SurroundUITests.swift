@@ -353,14 +353,37 @@ final class SurroundUITests: XCTestCase {
     ) {
         for _ in 0..<4 {
             #if targetEnvironment(macCatalyst)
-            let overlapsTabBar = false
-            #else
-            let overlapsTabBar = element.frame.maxY > app.frame.maxY - 100
-            #endif
-            guard !element.isHittable || overlapsTabBar else {
+            guard !element.isHittable else {
                 return
             }
             app.swipeUp()
+            #else
+            let safeTop = app.frame.minY
+            let safeBottom = app.frame.maxY - 100
+            let overlapsTopEdge = element.frame.minY < safeTop
+            let overlapsTabBar = element.frame.maxY > safeBottom
+
+            guard !element.isHittable
+                    || overlapsTopEdge
+                    || overlapsTabBar else {
+                return
+            }
+
+            if overlapsTopEdge {
+                // XCTest can report a partially clipped LazyVGrid button as
+                // hittable, then dispatch its coordinate tap through another
+                // row. Move the entire target back inside the viewport.
+                let dragStartsAt = app.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.75, dy: 0.35)
+                )
+                let dragEndsAt = app.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.75, dy: 0.50)
+                )
+                dragStartsAt.press(forDuration: 0.05, thenDragTo: dragEndsAt)
+            } else {
+                app.swipeUp()
+            }
+            #endif
         }
     }
 
