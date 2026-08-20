@@ -71,6 +71,66 @@ final class OGSModelDecodingTests: XCTestCase {
         }
     }
 
+    func testAnalysisChatBodyDecodesPackedMovesPassesAndEmptyPaths() throws {
+        let line = try decodeChatLine(
+            body: #"{"type":"analysis","from":7,"moves":"aa..BC","name":"Corner line"}"#
+        )
+
+        XCTAssertEqual(line.body, "Corner line")
+        let variation = try XCTUnwrap(line.variationData)
+        XCTAssertEqual(variation.fromMoveNumber, 7)
+        XCTAssertEqual(variation.moves, "aa..BC")
+        XCTAssertEqual(
+            try variation.decodedMoves(boardWidth: 3, boardHeight: 3),
+            [.placeStone(0, 0), .pass, .placeStone(2, 1)]
+        )
+
+        let emptyLine = try decodeChatLine(
+            body: #"{"type":"analysis","from":0,"moves":"","name":"Empty"}"#
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(emptyLine.variationData).decodedMoves(
+                boardWidth: 19,
+                boardHeight: 19
+            ),
+            []
+        )
+    }
+
+    func testMalformedAnalysisRemainsANameOnlyChatLine() throws {
+        let edited = try decodeChatLine(
+            body: #"{"type":"analysis","from":0,"moves":"!1aa","name":"Edited line"}"#
+        )
+        XCTAssertEqual(edited.body, "Edited line")
+        XCTAssertNil(edited.variation)
+        XCTAssertThrowsError(
+            try XCTUnwrap(edited.variationData).decodedMoves(
+                boardWidth: 19,
+                boardHeight: 19
+            )
+        )
+
+        let missingBase = try decodeChatLine(
+            body: #"{"type":"analysis","moves":"aa","name":"Incomplete line"}"#
+        )
+        XCTAssertEqual(missingBase.body, "Incomplete line")
+        XCTAssertNil(missingBase.variationData)
+        XCTAssertNil(missingBase.variation)
+    }
+
+    func testUnsupportedStructuredChatBodiesFailLineDecoding() {
+        let unsupportedBodies = [
+            #"{"type":"future-analysis","from":0,"moves":"aa","name":"Future line"}"#,
+            #"{"type":"translated","en":"Undo requested"}"#,
+            #"{"type":"review","review_id":123}"#,
+            #"{"type":"unknown","name":"Unknown line"}"#,
+        ]
+
+        for body in unsupportedBodies {
+            XCTAssertThrowsError(try decodeChatLine(body: body), body)
+        }
+    }
+
     func testMoveDecodesMinimalPassAndFullPlayerUpdateShapes() throws {
         let minimal = try decoder.decode(OGSMove.self, from: Data("[3,4]".utf8))
         XCTAssertEqual(minimal.column, 3)
@@ -96,6 +156,26 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertEqual(full.extra?.playerUpdate?.players, .init(black: 1526, white: 1769))
         XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams.black, [1526, 1767, 1765])
         XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams.white, [1769])
+    }
+
+    private func decodeChatLine(body: String) throws -> OGSChatLine {
+        let payload = #"""
+        {
+          "channel": "main",
+          "line": {
+            "body": \#(body),
+            "chat_id": "analysis-chat",
+            "date": 1700000000,
+            "move_number": 12,
+            "player_id": 42,
+            "professional": false,
+            "ranking": 25,
+            "ui_class": "",
+            "username": "chat-tester"
+          }
+        }
+        """#
+        return try decoder.decode(OGSChatLine.self, from: Data(payload.utf8))
     }
 
     func testMoveRejectsIncompleteCoordinates() {

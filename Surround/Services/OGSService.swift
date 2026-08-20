@@ -17,6 +17,8 @@ enum OGSServiceError: Error {
     case notLoggedIn
     case loginError(error: String)
     case staleAuthenticationContext
+    case variationSharingUnavailable
+    case invalidVariation
     case conditionalMovesUpdateUnavailable
     case conditionalMovesUpdateTimedOut
     case conditionalMovesUpdateInterrupted
@@ -230,6 +232,10 @@ extension OGSServiceError: LocalizedError {
             return error
         case .staleAuthenticationContext:
             return "Discarded a response from a previous account"
+        case .variationSharingUnavailable:
+            return "This variation cannot be shared right now"
+        case .invalidVariation:
+            return "This variation is no longer available"
         case .conditionalMovesUpdateUnavailable:
             return "Conditional moves cannot be updated right now"
         case .conditionalMovesUpdateTimedOut:
@@ -237,6 +243,20 @@ extension OGSServiceError: LocalizedError {
         case .conditionalMovesUpdateInterrupted:
             return "Updating conditional moves was interrupted"
         }
+    }
+}
+
+struct OGSGameChatAnalysisPayload: Encodable {
+    let body: OGSChatAnalysisBody
+    let gameID: Int
+    let moveNumber: Int
+    let type: OGSChatSendChannel
+
+    enum CodingKeys: String, CodingKey {
+        case body
+        case gameID = "game_id"
+        case moveNumber = "move_number"
+        case type
     }
 }
 
@@ -355,6 +375,7 @@ class OGSService: ObservableObject {
     private var desiredGameConnections = [Int: DesiredGameConnection]()
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
+    private var locallyReservedVariationNumbersByGameID = [Int: Set<Int>]()
     private var gamesResynchronizingAfterUndo = Set<Int>()
     private var undoResynchronizationTimeouts = [Int: DispatchWorkItem]()
     private var publicGameConnectionIDs = Set<Int>()
@@ -1812,6 +1833,7 @@ class OGSService: ObservableObject {
         finishedGamesSnapshot?.forEach(invalidate)
 
         desiredGameConnections.removeAll()
+        locallyReservedVariationNumbersByGameID.removeAll()
         cancelAllUndoResynchronizations()
         publicGameConnectionIDs.removeAll()
 
@@ -2568,6 +2590,124 @@ class OGSService: ObservableObject {
             }
             promise(.success(()))
         }.eraseToAnyPublisher()
+    }
+
+    func shareVariation(
+        _ variation: Variation,
+        in game: Game,
+        channel: OGSChatSendChannel,
+        name: String
+    ) throws {
+        guard isLoggedIn,
+              user != nil,
+              ogsWebsocket.opened,
+              ogsWebsocket.authenticated,
+              let gameID = game.ogsID,
+              connectedGames[gameID] === game,
+              connectedWithChat[gameID] == true else {
+            throw OGSServiceError.variationSharingUnavailable
+        }
+
+        guard game.moveTree.contains(variation.position),
+              let currentVariation = game.moveTree.variation(
+                to: variation.position
+              ),
+              currentVariation.basePosition === variation.basePosition,
+              currentVariation.moves == variation.moves else {
+            throw OGSServiceError.invalidVariation
+        }
+
+        let encodedMoves: String
+        do {
+            encodedMoves = try Move.moveString(
+                from: variation.moves,
+                boardWidth: game.width,
+                boardHeight: game.height
+            )
+        } catch {
+            throw OGSServiceError.invalidVariation
+        }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveName: String
+        if trimmedName.isEmpty {
+            effectiveName = try nextVariationName(in: game, gameID: gameID)
+        } else {
+            effectiveName = trimmedName
+        }
+
+        let payload = OGSGameChatAnalysisPayload(
+            body: OGSChatAnalysisBody(
+                fromMoveNumber: variation.basePosition.lastMoveNumber,
+                moves: encodedMoves,
+                name: effectiveName
+            ),
+            gameID: gameID,
+            moveNumber: game.currentPosition.lastMoveNumber,
+            type: channel.resolved(isUserPlaying: game.isUserPlaying)
+        )
+        let payloadObject: [String: Any]
+        do {
+            let data = try JSONEncoder().encode(payload)
+            guard let object = try JSONSerialization.jsonObject(with: data)
+                    as? [String: Any] else {
+                throw OGSServiceError.invalidJSON
+            }
+            payloadObject = object
+        } catch let error as OGSServiceError {
+            throw error
+        } catch {
+            throw OGSServiceError.invalidJSON
+        }
+
+        reserveVariationNumber(in: effectiveName, gameID: gameID)
+        ogsWebsocket.emit(command: "game/chat", data: payloadObject)
+    }
+
+    private func nextVariationName(in game: Game, gameID: Int) throws -> String {
+        var usedNumbers = locallyReservedVariationNumbersByGameID[gameID] ?? []
+        usedNumbers.formUnion(game.chatLog.compactMap { line in
+            guard let name = line.variationData?.name else {
+                return nil
+            }
+            return variationNumber(in: name)
+        })
+        guard let highestNumber = usedNumbers.max() else {
+            return "1"
+        }
+        guard highestNumber < Int.max else {
+            throw OGSServiceError.variationSharingUnavailable
+        }
+        return String(highestNumber + 1)
+    }
+
+    private func reserveVariationNumber(in name: String, gameID: Int) {
+        guard let number = variationNumber(in: name) else {
+            return
+        }
+        locallyReservedVariationNumbersByGameID[gameID, default: []].insert(
+            number
+        )
+    }
+
+    private func variationNumber(in name: String) -> Int? {
+        let bytes = Array(name.utf8)
+        guard let firstDigit = bytes.firstIndex(where: { byte in
+            byte >= Character("0").asciiValue!
+                && byte <= Character("9").asciiValue!
+        }) else {
+            return nil
+        }
+
+        let digitBytes = bytes[firstDigit...].prefix { byte in
+            byte >= Character("0").asciiValue!
+                && byte <= Character("9").asciiValue!
+        }
+        guard let number = Int(String(decoding: digitBytes, as: UTF8.self)),
+              number > 0 else {
+            return nil
+        }
+        return number
     }
     
     var playerCacheObservingCancellable: AnyCancellable?

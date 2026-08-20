@@ -39,6 +39,8 @@ struct SingleGameView: View {
     @State var hoveredCoordinates: [[Int]] = []
     
     @State var analyticsPosition: BoardPosition?
+    @State private var selectedChatChannel = OGSChatSendChannel.main
+    @State private var variationShareDraft: VariationShareDraft?
     
     @State var analyticsPendingMove: Move? = nil
     @State var analyticsPendingPosition: BoardPosition? = nil
@@ -62,6 +64,15 @@ struct SingleGameView: View {
         var canDeleteBranch = false
         var deletesVariations = false
     }
+
+    private var variationSharingChannel: OGSChatSendChannel? {
+        guard variationShareDraft != nil else {
+            return nil
+        }
+        return selectedChatChannel.resolved(
+            isUserPlaying: game.isUserPlaying
+        )
+    }
     
     var controlRow: some View {
         GameControlRow(
@@ -69,6 +80,8 @@ struct SingleGameView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
+            variationSharingChannel: variationSharingChannel,
+            cancelVariationSharing: cancelVariationSharingAndReturnToAnalyze,
             stoneRemovalOption: $stoneRemovalOption,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
@@ -81,6 +94,8 @@ struct SingleGameView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
+            variationSharingChannel: variationSharingChannel,
+            cancelVariationSharing: cancelVariationSharingAndReturnToAnalyze,
             stoneRemovalOption: $stoneRemovalOption,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
@@ -94,6 +109,13 @@ struct SingleGameView: View {
                     variation: hoveredVariation,
                     showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
                     highlightCoordinates: hoveredCoordinates
+                )
+            } else if let variationShareDraft {
+                BoardView(
+                    boardPosition: variationShareDraft.variation.position,
+                    variation: variationShareDraft.variation,
+                    showsCoordinate: showsBoardCoordinates
+                        && !(compact && attachedKeyboardVisible)
                 )
             } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || analyzeMode.wrappedValue) {
                 BoardView(
@@ -149,6 +171,10 @@ struct SingleGameView: View {
     private func showConditionalVariation(
         _ branch: ConditionalMoveBranch
     ) {
+        // Choosing another branch is an explicit navigation away from the
+        // variation being shared, so keep that destination instead of letting
+        // the Analyze-mode observer restore the original share snapshot.
+        variationShareDraft = nil
         analyticsPosition = branch.position
         withAnimation {
             if compact {
@@ -156,6 +182,62 @@ struct SingleGameView: View {
             }
             analyzeMode.wrappedValue = true
         }
+    }
+
+    private var canShareSelectedVariation: Bool {
+        guard game.analysisAvailable,
+              ogs.user != nil,
+              let analyticsPosition else {
+            return false
+        }
+        return game.moveTree.variation(to: analyticsPosition) != nil
+    }
+
+    private func beginSharingSelectedVariation() {
+        guard canShareSelectedVariation,
+              let analyticsPosition,
+              let variation = game.moveTree.variation(to: analyticsPosition) else {
+            return
+        }
+
+        analyticsPendingMove = nil
+        analyticsPendingPosition = nil
+        variationShareDraft = VariationShareDraft(
+            gameID: game.ID,
+            variation: variation
+        )
+        withAnimation {
+            if compact {
+                compactDisplayMode = .chat
+                analyzeMode.wrappedValue = false
+            }
+        }
+    }
+
+    private func cancelVariationSharingAndReturnToAnalyze() {
+        guard let draft = variationShareDraft else {
+            return
+        }
+
+        variationShareDraft = nil
+        analyticsPosition = game.ID == draft.gameID
+            && game.moveTree.contains(draft.variation.position)
+            ? draft.variation.position
+            : game.currentPosition
+        withAnimation {
+            if compact {
+                compactDisplayMode = .analyze
+            }
+            analyzeMode.wrappedValue = true
+        }
+    }
+
+    private func finishVariationSharing() {
+        variationShareDraft = nil
+    }
+
+    private func discardVariationSharing() {
+        variationShareDraft = nil
     }
     
     var topLeftPlayerColor: StoneColor {
@@ -249,7 +331,16 @@ struct SingleGameView: View {
     var chatLog: some View {
         VStack(spacing: 0) {
             compactClockHeader
-            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates).zIndex(-1)
+            ChatLog(
+                game: game,
+                hoveredPosition: $hoveredPosition,
+                hoveredVariation: $hoveredVariation,
+                hoveredCoordinates: $hoveredCoordinates,
+                selectedChannel: $selectedChatChannel,
+                variationShareDraft: $variationShareDraft,
+                onVariationShared: finishVariationSharing
+            )
+            .zIndex(-1)
         }
     }
 
@@ -266,6 +357,7 @@ struct SingleGameView: View {
             moveTree: game.moveTree,
             selectedPosition: $analyticsPosition,
             analysisAvailable: game.analysisAvailable,
+            canShareVariation: canShareSelectedVariation,
             canAddConditionalMoves: state.canAdd,
             addReplacesConditionalVariations:
                 state.addReplacesVariations,
@@ -273,6 +365,7 @@ struct SingleGameView: View {
             canDeleteSelectedBranch: state.canDeleteBranch,
             deletesConditionalVariations:
                 state.deletesVariations,
+            shareVariation: beginSharingSelectedVariation,
             addToConditionalMoves: addSelectedVariationToConditionalMoves,
             removeFromConditionalMoves:
                 removeSelectedVariationFromConditionalMoves,
@@ -490,7 +583,18 @@ struct SingleGameView: View {
             }
             Spacer(minLength: 0)
         }
-        .onChange(of: compactDisplayMode) { _, newValue in
+        .onChange(of: compactDisplayMode) { oldValue, newValue in
+            if oldValue == .chat,
+               newValue != .chat,
+               let draft = variationShareDraft {
+                variationShareDraft = nil
+                if newValue == .analyze {
+                    analyticsPosition = game.ID == draft.gameID
+                        && game.moveTree.contains(draft.variation.position)
+                        ? draft.variation.position
+                        : game.currentPosition
+                }
+            }
             withAnimation {
                 shouldHideActiveGamesCarousel.wrappedValue = newValue != .playerInfo
                 if newValue == .analyze, analyticsPosition == nil {
@@ -511,7 +615,15 @@ struct SingleGameView: View {
             let boardSize = min(width - 15 * 2, height - chatHeight - 15 * 3)
             return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
                 HStack(alignment: .top, spacing: 0) {
-                    ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
+                    ChatLog(
+                        game: game,
+                        hoveredPosition: $hoveredPosition,
+                        hoveredVariation: $hoveredVariation,
+                        hoveredCoordinates: $hoveredCoordinates,
+                        selectedChannel: $selectedChatChannel,
+                        variationShareDraft: $variationShareDraft,
+                        onVariationShared: finishVariationSharing
+                    )
                         .frame(height: chatHeight)
                     Spacer(minLength: 15)
                     VStack {
@@ -524,7 +636,8 @@ struct SingleGameView: View {
                             onSelectConditionalVariation:
                                 showConditionalVariation
                         )
-                        if !analyzeMode.wrappedValue {
+                        if !analyzeMode.wrappedValue
+                            || variationShareDraft != nil {
                             Spacer(minLength: 15).frame(maxHeight: 15)
                             controlRow
                         }
@@ -590,7 +703,8 @@ struct SingleGameView: View {
                                         showConditionalVariation
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            if !analyzeMode.wrappedValue {
+                            if !analyzeMode.wrappedValue
+                                || variationShareDraft != nil {
                                 if horizontalPlayerInfoWidth < 350 {
                                     verticalControlRow
                                         .padding(.bottom, -15)
@@ -598,7 +712,15 @@ struct SingleGameView: View {
                                     controlRow
                                 }
                             }
-                            ChatLog(game: game, hoveredPosition: $hoveredPosition, hoveredVariation: $hoveredVariation, hoveredCoordinates: $hoveredCoordinates)
+                            ChatLog(
+                                game: game,
+                                hoveredPosition: $hoveredPosition,
+                                hoveredVariation: $hoveredVariation,
+                                hoveredCoordinates: $hoveredCoordinates,
+                                selectedChannel: $selectedChatChannel,
+                                variationShareDraft: $variationShareDraft,
+                                onVariationShared: finishVariationSharing
+                            )
                         }
                         boardView.frame(width: boardSize, height: boardSize)
                     }.frame(height: boardSize)
@@ -795,13 +917,45 @@ struct SingleGameView: View {
         }
         .onDisappear {
             self.stonePlacingPlayer = nil
+            discardVariationSharing()
         }
         .onChange(of: analyzeMode.wrappedValue) { _, newValue in
-            if newValue, analyticsPosition == nil {
-                analyticsPosition = game.currentPosition
+            if newValue {
+                if let draft = variationShareDraft {
+                    variationShareDraft = nil
+                    analyticsPosition = game.ID == draft.gameID
+                        && game.moveTree.contains(draft.variation.position)
+                        ? draft.variation.position
+                        : game.currentPosition
+                } else if analyticsPosition == nil {
+                    analyticsPosition = game.currentPosition
+                }
             } else if !newValue {
                 analyticsPosition = nil
             }
+        }
+        .onChange(of: analyticsPosition.map(ObjectIdentifier.init)) { _, _ in
+            guard variationShareDraft != nil,
+                  !compact || compactDisplayMode == .analyze else {
+                return
+            }
+
+            // Analyze navigation is an explicit choice to leave the snapshot
+            // being shared. Compact sharing clears this position while it
+            // switches to Chat, so exempt that bookkeeping transition.
+            discardVariationSharing()
+        }
+        .onChange(of: zenMode) { _, newValue in
+            if newValue {
+                discardVariationSharing()
+            }
+        }
+        .onChange(of: game.ID) { _, _ in
+            discardVariationSharing()
+            selectedChatChannel = .main
+        }
+        .onChange(of: ogs.user?.id) { _, _ in
+            discardVariationSharing()
         }
         .onChange(of: game.conditionalMoveBranches.map(\.id)) {
             if let analyticsPosition,

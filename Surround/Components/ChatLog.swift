@@ -8,6 +8,18 @@
 import SwiftUI
 import Combine
 
+struct VariationShareDraft {
+    let gameID: GameID
+    let variation: Variation
+    var name: String
+
+    init(gameID: GameID, variation: Variation, name: String = "") {
+        self.gameID = gameID
+        self.variation = variation
+        self.name = name
+    }
+}
+
 struct ChatLog: View {
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
@@ -15,6 +27,9 @@ struct ChatLog: View {
     var hoveredPosition: Binding<BoardPosition?> = .constant(nil)
     var hoveredVariation: Binding<Variation?> = .constant(nil)
     var hoveredCoordinates: Binding<[[Int]]> = .constant([])
+    var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
+    var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
+    var onVariationShared: () -> Void = {}
     
     @State var atEndOfChat = false
     @State var shouldScrollToEndAfterKeyboardChange = false
@@ -143,7 +158,12 @@ struct ChatLog: View {
                 }.coordinateSpace(name: "scrollView")
             }
             if ogs.user != nil {
-                NewChatInput(game: game)
+                NewChatInput(
+                    game: game,
+                    selectedChannel: selectedChannel,
+                    variationShareDraft: variationShareDraft,
+                    onVariationShared: onVariationShared
+                )
                     .id(game.ID)
             }
         }
@@ -155,18 +175,41 @@ struct ChatLog: View {
 }
 
 struct NewChatInput: View {
+    private enum VariationShareFailure: Hashable, Identifiable {
+        case invalidVariation
+        case unavailable
+        case retryable
+
+        var id: Self { self }
+
+        var message: LocalizedStringResource {
+            switch self {
+            case .invalidVariation:
+                return LocalizedStringResource(
+                    "This variation is no longer available.",
+                    comment: "Message shown when an analyzed variation can no longer be shared because its branch has changed or been removed."
+                )
+            case .unavailable:
+                return LocalizedStringResource(
+                    "This variation cannot be shared right now.",
+                    comment: "Message shown after a temporary connection or account-state problem prevents an analyzed variation from being shared."
+                )
+            case .retryable:
+                return LocalizedStringResource("Please try again.")
+            }
+        }
+    }
+
     var game: Game
     @State private var newChat = ""
     @EnvironmentObject var ogs: OGSService
-    @State private var selectedChannel: OGSChatSendChannel
+    var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
+    var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
+    var onVariationShared: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
     
     @State private var chatSendingCancellable: AnyCancellable?
-
-    init(game: Game, selectedChannel: OGSChatSendChannel = .main) {
-        self.game = game
-        _selectedChannel = State(initialValue: selectedChannel)
-    }
+    @State private var variationShareFailure: VariationShareFailure?
 
     private func channelTitle(_ channel: OGSChatSendChannel) -> LocalizedStringResource {
         switch channel {
@@ -186,11 +229,18 @@ struct NewChatInput: View {
     }
 
     private var selectedChannelTitle: LocalizedStringResource {
-        channelTitle(selectedChannel)
+        channelTitle(selectedChannel.wrappedValue)
     }
 
     private var channelPlaceholder: LocalizedStringResource {
-        switch selectedChannel {
+        if variationShareDraft.wrappedValue != nil {
+            return LocalizedStringResource(
+                "Variation name...",
+                comment: "Single-line game-chat composer placeholder shown while naming an analyzed variation before sharing it; the field may be left blank for an automatic numeric name."
+            )
+        }
+
+        switch selectedChannel.wrappedValue {
         case .main:
             return LocalizedStringResource("Say hi!")
         case .malkovich:
@@ -216,20 +266,38 @@ struct NewChatInput: View {
         subtitle: LocalizedStringResource
     ) -> some View {
         Button {
-            selectedChannel = channel
+            selectedChannel.wrappedValue = channel
         } label: {
             Label {
                 Text(title)
             } icon: {
-                Image(systemName: selectedChannel == channel ? "checkmark.circle.fill" : "circle")
+                Image(systemName: selectedChannel.wrappedValue == channel ? "checkmark.circle.fill" : "circle")
             }
             Text(subtitle)
         }
-        .accessibilityAddTraits(selectedChannel == channel ? .isSelected : [])
+        .accessibilityAddTraits(
+            selectedChannel.wrappedValue == channel ? .isSelected : []
+        )
+        .accessibilityIdentifier(channelAccessibilityIdentifier(channel))
+    }
+
+    private func channelAccessibilityIdentifier(
+        _ channel: OGSChatSendChannel
+    ) -> String {
+        switch channel {
+        case .main:
+            return SurroundUITestContract.AccessibilityID.gameChatChannelMain
+        case .malkovich:
+            return SurroundUITestContract.AccessibilityID
+                .gameChatChannelMalkovich
+        case .personal:
+            return SurroundUITestContract.AccessibilityID
+                .gameChatChannelPersonal
+        }
     }
 
     private var backgroundColor: Color {
-        switch selectedChannel {
+        switch selectedChannel.wrappedValue {
         case .main:
             return Color(.systemBackground)
         case .malkovich:
@@ -239,12 +307,61 @@ struct NewChatInput: View {
         }
     }
 
-    func sendChat() {
+    private var inputText: Binding<String> {
+        if variationShareDraft.wrappedValue != nil {
+            return Binding(
+                get: {
+                    variationShareDraft.wrappedValue?.name ?? ""
+                },
+                set: { name in
+                    guard var draft = variationShareDraft.wrappedValue else {
+                        return
+                    }
+                    draft.name = name
+                    variationShareDraft.wrappedValue = draft
+                }
+            )
+        }
+        return $newChat
+    }
+
+    private var canSend: Bool {
+        variationShareDraft.wrappedValue != nil || !newChat.isEmpty
+    }
+
+    private func send() {
+        if let draft = variationShareDraft.wrappedValue {
+            do {
+                try ogs.shareVariation(
+                    draft.variation,
+                    in: game,
+                    channel: selectedChannel.wrappedValue,
+                    name: draft.name
+                )
+                onVariationShared()
+            } catch let error as OGSServiceError {
+                switch error {
+                case .invalidVariation:
+                    variationShareFailure = .invalidVariation
+                    onVariationShared()
+                case .variationSharingUnavailable:
+                    variationShareFailure = .unavailable
+                default:
+                    variationShareFailure = .retryable
+                }
+            } catch {
+                variationShareFailure = .retryable
+            }
+            return
+        }
+
         guard self.chatSendingCancellable == nil && newChat.count > 0 else {
             return
         }
         
-        let channel = selectedChannel.resolved(isUserPlaying: game.isUserPlaying)
+        let channel = selectedChannel.wrappedValue.resolved(
+            isUserPlaying: game.isUserPlaying
+        )
         self.chatSendingCancellable = ogs.sendChat(in: game, channel: channel, body: newChat)
             .zip(game.$chatLog.setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
@@ -295,6 +412,10 @@ struct NewChatInput: View {
                     }
                 }
                 .layoutPriority(1)
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID
+                        .gameChatChannelPicker
+                )
                 .accessibilityLabel(
                     Text(
                         "Chat channel",
@@ -305,11 +426,11 @@ struct NewChatInput: View {
                 Divider()
                     .frame(height: channelDividerHeight)
             }
-            TextField(text: $newChat) {
+            TextField(text: inputText) {
                 EmptyView()
             }
             .background(alignment: .leading) {
-                if newChat.isEmpty {
+                if inputText.wrappedValue.isEmpty {
                     Text(channelPlaceholder)
                         .foregroundStyle(Color(.placeholderText))
                         .lineLimit(1)
@@ -322,16 +443,23 @@ struct NewChatInput: View {
             .accessibilityLabel(
                 Text(channelPlaceholder)
             )
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameChatInput
+            )
             .layoutPriority(1)
             .submitLabel(.send)
             .onSubmit {
-                self.sendChat()
+                self.send()
             }
-            if self.chatSendingCancellable == nil {
-                Button(action: sendChat) {
+            if variationShareDraft.wrappedValue != nil
+                || self.chatSendingCancellable == nil {
+                Button(action: send) {
                     Image(systemName: "arrow.up.circle.fill")
                 }
-                .disabled(newChat.count == 0)
+                .disabled(!canSend)
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.gameChatSend
+                )
             } else {
                 ProgressView()
             }
@@ -339,58 +467,106 @@ struct NewChatInput: View {
         .padding(.vertical, 5)
         .padding(.horizontal, 10)
         .background(backgroundColor)
+        .alert(
+            String(
+                localized: "Couldn’t share variation",
+                comment: "Alert title shown when sending an analyzed variation to game chat fails."
+            ),
+            isPresented: Binding(
+                get: { variationShareFailure != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        variationShareFailure = nil
+                    }
+                }
+            ),
+            presenting: variationShareFailure
+        ) { _ in
+        } message: {
+            Text($0.message)
+        }
     }
 }
 
 #if DEBUG
 #Preview("New message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.main
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game)
+    return NewChatInput(game: game, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New Malkovich message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.malkovich
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: .malkovich)
+    return NewChatInput(game: game, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New personal message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.personal
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: .personal)
+    return NewChatInput(game: game, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New personal message input — Accessibility", traits: .fixedLayout(width: 350, height: 140)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.personal
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: .personal)
+    return NewChatInput(game: game, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
         .environment(\.dynamicTypeSize, .accessibility3)
 }
 
+#Preview("Variation name input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.main
+    @Previewable @State var variationShareDraft: VariationShareDraft? = {
+        let game = TestData.EuropeanChampionshipWithChat
+        return VariationShareDraft(
+            gameID: game.ID,
+            variation: Variation(
+                position: game.currentPosition,
+                basePosition: game.initialPosition
+            )
+        )
+    }()
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(
+        game: game,
+        selectedChannel: $selectedChannel,
+        variationShareDraft: $variationShareDraft
+    )
+    .environmentObject(ogs)
+}
+
 #Preview("New spectator message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.main
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "spectator", id: -1)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game)
+    return NewChatInput(game: game, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 

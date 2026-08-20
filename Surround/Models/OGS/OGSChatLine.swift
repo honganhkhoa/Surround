@@ -14,7 +14,7 @@ enum OGSChatChannel: String, Decodable {
     case spectator
 }
 
-enum OGSChatSendChannel: String {
+enum OGSChatSendChannel: String, Codable {
     case main
     case malkovich
     case personal
@@ -24,31 +24,57 @@ enum OGSChatSendChannel: String {
     }
 }
 
-struct OGSChatLineVariation: Decodable {
+struct OGSChatAnalysisBody: Codable, Equatable {
     var fromMoveNumber: Int
-    var moves: [Move]
+    var moves: String
     var name: String
     
     enum CodingKeys: String, CodingKey {
+        case type
         case from
         case moves
         case name
     }
+
+    init(fromMoveNumber: Int, moves: String, name: String) {
+        self.fromMoveNumber = fromMoveNumber
+        self.moves = moves
+        self.name = name
+    }
     
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: OGSChatLineVariation.CodingKeys.self)
-        
-        fromMoveNumber = try container.decode(Int.self, forKey: .from)
-        let moveString = try container.decode(String.self, forKey: .moves)
-        // TODO: This is a quick fix for an arithmetic overflow crash that cannot be caught, will handle this case properly when implementing support for board markers.
-        if !moveString.contains("!") && !moveString.contains(".") {
-            moves = Move.fromMoveString(moveString: moveString)
-        } else {
-            moves = []
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decodeIfPresent(String.self, forKey: .type)
+        guard type == nil || type == "analysis" else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "Unsupported structured chat body type"
+            )
         }
-        name = try container.decode(String.self, forKey: .name)
+        fromMoveNumber = try container.decode(Int.self, forKey: .from)
+        moves = try container.decode(String.self, forKey: .moves)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode("analysis", forKey: .type)
+        try container.encode(fromMoveNumber, forKey: .from)
+        try container.encode(moves, forKey: .moves)
+        try container.encode(name, forKey: .name)
+    }
+
+    func decodedMoves(boardWidth: Int, boardHeight: Int) throws -> [Move] {
+        try Move.fromMoveString(
+            moveString: moves,
+            boardWidth: boardWidth,
+            boardHeight: boardHeight
+        )
     }
 }
+
+typealias OGSChatLineVariation = OGSChatAnalysisBody
 
 struct OGSChatLine: Decodable, Identifiable, Hashable {
     var id: String
@@ -61,6 +87,28 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
     var variation: Variation?
     
     struct OGSChatLineCodingData: Decodable, Hashable {
+        private struct NamedStructuredBody: Decodable {
+            var name: String?
+
+            enum CodingKeys: String, CodingKey {
+                case type
+                case name
+            }
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                let type = try container.decode(String.self, forKey: .type)
+                guard type == "analysis" else {
+                    throw DecodingError.dataCorruptedError(
+                        forKey: .type,
+                        in: container,
+                        debugDescription: "Unsupported structured chat body type"
+                    )
+                }
+                name = try container.decodeIfPresent(String.self, forKey: .name)
+            }
+        }
+
         var body: String
         var chatId: String
         var date: Double
@@ -82,6 +130,13 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
             if let variation = try? container.decode(OGSChatLineVariation.self, forKey: .body) {
                 self.body = variation.name
                 self.variation = variation
+            } else if let structuredBody = try? container.decode(
+                NamedStructuredBody.self,
+                forKey: .body
+            ) {
+                // Keep malformed analysis lines visible without inventing a
+                // playable variation from invalid wire data.
+                body = structuredBody.name ?? ""
             } else {
                 body = try container.decode(String.self, forKey: .body)
             }

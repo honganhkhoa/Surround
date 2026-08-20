@@ -147,6 +147,60 @@ final class GameReplayTests: XCTestCase {
         XCTAssertEqual(variation.nonDuplicatingMoveCoordinatesByLabel[2], [2, 1])
     }
 
+    func testChatAnalysisReconstructionUsesSelfCaptureRuleAndKeepsMalformedLinesVisible() throws {
+        var gameData = try loadGameFixture(id: 25_076_729)
+        gameData.gameId = 246
+        gameData.width = 3
+        gameData.height = 3
+        gameData.moves = []
+        gameData.handicap = 0
+        gameData.freeHandicapPlacement = false
+        gameData.initialPlayer = .black
+        gameData.initialState = .init(
+            black: "",
+            white: "baabcbbc"
+        )
+        gameData.allowSelfCapture = true
+
+        let selfCaptureGame = Game(ogsGame: gameData)
+        selfCaptureGame.addChatLine(
+            try decodeAnalysisChatLine(
+                name: "Self capture",
+                from: 0,
+                moves: "bb"
+            )
+        )
+        let selfCaptureLine = try XCTUnwrap(selfCaptureGame.chatLog.last)
+        XCTAssertEqual(selfCaptureLine.body, "Self capture")
+        let selfCaptureVariation = try XCTUnwrap(selfCaptureLine.variation)
+        XCTAssertEqual(selfCaptureVariation.moves, [.placeStone(1, 1)])
+        XCTAssertEqual(selfCaptureVariation.position[1, 1], .empty)
+
+        selfCaptureGame.addChatLine(
+            try decodeAnalysisChatLine(
+                name: "Out of bounds",
+                from: 0,
+                moves: "az"
+            )
+        )
+        let malformedLine = try XCTUnwrap(selfCaptureGame.chatLog.last)
+        XCTAssertEqual(malformedLine.body, "Out of bounds")
+        XCTAssertNotNil(malformedLine.variationData)
+        XCTAssertNil(malformedLine.variation)
+
+        gameData.allowSelfCapture = false
+        let standardGame = Game(ogsGame: gameData)
+        standardGame.addChatLine(
+            try decodeAnalysisChatLine(
+                name: "Illegal self capture",
+                from: 0,
+                moves: "bb"
+            )
+        )
+        XCTAssertEqual(standardGame.chatLog.last?.body, "Illegal self capture")
+        XCTAssertNil(standardGame.chatLog.last?.variation)
+    }
+
     func testMoveTreeNavigationUsesNearestForkAndDisplayedLevels() throws {
         let game = Game(width: 5, height: 5, blackName: "black", whiteName: "white", gameId: .OGS(7))
         let mainPosition1 = try game.makeMove(move: .placeStone(0, 0))
@@ -1538,5 +1592,35 @@ final class GameReplayTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSGame.self, from: data)
+    }
+
+    private func decodeAnalysisChatLine(
+        name: String,
+        from: Int,
+        moves: String
+    ) throws -> OGSChatLine {
+        let payload: [String: Any] = [
+            "channel": "main",
+            "line": [
+                "body": [
+                    "type": "analysis",
+                    "from": from,
+                    "moves": moves,
+                    "name": name,
+                ],
+                "chat_id": "analysis-\(name)",
+                "date": 1_700_000_000.0,
+                "move_number": 0,
+                "player_id": 1,
+                "professional": false,
+                "ranking": 25.0,
+                "ui_class": "",
+                "username": "black",
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(OGSChatLine.self, from: data)
     }
 }

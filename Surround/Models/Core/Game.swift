@@ -1149,9 +1149,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         var line = line
         if let variationData = line.variationData {
             if let basePosition = self.positionByLastMoveNumber[variationData.fromMoveNumber] {
-                if let variation = try? Variation(
+                if let moves = try? variationData.decodedMoves(
+                    boardWidth: width,
+                    boardHeight: height
+                ), let variation = try? Variation(
                     basePosition: basePosition,
-                    moves: variationData.moves
+                    moves: moves,
+                    allowsSelfCapture: gameData?.allowSelfCapture ?? false
                 ) {
                     line.variation = variation
                 }

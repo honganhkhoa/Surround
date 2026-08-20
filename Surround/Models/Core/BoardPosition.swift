@@ -41,15 +41,94 @@ enum Move: Equatable, Hashable {
         }
     }
     
-    static func fromMoveString(moveString: String) -> [Move] {
+    static func fromMoveString(
+        moveString: String,
+        boardWidth: Int,
+        boardHeight: Int
+    ) throws -> [Move] {
+        guard boardWidth > 0, boardHeight > 0 else {
+            throw MoveStringError.invalidBoardSize
+        }
+
+        let bytes = Array(moveString.utf8)
+        guard bytes.count.isMultiple(of: 2) else {
+            throw MoveStringError.oddLength
+        }
+        guard !bytes.contains(Character("!").asciiValue!) else {
+            throw MoveStringError.editedMoveUnsupported
+        }
+
         var result = [Move]()
-        for index in stride(from: 0, to: moveString.count, by: 2) {
-            let column = moveString[moveString.index(moveString.startIndex, offsetBy: index)].asciiValue! - "a".first!.asciiValue!
-            let row = moveString[moveString.index(moveString.startIndex, offsetBy: index + 1)].asciiValue! - "a".first!.asciiValue!
-            result.append(.placeStone(Int(row), Int(column)))
+        result.reserveCapacity(bytes.count / 2)
+        for index in stride(from: 0, to: bytes.count, by: 2) {
+            let columnByte = bytes[index]
+            let rowByte = bytes[index + 1]
+            if columnByte == Character(".").asciiValue!,
+               rowByte == Character(".").asciiValue! {
+                result.append(.pass)
+                continue
+            }
+
+            guard let column = coordinateIndex(from: columnByte),
+                  let row = coordinateIndex(from: rowByte) else {
+                throw MoveStringError.invalidCoordinate
+            }
+            guard column < boardWidth, row < boardHeight else {
+                throw MoveStringError.outOfBounds
+            }
+            result.append(.placeStone(row, column))
         }
         return result
     }
+
+    static func moveString(
+        from moves: [Move],
+        boardWidth: Int,
+        boardHeight: Int
+    ) throws -> String {
+        guard boardWidth > 0, boardHeight > 0 else {
+            throw MoveStringError.invalidBoardSize
+        }
+
+        var result = ""
+        result.reserveCapacity(moves.count * 2)
+        for move in moves {
+            if case .placeStone(let row, let column) = move {
+                guard row >= 0,
+                      column >= 0,
+                      row < boardHeight,
+                      column < boardWidth,
+                      row < coordinateLabels.count,
+                      column < coordinateLabels.count else {
+                    throw MoveStringError.outOfBounds
+                }
+            }
+            result += move.toOGSString()
+        }
+        return result
+    }
+
+    private static func coordinateIndex(from byte: UInt8) -> Int? {
+        let lowercaseA = Character("a").asciiValue!
+        let lowercaseZ = Character("z").asciiValue!
+        let uppercaseA = Character("A").asciiValue!
+        let uppercaseZ = Character("Z").asciiValue!
+        if byte >= lowercaseA, byte <= lowercaseZ {
+            return Int(byte - lowercaseA)
+        }
+        if byte >= uppercaseA, byte <= uppercaseZ {
+            return Int(byte - uppercaseA)
+        }
+        return nil
+    }
+}
+
+enum MoveStringError: Error, Equatable {
+    case invalidBoardSize
+    case oddLength
+    case editedMoveUnsupported
+    case invalidCoordinate
+    case outOfBounds
 }
 
 enum MoveError: Error {

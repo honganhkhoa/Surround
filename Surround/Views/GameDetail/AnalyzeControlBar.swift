@@ -9,11 +9,13 @@ struct AnalyzeControlBar: View {
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
     var analysisAvailable: Bool
+    var canShareVariation: Bool
     var canAddConditionalMoves: Bool
     var addReplacesConditionalVariations: Bool
     var canRemoveConditionalMoves: Bool
     var canDeleteSelectedBranch: Bool
     var deletesConditionalVariations: Bool
+    var shareVariation: () -> Void
     var addToConditionalMoves: () -> Void
     var removeFromConditionalMoves: () -> Void
     var deleteBranch: (BoardPosition) -> Void
@@ -180,10 +182,10 @@ struct AnalyzeControlBar: View {
     private var actionsMenu: some View {
         Menu {
             Section {
-                Button(action: {}) {
+                Button(action: shareVariation) {
                     Label("Share variation in chat", systemImage: "message")
                 }
-                .disabled(true)
+                .disabled(!canShareVariation)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameAnalyzeShare
                 )

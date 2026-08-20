@@ -144,6 +144,208 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    func testShareVariationEmitsTypedPayloadWithOfficialMoveAndTrimmedName() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 242))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.isLoggedIn = true
+        let variation = try makeShareableVariation(in: game)
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+        socket.emissions.removeAll()
+
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .personal,
+            name: "  Study line  \n"
+        )
+
+        XCTAssertEqual(socket.emissions.count, 1)
+        let emission = try XCTUnwrap(socket.emissions.first)
+        XCTAssertEqual(emission.command, "game/chat")
+        XCTAssertFalse(emission.hasResultCallback)
+        let payload = try XCTUnwrap(emission.data as? [String: Any])
+        XCTAssertEqual(payload["game_id"] as? Int, 242)
+        XCTAssertEqual(payload["move_number"] as? Int, 2)
+        XCTAssertEqual(payload["type"] as? String, "personal")
+        let body = try XCTUnwrap(payload["body"] as? [String: Any])
+        XCTAssertEqual(body["type"] as? String, "analysis")
+        XCTAssertEqual(body["from"] as? Int, 1)
+        XCTAssertEqual(body["moves"] as? String, "bb..")
+        XCTAssertEqual(body["name"] as? String, "Study line")
+    }
+
+    func testShareVariationAutoNamesFromReceivedAndReservedNumbersAndResolvesSpectatorChannel() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 243))
+        game.ogs = service
+        service.user = OGSUser(
+            username: "spectator",
+            id: 99,
+            ranking: 25,
+            uiClass: "",
+            professional: false,
+            ratings: nil
+        )
+        service.isLoggedIn = true
+        let variation = try makeShareableVariation(in: game)
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+        socket.deliver(
+            name: "game/243/chat",
+            data: analysisChatEvent(
+                name: "Variation 4",
+                from: 1,
+                moves: "bb.."
+            )
+        )
+        socket.emissions.removeAll()
+
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .personal,
+            name: " \n"
+        )
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .malkovich,
+            name: ""
+        )
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .personal,
+            name: " v12 appendix "
+        )
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .personal,
+            name: ""
+        )
+
+        let chatEmissions = socket.emissions.filter { $0.command == "game/chat" }
+        XCTAssertEqual(chatEmissions.count, 4)
+        XCTAssertEqual(
+            chatEmissions.compactMap {
+                (($0.data as? [String: Any])?["body"] as? [String: Any])?["name"]
+                    as? String
+            },
+            ["5", "6", "v12 appendix", "13"]
+        )
+        XCTAssertEqual(
+            Set(chatEmissions.compactMap {
+                ($0.data as? [String: Any])?["type"] as? String
+            }),
+            ["main"]
+        )
+    }
+
+    func testShareVariationRejectsUnavailableSocketChatAndStaleVariationWithoutEmission() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 244))
+        game.ogs = service
+        service.user = game.blackPlayer
+        let variation = try makeShareableVariation(in: game)
+        service.connect(
+            to: game,
+            withChat: false,
+            owner: .explicit(UUID())
+        )
+        socket.emissions.removeAll()
+
+        XCTAssertThrowsError(
+            try service.shareVariation(
+                variation,
+                in: game,
+                channel: .main,
+                name: "Not logged in"
+            )
+        )
+        service.isLoggedIn = true
+        XCTAssertThrowsError(
+            try service.shareVariation(
+                variation,
+                in: game,
+                channel: .main,
+                name: "No chat"
+            )
+        )
+
+        let chatOwner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, withChat: true, owner: chatOwner)
+        socket.emissions.removeAll()
+        socket.authenticated = false
+        XCTAssertThrowsError(
+            try service.shareVariation(
+                variation,
+                in: game,
+                channel: .main,
+                name: "No auth"
+            )
+        )
+        socket.authenticated = true
+
+        let unregisteredPosition = try game.initialPosition.makeMove(
+            move: .placeStone(4, 4)
+        )
+        let staleVariation = Variation(
+            position: unregisteredPosition,
+            basePosition: game.initialPosition,
+            moves: [.placeStone(4, 4)]
+        )
+        XCTAssertThrowsError(
+            try service.shareVariation(
+                staleVariation,
+                in: game,
+                channel: .main,
+                name: "Stale"
+            )
+        )
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/chat" })
+    }
+
+    func testShareVariationRejectsDifferentGameInstanceForConnectedGameID() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let connectedGame = Game(ogsGame: try makeEmptyGameData(id: 245))
+        let staleGame = Game(ogsGame: try makeEmptyGameData(id: 245))
+        connectedGame.ogs = service
+        staleGame.ogs = service
+        service.user = connectedGame.blackPlayer
+        service.isLoggedIn = true
+        service.connect(
+            to: connectedGame,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+        let staleVariation = try makeShareableVariation(in: staleGame)
+        socket.emissions.removeAll()
+
+        XCTAssertThrowsError(
+            try service.shareVariation(
+                staleVariation,
+                in: staleGame,
+                channel: .main,
+                name: "Stale model"
+            )
+        )
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/chat" })
+    }
+
     func testGameEventsUpdateConnectedGameAndReconnectSubscription() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
@@ -1451,6 +1653,46 @@ final class OGSServiceEventTests: XCTestCase {
             undoResynchronizationTimeout: undoResynchronizationTimeout,
             conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout
         )
+    }
+
+    private func makeShareableVariation(in game: Game) throws -> Variation {
+        let branchPoint = try game.makeMove(move: .placeStone(0, 0))
+        try game.makeMove(move: .placeStone(0, 1))
+        let branch = try game.makeMove(
+            move: .placeStone(1, 1),
+            fromAnalyticsPosition: branchPoint
+        )
+        let terminal = try game.makeMove(
+            move: .pass,
+            fromAnalyticsPosition: branch
+        )
+        return try XCTUnwrap(game.moveTree.variation(to: terminal))
+    }
+
+    private func analysisChatEvent(
+        name: String,
+        from: Int,
+        moves: String
+    ) -> [String: Any] {
+        [
+            "channel": "main",
+            "line": [
+                "body": [
+                    "type": "analysis",
+                    "from": from,
+                    "moves": moves,
+                    "name": name,
+                ],
+                "chat_id": "received-analysis-\(name)",
+                "date": 1_700_000_000.0,
+                "move_number": 2,
+                "player_id": 1,
+                "professional": false,
+                "ranking": 25.0,
+                "ui_class": "",
+                "username": "black",
+            ],
+        ]
     }
 
     private func makeShortGameData(id: Int, phase: String) -> [String: Any] {

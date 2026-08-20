@@ -95,9 +95,104 @@ class BoardPositionTests: XCTestCase {
         XCTAssertEqual(Move.placeStone(2, 4).toOGSString(), "ec")
         XCTAssertEqual(Move.pass.toOGSString(), "..")
         XCTAssertEqual(
-            Move.fromMoveString(moveString: "aaecds"),
+            try Move.fromMoveString(
+                moveString: "aaecds",
+                boardWidth: 19,
+                boardHeight: 19
+            ),
             [.placeStone(0, 0), .placeStone(2, 4), .placeStone(18, 3)]
         )
+        XCTAssertEqual(
+            try Move.fromMoveString(
+                moveString: "..AaBC",
+                boardWidth: 3,
+                boardHeight: 3
+            ),
+            [.pass, .placeStone(0, 0), .placeStone(2, 1)]
+        )
+        XCTAssertEqual(
+            try Move.moveString(
+                from: [.pass, .placeStone(0, 0), .placeStone(2, 1)],
+                boardWidth: 3,
+                boardHeight: 3
+            ),
+            "..aabc"
+        )
+    }
+
+    func testMoveStringRejectsMalformedEditedAndOutOfBoardPaths() throws {
+        XCTAssertThrowsError(
+            try Move.fromMoveString(
+                moveString: "a",
+                boardWidth: 19,
+                boardHeight: 19
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .oddLength)
+        }
+        XCTAssertThrowsError(
+            try Move.fromMoveString(
+                moveString: "!1aa",
+                boardWidth: 19,
+                boardHeight: 19
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .editedMoveUnsupported)
+        }
+        XCTAssertThrowsError(
+            try Move.fromMoveString(
+                moveString: ".a",
+                boardWidth: 19,
+                boardHeight: 19
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .invalidCoordinate)
+        }
+        XCTAssertThrowsError(
+            try Move.fromMoveString(
+                moveString: "af",
+                boardWidth: 5,
+                boardHeight: 5
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .outOfBounds)
+        }
+        XCTAssertThrowsError(
+            try Move.fromMoveString(
+                moveString: "💥",
+                boardWidth: 19,
+                boardHeight: 19
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .invalidCoordinate)
+        }
+        XCTAssertThrowsError(
+            try Move.moveString(
+                from: [.placeStone(5, 0)],
+                boardWidth: 5,
+                boardHeight: 5
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .outOfBounds)
+        }
+        XCTAssertThrowsError(
+            try Move.moveString(
+                from: [.placeStone(-1, 0)],
+                boardWidth: 5,
+                boardHeight: 5
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .outOfBounds)
+        }
+        XCTAssertThrowsError(
+            try Move.moveString(
+                from: [.placeStone(0, 26)],
+                boardWidth: 27,
+                boardHeight: 27
+            )
+        ) { error in
+            XCTAssertEqual(error as? MoveStringError, .outOfBounds)
+        }
     }
 
     static func position(fromVisualStrings visualStrings: [String], nextToMove: StoneColor = .black) -> BoardPosition {
