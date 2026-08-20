@@ -13,6 +13,64 @@ final class OGSModelDecodingTests: XCTestCase {
     }()
     private let conditionalMovesDecoder = JSONDecoder()
 
+    func testChatLineDecodesFourPrimaryInboundChannels() throws {
+        let channels: [OGSChatChannel] = [
+            .main,
+            .malkovich,
+            .personal,
+            .spectator,
+        ]
+
+        for channel in channels {
+            let payload = #"""
+            {
+              "channel": "\#(channel.rawValue)",
+              "line": {
+                "body": "message on \#(channel.rawValue)",
+                "chat_id": "chat-\#(channel.rawValue)",
+                "date": 1700000000,
+                "move_number": 12,
+                "player_id": 42,
+                "professional": false,
+                "ranking": 25,
+                "ui_class": "",
+                "username": "chat-tester"
+              }
+            }
+            """#
+
+            let line = try decoder.decode(
+                OGSChatLine.self,
+                from: Data(payload.utf8)
+            )
+
+            XCTAssertEqual(line.channel, channel)
+            XCTAssertEqual(line.id, "chat-\(channel.rawValue)")
+            XCTAssertEqual(line.body, "message on \(channel.rawValue)")
+            XCTAssertEqual(line.moveNumber, 12)
+            XCTAssertEqual(line.user.id, 42)
+        }
+    }
+
+    func testSendChannelResolutionPreservesPlayerSelectionsAndUsesMainForNonPlayers() {
+        let channels: [OGSChatSendChannel] = [
+            .main,
+            .malkovich,
+            .personal,
+        ]
+
+        for selectedChannel in channels {
+            XCTAssertEqual(
+                selectedChannel.resolved(isUserPlaying: true),
+                selectedChannel
+            )
+            XCTAssertEqual(
+                selectedChannel.resolved(isUserPlaying: false),
+                .main
+            )
+        }
+    }
+
     func testMoveDecodesMinimalPassAndFullPlayerUpdateShapes() throws {
         let minimal = try decoder.decode(OGSMove.self, from: Data("[3,4]".utf8))
         XCTAssertEqual(minimal.column, 3)

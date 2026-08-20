@@ -101,6 +101,49 @@ final class OGSServiceEventTests: XCTestCase {
         super.tearDown()
     }
 
+    func testSendChatEmitsOnlyPrimaryClientChannelsWithCompletePayload() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 42))
+        let channels: [OGSChatSendChannel] = [
+            .main,
+            .malkovich,
+            .personal,
+        ]
+
+        for channel in channels {
+            _ = service.sendChat(
+                in: game,
+                channel: channel,
+                body: "message on \(channel.rawValue)"
+            )
+        }
+
+        let chatEmissions = socket.emissions.filter {
+            $0.command == "game/chat"
+        }
+        XCTAssertEqual(chatEmissions.count, channels.count)
+
+        for (emission, channel) in zip(chatEmissions, channels) {
+            let payload = try XCTUnwrap(emission.data as? [String: Any])
+            XCTAssertEqual(payload["type"] as? String, channel.rawValue)
+            XCTAssertEqual(payload["game_id"] as? Int, 42)
+            XCTAssertEqual(payload["move_number"] as? Int, 0)
+            XCTAssertEqual(
+                payload["body"] as? String,
+                "message on \(channel.rawValue)"
+            )
+            XCTAssertFalse(emission.hasResultCallback)
+        }
+
+        XCTAssertEqual(
+            Set(chatEmissions.compactMap {
+                ($0.data as? [String: Any])?["type"] as? String
+            }),
+            Set(["main", "malkovich", "personal"])
+        )
+    }
+
     func testGameEventsUpdateConnectedGameAndReconnectSubscription() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)

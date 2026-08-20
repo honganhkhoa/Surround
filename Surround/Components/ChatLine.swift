@@ -33,6 +33,49 @@ struct ChatLine: View {
         result.append(AttributedString(String(chatLine.body[index..<chatLine.body.endIndex])))
         return result
     }
+
+    private var bubbleColor: Color {
+        switch chatLine.channel {
+        case .malkovich:
+            return Color(.systemGreen).opacity(0.2)
+        case .personal:
+            return Color(.systemBlue).opacity(0.2)
+        case .main, .spectator:
+            return Color(.systemGray4)
+        }
+    }
+
+    @ViewBuilder
+    private var channelBadge: some View {
+        switch chatLine.channel {
+        case .malkovich:
+            Label {
+                Text("Malkovich", comment: "Name of the game-chat channel whose messages are hidden from the opponent during the game")
+            } icon: {
+                Image(systemName: "eye.slash.fill")
+            }
+            .accessibilityValue(
+                Text(
+                    "Hidden from opponent, visible to spectators",
+                    comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
+                )
+            )
+        case .personal:
+            Label {
+                Text("Personal", comment: "Name of the private game-chat channel visible only to the message author")
+            } icon: {
+                Image(systemName: "lock.fill")
+            }
+            .accessibilityValue(
+                Text(
+                    "Visible only to you",
+                    comment: "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value"
+                )
+            )
+        case .main, .spectator:
+            EmptyView()
+        }
+    }
     
     var body: some View {
         HStack {
@@ -52,6 +95,9 @@ struct ChatLine: View {
                             .foregroundColor(chatLine.user.uiColor)
                     }
                     VStack(alignment: horizontalAlignment, spacing: 2) {
+                        channelBadge
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
                         if let variation = chatLine.variation {
                             BoardView(boardPosition: variation.position, variation: variation)
                                 .frame(width: 176, height: 176)
@@ -62,10 +108,7 @@ struct ChatLine: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(
-                        Color(chatLine.channel == .malkovich ? UIColor.systemGreen : UIColor.systemGray4)
-                            .opacity(chatLine.channel == .malkovich ? 0.8 : 1)
-                    )
+                    .background(bubbleColor)
                     .cornerRadius(10)
                 }
                 if case .leading = horizontalAlignment {
@@ -83,6 +126,19 @@ struct ChatLine: View {
 
 #Preview("Spectator message", traits: .fixedLayout(width: 300, height: 100)) {
     ChatLine(chatLine: TestData.EuropeanChampionshipWithChat.chatLog[30])
+}
+
+#Preview("Malkovich message", traits: .fixedLayout(width: 300, height: 120)) {
+    var chatLine = TestData.EuropeanChampionshipWithChat.chatLog[11]
+    chatLine.channel = .malkovich
+    return ChatLine(chatLine: chatLine)
+}
+
+#Preview("Personal message — Accessibility", traits: .fixedLayout(width: 300, height: 180)) {
+    var chatLine = TestData.EuropeanChampionshipWithChat.chatLog[11]
+    chatLine.channel = .personal
+    return ChatLine(chatLine: chatLine)
+        .environment(\.dynamicTypeSize, .accessibility3)
 }
 
 #Preview("Trailing message — Dark", traits: .fixedLayout(width: 300, height: 100)) {

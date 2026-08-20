@@ -2556,7 +2556,7 @@ class OGSService: ObservableObject {
         }.eraseToAnyPublisher()
     }
     
-    func sendChat(in game: Game, channel: OGSChatChannel, body: String) -> AnyPublisher<Void, Error> {
+    func sendChat(in game: Game, channel: OGSChatSendChannel, body: String) -> AnyPublisher<Void, Error> {
         return Future<Void, Error> { promise in
             if let gameId = game.ogsID {
                 self.ogsWebsocket.emit(command: "game/chat", data: [

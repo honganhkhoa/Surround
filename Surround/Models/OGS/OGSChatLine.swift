@@ -7,10 +7,21 @@
 
 import Foundation
 
-enum OGSChatChannel: String, Codable {
+enum OGSChatChannel: String, Decodable {
     case main
     case malkovich
+    case personal
     case spectator
+}
+
+enum OGSChatSendChannel: String {
+    case main
+    case malkovich
+    case personal
+
+    func resolved(isUserPlaying: Bool) -> OGSChatSendChannel {
+        isUserPlaying ? self : .main
+    }
 }
 
 struct OGSChatLineVariation: Decodable {

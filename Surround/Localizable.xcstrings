@@ -8834,6 +8834,59 @@
         }
       }
     },
+    "Chat channel" : {
+      "comment" : "Accessibility label for the menu that selects who can see a game-chat message",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat-Kanal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal de discussion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットチャンネル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅 채널"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ช่องแชท"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kênh trò chuyện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聊天频道"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聊天頻道"
+          }
+        }
+      }
+    },
     "Chinese" : {
       "comment" : "rules name",
       "localizations" : {
@@ -12897,6 +12950,112 @@
         }
       }
     },
+    "Hidden from opponent during the game" : {
+      "comment" : "Malkovich game-chat visibility; used as the message-field placeholder",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Während der Partie vor deinem Gegner verborgen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invisible pour l’adversaire pendant la partie"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局中は対戦相手に表示されません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대국 중에는 상대에게 보이지 않습니다"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อนจากคู่แข่งระหว่างเกม"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ẩn khỏi đối thủ trong suốt ván đấu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对局期间不向对手显示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對局期間不會向對手顯示"
+          }
+        }
+      }
+    },
+    "Hidden from opponent, visible to spectators" : {
+      "comment" : "Malkovich game-chat visibility; used as the channel subtitle and accessibility value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vor deinem Gegner verborgen, für Zuschauer sichtbar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caché pour l’adversaire, visible aux spectateurs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対戦相手には非公開、観戦者には表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상대에게는 숨김, 관전자에게는 표시"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อนจากคู่แข่ง แต่ผู้ชมมองเห็นได้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ẩn với đối thủ, người xem vẫn thấy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对手不可见，观战者可见"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對手不可見，觀戰者可見"
+          }
+        }
+      }
+    },
     "Hide demo board" : {
       "comment" : "Demo board in settings",
       "localizations" : {
@@ -14317,6 +14476,7 @@
       }
     },
     "Malkovich" : {
+      "comment" : "Name of the game-chat channel whose messages are hidden from the opponent during the game",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -14364,58 +14524,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Malkovich"
-          }
-        }
-      }
-    },
-    "Malkovich log is hidden from your opponent during game, and always visible to you and observers." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Malkovich-Protokoll bleibt während der Partie vor deinem Gegner verborgen und ist für dich und Zuschauer immer sichtbar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le journal Malkovich est invisible pour l'adversaire pendant la partie et visible en tout temps pour vous et les spectateurs."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メモ(対局相手に非公開)。対局終了後に閲覧可。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "말코비치 기록은 대국 중 상대에게 보이지 않으며, 나와 관전자에게는 항상 표시됩니다."
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "บันทึก Malkovich จะซ่อนจากคู่แข่งระหว่างเกม และคุณกับผู้ชมจะมองเห็นได้เสมอ"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ghi chú Malkovich sau khi hết trận đối thủ mới xem được."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "对局期间，留言记录对您的对手不可见，但您和观战者始终可以查看。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Malkovich 紀錄在對局期間不會顯示給你的對手，但你與觀戰者隨時都能看到。"
           }
         }
       }
@@ -15913,58 +16021,6 @@
         }
       }
     },
-    "Note to yourself" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notiz an dich selbst"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Note pour vous-même"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自分へのノート"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "나만 보는 메모"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "บันทึกถึงตัวเอง"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ghi chú cho bạn"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "给自己的备注"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "給自己的備註"
-          }
-        }
-      }
-    },
     "Note: Sounds and voice countdown will not play when your device is in **Silent** mode." : {
       "localizations" : {
         "de" : {
@@ -16850,6 +16906,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次數： "
+          }
+        }
+      }
+    },
+    "Personal" : {
+      "comment" : "Name of the private game-chat channel visible only to the message author",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Persönlich"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인용"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ส่วนตัว"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cá nhân"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人"
           }
         }
       }
@@ -23280,6 +23389,112 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看完整紀錄"
+          }
+        }
+      }
+    },
+    "Visible only to you" : {
+      "comment" : "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur für dich sichtbar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible uniquement pour vous"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分だけに表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나만 볼 수 있습니다"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "มีเพียงคุณเท่านั้นที่มองเห็น"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ mình bạn có thể xem"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅您可见"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅你可見"
+          }
+        }
+      }
+    },
+    "Visible to everyone" : {
+      "comment" : "Subtitle for the public game-chat channel",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für alle sichtbar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible pour tout le monde"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全員に表示されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두가 볼 수 있습니다"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ทุกคนมองเห็นได้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi người đều có thể xem"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有人可见"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有人可見"
           }
         }
       }

@@ -144,6 +144,7 @@ struct ChatLog: View {
             }
             if ogs.user != nil {
                 NewChatInput(game: game)
+                    .id(game.ID)
             }
         }
         .background(
@@ -155,18 +156,95 @@ struct ChatLog: View {
 
 struct NewChatInput: View {
     var game: Game
-    @State var newChat = ""
+    @State private var newChat = ""
     @EnvironmentObject var ogs: OGSService
-    @State var malkovich = false
+    @State private var selectedChannel: OGSChatSendChannel
+    @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
     
-    @State var chatSendingCancellable: AnyCancellable?
+    @State private var chatSendingCancellable: AnyCancellable?
+
+    init(game: Game, selectedChannel: OGSChatSendChannel = .main) {
+        self.game = game
+        _selectedChannel = State(initialValue: selectedChannel)
+    }
+
+    private func channelTitle(_ channel: OGSChatSendChannel) -> LocalizedStringResource {
+        switch channel {
+        case .main:
+            return LocalizedStringResource("Chat")
+        case .malkovich:
+            return LocalizedStringResource(
+                "Malkovich",
+                comment: "Name of the game-chat channel whose messages are hidden from the opponent during the game"
+            )
+        case .personal:
+            return LocalizedStringResource(
+                "Personal",
+                comment: "Name of the private game-chat channel visible only to the message author"
+            )
+        }
+    }
+
+    private var selectedChannelTitle: LocalizedStringResource {
+        channelTitle(selectedChannel)
+    }
+
+    private var channelPlaceholder: LocalizedStringResource {
+        switch selectedChannel {
+        case .main:
+            return LocalizedStringResource("Say hi!")
+        case .malkovich:
+            return LocalizedStringResource(
+                "Hidden from opponent during the game",
+                comment: "Malkovich game-chat visibility; used as the message-field placeholder"
+            )
+        case .personal:
+            return personalVisibilityDescription
+        }
+    }
+
+    private var personalVisibilityDescription: LocalizedStringResource {
+        LocalizedStringResource(
+            "Visible only to you",
+            comment: "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value"
+        )
+    }
+
+    private func channelMenuButton(
+        _ channel: OGSChatSendChannel,
+        title: LocalizedStringResource,
+        subtitle: LocalizedStringResource
+    ) -> some View {
+        Button {
+            selectedChannel = channel
+        } label: {
+            Label {
+                Text(title)
+            } icon: {
+                Image(systemName: selectedChannel == channel ? "checkmark.circle.fill" : "circle")
+            }
+            Text(subtitle)
+        }
+        .accessibilityAddTraits(selectedChannel == channel ? .isSelected : [])
+    }
+
+    private var backgroundColor: Color {
+        switch selectedChannel {
+        case .main:
+            return Color(.systemBackground)
+        case .malkovich:
+            return Color(.systemGreen).opacity(0.2)
+        case .personal:
+            return Color(.systemBlue).opacity(0.2)
+        }
+    }
 
     func sendChat() {
         guard self.chatSendingCancellable == nil && newChat.count > 0 else {
             return
         }
         
-        let channel: OGSChatChannel = game.isUserPlaying ? (malkovich ? .malkovich : .main) : .spectator
+        let channel = selectedChannel.resolved(isUserPlaying: game.isUserPlaying)
         self.chatSendingCancellable = ogs.sendChat(in: game, channel: channel, body: newChat)
             .zip(game.$chatLog.setFailureType(to: Error.self))
             .sink(receiveCompletion: { _ in
@@ -182,38 +260,85 @@ struct NewChatInput: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                if game.isUserPlaying {
-                    Button(action: { malkovich.toggle() }) {
-                        Text(malkovich ? "Malkovich" : "Chat")
+        HStack {
+            if game.isUserPlaying {
+                Menu {
+                    channelMenuButton(
+                        .main,
+                        title: channelTitle(.main),
+                        subtitle: LocalizedStringResource(
+                            "Visible to everyone",
+                            comment: "Subtitle for the public game-chat channel"
+                        )
+                    )
+                    channelMenuButton(
+                        .malkovich,
+                        title: channelTitle(.malkovich),
+                        subtitle: LocalizedStringResource(
+                            "Hidden from opponent, visible to spectators",
+                            comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
+                        )
+                    )
+                    channelMenuButton(
+                        .personal,
+                        title: channelTitle(.personal),
+                        subtitle: personalVisibilityDescription
+                    )
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(selectedChannelTitle)
+                            .lineLimit(1)
+                            .allowsTightening(true)
+                            .minimumScaleFactor(0.8)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2.bold())
                     }
-                    Divider()
                 }
-                TextField(
-                    malkovich ? "Note to yourself" : "Say hi!",
-                    text: $newChat
+                .layoutPriority(1)
+                .accessibilityLabel(
+                    Text(
+                        "Chat channel",
+                        comment: "Accessibility label for the menu that selects who can see a game-chat message"
+                    )
                 )
-                .submitLabel(.send)
-                .onSubmit {
-                    self.sendChat()
+                .accessibilityValue(Text(selectedChannelTitle))
+                Divider()
+                    .frame(height: channelDividerHeight)
+            }
+            TextField(text: $newChat) {
+                EmptyView()
+            }
+            .background(alignment: .leading) {
+                if newChat.isEmpty {
+                    Text(channelPlaceholder)
+                        .foregroundStyle(Color(.placeholderText))
+                        .lineLimit(1)
+                        .allowsTightening(true)
+                        .minimumScaleFactor(0.7)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
-                if self.chatSendingCancellable == nil {
-                    Button(action: sendChat) {
-                        Image(systemName: "arrow.up.circle.fill")
-                    }.disabled(newChat.count == 0)
-                } else {
-                    ProgressView()
+            }
+            .accessibilityLabel(
+                Text(channelPlaceholder)
+            )
+            .layoutPriority(1)
+            .submitLabel(.send)
+            .onSubmit {
+                self.sendChat()
+            }
+            if self.chatSendingCancellable == nil {
+                Button(action: sendChat) {
+                    Image(systemName: "arrow.up.circle.fill")
                 }
-            }.fixedSize(horizontal: false, vertical: true)
-            if malkovich {
-                Text("Malkovich log is hidden from your opponent during game, and always visible to you and observers.")
-                    .font(.caption2)
+                .disabled(newChat.count == 0)
+            } else {
+                ProgressView()
             }
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 10)
-        .background(Color(malkovich ? .systemGreen : .systemBackground))
+        .background(backgroundColor)
     }
 }
 
@@ -221,6 +346,47 @@ struct NewChatInput: View {
 #Preview("New message input", traits: .fixedLayout(width: 350, height: 100)) {
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(game: game)
+        .environmentObject(ogs)
+}
+
+#Preview("New Malkovich message input", traits: .fixedLayout(width: 350, height: 100)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(game: game, selectedChannel: .malkovich)
+        .environmentObject(ogs)
+}
+
+#Preview("New personal message input", traits: .fixedLayout(width: 350, height: 100)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(game: game, selectedChannel: .personal)
+        .environmentObject(ogs)
+}
+
+#Preview("New personal message input — Accessibility", traits: .fixedLayout(width: 350, height: 140)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(game: game, selectedChannel: .personal)
+        .environmentObject(ogs)
+        .environment(\.dynamicTypeSize, .accessibility3)
+}
+
+#Preview("New spectator message input", traits: .fixedLayout(width: 350, height: 100)) {
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "spectator", id: -1)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
