@@ -202,10 +202,10 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
         hasher.combine(id)
     }
 
-    static var coordinatesRegex: NSRegularExpression {
-        let regex = try! NSRegularExpression(pattern: #"\b[abcdefghjklmnopqrstuvwxyz]([1-9]|1[0-9]|2[0-5])\b"#, options: [.caseInsensitive])
-        return regex
-    }
+    static let coordinatesRegex = try! NSRegularExpression(
+        pattern: #"\b[abcdefghjklmnopqrstuvwxyz]([1-9]|1[0-9]|2[0-5])\b"#,
+        options: [.caseInsensitive]
+    )
     
     lazy var coordinatesInBody: [NSTextCheckingResult] = {
         OGSChatLine.coordinatesRegex.matches(

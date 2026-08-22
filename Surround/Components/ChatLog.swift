@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 
 struct VariationShareDraft {
+    let focusRequestID = UUID()
     let gameID: GameID
     let variation: Variation
     var name: String
@@ -20,85 +21,176 @@ struct VariationShareDraft {
     }
 }
 
+struct ChatLogSelection: Hashable {
+    enum Target: Hashable {
+        case move(Int)
+        case chatLine(OGSChatLine.ID)
+    }
+
+    let target: Target
+    let preview: ChatLogSelectionPreview
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.target == rhs.target
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(target)
+    }
+}
+
+struct ChatLogSelectionPreview {
+    var position: BoardPosition?
+    var variation: Variation?
+    var coordinates: [[Int]] = []
+}
+
 struct ChatLog: View {
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
-    var hoveredPosition: Binding<BoardPosition?> = .constant(nil)
-    var hoveredVariation: Binding<Variation?> = .constant(nil)
-    var hoveredCoordinates: Binding<[[Int]]> = .constant([])
+    var selection: Binding<ChatLogSelection?> = .constant(nil)
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
+    var focusInputOnAppear = false
     var onVariationShared: () -> Void = {}
     
     @State var atEndOfChat = false
     @State var shouldScrollToEndAfterKeyboardChange = false
+    @State private var inputDismissalRequest = 0
 
     func shouldMergeChat(at index: Int) -> Bool {
         return index > 0 && game.chatLog[index].moveNumber == game.chatLog[index - 1].moveNumber && game.chatLog[index].user.id == game.chatLog[index - 1].user.id
     }
-    
+
+    private func clearSelection() {
+        selection.wrappedValue = nil
+    }
+
+    private func clearSelectionAndDismissInput() {
+        clearSelection()
+        inputDismissalRequest += 1
+    }
+
+    private func toggleMoveSelection(_ moveNumber: Int) {
+        let target = ChatLogSelection.Target.move(moveNumber)
+        guard selection.wrappedValue?.target != target else {
+            clearSelection()
+            return
+        }
+
+        selection.wrappedValue = ChatLogSelection(
+            target: target,
+            preview: ChatLogSelectionPreview(
+                position: game.positionByLastMoveNumber[moveNumber]
+            )
+        )
+    }
+
+    private func toggleChatLineSelection(_ line: OGSChatLine) {
+        let target = ChatLogSelection.Target.chatLine(line.id)
+        guard selection.wrappedValue?.target != target else {
+            clearSelection()
+            return
+        }
+
+        var line = line
+        selection.wrappedValue = ChatLogSelection(
+            target: target,
+            preview: ChatLogSelectionPreview(
+                position: line.variation?.position,
+                variation: line.variation,
+                coordinates: line.coordinates
+            )
+        )
+    }
+
     var chatLines: some View {
         ForEach(Array(game.chatLog.enumerated()), id: \.1) { index, chatLine in
             if index == 0 || game.chatLog[index - 1].moveNumber != chatLine.moveNumber {
-                ZStack {
-                    Divider()
-                    HStack {
-                        Spacer()
-                        Text("Move \(chatLine.moveNumber)")
-                            .font(.caption2)
-                            .padding(.leading, 5)
-                            .background(Color(colorScheme == .dark ? UIColor.systemBackground : UIColor.systemGray6))
+                let moveTarget = ChatLogSelection.Target.move(
+                    chatLine.moveNumber
+                )
+                Button {
+                    toggleMoveSelection(chatLine.moveNumber)
+                } label: {
+                    ZStack {
+                        Divider()
+                            .allowsHitTesting(false)
+                        HStack {
+                            Spacer()
+                            Text("Move \(chatLine.moveNumber)")
+                                .font(.caption2)
+                                .padding(.leading, 5)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(
+                                            Color(
+                                                colorScheme == .dark
+                                                    ? UIColor.systemBackground
+                                                    : UIColor.systemGray6
+                                            )
+                                        )
+                                }
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(
+                                            selection.wrappedValue?.target
+                                                == moveTarget
+                                                ? Color.accentColor
+                                                : .clear,
+                                            lineWidth: 2
+                                        )
+                                }
+                        }
                     }
-//                                BoardView(boardPosition: game.positionByLastMoveNumber[chatLine.moveNumber]!)
-//                                    .frame(width: 80, height: 80)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
-                .onTapGesture {
-                    // https://stackoverflow.com/questions/57700396/adding-a-drag-gesture-in-swiftui-to-a-view-inside-a-scrollview-blocks-the-scroll#answer-60015111
-                }
-                .gesture(
-                    LongPressGesture(minimumDuration: 0.5).sequenced(before: DragGesture(minimumDistance: 0))
-                        .onChanged { value in
-                            if case .second = value {
-                                hoveredPosition.wrappedValue = game.positionByLastMoveNumber[chatLine.moveNumber]
-                            }
-                        }
-                        .onEnded { _ in
-                            hoveredPosition.wrappedValue = nil
-                        }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selection.wrappedValue?.target == moveTarget
+                        ? .isSelected
+                        : []
+                )
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.gameChatMove(
+                        chatLine.moveNumber
+                    )
                 )
                 Spacer().frame(height: 2)
             }
+            let lineTarget = ChatLogSelection.Target.chatLine(chatLine.id)
             ChatLine(
                 chatLine: chatLine,
                 showUsername: !shouldMergeChat(at: index),
-                horizontalAlignment: ogs.user?.id == chatLine.user.id ? .trailing : .leading
-            )
-            .onTapGesture {
-                // https://stackoverflow.com/questions/57700396/adding-a-drag-gesture-in-swiftui-to-a-view-inside-a-scrollview-blocks-the-scroll#answer-60015111
-            }
-            .gesture(
-                LongPressGesture(minimumDuration: 0.5).sequenced(before: DragGesture(minimumDistance: 0))
-                    .onChanged { value in
-                        if let position = chatLine.variation?.position {
-                            if case .second = value {
-                                hoveredPosition.wrappedValue = position
-                                hoveredVariation.wrappedValue = chatLine.variation
-                            }
-                        }
-                        var chatLine = chatLine
-                        hoveredCoordinates.wrappedValue = chatLine.coordinates
-                    }
-                    .onEnded { _ in
-                        hoveredPosition.wrappedValue = nil
-                        hoveredVariation.wrappedValue = nil
-                        hoveredCoordinates.wrappedValue = []
-                    }
+                horizontalAlignment: ogs.user?.id == chatLine.user.id
+                    ? .trailing
+                    : .leading,
+                isSelected: selection.wrappedValue?.target == lineTarget,
+                accessibilityIdentifier: SurroundUITestContract
+                    .AccessibilityID.gameChatLine(chatLine.id),
+                select: {
+                    toggleChatLineSelection(chatLine)
+                }
             )
             Spacer().frame(height: 2)
         }
     }
-    
+
+    private func selectionStillExists(in chatLog: [OGSChatLine]) -> Bool {
+        guard let target = selection.wrappedValue?.target else {
+            return true
+        }
+
+        switch target {
+        case .move(let moveNumber):
+            return chatLog.contains { $0.moveNumber == moveNumber }
+        case .chatLine(let id):
+            return chatLog.contains { $0.id == id }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             GeometryReader { scrollViewGeometry in
@@ -123,19 +215,35 @@ struct ChatLog: View {
                                         }
                                     }
                                 }
-//                                print("scroll \(geometry.frame(in: .named("scrollView")))")
-//                                print("scrollView \(scrollViewGeometry.size)")
+//                                    print("scroll \(geometry.frame(in: .named("scrollView")))")
+//                                    print("scrollView \(scrollViewGeometry.size)")
                                 return AnyView(EmptyView())
                             }.frame(width: 10, height: 1).id("scrollViewBottom")
                         }
                         .padding(.horizontal, 10)
                         .padding(.top, 10)
                         .padding(.bottom, 0)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: scrollViewGeometry.size.height,
+                            alignment: .top
+                        )
+                        .background {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(
+                                    perform: clearSelectionAndDismissInput
+                                )
+                                .accessibilityHidden(true)
+                        }
                         .onAppear {
                             scrollView.scrollTo("scrollViewBottom")
                             game.markAllChatAsRead()
                         }
                         .onReceive(game.$chatLog) { newChatLog in
+                            if !selectionStillExists(in: newChatLog) {
+                                clearSelection()
+                            }
                             if atEndOfChat {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")
@@ -151,17 +259,24 @@ struct ChatLog: View {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")
                                     self.shouldScrollToEndAfterKeyboardChange = false
-                                }                                
+                                }
                             }
                         }
                     }
-                }.coordinateSpace(name: "scrollView")
+                }
+                .coordinateSpace(name: "scrollView")
+                .scrollDismissesKeyboard(.interactively)
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.gameChatLog
+                )
             }
             if ogs.user != nil {
                 NewChatInput(
                     game: game,
                     selectedChannel: selectedChannel,
                     variationShareDraft: variationShareDraft,
+                    focusInputOnAppear: focusInputOnAppear,
+                    inputDismissalRequest: inputDismissalRequest,
                     onVariationShared: onVariationShared
                 )
                     .id(game.ID)
@@ -171,6 +286,10 @@ struct ChatLog: View {
             Color(colorScheme == .dark ? UIColor.systemBackground : UIColor.systemGray6)
                 .shadow(radius: 2)
         )
+        .onDisappear(perform: clearSelection)
+        .onChange(of: game.ID) { _, _ in
+            clearSelection()
+        }
     }
 }
 
@@ -205,11 +324,20 @@ struct NewChatInput: View {
     @EnvironmentObject var ogs: OGSService
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
+    var focusInputOnAppear = false
+    var inputDismissalRequest = 0
     var onVariationShared: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
     
     @State private var chatSendingCancellable: AnyCancellable?
     @State private var variationShareFailure: VariationShareFailure?
+    @FocusState private var isInputFocused: Bool
+
+    private func focusInput() {
+        DispatchQueue.main.async {
+            isInputFocused = true
+        }
+    }
 
     private func channelTitle(_ channel: OGSChatSendChannel) -> LocalizedStringResource {
         switch channel {
@@ -429,6 +557,7 @@ struct NewChatInput: View {
             TextField(text: inputText) {
                 EmptyView()
             }
+            .focused($isInputFocused)
             .background(alignment: .leading) {
                 if inputText.wrappedValue.isEmpty {
                     Text(channelPlaceholder)
@@ -467,6 +596,20 @@ struct NewChatInput: View {
         .padding(.vertical, 5)
         .padding(.horizontal, 10)
         .background(backgroundColor)
+        .onAppear {
+            if focusInputOnAppear || variationShareDraft.wrappedValue != nil {
+                focusInput()
+            }
+        }
+        .onChange(of: variationShareDraft.wrappedValue?.focusRequestID) {
+            _, focusRequestID in
+            if focusRequestID != nil {
+                focusInput()
+            }
+        }
+        .onChange(of: inputDismissalRequest) {
+            isInputFocused = false
+        }
         .alert(
             String(
                 localized: "Couldn’t share variation",

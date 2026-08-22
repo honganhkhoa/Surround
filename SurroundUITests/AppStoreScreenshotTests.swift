@@ -8,7 +8,7 @@
 import XCTest
 import UIKit
 
-final class AppStoreScreenshotTests: XCTestCase {
+final class AppStoreScreenshotTests: SurroundUITestCase {
     private enum InterfaceStyle {
         case light
         case dark
@@ -67,6 +67,7 @@ final class AppStoreScreenshotTests: XCTestCase {
                 in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
                 app: gameApp
             )
+            dismissCompactChatInputAndWaitForLayout(in: gameApp)
             capture("03-game-chat", in: gameApp)
 
             selectSegment(
@@ -1275,52 +1276,6 @@ final class AppStoreScreenshotTests: XCTestCase {
         screenshot.name = "SpringBoard screenshot – \(name)"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-    }
-
-    private func selectSegment(
-        at index: Int,
-        in identifier: String,
-        app: XCUIApplication,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let controls = app
-            .descendants(matching: .segmentedControl)
-            .matching(identifier: identifier)
-        XCTAssertTrue(
-            controls.firstMatch.waitForExistence(timeout: 10),
-            "Expected a segmented control named \(identifier)",
-            file: file,
-            line: line
-        )
-
-        var hittableSegment: XCUIElement?
-        for controlIndex in 0..<controls.count {
-            let candidate = controls
-                .element(boundBy: controlIndex)
-                .buttons
-                .element(boundBy: index)
-            if candidate.exists && candidate.isHittable {
-                hittableSegment = candidate
-                break
-            }
-        }
-
-        guard let hittableSegment else {
-            XCTFail(
-                "Expected segment \(index) in \(identifier) to be hittable",
-                file: file,
-                line: line
-            )
-            return
-        }
-        XCTAssertTrue(
-            hittableSegment.exists,
-            "Expected segment \(index) in \(identifier)",
-            file: file,
-            line: line
-        )
-        hittableSegment.tap()
     }
 
     @discardableResult

@@ -27,16 +27,15 @@ struct SingleGameView: View {
     @State var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var attachedKeyboardVisible = false
     
-    @State var compactDisplayMode = DisplayMode.playerInfo
+    @Binding var compactDisplayMode: DisplayMode
+    var showsCompactChatBoard = true
     @State var showCompactModeSwitcher = true
     var analyzeMode: Binding<Bool> = .constant(false)
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
 
-    @State var hoveredPosition: BoardPosition? = nil
-    @State var hoveredVariation: Variation? = nil
-    @State var hoveredCoordinates: [[Int]] = []
+    @State private var selectedChatItem: ChatLogSelection?
     
     @State var analyticsPosition: BoardPosition?
     @State private var selectedChatChannel = OGSChatSendChannel.main
@@ -73,6 +72,27 @@ struct SingleGameView: View {
             isUserPlaying: game.isUserPlaying
         )
     }
+
+    private var chatSelection: Binding<ChatLogSelection?> {
+        Binding(
+            get: { selectedChatItem },
+            set: { newSelection in
+                selectedChatItem = newSelection
+                if newSelection != nil {
+                    analyzeMode.wrappedValue = false
+                }
+            }
+        )
+    }
+
+    private var showsCompactHorizontalControlRow: Bool {
+        compactDisplayMode != .analyze
+            && (
+                !attachedKeyboardVisible
+                    || (compactDisplayMode == .chat
+                        && !showsCompactChatBoard)
+            )
+    }
     
     var controlRow: some View {
         GameControlRow(
@@ -102,20 +122,21 @@ struct SingleGameView: View {
     }
     
     var boardView: some View {
-        ZStack {
-            if let hoveredPosition = hoveredPosition {
-                BoardView(
-                    boardPosition: hoveredPosition,
-                    variation: hoveredVariation,
-                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
-                    highlightCoordinates: hoveredCoordinates
-                )
-            } else if let variationShareDraft {
+        let selectedChatPreview = selectedChatItem?.preview
+        return ZStack {
+            if let variationShareDraft {
                 BoardView(
                     boardPosition: variationShareDraft.variation.position,
                     variation: variationShareDraft.variation,
                     showsCoordinate: showsBoardCoordinates
                         && !(compact && attachedKeyboardVisible)
+                )
+            } else if let selectedChatPosition = selectedChatPreview?.position {
+                BoardView(
+                    boardPosition: selectedChatPosition,
+                    variation: selectedChatPreview?.variation,
+                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
+                    highlightCoordinates: selectedChatPreview?.coordinates ?? []
                 )
             } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || analyzeMode.wrappedValue) {
                 BoardView(
@@ -147,7 +168,7 @@ struct SingleGameView: View {
                     newPosition: $pendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
                     stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints,
-                    highlightCoordinates: hoveredCoordinates,
+                    highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     undoRequestCoordinates: game.undoRequestCoordinates
                 )
             }
@@ -175,6 +196,7 @@ struct SingleGameView: View {
         // variation being shared, so keep that destination instead of letting
         // the Analyze-mode observer restore the original share snapshot.
         variationShareDraft = nil
+        selectedChatItem = nil
         analyticsPosition = branch.position
         withAnimation {
             if compact {
@@ -202,6 +224,7 @@ struct SingleGameView: View {
 
         analyticsPendingMove = nil
         analyticsPendingPosition = nil
+        selectedChatItem = nil
         variationShareDraft = VariationShareDraft(
             gameID: game.ID,
             variation: variation
@@ -333,11 +356,10 @@ struct SingleGameView: View {
             compactClockHeader
             ChatLog(
                 game: game,
-                hoveredPosition: $hoveredPosition,
-                hoveredVariation: $hoveredVariation,
-                hoveredCoordinates: $hoveredCoordinates,
+                selection: chatSelection,
                 selectedChannel: $selectedChatChannel,
                 variationShareDraft: $variationShareDraft,
+                focusInputOnAppear: true,
                 onVariationShared: finishVariationSharing
             )
             .zIndex(-1)
@@ -540,50 +562,55 @@ struct SingleGameView: View {
             if compactDisplayMode == .analyze && !attachedKeyboardVisible {
                 analyzeControlBar
             }
-            if !attachedKeyboardVisible && compactDisplayMode != .analyze {
+            if showsCompactHorizontalControlRow {
                 Spacer(minLength: 10).frame(maxHeight: 15)
                 controlRow
                     .padding(.horizontal)
                 Spacer(minLength: 10)
             }
-            if attachedKeyboardVisible && compactBoardSize < 320 {
-                EmptyView()
-            } else {
-                if attachedKeyboardVisible, let blackPlayer = game.currentPlayer(with: .black), let whitePlayer = game.currentPlayer(with: .white) {
-                    HStack(alignment: .top) {
-                        boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
-                        Spacer(minLength: 0)
-                        VStack(alignment: .trailing, spacing: 0) {
-                            HStack {
-                                Text(verbatim: blackPlayer.usernameAndRank)
-                                    .font(.footnote).bold()
-                                    .minimumScaleFactor(0.5)
-
-                                Stone(color: .black, shadowRadius: 2)
-                                    .frame(width: 20, height: 20)
-                            }
-                            Spacer().frame(height: 5)
-                            HStack {
-                                Text(verbatim: whitePlayer.usernameAndRank)
-                                    .font(.footnote).bold()
-                                    .minimumScaleFactor(0.5)
-                                Stone(color: .white, shadowRadius: 2)
-                                    .frame(width: 20, height: 20)
-                            }
-                            Spacer().frame(height: 15)
-                            verticalControlRow
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding([.leading, .trailing])
-                        .padding(.top, 5)
-                    }
+            if compactDisplayMode != .chat || showsCompactChatBoard {
+                if attachedKeyboardVisible && compactBoardSize < 320 {
+                    EmptyView()
                 } else {
-                    boardView.frame(width: compactBoardSize, height: compactBoardSize)
+                    if attachedKeyboardVisible, let blackPlayer = game.currentPlayer(with: .black), let whitePlayer = game.currentPlayer(with: .white) {
+                        HStack(alignment: .top) {
+                            boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
+                            Spacer(minLength: 0)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                HStack {
+                                    Text(verbatim: blackPlayer.usernameAndRank)
+                                        .font(.footnote).bold()
+                                        .minimumScaleFactor(0.5)
+
+                                    Stone(color: .black, shadowRadius: 2)
+                                        .frame(width: 20, height: 20)
+                                }
+                                Spacer().frame(height: 5)
+                                HStack {
+                                    Text(verbatim: whitePlayer.usernameAndRank)
+                                        .font(.footnote).bold()
+                                        .minimumScaleFactor(0.5)
+                                    Stone(color: .white, shadowRadius: 2)
+                                        .frame(width: 20, height: 20)
+                                }
+                                Spacer().frame(height: 15)
+                                verticalControlRow
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding([.leading, .trailing])
+                            .padding(.top, 5)
+                        }
+                    } else {
+                        boardView.frame(width: compactBoardSize, height: compactBoardSize)
+                    }
                 }
             }
             Spacer(minLength: 0)
         }
         .onChange(of: compactDisplayMode) { oldValue, newValue in
+            if oldValue == .chat && newValue != .chat {
+                selectedChatItem = nil
+            }
             if oldValue == .chat,
                newValue != .chat,
                let draft = variationShareDraft {
@@ -617,9 +644,7 @@ struct SingleGameView: View {
                 HStack(alignment: .top, spacing: 0) {
                     ChatLog(
                         game: game,
-                        hoveredPosition: $hoveredPosition,
-                        hoveredVariation: $hoveredVariation,
-                        hoveredCoordinates: $hoveredCoordinates,
+                        selection: chatSelection,
                         selectedChannel: $selectedChatChannel,
                         variationShareDraft: $variationShareDraft,
                         onVariationShared: finishVariationSharing
@@ -714,9 +739,7 @@ struct SingleGameView: View {
                             }
                             ChatLog(
                                 game: game,
-                                hoveredPosition: $hoveredPosition,
-                                hoveredVariation: $hoveredVariation,
-                                hoveredCoordinates: $hoveredCoordinates,
+                                selection: chatSelection,
                                 selectedChannel: $selectedChatChannel,
                                 variationShareDraft: $variationShareDraft,
                                 onVariationShared: finishVariationSharing
@@ -918,9 +941,11 @@ struct SingleGameView: View {
         .onDisappear {
             self.stonePlacingPlayer = nil
             discardVariationSharing()
+            selectedChatItem = nil
         }
         .onChange(of: analyzeMode.wrappedValue) { _, newValue in
             if newValue {
+                selectedChatItem = nil
                 if let draft = variationShareDraft {
                     variationShareDraft = nil
                     analyticsPosition = game.ID == draft.gameID
@@ -934,9 +959,16 @@ struct SingleGameView: View {
                 analyticsPosition = nil
             }
         }
-        .onChange(of: analyticsPosition.map(ObjectIdentifier.init)) { _, _ in
+        .onChange(of: analyticsPosition.map(ObjectIdentifier.init)) { _, newPositionID in
             guard variationShareDraft != nil,
                   !compact || compactDisplayMode == .analyze else {
+                return
+            }
+
+            // Selecting a chat preview exits Analyze by clearing its position.
+            // Keep the sharing snapshot for that mode transition; a real tree
+            // navigation still supplies a new position and ends sharing.
+            if newPositionID == nil, selectedChatItem != nil {
                 return
             }
 
@@ -948,10 +980,12 @@ struct SingleGameView: View {
         .onChange(of: zenMode) { _, newValue in
             if newValue {
                 discardVariationSharing()
+                selectedChatItem = nil
             }
         }
         .onChange(of: game.ID) { _, _ in
             discardVariationSharing()
+            selectedChatItem = nil
             selectedChatChannel = .main
         }
         .onChange(of: ogs.user?.id) { _, _ in
@@ -975,26 +1009,8 @@ struct SingleGameView: View {
 #if DEBUG
 #Preview("Play — Player info", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    let game = TestData.Ongoing19x19wBot3
-    let ogs = OGSService.previewInstance(
-        user: OGSUser(username: "kata-bot", id: 592684),
-        activeGames: [game]
-    )
-
-    NavigationView {
-        SingleGameView(
-            compact: true,
-            compactBoardSize: 390,
-            game: game,
-            zenMode: $zenMode
-        )
-        .navigationBarTitleDisplayMode(.inline)
-    }
-    .environmentObject(ogs)
-}
-
-#Preview("Play — Analysis", traits: .fixedLayout(width: 390, height: 844)) {
-    @Previewable @State var zenMode = false
+    @Previewable @State var compactDisplayMode =
+        SingleGameView.DisplayMode.playerInfo
     let game = TestData.Ongoing19x19wBot3
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "kata-bot", id: 592684),
@@ -1007,7 +1023,30 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: .analyze
+            compactDisplayMode: $compactDisplayMode
+        )
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    .environmentObject(ogs)
+}
+
+#Preview("Play — Analysis", traits: .fixedLayout(width: 390, height: 844)) {
+    @Previewable @State var zenMode = false
+    @Previewable @State var compactDisplayMode =
+        SingleGameView.DisplayMode.analyze
+    let game = TestData.Ongoing19x19wBot3
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "kata-bot", id: 592684),
+        activeGames: [game]
+    )
+
+    NavigationView {
+        SingleGameView(
+            compact: true,
+            compactBoardSize: 390,
+            game: game,
+            zenMode: $zenMode,
+            compactDisplayMode: $compactDisplayMode
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1016,6 +1055,8 @@ struct SingleGameView: View {
 
 #Preview("Finished game — Chat", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @State var compactDisplayMode =
+        SingleGameView.DisplayMode.chat
     let game = TestData.EuropeanChampionshipWithChat
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950),
@@ -1028,7 +1069,7 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: .chat
+            compactDisplayMode: $compactDisplayMode
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1037,6 +1078,8 @@ struct SingleGameView: View {
 
 #Preview("Stone removal", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @State var compactDisplayMode =
+        SingleGameView.DisplayMode.playerInfo
     let game = TestData.StoneRemoval9x9
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "HongAnhKhoa", id: 314459),
@@ -1048,7 +1091,8 @@ struct SingleGameView: View {
             compact: true,
             compactBoardSize: 390,
             game: game,
-            zenMode: $zenMode
+            zenMode: $zenMode,
+            compactDisplayMode: $compactDisplayMode
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1057,6 +1101,8 @@ struct SingleGameView: View {
 
 #Preview("Finished game — Score and playback", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @State var compactDisplayMode =
+        SingleGameView.DisplayMode.playerInfo
     let game = TestData.Scored19x19Korean
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "HongAnhKhoa", id: 314459),
@@ -1068,7 +1114,8 @@ struct SingleGameView: View {
             compact: true,
             compactBoardSize: 390,
             game: game,
-            zenMode: $zenMode
+            zenMode: $zenMode,
+            compactDisplayMode: $compactDisplayMode
         )
         .navigationBarTitleDisplayMode(.inline)
     }

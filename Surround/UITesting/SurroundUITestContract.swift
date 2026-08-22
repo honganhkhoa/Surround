@@ -29,6 +29,10 @@ enum SurroundUITestContract {
         "--surround-home-history-fails-once"
     static let analysisDisabledLaunchArgument =
         "--surround-analysis-disabled"
+    static let compactGameLayoutLaunchArgument =
+        "--surround-compact-game-layout"
+    static let attachedSoftwareKeyboardVisibleLaunchArgument =
+        "--surround-attached-software-keyboard-visible"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -142,6 +146,20 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 analysisDisabledLaunchArgument
+            )
+    }
+
+    static var forcesCompactGameLayout: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                compactGameLayoutLaunchArgument
+            )
+    }
+
+    static var simulatesAttachedSoftwareKeyboardVisible: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                attachedSoftwareKeyboardVisibleLaunchArgument
             )
     }
 
@@ -390,10 +408,19 @@ enum SurroundUITestContract {
         static let gameChatChannelMain = "game.chat.channel.main"
         static let gameChatChannelMalkovich = "game.chat.channel.malkovich"
         static let gameChatChannelPersonal = "game.chat.channel.personal"
+        static let gameChatLog = "game.chat.log"
+        static func gameChatMove(_ moveNumber: Int) -> String {
+            "game.chat.move.\(moveNumber)"
+        }
+        static func gameChatLine(_ id: String) -> String {
+            "game.chat.line.\(id)"
+        }
         static let gameChatInput = "game.chat.input"
         static let gameChatSend = "game.chat.send"
         static let gameVariationShareStatus = "game.variationShare.status"
         static let gameVariationShareCancel = "game.variationShare.cancel"
+        static let gameChatBoardHide = "game.chat.board.hide"
+        static let gameChatBoardShow = "game.chat.board.show"
         static let gameOptions = "game.options"
         static let gameActionsMenu = "game.actions"
         static let gameNext = "game.next"

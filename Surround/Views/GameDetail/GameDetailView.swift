@@ -28,10 +28,23 @@ struct GameDetailView: View {
     @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
     @State var analyzeMode = false
+    @State private var compactDisplayMode =
+        SingleGameView.DisplayMode.playerInfo
+    @State private var showsCompactChatBoard = true
 
     @ObservedObject var settings = userDefaults
     
     var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
+
+    private var effectiveAttachedKeyboardVisible: Bool {
+        #if DEBUG && MAIN_APP
+        attachedKeyboardVisible
+            || SurroundUITestContract
+                .simulatesAttachedSoftwareKeyboardVisible
+        #else
+        attachedKeyboardVisible
+        #endif
+    }
 
     var shouldShowActiveGamesCarousel: Bool {
         guard allowsActiveGamesCarousel else {
@@ -144,7 +157,10 @@ struct GameDetailView: View {
                         goToNextGame: goToNextGame,
                         zenMode: $zenMode,
                         exitZenMode: self.exitZenMode,
-                        attachedKeyboardVisible: self.attachedKeyboardVisible,
+                        attachedKeyboardVisible:
+                            self.effectiveAttachedKeyboardVisible,
+                        compactDisplayMode: $compactDisplayMode,
+                        showsCompactChatBoard: showsCompactChatBoard,
                         analyzeMode: self.$analyzeMode,
                         shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
                     )
@@ -158,7 +174,9 @@ struct GameDetailView: View {
     
     var regularBody: some View {
         GeometryReader { geometry -> AnyView in
-            let showsActiveGamesCarousel = !attachedKeyboardVisible && shouldShowActiveGamesCarousel
+            let showsActiveGamesCarousel =
+                !effectiveAttachedKeyboardVisible
+                    && shouldShowActiveGamesCarousel
             let horizontal = geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing + 100 > geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
             return AnyView(erasing: VStack(spacing: 0) {
@@ -173,7 +191,10 @@ struct GameDetailView: View {
                         horizontal: horizontal,
                         zenMode: $zenMode,
                         exitZenMode: self.exitZenMode,
-                        attachedKeyboardVisible: self.attachedKeyboardVisible,
+                        attachedKeyboardVisible:
+                            self.effectiveAttachedKeyboardVisible,
+                        compactDisplayMode: $compactDisplayMode,
+                        showsCompactChatBoard: showsCompactChatBoard,
                         analyzeMode: self.$analyzeMode
                     )
                 }
@@ -196,7 +217,13 @@ struct GameDetailView: View {
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
         #endif
-        let navigationBarHidden = (attachedKeyboardVisible && !compactLayout) || zenMode
+        #if DEBUG && MAIN_APP
+        if SurroundUITestContract.forcesCompactGameLayout {
+            compactLayout = true
+        }
+        #endif
+        let navigationBarHidden =
+            (effectiveAttachedKeyboardVisible && !compactLayout) || zenMode
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.usernameAndRank)"
@@ -300,7 +327,34 @@ struct GameDetailView: View {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
                             HStack {
-                                if !analyzeMode {
+                                if compactDisplayMode == .chat {
+                                    Button {
+                                        withAnimation {
+                                            showsCompactChatBoard.toggle()
+                                        }
+                                    } label: {
+                                        if showsCompactChatBoard {
+                                            Label(
+                                                "Hide main board",
+                                                image: "custom.squareshape.split.3x3.slash"
+                                            )
+                                        } else {
+                                            Label(
+                                                "Show main board",
+                                                image: "custom.squareshape.split.3x3.badge.eye"
+                                            )
+                                        }
+                                    }
+                                    .accessibilityIdentifier(
+                                        showsCompactChatBoard
+                                            ? SurroundUITestContract
+                                                .AccessibilityID
+                                                .gameChatBoardHide
+                                            : SurroundUITestContract
+                                                .AccessibilityID
+                                                .gameChatBoardShow
+                                    )
+                                } else if !analyzeMode {
                                     Button(action: enterZenMode) {
                                         Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                                     }

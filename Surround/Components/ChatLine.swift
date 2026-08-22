@@ -11,6 +11,9 @@ struct ChatLine: View {
     var chatLine: OGSChatLine
     var showUsername = true
     var horizontalAlignment: HorizontalAlignment = .leading
+    var isSelected = false
+    var accessibilityIdentifier = ""
+    var select: () -> Void = {}
 
     var chatBody: Text {
         Text(chatBodyAttributedString())
@@ -83,6 +86,25 @@ struct ChatLine: View {
                 Spacer()
                 Text(chatLine.body)
                     .font(.callout.bold())
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(
+                                isSelected ? Color.accentColor : .clear,
+                                lineWidth: 2
+                            )
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: select)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityIdentifier(accessibilityIdentifier)
+                    .accessibilityAction {
+                        select()
+                    }
                 Spacer()
             } else {
                 if case .trailing = horizontalAlignment {
@@ -105,11 +127,28 @@ struct ChatLine: View {
                         }
                         chatBody
                             .font(.callout)
+                            .textSelection(.enabled)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(bubbleColor)
                     .cornerRadius(10)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(
+                                isSelected ? Color.accentColor : .clear,
+                                lineWidth: 2
+                            )
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture(perform: select)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier(accessibilityIdentifier)
+                .accessibilityAction {
+                    select()
                 }
                 if case .leading = horizontalAlignment {
                     Spacer()

@@ -8,7 +8,7 @@
 import XCTest
 import UIKit
 
-final class CompatibilityScreenshotTests: XCTestCase {
+final class CompatibilityScreenshotTests: SurroundUITestCase {
     private enum WidgetFamily: String, CaseIterable {
         case small
         case medium
@@ -498,10 +498,17 @@ final class CompatibilityScreenshotTests: XCTestCase {
             SurroundUITestContract.AccessibilityID.gameDetail(gameID),
             in: app
         )
-        element(
-            SurroundUITestContract.AccessibilityID.gameBoard,
-            in: app
-        )
+        if scene == .gameChat {
+            dismissCompactChatInputAndWaitForLayout(
+                in: app,
+                timeout: 15
+            )
+        } else {
+            element(
+                SurroundUITestContract.AccessibilityID.gameBoard,
+                in: app
+            )
+        }
         if scene == .zenMode {
             element(
                 SurroundUITestContract.AccessibilityID.gameZenExit,

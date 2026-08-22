@@ -8,7 +8,7 @@
 import XCTest
 import UIKit
 
-final class SurroundUITests: XCTestCase {
+final class SurroundUITests: SurroundUITestCase {
     private func activateZenControl(
         _ identifier: String,
         in app: XCUIApplication,
@@ -386,6 +386,31 @@ final class SurroundUITests: XCTestCase {
         )
     }
 
+    private func assertNotSelected(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let selectedElement = element(
+            identifier,
+            in: app,
+            file: file,
+            line: line
+        )
+        let notSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == false"),
+            object: selectedElement
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [notSelected], timeout: 10),
+            .completed,
+            "Expected element with identifier \(identifier) not to be selected",
+            file: file,
+            line: line
+        )
+    }
+
     private func scrollIntoTappableArea(
         _ element: XCUIElement,
         in app: XCUIApplication
@@ -605,6 +630,368 @@ final class SurroundUITests: XCTestCase {
             in: app
         )
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+    }
+
+    func testCompactChatAutomaticallyFocusesComposer() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "The compact composer keyboard path requires an iOS device."
+        )
+        #else
+        let app = launchApp(
+            additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.activeGameBoard
+                    .rawValue,
+                SurroundUITestContract.compactGameLayoutLaunchArgument,
+            ],
+            orientation: .portrait
+        )
+
+        selectSegment(
+            at: 2,
+            in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
+            app: app
+        )
+        let input = element(
+            SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            matching: .textField
+        )
+        input.typeText("Compact focus")
+        XCTAssertEqual(input.value as? String, "Compact focus")
+        #endif
+    }
+
+    func testCompactChatCanHideAndShowMainBoard() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "The compact Chat layout requires an iOS device."
+        )
+        #else
+        let app = launchApp(
+            additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.activeGameBoard
+                    .rawValue,
+                SurroundUITestContract.compactGameLayoutLaunchArgument,
+                SurroundUITestContract
+                    .attachedSoftwareKeyboardVisibleLaunchArgument,
+            ],
+            orientation: .portrait
+        )
+
+        element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+        selectSegment(
+            at: 2,
+            in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
+            app: app
+        )
+        dismissCompactChatInputAndWaitForLayout(in: app)
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        let hideBoard = element(
+            SurroundUITestContract.AccessibilityID.gameChatBoardHide,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(hideBoard.label, "Hide main board")
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                SurroundUITestContract.AccessibilityID.gameZenEnter
+            ].exists
+        )
+
+        hideBoard.tap()
+        let boardHidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: board
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [boardHidden], timeout: 10),
+            .completed,
+            "Expected Hide main board to remove the compact Chat board."
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameActionsMenu,
+            in: app,
+            matching: .button
+        )
+        let showBoard = element(
+            SurroundUITestContract.AccessibilityID.gameChatBoardShow,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(showBoard.label, "Show main board")
+
+        showBoard.tap()
+        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        XCTAssertEqual(
+            element(
+                SurroundUITestContract.AccessibilityID.gameChatBoardHide,
+                in: app,
+                matching: .button
+            ).label,
+            "Hide main board"
+        )
+
+        selectSegment(
+            at: 1,
+            in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
+            app: app
+        )
+        element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                SurroundUITestContract.AccessibilityID.gameChatBoardHide
+            ].exists
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                SurroundUITestContract.AccessibilityID.gameChatBoardShow
+            ].exists
+        )
+        #endif
+    }
+
+    func testChatLineSelectionTogglesAndBackgroundDeselects() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameChat.rawValue,
+        ])
+        let firstLineID = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-1"
+        )
+        let secondLineID = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-2"
+        )
+
+        tap(firstLineID, in: app, matching: .button)
+        assertSelected(firstLineID, in: app)
+        tap(firstLineID, in: app, matching: .button)
+        assertNotSelected(firstLineID, in: app)
+
+        tap(firstLineID, in: app, matching: .button)
+        tap(secondLineID, in: app, matching: .button)
+        assertNotSelected(firstLineID, in: app)
+        assertSelected(secondLineID, in: app)
+
+        let chatLog = element(
+            SurroundUITestContract.AccessibilityID.gameChatLog,
+            in: app,
+            matching: .scrollView
+        )
+        let secondLine = element(
+            secondLineID,
+            in: app,
+            matching: .button
+        )
+        let background = chatLog
+            .coordinate(withNormalizedOffset: .zero)
+            .withOffset(
+                CGVector(
+                    dx: 4,
+                    dy: secondLine.frame.midY - chatLog.frame.minY
+                )
+            )
+        #if targetEnvironment(macCatalyst)
+        background.click()
+        #else
+        background.tap()
+        #endif
+        assertNotSelected(secondLineID, in: app)
+
+        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(42)
+        tap(moveID, in: app, matching: .button)
+        assertSelected(moveID, in: app)
+        tap(firstLineID, in: app, matching: .button)
+        assertNotSelected(moveID, in: app)
+        assertSelected(firstLineID, in: app)
+
+        #if targetEnvironment(macCatalyst)
+        let usesRegularGameLayout = true
+        #else
+        let usesRegularGameLayout = UIDevice.current.userInterfaceIdiom == .pad
+        #endif
+        if usesRegularGameLayout {
+            tap(moveID, in: app, matching: .button)
+            assertSelected(moveID, in: app)
+            tap(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+                in: app
+            )
+            let analyzeControlBar = element(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+                in: app
+            )
+            assertNotSelected(moveID, in: app)
+
+            tap(moveID, in: app, matching: .button)
+            assertSelected(moveID, in: app)
+            let exitedAnalyze = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"),
+                object: analyzeControlBar
+            )
+            XCTAssertEqual(
+                XCTWaiter.wait(for: [exitedAnalyze], timeout: 10),
+                .completed,
+                "Selecting a chat preview should exit Analyze mode"
+            )
+        }
+    }
+
+    func testVariationSharingSurvivesChatSelection() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let selectedIdentifier =
+            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+                baseMoveNumber:
+                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
+                movePath:
+                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
+            )
+
+        tap(selectedIdentifier, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            catalystTitle: "Share variation in chat",
+            in: app
+        )
+
+        let sharingStatus = element(
+            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
+            in: app
+        )
+        let variationName = "Persistent variation"
+        let variationNameInput = element(
+            SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            matching: .textField
+        )
+        variationNameInput.typeText(variationName)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+
+        func assertSharingDraftIsIntact(
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) {
+            XCTAssertTrue(
+                sharingStatus.exists,
+                "Expected Variation sharing to remain active.",
+                file: file,
+                line: line
+            )
+            XCTAssertEqual(
+                element(
+                    SurroundUITestContract.AccessibilityID.gameChatInput,
+                    in: app,
+                    matching: .textField,
+                    file: file,
+                    line: line
+                ).value as? String,
+                variationName,
+                "Expected the draft variation name to be preserved.",
+                file: file,
+                line: line
+            )
+        }
+
+        let lineID = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-1"
+        )
+        tap(lineID, in: app, matching: .button)
+        assertSelected(lineID, in: app)
+        assertSharingDraftIsIntact()
+
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        let expectedVariationPreview = board.screenshot().pngRepresentation
+
+        tap(lineID, in: app, matching: .button)
+        assertNotSelected(lineID, in: app)
+        assertSharingDraftIsIntact()
+        XCTAssertEqual(
+            board.screenshot().pngRepresentation,
+            expectedVariationPreview,
+            "Deselecting a chat line should keep the shared variation preview."
+        )
+
+        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(42)
+        tap(moveID, in: app, matching: .button)
+        assertSelected(moveID, in: app)
+        assertSharingDraftIsIntact()
+        XCTAssertEqual(
+            board.screenshot().pngRepresentation,
+            expectedVariationPreview,
+            "A selected move preview should not replace the shared variation preview."
+        )
+
+        tap(moveID, in: app, matching: .button)
+        assertNotSelected(moveID, in: app)
+        assertSharingDraftIsIntact()
+        XCTAssertEqual(
+            board.screenshot().pngRepresentation,
+            expectedVariationPreview,
+            "Deselecting a move should keep the shared variation preview."
+        )
+    }
+
+    func testChatTextUsesSystemSelectionMenu() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "Touch-and-hold text selection requires an iOS device."
+        )
+        #else
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameChat.rawValue,
+        ])
+        let firstLineID = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-1"
+        )
+        let firstLine = element(
+            firstLineID,
+            in: app,
+            matching: .button
+        )
+
+        firstLine
+            .coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)
+            )
+            .press(forDuration: 1)
+
+        let copyCommand = app
+            .descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier == %@ OR label == %@",
+                    "Copy",
+                    "Copy"
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(
+            copyCommand.waitForExistence(timeout: 10),
+            "Expected the system text-selection menu to include Copy"
+        )
+        assertNotSelected(firstLineID, in: app)
+        #endif
     }
 
     func testConditionalVariationsOpenAndJumpToAnalyze() {
@@ -1065,13 +1452,18 @@ final class SurroundUITests: XCTestCase {
             in: app
         )
         XCTAssertEqual(sharingStatus.label, "Sharing variation")
-        XCTAssertEqual(
-            element(
-                SurroundUITestContract.AccessibilityID.gameChatInput,
-                in: app
-            ).label,
-            "Variation name..."
+        let variationNameInput = element(
+            SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            matching: .textField
         )
+        XCTAssertEqual(variationNameInput.label, "Variation name...")
+        variationNameInput.typeText("Focused variation")
+        XCTAssertEqual(
+            variationNameInput.value as? String,
+            "Focused variation"
+        )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
@@ -1124,6 +1516,7 @@ final class SurroundUITests: XCTestCase {
             SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
             in: app
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         tap(parentIdentifier, in: app)
         let sharingEndedByTreeNavigation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"),
@@ -1153,6 +1546,7 @@ final class SurroundUITests: XCTestCase {
             SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
             in: app
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
             in: app,
@@ -1249,6 +1643,7 @@ final class SurroundUITests: XCTestCase {
             ).label,
             "Hidden from opponent during the game"
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
