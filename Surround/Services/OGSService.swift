@@ -2608,12 +2608,27 @@ class OGSService: ObservableObject {
             throw OGSServiceError.variationSharingUnavailable
         }
 
+        let encodedMarks = variation.markups.ogsMarks(
+            boardWidth: game.width,
+            boardHeight: game.height
+        )
+        let currentVariation = game.moveTree.variation(to: variation.position)
+        let isRegisteredVariation: Bool
+        if let currentVariation {
+            isRegisteredVariation = currentVariation.basePosition
+                === variation.basePosition
+                && currentVariation.moves == variation.moves
+        } else {
+            isRegisteredVariation = false
+        }
+        let isMarksOnlyMainBranchPosition = variation.moves.isEmpty
+            && variation.position === variation.basePosition
+            && game.moveTree.indexByBoardPosition[
+                ObjectIdentifier(variation.position)
+            ] == 0
+            && !encodedMarks.isEmpty
         guard game.moveTree.contains(variation.position),
-              let currentVariation = game.moveTree.variation(
-                to: variation.position
-              ),
-              currentVariation.basePosition === variation.basePosition,
-              currentVariation.moves == variation.moves else {
+              isRegisteredVariation || isMarksOnlyMainBranchPosition else {
             throw OGSServiceError.invalidVariation
         }
 
@@ -2640,7 +2655,8 @@ class OGSService: ObservableObject {
             body: OGSChatAnalysisBody(
                 fromMoveNumber: variation.basePosition.lastMoveNumber,
                 moves: encodedMoves,
-                name: effectiveName
+                name: effectiveName,
+                marks: encodedMarks.isEmpty ? nil : encodedMarks
             ),
             gameID: gameID,
             moveNumber: game.currentPosition.lastMoveNumber,

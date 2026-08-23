@@ -28,18 +28,26 @@ struct OGSChatAnalysisBody: Codable, Equatable {
     var fromMoveNumber: Int
     var moves: String
     var name: String
+    var marks: [String: String]?
     
     enum CodingKeys: String, CodingKey {
         case type
         case from
         case moves
         case name
+        case marks
     }
 
-    init(fromMoveNumber: Int, moves: String, name: String) {
+    init(
+        fromMoveNumber: Int,
+        moves: String,
+        name: String,
+        marks: [String: String]? = nil
+    ) {
         self.fromMoveNumber = fromMoveNumber
         self.moves = moves
         self.name = name
+        self.marks = marks
     }
     
     init(from decoder: Decoder) throws {
@@ -55,6 +63,10 @@ struct OGSChatAnalysisBody: Codable, Equatable {
         fromMoveNumber = try container.decode(Int.self, forKey: .from)
         moves = try container.decode(String.self, forKey: .moves)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        marks = try? container.decodeIfPresent(
+            [String: String].self,
+            forKey: .marks
+        )
     }
 
     func encode(to encoder: Encoder) throws {
@@ -63,11 +75,20 @@ struct OGSChatAnalysisBody: Codable, Equatable {
         try container.encode(fromMoveNumber, forKey: .from)
         try container.encode(moves, forKey: .moves)
         try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(marks, forKey: .marks)
     }
 
     func decodedMoves(boardWidth: Int, boardHeight: Int) throws -> [Move] {
         try Move.fromMoveString(
             moveString: moves,
+            boardWidth: boardWidth,
+            boardHeight: boardHeight
+        )
+    }
+
+    func decodedMarkups(boardWidth: Int, boardHeight: Int) -> BoardMarkups {
+        BoardMarkupCodec.decode(
+            marks,
             boardWidth: boardWidth,
             boardHeight: boardHeight
         )

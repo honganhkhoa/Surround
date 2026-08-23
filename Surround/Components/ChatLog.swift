@@ -14,7 +14,11 @@ struct VariationShareDraft {
     let variation: Variation
     var name: String
 
-    init(gameID: GameID, variation: Variation, name: String = "") {
+    init(
+        gameID: GameID,
+        variation: Variation,
+        name: String = ""
+    ) {
         self.gameID = gameID
         self.variation = variation
         self.name = name
@@ -316,15 +320,23 @@ private struct VariationSharePreviewRow: View {
     }
 
     private var accessibilityValue: String {
-        "\(variation.basePosition.lastMoveNumber):"
+        let moves = "\(variation.basePosition.lastMoveNumber):"
             + variation.moves.map { $0.toOGSString() }.joined(separator: "-")
+        let marks = variation.markups.ogsMarks(
+            boardWidth: variation.position.width,
+            boardHeight: variation.position.height
+        ).sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
+        return marks.isEmpty ? moves : "\(moves)|marks:\(marks)"
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             BoardView(
                 boardPosition: variation.position,
-                variation: variation
+                variation: variation,
+                markups: .constant(variation.markups)
             )
             .frame(width: 120, height: 120)
             .allowsHitTesting(false)

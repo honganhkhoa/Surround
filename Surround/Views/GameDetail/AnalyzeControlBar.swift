@@ -8,6 +8,8 @@ import SwiftUI
 struct AnalyzeControlBar: View {
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
+    @Binding var boardTool: AnalyzeBoardTool
+    var markups: BoardMarkups
     var analysisAvailable: Bool
     var canShareVariation: Bool
     var canAddConditionalMoves: Bool
@@ -96,49 +98,9 @@ struct AnalyzeControlBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 2) {
-            if analysisAvailable {
-                actionsMenu
-            }
-            Spacer(minLength: 8)
-            if analysisAvailable {
-                controlButton(
-                    "Previous branch",
-                    systemImage: "arrow.up",
-                    accessibilityIdentifier: SurroundUITestContract
-                        .AccessibilityID.gameAnalyzePreviousBranch,
-                    destination: previousBranch
-                )
-                controlButton(
-                    "Next branch",
-                    systemImage: "arrow.down",
-                    accessibilityIdentifier: SurroundUITestContract
-                        .AccessibilityID.gameAnalyzeNextBranch,
-                    destination: nextBranch
-                )
-                controlButton(
-                    "Back to fork",
-                    systemImage: "arrow.turn.left.up",
-                    accessibilityIdentifier: SurroundUITestContract
-                        .AccessibilityID.gameAnalyzeBackToFork,
-                    destination: nearestForkDestination
-                )
-            }
-            controlButton(
-                "Previous",
-                systemImage: "chevron.left",
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameAnalyzePrevious,
-                destination: previousPosition,
-                remembersCurrentPosition: true
-            )
-            controlButton(
-                "Next",
-                systemImage: "chevron.right",
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameAnalyzeNext,
-                destination: nextPosition
-            )
+        ViewThatFits(in: .horizontal) {
+            controlBarContent(showsAdjacentBranches: true)
+            controlBarContent(showsAdjacentBranches: false)
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 52)
@@ -176,6 +138,63 @@ struct AnalyzeControlBar: View {
             } else {
                 Text("This removes the selected move and every move after it in this branch.")
             }
+        }
+    }
+
+    private func controlBarContent(
+        showsAdjacentBranches: Bool
+    ) -> some View {
+        HStack(spacing: 2) {
+            if analysisAvailable {
+                actionsMenu
+                if selectedPosition != nil {
+                    MarkerToolMenu(
+                        markups: markups,
+                        tool: $boardTool
+                    )
+                }
+            }
+            Spacer(minLength: 8)
+            if analysisAvailable && showsAdjacentBranches {
+                controlButton(
+                    "Previous branch",
+                    systemImage: "arrow.up",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzePreviousBranch,
+                    destination: previousBranch
+                )
+                controlButton(
+                    "Next branch",
+                    systemImage: "arrow.down",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeNextBranch,
+                    destination: nextBranch
+                )
+            }
+            if analysisAvailable {
+                controlButton(
+                    "Back to fork",
+                    systemImage: "arrow.turn.left.up",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeBackToFork,
+                    destination: nearestForkDestination
+                )
+            }
+            controlButton(
+                "Previous",
+                systemImage: "chevron.left",
+                accessibilityIdentifier: SurroundUITestContract
+                    .AccessibilityID.gameAnalyzePrevious,
+                destination: previousPosition,
+                remembersCurrentPosition: true
+            )
+            controlButton(
+                "Next",
+                systemImage: "chevron.right",
+                accessibilityIdentifier: SurroundUITestContract
+                    .AccessibilityID.gameAnalyzeNext,
+                destination: nextPosition
+            )
         }
     }
 
@@ -293,6 +312,99 @@ struct AnalyzeControlBar: View {
         }
         if retainedPreferences.count != preferredNextPositionByPosition.count {
             preferredNextPositionByPosition = retainedPreferences
+        }
+    }
+}
+
+private struct MarkerToolMenu: View {
+    var markups: BoardMarkups
+    @Binding var tool: AnalyzeBoardTool
+
+    var body: some View {
+        Menu {
+            Picker("Board editing tool", selection: $tool) {
+                ForEach(AnalyzeBoardTool.allCases, id: \.self) { option in
+                    Label(toolTitle(option), systemImage: toolSystemImage(option))
+                        .tag(option)
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID
+                                .gameAnalyzeMarkerTool(option.rawValue)
+                        )
+                }
+            }
+        } label: {
+            Group {
+                if tool == .letters || tool == .numbers {
+                    Text(verbatim: currentLiteral)
+                        .font(.body.bold().monospaced())
+                } else {
+                    Image(systemName: toolSystemImage(tool))
+                }
+            }
+            .frame(width: 44, height: 44)
+            .foregroundColor(tool == .moves ? .primary : .accentColor)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        tool == .moves
+                            ? Color.clear
+                            : Color.accentColor.opacity(0.14)
+                    )
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .hoverEffect(.highlight)
+        .help("Board editing tool")
+        .accessibilityLabel("Board editing tool")
+        .accessibilityValue(Text(verbatim: accessibilityValue))
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu
+        )
+    }
+
+    private var currentLiteral: String {
+        tool == .letters
+            ? markups.nextBoardLetter
+            : markups.nextBoardNumber
+    }
+
+    private var accessibilityValue: String {
+        switch tool {
+        case .letters, .numbers:
+            return String(localized: toolTitle(tool))
+                + ", "
+                + String(
+                    localized: "Next label: \(currentLiteral)",
+                    comment: "Accessibility value announcing the next automatic letter or number that the Analyze board marker tool will place."
+                )
+        default:
+            return String(localized: toolTitle(tool))
+        }
+    }
+
+    private func toolTitle(_ tool: AnalyzeBoardTool) -> LocalizedStringResource {
+        switch tool {
+        case .moves: LocalizedStringResource("Add moves")
+        case .letters: LocalizedStringResource("Letters")
+        case .numbers: LocalizedStringResource("Numbers")
+        case .triangle: LocalizedStringResource("Triangle")
+        case .square: LocalizedStringResource("Square")
+        case .circle: LocalizedStringResource("Circle")
+        case .cross: LocalizedStringResource("X")
+        case .eraser: LocalizedStringResource("Eraser")
+        }
+    }
+
+    private func toolSystemImage(_ tool: AnalyzeBoardTool) -> String {
+        switch tool {
+        case .moves: "circle.tophalf.filled"
+        case .letters: "character"
+        case .numbers: "number"
+        case .triangle: "triangle"
+        case .square: "square"
+        case .circle: "circle"
+        case .cross: "xmark"
+        case .eraser: "eraser"
         }
     }
 }

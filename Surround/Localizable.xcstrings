@@ -1,6 +1,123 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add moves" : {
+      "comment" : "Analyze-board editing tool that places variation moves instead of annotations.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Züge hinzufügen" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter des coups" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "手を追加" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "수 추가" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "เพิ่มการเดิน" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Thêm nước đi" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加着法" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "新增著法" } }
+      }
+    },
+    "Board editing tool" : {
+      "comment" : "Accessibility label and picker title for choosing how taps edit an analyzed board.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Brettbearbeitungswerkzeug" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Outil d’annotation du goban" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "盤面編集ツール" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "바둑판 편집 도구" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "เครื่องมือแก้ไขกระดาน" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Công cụ chỉnh sửa bàn cờ" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "棋盘编辑工具" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "棋盤編輯工具" } }
+      }
+    },
+    "Circle" : {
+      "comment" : "Circular analyze-board marker.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Kreis" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cercle" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "丸" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "วงกลม" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Hình tròn" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "圆形" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "圓形" } }
+      }
+    },
+    "Eraser" : {
+      "comment" : "Analyze-board tool that removes annotations.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Radierer" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Gomme" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "消しゴム" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "지우개" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "ยางลบ" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Tẩy" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "橡皮擦" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "橡皮擦" } }
+      }
+    },
+    "Letters" : {
+      "comment" : "Analyze-board tool that places sequential letter labels.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Buchstaben" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lettres" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "文字" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "글자" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "ตัวอักษร" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Chữ cái" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字母" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "字母" } }
+      }
+    },
+    "Numbers" : {
+      "comment" : "Analyze-board tool that places sequential number labels.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zahlen" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nombres" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "数字" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "숫자" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "ตัวเลข" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Số" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数字" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "數字" } }
+      }
+    },
+    "Square" : {
+      "comment" : "Square analyze-board marker.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Quadrat" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Carré" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "四角" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사각형" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "สี่เหลี่ยม" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Hình vuông" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "方形" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "方形" } }
+      }
+    },
+    "Triangle" : {
+      "comment" : "Triangular analyze-board marker.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dreieck" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Triangle" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "三角" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "삼각형" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "สามเหลี่ยม" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Tam giác" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "三角形" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "三角形" } }
+      }
+    },
+    "X" : {
+      "comment" : "X-shaped analyze-board marker.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "X" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "X" } }
+      }
+    },
     " — players may drop mid-game" : {
       "localizations" : {
         "de" : {
@@ -15467,6 +15584,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "紐西蘭規則"
+          }
+        }
+      }
+    },
+    "Next label: %@" : {
+      "comment" : "Accessibility value announcing the next automatic letter or number that the Analyze board marker tool will place.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste Beschriftung: %1$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochaine étiquette : %1$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のラベル：%1$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 레이블: %1$@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ป้ายกำกับถัดไป: %1$@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhãn tiếp theo: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个标签：%1$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一個標籤：%1$@"
           }
         }
       }

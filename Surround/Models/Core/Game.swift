@@ -1152,11 +1152,15 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 if let moves = try? variationData.decodedMoves(
                     boardWidth: width,
                     boardHeight: height
-                ), let variation = try? Variation(
+                ), var variation = try? Variation(
                     basePosition: basePosition,
                     moves: moves,
                     allowsSelfCapture: gameData?.allowSelfCapture ?? false
                 ) {
+                    variation.markups = variationData.decodedMarkups(
+                        boardWidth: width,
+                        boardHeight: height
+                    )
                     line.variation = variation
                 }
             }

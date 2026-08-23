@@ -97,6 +97,35 @@ final class OGSModelDecodingTests: XCTestCase {
         )
     }
 
+    func testAnalysisChatBodyDecodesMarksWithoutInvalidatingVariation() throws {
+        let line = try decodeChatLine(
+            body: #"{"type":"analysis","from":7,"moves":"aa","name":"Marked","marks":{"A":"ii","triangle":"hj","black":"aa"}}"#
+        )
+        let variation = try XCTUnwrap(line.variationData)
+        let markups = variation.decodedMarkups(boardWidth: 19, boardHeight: 19)
+        XCTAssertEqual(
+            markups[BoardPoint(row: 8, column: 8)]?.label,
+            "A"
+        )
+        XCTAssertEqual(
+            markups[BoardPoint(row: 9, column: 7)]?.shapes,
+            [.triangle]
+        )
+        XCTAssertNil(markups[BoardPoint(row: 0, column: 0)])
+
+        let malformedMarks = try decodeChatLine(
+            body: #"{"type":"analysis","from":0,"moves":"aa","name":"Still valid","marks":["not-a-map"]}"#
+        )
+        let malformedVariation = try XCTUnwrap(malformedMarks.variationData)
+        XCTAssertEqual(malformedVariation.name, "Still valid")
+        XCTAssertTrue(
+            malformedVariation.decodedMarkups(
+                boardWidth: 19,
+                boardHeight: 19
+            ).isEmpty
+        )
+    }
+
     func testMalformedAnalysisRemainsANameOnlyChatLine() throws {
         let edited = try decodeChatLine(
             body: #"{"type":"analysis","from":0,"moves":"!1aa","name":"Edited line"}"#

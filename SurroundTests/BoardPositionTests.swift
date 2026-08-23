@@ -195,6 +195,136 @@ class BoardPositionTests: XCTestCase {
         }
     }
 
+    func testVariationMarkupsAreValueScopedWhenZeroMovePositionsAlias() throws {
+        let basePosition = BoardPosition(width: 5, height: 5)
+        var markedVariation = try Variation(
+            basePosition: basePosition,
+            moves: []
+        )
+        let plainVariation = try Variation(
+            basePosition: basePosition,
+            moves: []
+        )
+
+        XCTAssertTrue(markedVariation.position === basePosition)
+        XCTAssertTrue(plainVariation.position === basePosition)
+        markedVariation.markups[BoardPoint(row: 0, column: 0)] = BoardMarkup(
+            label: "A"
+        )
+        XCTAssertEqual(markedVariation.markups.count, 1)
+        XCTAssertTrue(plainVariation.markups.isEmpty)
+    }
+
+    func testZeroMoveVariationUsesPositionIndicators() throws {
+        let basePosition = BoardPosition(width: 5, height: 5)
+        let zeroMoveVariation = try Variation(
+            basePosition: basePosition,
+            moves: []
+        )
+        let placedMoveVariation = try Variation(
+            basePosition: basePosition,
+            moves: [.placeStone(0, 0)]
+        )
+        let passVariation = try Variation(
+            basePosition: basePosition,
+            moves: [.pass]
+        )
+
+        XCTAssertEqual(
+            BoardStoneIndicatorMode(variation: nil),
+            .positionIndicators
+        )
+        XCTAssertEqual(
+            BoardStoneIndicatorMode(variation: zeroMoveVariation),
+            .positionIndicators
+        )
+        XCTAssertEqual(
+            BoardStoneIndicatorMode(variation: placedMoveVariation),
+            .variationNumberings
+        )
+        XCTAssertTrue(passVariation.nonDuplicatingMoveCoordinatesByLabel.isEmpty)
+        XCTAssertEqual(
+            BoardStoneIndicatorMode(variation: passVariation),
+            .variationNumberings
+        )
+    }
+
+    func testBoardMarkupSequencesUseTheCurrentNode() {
+        var markups = BoardMarkups()
+        XCTAssertEqual(markups.nextBoardLetter, "A")
+        XCTAssertEqual(markups.nextBoardNumber, "1")
+
+        markups[BoardPoint(row: 0, column: 0)] = BoardMarkup(label: "A")
+        markups[BoardPoint(row: 0, column: 1)] = BoardMarkup(label: "C")
+        markups[BoardPoint(row: 0, column: 2)] = BoardMarkup(label: "custom")
+        markups[BoardPoint(row: 1, column: 0)] = BoardMarkup(label: "2")
+        markups[BoardPoint(row: 1, column: 1)] = BoardMarkup(label: "10")
+        XCTAssertEqual(markups.nextBoardLetter, "D")
+        XCTAssertEqual(markups.nextBoardNumber, "11")
+
+        markups[BoardPoint(row: 2, column: 0)] = BoardMarkup(label: "z")
+        XCTAssertEqual(markups.nextBoardLetter, "A")
+    }
+
+    func testBoardMarkupToolsReplaceAndEraseExistingMarkup() {
+        let point = BoardPoint(row: 1, column: 1)
+        var markups = BoardMarkups()
+
+        markups.paint(.letters, at: point)
+        XCTAssertEqual(markups[point]?.label, "A")
+        XCTAssertTrue(AnalyzeBoardTool.letters.matches(markups[point]))
+
+        markups.paint(.triangle, at: point)
+        XCTAssertNil(markups[point]?.label)
+        XCTAssertEqual(markups[point]?.shapes, [.triangle])
+        XCTAssertTrue(AnalyzeBoardTool.triangle.matches(markups[point]))
+
+        markups.paint(.eraser, at: point)
+        XCTAssertNil(markups[point])
+    }
+
+    func testBoardMarkupOGSCodecRoundTripsSupportedMarks() {
+        let original: BoardMarkups = [
+            BoardPoint(row: 2, column: 4): BoardMarkup(
+                label: "A",
+                shapes: [.circle]
+            ),
+            BoardPoint(row: 0, column: 0): BoardMarkup(shapes: [.triangle]),
+            BoardPoint(row: 1, column: 2): BoardMarkup(shapes: [.triangle]),
+        ]
+
+        let encoded = original.ogsMarks(boardWidth: 5, boardHeight: 3)
+        XCTAssertEqual(encoded["A"], "ec")
+        XCTAssertEqual(encoded["circle"], "ec")
+        XCTAssertEqual(encoded["triangle"], "aacb")
+        XCTAssertEqual(
+            BoardMarkupCodec.decode(encoded, boardWidth: 5, boardHeight: 3),
+            original
+        )
+    }
+
+    func testBoardMarkupDecoderSkipsMalformedUnsupportedAndOutOfBoundsData() {
+        let decoded = BoardMarkupCodec.decode(
+            [
+                "A": "aaeczzq",
+                "square": "ba",
+                "triangle": "a",
+                "black": "aa",
+                "removal": "aa",
+            ],
+            boardWidth: 5,
+            boardHeight: 3
+        )
+
+        XCTAssertEqual(decoded[BoardPoint(row: 0, column: 0)]?.label, "A")
+        XCTAssertEqual(decoded[BoardPoint(row: 2, column: 4)]?.label, "A")
+        XCTAssertEqual(
+            decoded[BoardPoint(row: 0, column: 1)]?.shapes,
+            [.square]
+        )
+        XCTAssertEqual(decoded.count, 3)
+    }
+
     static func position(fromVisualStrings visualStrings: [String], nextToMove: StoneColor = .black) -> BoardPosition {
         let position = BoardPosition(width: visualStrings[0].count, height: visualStrings.count)
         for row in 0..<position.height {

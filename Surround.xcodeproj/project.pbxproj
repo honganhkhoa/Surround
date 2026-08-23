@@ -61,6 +61,7 @@
 		BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
@@ -90,6 +91,7 @@
 		BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC285B6D2557FCBA005378F9 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		AA9000044000000000000004 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC285B852557FD57005378F9 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
@@ -162,6 +164,7 @@
 		BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BC64939625380D96002B2200 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		AA9000054000000000000005 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
@@ -193,6 +196,7 @@
 		BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
 		BC8CE8862657B2E100E4BE1A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC8CE8872657B2E100E4BE1A /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
 		BC8CE8882657B2E100E4BE1A /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC8CE8892657B2E100E4BE1A /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
@@ -292,6 +296,7 @@
 		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
+		AA9000064000000000000006 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
 		BCD214F1255A948E00F78E2A /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
@@ -438,6 +443,7 @@
 		BC042B3A24AB2DD00050B2D1 /* Game.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeControl.swift; sourceTree = "<group>"; };
 		BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardPosition.swift; sourceTree = "<group>"; };
+		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
 		BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UserDefaults+SurroundModels.swift"; sourceTree = "<group>"; };
 		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
@@ -815,6 +821,7 @@
 		BC042B3824AB2DD00050B2D1 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				AA9000014000000000000001 /* BoardMarkup.swift */,
 				BC042B3A24AB2DD00050B2D1 /* Game.swift */,
 				BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */,
 				BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */,
@@ -1326,6 +1333,7 @@
 				BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */,
 				BC042B5024AB2DD10050B2D1 /* OGSUser.swift in Sources */,
 				BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */,
+				AA9000024000000000000002 /* BoardMarkup.swift in Sources */,
 				BC511BC82C3CE61E00DDA256 /* View+apply.swift in Sources */,
 				BC92007A25CBDBAA00C14433 /* TimeSystemPickerView.swift in Sources */,
 				BC3CD7D325EE479800C931EB /* OGSPrivateMessage.swift in Sources */,
@@ -1414,6 +1422,7 @@
 				BCFF01F42705813200B09B0B /* UserDefaults+SurroundModels.swift in Sources */,
 				BC8CE88B2657B2E100E4BE1A /* OGSChatLine.swift in Sources */,
 				BC8CE8862657B2E100E4BE1A /* BoardPosition.swift in Sources */,
+				AA9000034000000000000003 /* BoardMarkup.swift in Sources */,
 				BC8CE8872657B2E100E4BE1A /* OGSUIConfig.swift in Sources */,
 				BC463AFC2662494A00D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC8CE8812657B2E100E4BE1A /* OGSAutomatchEntry.swift in Sources */,
@@ -1451,6 +1460,7 @@
 				BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */,
 				BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */,
 				BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */,
+				AA9000044000000000000004 /* BoardMarkup.swift in Sources */,
 				BC285B5B2557FCAC005378F9 /* OGSChallenge.swift in Sources */,
 				BC285BB4255908CB005378F9 /* SurroundNotificationService.swift in Sources */,
 				BC5EEC2B259D851B00675761 /* Variation.swift in Sources */,
@@ -1498,6 +1508,7 @@
 				BCC3276127BB69B1005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
 				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
+				AA9000054000000000000005 /* BoardMarkup.swift in Sources */,
 				BC3037F72692D03300181570 /* MoveTree.swift in Sources */,
 				BC463B052662515800D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */,
@@ -1525,6 +1536,7 @@
 				AF2000053E00000000000005 /* OGSConditionalMoves.swift in Sources */,
 				BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */,
 				BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */,
+				AA9000064000000000000006 /* BoardMarkup.swift in Sources */,
 				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,
 				BCB98CC2256D144100B1F8FD /* TestData.swift in Sources */,
 				BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */,

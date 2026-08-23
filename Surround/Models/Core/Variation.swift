@@ -11,12 +11,19 @@ struct Variation {
     var basePosition: BoardPosition
     var position: BoardPosition
     var moves: [Move]
+    var markups: BoardMarkups
     var nonDuplicatingMoveCoordinatesByLabel: [Int: [Int]]
     
-    init(position: BoardPosition, basePosition: BoardPosition, moves: [Move]) {
+    init(
+        position: BoardPosition,
+        basePosition: BoardPosition,
+        moves: [Move],
+        markups: BoardMarkups = [:]
+    ) {
         self.position = position
         self.basePosition = basePosition
         self.moves = moves
+        self.markups = markups
         self.nonDuplicatingMoveCoordinatesByLabel = [Int: [Int]]()
         var positions = Set<[Int]>()
         for (index, move) in moves.enumerated() {
@@ -63,5 +70,16 @@ struct Variation {
             )
         }
         self.init(position: position, basePosition: basePosition, moves: moves)
+    }
+}
+
+enum BoardStoneIndicatorMode: Equatable {
+    case positionIndicators
+    case variationNumberings
+
+    init(variation: Variation?) {
+        self = variation?.moves.isEmpty == false
+            ? .variationNumberings
+            : .positionIndicators
     }
 }

@@ -2119,6 +2119,7 @@ final class SurroundUITests: SurroundUITestCase {
 
         for hiddenIdentifier in [
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
             SurroundUITestContract.AccessibilityID.gameAnalyzePreviousBranch,
             SurroundUITestContract.AccessibilityID.gameAnalyzeNextBranch,
             SurroundUITestContract.AccessibilityID.gameAnalyzeBackToFork,
@@ -2146,6 +2147,10 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
         )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
+            in: app
+        )
         for visibleIdentifier in [
             SurroundUITestContract.AccessibilityID.gameAnalyzePreviousBranch,
             SurroundUITestContract.AccessibilityID.gameAnalyzeNextBranch,
@@ -2159,6 +2164,137 @@ final class SurroundUITests: SurroundUITestCase {
                 matching: .button
             )
         }
+    }
+
+    func testAnalyzeBoardMarkerMenuPlacesAndTogglesSequentialLetters() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let markerMenu = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
+            in: app
+        )
+        markerMenu.tap()
+        analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerTool(
+                "letters"
+            ),
+            catalystTitle: "Letters",
+            in: app
+        ).tap()
+        XCTAssertEqual(
+            markerMenu.value as? String,
+            "Letters, Next label: A"
+        )
+
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
+        XCTAssertTrue(
+            (board.value as? String)?.contains("|marks:A=") == true
+        )
+        XCTAssertEqual(
+            markerMenu.value as? String,
+            "Letters, Next label: B"
+        )
+
+        board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
+        XCTAssertFalse(
+            (board.value as? String)?.contains("|marks:") == true
+        )
+    }
+
+    func testAnalyzeTrunkMarkersShareWithoutLeakingToLiveBoard() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.activeGameBoard.rawValue,
+        ])
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        let liveBoardValue = board.value as? String
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+            in: app
+        )
+        let markerMenu = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
+            in: app
+        )
+        markerMenu.tap()
+        analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerTool(
+                "letters"
+            ),
+            catalystTitle: "Letters",
+            in: app
+        ).tap()
+        board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
+        XCTAssertTrue(
+            (board.value as? String)?.contains("|marks:A=") == true
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+            in: app
+        )
+        XCTAssertEqual(board.value as? String, liveBoardValue)
+        XCTAssertFalse(
+            (board.value as? String)?.contains("|marks:") == true,
+            "Expected Analyze markers to stay off the live game board."
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        XCTAssertTrue(
+            (board.value as? String)?.contains("|marks:A=") == true,
+            "Expected the Analyze session to retain markers for sharing."
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        let share = analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            catalystTitle: "Share variation in chat",
+            in: app
+        )
+        XCTAssertTrue(
+            share.isEnabled,
+            "Expected marks on a main-branch position to be shareable."
+        )
+        share.tap()
+        let preview = element(
+            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
+            in: app
+        )
+        XCTAssertTrue(
+            (preview.value as? String)?.contains(":|marks:A=") == true,
+            "Expected a zero-move variation preview containing the marker."
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
+            in: app,
+            matching: .button
+        )
     }
 
     func testFinishedGameOffersRematchEditor() {

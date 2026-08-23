@@ -43,6 +43,9 @@ struct SingleGameView: View {
     
     @State var analyticsPendingMove: Move? = nil
     @State var analyticsPendingPosition: BoardPosition? = nil
+    @State private var analyzeBoardTool = AnalyzeBoardTool.moves
+    @State private var analyzeMarkupsByPosition =
+        [ObjectIdentifier: BoardMarkups]()
     
     @State var stonePlacingPlayer: AVAudioPlayer? = nil
     @State private var conditionalMoveSubmissionCancellable: AnyCancellable?
@@ -94,6 +97,36 @@ struct SingleGameView: View {
         )
     }
 
+    private func analyzeMarkups(for position: BoardPosition) -> BoardMarkups {
+        analyzeMarkupsByPosition[ObjectIdentifier(position)] ?? [:]
+    }
+
+    private func analyzeMarkupsBinding(
+        for position: BoardPosition
+    ) -> Binding<BoardMarkups> {
+        let identifier = ObjectIdentifier(position)
+        return Binding(
+            get: { analyzeMarkupsByPosition[identifier] ?? [:] },
+            set: { markups in
+                if markups.isEmpty {
+                    analyzeMarkupsByPosition[identifier] = nil
+                } else {
+                    analyzeMarkupsByPosition[identifier] = markups
+                }
+            }
+        )
+    }
+
+    private func pruneAnalyzeMarkups() {
+        let registeredPositions = Set(game.moveTree.indexByBoardPosition.keys)
+        let retainedMarkups = analyzeMarkupsByPosition.filter {
+            registeredPositions.contains($0.key)
+        }
+        if retainedMarkups.count != analyzeMarkupsByPosition.count {
+            analyzeMarkupsByPosition = retainedMarkups
+        }
+    }
+
     private var showsCompactHorizontalControlRow: Bool {
         compactDisplayMode != .analyze
             && (
@@ -134,7 +167,10 @@ struct SingleGameView: View {
                     boardPosition: selectedChatPosition,
                     variation: selectedChatPreview?.variation,
                     showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
-                    highlightCoordinates: selectedChatPreview?.coordinates ?? []
+                    highlightCoordinates: selectedChatPreview?.coordinates ?? [],
+                    markups: .constant(
+                        selectedChatPreview?.variation?.markups ?? [:]
+                    )
                 )
             } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || analyzeMode.wrappedValue) {
                 BoardView(
@@ -144,7 +180,9 @@ struct SingleGameView: View {
                     playable: game.analysisAvailable,
                     newMove: $analyticsPendingMove,
                     newPosition: $analyticsPendingPosition,
-                    allowsSelfCapture: game.gameData?.allowSelfCapture ?? false
+                    allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
+                    boardTool: $analyzeBoardTool,
+                    markups: analyzeMarkupsBinding(for: analyticsPosition)
                 )
                 .onChange(of: analyticsPendingMove) { _, newMove in
                     if let newMove = newMove {
@@ -192,33 +230,54 @@ struct SingleGameView: View {
            let position = preview.position {
             return boardUITestAccessibilityValue(
                 position: position,
-                variation: preview.variation
+                variation: preview.variation,
+                markups: preview.variation?.markups ?? [:]
             )
         }
         if let analyticsPosition,
            compactDisplayMode == .analyze || analyzeMode.wrappedValue {
             return boardUITestAccessibilityValue(
                 position: analyticsPosition,
-                variation: game.moveTree.variation(to: analyticsPosition)
+                variation: game.moveTree.variation(to: analyticsPosition),
+                markups: analyzeMarkups(for: analyticsPosition)
             )
         }
         return boardUITestAccessibilityValue(
             position: game.currentPosition,
-            variation: nil
+            variation: nil,
+            markups: [:]
         )
     }
 
     private func boardUITestAccessibilityValue(
         position: BoardPosition,
-        variation: Variation?
+        variation: Variation?,
+        markups: BoardMarkups
     ) -> String {
+        let markerSuffix = boardUITestMarkerSuffix(markups)
         if let variation {
             return "variation:\(variation.basePosition.lastMoveNumber):"
                 + variation.moves.map { $0.toOGSString() }
                     .joined(separator: "-")
+                + markerSuffix
         }
         return "position:\(position.lastMoveNumber):"
             + (position.lastMove?.toOGSString() ?? "none")
+            + markerSuffix
+    }
+
+    private func boardUITestMarkerSuffix(_ markups: BoardMarkups) -> String {
+        let encoded = markups.ogsMarks(
+            boardWidth: game.width,
+            boardHeight: game.height
+        )
+        guard !encoded.isEmpty else {
+            return ""
+        }
+        return "|marks:"
+            + encoded.keys.sorted().map { key in
+                "\(key)=\(encoded[key]!)"
+            }.joined(separator: ",")
     }
     #endif
     
@@ -245,13 +304,35 @@ struct SingleGameView: View {
               let analyticsPosition else {
             return false
         }
-        return game.moveTree.variation(to: analyticsPosition) != nil
+        return shareableVariation(at: analyticsPosition) != nil
+    }
+
+    private func shareableVariation(
+        at position: BoardPosition
+    ) -> Variation? {
+        let markups = analyzeMarkups(for: position)
+        if var variation = game.moveTree.variation(to: position) {
+            variation.markups = markups
+            return variation
+        }
+
+        guard !markups.isEmpty,
+              game.moveTree.indexByBoardPosition[ObjectIdentifier(position)]
+                == 0 else {
+            return nil
+        }
+        return Variation(
+            position: position,
+            basePosition: position,
+            moves: [],
+            markups: markups
+        )
     }
 
     private func beginSharingSelectedVariation() {
         guard canShareSelectedVariation,
               let analyticsPosition,
-              let variation = game.moveTree.variation(to: analyticsPosition) else {
+              let variation = shareableVariation(at: analyticsPosition) else {
             return
         }
 
@@ -396,6 +477,10 @@ struct SingleGameView: View {
         return AnalyzeControlBar(
             moveTree: game.moveTree,
             selectedPosition: $analyticsPosition,
+            boardTool: $analyzeBoardTool,
+            markups: analyticsPosition.map {
+                analyzeMarkups(for: $0)
+            } ?? [:],
             analysisAvailable: game.analysisAvailable,
             canShareVariation: canShareSelectedVariation,
             canAddConditionalMoves: state.canAdd,
@@ -415,6 +500,12 @@ struct SingleGameView: View {
 
     private var conditionalMoveSubmissionPending: Bool {
         ogs.isConditionalMoveSubmissionPending(gameID: game.ogsID)
+    }
+
+    private func resetAnalyzeBoardTool() {
+        analyzeBoardTool = .moves
+        analyticsPendingMove = nil
+        analyticsPendingPosition = nil
     }
 
     private var analyzeControlBarConditionalState:
@@ -545,6 +636,7 @@ struct SingleGameView: View {
                 }
                 return
             }
+            pruneAnalyzeMarkups()
             analyticsPosition = destination
         } else if game.moveTree.contains(parentPosition) {
             analyticsPosition = parentPosition
@@ -952,6 +1044,13 @@ struct SingleGameView: View {
         .onDisappear {
             self.stonePlacingPlayer = nil
             selectedChatItem = nil
+            analyzeMarkupsByPosition.removeAll()
+            resetAnalyzeBoardTool()
+        }
+        .onReceive(game.moveTree.objectWillChange) {
+            DispatchQueue.main.async {
+                pruneAnalyzeMarkups()
+            }
         }
         .onChange(of: analyzeMode.wrappedValue) { _, newValue in
             if newValue {
@@ -961,17 +1060,33 @@ struct SingleGameView: View {
                 }
             } else if !newValue {
                 analyticsPosition = nil
+                resetAnalyzeBoardTool()
+            }
+        }
+        .onChange(of: analyzeBoardTool) { _, newValue in
+            if newValue != .moves {
+                analyticsPendingMove = nil
+                analyticsPendingPosition = nil
             }
         }
         .onChange(of: zenMode) { _, newValue in
             if newValue {
                 selectedChatItem = nil
+                resetAnalyzeBoardTool()
             }
         }
         .onChange(of: game.ID) { _, _ in
             selectedChatItem = nil
+            analyzeMarkupsByPosition.removeAll()
+            resetAnalyzeBoardTool()
+        }
+        .onChange(of: game.analysisAvailable) { _, newValue in
+            if !newValue {
+                resetAnalyzeBoardTool()
+            }
         }
         .onChange(of: game.conditionalMoveBranches.map(\.id)) {
+            pruneAnalyzeMarkups()
             if let analyticsPosition,
                !game.moveTree.contains(analyticsPosition) {
                 self.analyticsPosition = game.currentPosition

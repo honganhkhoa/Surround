@@ -208,6 +208,7 @@ struct Stones: View {
     var body: some View {
         let width = boardPosition.width
         let height = boardPosition.height
+        let indicatorMode = BoardStoneIndicatorMode(variation: variation)
                 
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let whiteLivingPath = CGMutablePath()
@@ -325,7 +326,7 @@ struct Stones: View {
                 Path(blackCapturedPath).fill(Color.black).opacity(0.5)
             }
 
-            if let variation = variation {
+            if indicatorMode == .variationNumberings, let variation {
                 VariationNumberings(variation: variation, cellSize: size)
             } else if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
                 if case .hasStone(let lastColor) = boardPosition[lastRow, lastColumn] {
@@ -355,7 +356,7 @@ struct Stones: View {
                 }
             }
 
-            if variation == nil {
+            if indicatorMode == .positionIndicators {
                 ForEach(Array(undoMarkerCoordinates.enumerated()), id: \.offset) { _, coordinate in
                     let row = coordinate[0]
                     let column = coordinate[1]
@@ -483,7 +484,7 @@ struct StoneRemovalOverlay: View {
     }
 }
 
-struct MarkerOverlay: View {
+struct CoordinateHighlightOverlay: View {
     @Environment(\.displayScale) private var displayScale
     @ObservedObject var boardPosition: BoardPosition
     var geometry: GeometryProxy
@@ -522,6 +523,201 @@ struct MarkerOverlay: View {
     }
 }
 
+struct BoardMarkupOverlay: View {
+    @Environment(\.displayScale) private var displayScale
+    @ObservedObject var boardPosition: BoardPosition
+    var markups: BoardMarkups
+    var geometry: GeometryProxy
+    var widgetRenderingMode: WidgetRenderingMode
+
+    var body: some View {
+        let size = stoneSize(
+            geometry: geometry,
+            boardSize: max(boardPosition.width, boardPosition.height),
+            displayScale: displayScale
+        )
+
+        ZStack {
+            ForEach(markups.keys.sorted(), id: \.self) { point in
+                if point.row >= 0,
+                   point.row < boardPosition.height,
+                   point.column >= 0,
+                   point.column < boardPosition.width,
+                   let markup = markups[point] {
+                    let foreground = markerColor(at: point)
+                    ZStack {
+                        if boardPosition[point.row, point.column] == .empty {
+                            Circle()
+                                .fill(emptyPointBackground)
+                                .frame(width: size * 0.62, height: size * 0.62)
+                        }
+                        ForEach(BoardMarkShape.allCases, id: \.self) { shape in
+                            if markup.shapes.contains(shape) {
+                                BoardMarkShapeView(shape: shape)
+                                    .stroke(
+                                        foreground,
+                                        style: StrokeStyle(
+                                            lineWidth: max(1 / displayScale, size * 0.09),
+                                            lineCap: .round,
+                                            lineJoin: .round
+                                        )
+                                    )
+                                    .frame(width: size * 0.58, height: size * 0.58)
+                            }
+                        }
+                        if let label = markup.label {
+                            Text(verbatim: label)
+                                .font(.system(size: size * 0.55, weight: .bold))
+                                .minimumScaleFactor(0.35)
+                                .foregroundStyle(foreground)
+                                .frame(width: size * 0.75, height: size * 0.75)
+                        }
+                    }
+                    .position(
+                        x: (CGFloat(point.column) + 0.5) * size,
+                        y: (CGFloat(point.row) + 0.5) * size
+                    )
+                }
+            }
+        }
+        .frame(
+            width: size * CGFloat(boardPosition.width),
+            height: size * CGFloat(boardPosition.height)
+        )
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var emptyPointBackground: Color {
+        widgetRenderingMode == .fullColor
+            ? Color(red: 0.86, green: 0.69, blue: 0.42)
+            : Color.white.opacity(0.8)
+    }
+
+    private func markerColor(at point: BoardPoint) -> Color {
+        if boardPosition[point.row, point.column] == .hasStone(.black) {
+            return .white
+        }
+        return .black
+    }
+}
+
+private struct BoardMarkShapeView: Shape {
+    let shape: BoardMarkShape
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        switch shape {
+        case .triangle:
+            path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
+        case .square:
+            path.addRect(rect)
+        case .circle:
+            path.addEllipse(in: rect)
+        case .cross:
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        }
+        return path
+    }
+}
+
+private struct BoardMarkupEditingOverlay: View {
+    private enum GestureMode {
+        case paint
+        case clear
+    }
+
+    @Environment(\.displayScale) private var displayScale
+    @ObservedObject var boardPosition: BoardPosition
+    @Binding var markups: BoardMarkups
+    @Binding var tool: AnalyzeBoardTool
+    var geometry: GeometryProxy
+    @State private var visitedPoints = Set<BoardPoint>()
+    @State private var gestureMode: GestureMode?
+    #if MAIN_APP
+    @State private var selectionFeedbackGenerator: UISelectionFeedbackGenerator?
+    #endif
+    @Setting(.hapticsFeedback) private var hapticsFeedback: Bool
+
+    var body: some View {
+        let size = stoneSize(
+            geometry: geometry,
+            boardSize: max(boardPosition.width, boardPosition.height),
+            displayScale: displayScale
+        )
+
+        Color.clear
+            .frame(
+                width: size * CGFloat(boardPosition.width),
+                height: size * CGFloat(boardPosition.height)
+            )
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        editPoint(at: value.location, cellSize: size)
+                    }
+                    .onEnded { _ in
+                        #if MAIN_APP
+                        if !visitedPoints.isEmpty && hapticsFeedback {
+                            SystemPlatformServices.shared
+                                .playNotificationFeedback(.success)
+                        }
+                        selectionFeedbackGenerator = nil
+                        #endif
+                        visitedPoints.removeAll()
+                        gestureMode = nil
+                    }
+            )
+    }
+
+    private func editPoint(at location: CGPoint, cellSize: CGFloat) {
+        let row = Int((location.y / cellSize - 0.5).rounded())
+        let column = Int((location.x / cellSize - 0.5).rounded())
+        guard row >= 0,
+              row < boardPosition.height,
+              column >= 0,
+              column < boardPosition.width else {
+            return
+        }
+
+        let point = BoardPoint(row: row, column: column)
+        guard visitedPoints.insert(point).inserted else {
+            return
+        }
+        if gestureMode == nil {
+            gestureMode = tool == .eraser || tool.matches(markups[point])
+                ? .clear
+                : .paint
+        }
+
+        var updatedMarkups = markups
+        switch gestureMode {
+        case .clear:
+            updatedMarkups[point] = nil
+        case .paint:
+            updatedMarkups.paint(tool, at: point)
+        case nil:
+            break
+        }
+        markups = updatedMarkups
+
+        #if MAIN_APP
+        if selectionFeedbackGenerator == nil && hapticsFeedback {
+            selectionFeedbackGenerator = SystemPlatformServices.shared
+                .makeSelectionFeedbackGenerator()
+        }
+        selectionFeedbackGenerator?.selectionChanged()
+        #endif
+    }
+}
+
 struct BoardView: View {
     var widgetRenderingMode: WidgetRenderingMode = .fullColor
     @ObservedObject var boardPosition: BoardPosition
@@ -542,6 +738,8 @@ struct BoardView: View {
     var cornerRadius: CGFloat = 0.0
     var highlightCoordinates: [[Int]] = []
     var undoRequestCoordinates: [[Int]] = []
+    var boardTool: Binding<AnalyzeBoardTool> = .constant(.moves)
+    var markups: Binding<BoardMarkups> = .constant([:])
     
     var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
@@ -561,7 +759,11 @@ struct BoardView: View {
                     isHoveredPointValid: isHoveredPointValid,
                     selectedPoint: $selectedPoint
                 )
-                .allowsHitTesting(playable && displayedPosition.estimatedScores == nil)
+                .allowsHitTesting(
+                    playable
+                        && boardTool.wrappedValue == .moves
+                        && displayedPosition.estimatedScores == nil
+                )
                 .onChange(of: hoveredPoint) { _, value in
                     isHoveredPointValid = nil
                     if let hoveredPoint = hoveredPoint {
@@ -587,7 +789,25 @@ struct BoardView: View {
                     isLastMovePending: newMove.wrappedValue != nil,
                     undoRequestCoordinates: undoRequestCoordinates
                 )
-                MarkerOverlay(boardPosition: boardPosition, geometry: boardGeometry, highlightCoordinates: highlightCoordinates)
+                BoardMarkupOverlay(
+                    boardPosition: boardPosition,
+                    markups: markups.wrappedValue,
+                    geometry: boardGeometry,
+                    widgetRenderingMode: widgetRenderingMode
+                )
+                CoordinateHighlightOverlay(
+                    boardPosition: boardPosition,
+                    geometry: boardGeometry,
+                    highlightCoordinates: highlightCoordinates
+                )
+                if playable && boardTool.wrappedValue != .moves {
+                    BoardMarkupEditingOverlay(
+                        boardPosition: boardPosition,
+                        markups: markups,
+                        tool: boardTool,
+                        geometry: boardGeometry
+                    )
+                }
                 if stoneRemovable {
                     StoneRemovalOverlay(
                         boardPosition: boardPosition,
@@ -623,6 +843,13 @@ struct BoardView: View {
                     )
             }
         }
+        .onChange(of: boardTool.wrappedValue) { _, _ in
+            hoveredPoint = nil
+            selectedPoint = nil
+            isHoveredPointValid = nil
+            newMove.wrappedValue = nil
+            newPosition.wrappedValue = nil
+        }
     }
 }
 
@@ -635,6 +862,21 @@ struct BoardView: View {
         variation: chatLine.variation,
         showsCoordinate: true,
         highlightCoordinates: [[2, 2]]
+    )
+}
+
+#Preview("Board markers", traits: .fixedLayout(width: 375, height: 375)) {
+    let position = TestData.Resigned9x9Japanese.currentPosition
+    BoardView(
+        boardPosition: position,
+        showsCoordinate: true,
+        markups: .constant([
+            BoardPoint(row: 2, column: 2): BoardMarkup(label: "A"),
+            BoardPoint(row: 3, column: 3): BoardMarkup(shapes: [.triangle]),
+            BoardPoint(row: 4, column: 4): BoardMarkup(shapes: [.square]),
+            BoardPoint(row: 5, column: 5): BoardMarkup(shapes: [.circle]),
+            BoardPoint(row: 6, column: 6): BoardMarkup(shapes: [.cross])
+        ])
     )
 }
 

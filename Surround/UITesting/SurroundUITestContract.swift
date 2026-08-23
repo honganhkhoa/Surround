@@ -393,6 +393,10 @@ enum SurroundUITestContract {
         static let gameAnalyzeToggle = "game.analyze"
         static let gameAnalyzeControlBar = "game.analyze.controls"
         static let gameAnalyzeActionsMenu = "game.analyze.actions"
+        static let gameAnalyzeMarkerMenu = "game.analyze.markers"
+        static func gameAnalyzeMarkerTool(_ tool: String) -> String {
+            "game.analyze.markers.\(tool)"
+        }
         static let gameAnalyzePreviousBranch = "game.analyze.previousBranch"
         static let gameAnalyzeNextBranch = "game.analyze.nextBranch"
         static let gameAnalyzeBackToFork = "game.analyze.backToFork"

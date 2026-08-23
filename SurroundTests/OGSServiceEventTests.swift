@@ -151,7 +151,13 @@ final class OGSServiceEventTests: XCTestCase {
         game.ogs = service
         service.user = game.blackPlayer
         service.isLoggedIn = true
-        let variation = try makeShareableVariation(in: game)
+        var variation = try makeShareableVariation(in: game)
+        variation.markups = [
+            BoardPoint(row: 2, column: 4): BoardMarkup(label: "A"),
+            BoardPoint(row: 0, column: 0): BoardMarkup(
+                shapes: [.triangle]
+            ),
+        ]
         service.connect(
             to: game,
             withChat: true,
@@ -179,6 +185,86 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(body["from"] as? Int, 1)
         XCTAssertEqual(body["moves"] as? String, "bb..")
         XCTAssertEqual(body["name"] as? String, "Study line")
+        let marks = try XCTUnwrap(body["marks"] as? [String: String])
+        XCTAssertEqual(marks["A"], "ec")
+        XCTAssertEqual(marks["triangle"], "aa")
+    }
+
+    func testShareMarksOnlyVariationFromMainBranchPosition() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 246))
+        game.ogs = service
+        service.user = game.blackPlayer
+        service.isLoggedIn = true
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+        socket.emissions.removeAll()
+        let position = game.currentPosition
+        let variation = Variation(
+            position: position,
+            basePosition: position,
+            moves: [],
+            markups: [
+                BoardPoint(row: 0, column: 0): BoardMarkup(label: "A")
+            ]
+        )
+
+        try service.shareVariation(
+            variation,
+            in: game,
+            channel: .main,
+            name: "Marks only"
+        )
+
+        let emission = try XCTUnwrap(socket.emissions.first)
+        let payload = try XCTUnwrap(emission.data as? [String: Any])
+        let body = try XCTUnwrap(payload["body"] as? [String: Any])
+        XCTAssertEqual(body["from"] as? Int, position.lastMoveNumber)
+        XCTAssertEqual(body["moves"] as? String, "")
+        XCTAssertEqual((body["marks"] as? [String: String])?["A"], "aa")
+    }
+
+    func testReceivedMarksOnlyVariationDoesNotMutateLivePosition() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 247))
+        game.ogs = service
+        let livePosition = game.currentPosition
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+
+        socket.deliver(
+            name: "game/247/chat",
+            data: analysisChatEvent(
+                name: "Marks only",
+                from: livePosition.lastMoveNumber,
+                moves: "",
+                marks: ["A": "ec", "triangle": "aa"]
+            )
+        )
+
+        let receivedVariation = try XCTUnwrap(game.chatLog.last?.variation)
+        XCTAssertTrue(game.currentPosition === livePosition)
+        XCTAssertTrue(receivedVariation.basePosition === livePosition)
+        XCTAssertTrue(receivedVariation.position === livePosition)
+        XCTAssertTrue(receivedVariation.moves.isEmpty)
+        XCTAssertEqual(
+            receivedVariation.markups[BoardPoint(row: 2, column: 4)]?.label,
+            "A"
+        )
+        XCTAssertEqual(
+            receivedVariation.markups[
+                BoardPoint(row: 0, column: 0)
+            ]?.shapes,
+            [.triangle]
+        )
     }
 
     func testShareVariationAutoNamesFromReceivedAndReservedNumbersAndResolvesSpectatorChannel() throws {
@@ -206,8 +292,18 @@ final class OGSServiceEventTests: XCTestCase {
             data: analysisChatEvent(
                 name: "Variation 4",
                 from: 1,
-                moves: "bb.."
+                moves: "bb..",
+                marks: ["A": "ec", "circle": "aa"]
             )
+        )
+        let receivedVariation = try XCTUnwrap(game.chatLog.last?.variation)
+        XCTAssertEqual(
+            receivedVariation.markups[BoardPoint(row: 2, column: 4)]?.label,
+            "A"
+        )
+        XCTAssertEqual(
+            receivedVariation.markups[BoardPoint(row: 0, column: 0)]?.shapes,
+            [.circle]
         )
         socket.emissions.removeAll()
 
@@ -251,6 +347,9 @@ final class OGSServiceEventTests: XCTestCase {
             }),
             ["main"]
         )
+        XCTAssertTrue(chatEmissions.allSatisfy {
+            (($0.data as? [String: Any])?["body"] as? [String: Any])?["marks"] == nil
+        })
     }
 
     func testShareVariationRejectsUnavailableSocketChatAndStaleVariationWithoutEmission() throws {
@@ -1672,17 +1771,22 @@ final class OGSServiceEventTests: XCTestCase {
     private func analysisChatEvent(
         name: String,
         from: Int,
-        moves: String
+        moves: String,
+        marks: [String: String]? = nil
     ) -> [String: Any] {
-        [
+        var body: [String: Any] = [
+            "type": "analysis",
+            "from": from,
+            "moves": moves,
+            "name": name,
+        ]
+        if let marks {
+            body["marks"] = marks
+        }
+        return [
             "channel": "main",
             "line": [
-                "body": [
-                    "type": "analysis",
-                    "from": from,
-                    "moves": moves,
-                    "name": name,
-                ],
+                "body": body,
                 "chat_id": "received-analysis-\(name)",
                 "date": 1_700_000_000.0,
                 "move_number": 2,

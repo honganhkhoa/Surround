@@ -121,7 +121,11 @@ struct ChatLine: View {
                             .font(.caption2.bold())
                             .foregroundStyle(.secondary)
                         if let variation = chatLine.variation {
-                            BoardView(boardPosition: variation.position, variation: variation)
+                            BoardView(
+                                boardPosition: variation.position,
+                                variation: variation,
+                                markups: .constant(variation.markups)
+                            )
                                 .frame(width: 176, height: 176)
                                 .padding(.top, 5)
                         }
