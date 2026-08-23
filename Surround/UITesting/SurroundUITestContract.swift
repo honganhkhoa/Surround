@@ -417,6 +417,7 @@ enum SurroundUITestContract {
         }
         static let gameChatInput = "game.chat.input"
         static let gameChatSend = "game.chat.send"
+        static let gameVariationSharePreview = "game.variationShare.preview"
         static let gameVariationShareStatus = "game.variationShare.status"
         static let gameVariationShareCancel = "game.variationShare.cancel"
         static let gameChatBoardHide = "game.chat.board.hide"

@@ -31,6 +31,8 @@ struct GameDetailView: View {
     @State private var compactDisplayMode =
         SingleGameView.DisplayMode.playerInfo
     @State private var showsCompactChatBoard = true
+    @State private var variationShareDraft: VariationShareDraft?
+    @State private var selectedChatChannel = OGSChatSendChannel.main
 
     @ObservedObject var settings = userDefaults
     
@@ -160,7 +162,9 @@ struct GameDetailView: View {
                         attachedKeyboardVisible:
                             self.effectiveAttachedKeyboardVisible,
                         compactDisplayMode: $compactDisplayMode,
-                        showsCompactChatBoard: showsCompactChatBoard,
+                        showsCompactChatBoard: $showsCompactChatBoard,
+                        variationShareDraft: $variationShareDraft,
+                        selectedChatChannel: $selectedChatChannel,
                         analyzeMode: self.$analyzeMode,
                         shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
                     )
@@ -194,7 +198,9 @@ struct GameDetailView: View {
                         attachedKeyboardVisible:
                             self.effectiveAttachedKeyboardVisible,
                         compactDisplayMode: $compactDisplayMode,
-                        showsCompactChatBoard: showsCompactChatBoard,
+                        showsCompactChatBoard: $showsCompactChatBoard,
+                        variationShareDraft: $variationShareDraft,
+                        selectedChatChannel: $selectedChatChannel,
                         analyzeMode: self.$analyzeMode
                     )
                 }
@@ -300,8 +306,14 @@ struct GameDetailView: View {
         }
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
+                variationShareDraft = nil
+                selectedChatChannel = .main
                 updateDetailOfCurrentGameIfNecessary()
             }
+        }
+        .onChange(of: ogs.user?.id) { _, _ in
+            variationShareDraft = nil
+            selectedChatChannel = .main
         }
         .onDisappear {
             detailConnection.release(using: ogs)

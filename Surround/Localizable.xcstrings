@@ -17909,7 +17909,7 @@
       }
     },
     "Recording variation" : {
-      "comment" : "Short game-board status shown while the selected analyzed variation is being prepared for Malkovich or personal chat, where it is recorded privately rather than shared publicly.",
+      "comment" : "Title shown beside a draft variation preview while it is being prepared for Malkovich or personal chat, where it is recorded privately rather than shared publicly.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19635,7 +19635,7 @@
       }
     },
     "Sharing variation" : {
-      "comment" : "Short game-board status shown while the selected analyzed variation is being prepared for public game chat.",
+      "comment" : "Title shown beside a draft variation preview while it is being prepared for public game chat.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

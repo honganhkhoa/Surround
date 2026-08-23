@@ -46,8 +46,6 @@ struct GameControlRow: View {
     var pendingMove: Binding<Move?> = .constant(nil)
     var pendingPosition: Binding<BoardPosition?> = .constant(nil)
     var goToNextGame: (() -> ())?
-    var variationSharingChannel: OGSChatSendChannel?
-    var cancelVariationSharing: (() -> Void)?
     @State var ogsRequestCancellable: AnyCancellable?
     var stoneRemovalOption: Binding<StoneRemovalOption> = .constant(.toggleGroup)
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
@@ -143,36 +141,9 @@ struct GameControlRow: View {
         return gamesWaiting > 0 ? gamesWaiting : nil
     }
 
-    private func variationSharingStatus(
-        for channel: OGSChatSendChannel
-    ) -> LocalizedStringResource {
-        switch channel {
-        case .main:
-            return LocalizedStringResource(
-                "Sharing variation",
-                comment: "Short game-board status shown while the selected analyzed variation is being prepared for public game chat."
-            )
-        case .malkovich, .personal:
-            return LocalizedStringResource(
-                "Recording variation",
-                comment: "Short game-board status shown while the selected analyzed variation is being prepared for Malkovich or personal chat, where it is recorded privately rather than shared publicly."
-            )
-        }
-    }
-    
     var statusText: some View {
         Group {
-            if let variationSharingChannel {
-                Text(variationSharingStatus(for: variationSharingChannel))
-                    .font(Font.title2.bold())
-                    .lineLimit(1)
-                    .allowsTightening(true)
-                    .minimumScaleFactor(0.7)
-                    .accessibilityIdentifier(
-                        SurroundUITestContract.AccessibilityID
-                            .gameVariationShareStatus
-                    )
-            } else if game.canAcceptUndo || game.canCancelUndo {
+            if game.canAcceptUndo || game.canCancelUndo {
                 Menu {
                     if game.canAcceptUndo {
                         Button(action: { ogs.acceptUndo(game: game) }) {
@@ -303,18 +274,7 @@ struct GameControlRow: View {
     
     var mainActionButton: some View {
         Group {
-            if variationSharingChannel != nil {
-                Button("Cancel") {
-                    cancelVariationSharing?()
-                }
-                .padding(10)
-                .contentShape(RoundedRectangle(cornerRadius: 10))
-                .hoverEffect(.highlight)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID
-                        .gameVariationShareCancel
-                )
-            } else if ogsRequestCancellable == nil {
+            if ogsRequestCancellable == nil {
                 if let userColor = game.userStoneColor {
                     let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
                     let userNeedsToAcceptStoneRemoval =
@@ -523,13 +483,4 @@ private func gameControlRowPreviewData() -> (games: [Game], ogs: OGSService) {
     .environmentObject(previewData.ogs)
 }
 
-#Preview("Variation sharing controls", traits: .fixedLayout(width: 320, height: 60)) {
-    let previewData = gameControlRowPreviewData()
-    GameControlRow(
-        game: previewData.games[2],
-        variationSharingChannel: .main,
-        cancelVariationSharing: {}
-    )
-    .environmentObject(previewData.ogs)
-}
 #endif

@@ -28,7 +28,9 @@ struct SingleGameView: View {
     var attachedKeyboardVisible = false
     
     @Binding var compactDisplayMode: DisplayMode
-    var showsCompactChatBoard = true
+    var showsCompactChatBoard: Binding<Bool> = .constant(true)
+    var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
+    var selectedChatChannel: Binding<OGSChatSendChannel> = .constant(.main)
     @State var showCompactModeSwitcher = true
     var analyzeMode: Binding<Bool> = .constant(false)
     var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
@@ -38,8 +40,6 @@ struct SingleGameView: View {
     @State private var selectedChatItem: ChatLogSelection?
     
     @State var analyticsPosition: BoardPosition?
-    @State private var selectedChatChannel = OGSChatSendChannel.main
-    @State private var variationShareDraft: VariationShareDraft?
     
     @State var analyticsPendingMove: Move? = nil
     @State var analyticsPendingPosition: BoardPosition? = nil
@@ -64,15 +64,6 @@ struct SingleGameView: View {
         var deletesVariations = false
     }
 
-    private var variationSharingChannel: OGSChatSendChannel? {
-        guard variationShareDraft != nil else {
-            return nil
-        }
-        return selectedChatChannel.resolved(
-            isUserPlaying: game.isUserPlaying
-        )
-    }
-
     private var chatSelection: Binding<ChatLogSelection?> {
         Binding(
             get: { selectedChatItem },
@@ -85,12 +76,30 @@ struct SingleGameView: View {
         )
     }
 
+    private var currentGameVariationShareDraft: Binding<VariationShareDraft?> {
+        Binding(
+            get: {
+                guard let draft = variationShareDraft.wrappedValue,
+                      draft.gameID == game.ID else {
+                    return nil
+                }
+                return draft
+            },
+            set: { draft in
+                guard draft == nil || draft?.gameID == game.ID else {
+                    return
+                }
+                variationShareDraft.wrappedValue = draft
+            }
+        )
+    }
+
     private var showsCompactHorizontalControlRow: Bool {
         compactDisplayMode != .analyze
             && (
                 !attachedKeyboardVisible
                     || (compactDisplayMode == .chat
-                        && !showsCompactChatBoard)
+                        && !showsCompactChatBoard.wrappedValue)
             )
     }
     
@@ -100,8 +109,6 @@ struct SingleGameView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            variationSharingChannel: variationSharingChannel,
-            cancelVariationSharing: cancelVariationSharingAndReturnToAnalyze,
             stoneRemovalOption: $stoneRemovalOption,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
@@ -114,8 +121,6 @@ struct SingleGameView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            variationSharingChannel: variationSharingChannel,
-            cancelVariationSharing: cancelVariationSharingAndReturnToAnalyze,
             stoneRemovalOption: $stoneRemovalOption,
             stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
         )
@@ -124,14 +129,7 @@ struct SingleGameView: View {
     var boardView: some View {
         let selectedChatPreview = selectedChatItem?.preview
         return ZStack {
-            if let variationShareDraft {
-                BoardView(
-                    boardPosition: variationShareDraft.variation.position,
-                    variation: variationShareDraft.variation,
-                    showsCoordinate: showsBoardCoordinates
-                        && !(compact && attachedKeyboardVisible)
-                )
-            } else if let selectedChatPosition = selectedChatPreview?.position {
+            if let selectedChatPosition = selectedChatPreview?.position {
                 BoardView(
                     boardPosition: selectedChatPosition,
                     variation: selectedChatPreview?.variation,
@@ -180,10 +178,49 @@ struct SingleGameView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .allowsHitTesting(false)
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameBoard)
+                    .accessibilityValue(
+                        Text(verbatim: boardUITestAccessibilityValue)
+                    )
             }
             #endif
         }
     }
+
+    #if DEBUG && MAIN_APP
+    private var boardUITestAccessibilityValue: String {
+        if let preview = selectedChatItem?.preview,
+           let position = preview.position {
+            return boardUITestAccessibilityValue(
+                position: position,
+                variation: preview.variation
+            )
+        }
+        if let analyticsPosition,
+           compactDisplayMode == .analyze || analyzeMode.wrappedValue {
+            return boardUITestAccessibilityValue(
+                position: analyticsPosition,
+                variation: game.moveTree.variation(to: analyticsPosition)
+            )
+        }
+        return boardUITestAccessibilityValue(
+            position: game.currentPosition,
+            variation: nil
+        )
+    }
+
+    private func boardUITestAccessibilityValue(
+        position: BoardPosition,
+        variation: Variation?
+    ) -> String {
+        if let variation {
+            return "variation:\(variation.basePosition.lastMoveNumber):"
+                + variation.moves.map { $0.toOGSString() }
+                    .joined(separator: "-")
+        }
+        return "position:\(position.lastMoveNumber):"
+            + (position.lastMove?.toOGSString() ?? "none")
+    }
+    #endif
     
     var userColor: StoneColor {
         return game.userStoneColor ?? .white
@@ -192,10 +229,6 @@ struct SingleGameView: View {
     private func showConditionalVariation(
         _ branch: ConditionalMoveBranch
     ) {
-        // Choosing another branch is an explicit navigation away from the
-        // variation being shared, so keep that destination instead of letting
-        // the Analyze-mode observer restore the original share snapshot.
-        variationShareDraft = nil
         selectedChatItem = nil
         analyticsPosition = branch.position
         withAnimation {
@@ -225,42 +258,25 @@ struct SingleGameView: View {
         analyticsPendingMove = nil
         analyticsPendingPosition = nil
         selectedChatItem = nil
-        variationShareDraft = VariationShareDraft(
+        variationShareDraft.wrappedValue = VariationShareDraft(
             gameID: game.ID,
             variation: variation
         )
         withAnimation {
             if compact {
+                showsCompactChatBoard.wrappedValue = false
                 compactDisplayMode = .chat
                 analyzeMode.wrappedValue = false
             }
         }
     }
 
-    private func cancelVariationSharingAndReturnToAnalyze() {
-        guard let draft = variationShareDraft else {
-            return
-        }
-
-        variationShareDraft = nil
-        analyticsPosition = game.ID == draft.gameID
-            && game.moveTree.contains(draft.variation.position)
-            ? draft.variation.position
-            : game.currentPosition
-        withAnimation {
-            if compact {
-                compactDisplayMode = .analyze
-            }
-            analyzeMode.wrappedValue = true
-        }
+    private func cancelVariationSharing() {
+        variationShareDraft.wrappedValue = nil
     }
 
     private func finishVariationSharing() {
-        variationShareDraft = nil
-    }
-
-    private func discardVariationSharing() {
-        variationShareDraft = nil
+        variationShareDraft.wrappedValue = nil
     }
     
     var topLeftPlayerColor: StoneColor {
@@ -357,10 +373,12 @@ struct SingleGameView: View {
             ChatLog(
                 game: game,
                 selection: chatSelection,
-                selectedChannel: $selectedChatChannel,
-                variationShareDraft: $variationShareDraft,
+                selectedChannel: selectedChatChannel,
+                variationShareDraft: currentGameVariationShareDraft,
                 focusInputOnAppear: true,
-                onVariationShared: finishVariationSharing
+                onVariationShared: finishVariationSharing,
+                onCancelVariationSharing:
+                    cancelVariationSharing
             )
             .zIndex(-1)
         }
@@ -568,7 +586,8 @@ struct SingleGameView: View {
                     .padding(.horizontal)
                 Spacer(minLength: 10)
             }
-            if compactDisplayMode != .chat || showsCompactChatBoard {
+            if compactDisplayMode != .chat
+                || showsCompactChatBoard.wrappedValue {
                 if attachedKeyboardVisible && compactBoardSize < 320 {
                     EmptyView()
                 } else {
@@ -611,17 +630,6 @@ struct SingleGameView: View {
             if oldValue == .chat && newValue != .chat {
                 selectedChatItem = nil
             }
-            if oldValue == .chat,
-               newValue != .chat,
-               let draft = variationShareDraft {
-                variationShareDraft = nil
-                if newValue == .analyze {
-                    analyticsPosition = game.ID == draft.gameID
-                        && game.moveTree.contains(draft.variation.position)
-                        ? draft.variation.position
-                        : game.currentPosition
-                }
-            }
             withAnimation {
                 shouldHideActiveGamesCarousel.wrappedValue = newValue != .playerInfo
                 if newValue == .analyze, analyticsPosition == nil {
@@ -645,9 +653,11 @@ struct SingleGameView: View {
                     ChatLog(
                         game: game,
                         selection: chatSelection,
-                        selectedChannel: $selectedChatChannel,
-                        variationShareDraft: $variationShareDraft,
-                        onVariationShared: finishVariationSharing
+                        selectedChannel: selectedChatChannel,
+                        variationShareDraft: currentGameVariationShareDraft,
+                        onVariationShared: finishVariationSharing,
+                        onCancelVariationSharing:
+                            cancelVariationSharing
                     )
                         .frame(height: chatHeight)
                     Spacer(minLength: 15)
@@ -661,8 +671,7 @@ struct SingleGameView: View {
                             onSelectConditionalVariation:
                                 showConditionalVariation
                         )
-                        if !analyzeMode.wrappedValue
-                            || variationShareDraft != nil {
+                        if !analyzeMode.wrappedValue {
                             Spacer(minLength: 15).frame(maxHeight: 15)
                             controlRow
                         }
@@ -728,8 +737,7 @@ struct SingleGameView: View {
                                         showConditionalVariation
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            if !analyzeMode.wrappedValue
-                                || variationShareDraft != nil {
+                            if !analyzeMode.wrappedValue {
                                 if horizontalPlayerInfoWidth < 350 {
                                     verticalControlRow
                                         .padding(.bottom, -15)
@@ -740,9 +748,12 @@ struct SingleGameView: View {
                             ChatLog(
                                 game: game,
                                 selection: chatSelection,
-                                selectedChannel: $selectedChatChannel,
-                                variationShareDraft: $variationShareDraft,
-                                onVariationShared: finishVariationSharing
+                                selectedChannel: selectedChatChannel,
+                                variationShareDraft:
+                                    currentGameVariationShareDraft,
+                                onVariationShared: finishVariationSharing,
+                                onCancelVariationSharing:
+                                    cancelVariationSharing
                             )
                         }
                         boardView.frame(width: boardSize, height: boardSize)
@@ -940,56 +951,25 @@ struct SingleGameView: View {
         }
         .onDisappear {
             self.stonePlacingPlayer = nil
-            discardVariationSharing()
             selectedChatItem = nil
         }
         .onChange(of: analyzeMode.wrappedValue) { _, newValue in
             if newValue {
                 selectedChatItem = nil
-                if let draft = variationShareDraft {
-                    variationShareDraft = nil
-                    analyticsPosition = game.ID == draft.gameID
-                        && game.moveTree.contains(draft.variation.position)
-                        ? draft.variation.position
-                        : game.currentPosition
-                } else if analyticsPosition == nil {
+                if analyticsPosition == nil {
                     analyticsPosition = game.currentPosition
                 }
             } else if !newValue {
                 analyticsPosition = nil
             }
         }
-        .onChange(of: analyticsPosition.map(ObjectIdentifier.init)) { _, newPositionID in
-            guard variationShareDraft != nil,
-                  !compact || compactDisplayMode == .analyze else {
-                return
-            }
-
-            // Selecting a chat preview exits Analyze by clearing its position.
-            // Keep the sharing snapshot for that mode transition; a real tree
-            // navigation still supplies a new position and ends sharing.
-            if newPositionID == nil, selectedChatItem != nil {
-                return
-            }
-
-            // Analyze navigation is an explicit choice to leave the snapshot
-            // being shared. Compact sharing clears this position while it
-            // switches to Chat, so exempt that bookkeeping transition.
-            discardVariationSharing()
-        }
         .onChange(of: zenMode) { _, newValue in
             if newValue {
-                discardVariationSharing()
                 selectedChatItem = nil
             }
         }
         .onChange(of: game.ID) { _, _ in
-            discardVariationSharing()
             selectedChatItem = nil
-            selectedChatChannel = .main
-        }
-        .onChange(of: ogs.user?.id) { _, _ in
-            discardVariationSharing()
         }
         .onChange(of: game.conditionalMoveBranches.map(\.id)) {
             if let analyticsPosition,

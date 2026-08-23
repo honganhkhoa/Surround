@@ -54,6 +54,7 @@ struct ChatLog: View {
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var focusInputOnAppear = false
     var onVariationShared: () -> Void = {}
+    var onCancelVariationSharing: () -> Void = {}
     
     @State var atEndOfChat = false
     @State var shouldScrollToEndAfterKeyboardChange = false
@@ -277,7 +278,8 @@ struct ChatLog: View {
                     variationShareDraft: variationShareDraft,
                     focusInputOnAppear: focusInputOnAppear,
                     inputDismissalRequest: inputDismissalRequest,
-                    onVariationShared: onVariationShared
+                    onVariationShared: onVariationShared,
+                    onCancelVariationSharing: onCancelVariationSharing
                 )
                     .id(game.ID)
             }
@@ -289,6 +291,78 @@ struct ChatLog: View {
         .onDisappear(perform: clearSelection)
         .onChange(of: game.ID) { _, _ in
             clearSelection()
+        }
+    }
+}
+
+private struct VariationSharePreviewRow: View {
+    let variation: Variation
+    let channel: OGSChatSendChannel
+    let onCancel: () -> Void
+
+    private var title: LocalizedStringResource {
+        switch channel {
+        case .main:
+            return LocalizedStringResource(
+                "Sharing variation",
+                comment: "Title shown beside a draft variation preview while it is being prepared for public game chat."
+            )
+        case .malkovich, .personal:
+            return LocalizedStringResource(
+                "Recording variation",
+                comment: "Title shown beside a draft variation preview while it is being prepared for Malkovich or personal chat, where it is recorded privately rather than shared publicly."
+            )
+        }
+    }
+
+    private var accessibilityValue: String {
+        "\(variation.basePosition.lastMoveNumber):"
+            + variation.moves.map { $0.toOGSString() }.joined(separator: "-")
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            BoardView(
+                boardPosition: variation.position,
+                variation: variation
+            )
+            .frame(width: 120, height: 120)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(title))
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID
+                    .gameVariationSharePreview
+            )
+            .accessibilityValue(
+                Text(verbatim: accessibilityValue),
+                isEnabled: SurroundUITestContract.isEnabled
+            )
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(title)
+                    .font(Font.title2.bold())
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
+                    .allowsTightening(true)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID
+                            .gameVariationShareStatus
+                    )
+                Spacer(minLength: 0)
+                Button("Cancel", action: onCancel)
+                    .padding(10)
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                    .hoverEffect(.highlight)
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID
+                            .gameVariationShareCancel
+                    )
+            }
+            .frame(height: 120)
         }
     }
 }
@@ -327,6 +401,7 @@ struct NewChatInput: View {
     var focusInputOnAppear = false
     var inputDismissalRequest = 0
     var onVariationShared: () -> Void = {}
+    var onCancelVariationSharing: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
     
     @State private var chatSendingCancellable: AnyCancellable?
@@ -505,96 +580,110 @@ struct NewChatInput: View {
     }
     
     var body: some View {
-        HStack {
-            if game.isUserPlaying {
-                Menu {
-                    channelMenuButton(
-                        .main,
-                        title: channelTitle(.main),
-                        subtitle: LocalizedStringResource(
-                            "Visible to everyone",
-                            comment: "Subtitle for the public game-chat channel"
+        VStack(spacing: 0) {
+            if let draft = variationShareDraft.wrappedValue {
+                VariationSharePreviewRow(
+                    variation: draft.variation,
+                    channel: selectedChannel.wrappedValue.resolved(
+                        isUserPlaying: game.isUserPlaying
+                    ),
+                    onCancel: onCancelVariationSharing
+                )
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+            }
+
+            HStack {
+                if game.isUserPlaying {
+                    Menu {
+                        channelMenuButton(
+                            .main,
+                            title: channelTitle(.main),
+                            subtitle: LocalizedStringResource(
+                                "Visible to everyone",
+                                comment: "Subtitle for the public game-chat channel"
+                            )
+                        )
+                        channelMenuButton(
+                            .malkovich,
+                            title: channelTitle(.malkovich),
+                            subtitle: LocalizedStringResource(
+                                "Hidden from opponent, visible to spectators",
+                                comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
+                            )
+                        )
+                        channelMenuButton(
+                            .personal,
+                            title: channelTitle(.personal),
+                            subtitle: personalVisibilityDescription
+                        )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(selectedChannelTitle)
+                                .lineLimit(1)
+                                .allowsTightening(true)
+                                .minimumScaleFactor(0.8)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2.bold())
+                        }
+                    }
+                    .layoutPriority(1)
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID
+                            .gameChatChannelPicker
+                    )
+                    .accessibilityLabel(
+                        Text(
+                            "Chat channel",
+                            comment: "Accessibility label for the menu that selects who can see a game-chat message"
                         )
                     )
-                    channelMenuButton(
-                        .malkovich,
-                        title: channelTitle(.malkovich),
-                        subtitle: LocalizedStringResource(
-                            "Hidden from opponent, visible to spectators",
-                            comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
-                        )
-                    )
-                    channelMenuButton(
-                        .personal,
-                        title: channelTitle(.personal),
-                        subtitle: personalVisibilityDescription
-                    )
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(selectedChannelTitle)
+                    .accessibilityValue(Text(selectedChannelTitle))
+                    Divider()
+                        .frame(height: channelDividerHeight)
+                }
+                TextField(text: inputText) {
+                    EmptyView()
+                }
+                .focused($isInputFocused)
+                .background(alignment: .leading) {
+                    if inputText.wrappedValue.isEmpty {
+                        Text(channelPlaceholder)
+                            .foregroundStyle(Color(.placeholderText))
                             .lineLimit(1)
                             .allowsTightening(true)
-                            .minimumScaleFactor(0.8)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2.bold())
+                            .minimumScaleFactor(0.7)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
                 }
-                .layoutPriority(1)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID
-                        .gameChatChannelPicker
-                )
                 .accessibilityLabel(
-                    Text(
-                        "Chat channel",
-                        comment: "Accessibility label for the menu that selects who can see a game-chat message"
-                    )
-                )
-                .accessibilityValue(Text(selectedChannelTitle))
-                Divider()
-                    .frame(height: channelDividerHeight)
-            }
-            TextField(text: inputText) {
-                EmptyView()
-            }
-            .focused($isInputFocused)
-            .background(alignment: .leading) {
-                if inputText.wrappedValue.isEmpty {
                     Text(channelPlaceholder)
-                        .foregroundStyle(Color(.placeholderText))
-                        .lineLimit(1)
-                        .allowsTightening(true)
-                        .minimumScaleFactor(0.7)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-            .accessibilityLabel(
-                Text(channelPlaceholder)
-            )
-            .accessibilityIdentifier(
-                SurroundUITestContract.AccessibilityID.gameChatInput
-            )
-            .layoutPriority(1)
-            .submitLabel(.send)
-            .onSubmit {
-                self.send()
-            }
-            if variationShareDraft.wrappedValue != nil
-                || self.chatSendingCancellable == nil {
-                Button(action: send) {
-                    Image(systemName: "arrow.up.circle.fill")
-                }
-                .disabled(!canSend)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameChatSend
                 )
-            } else {
-                ProgressView()
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.gameChatInput
+                )
+                .layoutPriority(1)
+                .submitLabel(.send)
+                .onSubmit {
+                    self.send()
+                }
+                if variationShareDraft.wrappedValue != nil
+                    || self.chatSendingCancellable == nil {
+                    Button(action: send) {
+                        Image(systemName: "arrow.up.circle.fill")
+                    }
+                    .disabled(!canSend)
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.gameChatSend
+                    )
+                } else {
+                    ProgressView()
+                }
             }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 10)
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 10)
         .background(backgroundColor)
         .onAppear {
             if focusInputOnAppear || variationShareDraft.wrappedValue != nil {
@@ -677,7 +766,7 @@ struct NewChatInput: View {
         .environment(\.dynamicTypeSize, .accessibility3)
 }
 
-#Preview("Variation name input", traits: .fixedLayout(width: 350, height: 100)) {
+#Preview("Variation name input", traits: .fixedLayout(width: 350, height: 180)) {
     @Previewable @State var selectedChannel = OGSChatSendChannel.main
     @Previewable @State var variationShareDraft: VariationShareDraft? = {
         let game = TestData.EuropeanChampionshipWithChat
@@ -697,9 +786,41 @@ struct NewChatInput: View {
     return NewChatInput(
         game: game,
         selectedChannel: $selectedChannel,
-        variationShareDraft: $variationShareDraft
+        variationShareDraft: $variationShareDraft,
+        onCancelVariationSharing: {
+            variationShareDraft = nil
+        }
     )
     .environmentObject(ogs)
+}
+
+#Preview("Variation name input — Accessibility", traits: .fixedLayout(width: 350, height: 240)) {
+    @Previewable @State var selectedChannel = OGSChatSendChannel.malkovich
+    @Previewable @State var variationShareDraft: VariationShareDraft? = {
+        let game = TestData.EuropeanChampionshipWithChat
+        return VariationShareDraft(
+            gameID: game.ID,
+            variation: Variation(
+                position: game.currentPosition,
+                basePosition: game.initialPosition
+            )
+        )
+    }()
+    let ogs = OGSService.previewInstance(
+        user: OGSUser(username: "artem92", id: 655950)
+    )
+    let game = TestData.EuropeanChampionshipWithChat
+    game.ogs = ogs
+    return NewChatInput(
+        game: game,
+        selectedChannel: $selectedChannel,
+        variationShareDraft: $variationShareDraft,
+        onCancelVariationSharing: {
+            variationShareDraft = nil
+        }
+    )
+    .environmentObject(ogs)
+    .environment(\.dynamicTypeSize, .accessibility3)
 }
 
 #Preview("New spectator message input", traits: .fixedLayout(width: 350, height: 100)) {
