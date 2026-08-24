@@ -361,6 +361,85 @@ final class SurroundUITests: SurroundUITestCase {
         #endif
     }
 
+    private func enterText(
+        _ text: String,
+        into textField: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        tap(
+            textField,
+            description: SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            file: file,
+            line: line
+        )
+
+        #if !targetEnvironment(macCatalyst)
+        let focused = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hasFocus == true"),
+            object: textField
+        )
+        let focusResult = XCTWaiter.wait(for: [focused], timeout: 10)
+        if focusResult != .completed {
+            keepTextInputHierarchy(
+                textField,
+                in: app,
+                reason: "chat composer not focused"
+            )
+        }
+        XCTAssertEqual(
+            focusResult,
+            .completed,
+            "Expected the chat composer to accept keyboard input",
+            file: file,
+            line: line
+        )
+        #endif
+
+        textField.typeText(text)
+
+        let completeValue = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", text),
+            object: textField
+        )
+        let result = XCTWaiter.wait(for: [completeValue], timeout: 5)
+        if result != .completed {
+            keepTextInputHierarchy(
+                textField,
+                in: app,
+                reason: "incomplete chat composer input"
+            )
+        }
+        XCTAssertEqual(
+            result,
+            .completed,
+            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: textField.value))",
+            file: file,
+            line: line
+        )
+    }
+
+    private func keepTextInputHierarchy(
+        _ textField: XCUIElement,
+        in app: XCUIApplication,
+        reason: String
+    ) {
+        let hierarchy = XCTAttachment(
+            string: """
+            Element:
+            \(textField.debugDescription)
+
+            Application hierarchy:
+            \(app.debugDescription)
+            """
+        )
+        hierarchy.name = "Accessibility hierarchy – \(reason)"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+    }
+
     private func assertSelected(
         _ identifier: String,
         in app: XCUIApplication,
@@ -1169,7 +1248,7 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .textField
         )
-        variationNameInput.typeText(variationName)
+        enterText(variationName, into: variationNameInput, in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
         let mainBoard = element(
             SurroundUITestContract.AccessibilityID.gameBoard,
@@ -1332,12 +1411,7 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .textField
         )
-        replacementNameInput.typeText(replacementName)
-        XCTAssertEqual(
-            replacementNameInput.value as? String,
-            replacementName,
-            "Replacing a shared variation should reset its draft name."
-        )
+        enterText(replacementName, into: replacementNameInput, in: app)
     }
 
     func testChatTextUsesSystemSelectionMenu() throws {
@@ -1856,10 +1930,10 @@ final class SurroundUITests: SurroundUITestCase {
             matching: .textField
         )
         XCTAssertEqual(variationNameInput.label, "Variation name...")
-        variationNameInput.typeText("Focused variation")
-        XCTAssertEqual(
-            variationNameInput.value as? String,
-            "Focused variation"
+        enterText(
+            "Focused variation",
+            into: variationNameInput,
+            in: app
         )
         dismissSoftwareKeyboardIfNeeded(in: app)
         element(
