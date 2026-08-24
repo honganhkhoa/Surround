@@ -94,18 +94,13 @@ class SurroundUITestCase: XCTestCase {
         // regardless of whether this simulator uses a hardware keyboard.
         input.tap()
         let keyboard = app.keyboards.firstMatch
-        let softwareKeyboardWasVisible = pollUntil(timeout: 1) {
-            self.isSoftwareKeyboardVisible(keyboard, in: app)
-        }
+        let softwareKeyboardWasVisible = keyboard.waitForExistence(timeout: 1)
 
         tapChatLogBackground(chatLog)
 
-        if softwareKeyboardWasVisible
-            || isSoftwareKeyboardVisible(keyboard, in: app) {
+        if softwareKeyboardWasVisible || keyboard.exists {
             XCTAssertTrue(
-                pollUntil(timeout: timeout) {
-                    !self.isSoftwareKeyboardVisible(keyboard, in: app)
-                },
+                keyboard.waitForNonExistence(timeout: timeout),
                 "Expected the compact chat keyboard to disappear before capture.",
                 file: file,
                 line: line
@@ -167,8 +162,7 @@ class SurroundUITestCase: XCTestCase {
     ) {
         #if !targetEnvironment(macCatalyst)
         let keyboard = app.keyboards.firstMatch
-        guard keyboard.waitForExistence(timeout: 2),
-              isSoftwareKeyboardVisible(keyboard, in: app) else {
+        guard keyboard.waitForExistence(timeout: 2) else {
             return
         }
 
@@ -182,9 +176,7 @@ class SurroundUITestCase: XCTestCase {
         )
         tapChatLogBackground(chatLog)
         XCTAssertTrue(
-            pollUntil(timeout: 10) {
-                !self.isSoftwareKeyboardVisible(keyboard, in: app)
-            },
+            keyboard.waitForNonExistence(timeout: 10),
             "Expected the chat composer keyboard to be dismissed",
             file: file,
             line: line
@@ -230,19 +222,6 @@ class SurroundUITestCase: XCTestCase {
             file: file,
             line: line
         )
-    }
-
-    private func isSoftwareKeyboardVisible(
-        _ keyboard: XCUIElement,
-        in app: XCUIApplication
-    ) -> Bool {
-        guard keyboard.exists else {
-            return false
-        }
-        let frame = keyboard.frame
-        return frame.width > 0
-            && frame.height > 0
-            && frame.intersects(app.frame)
     }
 
     private func requiredElement(
