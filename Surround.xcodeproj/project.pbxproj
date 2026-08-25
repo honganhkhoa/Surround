@@ -1146,6 +1146,9 @@
 				"zh-Hans",
 				"zh-Hant",
 				ko,
+				es,
+				"pt-BR",
+				"pt-PT",
 			);
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (

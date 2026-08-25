@@ -26,6 +26,10 @@ readonly -a expected_locales=(
   "zh-Hans-CN"
   "zh-Hant-TW"
   "ko-KR"
+  "es-ES"
+  "es-MX"
+  "pt-BR"
+  "pt-PT"
 )
 
 readonly -a expected_iphone_scenes=(
@@ -92,7 +96,8 @@ Options:
   --locale LOCALE      Optional exact test-plan configuration to capture.
                        Repeat to capture multiple locales. Supported values are
                        en-US, fr-FR, de-DE, ja-JP, vi-VN, th-TH,
-                       zh-Hans-CN, zh-Hant-TW, and ko-KR. Defaults to all nine.
+                       zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES, es-MX, pt-BR,
+                       and pt-PT. Defaults to all thirteen.
   -h, --help           Show this help.
 
 Environment overrides:
@@ -106,9 +111,10 @@ Environment overrides:
                            when updating the submission runtime.
 
 The AppStoreScreenshots test plan must contain configurations named en-US,
-fr-FR, de-DE, ja-JP, vi-VN, th-TH, zh-Hans-CN, zh-Hant-TW, and ko-KR. For
-example, pass --locale en-US for an English-only capture. The UI test must keep
-exactly ten named screenshot attachments for iPhone and exactly ten for iPad.
+fr-FR, de-DE, ja-JP, vi-VN, th-TH, zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES,
+es-MX, pt-BR, and pt-PT. For example, pass --locale en-US for an English-only
+capture. The UI test must keep exactly ten named screenshot attachments for
+iPhone and exactly ten for iPad.
 Run this command with --help after changing the scene contract, then review
 the generated index.html.
 

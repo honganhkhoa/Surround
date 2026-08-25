@@ -16,6 +16,9 @@ final class TimeUtilitiesTests: XCTestCase {
         "zh-Hant",
         "ko",
         "th",
+        "es",
+        "pt-BR",
+        "pt-PT",
     ]
 
     // The catalog abbreviates some English forms ("5 days left" ships as "5 days",
@@ -96,10 +99,16 @@ final class TimeUtilitiesTests: XCTestCase {
         XCTAssertEqual(preferredLocalization(for: "ja-JP"), "ja")
         XCTAssertEqual(preferredLocalization(for: "th-TH"), "th")
         XCTAssertEqual(preferredLocalization(for: "vi-VN"), "vi")
+        XCTAssertEqual(preferredLocalization(for: "es-ES"), "es")
+        XCTAssertEqual(preferredLocalization(for: "es-MX"), "es")
+        XCTAssertEqual(preferredLocalization(for: "pt"), "pt-BR")
+        XCTAssertEqual(preferredLocalization(for: "pt-BR"), "pt-BR")
+        XCTAssertEqual(preferredLocalization(for: "pt-PT"), "pt-PT")
+        XCTAssertEqual(preferredLocalization(for: "pt-AO"), "pt-PT")
     }
 
     func testPreferredLocalizationFallsBackToDevelopmentLanguage() {
-        XCTAssertEqual(preferredLocalization(for: "es-ES"), "en")
+        XCTAssertEqual(preferredLocalization(for: "it-IT"), "en")
     }
 
     private func hoursLeft(_ hours: Int) -> String {

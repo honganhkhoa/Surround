@@ -71,6 +71,38 @@
         "language" : "ko",
         "region" : "KR"
       }
+    },
+    {
+      "id" : "7A100001-4000-4000-8000-000000000001",
+      "name" : "es-ES",
+      "options" : {
+        "language" : "es",
+        "region" : "ES"
+      }
+    },
+    {
+      "id" : "7A100002-4000-4000-8000-000000000002",
+      "name" : "es-MX",
+      "options" : {
+        "language" : "es",
+        "region" : "MX"
+      }
+    },
+    {
+      "id" : "7A100003-4000-4000-8000-000000000003",
+      "name" : "pt-BR",
+      "options" : {
+        "language" : "pt-BR",
+        "region" : "BR"
+      }
+    },
+    {
+      "id" : "7A100004-4000-4000-8000-000000000004",
+      "name" : "pt-PT",
+      "options" : {
+        "language" : "pt-PT",
+        "region" : "PT"
+      }
     }
   ],
   "defaultOptions" : {

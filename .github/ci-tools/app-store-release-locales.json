@@ -38,6 +38,22 @@
     {
       "appStoreLocale": "ko",
       "screenshotConfiguration": "ko-KR"
+    },
+    {
+      "appStoreLocale": "es-ES",
+      "screenshotConfiguration": "es-ES"
+    },
+    {
+      "appStoreLocale": "es-MX",
+      "screenshotConfiguration": "es-MX"
+    },
+    {
+      "appStoreLocale": "pt-BR",
+      "screenshotConfiguration": "pt-BR"
+    },
+    {
+      "appStoreLocale": "pt-PT",
+      "screenshotConfiguration": "pt-PT"
     }
   ],
   "screenshotFamilies": [
