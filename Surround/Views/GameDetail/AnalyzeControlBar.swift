@@ -6,6 +6,11 @@
 import SwiftUI
 
 struct AnalyzeControlBar: View {
+    private enum ConditionalMoveQuickActionPresentation {
+        case labeled
+        case iconOnly
+    }
+
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
     @Binding var boardTool: AnalyzeBoardTool
@@ -15,6 +20,7 @@ struct AnalyzeControlBar: View {
     var canAddConditionalMoves: Bool
     var addReplacesConditionalVariations: Bool
     var canRemoveConditionalMoves: Bool
+    var showsConditionalMoveQuickAction: Bool
     var canDeleteSelectedBranch: Bool
     var deletesConditionalVariations: Bool
     var shareVariation: () -> Void
@@ -99,8 +105,18 @@ struct AnalyzeControlBar: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            controlBarContent(showsAdjacentBranches: true)
-            controlBarContent(showsAdjacentBranches: false)
+            controlBarContent(
+                showsAdjacentBranches: true,
+                conditionalMoveQuickActionPresentation: .labeled
+            )
+            controlBarContent(
+                showsAdjacentBranches: false,
+                conditionalMoveQuickActionPresentation: .labeled
+            )
+            controlBarContent(
+                showsAdjacentBranches: false,
+                conditionalMoveQuickActionPresentation: .iconOnly
+            )
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 52)
@@ -142,7 +158,9 @@ struct AnalyzeControlBar: View {
     }
 
     private func controlBarContent(
-        showsAdjacentBranches: Bool
+        showsAdjacentBranches: Bool,
+        conditionalMoveQuickActionPresentation:
+            ConditionalMoveQuickActionPresentation
     ) -> some View {
         HStack(spacing: 2) {
             if analysisAvailable {
@@ -151,6 +169,9 @@ struct AnalyzeControlBar: View {
                     MarkerToolMenu(
                         markups: markups,
                         tool: $boardTool
+                    )
+                    conditionalMoveQuickAction(
+                        presentation: conditionalMoveQuickActionPresentation
                     )
                 }
             }
@@ -208,7 +229,9 @@ struct AnalyzeControlBar: View {
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameAnalyzeShare
                 )
+            }
 
+            Section {
                 Button(action: addToConditionalMoves) {
                     Label(
                         "Add to conditional moves",
@@ -262,6 +285,75 @@ struct AnalyzeControlBar: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu
         )
+    }
+
+    @ViewBuilder
+    private func conditionalMoveQuickAction(
+        presentation: ConditionalMoveQuickActionPresentation
+    ) -> some View {
+        if showsConditionalMoveQuickAction {
+            if canRemoveConditionalMoves {
+                conditionalMoveQuickActionButton(
+                    "Remove from conditional moves",
+                    shortTitle: "Remove",
+                    image: "custom.envelope.and.arrow.trianglehead.branch.badge.minus",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeQuickRemoveConditional,
+                    presentation: presentation,
+                    action: removeFromConditionalMoves
+                )
+            } else if canAddConditionalMoves {
+                conditionalMoveQuickActionButton(
+                    "Add to conditional moves",
+                    shortTitle: "Add",
+                    image: "custom.envelope.and.arrow.trianglehead.branch.badge.plus",
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameAnalyzeQuickAddConditional,
+                    presentation: presentation,
+                    includesReplacementWarning:
+                        addReplacesConditionalVariations,
+                    action: addToConditionalMoves
+                )
+            }
+        }
+    }
+
+    private func conditionalMoveQuickActionButton(
+        _ title: LocalizedStringKey,
+        shortTitle: LocalizedStringKey,
+        image: String,
+        accessibilityIdentifier: String,
+        presentation: ConditionalMoveQuickActionPresentation,
+        includesReplacementWarning: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            switch presentation {
+            case .labeled:
+                Label(shortTitle, image: image)
+                    .labelStyle(TitleAndIconLabelStyle())
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(minWidth: 44, minHeight: 44)
+            case .iconOnly:
+                Label(shortTitle, image: image)
+                    .labelStyle(IconOnlyLabelStyle())
+                    .frame(width: 44, height: 44)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .hoverEffect(.highlight)
+        .foregroundStyle(Color.conditionalMoveHighlight)
+        .help(Text(title))
+        .accessibilityLabel(
+            includesReplacementWarning
+                ? Text(title)
+                    + Text(verbatim: ", ")
+                    + Text("Replaces conflicting variations")
+                : Text(title)
+        )
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private func controlButton(

@@ -8,6 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
+		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
+		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
+		AA9000044000000000000004 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
+		AA9000054000000000000005 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
+		AA9000064000000000000006 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
 		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
 		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
@@ -61,7 +66,6 @@
 		BC042B5224AB2DD10050B2D1 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC042B5424AB2DD10050B2D1 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		BC042B5624AB2DD10050B2D1 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4024AB2DD10050B2D1 /* BoardView.swift */; };
 		BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
@@ -91,7 +95,6 @@
 		BC285B6C2557FCBA005378F9 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC285B6D2557FCBA005378F9 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC285B6E2557FCBA005378F9 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		AA9000044000000000000004 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC285B842557FD57005378F9 /* TimeUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */; };
 		BC285B852557FD57005378F9 /* OGSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B4324AB2DD10050B2D1 /* OGSService.swift */; };
 		BC285B8B2557FD5B005378F9 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
@@ -164,7 +167,6 @@
 		BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BC64939625380D96002B2200 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		AA9000054000000000000005 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC6493A225380DCA002B2200 /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
@@ -196,7 +198,6 @@
 		BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */; };
 		BC8CE8862657B2E100E4BE1A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BC8CE8872657B2E100E4BE1A /* OGSUIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */; };
 		BC8CE8882657B2E100E4BE1A /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
 		BC8CE8892657B2E100E4BE1A /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
@@ -296,7 +297,6 @@
 		BCD214DD255A946D00F78E2A /* SurroundNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BCD214ED255A948E00F78E2A /* TimeControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */; };
 		BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */; };
-		AA9000064000000000000006 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		BCD214EF255A948E00F78E2A /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BCD214F0255A948E00F78E2A /* OGSClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3924AB2DD00050B2D1 /* OGSClock.swift */; };
 		BCD214F1255A948E00F78E2A /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
@@ -389,12 +389,11 @@
 /* Begin PBXFileReference section */
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
+		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
 		AE10000139A0000000000001 /* TimeControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeControlTests.swift; sourceTree = "<group>"; };
 		AE10000239A0000000000002 /* OGSModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSModelDecodingTests.swift; sourceTree = "<group>"; };
 		AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBehaviorTests.swift; sourceTree = "<group>"; };
 		AE10000439A0000000000004 /* GameReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameReplayTests.swift; sourceTree = "<group>"; };
-		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
-		AF3000023F00000000000002 /* ConditionalMovesPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalMovesPopover.swift; sourceTree = "<group>"; };
 		AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceIsolationTests.swift; sourceTree = "<group>"; };
 		AE10000639A0000000000006 /* OGSServiceEventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSServiceEventTests.swift; sourceTree = "<group>"; };
 		AE10000739A0000000000007 /* OGSWebsocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSWebsocketTests.swift; sourceTree = "<group>"; };
@@ -418,6 +417,9 @@
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
 		AE6000063B00000000000006 /* GameHistoryPaginationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistoryPaginationState.swift; sourceTree = "<group>"; };
+		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
+		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
+		AF3000023F00000000000002 /* ConditionalMovesPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalMovesPopover.swift; sourceTree = "<group>"; };
 		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundApp.swift; sourceTree = "<group>"; };
 		BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewWrapper.swift; sourceTree = "<group>"; };
@@ -443,7 +445,6 @@
 		BC042B3A24AB2DD00050B2D1 /* Game.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		BC042B3B24AB2DD00050B2D1 /* TimeControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeControl.swift; sourceTree = "<group>"; };
 		BC042B3C24AB2DD00050B2D1 /* BoardPosition.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardPosition.swift; sourceTree = "<group>"; };
-		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
 		BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UserDefaults+SurroundModels.swift"; sourceTree = "<group>"; };
 		BC042B4024AB2DD10050B2D1 /* BoardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		BC042B4324AB2DD10050B2D1 /* OGSService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OGSService.swift; sourceTree = "<group>"; };
@@ -478,7 +479,6 @@
 		BC463B0026624D3500D40D3A /* puzzle-2630.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "puzzle-2630.json"; sourceTree = "<group>"; };
 		BC463B0326624D5D00D40D3A /* PuzzleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuzzleTests.swift; sourceTree = "<group>"; };
 		BC463B0C266353D700D40D3A /* SingleGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleGameView.swift; sourceTree = "<group>"; };
-		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
 		BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGamesCarousel.swift; sourceTree = "<group>"; };
 		BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPickerView.swift; sourceTree = "<group>"; };
 		BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBrowserView.swift; sourceTree = "<group>"; };
@@ -1629,7 +1629,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -1642,7 +1642,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1659,7 +1659,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -1669,7 +1669,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1684,7 +1684,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1692,7 +1692,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1707,7 +1707,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -1717,7 +1717,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1734,7 +1734,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -1746,7 +1746,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1762,7 +1762,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1770,7 +1770,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1787,7 +1787,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -1800,7 +1800,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1981,7 +1981,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -1993,7 +1993,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2151,7 +2151,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2164,7 +2164,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2183,7 +2183,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2196,7 +2196,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2293,7 +2293,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2301,7 +2301,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2316,7 +2316,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2324,7 +2324,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2341,7 +2341,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2353,7 +2353,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2371,7 +2371,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2383,7 +2383,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2441,7 +2441,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2451,7 +2451,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2466,7 +2466,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026080901;
+				CURRENT_PROJECT_VERSION = 2026082601;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2476,7 +2476,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

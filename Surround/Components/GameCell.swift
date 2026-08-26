@@ -14,6 +14,8 @@ struct PlayerInfoLine: View {
     var conditionalMovesContext: ConditionalMovesPresentationContext?
     var navigationAccessibilityIdentifier: String
     @EnvironmentObject var ogs: OGSService
+    @ScaledMetric(relativeTo: .subheadline)
+    private var conditionalMovesLineMinimumHeight: CGFloat = 30
 
     var isUserLine: Bool {
         guard let user = ogs.user else {
@@ -51,6 +53,11 @@ struct PlayerInfoLine: View {
                     InlineTimerView(timeControl: game.gameData?.timeControl, clock: game.clock, player: color, pauseControl: game.pauseControl)
                 }
             }
+            .frame(
+                minHeight: conditionalMovesContext == nil
+                    ? nil
+                    : conditionalMovesLineMinimumHeight
+            )
         } else {
             HStack(alignment: .top) {
                 Stone(color: color, shadowRadius: 1).frame(width: 15, height: 15)

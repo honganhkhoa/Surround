@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add" : {
+      "comment" : "Short visible label beside the icon for the Analyze control-bar shortcut that adds a conditional-move variation.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Hinzufügen" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajouter" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "追加" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "추가" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "เพิ่ม" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Thêm" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "加入" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Adicionar" } },
+        "pt-PT" : { "stringUnit" : { "state" : "translated", "value" : "Adicionar" } }
+      }
+    },
     "Add moves" : {
       "comment" : "Analyze-board editing tool that places variation moves instead of annotations.",
       "localizations" : {
@@ -11260,6 +11276,22 @@
         "pt-PT" : { "stringUnit" : { "state" : "translated", "value" : "Jogadas condicionais" } }
       }
     },
+    "Conditional moves plan" : {
+      "comment" : "Title above the saved conditional-move variations in the popover.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Plan für bedingte Züge" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Plan de coups conditionnels" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "先回り着手のプラン" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "조건부 착수 계획" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "แผนการเดินหมากแบบมีเงื่อนไข" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Kế hoạch các nước đi có điều kiện" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "条件落子计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "預測落子計畫" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Plan de jugadas condicionales" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Plano de jogadas condicionais" } },
+        "pt-PT" : { "stringUnit" : { "state" : "translated", "value" : "Plano de jogadas condicionais" } }
+      }
+    },
     "Conditional variation %lld of %lld" : {
       "comment" : "VoiceOver label for one board in the conditional-moves popover. The first number is the variation's one-based position and the second is the total number of variations.",
       "localizations" : {
@@ -20453,6 +20485,22 @@
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Revancha" } },
         "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Revanche" } },
         "pt-PT" : { "stringUnit" : { "state" : "translated", "value" : "Desforra" } }
+      }
+    },
+    "Remove" : {
+      "comment" : "Short visible label beside the icon for the Analyze control-bar shortcut that removes a conditional-move variation.",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Entfernen" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retirer" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "削除" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "제거" } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "นำออก" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Xoá" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移除" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "移除" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Quitar" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Remover" } },
+        "pt-PT" : { "stringUnit" : { "state" : "translated", "value" : "Remover" } }
       }
     },
     "Remove from conditional moves" : {

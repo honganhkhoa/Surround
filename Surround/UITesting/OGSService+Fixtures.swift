@@ -1347,7 +1347,9 @@ extension OGSService {
         let fixtureGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.copperKoiOpening,
             clock: copperKoiClock,
-            disableAnalysis: SurroundUITestContract.simulatesAnalysisDisabled
+            disableAnalysis: SurroundUITestContract.simulatesAnalysisDisabled,
+            prefixMoveCount: SurroundUITestContract
+                .simulatesHomeBoardAlignment ? 47 : nil
         )
         precondition(
             fixtureGame.ogsID == SurroundUITestContract.screenshotPrimaryGameID
@@ -1402,6 +1404,24 @@ extension OGSService {
                 user: fixtureUser
             ),
         ]
+        if SurroundUITestContract.simulatesHomeBoardAlignment {
+            let topConditionalMovePlan = try! ConditionalMovePlan(
+                gameID: fixtureGame.ogsID!,
+                ownerID: fixtureUser.id,
+                rootMoveNumber: fixtureGame.currentPosition.lastMoveNumber,
+                paths: [[.pass, .pass]]
+            )
+            precondition(
+                fixtureGame.stoneColor(of: fixtureUser) == .black
+                    && fixtureGame.currentPosition.nextToMove == .white
+                    && fixtureGame.setConditionalMovePlan(
+                        topConditionalMovePlan,
+                        expectedOwnerID: fixtureUser.id
+                    )
+                    && !fixtureGame.conditionalMoveBranches.isEmpty,
+                "The board-alignment fixture must show a conditional-moves button above its board."
+            )
+        }
 
         let waitingGame1 = makeFixtureGame(
             from: AppStoreScreenshotProfileData.cobaltFoxOpening,
@@ -1437,13 +1457,20 @@ extension OGSService {
                 ],
             ]
         )
-        precondition(
-            waitingGame1.setConditionalMovePlan(
-                conditionalMovePlan,
-                expectedOwnerID: fixtureUser.id
-            ) && waitingGame1.conditionalMoveBranches.count == 3,
-            "The screenshot fixture must expose three conditional branches."
-        )
+        if SurroundUITestContract.simulatesHomeBoardAlignment {
+            precondition(
+                waitingGame1.conditionalMoveBranches.isEmpty,
+                "The board-alignment fixture must include a no-plan game."
+            )
+        } else {
+            precondition(
+                waitingGame1.setConditionalMovePlan(
+                    conditionalMovePlan,
+                    expectedOwnerID: fixtureUser.id
+                ) && waitingGame1.conditionalMoveBranches.count == 3,
+                "The screenshot fixture must expose three conditional branches."
+            )
+        }
         let conflictingConditionalPosition = addAnalysisVariation(
             to: waitingGame1,
             fromMoveNumber:
@@ -1467,16 +1494,45 @@ extension OGSService {
         )
         let additionalYourMoveGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.indigoCraneOpening,
-            clock: indigoCraneClock
+            clock: indigoCraneClock,
+            prefixMoveCount: SurroundUITestContract
+                .simulatesHomeBoardAlignment ? 60 : nil
         )
         let compatibilityWidgetGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.mapleRidgeOpening,
             clock: mapleRidgeClock
         )
+        if SurroundUITestContract.simulatesHomeBoardAlignment {
+            let bottomConditionalMovePlan = try! ConditionalMovePlan(
+                gameID: additionalYourMoveGame.ogsID!,
+                ownerID: fixtureUser.id,
+                rootMoveNumber:
+                    additionalYourMoveGame.currentPosition.lastMoveNumber,
+                paths: [[.pass, .pass]]
+            )
+            precondition(
+                fixtureGame.clock?.currentPlayerId != fixtureUser.id
+                    && additionalYourMoveGame.clock?.currentPlayerId
+                        != fixtureUser.id
+                    && additionalYourMoveGame.stoneColor(of: fixtureUser)
+                        == .white
+                    && additionalYourMoveGame.setConditionalMovePlan(
+                        bottomConditionalMovePlan,
+                        expectedOwnerID: fixtureUser.id
+                    )
+                    && !additionalYourMoveGame
+                        .conditionalMoveBranches.isEmpty
+                    && waitingGame1.conditionalMoveBranches.isEmpty,
+                "The board-alignment fixture must expose top, bottom, and no-plan opponent-turn games."
+            )
+        } else {
+            precondition(
+                additionalYourMoveGame.clock?.currentPlayerId == fixtureUser.id
+            )
+        }
         precondition(
-            additionalYourMoveGame.clock?.currentPlayerId == fixtureUser.id
-                && additionalYourMoveGame.gameData?.timeControl.speed
-                    == .correspondence
+            additionalYourMoveGame.gameData?.timeControl.speed
+                == .correspondence
         )
         precondition(
             compatibilityWidgetGame.ogsID
@@ -1497,6 +1553,10 @@ extension OGSService {
         for game in activeFixtureGames {
             state.activeGames[game.ogsID!] = game
         }
+        let expectedUserTurnGameCount =
+            SurroundUITestContract.isCapturingCompatibilityScreenshots
+                ? (SurroundUITestContract.simulatesHomeBoardAlignment ? 1 : 3)
+                : 2
         precondition(
             state.activeGames.count
                 == (
@@ -1508,11 +1568,7 @@ extension OGSService {
                 )
                 && state.activeGames.values.filter {
                     $0.clock?.currentPlayerId == fixtureUser.id
-                }.count
-                    == (
-                        SurroundUITestContract
-                            .isCapturingCompatibilityScreenshots ? 3 : 2
-                    ),
+                }.count == expectedUserTurnGameCount,
             "The screenshot fixture must contain deterministic correspondence games."
         )
 

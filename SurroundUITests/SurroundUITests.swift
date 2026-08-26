@@ -1458,6 +1458,115 @@ final class SurroundUITests: SurroundUITestCase {
         #endif
     }
 
+    func testHomeBoardsStayAlignedWithConditionalMoveButtons() throws {
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom == .phone,
+            "Full Home game cards require the regular-width iPad or Mac layout."
+        )
+
+        var launchArguments = [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+            SurroundUITestContract.homeBoardAlignmentLaunchArgument,
+        ]
+        #if targetEnvironment(macCatalyst)
+        launchArguments += [
+            SurroundUITestContract.catalystWindowSizeLaunchArgument,
+            "1440x760",
+        ]
+        let idiom = "catalyst"
+        #else
+        let idiom = "ipad"
+        #endif
+        let app = launchApp(
+            additionalLaunchArguments: launchArguments,
+            orientation: .landscapeRight
+        )
+
+        let topPlanGameID = SurroundUITestContract.screenshotPrimaryGameID
+        let bottomPlanGameID =
+            SurroundUITestContract.homeHistoryRetryFixtureGameID
+        let noPlanGameID =
+            SurroundUITestContract.conditionalMovesFixtureGameID
+        let topBoard = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(topPlanGameID),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(topBoard, in: app)
+        let bottomBoard = element(
+            SurroundUITestContract.AccessibilityID.homeGame(bottomPlanGameID),
+            in: app,
+            matching: .button
+        )
+        let noPlanBoard = element(
+            SurroundUITestContract.AccessibilityID.homeGame(noPlanGameID),
+            in: app,
+            matching: .button
+        )
+        let topPlanButton = element(
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalButton(topPlanGameID),
+            in: app,
+            matching: .button
+        )
+        let bottomPlanButton = element(
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalButton(bottomPlanGameID),
+            in: app,
+            matching: .button
+        )
+
+        let topBoardFrame = topBoard.frame
+        let bottomBoardFrame = bottomBoard.frame
+        let noPlanBoardFrame = noPlanBoard.frame
+        XCTAssertLessThan(
+            topBoardFrame.maxX,
+            bottomBoardFrame.minX,
+            "The two planned games must occupy neighboring grid columns."
+        )
+        XCTAssertGreaterThan(
+            topBoardFrame.width,
+            250,
+            "The alignment regression must exercise full-size game cards."
+        )
+        XCTAssertEqual(topBoardFrame.minY, bottomBoardFrame.minY, accuracy: 1)
+        XCTAssertEqual(topBoardFrame.minY, noPlanBoardFrame.minY, accuracy: 1)
+        XCTAssertEqual(topBoardFrame.maxY, bottomBoardFrame.maxY, accuracy: 1)
+        XCTAssertEqual(
+            topBoardFrame.width,
+            bottomBoardFrame.width,
+            accuracy: 1
+        )
+        XCTAssertEqual(
+            topBoardFrame.height,
+            bottomBoardFrame.height,
+            accuracy: 1
+        )
+        XCTAssertLessThan(
+            topPlanButton.frame.midY,
+            topBoardFrame.minY,
+            "The Black user's conditional-plan button must be above its board."
+        )
+        XCTAssertGreaterThan(
+            bottomPlanButton.frame.midY,
+            bottomBoardFrame.maxY,
+            "The White user's conditional-plan button must be below its board."
+        )
+        keepScreenshot("home-board-alignment-\(idiom)", in: app)
+
+        XCTAssertFalse(
+            app.descendants(matching: .button)
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .homeConditionalButton(noPlanGameID)
+                )
+                .firstMatch.exists,
+            "The third fixture must exercise a game without a saved plan."
+        )
+    }
+
     func testConditionalVariationsOpenAndJumpToAnalyze() {
         #if targetEnvironment(macCatalyst)
         let orientation = UIDeviceOrientation.landscapeRight
@@ -1503,6 +1612,12 @@ final class SurroundUITests: SurroundUITestCase {
                 .homeConditionalPopover(gameID),
             in: app
         )
+        let homePopoverTitle = element(
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalPopoverTitle(gameID),
+            in: app
+        )
+        XCTAssertEqual(homePopoverTitle.label, "Conditional moves plan")
         for branchID in SurroundUITestContract
             .conditionalMovesFixtureBranchIDs {
             let variation = element(
@@ -1564,6 +1679,12 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameConditionalPopover,
             in: app
         )
+        let detailPopoverTitle = element(
+            SurroundUITestContract.AccessibilityID
+                .gameConditionalPopoverTitle,
+            in: app
+        )
+        XCTAssertEqual(detailPopoverTitle.label, "Conditional moves plan")
         let selectedPath = SurroundUITestContract
             .conditionalMovesFixturePaths[1]
         tap(
@@ -1577,6 +1698,26 @@ final class SurroundUITests: SurroundUITestCase {
         element(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
+        )
+        let quickAddConditional = app.descendants(matching: .button)
+            .matching(
+                identifier: SurroundUITestContract.AccessibilityID
+                    .gameAnalyzeQuickAddConditional
+            )
+            .firstMatch
+        let quickRemoveConditional = app.descendants(matching: .button)
+            .matching(
+                identifier: SurroundUITestContract.AccessibilityID
+                    .gameAnalyzeQuickRemoveConditional
+            )
+            .firstMatch
+        XCTAssertFalse(
+            quickAddConditional.exists,
+            "The quick Add action should stay hidden until Add has been used."
+        )
+        XCTAssertFalse(
+            quickRemoveConditional.exists,
+            "The quick Remove action should stay hidden until Add has been used."
         )
         let selectedNodeIdentifier = SurroundUITestContract.AccessibilityID
             .gameAnalysisPosition(
@@ -1683,6 +1824,14 @@ final class SurroundUITests: SurroundUITestCase {
         )
         dismissPopover(in: app)
         XCTAssertFalse(
+            quickAddConditional.exists,
+            "Using Remove must not unlock conditional-move quick actions."
+        )
+        XCTAssertFalse(
+            quickRemoveConditional.exists,
+            "Using Remove must not unlock conditional-move quick actions."
+        )
+        XCTAssertFalse(
             String(describing: element(selectedNodeIdentifier, in: app).value)
                 .contains("Conditional"),
             "Expected the removed variation endpoint to lose its conditional accessibility value."
@@ -1707,6 +1856,90 @@ final class SurroundUITests: SurroundUITestCase {
             XCTWaiter.wait(for: [restoredConditionalState], timeout: 10),
             .completed,
             "Expected the server echo to restore the selected conditional variation."
+        )
+
+        let quickRemoveAfterAdd = element(
+            SurroundUITestContract.AccessibilityID
+                .gameAnalyzeQuickRemoveConditional,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(
+            quickRemoveAfterAdd.label,
+            "Remove from conditional moves"
+        )
+        XCTAssertGreaterThan(
+            quickRemoveAfterAdd.frame.width,
+            44,
+            "The shortcut should visibly include its short Remove label."
+        )
+        XCTAssertEqual(quickRemoveAfterAdd.frame.height, 44, accuracy: 4)
+        XCTAssertFalse(
+            quickAddConditional.exists,
+            "Only the available conditional-move quick action should be shown."
+        )
+        let markerTool = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
+            in: app
+        )
+        XCTAssertGreaterThan(
+            quickRemoveAfterAdd.frame.midX,
+            markerTool.frame.midX,
+            "The conditional-move quick action should follow the marker tool."
+        )
+
+        tap(conflictingNodeIdentifier, in: app)
+        assertSelected(conflictingNodeIdentifier, in: app)
+        let replacingQuickAdd = element(
+            SurroundUITestContract.AccessibilityID
+                .gameAnalyzeQuickAddConditional,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(
+            replacingQuickAdd.label,
+            "Add to conditional moves, Replaces conflicting variations"
+        )
+        XCTAssertFalse(
+            quickRemoveConditional.exists,
+            "Quick Add should replace Quick Remove for a conflicting branch."
+        )
+        tap(selectedNodeIdentifier, in: app)
+        assertSelected(selectedNodeIdentifier, in: app)
+
+        tap(
+            quickRemoveAfterAdd,
+            description: "Quick Remove from conditional moves",
+            in: app
+        )
+        let quickAddAfterRemoval = element(
+            SurroundUITestContract.AccessibilityID
+                .gameAnalyzeQuickAddConditional,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(quickAddAfterRemoval.label, "Add to conditional moves")
+        XCTAssertGreaterThan(
+            quickAddAfterRemoval.frame.width,
+            44,
+            "The shortcut should visibly include its short Add label."
+        )
+        XCTAssertEqual(quickAddAfterRemoval.frame.height, 44, accuracy: 4)
+        XCTAssertFalse(
+            quickRemoveConditional.exists,
+            "Quick Remove should be replaced when only Add is available."
+        )
+
+        tap(
+            quickAddAfterRemoval,
+            description: "Quick Add to conditional moves",
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID
+                .gameAnalyzeQuickRemoveConditional,
+            in: app,
+            matching: .button
         )
         keepScreenshot("conditional-analyze-detail-\(idiom)", in: app)
 

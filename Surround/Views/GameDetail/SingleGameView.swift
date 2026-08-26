@@ -50,6 +50,8 @@ struct SingleGameView: View {
     @State var stonePlacingPlayer: AVAudioPlayer? = nil
     @State private var conditionalMoveSubmissionCancellable: AnyCancellable?
     @State private var showingConditionalMoveSubmissionError = false
+    @State private var hasUsedAddToConditionalMoves =
+        userDefaults[.hasUsedAddToConditionalMoves] ?? false
     
     @Namespace var animation
     
@@ -487,6 +489,8 @@ struct SingleGameView: View {
             addReplacesConditionalVariations:
                 state.addReplacesVariations,
             canRemoveConditionalMoves: state.canRemove,
+            showsConditionalMoveQuickAction:
+                hasUsedAddToConditionalMoves,
             canDeleteSelectedBranch: state.canDeleteBranch,
             deletesConditionalVariations:
                 state.deletesVariations,
@@ -571,6 +575,8 @@ struct SingleGameView: View {
               ) else {
             return
         }
+        hasUsedAddToConditionalMoves = true
+        userDefaults[.hasUsedAddToConditionalMoves] = true
         submitConditionalMovePlan(plan)
     }
 

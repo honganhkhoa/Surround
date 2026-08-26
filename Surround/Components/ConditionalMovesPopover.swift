@@ -6,7 +6,7 @@
 import SwiftUI
 
 extension Color {
-    static let conditionalMoveHighlight = Color.orange
+    static let conditionalMoveHighlight = Color.brown
 }
 
 enum ConditionalMovesPresentationContext: Hashable {
@@ -28,6 +28,16 @@ enum ConditionalMovesPresentationContext: Hashable {
             SurroundUITestContract.AccessibilityID.homeConditionalPopover(gameID)
         case .gameDetail:
             SurroundUITestContract.AccessibilityID.gameConditionalPopover
+        }
+    }
+
+    var popoverTitleAccessibilityIdentifier: String {
+        switch self {
+        case .home(let gameID):
+            SurroundUITestContract.AccessibilityID
+                .homeConditionalPopoverTitle(gameID)
+        case .gameDetail:
+            SurroundUITestContract.AccessibilityID.gameConditionalPopoverTitle
         }
     }
 
@@ -88,8 +98,9 @@ struct ConditionalMovesButton: View {
             isPresented = true
         } label: {
             Image(systemName: "envelope.and.arrow.trianglehead.branch")
+                .foregroundStyle(.white)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderedProminent)
         .controlSize(.small)
         .tint(.conditionalMoveHighlight)
         .accessibilityLabel(Text("Conditional moves"))
@@ -122,6 +133,8 @@ struct ConditionalMovesPopoverGrid: View {
     var onSelect: ((ConditionalMoveBranch) -> Void)?
 
     private let spacing: CGFloat = 12
+    @ScaledMetric(relativeTo: .headline)
+    private var titleMinimumHeight: CGFloat = 44
 
     private var boardSize: CGFloat {
         layout.boardSize
@@ -141,7 +154,9 @@ struct ConditionalMovesPopoverGrid: View {
 
     private var popoverHeight: CGFloat {
         min(
-            boardSize * CGFloat(rowCount) + spacing * CGFloat(rowCount + 2),
+            titleMinimumHeight
+                + boardSize * CGFloat(rowCount)
+                + spacing * CGFloat(rowCount + 2),
             528
         )
     }
@@ -156,19 +171,38 @@ struct ConditionalMovesPopoverGrid: View {
     }
 
     var body: some View {
-        ScrollView(.vertical) {
-            LazyVGrid(columns: columns, spacing: spacing) {
-                ForEach(Array(branches.enumerated()), id: \.element.id) {
-                    index,
-                    branch in
-                    variationView(
-                        branch,
-                        index: index,
-                        count: branches.count
-                    )
+        VStack(alignment: .leading, spacing: 0) {
+            Text(
+                "Conditional moves plan",
+                comment: "Title above the saved conditional-move variations in the popover."
+            )
+            .font(.headline)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, spacing * 1.5)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: titleMinimumHeight,
+                alignment: .bottomLeading
+            )
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier(
+                context.popoverTitleAccessibilityIdentifier
+            )
+
+            ScrollView(.vertical) {
+                LazyVGrid(columns: columns, spacing: spacing) {
+                    ForEach(Array(branches.enumerated()), id: \.element.id) {
+                        index,
+                        branch in
+                        variationView(
+                            branch,
+                            index: index,
+                            count: branches.count
+                        )
+                    }
                 }
+                .padding(spacing * 1.5)
             }
-            .padding(spacing * 1.5)
         }
         .frame(width: popoverWidth, height: popoverHeight)
         .accessibilityElement(children: .contain)

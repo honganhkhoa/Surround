@@ -31,6 +31,8 @@ enum SurroundUITestContract {
         "--surround-analysis-disabled"
     static let compactGameLayoutLaunchArgument =
         "--surround-compact-game-layout"
+    static let homeBoardAlignmentLaunchArgument =
+        "--surround-home-board-alignment"
     static let attachedSoftwareKeyboardVisibleLaunchArgument =
         "--surround-attached-software-keyboard-visible"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
@@ -156,6 +158,13 @@ enum SurroundUITestContract {
             )
     }
 
+    static var simulatesHomeBoardAlignment: Bool {
+        isCapturingCompatibilityScreenshots
+            && ProcessInfo.processInfo.arguments.contains(
+                homeBoardAlignmentLaunchArgument
+            )
+    }
+
     static var simulatesAttachedSoftwareKeyboardVisible: Bool {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
@@ -270,6 +279,7 @@ enum SurroundUITestContract {
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingAppStoreScreenshotsInDarkMode = false
     static let isCapturingCompatibilityScreenshots = false
+    static let simulatesHomeBoardAlignment = false
     static let compatibilityScene: CompatibilityScene? = nil
     static let compatibilityWidgetProofToken: String? = nil
     static let appStoreScreenshotWidgetProofToken: String? = nil
@@ -378,6 +388,9 @@ enum SurroundUITestContract {
         static func homeConditionalPopover(_ id: Int) -> String {
             "home.game.\(id).conditional.popover"
         }
+        static func homeConditionalPopoverTitle(_ id: Int) -> String {
+            "home.game.\(id).conditional.popover.title"
+        }
         static func homeConditionalVariation(
             _ id: Int,
             branchID: String
@@ -386,6 +399,8 @@ enum SurroundUITestContract {
         }
         static let gameConditionalButton = "game.conditional.button"
         static let gameConditionalPopover = "game.conditional.popover"
+        static let gameConditionalPopoverTitle =
+            "game.conditional.popover.title"
         static func gameConditionalVariation(_ branchID: String) -> String {
             "game.conditional.variation.\(branchID)"
         }
@@ -406,6 +421,10 @@ enum SurroundUITestContract {
         static let gameAnalyzeAddConditional = "game.analyze.addConditional"
         static let gameAnalyzeRemoveConditional =
             "game.analyze.removeConditional"
+        static let gameAnalyzeQuickAddConditional =
+            "game.analyze.quickAddConditional"
+        static let gameAnalyzeQuickRemoveConditional =
+            "game.analyze.quickRemoveConditional"
         static let gameAnalyzeDeleteBranch = "game.analyze.deleteBranch"
         static let gameAnalyzeConfirmDelete = "game.analyze.confirmDelete"
         static let gameChatChannelPicker = "game.chat.channelPicker"
