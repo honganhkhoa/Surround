@@ -1532,7 +1532,6 @@ final class SurroundUITests: SurroundUITestCase {
             "The alignment regression must exercise full-size game cards."
         )
         XCTAssertEqual(topBoardFrame.minY, bottomBoardFrame.minY, accuracy: 1)
-        XCTAssertEqual(topBoardFrame.minY, noPlanBoardFrame.minY, accuracy: 1)
         XCTAssertEqual(topBoardFrame.maxY, bottomBoardFrame.maxY, accuracy: 1)
         XCTAssertEqual(
             topBoardFrame.width,
@@ -1544,6 +1543,41 @@ final class SurroundUITests: SurroundUITestCase {
             bottomBoardFrame.height,
             accuracy: 1
         )
+        XCTAssertEqual(
+            topBoardFrame.width,
+            noPlanBoardFrame.width,
+            accuracy: 1
+        )
+        XCTAssertEqual(
+            topBoardFrame.height,
+            noPlanBoardFrame.height,
+            accuracy: 1
+        )
+        // Wide layouts have a third column; narrower iPads wrap the third game.
+        if noPlanBoardFrame.minX > bottomBoardFrame.maxX {
+            XCTAssertEqual(
+                topBoardFrame.minY,
+                noPlanBoardFrame.minY,
+                accuracy: 1
+            )
+            XCTAssertEqual(
+                topBoardFrame.maxY,
+                noPlanBoardFrame.maxY,
+                accuracy: 1
+            )
+        } else {
+            XCTAssertEqual(
+                topBoardFrame.minX,
+                noPlanBoardFrame.minX,
+                accuracy: 1,
+                "The no-plan game must wrap to the first grid column."
+            )
+            XCTAssertGreaterThan(
+                noPlanBoardFrame.minY,
+                topBoardFrame.maxY,
+                "The no-plan game must wrap below the planned games."
+            )
+        }
         XCTAssertLessThan(
             topPlanButton.frame.midY,
             topBoardFrame.minY,
