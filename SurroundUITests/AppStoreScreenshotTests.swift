@@ -9,13 +9,11 @@ import XCTest
 import UIKit
 
 final class AppStoreScreenshotTests: SurroundUITestCase {
-    private enum InterfaceStyle {
-        case light
-        case dark
-    }
-
     private var capturedSceneNames = [String]()
     private var appStoreWidgetProofToken = ""
+
+    private let screenshotVariationChatLineID =
+        "app-store-chat-variation"
 
     private let expectedPhoneSceneNames = [
         "01-game-board",
@@ -26,7 +24,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         "06-zen-mode",
         "07-preferred-settings",
         "08-public-games",
-        "09-game-board-dark",
+        "09-conditional-moves",
         "10-home-screen-widget",
     ]
 
@@ -35,7 +33,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         "02-active-games",
         "03-game-analysis",
         "04-zen-mode",
-        "05-game-board-dark",
+        "05-conditional-moves",
         "06-public-games",
         "07-quick-match",
         "08-open-challenges",
@@ -59,6 +57,9 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
 
         let gameApp = launchApp()
         openFixtureGame(in: gameApp)
+        if !isPhone {
+            selectPersonalChatAndWaitForVariation(in: gameApp)
+        }
         capture("01-game-board", in: gameApp)
 
         if isPhone {
@@ -68,6 +69,8 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 app: gameApp
             )
             dismissCompactChatInputAndWaitForLayout(in: gameApp)
+            selectPersonalChatAndWaitForVariation(in: gameApp)
+            hideCompactChatBoardAndWaitForVariation(in: gameApp)
             capture("03-game-chat", in: gameApp)
 
             selectSegment(
@@ -75,8 +78,14 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
                 app: gameApp
             )
-            selectScreenshotAnalysisVariation(in: gameApp)
+            selectScreenshotConditionalVariation(in: gameApp)
+            openScreenshotAnalysisActionsMenu(in: gameApp)
             capture("05-game-analysis", in: gameApp)
+            dismissPopover(
+                containing: SurroundUITestContract.AccessibilityID
+                    .gameAnalyzeShare,
+                in: gameApp
+            )
 
             selectSegment(
                 at: 1,
@@ -88,8 +97,14 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
                 in: gameApp
             )
-            selectScreenshotAnalysisVariation(in: gameApp)
+            selectScreenshotConditionalVariation(in: gameApp)
+            openScreenshotAnalysisActionsMenu(in: gameApp)
             capture("03-game-analysis", in: gameApp)
+            dismissPopover(
+                containing: SurroundUITestContract.AccessibilityID
+                    .gameAnalyzeShare,
+                in: gameApp
+            )
             tap(
                 SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
                 in: gameApp
@@ -131,60 +146,44 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             setSidebarCollapsed(false, in: gameApp)
         }
 
-        if isPhone {
-            gameApp.terminate()
+        gameApp.terminate()
 
-            let darkGameApp = launchApp(interfaceStyle: .dark)
-            openFixtureGame(in: darkGameApp)
-            // Force one compact-mode layout transition after the dark
-            // appearance is applied. Without it, SwiftUI can briefly retain a
-            // zero-height board geometry from the launch-time color-scheme
-            // transition even though the board accessibility element exists.
-            selectSegment(
-                at: 2,
-                in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
-                app: darkGameApp
-            )
-            selectSegment(
-                at: 1,
-                in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
-                app: darkGameApp
-            )
-            capture("09-game-board-dark", in: darkGameApp)
-            darkGameApp.terminate()
-        } else {
-            gameApp.terminate()
-
-            let darkGameApp = launchApp(interfaceStyle: .dark)
-            openFixtureGame(in: darkGameApp)
-            capture("05-game-board-dark", in: darkGameApp)
-            darkGameApp.terminate()
-        }
+        let conditionalMovesApp = launchApp()
+        openFixtureGame(in: conditionalMovesApp)
+        openScreenshotConditionalMovesPlan(in: conditionalMovesApp)
+        capture(
+            isPhone ? "09-conditional-moves" : "05-conditional-moves",
+            in: conditionalMovesApp
+        )
+        conditionalMovesApp.terminate()
 
         let homeApp = launchApp()
         waitForHomeGames(in: homeApp)
         capture("02-active-games", in: homeApp)
+        homeApp.terminate()
+
+        let preferredSettingsApp = launchApp()
         tap(
             SurroundUITestContract.AccessibilityID.homePreferredSettings,
-            in: homeApp
+            in: preferredSettingsApp
         )
         element(
             SurroundUITestContract.AccessibilityID.screenPreferredSettings,
-            in: homeApp
+            in: preferredSettingsApp
         )
         for settingIndex in 0..<2 {
             element(
                 SurroundUITestContract.AccessibilityID.preferredSetting(
                     settingIndex
                 ),
-                in: homeApp
+                in: preferredSettingsApp
             )
         }
         capture(
             isPhone ? "07-preferred-settings" : "09-preferred-settings",
-            in: homeApp
+            in: preferredSettingsApp
         )
-        homeApp.terminate()
+        preferredSettingsApp.terminate()
 
         let newGameApp = launchApp()
         tap(
@@ -243,7 +242,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         #endif
     }
 
-    private func launchApp(interfaceStyle: InterfaceStyle = .light) -> XCUIApplication {
+    private func launchApp() -> XCUIApplication {
         #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .phone
             ? .portrait
@@ -261,11 +260,6 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 .appStoreScreenshotWidgetProofTokenLaunchArgument,
             appStoreWidgetProofToken,
         ]
-        if interfaceStyle == .dark {
-            app.launchArguments.append(
-                SurroundUITestContract.screenshotDarkModeLaunchArgument
-            )
-        }
         app.launch()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -278,7 +272,142 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         return app
     }
 
-    private func selectScreenshotAnalysisVariation(
+    private func selectPersonalChatAndWaitForVariation(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        tap(
+            SurroundUITestContract.AccessibilityID.gameChatChannelPicker,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameChatChannelPersonal,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+
+        // Reopen the localized menu long enough to prove that Personal owns
+        // the selected trait, then dismiss it before screenshot composition.
+        tap(
+            SurroundUITestContract.AccessibilityID.gameChatChannelPicker,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let personal = element(
+            SurroundUITestContract.AccessibilityID.gameChatChannelPersonal,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let personalSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: personal
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [personalSelected], timeout: 10),
+            .completed,
+            "Expected Personal to be the selected chat channel.",
+            file: file,
+            line: line
+        )
+        dismissPopover(
+            containing: SurroundUITestContract.AccessibilityID
+                .gameChatChannelPersonal,
+            in: app,
+            file: file,
+            line: line
+        )
+
+        waitForScreenshotVariation(in: app, file: file, line: line)
+    }
+
+    private func hideCompactChatBoardAndWaitForVariation(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app,
+            file: file,
+            line: line
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameChatBoardHide,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let boardHidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: board
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [boardHidden], timeout: 10),
+            .completed,
+            "Expected the iPhone Chat screenshot to hide the main board.",
+            file: file,
+            line: line
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameChatBoardShow,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        waitForScreenshotVariation(in: app, file: file, line: line)
+    }
+
+    private func waitForScreenshotVariation(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let variationLine = element(
+            SurroundUITestContract.AccessibilityID.gameChatLine(
+                screenshotVariationChatLineID
+            ),
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let chatLog = element(
+            SurroundUITestContract.AccessibilityID.gameChatLog,
+            in: app,
+            matching: .scrollView,
+            file: file,
+            line: line
+        )
+        for _ in 0..<6 where !variationLine.isHittable {
+            chatLog.swipeUp(velocity: .slow)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.4))
+        }
+        XCTAssertTrue(
+            waitUntil(timeout: 10) {
+                variationLine.isHittable
+                    && variationLine.frame.width > 8
+                    && variationLine.frame.height > 8
+                    && variationLine.frame.intersects(app.frame)
+            },
+            "Expected the shared Personal variation preview to be visible.",
+            file: file,
+            line: line
+        )
+    }
+
+    private func selectScreenshotConditionalVariation(
         in app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -286,9 +415,10 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         let identifier =
             SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
                 baseMoveNumber:
-                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
+                    SurroundUITestContract
+                        .screenshotConditionalMoveRootMoveNumber,
                 movePath:
-                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
+                    SurroundUITestContract.screenshotConditionalMovePaths[0]
             )
         tap(identifier, in: app, file: file, line: line)
 
@@ -305,7 +435,144 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         XCTAssertEqual(
             XCTWaiter.wait(for: [selected], timeout: 10),
             .completed,
-            "Expected the screenshot analysis variation to be selected",
+            "Expected the saved conditional variation to be selected",
+            file: file,
+            line: line
+        )
+    }
+
+    private func openScreenshotAnalysisActionsMenu(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let share = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let add = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        let remove = element(
+            SurroundUITestContract.AccessibilityID
+                .gameAnalyzeRemoveConditional,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            share.isEnabled,
+            "Expected Share variation in chat to be enabled.",
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            add.isEnabled,
+            "Expected Add to conditional moves to be disabled for a saved branch.",
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            remove.isEnabled,
+            "Expected Remove from conditional moves to be enabled.",
+            file: file,
+            line: line
+        )
+    }
+
+    private func openScreenshotConditionalMovesPlan(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            SurroundUITestContract.screenshotConditionalMoveBranchIDs.count,
+            2,
+            "The App Store conditional plan must expose exactly two branches.",
+            file: file,
+            line: line
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameConditionalButton,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameConditionalPopover,
+            in: app,
+            file: file,
+            line: line
+        )
+        element(
+            SurroundUITestContract.AccessibilityID
+                .gameConditionalPopoverTitle,
+            in: app,
+            file: file,
+            line: line
+        )
+
+        for branchID in SurroundUITestContract
+            .screenshotConditionalMoveBranchIDs {
+            let variation = element(
+                SurroundUITestContract.AccessibilityID
+                    .gameConditionalVariation(branchID),
+                in: app,
+                matching: .button,
+                file: file,
+                line: line
+            )
+            XCTAssertTrue(
+                waitUntil(timeout: 10) {
+                    variation.isHittable
+                        && variation.frame.width > 8
+                        && variation.frame.height > 8
+                        && variation.frame.intersects(app.frame)
+                },
+                "Expected conditional variation \(branchID) to render in the popover.",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func dismissPopover(
+        containing identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let presentedElement = app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+        XCTAssertTrue(
+            presentedElement.exists,
+            "Expected the presented menu or popover to contain \(identifier).",
+            file: file,
+            line: line
+        )
+        app.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.02, dy: 0.12)
+        ).tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !presentedElement.exists },
+            "Expected the open menu or popover to dismiss.",
             file: file,
             line: line
         )
@@ -497,12 +764,87 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
 
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.75))
 
+        let springboard = XCUIApplication(
+            bundleIdentifier: "com.apple.springboard"
+        )
+        guard waitForSystemNotificationBannersToClear(
+            in: springboard,
+            beforeCapturing: name
+        ) else {
+            return
+        }
+
         let screenshot = XCUIScreen.main.screenshot()
+        guard assertNoSystemNotificationBanner(
+            in: springboard,
+            whileCapturing: name
+        ) else {
+            return
+        }
         let attachment = XCTAttachment(screenshot: screenshot, quality: .original)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
         capturedSceneNames.append(name)
+    }
+
+    @discardableResult
+    private func waitForSystemNotificationBannersToClear(
+        in springboard: XCUIApplication,
+        beforeCapturing sceneName: String
+    ) -> Bool {
+        let banner = systemNotificationBanner(in: springboard)
+        let deadline = Date(timeIntervalSinceNow: 15)
+        var clearSince: Date?
+
+        while Date() < deadline {
+            if banner.exists {
+                clearSince = nil
+            } else if let clearSince {
+                if Date().timeIntervalSince(clearSince) >= 1 {
+                    return true
+                }
+            } else {
+                clearSince = Date()
+            }
+
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        }
+
+        keepSpringBoardDiagnostics(
+            springboard,
+            name: "System notification blocked \(sceneName)"
+        )
+        XCTFail(
+            "Expected unrelated system notification banners to clear before capturing \(sceneName)."
+        )
+        return false
+    }
+
+    private func assertNoSystemNotificationBanner(
+        in springboard: XCUIApplication,
+        whileCapturing sceneName: String
+    ) -> Bool {
+        guard !systemNotificationBanner(in: springboard).exists else {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "System notification appeared during \(sceneName)"
+            )
+            XCTFail(
+                "An unrelated system notification appeared while capturing \(sceneName); the screenshot was rejected."
+            )
+            return false
+        }
+        return true
+    }
+
+    private func systemNotificationBanner(
+        in springboard: XCUIApplication
+    ) -> XCUIElement {
+        springboard
+            .descendants(matching: .any)
+            .matching(identifier: "NotificationShortLookView")
+            .firstMatch
     }
 
     private func captureHomeScreenWidget() {
@@ -618,7 +960,20 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
 
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.5))
 
+        guard waitForSystemNotificationBannersToClear(
+            in: springboard,
+            beforeCapturing: sceneName
+        ) else {
+            return
+        }
+
         let screenshot = XCUIScreen.main.screenshot()
+        guard assertNoSystemNotificationBanner(
+            in: springboard,
+            whileCapturing: sceneName
+        ) else {
+            return
+        }
         let attachment = XCTAttachment(
             screenshot: screenshot,
             quality: .original

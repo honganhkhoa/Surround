@@ -556,7 +556,7 @@ private enum AppStoreScreenshotProfileData {
     }
 
     /// Game 68301595 has 145 moves. The active fixture intentionally keeps
-    /// only its first 48 moves.
+    /// only its first 101 moves.
     static let copperKoiOpening = AppStoreScreenshotProfileGame(
         id: 68_301_595,
         sourceMoveCount: 145,
@@ -576,7 +576,14 @@ private enum AppStoreScreenshotProfileData {
           [15,7],[15,15],[15,16],[16,14],[17,15],[15,14],[16,11],[15,11],
           [16,10],[15,10],[16,9],[15,8],[16,8],[14,7],[14,6],[15,6],
           [16,7],[13,6],[14,5],[13,8],[2,13],[2,14],[3,13],[5,15],
-          [3,9],[1,11],[1,12],[3,11],[5,12],[5,11],[6,11],[5,10]
+          [3,9],[1,11],[1,12],[3,11],[5,12],[5,11],[6,11],[5,10],
+          [6,13],[8,16],[2,5],[2,3],[6,2],[5,2],[5,3],[4,2],
+          [6,3],[6,10],[7,11],[5,7],[4,8],[5,8],[8,9],[4,7],
+          [3,7],[4,5],[4,4],[3,6],[2,6],[2,7],[3,8],[1,7],
+          [1,8],[2,8],[2,9],[1,9],[1,10],[0,8],[2,11],[3,10],
+          [2,10],[1,6],[1,5],[0,6],[3,4],[8,6],[8,4],[10,6],
+          [6,6],[6,7],[7,6],[7,7],[8,7],[8,8],[9,7],[9,8],
+          [9,6],[10,7],[9,5],[10,9],[2,16]
         ]
         """#
     )
@@ -1301,11 +1308,12 @@ extension OGSService {
         func makeChatLine(
             id: String,
             moveNumber: Int,
-            body: String,
+            channel: OGSChatChannel = .main,
+            body: Any,
             user: OGSUser
         ) -> OGSChatLine {
             let payload: [String: Any] = [
-                "channel": "main",
+                "channel": channel.rawValue,
                 "line": [
                     "body": body,
                     "chat_id": id,
@@ -1354,6 +1362,18 @@ extension OGSService {
         precondition(
             fixtureGame.ogsID == SurroundUITestContract.screenshotPrimaryGameID
         )
+        if !SurroundUITestContract.simulatesHomeBoardAlignment {
+            precondition(
+                fixtureGame.currentPosition.lastMoveNumber
+                    == SurroundUITestContract
+                        .screenshotConditionalMoveRootMoveNumber
+                    && fixtureGame.currentPosition.lastMove?.toOGSString()
+                        == "cq"
+                    && fixtureGame.stoneColor(of: fixtureUser) == .black
+                    && fixtureGame.currentPosition.nextToMove == .white,
+                "The primary screenshot fixture must end at move 101 (cq) with White to move."
+            )
+        }
         if SurroundUITestContract.simulatesAnalysisDisabled {
             precondition(
                 fixtureGame.positionByLastMoveNumber[
@@ -1390,20 +1410,34 @@ extension OGSService {
                 )
             )
         }
-        fixtureGame.chatLog = [
+        fixtureGame.addChatLine(
             makeChatLine(
                 id: "app-store-chat-1",
-                moveNumber: 42,
+                moveNumber: 0,
                 body: "Good luck — have a great game!",
-                user: fixtureGame.whitePlayer!
-            ),
+                user: fixtureUser
+            )
+        )
+        fixtureGame.addChatLine(
             makeChatLine(
                 id: "app-store-chat-2",
-                moveNumber: 45,
+                moveNumber: 1,
                 body: "Thanks, you too.",
-                user: fixtureUser
-            ),
-        ]
+                user: fixtureGame.whitePlayer!
+            )
+        )
+        precondition(
+            fixtureGame.chatLog.map(\.id) == [
+                "app-store-chat-1",
+                "app-store-chat-2",
+            ]
+                && fixtureGame.chatLog[0].moveNumber == 0
+                && fixtureGame.chatLog[0].user.id == fixtureUser.id
+                && fixtureGame.chatLog[1].moveNumber == 1
+                && fixtureGame.chatLog[1].user.id
+                    == fixtureGame.whitePlayer?.id,
+            "The primary screenshot fixture must preserve its opening chat exchange."
+        )
         if SurroundUITestContract.simulatesHomeBoardAlignment {
             let topConditionalMovePlan = try! ConditionalMovePlan(
                 gameID: fixtureGame.ogsID!,
@@ -1420,6 +1454,90 @@ extension OGSService {
                     )
                     && !fixtureGame.conditionalMoveBranches.isEmpty,
                 "The board-alignment fixture must show a conditional-moves button above its board."
+            )
+        } else {
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: "app-store-chat-variation",
+                    moveNumber: 91,
+                    channel: .personal,
+                    body: [
+                        "type": "analysis",
+                        "from": 91,
+                        "moves": "iihhhicq",
+                        "name": "Get back to bottom left after this",
+                    ] as [String: Any],
+                    user: fixtureUser
+                )
+            )
+            precondition(
+                fixtureGame.chatLog.map(\.id) == [
+                    "app-store-chat-1",
+                    "app-store-chat-2",
+                    "app-store-chat-variation",
+                ]
+                    && fixtureGame.chatLog[2].moveNumber == 91
+                    && fixtureGame.chatLog[2].channel.rawValue == "personal"
+                    && fixtureGame.chatLog[2].user.id == fixtureUser.id
+                    && fixtureGame.chatLog[2].variationData
+                        == OGSChatLineVariation(
+                            fromMoveNumber: 91,
+                            moves: "iihhhicq",
+                            name: "Get back to bottom left after this"
+                        )
+                    && fixtureGame.chatLog[2].variation != nil,
+                "The primary screenshot fixture must materialize its Personal shared variation."
+            )
+            let screenshotConditionalMovePaths =
+                SurroundUITestContract.screenshotConditionalMovePaths.map {
+                    try! Move.fromMoveString(
+                        moveString: $0.joined(),
+                        boardWidth: fixtureGame.width,
+                        boardHeight: fixtureGame.height
+                    )
+                }
+            let screenshotConditionalMovePlan = try! ConditionalMovePlan(
+                gameID: fixtureGame.ogsID!,
+                ownerID: fixtureUser.id,
+                rootMoveNumber:
+                    SurroundUITestContract
+                        .screenshotConditionalMoveRootMoveNumber,
+                paths: screenshotConditionalMovePaths
+            )
+            guard let validatedScreenshotConditionalMovePlan =
+                screenshotConditionalMovePlan.validated(
+                    width: fixtureGame.width,
+                    height: fixtureGame.height
+                )
+            else {
+                preconditionFailure(
+                    "The root-101 screenshot conditional plan must validate."
+                )
+            }
+            let orderedPathStrings = validatedScreenshotConditionalMovePlan
+                .orderedPaths()
+                .map { $0.moves.map { $0.toOGSString() } }
+            precondition(
+                orderedPathStrings.count == 2
+                    && Set(orderedPathStrings)
+                        == Set(
+                            SurroundUITestContract
+                                .screenshotConditionalMovePaths
+                        ),
+                "Both screenshot conditional paths must survive plan validation."
+            )
+            precondition(
+                fixtureGame.setConditionalMovePlan(
+                    validatedScreenshotConditionalMovePlan,
+                    expectedOwnerID: fixtureUser.id
+                )
+                    && fixtureGame.conditionalMoveBranches.count == 2
+                    && Set(fixtureGame.conditionalMoveBranches.map(\.id))
+                        == Set(
+                            SurroundUITestContract
+                                .screenshotConditionalMoveBranchIDs
+                        ),
+                "The primary screenshot fixture must project exactly two root-101 conditional branches."
             )
         }
 
@@ -1555,8 +1673,8 @@ extension OGSService {
         }
         let expectedUserTurnGameCount =
             SurroundUITestContract.isCapturingCompatibilityScreenshots
-                ? (SurroundUITestContract.simulatesHomeBoardAlignment ? 1 : 3)
-                : 2
+                ? (SurroundUITestContract.simulatesHomeBoardAlignment ? 1 : 2)
+                : 1
         precondition(
             state.activeGames.count
                 == (

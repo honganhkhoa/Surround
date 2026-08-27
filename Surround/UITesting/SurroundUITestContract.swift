@@ -10,7 +10,6 @@ import Foundation
 enum SurroundUITestContract {
     static let launchArgument = "--surround-ui-testing"
     static let screenshotLaunchArgument = "--surround-app-store-screenshots"
-    static let screenshotDarkModeLaunchArgument = "--surround-app-store-screenshots-dark-mode"
     static let compatibilityScreenshotLaunchArgument =
         "--surround-compatibility-screenshots"
     static let compatibilitySceneLaunchArgument =
@@ -83,6 +82,15 @@ enum SurroundUITestContract {
         "cf",
         "fc",
     ]
+    static let screenshotConditionalMoveRootMoveNumber = 101
+    static let screenshotConditionalMovePaths = [
+        ["bo", "er", "eq", "dr", "fr", "br"],
+        ["bo", "er", "dq", "dr", "bq", "br", "cp", "cr"],
+    ]
+    static let screenshotConditionalMoveBranchIDs =
+        screenshotConditionalMovePaths.map {
+            "\(screenshotConditionalMoveRootMoveNumber):\($0.joined())"
+        }
 
     enum CompatibilityScene: String, CaseIterable {
         case welcome
@@ -123,11 +131,6 @@ enum SurroundUITestContract {
 
     static var isCapturingAppStoreScreenshots: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(screenshotLaunchArgument)
-    }
-
-    static var isCapturingAppStoreScreenshotsInDarkMode: Bool {
-        isCapturingAppStoreScreenshots
-            && ProcessInfo.processInfo.arguments.contains(screenshotDarkModeLaunchArgument)
     }
 
     static var isCapturingCompatibilityScreenshots: Bool {
@@ -277,7 +280,6 @@ enum SurroundUITestContract {
     #else
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
-    static let isCapturingAppStoreScreenshotsInDarkMode = false
     static let isCapturingCompatibilityScreenshots = false
     static let simulatesHomeBoardAlignment = false
     static let compatibilityScene: CompatibilityScene? = nil

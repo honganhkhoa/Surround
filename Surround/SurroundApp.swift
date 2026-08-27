@@ -72,11 +72,7 @@ struct SurroundApp: App {
                         || SurroundUITestContract
                             .isCapturingCompatibilityScreenshots
                 )
-                    ? (
-                        SurroundUITestContract.isCapturingAppStoreScreenshotsInDarkMode
-                            ? .dark
-                            : .light
-                    )
+                    ? .light
                     : nil
             )
     }

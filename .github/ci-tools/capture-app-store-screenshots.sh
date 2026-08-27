@@ -41,7 +41,7 @@ readonly -a expected_iphone_scenes=(
   "06-zen-mode"
   "07-preferred-settings"
   "08-public-games"
-  "09-game-board-dark"
+  "09-conditional-moves"
   "10-home-screen-widget"
 )
 
@@ -50,7 +50,7 @@ readonly -a expected_ipad_scenes=(
   "02-active-games"
   "03-game-analysis"
   "04-zen-mode"
-  "05-game-board-dark"
+  "05-conditional-moves"
   "06-public-games"
   "07-quick-match"
   "08-open-challenges"

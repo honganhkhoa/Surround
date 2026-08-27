@@ -319,7 +319,10 @@ struct PlayersBannerView: View {
             }
         }
         
-        return VStack(alignment: leftSide ? .leading : .trailing) {
+        return VStack(
+            alignment: leftSide ? .leading : .trailing,
+            spacing: 2
+        ) {
             if showsPlayersName && !shouldShowNamesOutOfColumn {
                 playerName(color: color)
             }

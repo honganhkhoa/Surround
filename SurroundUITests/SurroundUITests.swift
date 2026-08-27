@@ -1156,7 +1156,7 @@ final class SurroundUITests: SurroundUITestCase {
         #endif
         assertNotSelected(secondLineID, in: app)
 
-        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(42)
+        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(0)
         tap(moveID, in: app, matching: .button)
         assertSelected(moveID, in: app)
         tap(firstLineID, in: app, matching: .button)
@@ -1298,7 +1298,7 @@ final class SurroundUITests: SurroundUITestCase {
         XCTAssertNotNil(plainChatLineBoardValue)
         XCTAssertEqual(
             plainChatLineBoardValue,
-            "position:48:fk",
+            "position:101:cq",
             "Expected a plain chat line to render the current-game fallback board."
         )
         assertSharingDraftIsIntact()
@@ -1312,7 +1312,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         assertSharingDraftIsIntact()
 
-        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(42)
+        let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(0)
         tap(moveID, in: app, matching: .button)
         assertSelected(moveID, in: app)
         XCTAssertNotEqual(
