@@ -35,15 +35,15 @@ fi
 
 ensure_dictionary() {
   local key_path="$1"
-  if plutil -extract "$key_path" raw -expect dictionary \
-    -o /dev/null "$preferences_plist" 2>/dev/null; then
+  local plist_buddy_path=":${key_path//./:}"
+  if /usr/libexec/PlistBuddy \
+    -c "Print $plist_buddy_path" "$preferences_plist" \
+    >/dev/null 2>&1; then
     return
   fi
-  if plutil -type "$key_path" "$preferences_plist" >/dev/null 2>&1; then
-    plutil -replace "$key_path" -dictionary "$preferences_plist"
-  else
-    plutil -insert "$key_path" -dictionary "$preferences_plist"
-  fi
+
+  /usr/libexec/PlistBuddy \
+    -c "Add $plist_buddy_path dict" "$preferences_plist"
 }
 
 device_preferences_path="DevicePreferences.${simulator_id}"
@@ -54,21 +54,30 @@ ensure_dictionary "$device_preferences_path"
 # Keep XCTest on the hardware-keyboard path. The UI tests still assert the
 # composer-specific keyboard-focus signal and text delivery; this only removes
 # the software-keyboard animation that can poison XCTest's quiescence monitor.
-if plutil -type "$keyboard_preference_path" "$preferences_plist" \
-  >/dev/null 2>&1; then
-  plutil -replace "$keyboard_preference_path" -bool true "$preferences_plist"
-else
-  plutil -insert "$keyboard_preference_path" -bool true "$preferences_plist"
-fi
+keyboard_preference_buddy_path=":${keyboard_preference_path//./:}"
+/usr/libexec/PlistBuddy \
+  -c "Delete $keyboard_preference_buddy_path" "$preferences_plist" \
+  >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy \
+  -c "Add $keyboard_preference_buddy_path bool true" "$preferences_plist"
 
 defaults import com.apple.iphonesimulator "$preferences_plist" >/dev/null
 defaults export com.apple.iphonesimulator "$preferences_plist" >/dev/null
 
+verification_key="SurroundHardwareKeyboardVerification"
+/usr/libexec/PlistBuddy \
+  -c "Delete :$verification_key" "$preferences_plist" \
+  >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy \
+  -c "Copy $keyboard_preference_buddy_path :$verification_key" \
+  "$preferences_plist"
 configured_value="$(
-  plutil -extract "$keyboard_preference_path" raw -expect bool \
+  plutil -extract "$verification_key" raw -expect bool \
     -o - "$preferences_plist" 2>/dev/null \
     || true
 )"
+/usr/libexec/PlistBuddy \
+  -c "Delete :$verification_key" "$preferences_plist"
 
 if [[ "$configured_value" != "true" ]]; then
   echo "Could not enable the hardware keyboard for simulator $simulator_id." >&2
