@@ -525,6 +525,9 @@ final class SurroundUITests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
+        let target = app.buttons
+            .matching(identifier: identifier)
+            .firstMatch
         let analysisTree = element(
             SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
             in: app,
@@ -532,9 +535,6 @@ final class SurroundUITests: SurroundUITestCase {
             file: file,
             line: line
         )
-        let target = app.descendants(matching: .any)
-            .matching(identifier: identifier)
-            .firstMatch
 
         for attempt in 0...10 {
             var targetExists = target.exists
@@ -596,7 +596,46 @@ final class SurroundUITests: SurroundUITestCase {
         line: UInt = #line
     ) {
         var lastTarget: XCUIElement?
-        for _ in 0..<2 {
+        for attempt in 0..<2 {
+            // AnalyzeTreeView normally centers the selected position. Use
+            // XCTest's valid hit point in that common case so long journeys do
+            // not repeatedly traverse the complete accessibility hierarchy.
+            // If that interaction does not select the node, the next attempt
+            // falls back to the frame-aware reveal and centered interaction.
+            let visibleTarget = app.buttons
+                .matching(identifier: identifier)
+                .firstMatch
+            let analysisTree = app.scrollViews
+                .matching(
+                    identifier:
+                        SurroundUITestContract.AccessibilityID
+                            .gameAnalyzeTreeScroll
+                )
+                .firstMatch
+            let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+            if attempt == 0,
+               visibleTarget.exists,
+               hasTappableInteractionPoint(
+                   interactionPoint,
+                   visibleTarget.frame,
+                   in: analysisTree.frame
+               ) {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                if visibleTarget.exists,
+                   hasTappableInteractionPoint(
+                       interactionPoint,
+                       visibleTarget.frame,
+                       in: analysisTree.frame
+                   ), visibleTarget.isHittable {
+                    lastTarget = visibleTarget
+                    activate(visibleTarget)
+                    if waitForStableSelection(of: visibleTarget, timeout: 5) {
+                        return
+                    }
+                    continue
+                }
+            }
+
             let target = revealAnalysisPosition(
                 identifier,
                 in: app,
@@ -610,7 +649,7 @@ final class SurroundUITests: SurroundUITestCase {
             }
         }
 
-        let target = lastTarget ?? app.descendants(matching: .any)
+        let target = lastTarget ?? app.buttons
             .matching(identifier: identifier)
             .firstMatch
         let analysisTree = app.scrollViews
@@ -805,34 +844,52 @@ final class SurroundUITests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let focusedTextField = focusChatInput(
+        var currentTextField = focusChatInput(
             textField,
             in: app,
             mode: focusMode,
             file: file,
             line: line
         )
-        focusedTextField.typeText(text)
+        currentTextField.typeText(text)
 
-        var completed = waitForValue(text, in: focusedTextField, timeout: 2)
+        var completed = waitForValue(text, in: currentTextField, timeout: 2)
         if !completed {
-            if let actualValue = focusedTextField.value as? String,
-               text.hasPrefix(actualValue),
-               actualValue != text {
-                focusedTextField.typeText(String(text.dropFirst(actualValue.count)))
+            // Preserve the initial focus assertion above, then recover from a
+            // stale XCTest element snapshot only after text delivery fails.
+            // Re-resolving and explicitly focusing here lets the retry target
+            // the current composer without weakening automatic-focus tests.
+            let resolvedTextField = app.textFields
+                .matching(
+                    identifier:
+                        SurroundUITestContract.AccessibilityID.gameChatInput
+                )
+                .firstMatch
+            currentTextField = focusChatInput(
+                resolvedTextField,
+                in: app,
+                mode: .acquireWithRetry,
+                file: file,
+                line: line
+            )
+            let actualValue = currentTextField.value as? String ?? ""
+            if text.hasPrefix(actualValue), actualValue != text {
+                currentTextField.typeText(
+                    String(text.dropFirst(actualValue.count))
+                )
             }
-            completed = waitForValue(text, in: focusedTextField, timeout: 5)
+            completed = waitForValue(text, in: currentTextField, timeout: 5)
         }
         if !completed {
             keepTextInputHierarchy(
-                focusedTextField,
+                currentTextField,
                 in: app,
                 reason: "incomplete chat composer input"
             )
         }
         XCTAssertTrue(
             completed,
-            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: focusedTextField.value))",
+            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: currentTextField.value))",
             file: file,
             line: line
         )
@@ -860,31 +917,23 @@ final class SurroundUITests: SurroundUITestCase {
         #else
         switch mode {
         case .requireExistingFocus:
-            if waitForFocus(in: textField, app: app, timeout: 10) {
-                return textField
+            if waitForChatInputFocus(in: app, timeout: 10) {
+                return resolvedChatInput(in: app)
             }
         case .acquireWithRetry:
+            if chatInputHasKeyboardFocus(in: app) {
+                return resolvedChatInput(in: app)
+            }
             for _ in 0..<2 {
-                let currentTextField = app.textFields
-                    .matching(
-                        identifier:
-                            SurroundUITestContract.AccessibilityID.gameChatInput
-                    )
-                    .firstMatch
-                tap(
+                let currentTextField = resolvedChatInput(in: app)
+                focusChatInputAtTrailingEdgeIfNeeded(
                     currentTextField,
-                    description:
-                        SurroundUITestContract.AccessibilityID.gameChatInput,
                     in: app,
                     file: file,
                     line: line
                 )
-                if waitForFocus(
-                    in: currentTextField,
-                    app: app,
-                    timeout: 3
-                ) {
-                    return currentTextField
+                if waitForChatInputFocus(in: app, timeout: 3) {
+                    return resolvedChatInput(in: app)
                 }
             }
         }
@@ -903,26 +952,91 @@ final class SurroundUITests: SurroundUITestCase {
         #endif
     }
 
-    private func waitForFocus(
-        in textField: XCUIElement,
-        app: XCUIApplication,
+    private func focusChatInputAtTrailingEdgeIfNeeded(
+        _ textField: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString,
+        line: UInt
+    ) {
+        let existingValue = textField.value as? String ?? ""
+        guard !existingValue.isEmpty else {
+            tap(
+                textField,
+                description:
+                    SurroundUITestContract.AccessibilityID.gameChatInput,
+                in: app,
+                file: file,
+                line: line
+            )
+            return
+        }
+
+        let isHittable = waitUntilHittable(textField, timeout: 10)
+        if !isHittable {
+            keepTextInputHierarchy(
+                textField,
+                in: app,
+                reason: "nonempty chat composer not hittable for refocus"
+            )
+        }
+        XCTAssertTrue(
+            isHittable,
+            "Expected the chat composer to be hittable for refocus",
+            file: file,
+            line: line
+        )
+        guard isHittable else {
+            return
+        }
+
+        // Refocusing at the trailing edge preserves append semantics when a
+        // loaded CI runner delivered only a prefix of the requested text.
+        activate(textField, at: CGVector(dx: 0.98, dy: 0.5))
+    }
+
+    private func resolvedChatInput(in app: XCUIApplication) -> XCUIElement {
+        app.textFields
+            .matching(
+                identifier:
+                    SurroundUITestContract.AccessibilityID.gameChatInput
+            )
+            .firstMatch
+    }
+
+    private func waitForChatInputFocus(
+        in app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        if textField.debugDescription.contains("Keyboard Focused") {
-            return true
-        }
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        repeat {
+            if chatInputHasKeyboardFocus(in: app) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
 
-        let keyboard = app.keyboards.firstMatch
-        if !keyboard.exists {
-            _ = keyboard.waitForExistence(timeout: timeout)
-        }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        return false
+    }
 
-        // Keyboard existence only synchronizes with the focus transition: it
-        // cannot identify the first responder. `hasFocus` is accessibility
-        // focus, not keyboard focus, for this SwiftUI field on iPadOS 26, so
-        // verify XCTest's field-specific snapshot token after the wait.
-        return textField.debugDescription.contains("Keyboard Focused")
+    private func focusSharedVariationInput(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let textField = element(
+            SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            matching: .textField,
+            file: file,
+            line: line
+        )
+        return focusChatInput(
+            textField,
+            in: app,
+            mode: .requireExistingFocus,
+            file: file,
+            line: line
+        )
     }
 
     private func waitForValue(
@@ -1388,21 +1502,26 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .button
         )
-        let selectedPosition = app.descendants(matching: .any).matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND selected == true",
-                "game.analysis.position."
-            )
-        ).firstMatch
-        XCTAssertTrue(
-            selectedPosition.waitForExistence(timeout: 10),
-            "Expected branch navigation to select a shareable variation."
-        )
-        let selectedIdentifier = selectedPosition.identifier
-        XCTAssertFalse(selectedIdentifier.isEmpty)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
+        )
+        let shareVariation = analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            catalystTitle: "Share variation in chat",
+            in: app
+        )
+        let shareableVariationSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"),
+            object: shareVariation
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(
+                for: [shareableVariationSelected],
+                timeout: 10
+            ),
+            .completed,
+            "Expected branch navigation to select a shareable variation."
         )
         tapAnalyzeMenuItem(
             SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
@@ -1739,6 +1858,7 @@ final class SurroundUITests: SurroundUITestCase {
             catalystTitle: "Share variation in chat",
             in: app
         )
+        let variationNameInput = focusSharedVariationInput(in: app)
 
         let parentIdentifier =
             SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
@@ -1763,12 +1883,12 @@ final class SurroundUITests: SurroundUITestCase {
         let frozenPreviewValue = sharingPreview.value as? String
         XCTAssertNotNil(frozenPreviewValue)
         let variationName = "Persistent variation"
-        let variationNameInput = element(
-            SurroundUITestContract.AccessibilityID.gameChatInput,
+        enterText(
+            variationName,
+            into: variationNameInput,
             in: app,
-            matching: .textField
+            focusMode: .requireExistingFocus
         )
-        enterText(variationName, into: variationNameInput, in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
         let mainBoard = element(
             SurroundUITestContract.AccessibilityID.gameBoard,
@@ -1890,6 +2010,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app
         )
+        _ = focusSharedVariationInput(in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
@@ -1915,6 +2036,7 @@ final class SurroundUITests: SurroundUITestCase {
             catalystTitle: "Share variation in chat",
             in: app
         )
+        let replacementNameInput = focusSharedVariationInput(in: app)
 
         let replacementPreview = element(
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
@@ -1926,12 +2048,12 @@ final class SurroundUITests: SurroundUITestCase {
             "Sharing another branch should replace the frozen composer preview."
         )
         let replacementName = "Replacement variation"
-        let replacementNameInput = element(
-            SurroundUITestContract.AccessibilityID.gameChatInput,
+        enterText(
+            replacementName,
+            into: replacementNameInput,
             in: app,
-            matching: .textField
+            focusMode: .requireExistingFocus
         )
-        enterText(replacementName, into: replacementNameInput, in: app)
     }
 
     func testChatTextUsesSystemSelectionMenu() throws {
@@ -2304,7 +2426,7 @@ final class SurroundUITests: SurroundUITestCase {
                 movePath: SurroundUITestContract
                     .conditionalMovesFixtureConflictingPath
             )
-        tap(conflictingNodeIdentifier, in: app)
+        tapAnalysisPosition(conflictingNodeIdentifier, in: app)
         assertSelected(conflictingNodeIdentifier, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
@@ -2325,7 +2447,7 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
         dismissPopover(in: app)
-        tap(selectedNodeIdentifier, in: app)
+        tapAnalysisPosition(selectedNodeIdentifier, in: app)
         assertSelected(selectedNodeIdentifier, in: app)
 
         tap(
@@ -2442,7 +2564,7 @@ final class SurroundUITests: SurroundUITestCase {
             "The conditional-move quick action should follow the marker tool."
         )
 
-        tap(conflictingNodeIdentifier, in: app)
+        tapAnalysisPosition(conflictingNodeIdentifier, in: app)
         assertSelected(conflictingNodeIdentifier, in: app)
         let replacingQuickAdd = element(
             SurroundUITestContract.AccessibilityID
@@ -2458,7 +2580,7 @@ final class SurroundUITests: SurroundUITestCase {
             quickRemoveConditional.exists,
             "Quick Add should replace Quick Remove for a conflicting branch."
         )
-        tap(selectedNodeIdentifier, in: app)
+        tapAnalysisPosition(selectedNodeIdentifier, in: app)
         assertSelected(selectedNodeIdentifier, in: app)
 
         tap(
@@ -2596,7 +2718,7 @@ final class SurroundUITests: SurroundUITestCase {
                 )
             )
 
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         assertSelected(selectedIdentifier, in: app)
 
         tap(
@@ -2643,7 +2765,7 @@ final class SurroundUITests: SurroundUITestCase {
                 matching: .button
             ).isEnabled
         )
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         assertSelected(selectedIdentifier, in: app)
 
         XCTAssertFalse(
@@ -2711,16 +2833,13 @@ final class SurroundUITests: SurroundUITestCase {
         XCTAssertEqual(sharingPreview.frame.height, 120, accuracy: 4)
         let frozenPreviewValue = sharingPreview.value as? String
         XCTAssertNotNil(frozenPreviewValue)
-        let variationNameInput = element(
-            SurroundUITestContract.AccessibilityID.gameChatInput,
-            in: app,
-            matching: .textField
-        )
+        let variationNameInput = focusSharedVariationInput(in: app)
         XCTAssertEqual(variationNameInput.label, "Variation name...")
         enterText(
             "Focused variation",
             into: variationNameInput,
-            in: app
+            in: app,
+            focusMode: .requireExistingFocus
         )
         dismissSoftwareKeyboardIfNeeded(in: app)
         element(
@@ -2769,7 +2888,7 @@ final class SurroundUITests: SurroundUITestCase {
         assertSelected(parentIdentifier, in: app)
         assertSharingDraftIsIntact()
 
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         assertSelected(selectedIdentifier, in: app)
         assertSharingDraftIsIntact()
         tap(
@@ -2821,7 +2940,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         assertSelected(parentIdentifier, in: app)
 
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         assertSelected(selectedIdentifier, in: app)
 
         tap(
@@ -2862,7 +2981,7 @@ final class SurroundUITests: SurroundUITestCase {
                     SurroundUITestContract.screenshotAnalysisSelectedMovePath
             )
 
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -2889,6 +3008,8 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .button
         )
+        _ = focusSharedVariationInput(in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
         tapChatChannel(
             SurroundUITestContract.AccessibilityID.gameChatChannelMalkovich,
             catalystTitle: "Malkovich",
@@ -3143,6 +3264,7 @@ final class SurroundUITests: SurroundUITestCase {
             "Expected marks on a main-branch position to be shareable."
         )
         share.tap()
+        _ = focusSharedVariationInput(in: app)
         let preview = element(
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app
@@ -3151,6 +3273,7 @@ final class SurroundUITests: SurroundUITestCase {
             (preview.value as? String)?.contains(":|marks:A=") == true,
             "Expected a zero-move variation preview containing the marker."
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
             in: app,

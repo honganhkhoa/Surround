@@ -68,6 +68,12 @@ jobs:
           simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
+      - name: Configure the iPadOS 26 test keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}"
+
       - name: Run iPad UI tests
         shell: bash
         run: |
@@ -115,6 +121,12 @@ jobs:
         run: |
           simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Configure the iPadOS 18 test keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.ipad_simulator.outputs.id }}"
 
       - name: Run unit tests on iOS 18
         shell: bash

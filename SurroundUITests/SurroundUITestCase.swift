@@ -90,22 +90,35 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
 
-        // Ensure the focus-on-appear action has completed before dismissing it,
+        // Preserve the focus-on-appear assertion before dismissing it,
         // regardless of whether this simulator uses a hardware keyboard.
-        input.tap()
         let keyboard = app.keyboards.firstMatch
-        let softwareKeyboardWasVisible = keyboard.waitForExistence(timeout: 1)
+        XCTAssertTrue(
+            pollUntil(timeout: timeout) {
+                chatInputHasKeyboardFocus(in: app)
+            },
+            "Expected the compact chat composer to receive keyboard focus automatically.",
+            file: file,
+            line: line
+        )
 
         tapChatLogBackground(chatLog)
 
-        if softwareKeyboardWasVisible || keyboard.exists {
-            XCTAssertTrue(
-                keyboard.waitForNonExistence(timeout: timeout),
-                "Expected the compact chat keyboard to disappear before capture.",
-                file: file,
-                line: line
-            )
-        }
+        var consecutiveDismissedChecks = 0
+        XCTAssertTrue(
+            pollUntil(timeout: timeout) {
+                if !chatInputHasKeyboardFocus(in: app)
+                    && !softwareKeyboardIsVisible(keyboard, in: app) {
+                    consecutiveDismissedChecks += 1
+                } else {
+                    consecutiveDismissedChecks = 0
+                }
+                return consecutiveDismissedChecks >= 3
+            },
+            "Expected the compact chat keyboard to disappear before capture.",
+            file: file,
+            line: line
+        )
 
         let board = app.descendants(matching: .any)
             .matching(
@@ -162,7 +175,11 @@ class SurroundUITestCase: XCTestCase {
     ) {
         #if !targetEnvironment(macCatalyst)
         let keyboard = app.keyboards.firstMatch
-        guard keyboard.waitForExistence(timeout: 2) else {
+        let inputWasFocusedOrKeyboardVisible = pollUntil(timeout: 2) {
+            chatInputHasKeyboardFocus(in: app)
+                || softwareKeyboardIsVisible(keyboard, in: app)
+        }
+        guard inputWasFocusedOrKeyboardVisible else {
             return
         }
 
@@ -175,9 +192,22 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
         tapChatLogBackground(chatLog)
+        var consecutiveDismissedChecks = 0
+        let dismissed = pollUntil(timeout: 10) {
+            if !chatInputHasKeyboardFocus(in: app)
+                && !softwareKeyboardIsVisible(keyboard, in: app) {
+                consecutiveDismissedChecks += 1
+            } else {
+                consecutiveDismissedChecks = 0
+            }
+            return consecutiveDismissedChecks >= 3
+        }
+        if !dismissed {
+            keepHierarchy(of: app, name: "chat composer focus not dismissed")
+        }
         XCTAssertTrue(
-            keyboard.waitForNonExistence(timeout: 10),
-            "Expected the chat composer keyboard to be dismissed",
+            dismissed,
+            "Expected the chat composer to lose focus and its keyboard to be dismissed",
             file: file,
             line: line
         )
@@ -197,6 +227,31 @@ class SurroundUITestCase: XCTestCase {
                 CGVector(dx: 4, dy: chatLog.frame.height / 2)
             )
             .tap()
+    }
+
+    func chatInputHasKeyboardFocus(in app: XCUIApplication) -> Bool {
+        let input = app.textFields
+            .matching(
+                identifier:
+                    SurroundUITestContract.AccessibilityID.gameChatInput
+            )
+            .firstMatch
+        return input.exists
+            && input.debugDescription.contains("Keyboard Focused")
+    }
+
+    func softwareKeyboardIsVisible(
+        _ keyboard: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        guard keyboard.exists else {
+            return false
+        }
+        let frame = keyboard.frame
+        let visibleFrame = frame.intersection(app.frame)
+        return !frame.isNull
+            && visibleFrame.width > 1
+            && visibleFrame.height > 1
     }
 
     private func assertNoSelectedChatItem(

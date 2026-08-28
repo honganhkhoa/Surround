@@ -36,6 +36,7 @@ itself:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+.github/ci-tools/configure-ios-simulator-hardware-keyboard.sh "$simulator_id"
 xcodebuild test \
   -scheme Surround \
   -project Surround.xcodeproj \
@@ -43,6 +44,12 @@ xcodebuild test \
   -destination "platform=iOS Simulator,id=${simulator_id}" \
   -only-testing:SurroundUITests
 ```
+
+The UI-test harness enables the selected simulator's hardware-keyboard path so
+long journeys do not depend on XCTest receiving every software-keyboard
+animation-completion notification. Composer tests still require the specific
+chat field to report keyboard focus and accept the complete typed value, so
+automatic-focus coverage remains intact.
 
 CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains both result bundles in the `surround-ios-18-test-results` artifact.
 

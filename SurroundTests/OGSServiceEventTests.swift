@@ -632,7 +632,11 @@ final class OGSServiceEventTests: XCTestCase {
             completed.fulfill()
         } receiveValue: {}
 
-        await fulfillment(of: [completed], timeout: 2)
+        // The offline echo and its Combine completion are dispatched through
+        // the main run loop. Give a contended CI runner enough time to service
+        // those callbacks while keeping the production submission timeout at
+        // one second so this still exercises the same behavior.
+        await fulfillment(of: [completed], timeout: 10)
         withExtendedLifetime(cancellable) {}
         XCTAssertNil(completionError)
         XCTAssertEqual(game.conditionalMovePlan, replacement)
