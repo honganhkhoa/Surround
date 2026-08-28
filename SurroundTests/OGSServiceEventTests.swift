@@ -3,11 +3,26 @@
 //  SurroundTests
 //
 
-import XCTest
-import DictionaryCoding
+import Alamofire
 import Combine
+import DictionaryCoding
+import XCTest
 
 final class OGSServiceEventTests: XCTestCase {
+    private final class RejectingURLProtocol: URLProtocol {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            client?.urlProtocol(
+                self,
+                didFailWithError: URLError(.notConnectedToInternet)
+            )
+        }
+
+        override func stopLoading() {}
+    }
+
     private class FakeWebsocket: OGSWebsocketProtocol {
         struct Emission {
             let command: String
@@ -1301,7 +1316,10 @@ final class OGSServiceEventTests: XCTestCase {
 
     func testPublicGameRefreshReleasesOnlyPublicListOwners() throws {
         let socket = FakeWebsocket()
-        let service = makeService(socket: socket)
+        let service = makeService(
+            socket: socket,
+            cachedUsers: try makePublicGameUsers()
+        )
         let historyGame = Game(ogsGame: try makeEmptyGameData(id: 51, phase: "finished"))
         historyGame.ogs = service
         let detailOwnerID = UUID()
@@ -1461,8 +1479,11 @@ final class OGSServiceEventTests: XCTestCase {
     func testPublicRefreshReusesDesiredCanonicalModelWhileSocketIsDown() throws {
         let socket = FakeWebsocket()
         socket.dropSocket()
-        let service = makeService(socket: socket)
         let canonicalGame = Game(ogsGame: try makeEmptyGameData(id: 54))
+        let service = makeService(
+            socket: socket,
+            cachedUsers: Array(canonicalGame.playerByOGSId.values)
+        )
         canonicalGame.ogs = service
         service.connect(to: canonicalGame, owner: .explicit(UUID()))
 
@@ -1737,15 +1758,32 @@ final class OGSServiceEventTests: XCTestCase {
 
     private func makeService(
         socket: OGSWebsocketProtocol,
-        installsObservers: Bool = true,
+        cachedUsers: [OGSUser] = [],
+        installsObservers: Bool = false,
         undoResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RejectingURLProtocol.self]
+        configuration.httpCookieStorage = nil
+        let httpClient = AlamofireOGSHTTPClient(
+            session: Session(configuration: configuration),
+            cookieStorage: nil
+        )
+        var initialState: OGSService.BootstrapState?
+        if !cachedUsers.isEmpty {
+            var state = OGSService.BootstrapState()
+            state.cachedUsersById = Dictionary(
+                cachedUsers.map { ($0.id, $0) },
+                uniquingKeysWith: { _, latest in latest }
+            )
+            initialState = state
+        }
         return OGSService(
             environment: environment,
-            httpClient: AlamofireOGSHTTPClient.isolated(),
+            httpClient: httpClient,
             preferences: UserDefaults(suiteName: preferenceSuite)!,
             ogsWebsocket: socket,
             connectsAutomatically: false,
@@ -1754,8 +1792,17 @@ final class OGSServiceEventTests: XCTestCase {
             startsTimers: false,
             installsObservers: installsObservers,
             undoResynchronizationTimeout: undoResynchronizationTimeout,
-            conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout
+            conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout,
+            initialState: initialState
         )
+    }
+
+    private func makePublicGameUsers() throws -> [OGSUser] {
+        let data = try JSONSerialization.data(withJSONObject: [
+            ["id": 1, "username": "black"],
+            ["id": 2, "username": "white"],
+        ])
+        return try JSONDecoder().decode([OGSUser].self, from: data)
     }
 
     private func makeShareableVariation(in game: Game) throws -> Variation {

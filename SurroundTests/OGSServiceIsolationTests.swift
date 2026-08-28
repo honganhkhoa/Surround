@@ -1251,7 +1251,8 @@ final class OGSServiceIsolationTests: XCTestCase {
             connectsAutomatically: false,
             usesSurroundOverviewService: false,
             enablesAppSideEffects: false,
-            startsTimers: false
+            startsTimers: false,
+            installsObservers: false
         )
     }
 
