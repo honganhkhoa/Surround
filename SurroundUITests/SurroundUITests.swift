@@ -9,6 +9,16 @@ import XCTest
 import UIKit
 
 final class SurroundUITests: SurroundUITestCase {
+    private enum TextInputFocusMode {
+        case acquireWithRetry
+        case requireExistingFocus
+    }
+
+    private enum ScrollRevealAxis {
+        case horizontal
+        case vertical
+    }
+
     private func activateZenControl(
         _ identifier: String,
         in app: XCUIApplication,
@@ -88,13 +98,10 @@ final class SurroundUITests: SurroundUITestCase {
         return element
     }
 
-    @discardableResult
-    private func analyzeMenuItem(
+    private func unresolvedAnalyzeMenuItem(
         _ accessibilityIdentifier: String,
         catalystTitle: String,
-        in app: XCUIApplication,
-        file: StaticString = #filePath,
-        line: UInt = #line
+        in app: XCUIApplication
     ) -> XCUIElement {
         #if targetEnvironment(macCatalyst)
         let menuItems = app.descendants(matching: .menuItem)
@@ -105,7 +112,7 @@ final class SurroundUITests: SurroundUITestCase {
             return exactTitleItem
         }
 
-        let compatibleItem = menuItems.matching(
+        return menuItems.matching(
             NSPredicate(
                 format: "identifier == %@ OR label == %@ OR title == %@ OR value == %@ OR identifier BEGINSWITH %@ OR label BEGINSWITH %@ OR title BEGINSWITH %@ OR value BEGINSWITH %@",
                 catalystTitle,
@@ -118,7 +125,27 @@ final class SurroundUITests: SurroundUITestCase {
                 catalystTitle
             )
         ).firstMatch
-        let appeared = compatibleItem.waitForExistence(timeout: 10)
+        #else
+        return app.buttons
+            .matching(identifier: accessibilityIdentifier)
+            .firstMatch
+        #endif
+    }
+
+    @discardableResult
+    private func analyzeMenuItem(
+        _ accessibilityIdentifier: String,
+        catalystTitle: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let menuItem = unresolvedAnalyzeMenuItem(
+            accessibilityIdentifier,
+            catalystTitle: catalystTitle,
+            in: app
+        )
+        let appeared = menuItem.waitForExistence(timeout: 10)
         if !appeared {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name =
@@ -132,16 +159,7 @@ final class SurroundUITests: SurroundUITestCase {
             file: file,
             line: line
         )
-        return compatibleItem
-        #else
-        return element(
-            accessibilityIdentifier,
-            in: app,
-            matching: .button,
-            file: file,
-            line: line
-        )
-        #endif
+        return menuItem
     }
 
     private func tapAnalyzeMenuItem(
@@ -151,14 +169,48 @@ final class SurroundUITests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        tap(
-            analyzeMenuItem(
+        var menuItem = analyzeMenuItem(
+            accessibilityIdentifier,
+            catalystTitle: catalystTitle,
+            in: app,
+            file: file,
+            line: line
+        )
+        if !waitUntilHittable(menuItem, timeout: 3) {
+            let actionsMenu = app.descendants(matching: .any)
+                .matching(
+                    identifier:
+                        SurroundUITestContract.AccessibilityID
+                            .gameAnalyzeActionsMenu
+                )
+                .firstMatch
+            #if targetEnvironment(macCatalyst)
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+            if waitUntilHittable(actionsMenu, timeout: 2) {
+                activate(actionsMenu)
+            }
+            #else
+            if waitUntilHittable(actionsMenu, timeout: 2) {
+                activate(actionsMenu)
+                let refreshedItem = unresolvedAnalyzeMenuItem(
+                    accessibilityIdentifier,
+                    catalystTitle: catalystTitle,
+                    in: app
+                )
+                if !waitUntilHittable(refreshedItem, timeout: 2),
+                   waitUntilHittable(actionsMenu, timeout: 2) {
+                    activate(actionsMenu)
+                }
+            }
+            #endif
+            menuItem = unresolvedAnalyzeMenuItem(
                 accessibilityIdentifier,
                 catalystTitle: catalystTitle,
-                in: app,
-                file: file,
-                line: line
-            ),
+                in: app
+            )
+        }
+        tap(
+            menuItem,
             description: catalystTitle,
             in: app,
             file: file,
@@ -327,12 +379,8 @@ final class SurroundUITests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let hittable = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "hittable == true"),
-            object: element
-        )
-        let result = XCTWaiter.wait(for: [hittable], timeout: 10)
-        if result != .completed {
+        let isHittable = waitUntilHittable(element, timeout: 10)
+        if !isHittable {
             let hierarchy = XCTAttachment(
                 string: """
                 Element:
@@ -348,12 +396,16 @@ final class SurroundUITests: SurroundUITestCase {
             add(hierarchy)
         }
         XCTAssertEqual(
-            result,
-            .completed,
+            isHittable,
+            true,
             "Expected \(description) to be hittable",
             file: file,
             line: line
         )
+        activate(element)
+    }
+
+    private func activate(_ element: XCUIElement) {
         #if targetEnvironment(macCatalyst)
         element.click()
         #else
@@ -361,64 +413,528 @@ final class SurroundUITests: SurroundUITestCase {
         #endif
     }
 
-    private func enterText(
-        _ text: String,
-        into textField: XCUIElement,
+    private func waitUntilHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let hittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"),
+            object: element
+        )
+        return XCTWaiter.wait(for: [hittable], timeout: timeout) == .completed
+    }
+
+    @discardableResult
+    private func revealChatItem(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching elementType: XCUIElement.ElementType = .any,
+        interactionPoint: CGVector = CGVector(dx: 0.5, dy: 0.5),
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let chatLog = element(
+            SurroundUITestContract.AccessibilityID.gameChatLog,
+            in: app,
+            matching: .scrollView,
+            file: file,
+            line: line
+        )
+        let target = app.descendants(matching: elementType)
+            .matching(identifier: identifier)
+            .firstMatch
+
+        for attempt in 0...8 {
+            var targetExists = target.exists
+            var targetFrame = targetExists ? target.frame : .null
+            var chatLogFrame = chatLog.frame
+            if hasTappableInteractionPoint(
+                interactionPoint,
+                targetFrame,
+                in: chatLogFrame
+            ) {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                targetExists = target.exists
+                targetFrame = targetExists ? target.frame : .null
+                chatLogFrame = chatLog.frame
+                if hasTappableInteractionPoint(
+                    interactionPoint,
+                    targetFrame,
+                    in: chatLogFrame
+                ) {
+                    if targetFrame.height > chatLogFrame.height
+                        || target.isHittable {
+                        return target
+                    }
+                }
+            }
+
+            guard attempt < 8 else { break }
+
+            guard dragScrollView(
+                chatLog,
+                axis: .vertical,
+                targetFrame: targetExists
+                    ? validInteractionFrame(
+                        targetFrame,
+                        interactionPoint: interactionPoint
+                    ) : nil,
+                containerFrame: chatLogFrame,
+                interactionPoint: interactionPoint
+            ) else { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+
+        keepInteractionHierarchy(
+            target,
+            container: chatLog,
+            in: app,
+            reason: "unable to reveal chat item \(identifier)"
+        )
+        XCTFail(
+            "Expected chat item \(identifier) to become visible and hittable",
+            file: file,
+            line: line
+        )
+        return target
+    }
+
+    private func tapChatItem(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching elementType: XCUIElement.ElementType = .any,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+        let target = revealChatItem(
+            identifier,
+            in: app,
+            matching: elementType,
+            interactionPoint: interactionPoint,
+            file: file,
+            line: line
+        )
+        activate(target, at: interactionPoint)
+    }
+
+    @discardableResult
+    private func revealAnalysisPosition(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let analysisTree = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
+            in: app,
+            matching: .scrollView,
+            file: file,
+            line: line
+        )
+        let target = app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+
+        for attempt in 0...10 {
+            var targetExists = target.exists
+            var targetFrame = targetExists ? target.frame : .null
+            var analysisTreeFrame = analysisTree.frame
+            if hasTappableInteractionPoint(
+                CGVector(dx: 0.5, dy: 0.5),
+                targetFrame,
+                in: analysisTreeFrame
+            ) {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                targetExists = target.exists
+                targetFrame = targetExists ? target.frame : .null
+                analysisTreeFrame = analysisTree.frame
+                if hasTappableInteractionPoint(
+                    CGVector(dx: 0.5, dy: 0.5),
+                    targetFrame,
+                    in: analysisTreeFrame
+                ), target.isHittable {
+                    return target
+                }
+            }
+
+            guard attempt < 10 else { break }
+
+            let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+            guard dragScrollView(
+                analysisTree,
+                axis: .horizontal,
+                targetFrame: targetExists
+                    ? validInteractionFrame(
+                        targetFrame,
+                        interactionPoint: interactionPoint
+                    ) : nil,
+                containerFrame: analysisTreeFrame,
+                interactionPoint: interactionPoint
+            ) else { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+
+        keepInteractionHierarchy(
+            target,
+            container: analysisTree,
+            in: app,
+            reason: "unable to reveal analysis position \(identifier)"
+        )
+        XCTFail(
+            "Expected analysis position \(identifier) to become visible and hittable",
+            file: file,
+            line: line
+        )
+        return target
+    }
+
+    private func tapAnalysisPosition(
+        _ identifier: String,
         in app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        tap(
-            textField,
-            description: SurroundUITestContract.AccessibilityID.gameChatInput,
-            in: app,
-            file: file,
-            line: line
-        )
-
-        #if !targetEnvironment(macCatalyst)
-        let focused = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "hasFocus == true"),
-            object: textField
-        )
-        let focusResult = XCTWaiter.wait(for: [focused], timeout: 10)
-        if focusResult != .completed {
-            keepTextInputHierarchy(
-                textField,
+        var lastTarget: XCUIElement?
+        for _ in 0..<2 {
+            let target = revealAnalysisPosition(
+                identifier,
                 in: app,
-                reason: "chat composer not focused"
+                file: file,
+                line: line
             )
+            lastTarget = target
+            activate(target, at: CGVector(dx: 0.5, dy: 0.5))
+            if waitForStableSelection(of: target, timeout: 5) {
+                return
+            }
         }
-        XCTAssertEqual(
-            focusResult,
-            .completed,
-            "Expected the chat composer to accept keyboard input",
+
+        let target = lastTarget ?? app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+        let analysisTree = app.scrollViews
+            .matching(
+                identifier:
+                    SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll
+            )
+            .firstMatch
+        keepInteractionHierarchy(
+            target,
+            container: analysisTree,
+            in: app,
+            reason: "analysis selection did not settle for \(identifier)"
+        )
+        XCTFail(
+            "Expected analysis position \(identifier) to remain selected",
             file: file,
             line: line
+        )
+    }
+
+    private func hasTappableInteractionPoint(
+        _ interactionPoint: CGVector,
+        _ elementFrame: CGRect,
+        in containerFrame: CGRect
+    ) -> Bool {
+        guard let elementFrame = validInteractionFrame(
+            elementFrame,
+            interactionPoint: interactionPoint
+        ), !containerFrame.isEmpty else {
+            return false
+        }
+
+        let screenPoint = CGPoint(
+            x: elementFrame.minX + elementFrame.width * interactionPoint.dx,
+            y: elementFrame.minY + elementFrame.height * interactionPoint.dy
+        )
+        return containerFrame.insetBy(dx: 4, dy: 4).contains(screenPoint)
+    }
+
+    private func validInteractionFrame(
+        _ frame: CGRect,
+        interactionPoint: CGVector
+    ) -> CGRect? {
+        guard !frame.isEmpty,
+              !frame.isNull,
+              frame.minX.isFinite,
+              frame.minY.isFinite,
+              frame.width.isFinite,
+              frame.height.isFinite else {
+            return nil
+        }
+
+        let x = frame.minX + frame.width * interactionPoint.dx
+        let y = frame.minY + frame.height * interactionPoint.dy
+        return x.isFinite && y.isFinite ? frame : nil
+    }
+
+    private func dragScrollView(
+        _ scrollView: XCUIElement,
+        axis: ScrollRevealAxis,
+        targetFrame: CGRect?,
+        containerFrame: CGRect,
+        interactionPoint: CGVector
+    ) -> Bool {
+        guard !containerFrame.isEmpty else { return false }
+
+        let viewportLength: CGFloat
+        let targetCoordinate: CGFloat?
+        let viewportCenter: CGFloat
+        switch axis {
+        case .horizontal:
+            viewportLength = containerFrame.width
+            targetCoordinate = targetFrame.map {
+                $0.minX + $0.width * interactionPoint.dx
+            }
+            viewportCenter = containerFrame.midX
+        case .vertical:
+            viewportLength = containerFrame.height
+            targetCoordinate = targetFrame.map {
+                $0.minY + $0.height * interactionPoint.dy
+            }
+            viewportCenter = containerFrame.midY
+        }
+
+        guard viewportLength.isFinite, viewportLength > 0 else {
+            return false
+        }
+
+        let maximumDelta = viewportLength * 0.3
+        let requestedDelta = targetCoordinate.map { viewportCenter - $0 }
+            ?? maximumDelta
+        guard requestedDelta.isFinite else { return false }
+        let clampedDelta = min(
+            maximumDelta,
+            max(-maximumDelta, requestedDelta)
+        )
+        let minimumEffectiveDelta = min(CGFloat(12), maximumDelta)
+        guard abs(clampedDelta) >= minimumEffectiveDelta else {
+            return false
+        }
+        let dragDelta = clampedDelta
+
+        #if targetEnvironment(macCatalyst)
+        switch (axis, dragDelta.sign) {
+        case (.horizontal, .plus):
+            scrollView.swipeRight(velocity: .slow)
+        case (.horizontal, .minus):
+            scrollView.swipeLeft(velocity: .slow)
+        case (.vertical, .plus):
+            scrollView.swipeDown(velocity: .slow)
+        case (.vertical, .minus):
+            scrollView.swipeUp(velocity: .slow)
+        }
+        #else
+        let start = scrollView.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        )
+        let offset: CGVector
+        switch axis {
+        case .horizontal:
+            offset = CGVector(dx: dragDelta, dy: 0)
+        case .vertical:
+            offset = CGVector(dx: 0, dy: dragDelta)
+        }
+        start.press(
+            forDuration: 0.05,
+            thenDragTo: start.withOffset(offset)
         )
         #endif
+        return true
+    }
 
-        textField.typeText(text)
-
-        let completeValue = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", text),
-            object: textField
+    private func activate(
+        _ element: XCUIElement,
+        at interactionPoint: CGVector
+    ) {
+        let coordinate = element.coordinate(
+            withNormalizedOffset: interactionPoint
         )
-        let result = XCTWaiter.wait(for: [completeValue], timeout: 5)
-        if result != .completed {
+        #if targetEnvironment(macCatalyst)
+        coordinate.click()
+        #else
+        coordinate.tap()
+        #endif
+    }
+
+    private func waitForStableSelection(
+        of element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let selected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: element
+        )
+        guard XCTWaiter.wait(for: [selected], timeout: timeout) == .completed else {
+            return false
+        }
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        return element.exists && element.isSelected
+    }
+
+    private func keepInteractionHierarchy(
+        _ element: XCUIElement,
+        container: XCUIElement,
+        in app: XCUIApplication,
+        reason: String
+    ) {
+        let hierarchy = XCTAttachment(
+            string: """
+            Element:
+            \(element.debugDescription)
+
+            Container:
+            \(container.debugDescription)
+
+            Application hierarchy:
+            \(app.debugDescription)
+            """
+        )
+        hierarchy.name = "Accessibility hierarchy – \(reason)"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+    }
+
+    private func enterText(
+        _ text: String,
+        into textField: XCUIElement,
+        in app: XCUIApplication,
+        focusMode: TextInputFocusMode = .acquireWithRetry,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let focusedTextField = focusChatInput(
+            textField,
+            in: app,
+            mode: focusMode,
+            file: file,
+            line: line
+        )
+        focusedTextField.typeText(text)
+
+        var completed = waitForValue(text, in: focusedTextField, timeout: 2)
+        if !completed {
+            if let actualValue = focusedTextField.value as? String,
+               text.hasPrefix(actualValue),
+               actualValue != text {
+                focusedTextField.typeText(String(text.dropFirst(actualValue.count)))
+            }
+            completed = waitForValue(text, in: focusedTextField, timeout: 5)
+        }
+        if !completed {
             keepTextInputHierarchy(
-                textField,
+                focusedTextField,
                 in: app,
                 reason: "incomplete chat composer input"
             )
         }
-        XCTAssertEqual(
-            result,
-            .completed,
-            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: textField.value))",
+        XCTAssertTrue(
+            completed,
+            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: focusedTextField.value))",
             file: file,
             line: line
         )
+    }
+
+    private func focusChatInput(
+        _ textField: XCUIElement,
+        in app: XCUIApplication,
+        mode: TextInputFocusMode,
+        file: StaticString,
+        line: UInt
+    ) -> XCUIElement {
+        #if targetEnvironment(macCatalyst)
+        if mode == .acquireWithRetry {
+            tap(
+                textField,
+                description:
+                    SurroundUITestContract.AccessibilityID.gameChatInput,
+                in: app,
+                file: file,
+                line: line
+            )
+        }
+        return textField
+        #else
+        switch mode {
+        case .requireExistingFocus:
+            if waitForFocus(in: textField, app: app, timeout: 10) {
+                return textField
+            }
+        case .acquireWithRetry:
+            for _ in 0..<2 {
+                let currentTextField = app.textFields
+                    .matching(
+                        identifier:
+                            SurroundUITestContract.AccessibilityID.gameChatInput
+                    )
+                    .firstMatch
+                tap(
+                    currentTextField,
+                    description:
+                        SurroundUITestContract.AccessibilityID.gameChatInput,
+                    in: app,
+                    file: file,
+                    line: line
+                )
+                if waitForFocus(
+                    in: currentTextField,
+                    app: app,
+                    timeout: 3
+                ) {
+                    return currentTextField
+                }
+            }
+        }
+
+        keepTextInputHierarchy(
+            textField,
+            in: app,
+            reason: "chat composer not focused"
+        )
+        XCTFail(
+            "Expected the chat composer to accept keyboard input",
+            file: file,
+            line: line
+        )
+        return textField
+        #endif
+    }
+
+    private func waitForFocus(
+        in textField: XCUIElement,
+        app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        if textField.debugDescription.contains("Keyboard Focused") {
+            return true
+        }
+
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.exists {
+            _ = keyboard.waitForExistence(timeout: timeout)
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+
+        // Keyboard existence only synchronizes with the focus transition: it
+        // cannot identify the first responder. `hasFocus` is accessibility
+        // focus, not keyboard focus, for this SwiftUI field on iPadOS 26, so
+        // verify XCTest's field-specific snapshot token after the wait.
+        return textField.debugDescription.contains("Keyboard Focused")
+    }
+
+    private func waitForValue(
+        _ value: String,
+        in textField: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let completeValue = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", value),
+            object: textField
+        )
+        return XCTWaiter.wait(for: [completeValue], timeout: timeout) == .completed
     }
 
     private func keepTextInputHierarchy(
@@ -738,8 +1254,12 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .textField
         )
-        input.typeText("Compact focus")
-        XCTAssertEqual(input.value as? String, "Compact focus")
+        enterText(
+            "Compact focus",
+            into: input,
+            in: app,
+            focusMode: .requireExistingFocus
+        )
         #endif
     }
 
@@ -1121,13 +1641,13 @@ final class SurroundUITests: SurroundUITestCase {
             "app-store-chat-2"
         )
 
-        tap(firstLineID, in: app, matching: .button)
+        tapChatItem(firstLineID, in: app, matching: .button)
         assertSelected(firstLineID, in: app)
-        tap(firstLineID, in: app, matching: .button)
+        tapChatItem(firstLineID, in: app, matching: .button)
         assertNotSelected(firstLineID, in: app)
 
-        tap(firstLineID, in: app, matching: .button)
-        tap(secondLineID, in: app, matching: .button)
+        tapChatItem(firstLineID, in: app, matching: .button)
+        tapChatItem(secondLineID, in: app, matching: .button)
         assertNotSelected(firstLineID, in: app)
         assertSelected(secondLineID, in: app)
 
@@ -1136,7 +1656,7 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .scrollView
         )
-        let secondLine = element(
+        let secondLine = revealChatItem(
             secondLineID,
             in: app,
             matching: .button
@@ -1157,9 +1677,9 @@ final class SurroundUITests: SurroundUITestCase {
         assertNotSelected(secondLineID, in: app)
 
         let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(0)
-        tap(moveID, in: app, matching: .button)
+        tapChatItem(moveID, in: app, matching: .button)
         assertSelected(moveID, in: app)
-        tap(firstLineID, in: app, matching: .button)
+        tapChatItem(firstLineID, in: app, matching: .button)
         assertNotSelected(moveID, in: app)
         assertSelected(firstLineID, in: app)
 
@@ -1169,7 +1689,7 @@ final class SurroundUITests: SurroundUITestCase {
         let usesRegularGameLayout = UIDevice.current.userInterfaceIdiom == .pad
         #endif
         if usesRegularGameLayout {
-            tap(moveID, in: app, matching: .button)
+            tapChatItem(moveID, in: app, matching: .button)
             assertSelected(moveID, in: app)
             tap(
                 SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
@@ -1181,7 +1701,7 @@ final class SurroundUITests: SurroundUITestCase {
             )
             assertNotSelected(moveID, in: app)
 
-            tap(moveID, in: app, matching: .button)
+            tapChatItem(moveID, in: app, matching: .button)
             assertSelected(moveID, in: app)
             let exitedAnalyze = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"),
@@ -1209,7 +1729,7 @@ final class SurroundUITests: SurroundUITestCase {
                     SurroundUITestContract.screenshotAnalysisSelectedMovePath
             )
 
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -1292,7 +1812,7 @@ final class SurroundUITests: SurroundUITestCase {
         let lineID = SurroundUITestContract.AccessibilityID.gameChatLine(
             "app-store-chat-1"
         )
-        tap(lineID, in: app, matching: .button)
+        tapChatItem(lineID, in: app, matching: .button)
         assertSelected(lineID, in: app)
         let plainChatLineBoardValue = mainBoard.value as? String
         XCTAssertNotNil(plainChatLineBoardValue)
@@ -1303,7 +1823,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         assertSharingDraftIsIntact()
 
-        tap(lineID, in: app, matching: .button)
+        tapChatItem(lineID, in: app, matching: .button)
         assertNotSelected(lineID, in: app)
         XCTAssertEqual(
             mainBoard.value as? String,
@@ -1313,7 +1833,7 @@ final class SurroundUITests: SurroundUITestCase {
         assertSharingDraftIsIntact()
 
         let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(0)
-        tap(moveID, in: app, matching: .button)
+        tapChatItem(moveID, in: app, matching: .button)
         assertSelected(moveID, in: app)
         XCTAssertNotEqual(
             mainBoard.value as? String,
@@ -1322,7 +1842,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         assertSharingDraftIsIntact()
 
-        tap(moveID, in: app, matching: .button)
+        tapChatItem(moveID, in: app, matching: .button)
         assertNotSelected(moveID, in: app)
         assertSharingDraftIsIntact()
 
@@ -1334,7 +1854,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
         )
-        tap(selectedIdentifier, in: app)
+        tapAnalysisPosition(selectedIdentifier, in: app)
         assertSelected(selectedIdentifier, in: app)
         let selectedAnalyzeBoardValue = mainBoard.value as? String
         XCTAssertNotNil(selectedAnalyzeBoardValue)
@@ -1385,7 +1905,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
         )
-        tap(parentIdentifier, in: app)
+        tapAnalysisPosition(parentIdentifier, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -1428,16 +1948,16 @@ final class SurroundUITests: SurroundUITestCase {
         let firstLineID = SurroundUITestContract.AccessibilityID.gameChatLine(
             "app-store-chat-1"
         )
-        let firstLine = element(
+        let selectionPoint = CGVector(dx: 0.5, dy: 0.75)
+        let firstLine = revealChatItem(
             firstLineID,
             in: app,
-            matching: .button
+            matching: .button,
+            interactionPoint: selectionPoint
         )
 
         firstLine
-            .coordinate(
-                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)
-            )
+            .coordinate(withNormalizedOffset: selectionPoint)
             .press(forDuration: 1)
 
         let copyCommand = app
@@ -2707,7 +3227,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         element(
             SurroundUITestContract.AccessibilityID.gameDetail(
-                SurroundUITestContract.screenshotPrimaryGameID
+                SurroundUITestContract.screenshotNextGameID
             ),
             in: app
         )

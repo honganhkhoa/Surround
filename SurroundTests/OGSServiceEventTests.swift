@@ -592,7 +592,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertFalse(service.isConditionalMoveSubmissionPending(gameID: 125))
     }
 
-    func testOfflineConditionalMoveSubmissionEchoesAuthoritativeUpdate() throws {
+    func testOfflineConditionalMoveSubmissionEchoesAuthoritativeUpdate() async throws {
         let service = makeService(
             socket: OGSOfflineNoOpWebsocket(),
             conditionalMoveSubmissionTimeout: 1
@@ -632,7 +632,7 @@ final class OGSServiceEventTests: XCTestCase {
             completed.fulfill()
         } receiveValue: {}
 
-        wait(for: [completed], timeout: 2)
+        await fulfillment(of: [completed], timeout: 2)
         withExtendedLifetime(cancellable) {}
         XCTAssertNil(completionError)
         XCTAssertEqual(game.conditionalMovePlan, replacement)

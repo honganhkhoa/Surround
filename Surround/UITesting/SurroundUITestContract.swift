@@ -40,6 +40,7 @@ enum SurroundUITestContract {
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
     static let homeHistoryRetryFixtureGameID = 18_759_438
+    static let screenshotNextGameID = 18_759_438
     static let screenshotPrimaryGameID = 68_301_595
     static let conditionalMovesFixtureGameID = 62_050_416
     static let conditionalMovesFixtureRootMoveNumber = 60
@@ -55,8 +56,8 @@ enum SurroundUITestContract {
         }
     static let screenshotFixtureGameIDs = [
         screenshotPrimaryGameID,
-        18_759_438,
-        62_050_416,
+        screenshotNextGameID,
+        conditionalMovesFixtureGameID,
     ]
     static let screenshotHistoryGameIDs = [
         68_301_601,
@@ -409,6 +410,7 @@ enum SurroundUITestContract {
         static let gameDisplayModePicker = "game.displayMode"
         static let gameAnalyzeToggle = "game.analyze"
         static let gameAnalyzeControlBar = "game.analyze.controls"
+        static let gameAnalyzeTreeScroll = "game.analyze.tree.scroll"
         static let gameAnalyzeActionsMenu = "game.analyze.actions"
         static let gameAnalyzeMarkerMenu = "game.analyze.markers"
         static func gameAnalyzeMarkerTool(_ tool: String) -> String {

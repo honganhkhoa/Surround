@@ -118,6 +118,12 @@ final class OGSServiceIsolationTests: XCTestCase {
         }
 
         override func stopLoading() {}
+
+        static func recordedRequests(forPath path: String) -> [URLRequest] {
+            lock.lock()
+            defer { lock.unlock() }
+            return requests.filter { $0.url?.path == path }
+        }
     }
 
     private var cancellables = Set<AnyCancellable>()
@@ -959,7 +965,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertFalse(pagination.isLoading)
     }
 
-    func testTwoLoginsKeepCookiesPreferencesAndUsersIsolated() throws {
+    func testTwoLoginsKeepCookiesPreferencesAndUsersIsolated() async throws {
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         let firstHTTP = makeHTTPClient(responseUsername: "player-one")
         let secondHTTP = makeHTTPClient(responseUsername: "player-two")
@@ -992,7 +998,7 @@ final class OGSServiceIsolationTests: XCTestCase {
             )
             .store(in: &cancellables)
 
-        wait(for: [firstLogin, secondLogin], timeout: 5)
+        await fulfillment(of: [firstLogin, secondLogin], timeout: 5)
         XCTAssertTrue(loginErrors.isEmpty)
         XCTAssertEqual(first.user?.id, 101)
         XCTAssertEqual(second.user?.id, 202)
@@ -1026,9 +1032,9 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertTrue(firstGame.preferences === first.preferences)
         XCTAssertTrue(secondGame.preferences === second.preferences)
 
-        StubURLProtocol.lock.lock()
-        let loginRequests = StubURLProtocol.requests.filter { $0.url?.path == "/api/v0/login" }
-        StubURLProtocol.lock.unlock()
+        let loginRequests = StubURLProtocol.recordedRequests(
+            forPath: "/api/v0/login"
+        )
         XCTAssertEqual(loginRequests.count, 2)
     }
 

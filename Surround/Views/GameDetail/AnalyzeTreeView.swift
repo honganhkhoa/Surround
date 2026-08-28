@@ -233,7 +233,11 @@ struct AnalyzeTreeView: View {
                                 }
                             }
                         }
-                    }.frame(minHeight: geometry.size.height)
+                    }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll
+                    )
+                    .frame(minHeight: geometry.size.height)
                 }.frame(minHeight: geometry.size.height)
             }.frame(height: geometry.size.height)
         }

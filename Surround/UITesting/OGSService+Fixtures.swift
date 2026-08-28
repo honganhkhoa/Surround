@@ -1616,6 +1616,11 @@ extension OGSService {
             prefixMoveCount: SurroundUITestContract
                 .simulatesHomeBoardAlignment ? 60 : nil
         )
+        precondition(
+            additionalYourMoveGame.ogsID
+                == SurroundUITestContract.screenshotNextGameID,
+            "The Next-game fixture must retain its semantic OGS game id."
+        )
         let compatibilityWidgetGame = makeFixtureGame(
             from: AppStoreScreenshotProfileData.mapleRidgeOpening,
             clock: mapleRidgeClock
@@ -1645,7 +1650,8 @@ extension OGSService {
             )
         } else {
             precondition(
-                additionalYourMoveGame.clock?.currentPlayerId == fixtureUser.id
+                additionalYourMoveGame.clock?.currentPlayerId == fixtureUser.id,
+                "The Next-game fixture must be active on the user's turn."
             )
         }
         precondition(
@@ -1667,6 +1673,47 @@ extension OGSService {
         ]
         if SurroundUITestContract.isCapturingCompatibilityScreenshots {
             activeFixtureGames.append(compatibilityWidgetGame)
+        }
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots
+            && !SurroundUITestContract.simulatesHomeBoardAlignment
+        {
+            func userThinkingTimeLeft(in game: Game) -> Double? {
+                guard let clock = game.clock else { return nil }
+                switch game.stoneColor(of: fixtureUser) {
+                case .black:
+                    return clock.blackTime.thinkingTimeLeft
+                case .white:
+                    return clock.whiteTime.thinkingTimeLeft
+                case nil:
+                    return nil
+                }
+            }
+
+            let userTurnGames = activeFixtureGames.filter {
+                $0.clock?.currentPlayerId == fixtureUser.id
+            }
+            guard let nextGameTimeLeft = userThinkingTimeLeft(
+                in: additionalYourMoveGame
+            ) else {
+                preconditionFailure(
+                    "The Next-game fixture must expose the user's thinking time."
+                )
+            }
+            precondition(
+                userTurnGames.count == 2
+                    && userTurnGames.allSatisfy { game in
+                        if game.ogsID
+                            == SurroundUITestContract.screenshotNextGameID
+                        {
+                            return true
+                        }
+                        guard let timeLeft = userThinkingTimeLeft(in: game) else {
+                            return false
+                        }
+                        return timeLeft > nextGameTimeLeft
+                    },
+                "The Next-game fixture must be the unique first active game on the user's turn."
+            )
         }
         for game in activeFixtureGames {
             state.activeGames[game.ogsID!] = game
