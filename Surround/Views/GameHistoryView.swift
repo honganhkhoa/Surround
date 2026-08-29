@@ -138,7 +138,7 @@ struct GameHistoryView: View {
             set: { if !$0 { nav.gameHistory.activeGame = nil } }
         ), destination: {
             GameDetailView(
-                currentGame: nav.gameHistory.activeGame,
+                currentGame: $nav.gameHistory.activeGame,
                 allowsActiveGamesCarousel: false
             )
         })

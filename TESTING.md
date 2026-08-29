@@ -238,9 +238,11 @@ The compatibility screenshot runner compares the minimum and current system rend
 
 - iPhone 16 Pro Max in portrait on iOS 18.0 and iOS 26.0;
 - iPad Pro 13-inch (M4) in landscape on iPadOS 18.0 and iPadOS 26.0; and
-- small, medium, and large home-screen widgets on both device families.
+- the existing full-capacity small, medium, and large home-screen widgets on both device families;
+- one-game small plus one- and three-game large adaptive-layout regressions on both device families; and
+- one-, four-, and six-game extra-large widgets on iPad.
 
-Run the complete 63-pair matrix from the repository root:
+Run the complete 72-pair matrix from the repository root:
 
 ```sh
 .github/ci-tools/capture-ios-version-comparison.sh \
@@ -249,14 +251,25 @@ Run the complete 63-pair matrix from the repository root:
 
 The output path must not already exist. The gitignored artifact contains:
 
-- `originals/ios-18/<iphone|ipad>/` and `originals/ios-26/<iphone|ipad>/`, holding 126 full-resolution captures;
-- `comparisons/<iphone|ipad>/`, holding 63 labelled, lossless side-by-side PNGs;
+- `originals/ios-18/<iphone|ipad>/` and `originals/ios-26/<iphone|ipad>/`, holding 144 full-resolution captures;
+- `comparisons/<iphone|ipad>/`, holding 72 labelled, lossless side-by-side PNGs;
 - `comparison.md`, a responsive `index.html`, and `run-metadata.json`; and
 - `runs/<ios-18|ios-26>/`, retaining each run's result bundles, logs, and attachment manifests.
 
 The metadata records the source fingerprint, Xcode version, runtime and device identities, locale, system appearance, verified full-color widget rendering mode, orientation, pixel dimensions, scene manifest, and widget family.
 
 The runner requires Xcode 26 or newer, installed iOS 18.0 and iOS 26.0 simulator runtimes, matching simulator device types, `jq`, Swift, and `sips`. For each OS run, it creates fresh temporary simulators from the exact required device-type and runtime identifiers. It also verifies that the Surround app and UI-test runner are absent before testing, so old preferences, app data, and Home Screen placement cannot contaminate the captures. The temporary simulators are shut down and deleted during teardown, including after a failed capture. Each simulator boot has a three-minute bound and one clean retry so a wedged CoreSimulator display service fails deterministically instead of hanging the capture indefinitely.
+
+Each per-OS run selects all three tests in the `CompatibilityScreenshots` test plan: the stable route/widget matrix, the adaptive widget regressions, and physical SpringBoard tap coverage. The tap test checks linked board and timer regions plus genuine grid-gap, outer-padding, and rail background. It produces no screenshot attachments. Before accepting any widget capture, the harness samples every expected board region and rejects a visually uniform board, which catches blank or solid-color rendering while keeping the screenshot artifact contract deterministic.
+
+To run this widget coverage once on one installed runtime without producing the cross-version comparison, use the checked-in per-runtime command:
+
+```sh
+output_path=".build/CompatibilityWidgets-iOS26-$(date +%Y%m%d-%H%M%S)"
+.github/ci-tools/capture-compatibility-screenshots.sh --output "$output_path" --runtime 26.0
+```
+
+These SpringBoard tests remain explicitly skipped by the normal `Surround` scheme, so the regular iPad UI lanes do not inherit their simulator setup cost. The dedicated compatibility test plan and runner are their supported entry point.
 
 It rejects a changed source tree between captures, missing or duplicate scenes, mismatched dimensions, incorrect orientation, alpha channels, and widget screenshots whose frame geometry does not match the requested family. Review `index.html` for clipping, overlap, missing controls, unreadable content, broken navigation, and incorrect adaptive or widget layout; the images are intentionally not required to be pixel-identical across OS versions. The runner removes each isolated widget before adding the next family.
 

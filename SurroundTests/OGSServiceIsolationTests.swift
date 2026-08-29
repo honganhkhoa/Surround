@@ -1134,6 +1134,44 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(socket.reconnectCount, 2)
     }
 
+    func testCachedOverviewGameDecodesWidgetSourceSnapshot() throws {
+        let gameID = 845_001
+        let detail = try makeFinishedGameDetail(gameID: gameID)
+        let gameJSON = try XCTUnwrap(
+            detail.rawData["gamedata"] as? [String: Any]
+        )
+        let service = makeService(
+            environment: .production,
+            httpClient: makeHTTPClient(responseUsername: "overview-cache"),
+            label: "overview-cache"
+        )
+        service.preferences[.latestOGSOverview] = try JSONSerialization.data(
+            withJSONObject: [
+                "active_games": [["json": gameJSON]],
+            ]
+        )
+
+        let game = try XCTUnwrap(
+            service.cachedOverviewGame(gameID: gameID)
+        )
+        XCTAssertEqual(game.ogsID, gameID)
+        XCTAssertTrue(game.ogs === service)
+        XCTAssertNil(service.cachedOverviewGame(gameID: gameID + 1))
+    }
+
+    func testCachedOverviewGameRejectsMalformedOrNonpositiveRequests() {
+        let service = makeService(
+            environment: .production,
+            httpClient: makeHTTPClient(responseUsername: "bad-overview-cache"),
+            label: "bad-overview-cache"
+        )
+        service.preferences[.latestOGSOverview] = Data("not-json".utf8)
+
+        XCTAssertNil(service.cachedOverviewGame(gameID: 1))
+        XCTAssertNil(service.cachedOverviewGame(gameID: 0))
+        XCTAssertNil(service.cachedOverviewGame(gameID: -1))
+    }
+
     private func makeHTTPClient(responseUsername: String) -> AlamofireOGSHTTPClient {
         let configuration = URLSessionConfiguration.ephemeral
         let storage = configuration.httpCookieStorage!

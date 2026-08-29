@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Combine
-import DictionaryCoding
 
 /// Gives the same OGS game a distinct identity in each home-screen section.
 /// A game can briefly exist in both an active projection and finished history
@@ -50,8 +49,10 @@ struct HomeView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
-    @State var gameDetailCancellable: AnyCancellable?
     @State var displayMode: GameCell.CellDisplayMode
+
+    @State private var openingGameRequestID: UUID?
+    @State private var failedGameOpen: PendingGameOpen?
 
     @State var recentFinishedGames: [Game] = []
     @State var recentFinishedCancellable: AnyCancellable?
@@ -441,55 +442,105 @@ struct HomeView: View {
         }
     }
 
-    func openRequestedActiveGameIfReady() {
-        print("Checking game #\(nav.home.ogsIdToOpen)")
-        if nav.home.activeGame == nil && nav.home.ogsIdToOpen != -1 && gameDetailCancellable == nil {
-            print("Continue checking game #\(nav.home.ogsIdToOpen)")
-            if let game = ogs.activeGames[nav.home.ogsIdToOpen] {
-                if game.gameData != nil {
-                    self.showGameDetail(game: game)
-                    nav.home.ogsIdToOpen = -1
-                    self.gameDetailCancellable?.cancel()
-                    self.gameDetailCancellable = nil
-                } else {
-                    print("Waiting for game data of #\(nav.home.ogsIdToOpen)")
-                    self.gameDetailCancellable = game.$gameData.sink(receiveValue: { newGameData in
-                        if newGameData != nil {
-                            DispatchQueue.main.async {
-                                self.gameDetailCancellable?.cancel()
-                                self.gameDetailCancellable = nil
-                                self.openRequestedActiveGameIfReady()
-                            }
-                        }
-                    })
+    @MainActor
+    private func resolvePendingGameOpen(_ request: PendingGameOpen) async {
+        guard request.rootView == .home,
+              nav.pendingGameOpen?.id == request.id else {
+            return
+        }
+
+        // A newer token owns all transient routing UI immediately, even when
+        // the cancelled request's publisher takes a moment to unwind.
+        openingGameRequestID = nil
+        failedGameOpen = nil
+
+        do {
+            let resolver = GameOpenResolver<Game>(
+                activeGame: { gameID in
+                    guard let game = ogs.activeGames[gameID],
+                          game.gameData != nil else {
+                        return nil
+                    }
+                    return game
+                },
+                sharedOverviewGame: { gameID in
+                    ogs.cachedOverviewGame(gameID: gameID)
+                },
+                restGame: { gameID in
+                    #if DEBUG && MAIN_APP
+                    if SurroundUITestContract.simulatesWidgetDeepLinkRouting,
+                       gameID == SurroundUITestContract.widgetRoutingMissingGameID {
+                        try await Task.sleep(
+                            nanoseconds: SurroundUITestContract
+                                .widgetRoutingRESTDelayNanoseconds
+                        )
+                    }
+                    #endif
+                    for try await game in ogs.getGameDetail(
+                        gameID: gameID
+                    ).values {
+                        return game
+                    }
+                    throw OGSServiceError.invalidJSON
                 }
+            )
+            let resolution = try await resolver.resolve(
+                gameID: request.ogsGameID,
+                onRESTRequired: {
+                    openingGameRequestID = request.id
+                }
+            )
+            if openingGameRequestID == request.id {
+                openingGameRequestID = nil
+            }
+            guard !Task.isCancelled,
+                  nav.pendingGameOpen?.id == request.id else {
                 return
             }
-
-            if let cachedGameData = userDefaults[.cachedOGSGames]?[nav.home.ogsIdToOpen] {
-                if let ogsGame = try? JSONSerialization.jsonObject(with: cachedGameData) as? [String: Any] {
-                    let decoder = DictionaryDecoder()
-                    decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    if let ogsGame = try? decoder.decode(OGSGame.self, from: ogsGame) {
-                        let game = Game(ogsGame: ogsGame)
-                        self.showGameDetail(game: game)
-                        nav.home.ogsIdToOpen = -1
-                        return
-                    }
-                }
+            finishPendingGameOpen(request, game: resolution.game)
+        } catch {
+            if openingGameRequestID == request.id {
+                openingGameRequestID = nil
             }
-
-            print("Waiting for #\(nav.home.ogsIdToOpen) to become active")
-            self.gameDetailCancellable = ogs.$activeGames.sink(receiveValue: { newActiveGames in
-                if newActiveGames[nav.home.ogsIdToOpen] != nil {
-                    DispatchQueue.main.async {
-                        self.gameDetailCancellable?.cancel()
-                        self.gameDetailCancellable = nil
-                        self.openRequestedActiveGameIfReady()
-                    }
-                }
-            })
+            guard !Task.isCancelled,
+                  nav.pendingGameOpen?.id == request.id else {
+                return
+            }
+            failedGameOpen = request
         }
+    }
+
+    @MainActor
+    private func finishPendingGameOpen(
+        _ request: PendingGameOpen,
+        game: Game
+    ) {
+        guard nav.pendingGameOpen?.id == request.id else { return }
+        failedGameOpen = nil
+        showGameDetail(
+            game: game,
+            showsCarousel: game.gamePhase != .finished
+        )
+        nav.clearPendingGameOpen(id: request.id)
+    }
+
+    private func retryFailedGameOpen() {
+        guard let failedGameOpen,
+              let route = AppRoute(
+                rootView: failedGameOpen.rootView,
+                ogsGameID: failedGameOpen.ogsGameID
+              ) else {
+            return
+        }
+        self.failedGameOpen = nil
+        nav.handle(route: route)
+    }
+
+    private func cancelFailedGameOpen() {
+        if let request = failedGameOpen {
+            nav.clearPendingGameOpen(id: request.id)
+        }
+        failedGameOpen = nil
     }
 
     var shouldShowSettingsButton: Bool {
@@ -504,13 +555,6 @@ struct HomeView: View {
     }
         
     var body: some View {
-        if let currentActiveGame = nav.home.activeGame {
-            print("Reloading..., current active game #\(currentActiveGame)")
-        } else {
-            print("Reloading..., no current active game")
-        }
-        print("Waiting to open game #\(nav.home.ogsIdToOpen)")
-        print("Showing game detail: \(nav.home.activeGame != nil)")
         return VStack {
             if ogs.isLoggedIn {
                 activeGamesView
@@ -538,6 +582,38 @@ struct HomeView: View {
                 }
             }
         }
+        .overlay {
+            if openingGameRequestID != nil {
+                ProgressView("Opening game…")
+                    .padding()
+                    .background(
+                        .regularMaterial,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.openingGame
+                    )
+            }
+        }
+        .alert(
+            "Unable to open game",
+            isPresented: Binding(
+                get: { failedGameOpen != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        cancelFailedGameOpen()
+                    }
+                }
+            )
+        ) {
+            Button("Retry", action: retryFailedGameOpen)
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.openGameRetry
+                )
+            Button("Cancel", role: .cancel, action: cancelFailedGameOpen)
+        } message: {
+            Text("The game may have ended or could not be loaded. Please try again.")
+        }
         .navigationDestination(isPresented: Binding(
             get: { nav.home.activeGame != nil },
             set: {
@@ -548,7 +624,7 @@ struct HomeView: View {
             }
         ), destination: {
             GameDetailView(
-                currentGame: nav.home.activeGame,
+                currentGame: $nav.home.activeGame,
                 allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel
             )
         })
@@ -556,11 +632,6 @@ struct HomeView: View {
             GameHistoryView()
         }
         .onAppear {
-            if nav.home.ogsIdToOpen != -1 {
-                DispatchQueue.main.async {
-                    openRequestedActiveGameIfReady()
-                }
-            }
             loadRecentFinishedGames()
         }
         .onChange(of: ogs.user?.id) { _, _ in
@@ -622,24 +693,12 @@ struct HomeView: View {
                     .environmentObject(nav)
             }
         }
-        .onChange(of: nav.home.ogsIdToOpen, initial: true) { _, ogsGameIdToOpen in
-            if ogsGameIdToOpen != -1 {
-                if ogsGameIdToOpen != nav.home.activeGame?.ogsID {
-                    if nav.home.activeGame != nil {
-                        nav.home.activeGame = nil
-                        DispatchQueue.main.asyncAfter(
-                            deadline: DispatchTime.now().advanced(by: .seconds(1)),
-                            execute: {
-                                openRequestedActiveGameIfReady()
-                            }
-                        )
-                    } else {
-                        DispatchQueue.main.async {
-                            openRequestedActiveGameIfReady()
-                        }
-                    }
-                }
+        .task(id: nav.pendingGameOpen?.id) {
+            guard let request = nav.pendingGameOpen,
+                  request.rootView == .home else {
+                return
             }
+            await resolvePendingGameOpen(request)
         }
         .onChange(of: displayMode, initial: true) { _, newDisplayMode in
             guard allowsLocalPersistence else { return }

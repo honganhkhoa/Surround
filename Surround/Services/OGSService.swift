@@ -1393,6 +1393,35 @@ class OGSService: ObservableObject {
         })
     }
     
+    /// Reconstructs a game from the same cached overview snapshot used by the
+    /// correspondence widget. This gives deep links an immediate offline path
+    /// while the canonical active-game collection and REST detail are loading.
+    func cachedOverviewGame(gameID: Int) -> Game? {
+        guard gameID > 0,
+              let overviewData = preferences[.latestOGSOverview],
+              let overview = try? JSONSerialization.jsonObject(
+                with: overviewData
+              ) as? [String: Any],
+              let activeGames = overview["active_games"] as? [[String: Any]] else {
+            return nil
+        }
+
+        for activeGame in activeGames {
+            guard let gameJSON = activeGame["json"] as? [String: Any],
+                  let ogsGame = try? dictionaryDecoder.decode(
+                    OGSGame.self,
+                    from: gameJSON
+                  ),
+                  ogsGame.gameId == gameID else {
+                continue
+            }
+            let game = Game(ogsGame: ogsGame)
+            game.ogs = self
+            return game
+        }
+        return nil
+    }
+
     /// Fetches and decodes one game's REST detail without changing WebSocket
     /// connection state. If that game already has connection intent, enriches
     /// and returns its canonical model so WebSocket events and the caller

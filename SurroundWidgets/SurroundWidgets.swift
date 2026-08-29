@@ -13,7 +13,7 @@ import Combine
 
 class Provider: TimelineProvider {
 #if DEBUG
-    func appStoreScreenshotEntry(in context: Context) -> CorrespondenceGamesEntry? {
+    func appStoreScreenshotEntry(in _: Context) -> CorrespondenceGamesEntry? {
         guard let fixture = userDefaults[.appStoreScreenshotWidgetFixture],
               fixture.isValid,
               let overview = try? JSONSerialization.jsonObject(
@@ -21,7 +21,6 @@ class Provider: TimelineProvider {
               ) as? [String: Any],
               var entry = getEntry(
                 fromOverviewJSON: overview,
-                context: context,
                 userID: fixture.userID,
                 localeIdentifier: fixture.localeIdentifier,
                 usesStaticClock: true
@@ -30,6 +29,7 @@ class Provider: TimelineProvider {
         }
 
         entry.screenshotFixtureValidUntil = fixture.validUntil
+        entry.screenshotExpectedGameCount = fixture.expectedGameCount
         entry.screenshotAppStoreProofToken = fixture.appStoreProofToken
         entry.screenshotCompatibilityProofToken =
             fixture.compatibilityProofToken
@@ -67,7 +67,7 @@ class Provider: TimelineProvider {
         
         if let overviewData = userDefaults[.latestOGSOverview] {
             if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
-                if let entry = getEntry(fromOverviewJSON: data, context: context) {
+                if let entry = getEntry(fromOverviewJSON: data) {
                     completion(entry)
                     return
                 }
@@ -79,7 +79,6 @@ class Provider: TimelineProvider {
     
     func getEntry(
         fromOverviewJSON overviewJSON: [String: Any],
-        context: Context,
         userID: Int? = nil,
         localeIdentifier: String? = nil,
         usesStaticClock: Bool = false
@@ -94,7 +93,6 @@ class Provider: TimelineProvider {
             return CorrespondenceGamesEntry(
                 date: Date(),
                 games: games,
-                widgetFamily: context.family,
                 userID: resolvedUserID,
                 noGamesMessage: localizedNoGamesMessage(
                     localeIdentifier: localeIdentifier
@@ -124,7 +122,7 @@ class Provider: TimelineProvider {
         userID: Int? = nil,
         usesStaticClock: Bool = false
     ) -> [Game] {
-        var result = [Game]()
+        var decodedGames = [Game]()
         let decoder = DictionaryDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         for gameData in activeGamesData {
@@ -138,34 +136,35 @@ class Provider: TimelineProvider {
                         // compatibility captures cannot drift between OS runs.
                         game.clock = game.gameData?.clock
                     }
-                    result.append(game)
+                    decodedGames.append(game)
                 }
             }
         }
         
         let userId = userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
-        let isGamesInIncreasingOrder: (Game, Game) -> Bool = { game1, game2 in
-            if let clock1 = game1.clock, let clock2 = game2.clock {
-                let isGame1OnUserTurn = clock1.currentPlayerId == userId
-                let isGame2OnUserTurn = clock2.currentPlayerId == userId
-                if isGame1OnUserTurn != isGame2OnUserTurn {
-                    return isGame1OnUserTurn
-                }
-
-                let time1 = game1.stoneColor(ofPlayerWithId: userId) == .black ? clock1.blackTime : clock1.whiteTime
-                let time2 = game2.stoneColor(ofPlayerWithId: userId) == .black ? clock2.blackTime : clock2.whiteTime
-                let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
-                let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
-                return timeLeft1 <= timeLeft2
+        return CorrespondenceWidgetContentPolicy.sortedCorrespondenceGames(
+            decodedGames,
+            isCorrespondence: {
+                $0.gameData?.timeControl.speed == .correspondence
+            },
+            isUserTurn: {
+                $0.clock?.currentPlayerId == userId
+            },
+            timeLeft: { game in
+                guard let clock = game.clock else { return .infinity }
+                let thinkingTime = game.stoneColor(
+                    ofPlayerWithId: userId
+                ) == .black ? clock.blackTime : clock.whiteTime
+                return thinkingTime.thinkingTimeLeft ?? .infinity
             }
-            return false
-        }
-        
-        return result.sorted(by: isGamesInIncreasingOrder)
+        )
     }
 
     var overviewLoadingCancellable: AnyCancellable?
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+    func getTimeline(
+        in context: Context,
+        completion: @escaping (Timeline<CorrespondenceGamesEntry>) -> Void
+    ) {
 #if DEBUG
         if let fixture = userDefaults[.appStoreScreenshotWidgetFixture],
            fixture.isValid,
@@ -186,7 +185,7 @@ class Provider: TimelineProvider {
                 if currentDate.timeIntervalSince(lastOverviewUpdate) < 60 && isLoggedIn {
                     if let overviewData = userDefaults[.latestOGSOverview] {
                         if let data = try? JSONSerialization.jsonObject(with: overviewData) as? [String: Any] {
-                            if let entry = getEntry(fromOverviewJSON: data, context: context) {
+                            if let entry = getEntry(fromOverviewJSON: data) {
                                 let nextReloadDate = currentDate.advanced(by: 15 * 60)
                                 completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                                 return
@@ -249,7 +248,7 @@ class Provider: TimelineProvider {
 
             if let oldOverviewData = userDefaults[.latestOGSOverview], let overviewData = overviewData {
                 SurroundNotificationService.shared.scheduleNotificationsIfNecessary(withOldOverviewData: oldOverviewData, newOverviewData: overviewData, completionHandler: { _ in
-                    if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
+                    if let entry = self.getEntry(fromOverviewJSON: overviewValue) {
                         completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                     }
                 })
@@ -259,7 +258,7 @@ class Provider: TimelineProvider {
                 if let overviewData = overviewData {
                     userDefaults.updateLatestOGSOverview(overviewData: overviewData)
                 }
-                if let entry = self.getEntry(fromOverviewJSON: overviewValue, context: context) {
+                if let entry = self.getEntry(fromOverviewJSON: overviewValue) {
                     completion(Timeline(entries: [entry], policy: .after(nextReloadDate)))
                     return
                 }
@@ -271,7 +270,6 @@ class Provider: TimelineProvider {
 struct CorrespondenceGamesEntry: TimelineEntry {
     var date: Date
     var games: [Game] = []
-    var widgetFamily: WidgetFamily = .systemSmall
     var userID: Int?
     var noGamesMessage: String?
     var debugMessage: String?
@@ -280,68 +278,110 @@ struct CorrespondenceGamesEntry: TimelineEntry {
     var usesStaticClock = false
     #if DEBUG
     var screenshotFixtureValidUntil: Date?
+    var screenshotExpectedGameCount: Int?
     var screenshotAppStoreProofToken: String?
     var screenshotCompatibilityProofToken: String?
     #endif
 }
 
-struct CorrespondenceGamesWidgetView : View {
-    @Environment(\.widgetRenderingMode) var widgetRenderingMode
-    @Environment(\.displayScale) var displayScale
-    
-    var entry: Provider.Entry
+struct CorrespondenceGamesWidgetView: View {
+    @Environment(\.widgetFamily) private var widgetFamily
+    @Environment(\.widgetRenderingMode) private var widgetRenderingMode
 
-    var gamesCount: Int {
-        switch entry.widgetFamily {
-        case .systemSmall:
-            return 1
-        case .systemMedium:
-            return 2
-        case .systemLarge:
-            return 4
-        case .systemExtraLarge:
-            return 4
-        default:
-            return 1
-        }
+    var entry: Provider.Entry
+    var previewFamily: WidgetFamily? = nil
+    var previewRenderingMode: WidgetRenderingMode? = nil
+
+    private var resolvedFamily: WidgetFamily {
+        previewFamily ?? widgetFamily
     }
-    
-    var gamesToDisplay: ArraySlice<Game> {
+
+    private var resolvedRenderingMode: WidgetRenderingMode {
+        previewRenderingMode ?? widgetRenderingMode
+    }
+
+    private var gamesCapacity: Int {
+        CorrespondenceWidgetGridLayout.maximumGameCount(for: resolvedFamily)
+    }
+
+    private var gamesToDisplay: [Game] {
         if entry.isPlaceholder {
-            let placeholderGame = Game(width: 19, height: 19, blackName: "", whiteName: "", gameId: .OGS(-1))
-            return Array(repeating: placeholderGame, count: gamesCount)[0..<gamesCount]
-        } else {
-            return entry.games[0..<min(self.gamesCount, entry.games.count)]
+            let placeholderGame = Game(
+                width: 19,
+                height: 19,
+                blackName: "",
+                whiteName: "",
+                gameId: .OGS(-1)
+            )
+            return Array(repeating: placeholderGame, count: gamesCapacity)
+        }
+        return Array(entry.games.prefix(gamesCapacity))
+    }
+
+    private var userId: Int {
+        entry.userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
+    }
+
+    private var numberOfGamesOnUserTurn: Int {
+        CorrespondenceWidgetContentPolicy.pendingCount(in: entry.games) {
+            $0.clock?.currentPlayerId == userId
         }
     }
-    
-    var userId: Int {
-        return entry.userID ?? userDefaults[.ogsUIConfig]?.user.id ?? -1
+
+    private var homeDestination: URL? {
+        NavigationService.appURL(rootView: .home)
+    }
+
+    private func destination(for game: Game) -> URL? {
+        guard let gameID = game.ogsID, gameID > 0 else {
+            return nil
+        }
+        return NavigationService.appURL(rootView: .home, ogsGameId: gameID)
+    }
+
+    private var widgetDestination: URL? {
+        switch CorrespondenceWidgetContentPolicy.primaryDestination(
+            displayedGameIDs: gamesToDisplay.map(\.ogsID),
+            isPlaceholder: entry.isPlaceholder
+        ) {
+        case .home:
+            return homeDestination
+        case .game(let gameID):
+            return NavigationService.appURL(
+                rootView: .home,
+                ogsGameId: gameID
+            )
+        }
     }
 
     #if DEBUG
     private var screenshotReadinessIdentifier: String {
         let family: String
-        switch entry.widgetFamily {
+        switch resolvedFamily {
         case .systemSmall:
             family = "small"
         case .systemMedium:
             family = "medium"
         case .systemLarge:
             family = "large"
+        case .systemExtraLarge:
+            family = "extra-large"
         default:
             family = "unsupported"
         }
 
-        let expectedGameCount =
-            SurroundUITestContract.compatibilityWidgetGameCount
+        let expectedGameCount = entry.screenshotExpectedGameCount
+            ?? SurroundUITestContract.compatibilityWidgetGameCount
         let actualGameCount = entry.games.count
-        let expectedDisplayedGameCount = gamesCount
         let actualDisplayedGameCount = gamesToDisplay.count
 
         if let proofToken = entry.screenshotAppStoreProofToken {
-            let expectedGameCount =
-                SurroundUITestContract.appStoreScreenshotWidgetGameCount
+            let expectedGameCount = entry.screenshotExpectedGameCount
+                ?? SurroundUITestContract.appStoreScreenshotWidgetGameCount
+            let expectedDisplayedGameCount = min(
+                gamesCapacity,
+                expectedGameCount
+            )
             guard family == "medium",
                   entry.usesStaticClock,
                   !entry.isPlaceholder,
@@ -351,7 +391,7 @@ struct CorrespondenceGamesWidgetView : View {
                   let localeIdentifier = entry.localeIdentifier,
                   !localeIdentifier.isEmpty,
                   let validUntil = entry.screenshotFixtureValidUntil,
-                  widgetRenderingMode == .fullColor else {
+                  resolvedRenderingMode == .fullColor else {
                 return [
                     "surround.appstore.widget.unready",
                     family,
@@ -373,6 +413,7 @@ struct CorrespondenceGamesWidgetView : View {
             ].joined(separator: ".")
         }
 
+        let expectedDisplayedGameCount = min(gamesCapacity, expectedGameCount)
         guard entry.usesStaticClock,
               !entry.isPlaceholder,
               entry.debugMessage == nil,
@@ -380,7 +421,7 @@ struct CorrespondenceGamesWidgetView : View {
               actualDisplayedGameCount == expectedDisplayedGameCount,
               let validUntil = entry.screenshotFixtureValidUntil,
               let proofToken = entry.screenshotCompatibilityProofToken,
-              widgetRenderingMode == .fullColor else {
+              resolvedRenderingMode == .fullColor else {
             return [
                 "surround.compatibility.widget.unready",
                 family,
@@ -424,7 +465,7 @@ struct CorrespondenceGamesWidgetView : View {
         )
     }
     
-    func timer(game: Game) -> some View {
+    private func timer(game: Game) -> some View {
         if let clock = game.clock, let timeControlSystem = game.gameData?.timeControl.system {
             let thinkingTime = clock.blackPlayerId == userId ? clock.blackTime : clock.whiteTime
             var timeLeft = thinkingTime.thinkingTimeLeft
@@ -484,37 +525,42 @@ struct CorrespondenceGamesWidgetView : View {
         return AnyView(EmptyView())
     }
     
-    func gameCell(game: Game, boardSize: CGFloat) -> some View {
-        let boardRenderer = ImageRenderer(
-            content: BoardView(widgetRenderingMode: widgetRenderingMode, boardPosition: game.currentPosition, cornerRadius: 10).frame(width: boardSize, height: boardSize)
-        )
-        boardRenderer.scale = displayScale
-        let boardImage = boardRenderer.uiImage
+    private func gameCell(game: Game, boardSize: CGFloat) -> some View {
         return VStack(spacing: 0) {
-            Link(destination: NavigationService.appURL(rootView: .home, game: game)!) {
-                ZStack {
-                    if game.clock?.currentPlayerId == userId {
-                        if widgetRenderingMode == .accented {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(.clear)
-                                .stroke(.white)
-                                .frame(width: boardSize + 6, height: boardSize + 6)
-                        } else {
-                            Color(.systemTeal)
-                                .frame(width: boardSize + 6, height: boardSize + 6)
-                                .cornerRadius(10)
-                        }
-                    }
-                    if let boardImage {
-                        Image(uiImage: boardImage)
-                            .widgetAccentedRenderingMode(.desaturated)
-                            .padding(3)
+            ZStack {
+                if game.clock?.currentPlayerId == userId {
+                    if resolvedRenderingMode == .fullColor {
+                        Color(.systemTeal)
+                            .frame(
+                                width: boardSize
+                                    + CorrespondenceWidgetGridLayout.boardChrome,
+                                height: boardSize
+                                    + CorrespondenceWidgetGridLayout.boardChrome
+                            )
+                            .cornerRadius(10)
                     } else {
-                        BoardView(boardPosition: game.currentPosition, cornerRadius: 10)
-                            .frame(width: boardSize, height: boardSize)
-                            .padding(3)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.clear)
+                            .stroke(.primary)
+                            .frame(
+                                width: boardSize
+                                    + CorrespondenceWidgetGridLayout.boardChrome,
+                                height: boardSize
+                                    + CorrespondenceWidgetGridLayout.boardChrome
+                            )
                     }
                 }
+                // Render the board directly into WidgetKit's view tree.
+                // ImageRenderer can return a non-nil but transparent UIImage
+                // in a real widget, which suppresses a nil-only fallback and
+                // leaves just the turn-highlight backing visible.
+                BoardView(
+                    widgetRenderingMode: resolvedRenderingMode,
+                    boardPosition: game.currentPosition,
+                    cornerRadius: 10
+                )
+                .frame(width: boardSize, height: boardSize)
+                .padding(CorrespondenceWidgetGridLayout.boardChrome / 2)
             }
             HStack {
                 timer(game: game)
@@ -524,70 +570,118 @@ struct CorrespondenceGamesWidgetView : View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
-            }.frame(width: boardSize)
-        }
-    }
-    
-    var boards: some View {
-        let gamesToDisplay = self.gamesToDisplay
-        
-        return GeometryReader { geometry -> AnyView in
-            var boardMaxHeight = geometry.size.height - 15
-            if entry.widgetFamily == .systemLarge && gamesToDisplay.count > 1 {
-                boardMaxHeight = (boardMaxHeight - 20) / 2
             }
-            var boardMaxWidth = geometry.size.width - 20
-            if entry.widgetFamily != .systemSmall {
-                boardMaxWidth = (boardMaxWidth - 20) / 2
-            }
-            let boardSize = min(boardMaxWidth, boardMaxHeight - 15)
-            return AnyView(
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        gameCell(game: gamesToDisplay[0], boardSize: boardSize)
-                            .widgetURL(
-                                self.gamesCount == 1
-                                    ? NavigationService.appURL(rootView: .home, game: gamesToDisplay[0])!
-                                    : NavigationService.appURL(rootView: .home)!
-                            )
-                        Spacer(minLength: 0)
-                        if gamesToDisplay.count > 1 {
-                            gameCell(game: gamesToDisplay[1], boardSize: boardSize)
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    if gamesToDisplay.count > 2 {
-                        HStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            gameCell(game: gamesToDisplay[2], boardSize: boardSize)
-                            Spacer(minLength: 0)
-                            if gamesToDisplay.count > 3 {
-                                gameCell(game: gamesToDisplay[3], boardSize: boardSize)
-                                Spacer(minLength: 0)
-                            }
-                        }
-                    }
-                }
+            .frame(
+                width: boardSize
+                    + CorrespondenceWidgetGridLayout.boardChrome,
+                height: CorrespondenceWidgetGridLayout.timerHeight
             )
         }
+        .frame(
+            width: boardSize + CorrespondenceWidgetGridLayout.boardChrome,
+            height: boardSize + CorrespondenceWidgetGridLayout.boardChrome
+                + CorrespondenceWidgetGridLayout.timerHeight
+        )
+        .contentShape(Rectangle())
     }
-    
-    var body: some View {
-        var numberOfGamesOnUserTurn = 0
-        for game in entry.games {
-            if game.clock?.currentPlayerId == userId {
-                numberOfGamesOnUserTurn += 1
+
+    @ViewBuilder
+    private func displayedGameCell(game: Game, boardSize: CGFloat) -> some View {
+        if !entry.isPlaceholder,
+           gamesToDisplay.count > 1,
+           let destination = destination(for: game) {
+            Link(destination: destination) {
+                gameCell(game: game, boardSize: boardSize)
+            }
+            .buttonStyle(.plain)
+        } else {
+            gameCell(game: game, boardSize: boardSize)
+        }
+    }
+
+    @ViewBuilder
+    private func gameRow(
+        row: Int,
+        layout: CorrespondenceWidgetGridLayout,
+        boardSize: CGFloat
+    ) -> some View {
+        let startIndex = row * layout.columns
+        let endIndex = min(startIndex + layout.columns, gamesToDisplay.count)
+        HStack(spacing: CorrespondenceWidgetGridLayout.columnSpacing) {
+            ForEach(startIndex..<endIndex, id: \.self) { index in
+                displayedGameCell(
+                    game: gamesToDisplay[index],
+                    boardSize: boardSize
+                )
             }
         }
-        
-        let gamesToDisplay = self.gamesToDisplay
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var boards: some View {
+        GeometryReader { geometry in
+            let layout = CorrespondenceWidgetGridLayout.make(
+                family: resolvedFamily,
+                gameCount: gamesToDisplay.count,
+                availableSize: geometry.size
+            )
+            let boardSize = layout.boardSize(in: geometry.size)
+            VStack(spacing: CorrespondenceWidgetGridLayout.rowSpacing) {
+                ForEach(0..<layout.rows, id: \.self) { row in
+                    gameRow(row: row, layout: layout, boardSize: boardSize)
+                }
+            }
+            .padding(CorrespondenceWidgetGridLayout.outerPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
+    }
+
+    @ViewBuilder
+    private var turnRailBackground: some View {
+        let emphasis = CorrespondenceWidgetContentPolicy.railEmphasis(
+            pendingCount: numberOfGamesOnUserTurn
+        )
+        if resolvedRenderingMode == .fullColor {
+            if emphasis == .pending {
+                Color(.systemIndigo)
+            } else {
+                Color(.systemGray)
+            }
+        } else if resolvedRenderingMode == .accented {
+            Color.white
+                .opacity(emphasis == .pending ? 0.75 : 0.3)
+                .luminanceToAlpha()
+        } else {
+            Color.primary.opacity(emphasis == .pending ? 0.45 : 0.18)
+        }
+    }
+
+    private var turnRailLabel: some View {
+        GeometryReader { geometry in
+            ViewThatFits(in: .horizontal) {
+                Text(
+                    "Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)",
+                    comment: "On Correspondence Games Widget"
+                )
+                .fixedSize()
+                Text(verbatim: "\(numberOfGamesOnUserTurn)/\(entry.games.count)")
+                    .fixedSize()
+            }
+            .font(.subheadline.bold())
+            .foregroundStyle(
+                resolvedRenderingMode == .fullColor ? Color.white : Color.primary
+            )
+            .lineLimit(1)
+            .frame(width: geometry.size.height, height: geometry.size.width)
+            .rotationEffect(.degrees(-90))
+            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+        }
+    }
+
+    var body: some View {
         let widgetContent = HStack(alignment: .center, spacing: 0) {
             if gamesToDisplay.count > 0 {
                 boards
-                    .padding(.top, 5)
             } else {
                 Text(entry.noGamesMessage ?? String(localized: "Failed to load your correspondence games.", comment: "Correspondence Games Widget error"))
                     .font(.subheadline)
@@ -596,33 +690,20 @@ struct CorrespondenceGamesWidgetView : View {
                     .frame(maxWidth: .infinity)
             }
             ZStack {
-                if widgetRenderingMode == .fullColor {
-                    Color(.systemIndigo)
-                        .frame(width: 25)
-                } else {
-                    Color(.systemIndigo)
-                        .luminanceToAlpha()
-                        .frame(width: 25)
-                }
+                turnRailBackground
                 if entry.games.count > 0 {
-                    Text("Your turn: \(numberOfGamesOnUserTurn)/\(entry.games.count)", comment: "On Correspondence Games Widget")
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundColor(.white)
-                        .rotationEffect(.degrees(-90))
-                        .fixedSize()
+                    turnRailLabel
                 }
             }
-            .frame(width: 25)
+            .frame(width: CorrespondenceWidgetGridLayout.turnRailWidth)
+            .frame(maxHeight: .infinity)
         }
+        .widgetURL(widgetDestination)
         .containerBackground(for: .widget) {
-            Color.clear
+            Color(.secondarySystemBackground)
         }
 
-        return ZStack {
-            AccessoryWidgetBackground()
-            applyingScreenshotReadinessIdentifier(to: widgetContent)
-        }
+        return applyingScreenshotReadinessIdentifier(to: widgetContent)
     }
 }
 
@@ -641,52 +722,57 @@ struct SurroundWidgets: Widget {
         }
         .configurationDisplayName(String(localized: "Correspondence Games", comment: "Correspondence Games Widget name"))
         .description(String(localized: "This Widget display a summary of your correspondence games on online-go.com.", comment: "Correspondence Games Widget description"))
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .systemLarge,
+            .systemExtraLarge,
+        ])
         .contentMarginsDisabled()
     }
 }
 
 #if DEBUG
-private func populatedWidgetPreviewEntry(
-    family: WidgetFamily
-) -> CorrespondenceGamesEntry {
-    CorrespondenceGamesEntry(
+private func populatedWidgetPreviewEntry(gameCount: Int) -> CorrespondenceGamesEntry {
+    let previewGames = [
+        TestData.Ongoing19x19wBot1,
+        TestData.Ongoing19x19wBot2,
+        TestData.Ongoing19x19wBot3,
+    ]
+    return CorrespondenceGamesEntry(
         date: Date(),
-        games: [
-            TestData.Ongoing19x19wBot1,
-            TestData.Ongoing19x19wBot2,
-            TestData.Ongoing19x19wBot3,
-        ],
-        widgetFamily: family,
+        games: (0..<gameCount).map { previewGames[$0 % previewGames.count] },
         userID: 592684,
         usesStaticClock: true
     )
 }
 
-#Preview("Correspondence games — Populated small", as: .systemSmall) {
-    SurroundWidgets()
-} timeline: {
-    populatedWidgetPreviewEntry(family: .systemSmall)
+private func boardSizeWidgetPreviewEntry(
+    localeIdentifier: String? = nil
+) -> CorrespondenceGamesEntry {
+    let thirteenByThirteen = Game(
+        width: 13,
+        height: 13,
+        blackName: "Black",
+        whiteName: "White",
+        gameId: .OGS(13_013)
+    )
+    return CorrespondenceGamesEntry(
+        date: Date(),
+        games: [
+            TestData.Resigned9x9Japanese,
+            thirteenByThirteen,
+            TestData.Ongoing19x19wBot1,
+        ],
+        userID: 592684,
+        localeIdentifier: localeIdentifier,
+        usesStaticClock: true
+    )
 }
 
-#Preview("Correspondence games — Populated medium", as: .systemMedium) {
-    SurroundWidgets()
-} timeline: {
-    populatedWidgetPreviewEntry(family: .systemMedium)
-}
-
-#Preview("Correspondence games — Populated large", as: .systemLarge) {
-    SurroundWidgets()
-} timeline: {
-    populatedWidgetPreviewEntry(family: .systemLarge)
-}
-
-#Preview("Correspondence games — Empty", as: .systemMedium) {
-    SurroundWidgets()
-} timeline: {
+private func emptyWidgetPreviewEntry() -> CorrespondenceGamesEntry {
     CorrespondenceGamesEntry(
         date: Date(),
-        widgetFamily: .systemMedium,
         userID: 592684,
         noGamesMessage: String(
             localized: "You don't have any correspondence games at the moment."
@@ -694,12 +780,121 @@ private func populatedWidgetPreviewEntry(
     )
 }
 
+#Preview("Correspondence games — Populated small", as: .systemSmall) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 1)
+}
+
+#Preview("Correspondence games — Populated medium", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 2)
+}
+
+#Preview("Correspondence games — Single medium", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 1)
+}
+
+#Preview("Correspondence games — Single large", as: .systemLarge) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 1)
+}
+
+#Preview("Correspondence games — Populated large", as: .systemLarge) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 4)
+}
+
+#Preview("Correspondence games — Populated extra large", as: .systemExtraLarge) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 6)
+}
+
+#Preview("Correspondence games — Single extra large", as: .systemExtraLarge) {
+    SurroundWidgets()
+} timeline: {
+    populatedWidgetPreviewEntry(gameCount: 1)
+}
+
+#Preview("Correspondence games — Empty small", as: .systemSmall) {
+    SurroundWidgets()
+} timeline: {
+    emptyWidgetPreviewEntry()
+}
+
+#Preview("Correspondence games — Empty large", as: .systemLarge) {
+    SurroundWidgets()
+} timeline: {
+    emptyWidgetPreviewEntry()
+}
+
+#Preview("Correspondence games — Empty extra large", as: .systemExtraLarge) {
+    SurroundWidgets()
+} timeline: {
+    emptyWidgetPreviewEntry()
+}
+
+#Preview("Correspondence games — Empty", as: .systemMedium) {
+    SurroundWidgets()
+} timeline: {
+    CorrespondenceGamesEntry(
+        date: Date(),
+        userID: 592684,
+        noGamesMessage: String(
+            localized: "You don't have any correspondence games at the moment."
+        )
+    )
+}
+
+
+#Preview("Correspondence games — 9×9, 13×13, and 19×19") {
+    CorrespondenceGamesWidgetView(
+        entry: boardSizeWidgetPreviewEntry(),
+        previewFamily: .systemLarge,
+        previewRenderingMode: .fullColor
+    )
+        .frame(width: 338, height: 354)
+}
+
+#Preview("Correspondence games — Long locale, dark") {
+    CorrespondenceGamesWidgetView(
+        entry: boardSizeWidgetPreviewEntry(localeIdentifier: "de-DE"),
+        previewFamily: .systemLarge,
+        previewRenderingMode: .fullColor
+    )
+    .environment(\.colorScheme, .dark)
+    .frame(width: 338, height: 354)
+}
+
+#Preview("Correspondence games — Accented") {
+    CorrespondenceGamesWidgetView(
+        entry: populatedWidgetPreviewEntry(gameCount: 2),
+        previewFamily: .systemMedium,
+        previewRenderingMode: .accented
+    )
+        .frame(width: 338, height: 158)
+}
+
+#Preview("Correspondence games — Vibrant") {
+    CorrespondenceGamesWidgetView(
+        entry: populatedWidgetPreviewEntry(gameCount: 2),
+        previewFamily: .systemMedium,
+        previewRenderingMode: .vibrant
+    )
+        .frame(width: 338, height: 158)
+}
+
 #Preview("Correspondence games — Placeholder", as: .systemMedium) {
     SurroundWidgets()
 } timeline: {
     CorrespondenceGamesEntry(
         date: Date(),
-        widgetFamily: .systemMedium,
         isPlaceholder: true
     )
 }
@@ -709,7 +904,6 @@ private func populatedWidgetPreviewEntry(
 } timeline: {
     CorrespondenceGamesEntry(
         date: Date(),
-        widgetFamily: .systemMedium,
         noGamesMessage: String(
             localized: "Sign in to your online-go.com account to see your games here."
         )

@@ -1046,6 +1046,21 @@ extension OGSService {
 
             state.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
 
+            if SurroundUITestContract.simulatesWidgetDeepLinkRouting {
+                let replacementGame = makeGeneratedGame(
+                    from: TestData.Ongoing19x19wBot1,
+                    blackUsername: "CedarPanda",
+                    whiteUsername: "CloudBadger"
+                )
+                precondition(
+                    replacementGame.ogsID
+                        == SurroundUITestContract.widgetRoutingSecondGameID
+                )
+                state.activeGames[
+                    SurroundUITestContract.widgetRoutingSecondGameID
+                ] = replacementGame
+            }
+
             let publicGame = makeGeneratedGame(
                 from: TestData.Ongoing19x19HandicappedWithNoInitialState,
                 blackUsername: "WillowKnight",
@@ -1782,23 +1797,42 @@ extension OGSService {
                 ]
             )
         }
+        let baseWidgetGameCount = widgetActiveGames.count
         precondition(
-            widgetActiveGames.count
-                == (
-                    SurroundUITestContract
-                        .isCapturingCompatibilityScreenshots
-                            ? SurroundUITestContract
-                                .compatibilityWidgetGameCount
-                            : SurroundUITestContract
-                                .appStoreScreenshotWidgetGameCount
-                ),
+            baseWidgetGameCount > 0,
+            "The widget fixture needs at least one source game."
+        )
+        let expectedWidgetGameCount =
+            SurroundUITestContract.isCapturingCompatibilityScreenshots
+                ? SurroundUITestContract.compatibilityWidgetFixtureGameCount
+                : SurroundUITestContract.appStoreScreenshotWidgetGameCount
+        if widgetActiveGames.count > expectedWidgetGameCount {
+            widgetActiveGames = Array(
+                widgetActiveGames.prefix(expectedWidgetGameCount)
+            )
+        }
+        while widgetActiveGames.count < expectedWidgetGameCount {
+            let sourceIndex = widgetActiveGames.count % baseWidgetGameCount
+            var duplicate = widgetActiveGames[sourceIndex]
+            let duplicateID = 99_000_000 + widgetActiveGames.count
+            duplicate["id"] = duplicateID
+            if var gameJSON = duplicate["json"] as? [String: Any] {
+                gameJSON["game_id"] = duplicateID
+                duplicate["json"] = gameJSON
+            }
+            widgetActiveGames.append(duplicate)
+        }
+        precondition(
+            widgetActiveGames.count == expectedWidgetGameCount,
             "The compatibility fixture must populate every widget family."
         )
-        precondition(
-            Set(widgetActiveGames.compactMap { $0["id"] as? Int })
-                == Set(state.activeGames.keys),
-            "The app and widget screenshot fixtures must use the same active game ids."
-        )
+        if expectedWidgetGameCount == state.activeGames.count {
+            precondition(
+                Set(widgetActiveGames.compactMap { $0["id"] as? Int })
+                    == Set(state.activeGames.keys),
+                "The app and widget screenshot fixtures must use the same active game ids."
+            )
+        }
         let widgetOverviewData = try! JSONSerialization.data(
             withJSONObject: [
                 "active_games": widgetActiveGames,
@@ -1811,6 +1845,7 @@ extension OGSService {
             userID: fixtureUser.id,
             localeIdentifier: Locale.current.identifier,
             overviewData: widgetOverviewData,
+            expectedGameCount: expectedWidgetGameCount,
             appStoreProofToken:
                 SurroundUITestContract.appStoreScreenshotWidgetProofToken,
             compatibilityProofToken:

@@ -163,6 +163,12 @@
 		BC64937A25380A9F002B2200 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937925380A9F002B2200 /* WidgetKit.framework */; };
 		BC64937C25380A9F002B2200 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC64937B25380A9F002B2200 /* SwiftUI.framework */; };
 		BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC64937E25380A9F002B2200 /* SurroundWidgets.swift */; };
+		C0D100022026082900000002 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
+		C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
+		C0D100052026082900000005 /* CorrespondenceWidgetGridLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */; };
+		C0D100072026082900000007 /* AppRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100062026082900000006 /* AppRouteTests.swift */; };
+		C0D100082026082900000008 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
+		C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
 		BC64938125380AA1002B2200 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC64938025380AA1002B2200 /* Assets.xcassets */; };
 		BC64938525380AA2002B2200 /* SurroundWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BC64937725380A9F002B2200 /* SurroundWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BC64939625380D96002B2200 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3A24AB2DD00050B2D1 /* Game.swift */; };
@@ -493,6 +499,9 @@
 		BC64937925380A9F002B2200 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		BC64937B25380A9F002B2200 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		BC64937E25380A9F002B2200 /* SurroundWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundWidgets.swift; sourceTree = "<group>"; };
+		C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayout.swift; sourceTree = "<group>"; };
+		C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayoutTests.swift; sourceTree = "<group>"; };
+		C0D100062026082900000006 /* AppRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteTests.swift; sourceTree = "<group>"; };
 		BC64938025380AA1002B2200 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BC64938225380AA1002B2200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BC6493F425382011002B2200 /* Surround.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Surround.entitlements; sourceTree = "<group>"; };
@@ -718,6 +727,8 @@
 			isa = PBXGroup;
 			children = (
 				BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */,
+				C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */,
+				C0D100062026082900000006 /* AppRouteTests.swift */,
 				BC042B0624AB2CFA0050B2D1 /* Info.plist */,
 				BC8CE87E2657B1B100E4BE1A /* GameTests.swift */,
 				BC463AF8265CB08300D40D3A /* BoardPositionTests.swift */,
@@ -909,6 +920,7 @@
 			isa = PBXGroup;
 			children = (
 				BC64937E25380A9F002B2200 /* SurroundWidgets.swift */,
+				C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */,
 				BC64938025380AA1002B2200 /* Assets.xcassets */,
 				BC64938225380AA1002B2200 /* Info.plist */,
 			);
@@ -1389,6 +1401,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */,
+				C0D100052026082900000005 /* CorrespondenceWidgetGridLayoutTests.swift in Sources */,
+				C0D100072026082900000007 /* AppRouteTests.swift in Sources */,
+				C0D100082026082900000008 /* NavigationService.swift in Sources */,
 				AF2000023E00000000000002 /* OGSConditionalMoves.swift in Sources */,
 				AE20000139A0000000000001 /* TimeControlTests.swift in Sources */,
 				AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */,
@@ -1443,6 +1459,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				AE4100013C00000000000001 /* AppStoreScreenshotTests.swift in Sources */,
 				AE4200013C00000000000001 /* CompatibilityScreenshotTests.swift in Sources */,
 				AE3100033A00000000000003 /* SurroundUITestContract.swift in Sources */,
@@ -1495,6 +1512,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0D100022026082900000002 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				AF2000043E00000000000004 /* OGSConditionalMoves.swift in Sources */,
 				AE31000A3A0000000000000A /* SurroundUITestContract.swift in Sources */,
 				BC64939C25380DC3002B2200 /* UserDefaults+SurroundModels.swift in Sources */,

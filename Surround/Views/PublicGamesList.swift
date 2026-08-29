@@ -6,14 +6,60 @@
 //
 
 import SwiftUI
-import Combine
 
 struct PublicGamesList: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
-    @State var gameDetailCancellable: AnyCancellable?
+    @MainActor
+    private func resolvePendingGameOpen(_ request: PendingGameOpen) async {
+        guard request.rootView == .publicGames,
+              nav.pendingGameOpen?.id == request.id else {
+            return
+        }
+
+        do {
+            let resolver = GameOpenResolver<Game>(
+                activeGame: { gameID in
+                    if let game = ogs.activeGames[gameID],
+                       game.gameData != nil {
+                        return game
+                    }
+                    if let game = ogs.sortedPublicGames.first(where: {
+                        $0.ogsID == gameID
+                    }), game.gameData != nil {
+                        return game
+                    }
+                    return nil
+                },
+                sharedOverviewGame: { _ in nil },
+                restGame: { gameID in
+                    for try await game in ogs.getGameDetail(
+                        gameID: gameID
+                    ).values {
+                        return game
+                    }
+                    throw OGSServiceError.invalidJSON
+                }
+            )
+            let resolution = try await resolver.resolve(
+                gameID: request.ogsGameID
+            )
+            guard !Task.isCancelled,
+                  nav.pendingGameOpen?.id == request.id else {
+                return
+            }
+            nav.publicGames.activeGame = resolution.game
+            nav.clearPendingGameOpen(id: request.id)
+        } catch {
+            guard !Task.isCancelled,
+                  nav.pendingGameOpen?.id == request.id else {
+                return
+            }
+            nav.clearPendingGameOpen(id: request.id)
+        }
+    }
     
     var body: some View {
         Group {
@@ -37,22 +83,18 @@ struct PublicGamesList: View {
             get: { nav.publicGames.activeGame != nil },
             set: { if !$0 { nav.publicGames.activeGame = nil } }
         ), destination: {
-            GameDetailView(currentGame: nav.publicGames.activeGame)
+            GameDetailView(currentGame: $nav.publicGames.activeGame)
         })
         .onAppear {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()
-            if nav.publicGames.ogsIdToOpen != -1 {
-                self.gameDetailCancellable = ogs.getGameDetail(gameID: nav.publicGames.ogsIdToOpen).sink(
-                    receiveCompletion: { _ in
-                        nav.publicGames.ogsIdToOpen = -1
-                    },
-                    receiveValue: { game in
-                        if nav.publicGames.activeGame == nil {
-                            nav.publicGames.activeGame = game
-                        }
-                    })
+        }
+        .task(id: nav.pendingGameOpen?.id) {
+            guard let request = nav.pendingGameOpen,
+                  request.rootView == .publicGames else {
+                return
             }
+            await resolvePendingGameOpen(request)
         }
         .navigationBarTitle(Text("Public live games"))
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenPublicGames)

@@ -228,9 +228,14 @@ struct RengoActions: View {
                 self.ogsRequestCancellable = nil
                 if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
                     withAnimation {
-                        nav.home.ogsIdToOpen = newGameId
-                        if challenge.challenged == nil {
-                            nav.home.showingNewGameView = false
+                        if let route = AppRoute(
+                            rootView: .home,
+                            ogsGameID: newGameId
+                        ) {
+                            if challenge.challenged == nil {
+                                nav.home.showingNewGameView = false
+                            }
+                            nav.requestGameOpen(route)
                         }
                     }
                 }
@@ -336,9 +341,14 @@ struct ChallengeCell: View {
                 self.ogsRequestCancellable = nil
                 if !nav.main.showWaitingGames {  // Waiting games list view is meant to preserve context, so don't perform navigation when accepting games from there
                     withAnimation {
-                        nav.home.ogsIdToOpen = newGameId
-                        if challenge.challenged == nil {
-                            nav.home.showingNewGameView = false
+                        if let route = AppRoute(
+                            rootView: .home,
+                            ogsGameID: newGameId
+                        ) {
+                            if challenge.challenged == nil {
+                                nav.home.showingNewGameView = false
+                            }
+                            nav.requestGameOpen(route)
                         }
                     }
                 }

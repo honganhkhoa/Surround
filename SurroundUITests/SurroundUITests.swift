@@ -1266,6 +1266,104 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    func testWidgetDeepLinkRouting() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "Widget URL interaction is exercised on iPad; Catalyst scene reuse remains a manual multi-window check."
+        )
+        #else
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.widgetDeepLinkRoutingLaunchArgument,
+        ])
+        let firstGameID = SurroundUITestContract.fixtureGameID
+        let secondGameID =
+            SurroundUITestContract.widgetRoutingSecondGameID
+        let missingGameID =
+            SurroundUITestContract.widgetRoutingMissingGameID
+
+        // Terminate the priming launch so the first URL exercises cold launch.
+        app.terminate()
+        app.open(URL(string: "surround://home/\(firstGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
+            in: app
+        )
+
+        // A newer tap atomically replaces an already open game.
+        app.open(URL(string: "surround://home/\(secondGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(secondGameID),
+            in: app
+        )
+
+        // Repeating a route produces a fresh request and remains retryable.
+        app.open(URL(string: "surround://home/\(secondGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(secondGameID),
+            in: app
+        )
+
+        // A REST-only route exposes its loading state before deterministic
+        // offline failure, then returns to the existing Home context.
+        app.open(URL(string: "surround://home")!)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        app.open(URL(string: "surround://home/\(missingGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.openingGame,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.openGameRetry,
+            in: app,
+            matching: .button
+        )
+        var cancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        cancel.tap()
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+
+        // Tracked sheets must not block a subsequent game route.
+        tap(
+            SurroundUITestContract.AccessibilityID.homeNewGame,
+            in: app,
+            matching: .button
+        )
+        let newGame = element(
+            SurroundUITestContract.AccessibilityID.screenNewGame,
+            in: app
+        )
+        app.open(URL(string: "surround://home/\(firstGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
+            in: app
+        )
+        XCTAssertFalse(
+            newGame.exists,
+            "Opening a routed game must dismiss the tracked New Game sheet."
+        )
+
+        // A failed replacement keeps the game being read on screen. The
+        // loading delay makes the preservation check deterministic.
+        app.open(URL(string: "surround://home/\(missingGameID)")!)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.openGameRetry,
+            in: app,
+            matching: .button
+        )
+        cancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        cancel.tap()
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
+            in: app
+        )
+        #endif
+    }
+
     func testHomeHistoryRetryRecoversAndKeepsNavigationAvailable() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.homeHistoryFailsOnceLaunchArgument,

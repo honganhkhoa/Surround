@@ -39,13 +39,14 @@ let userDefaults = makeSurroundUserDefaults()
 
 #if DEBUG
 struct AppStoreScreenshotWidgetFixture: Codable {
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     let validUntil: Date
     let userID: Int
     let localeIdentifier: String
     let overviewData: Data
+    let expectedGameCount: Int
     let appStoreProofToken: String?
     let compatibilityProofToken: String?
 

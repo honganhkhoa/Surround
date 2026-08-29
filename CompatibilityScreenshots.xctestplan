@@ -22,7 +22,9 @@
     {
       "parallelizable" : false,
       "selectedTests" : [
-        "CompatibilityScreenshotTests/testCompatibilityScreenshots()"
+        "CompatibilityScreenshotTests/testAdaptiveWidgetRegressionScreenshots()",
+        "CompatibilityScreenshotTests/testCompatibilityScreenshots()",
+        "CompatibilityScreenshotTests/testWidgetTapTargets()"
       ],
       "target" : {
         "containerPath" : "container:Surround.xcodeproj",

@@ -14,7 +14,7 @@ struct GameDetailView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
 
-    @State var currentGame: Game?
+    @Binding var currentGame: Game?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
     @State private var detailConnection = GameDetailConnectionCoordinator()
@@ -210,12 +210,6 @@ struct GameDetailView: View {
     
     var body: some View {
         guard let currentGame = self.currentGame else {
-            // Work-around for pre-iOS 16.4 bug related navigation destination with data dependencies captured from ancestor views.
-            if let currentGameFromNav = nav.home.activeGame {
-                DispatchQueue.main.async {
-                    self.currentGame = currentGameFromNav
-                }
-            }
             return AnyView(EmptyView())
         }
 
@@ -306,6 +300,7 @@ struct GameDetailView: View {
         }
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
+                showSettings = false
                 variationShareDraft = nil
                 selectedChatChannel = .main
                 updateDetailOfCurrentGameIfNecessary()
@@ -487,7 +482,7 @@ private func gameDetailPreviewFixture() -> (
 
     NavigationView {
         GameDetailView(
-            currentGame: fixture.games[0],
+            currentGame: .constant(fixture.games[0]),
             activeGames: fixture.games,
             zenMode: true
         )
@@ -501,7 +496,7 @@ private func gameDetailPreviewFixture() -> (
 
     NavigationView {
         GameDetailView(
-            currentGame: fixture.games[0],
+            currentGame: .constant(fixture.games[0]),
             activeGames: fixture.games
         )
     }
@@ -512,7 +507,7 @@ private func gameDetailPreviewFixture() -> (
 #Preview("Regular landscape — Zen mode", traits: .fixedLayout(width: 960, height: 754)) {
     let fixture = gameDetailPreviewFixture()
 
-    GameDetailView(currentGame: fixture.games[0], zenMode: true)
+    GameDetailView(currentGame: .constant(fixture.games[0]), zenMode: true)
         .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
         .environmentObject(fixture.ogs)
         .environmentObject(fixture.navigation)
@@ -521,7 +516,7 @@ private func gameDetailPreviewFixture() -> (
 #Preview("Regular portrait — Active game", traits: .fixedLayout(width: 750, height: 1024)) {
     let fixture = gameDetailPreviewFixture()
 
-    GameDetailView(currentGame: fixture.games[0])
+    GameDetailView(currentGame: .constant(fixture.games[0]))
         .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
         .environmentObject(fixture.ogs)
         .environmentObject(fixture.navigation)

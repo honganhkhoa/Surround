@@ -38,7 +38,10 @@
         { "name": "game-chat", "kind": "native" },
         { "name": "widget-small", "kind": "widget", "widgetFamily": "systemSmall" },
         { "name": "widget-medium", "kind": "widget", "widgetFamily": "systemMedium" },
-        { "name": "widget-large", "kind": "widget", "widgetFamily": "systemLarge" }
+        { "name": "widget-large", "kind": "widget", "widgetFamily": "systemLarge" },
+        { "name": "widget-small-full-capacity", "kind": "widget", "widgetFamily": "systemSmall" },
+        { "name": "widget-large-one-game", "kind": "widget", "widgetFamily": "systemLarge" },
+        { "name": "widget-large-three-games", "kind": "widget", "widgetFamily": "systemLarge" }
       ]
     },
     "ipad": {
@@ -75,7 +78,13 @@
         { "name": "preferred-setting-editor", "kind": "native" },
         { "name": "widget-small", "kind": "widget", "widgetFamily": "systemSmall" },
         { "name": "widget-medium", "kind": "widget", "widgetFamily": "systemMedium" },
-        { "name": "widget-large", "kind": "widget", "widgetFamily": "systemLarge" }
+        { "name": "widget-large", "kind": "widget", "widgetFamily": "systemLarge" },
+        { "name": "widget-small-full-capacity", "kind": "widget", "widgetFamily": "systemSmall" },
+        { "name": "widget-large-one-game", "kind": "widget", "widgetFamily": "systemLarge" },
+        { "name": "widget-large-three-games", "kind": "widget", "widgetFamily": "systemLarge" },
+        { "name": "widget-extra-large-one-game", "kind": "widget", "widgetFamily": "systemExtraLarge" },
+        { "name": "widget-extra-large-four-games", "kind": "widget", "widgetFamily": "systemExtraLarge" },
+        { "name": "widget-extra-large-six-games", "kind": "widget", "widgetFamily": "systemExtraLarge" }
       ]
     }
   }

@@ -16,6 +16,8 @@ enum SurroundUITestContract {
         "--surround-compatibility-scene"
     static let compatibilityWidgetProofTokenLaunchArgument =
         "--surround-compatibility-widget-proof-token"
+    static let compatibilityWidgetGameCountLaunchArgument =
+        "--surround-compatibility-widget-game-count"
     static let catalystWindowSizeLaunchArgument =
         "--surround-catalyst-window-size"
     static let catalystDefaultWindowSizeLaunchArgument =
@@ -32,6 +34,8 @@ enum SurroundUITestContract {
         "--surround-compact-game-layout"
     static let homeBoardAlignmentLaunchArgument =
         "--surround-home-board-alignment"
+    static let widgetDeepLinkRoutingLaunchArgument =
+        "--surround-widget-deep-link-routing"
     static let attachedSoftwareKeyboardVisibleLaunchArgument =
         "--surround-attached-software-keyboard-visible"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
@@ -39,6 +43,9 @@ enum SurroundUITestContract {
     static let compatibilityWidgetGameCount = 4
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
+    static let widgetRoutingSecondGameID = 26_268_396
+    static let widgetRoutingMissingGameID = 999_999_999
+    static let widgetRoutingRESTDelayNanoseconds: UInt64 = 1_000_000_000
     static let homeHistoryRetryFixtureGameID = 18_759_438
     static let screenshotNextGameID = 18_759_438
     static let screenshotPrimaryGameID = 68_301_595
@@ -169,6 +176,13 @@ enum SurroundUITestContract {
             )
     }
 
+    static var simulatesWidgetDeepLinkRouting: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                widgetDeepLinkRoutingLaunchArgument
+            )
+    }
+
     static var simulatesAttachedSoftwareKeyboardVisible: Bool {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
@@ -254,6 +268,26 @@ enum SurroundUITestContract {
         return token.uuidString
     }
 
+    static var compatibilityWidgetFixtureGameCount: Int {
+        guard isCapturingCompatibilityScreenshots else {
+            return compatibilityWidgetGameCount
+        }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(
+            of: compatibilityWidgetGameCountLaunchArgument
+        ) else {
+            return compatibilityWidgetGameCount
+        }
+        guard arguments.indices.contains(argumentIndex + 1),
+              let count = Int(arguments[argumentIndex + 1]),
+              (1...6).contains(count) else {
+            preconditionFailure(
+                "\(compatibilityWidgetGameCountLaunchArgument) requires a value from 1 through 6."
+            )
+        }
+        return count
+    }
+
     static var appStoreScreenshotWidgetProofToken: String? {
         guard isCapturingAppStoreScreenshots else {
             return nil
@@ -283,6 +317,9 @@ enum SurroundUITestContract {
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
     static let simulatesHomeBoardAlignment = false
+    static let simulatesWidgetDeepLinkRouting = false
+    static let compatibilityWidgetFixtureGameCount =
+        compatibilityWidgetGameCount
     static let compatibilityScene: CompatibilityScene? = nil
     static let compatibilityWidgetProofToken: String? = nil
     static let appStoreScreenshotWidgetProofToken: String? = nil
@@ -344,6 +381,8 @@ enum SurroundUITestContract {
         static let homeHistoryRetry = "home.history.retry"
         static let homeHistoryEmpty = "home.history.empty"
         static let homeHistoryViewAll = "home.history.viewAll"
+        static let openingGame = "home.openingGame"
+        static let openGameRetry = "home.openGame.retry"
 
         static let gameHistoryLoading = "gameHistory.loading"
         static let gameHistoryError = "gameHistory.error"

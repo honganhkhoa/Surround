@@ -5,7 +5,9 @@ set -euo pipefail
 readonly exit_usage=64
 readonly scheme_name="CompatibilityScreenshots"
 readonly test_plan_name="CompatibilityScreenshots"
-readonly test_identifier="SurroundUITests/CompatibilityScreenshotTests/testCompatibilityScreenshots"
+readonly legacy_screenshot_test_identifier="SurroundUITests/CompatibilityScreenshotTests/testCompatibilityScreenshots"
+readonly adaptive_screenshot_test_identifier="SurroundUITests/CompatibilityScreenshotTests/testAdaptiveWidgetRegressionScreenshots"
+readonly widget_tap_test_identifier="SurroundUITests/CompatibilityScreenshotTests/testWidgetTapTargets"
 readonly app_bundle_identifier="com.honganhkhoa.Surround"
 readonly ui_test_runner_bundle_identifier="com.honganhkhoa.SurroundUITests.xctrunner"
 readonly required_iphone_device_type_identifier="com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max"
@@ -44,8 +46,8 @@ Options:
                             Home Screen content on those simulators.
   -h, --help                Show this help.
 
-The output contains one xcresult, exported attachments, 32 normalized iPhone
-PNGs, 31 normalized iPad PNGs, an attachment record, a build log, and run
+The output contains one xcresult, exported attachments, 35 normalized iPhone
+PNGs, 37 normalized iPad PNGs, an attachment record, a build log, and run
 metadata. By default the runner creates isolated simulators and verifies their
 deletion during teardown. With --reuse-devices, selected simulators are returned
 to their original boot state, locale, and appearance, but app data and Home
@@ -666,7 +668,10 @@ jq -e '
       "game-chat",
       "widget-small",
       "widget-medium",
-      "widget-large"
+      "widget-large",
+      "widget-small-full-capacity",
+      "widget-large-one-game",
+      "widget-large-three-games"
     ]
   )
   and (
@@ -702,7 +707,13 @@ jq -e '
       "preferred-setting-editor",
       "widget-small",
       "widget-medium",
-      "widget-large"
+      "widget-large",
+      "widget-small-full-capacity",
+      "widget-large-one-game",
+      "widget-large-three-games",
+      "widget-extra-large-one-game",
+      "widget-extra-large-four-games",
+      "widget-extra-large-six-games"
     ]
   )
   and (
@@ -722,7 +733,10 @@ jq -e '
     | map(select(.kind == "widget"))
     | all(
         (
-          .name == "widget-small"
+          (
+            .name == "widget-small"
+            or .name == "widget-small-full-capacity"
+          )
           and .widgetFamily == "systemSmall"
         )
         or (
@@ -730,8 +744,20 @@ jq -e '
           and .widgetFamily == "systemMedium"
         )
         or (
-          .name == "widget-large"
+          (
+            .name == "widget-large"
+            or .name == "widget-large-one-game"
+            or .name == "widget-large-three-games"
+          )
           and .widgetFamily == "systemLarge"
+        )
+        or (
+          (
+            .name == "widget-extra-large-one-game"
+            or .name == "widget-extra-large-four-games"
+            or .name == "widget-extra-large-six-games"
+          )
+          and .widgetFamily == "systemExtraLarge"
         )
       )
   )
@@ -933,7 +959,7 @@ xcodebuild_log_path="${output_root}/xcodebuild.log"
 records_path="${output_root}/screenshot-attachments.tsv"
 metadata_path="${output_root}/run-metadata.json"
 
-echo "Running ${test_identifier} on iPhone and iPad..."
+echo "Running compatibility screenshots and physical widget taps on iPhone and iPad..."
 set -o pipefail
 xcodebuild test \
   -project "$project_path" \
@@ -946,7 +972,9 @@ xcodebuild test \
   -resultBundlePath "$result_bundle_path" \
   -parallel-testing-enabled NO \
   -only-test-configuration "en-US" \
-  "-only-testing:${test_identifier}" \
+  "-only-testing:${legacy_screenshot_test_identifier}" \
+  "-only-testing:${adaptive_screenshot_test_identifier}" \
+  "-only-testing:${widget_tap_test_identifier}" \
   2>&1 | tee "$xcodebuild_log_path"
 
 echo "Exporting XCTest attachments..."
@@ -963,12 +991,18 @@ jq -e 'type == "array"' "$attachment_manifest" >/dev/null \
 jq -r \
   --argjson iphone_scenes "$expected_iphone_scenes_json" \
   --argjson ipad_scenes "$expected_ipad_scenes_json" \
-  --arg expected_test \
-    "CompatibilityScreenshotTests/testCompatibilityScreenshots" '
+  --arg legacy_test \
+    "CompatibilityScreenshotTests/testCompatibilityScreenshots" \
+  --arg adaptive_test \
+    "CompatibilityScreenshotTests/testAdaptiveWidgetRegressionScreenshots" '
     ($iphone_scenes + $ipad_scenes | unique) as $recognized_scenes
     |
     .[]
-    | select(.testIdentifier | contains($expected_test))
+    | .testIdentifier as $test_identifier
+    | select(
+        ($test_identifier | contains($legacy_test))
+        or ($test_identifier | contains($adaptive_test))
+      )
     | .attachments[]
     | .suggestedHumanReadableName as $suggested_name
     | (

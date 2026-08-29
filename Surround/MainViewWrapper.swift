@@ -269,33 +269,33 @@ private struct CompatibilityScreenshotRootView: View {
             }
         case .activeGameBoard:
             NavigationStack {
-                GameDetailView(currentGame: primaryGame)
+                GameDetailView(currentGame: .constant(primaryGame))
             }
         case .gameAnalysis:
             NavigationStack {
                 GameDetailView(
-                    currentGame: primaryGame,
+                    currentGame: .constant(primaryGame),
                     analyzeMode: true
                 )
             }
         case .zenMode:
             NavigationStack {
                 GameDetailView(
-                    currentGame: primaryGame,
+                    currentGame: .constant(primaryGame),
                     zenMode: true
                 )
             }
         case .gameOptions:
             NavigationStack {
                 GameDetailView(
-                    currentGame: primaryGame,
+                    currentGame: .constant(primaryGame),
                     showSettings: true
                 )
             }
         case .finishedGamePlayback:
             NavigationStack {
                 GameDetailView(
-                    currentGame: finishedGame,
+                    currentGame: .constant(finishedGame),
                     allowsActiveGamesCarousel: false,
                     analyzeMode: true
                 )
@@ -303,7 +303,7 @@ private struct CompatibilityScreenshotRootView: View {
         case .publicGameSpectator:
             NavigationStack {
                 GameDetailView(
-                    currentGame: publicGame,
+                    currentGame: .constant(publicGame),
                     allowsActiveGamesCarousel: false
                 )
             }
@@ -357,7 +357,7 @@ private struct CompatibilityScreenshotRootView: View {
             }
         case .gameChat:
             NavigationStack {
-                GameDetailView(currentGame: primaryGame)
+                GameDetailView(currentGame: .constant(primaryGame))
             }
         }
     }

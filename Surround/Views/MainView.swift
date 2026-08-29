@@ -50,6 +50,10 @@ struct MainView: View {
         self.allowsRemoteActivity = allowsRemoteActivity
     }
 
+    private var handledExternalEventRoots: Set<String> {
+        Set(RootView.allCases.map(\.rawValue))
+    }
+
     func updateDisplaySleepPrevention() {
         guard allowsRemoteActivity else { return }
         let hasLiveGame = !ogs.liveGames.isEmpty || ogs.waitingLiveGames > 0
@@ -96,28 +100,6 @@ struct MainView: View {
         })
     }
     
-    func navigateTo(appURL: URL) {
-        if let rootViewName = appURL.host, let rootView = RootView(rawValue: rootViewName) {
-            nav.main.rootView = rootView
-            switch rootView {
-            case .home:
-                if appURL.pathComponents.count > 1 {
-                    if let ogsGameId = Int(appURL.pathComponents[1]) {
-                        nav.home.ogsIdToOpen = ogsGameId
-                    }
-                }
-            case .publicGames:
-                if appURL.pathComponents.count > 1 {
-                    if let ogsGameId = Int(appURL.pathComponents[1]) {
-                        nav.publicGames.ogsIdToOpen = ogsGameId
-                    }
-                }
-            default:
-                break
-            }
-        }
-    }
-
     var body: some View {
         if firstLaunch {
             DispatchQueue.main.async {
@@ -199,7 +181,7 @@ struct MainView: View {
             ) {
                 ZStack(alignment: .top) {
                     NavigationStack {
-                        GameDetailView(currentGame: nav.main.modalLiveGame)
+                        GameDetailView(currentGame: $nav.main.modalLiveGame)
                             .toolbar {
                                 ToolbarItem(placement: .cancellationAction) {
                                     Button(action: { nav.main.modalLiveGame = nil }) {
@@ -261,8 +243,14 @@ struct MainView: View {
             )
         })
         .onOpenURL { url in
-            navigateTo(appURL: url)
+            nav.handle(appURL: url)
         }
+        .handlesExternalEvents(
+            preferring: scenePhase == .active
+                ? handledExternalEventRoots
+                : [],
+            allowing: handledExternalEventRoots
+        )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
     }
 }

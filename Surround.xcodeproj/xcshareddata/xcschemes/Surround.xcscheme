@@ -71,6 +71,12 @@
                   Identifier = "CompatibilityScreenshotTests/testCompatibilityScreenshots()">
                </Test>
                <Test
+                  Identifier = "CompatibilityScreenshotTests/testAdaptiveWidgetRegressionScreenshots()">
+               </Test>
+               <Test
+                  Identifier = "CompatibilityScreenshotTests/testWidgetTapTargets()">
+               </Test>
+               <Test
                   Identifier = "CompatibilityScreenshotTests/testMacDesktopLayoutScreenshots()">
                </Test>
                <Test

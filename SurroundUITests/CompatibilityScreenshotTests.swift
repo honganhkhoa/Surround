@@ -7,18 +7,36 @@
 
 import XCTest
 import UIKit
+import WidgetKit
 
 final class CompatibilityScreenshotTests: SurroundUITestCase {
     private enum WidgetFamily: String, CaseIterable {
         case small
         case medium
         case large
+        case extraLarge = "extra-large"
+
+        static let legacyFamilies: [Self] = [
+            .small,
+            .medium,
+            .large,
+        ]
+
+        var systemFamily: WidgetKit.WidgetFamily {
+            switch self {
+            case .small: return .systemSmall
+            case .medium: return .systemMedium
+            case .large: return .systemLarge
+            case .extraLarge: return .systemExtraLarge
+            }
+        }
 
         var gallerySwipeCount: Int {
             switch self {
             case .small: 0
             case .medium: 1
             case .large: 2
+            case .extraLarge: 3
             }
         }
 
@@ -27,17 +45,42 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         }
 
         func readinessIdentifierPrefix(
-            proofToken: String
+            proofToken: String,
+            gameCount: Int
         ) -> String {
             [
                 "surround.compatibility.widget.ready",
                 rawValue,
-                "games-\(SurroundUITestContract.compatibilityWidgetGameCount)",
+                "games-\(gameCount)",
                 "rendering-fullColor",
                 "token-\(proofToken)",
                 "expires-",
             ].joined(separator: ".")
         }
+    }
+
+    private struct WidgetVariant {
+        let family: WidgetFamily
+        let gameCount: Int
+        let sceneName: String
+    }
+
+    private struct WidgetHorizontalTapRegions {
+        let firstCellCenter: CGFloat
+        let secondCellCenter: CGFloat
+        let gridGap: CGFloat
+        let outerBackground: CGFloat
+        let railCenter: CGFloat
+    }
+
+    private struct WidgetRenderedLayout {
+        let cellFrames: [CGRect]
+        let boardFrames: [CGRect]
+    }
+
+    private struct BoardVisualStatistics {
+        let luminanceRange: Double
+        let luminanceStandardDeviation: Double
     }
 
     private struct HomeScreenPage: Equatable {
@@ -97,11 +140,19 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             app.terminate()
         }
 
-        seedWidgetFixture()
-        captureWidgetFamilies()
+        captureWidgetFamilies(
+            WidgetFamily.legacyFamilies.map {
+                WidgetVariant(
+                    family: $0,
+                    gameCount: SurroundUITestContract
+                        .compatibilityWidgetGameCount,
+                    sceneName: $0.sceneName
+                )
+            }
+        )
 
         let expectedNames = nativeScenes.map(\.rawValue)
-            + WidgetFamily.allCases.map(\.sceneName)
+            + WidgetFamily.legacyFamilies.map(\.sceneName)
         XCTAssertEqual(
             capturedSceneNames,
             expectedNames,
@@ -111,6 +162,165 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             capturedSceneNames.count,
             isPhone ? 32 : 31,
             "Compatibility capture produced an unexpected scene count."
+        )
+        #endif
+    }
+
+    func testAdaptiveWidgetRegressionScreenshots() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "Adaptive widget regression capture requires an iOS Simulator."
+        )
+        #else
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        var variants = [
+            WidgetVariant(
+                family: .small,
+                gameCount: 1,
+                sceneName: "widget-small-full-capacity"
+            ),
+            WidgetVariant(
+                family: .large,
+                gameCount: 1,
+                sceneName: "widget-large-one-game"
+            ),
+            WidgetVariant(
+                family: .large,
+                gameCount: 3,
+                sceneName: "widget-large-three-games"
+            ),
+        ]
+        if !isPhone {
+            variants += [
+                WidgetVariant(
+                    family: .extraLarge,
+                    gameCount: 1,
+                    sceneName: "widget-extra-large-one-game"
+                ),
+                WidgetVariant(
+                    family: .extraLarge,
+                    gameCount: 4,
+                    sceneName: "widget-extra-large-four-games"
+                ),
+                WidgetVariant(
+                    family: .extraLarge,
+                    gameCount: 6,
+                    sceneName: "widget-extra-large-six-games"
+                ),
+            ]
+        }
+
+        captureWidgetFamilies(variants)
+        XCTAssertEqual(capturedSceneNames, variants.map(\.sceneName))
+        #endif
+    }
+
+    func testWidgetTapTargets() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "Widget hit-region interaction requires an iOS Simulator."
+        )
+        #else
+        let variants = [
+            WidgetVariant(
+                family: .large,
+                gameCount: 1,
+                sceneName: "widget-large-tap-targets"
+            ),
+            WidgetVariant(
+                family: .medium,
+                gameCount: 2,
+                sceneName: "widget-medium-tap-targets"
+            ),
+        ]
+
+        captureWidgetFamilies(
+            variants,
+            capturesScreenshots: false
+        ) { variant, springboard in
+            guard let regions = self.widgetHorizontalTapRegions(
+                for: variant.family,
+                gameCount: variant.gameCount,
+                in: springboard
+            ) else {
+                XCTFail(
+                    "Expected the \(variant.family.rawValue) widget before calculating its hit regions."
+                )
+                return
+            }
+            switch variant.family {
+            case .large:
+                let gameID = SurroundUITestContract.screenshotPrimaryGameID
+                // A one-game widget has one URL across its entire surface.
+                // Sample the board, lower timer region, outer grid
+                // background, and the rail using the rendered widget width.
+                for point in [
+                    CGVector(dx: regions.gridGap, dy: 0.42),
+                    CGVector(dx: regions.gridGap, dy: 0.92),
+                    CGVector(dx: regions.outerBackground, dy: 0.50),
+                    CGVector(dx: regions.railCenter, dy: 0.50),
+                ] {
+                    self.assertWidgetTap(
+                        point,
+                        opensGame: gameID,
+                        family: variant.family,
+                        in: springboard
+                    )
+                }
+            case .medium:
+                let firstGameID =
+                    SurroundUITestContract.screenshotNextGameID
+                let secondGameID =
+                    SurroundUITestContract.screenshotPrimaryGameID
+                let cellTargets: [(CGVector, Int)] = [
+                    // Board and lower timer region in the first linked cell.
+                    (
+                        CGVector(dx: regions.firstCellCenter, dy: 0.38),
+                        firstGameID
+                    ),
+                    (
+                        CGVector(dx: regions.firstCellCenter, dy: 0.91),
+                        firstGameID
+                    ),
+                    // The same linked regions in the second cell.
+                    (
+                        CGVector(dx: regions.secondCellCenter, dy: 0.38),
+                        secondGameID
+                    ),
+                    (
+                        CGVector(dx: regions.secondCellCenter, dy: 0.91),
+                        secondGameID
+                    ),
+                ]
+                for (point, gameID) in cellTargets {
+                    self.assertWidgetTap(
+                        point,
+                        opensGame: gameID,
+                        family: variant.family,
+                        in: springboard
+                    )
+                }
+                // Grid outer padding, the inter-cell gap, and the rail are
+                // outside the cell Links. Each must follow the widget-wide
+                // Home fallback instead of inheriting a nearby game URL.
+                for backgroundX in [
+                    regions.outerBackground,
+                    regions.gridGap,
+                    regions.railCenter,
+                ] {
+                    self.assertWidgetTapOpensHome(
+                        CGVector(dx: backgroundX, dy: 0.50),
+                        family: variant.family,
+                        in: springboard
+                    )
+                }
+            default:
+                XCTFail("Unexpected widget interaction family")
+            }
+        }
+        XCTAssertTrue(
+            capturedSceneNames.isEmpty,
+            "Hit-region coverage must not change the screenshot manifest."
         )
         #endif
     }
@@ -275,6 +485,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
     private func launchApp(
         for scene: SurroundUITestContract.CompatibilityScene,
         widgetProofToken: String? = nil,
+        widgetGameCount: Int? = nil,
         catalystWindowSize: CGSize? = nil,
         useCatalystDefaultWindowSize: Bool = false
     ) -> XCUIApplication {
@@ -294,6 +505,13 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                 SurroundUITestContract
                     .compatibilityWidgetProofTokenLaunchArgument,
                 widgetProofToken,
+            ]
+        }
+        if let widgetGameCount {
+            launchArguments += [
+                SurroundUITestContract
+                    .compatibilityWidgetGameCountLaunchArgument,
+                String(widgetGameCount),
             ]
         }
         if let catalystWindowSize {
@@ -517,12 +735,22 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         }
     }
 
-    private func seedWidgetFixture() {
+    private func seedWidgetFixture(
+        gameCount: Int,
+        keepsAppRunning: Bool = false
+    ) {
         let app = launchApp(
             for: .home,
-            widgetProofToken: compatibilityWidgetProofToken
+            widgetProofToken: compatibilityWidgetProofToken,
+            widgetGameCount: gameCount
         )
-        app.terminate()
+        if keepsAppRunning {
+            #if !targetEnvironment(macCatalyst)
+            XCUIDevice.shared.press(.home)
+            #endif
+        } else {
+            app.terminate()
+        }
     }
 
     private func capture(
@@ -880,7 +1108,11 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
 
     // MARK: - Widgets
 
-    private func captureWidgetFamilies() {
+    private func captureWidgetFamilies(
+        _ variants: [WidgetVariant],
+        capturesScreenshots: Bool = true,
+        interaction: ((WidgetVariant, XCUIApplication) -> Void)? = nil
+    ) {
         setCaptureOrientation()
         #if !targetEnvironment(macCatalyst)
         XCUIDevice.shared.press(.home)
@@ -960,7 +1192,19 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             return
         }
 
-        for family in WidgetFamily.allCases {
+        for variant in variants {
+            let family = variant.family
+            seedWidgetFixture(
+                gameCount: variant.gameCount,
+                keepsAppRunning: interaction != nil
+            )
+            #if !targetEnvironment(macCatalyst)
+            XCUIDevice.shared.press(.home)
+            #endif
+            XCTAssertTrue(
+                springboard.wait(for: .runningForeground, timeout: 10),
+                "Expected SpringBoard after seeding the widget fixture."
+            )
             addWidget(
                 family,
                 to: springboard,
@@ -1020,10 +1264,30 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             )
             assertFreshCompatibilityFixture(
                 family,
+                gameCount: variant.gameCount,
                 in: springboard
             )
+            assertWidgetBoardsHaveVisualDetail(
+                widget,
+                family: family,
+                gameCount: variant.gameCount,
+                in: springboard
+            )
+            interaction?(variant, springboard)
+            guard waitForWidget(family, in: springboard) != nil else {
+                keepSpringBoardDiagnostics(
+                    springboard,
+                    name: "\(family.rawValue) widget missing after interaction"
+                )
+                XCTFail(
+                    "Expected the \(family.rawValue) widget after exercising its hit regions."
+                )
+                return
+            }
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.5))
-            keepScreenshot(family.sceneName)
+            if capturesScreenshots {
+                keepScreenshot(variant.sceneName)
+            }
 
             guard restoreSurroundAppIcon(
                 from: iconParking,
@@ -1107,6 +1371,13 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             return ratio >= 0.75
                 && ratio <= 1.35
                 && size.width >= smallWidgetSize.width * 1.55
+                && size.height >= smallWidgetSize.height * 1.55
+        case .extraLarge:
+            guard let smallWidgetSize else {
+                return false
+            }
+            return ratio >= 1.55
+                && size.width >= smallWidgetSize.width * 3
                 && size.height >= smallWidgetSize.height * 1.55
         }
     }
@@ -1411,10 +1682,12 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
 
     private func assertFreshCompatibilityFixture(
         _ family: WidgetFamily,
+        gameCount: Int,
         in springboard: XCUIApplication
     ) {
         let identifierPrefix = family.readinessIdentifierPrefix(
-            proofToken: compatibilityWidgetProofToken
+            proofToken: compatibilityWidgetProofToken,
+            gameCount: gameCount
         )
         let readyContent = springboard
             .descendants(matching: .any)
@@ -1445,7 +1718,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                 : ""
             XCTFail(
                 "Expected fresh "
-                    + "\(SurroundUITestContract.compatibilityWidgetGameCount)-game "
+                    + "\(gameCount)-game "
                     + "compatibility content in the \(family.rawValue) widget."
                     + unreadyDetail
             )
@@ -1464,6 +1737,324 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             Date(timeIntervalSince1970: expiry),
             Date().addingTimeInterval(5 * 60 * 60),
             "The \(family.rawValue) widget fixture must come from this capture run, not a stale timeline."
+        )
+    }
+
+    private func assertWidgetTap(
+        _ normalizedPoint: CGVector,
+        opensGame gameID: Int,
+        family: WidgetFamily,
+        in springboard: XCUIApplication
+    ) {
+        guard let widget = waitForWidget(family, in: springboard) else {
+            XCTFail("Expected the \(family.rawValue) widget before tapping it.")
+            return
+        }
+        widget.coordinate(withNormalizedOffset: normalizedPoint).tap()
+
+        guard let app = activeApp else {
+            XCTFail("Expected the fixture app to remain available.")
+            return
+        }
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 10),
+            "Expected a widget tap to foreground Surround."
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(gameID),
+            in: app
+        )
+        returnToWidget(family, in: springboard)
+    }
+
+    private func widgetHorizontalTapRegions(
+        for family: WidgetFamily,
+        gameCount: Int,
+        in springboard: XCUIApplication
+    ) -> WidgetHorizontalTapRegions? {
+        guard let widget = waitForWidget(family, in: springboard),
+              let layout = widgetRenderedLayout(
+                family: family,
+                gameCount: gameCount,
+                widgetSize: widget.frame.size
+              ),
+              let firstCell = layout.cellFrames.first else {
+            return nil
+        }
+
+        let width = widget.frame.width
+        let boardContentWidth = width
+            - CorrespondenceWidgetGridLayout.turnRailWidth
+        let secondCell = layout.cellFrames.dropFirst().first ?? firstCell
+        let gridGap = layout.cellFrames.count > 1
+            ? (firstCell.maxX + secondCell.minX) / 2
+            : firstCell.midX
+        let outerBackground = max(1, firstCell.minX / 2)
+
+        return WidgetHorizontalTapRegions(
+            firstCellCenter: firstCell.midX / width,
+            secondCellCenter: secondCell.midX / width,
+            gridGap: gridGap / width,
+            outerBackground: outerBackground / width,
+            railCenter: (
+                boardContentWidth
+                    + CorrespondenceWidgetGridLayout.turnRailWidth / 2
+            ) / width
+        )
+    }
+
+    private func widgetRenderedLayout(
+        family: WidgetFamily,
+        gameCount: Int,
+        widgetSize: CGSize
+    ) -> WidgetRenderedLayout? {
+        let displayedCount = min(
+            max(gameCount, 0),
+            CorrespondenceWidgetGridLayout.maximumGameCount(
+                for: family.systemFamily
+            )
+        )
+        let availableSize = CGSize(
+            width: widgetSize.width
+                - CorrespondenceWidgetGridLayout.turnRailWidth,
+            height: widgetSize.height
+        )
+        guard displayedCount > 0,
+              availableSize.width > 0,
+              availableSize.height > 0 else {
+            return nil
+        }
+
+        let layout = CorrespondenceWidgetGridLayout.make(
+            family: family.systemFamily,
+            gameCount: displayedCount,
+            availableSize: availableSize
+        )
+
+        return WidgetRenderedLayout(
+            cellFrames: layout.itemFrames(
+                gameCount: displayedCount,
+                in: availableSize
+            ),
+            boardFrames: layout.boardFrames(
+                gameCount: displayedCount,
+                in: availableSize
+            )
+        )
+    }
+
+    private func assertWidgetBoardsHaveVisualDetail(
+        _ widget: XCUIElement,
+        family: WidgetFamily,
+        gameCount: Int,
+        in springboard: XCUIApplication
+    ) {
+        guard let layout = widgetRenderedLayout(
+            family: family,
+            gameCount: gameCount,
+            widgetSize: widget.frame.size
+        ) else {
+            XCTFail(
+                "Expected board regions for the \(family.rawValue) widget."
+            )
+            return
+        }
+
+        let image = widget.screenshot().image
+        var failures = [String]()
+        for (index, boardFrame) in layout.boardFrames.enumerated() {
+            // Stay well inside the board so timer text, highlight chrome,
+            // rounded corners, and screenshot row orientation cannot make a
+            // blank board look detailed.
+            let sampleInset = max(6, boardFrame.width * 0.22)
+            let sampleFrame = boardFrame.insetBy(
+                dx: sampleInset,
+                dy: sampleInset
+            )
+            guard let statistics = boardVisualStatistics(
+                in: image,
+                pointRect: sampleFrame,
+                referenceSize: widget.frame.size
+            ) else {
+                failures.append("board \(index + 1) could not be sampled")
+                continue
+            }
+            if statistics.luminanceRange <= 0.06
+                || statistics.luminanceStandardDeviation <= 0.015
+            {
+                let range = String(
+                    format: "%.3f",
+                    statistics.luminanceRange
+                )
+                let deviation = String(
+                    format: "%.3f",
+                    statistics.luminanceStandardDeviation
+                )
+                failures.append(
+                    "board \(index + 1) was visually uniform "
+                        + "(range \(range), deviation \(deviation))"
+                )
+            }
+        }
+
+        if !failures.isEmpty {
+            keepSpringBoardDiagnostics(
+                springboard,
+                name: "\(family.rawValue) widget board visual integrity failed"
+            )
+            XCTFail(
+                "The \(family.rawValue) widget must render grid or stone "
+                    + "detail in every board region: "
+                    + failures.joined(separator: "; ")
+            )
+        }
+    }
+
+    private func boardVisualStatistics(
+        in image: UIImage,
+        pointRect: CGRect,
+        referenceSize: CGSize
+    ) -> BoardVisualStatistics? {
+        guard let cgImage = image.cgImage,
+              referenceSize.width > 0,
+              referenceSize.height > 0 else {
+            return nil
+        }
+
+        let pixelWidth = cgImage.width
+        let pixelHeight = cgImage.height
+        let bytesPerRow = pixelWidth * 4
+        var pixels = [UInt8](
+            repeating: 0,
+            count: bytesPerRow * pixelHeight
+        )
+        let drewImage = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(
+                data: bytes.baseAddress,
+                width: pixelWidth,
+                height: pixelHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue
+                    | CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else {
+                return false
+            }
+            context.draw(
+                cgImage,
+                in: CGRect(
+                    x: 0,
+                    y: 0,
+                    width: pixelWidth,
+                    height: pixelHeight
+                )
+            )
+            return true
+        }
+        guard drewImage else { return nil }
+
+        let scaleX = CGFloat(pixelWidth) / referenceSize.width
+        let scaleY = CGFloat(pixelHeight) / referenceSize.height
+        let pixelRect = CGRect(
+            x: pointRect.minX * scaleX,
+            y: pointRect.minY * scaleY,
+            width: pointRect.width * scaleX,
+            height: pointRect.height * scaleY
+        ).intersection(
+            CGRect(
+                x: 0,
+                y: 0,
+                width: pixelWidth,
+                height: pixelHeight
+            )
+        )
+        guard !pixelRect.isNull,
+              pixelRect.width >= 2,
+              pixelRect.height >= 2 else {
+            return nil
+        }
+
+        let minX = max(0, Int(floor(pixelRect.minX)))
+        let maxX = min(pixelWidth, Int(ceil(pixelRect.maxX)))
+        let minY = max(0, Int(floor(pixelRect.minY)))
+        let maxY = min(pixelHeight, Int(ceil(pixelRect.maxY)))
+        let sampleStep = max(
+            1,
+            Int(min(pixelRect.width, pixelRect.height) / 96)
+        )
+        var minimumLuminance = Double.greatestFiniteMagnitude
+        var maximumLuminance = -Double.greatestFiniteMagnitude
+        var sum = 0.0
+        var squaredSum = 0.0
+        var sampleCount = 0
+
+        for y in stride(from: minY, to: maxY, by: sampleStep) {
+            for x in stride(from: minX, to: maxX, by: sampleStep) {
+                let offset = y * bytesPerRow + x * 4
+                let red = Double(pixels[offset]) / 255
+                let green = Double(pixels[offset + 1]) / 255
+                let blue = Double(pixels[offset + 2]) / 255
+                let luminance = 0.2126 * red
+                    + 0.7152 * green
+                    + 0.0722 * blue
+                minimumLuminance = min(minimumLuminance, luminance)
+                maximumLuminance = max(maximumLuminance, luminance)
+                sum += luminance
+                squaredSum += luminance * luminance
+                sampleCount += 1
+            }
+        }
+        guard sampleCount > 1 else { return nil }
+
+        let mean = sum / Double(sampleCount)
+        let variance = max(
+            0,
+            squaredSum / Double(sampleCount) - mean * mean
+        )
+        return BoardVisualStatistics(
+            luminanceRange: maximumLuminance - minimumLuminance,
+            luminanceStandardDeviation: sqrt(variance)
+        )
+    }
+
+    private func assertWidgetTapOpensHome(
+        _ normalizedPoint: CGVector,
+        family: WidgetFamily,
+        in springboard: XCUIApplication
+    ) {
+        guard let widget = waitForWidget(family, in: springboard) else {
+            XCTFail("Expected the \(family.rawValue) widget before tapping it.")
+            return
+        }
+        widget.coordinate(withNormalizedOffset: normalizedPoint).tap()
+
+        guard let app = activeApp else {
+            XCTFail("Expected the fixture app to remain available.")
+            return
+        }
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 10),
+            "Expected the widget background to foreground Surround."
+        )
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        returnToWidget(family, in: springboard)
+    }
+
+    private func returnToWidget(
+        _ family: WidgetFamily,
+        in springboard: XCUIApplication
+    ) {
+        #if !targetEnvironment(macCatalyst)
+        XCUIDevice.shared.press(.home)
+        #endif
+        XCTAssertTrue(
+            springboard.wait(for: .runningForeground, timeout: 10),
+            "Expected to return to SpringBoard after a widget route."
+        )
+        XCTAssertNotNil(
+            waitForWidget(family, in: springboard),
+            "Expected the widget to remain available for the next hit-region assertion."
         )
     }
 

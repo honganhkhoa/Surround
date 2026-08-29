@@ -33,7 +33,7 @@ Environment equivalents:
   COMPATIBILITY_IPHONE_DEVICE
   COMPATIBILITY_IPAD_DEVICE
 
-The output contains 126 normalized originals, 63 labelled lossless comparison
+The output contains 144 normalized originals, 72 labelled lossless comparison
 PNGs, comparison.md, index.html, run-metadata.json, and the two source xcresult
 runs. All captures are en-US, light/full-color appearance, and use a pinned
 9:41 status bar. The command rejects source changes between the two
@@ -259,6 +259,17 @@ for command_name in awk git jq shasum sips swift xcrun; do
   require_command "$command_name"
 done
 
+expected_iphone_count="$(
+  jq -r '.deviceFamilies.iphone.scenes | length' "$scene_manifest"
+)"
+expected_ipad_count="$(
+  jq -r '.deviceFamilies.ipad.scenes | length' "$scene_manifest"
+)"
+expected_comparison_count="$((
+  expected_iphone_count + expected_ipad_count
+))"
+expected_original_count="$((expected_comparison_count * 2))"
+
 if [[ "$output_argument" == "${repository_root}/"* ]]; then
   relative_output="${output_argument#${repository_root}/}"
   git -C "$repository_root" check-ignore -q "$relative_output" \
@@ -343,7 +354,7 @@ ios18_metadata="${output_root}/runs/ios-18/run-metadata.json"
 ios26_metadata="${output_root}/runs/ios-26/run-metadata.json"
 jq -e '
   .runtime.version == "18.0"
-  and .screenshotCount == 63
+  and .screenshotCount == $expected_count
   and .widgetRenderingMode == "fullColor"
   and .ephemeralDevices == true
   and .devices.iphone.name == $iphone_name
@@ -355,11 +366,12 @@ jq -e '
   --arg ipad_name "$ipad_device_argument" \
   --arg iphone_type_identifier "$required_iphone_device_type_identifier" \
   --arg ipad_type_identifier "$required_ipad_device_type_identifier" \
+  --argjson expected_count "$expected_comparison_count" \
   "$ios18_metadata" >/dev/null \
   || fail "The first capture is not a complete iOS 18 run."
 jq -e '
   .runtime.version == "26.0"
-  and .screenshotCount == 63
+  and .screenshotCount == $expected_count
   and .widgetRenderingMode == "fullColor"
   and .ephemeralDevices == true
   and .devices.iphone.name == $iphone_name
@@ -371,6 +383,7 @@ jq -e '
   --arg ipad_name "$ipad_device_argument" \
   --arg iphone_type_identifier "$required_iphone_device_type_identifier" \
   --arg ipad_type_identifier "$required_ipad_device_type_identifier" \
+  --argjson expected_count "$expected_comparison_count" \
   "$ios26_metadata" >/dev/null \
   || fail "The second capture is not a complete iOS 26 run."
 jq -s -e \
@@ -486,8 +499,8 @@ comparison_count="$(
   awk 'NF > 0 { count += 1 } END { print count + 0 }' \
     "$comparison_records"
 )"
-[[ "$comparison_count" -eq 63 ]] \
-  || fail "Expected 63 comparison PNGs, produced ${comparison_count}."
+[[ "$comparison_count" -eq "$expected_comparison_count" ]] \
+  || fail "Expected ${expected_comparison_count} comparison PNGs, produced ${comparison_count}."
 
 for family in iphone ipad; do
   shopt -s nullglob
@@ -496,9 +509,9 @@ for family in iphone ipad; do
   comparison_files=("${output_root}/comparisons/${family}"/*.png)
   shopt -u nullglob
   if [[ "$family" == "iphone" ]]; then
-    expected_family_count=32
+    expected_family_count="$expected_iphone_count"
   else
-    expected_family_count=31
+    expected_family_count="$expected_ipad_count"
   fi
   [[ "${#ios18_files[@]}" -eq "$expected_family_count" ]] \
     || fail "Unexpected iOS 18 ${family} original count."
@@ -512,6 +525,8 @@ metadata_path="${output_root}/run-metadata.json"
 jq -n \
   --arg generatedAt "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   --arg sourceFingerprint "$source_fingerprint" \
+  --argjson originalScreenshotCount "$expected_original_count" \
+  --argjson comparisonCount "$expected_comparison_count" \
   --slurpfile ios18 "$ios18_metadata" \
   --slurpfile ios26 "$ios26_metadata" \
   --slurpfile scenes "$scene_manifest" '
@@ -524,8 +539,8 @@ jq -n \
       widgetRenderingMode: "fullColor",
       ephemeralDevices: true,
       statusBarTime: "09:41",
-      originalScreenshotCount: 126,
-      comparisonCount: 63,
+      originalScreenshotCount: $originalScreenshotCount,
+      comparisonCount: $comparisonCount,
       comparisonLayout: {
         gapPixels: 24,
         headerPixels: 180,
@@ -628,15 +643,15 @@ gallery_path="${output_root}/index.html"
     '<body>' \
     '<header>' \
     '  <h1>Surround · iOS 18 vs iOS 26</h1>'
-  printf '  <p>126 originals · 63 comparisons · en-US · light · 9:41 · source <code>%s</code></p>\n' \
-    "$source_fingerprint"
+  printf '  <p>%s originals · %s comparisons · en-US · light · 9:41 · source <code>%s</code></p>\n' \
+    "$expected_original_count" "$expected_comparison_count" "$source_fingerprint"
   printf '%s\n' '</header>'
 
   for family in iphone ipad; do
     if [[ "$family" == "iphone" ]]; then
-      section_title="iPhone 16 Pro Max · portrait · 32 pairs"
+      section_title="iPhone 16 Pro Max · portrait · ${expected_iphone_count} pairs"
     else
-      section_title="iPad Pro 13-inch (M4) · landscape · 31 pairs"
+      section_title="iPad Pro 13-inch (M4) · landscape · ${expected_ipad_count} pairs"
     fi
     printf '<section><h2>%s</h2>\n' "$section_title"
     for kind in native widget; do
@@ -664,7 +679,7 @@ gallery_path="${output_root}/index.html"
 } >"$gallery_path"
 
 echo
-echo "Captured 126 originals and produced 63 comparisons."
+echo "Captured ${expected_original_count} originals and produced ${expected_comparison_count} comparisons."
 echo "Markdown: ${comparison_markdown}"
 echo "Gallery:  ${gallery_path}"
 echo "Metadata: ${metadata_path}"
