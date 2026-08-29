@@ -34,6 +34,12 @@ final class TimeControlTests: XCTestCase {
                 true
             ),
             (
+                #"{"time_control":"byoyomi","system":"byoyomi","main_time":300,"periods":5,"period_time":20,"speed":"rapid","pause_on_weekends":false}"#,
+                .ByoYomi(mainTime: 300, periods: 5, periodTime: 20),
+                .rapid,
+                false
+            ),
+            (
                 #"{"time_control":"simple","system":"simple","per_move":172800,"speed":"correspondence","pause_on_weekends":true}"#,
                 .Simple(perMove: 172800),
                 .correspondence,
@@ -77,6 +83,58 @@ final class TimeControlTests: XCTestCase {
         XCTAssertEqual(control.system, .Fischer(initialTime: 120, timeIncrement: 30, maxTime: 300))
     }
 
+    func testUnknownSpeedFallsBackToSystemClassification() throws {
+        let payload = #"{"time_control":"byoyomi","system":"byoyomi","main_time":600,"periods":5,"period_time":30,"speed":"future-speed","pause_on_weekends":false}"#
+
+        let control = try decoder.decode(TimeControl.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(control.system, .ByoYomi(mainTime: 600, periods: 5, periodTime: 30))
+        XCTAssertEqual(control.speed, .live)
+
+        let encoded = try encoder.encode(control)
+        let encodedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        XCTAssertNil(encodedObject["speed"])
+    }
+
+    func testMissingSpeedRemainsUnclassified() throws {
+        let payload = #"{"time_control":"byoyomi","system":"byoyomi","main_time":600,"periods":5,"period_time":30,"pause_on_weekends":false}"#
+
+        let control = try decoder.decode(TimeControl.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(control.system, .ByoYomi(mainTime: 600, periods: 5, periodTime: 30))
+        XCTAssertNil(control.speed)
+    }
+
+    func testUnknownSpeedForNoTimeControlFallsBackToCorrespondence() throws {
+        let payload = #"{"time_control":"none","system":"none","speed":"future-speed","pause_on_weekends":false}"#
+
+        let control = try decoder.decode(TimeControl.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(control.system, .None)
+        XCTAssertEqual(control.speed, .correspondence)
+        XCTAssertEqual(control.speed?.isRealtime, false)
+    }
+
+    func testRapidSpeedRoundTripsThroughOGSWireFormat() throws {
+        let control = TimeControl(
+            codingData: .init(
+                timeControl: "byoyomi",
+                mainTime: 300,
+                periods: 5,
+                periodTime: 20,
+                speed: .rapid,
+                pauseOnWeekends: false
+            )
+        )
+
+        let decoded = try decoder.decode(TimeControl.self, from: encoder.encode(control))
+
+        XCTAssertEqual(decoded.system, .ByoYomi(mainTime: 300, periods: 5, periodTime: 20))
+        XCTAssertEqual(decoded.speed, .rapid)
+    }
+
     func testSystemsRoundTripThroughOGSWireFormat() throws {
         let systems: [TimeControlSystem] = [
             .Fischer(initialTime: 120, timeIncrement: 30, maxTime: 300),
@@ -96,6 +154,8 @@ final class TimeControlTests: XCTestCase {
     }
 
     func testSpeedClassificationBoundaries() {
+        XCTAssertEqual(TimeControlSystem.None.speed, .correspondence)
+        XCTAssertEqual(TimeControlSystem.Simple(perMove: 0).speed, .correspondence)
         XCTAssertEqual(TimeControlSystem.Simple(perMove: 9).speed, .blitz)
         XCTAssertEqual(TimeControlSystem.Simple(perMove: 10).speed, .live)
         XCTAssertEqual(TimeControlSystem.Simple(perMove: 3600).speed, .live)

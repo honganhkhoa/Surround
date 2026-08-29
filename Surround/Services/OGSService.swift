@@ -302,7 +302,7 @@ class OGSService: ObservableObject {
     private var ogsRoot: String { environment.rootURL.absoluteString }
 
     private let httpClient: OGSHTTPClient
-    private let undoResynchronizationTimeout: TimeInterval
+    private let gameResynchronizationTimeout: TimeInterval
     private let conditionalMoveSubmissionTimeout: TimeInterval
 
     private struct PendingConditionalMoveSubmission {
@@ -376,8 +376,13 @@ class OGSService: ObservableObject {
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
     private var locallyReservedVariationNumbersByGameID = [Int: Set<Int>]()
-    private var gamesResynchronizingAfterUndo = Set<Int>()
-    private var undoResynchronizationTimeouts = [Int: DispatchWorkItem]()
+    private enum GameResynchronizationState {
+        case awaitingTargetedSnapshot
+        case awaitingSharedSocketSnapshot
+    }
+
+    private var gameResynchronizationStates = [Int: GameResynchronizationState]()
+    private var gameResynchronizationTimeouts = [Int: DispatchWorkItem]()
     private var publicGameConnectionIDs = Set<Int>()
     private let authenticationGenerationLock = NSLock()
     private var authenticationGenerationStorage: UInt = 0
@@ -469,7 +474,7 @@ class OGSService: ObservableObject {
                 } else {
                     gamesOnOpponentTurn.append(game)
                 }
-            } else if game.gameData?.timeControl.speed == .live || game.gameData?.timeControl.speed == .blitz {
+            } else if game.gameData?.timeControl.speed?.isRealtime == true {
                 liveGames.append(game)
             }
         }
@@ -603,8 +608,8 @@ class OGSService: ObservableObject {
     ///   - installsObservers: Installs the debounced model observers and runs
     ///     the initial login check. Set this false for synchronous previews or
     ///     narrowly scoped tests that must not initiate follow-up requests.
-    ///   - undoResynchronizationTimeout: Time to wait for authoritative game
-    ///     data after a targeted Undo recovery before reconnecting the socket.
+    ///   - gameResynchronizationTimeout: Time to wait for authoritative game
+    ///     data after a targeted recovery before reconnecting the socket.
     ///   - remoteSettings: Store for this identity's OGS remote settings. When
     ///     omitted, a store scoped to `preferences` is created automatically.
     ///   - initialState: Optional synchronous state for previews or injected
@@ -619,14 +624,14 @@ class OGSService: ObservableObject {
         enablesAppSideEffects: Bool = false,
         startsTimers: Bool = false,
         installsObservers: Bool = true,
-        undoResynchronizationTimeout: TimeInterval = 15,
+        gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
         remoteSettings: OGSRemoteSetting? = nil,
         initialState: BootstrapState? = nil
     ) {
         self.environment = environment
         self.httpClient = httpClient
-        self.undoResynchronizationTimeout = undoResynchronizationTimeout
+        self.gameResynchronizationTimeout = gameResynchronizationTimeout
         self.conditionalMoveSubmissionTimeout = conditionalMoveSubmissionTimeout
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
@@ -710,6 +715,7 @@ class OGSService: ObservableObject {
             failAllConditionalMoveSubmissions(
                 with: OGSServiceError.conditionalMovesUpdateInterrupted
             )
+            markPendingGameResynchronizationsAsEscalated()
             // The transport has gone away, so none of these subscriptions are
             // currently active. Keep only explicit desired state for reconnect.
             self.connectedGames.removeAll()
@@ -814,41 +820,72 @@ class OGSService: ObservableObject {
         
         switch eventName {
         case "gamedata":
-            if let gameData = data as? [String: Any], let ogsGame = try? dictionaryDecoder.decode(OGSGame.self, from: gameData) {
+            guard let gameData = data as? [String: Any] else {
+                print("Invalid gamedata shape for game \(ogsGameId)")
+                return
+            }
+            do {
+                let ogsGame = try dictionaryDecoder.decode(OGSGame.self, from: gameData)
                 connectedGame.gameData = ogsGame
-                finishUndoResynchronization(gameID: ogsGameId)
+                finishGameResynchronization(gameID: ogsGameId)
+                if self.activeGames[ogsGameId] != nil {
+                    preferences[.latestOGSOverviewOutdated] = true
+                }
                 failConditionalMoveSubmissionIfStale(
                     gameID: ogsGameId,
                     game: connectedGame
                 )
-            } else {
-                print("Error parsing game: \(data ?? "")")
+            } catch {
+                print("Error decoding gamedata for game \(ogsGameId): \(error)")
             }
         case "move":
-            if let movedata = data as? [String: Any] {
-                if let move = movedata["move"] as? [Any], move.count >= 2 {
-                    if let column = move[0] as? Int, let row = move[1] as? Int {
-                        do {
-                            try connectedGame.makeMove(move: column == -1 ? .pass : .placeStone(row, column))
-                        } catch {
-                            print(ogsGameId, movedata, error)
-                        }
-                        if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
-                            connectedGame.latestPlayerUpdate = try? dictionaryDecoder.decode(OGSMoveExtra.self, from: playerUpdate).playerUpdate
-                        } else {
-                            connectedGame.latestPlayerUpdate = nil
-                        }
-
-                        if let _ = self.activeGames[ogsGameId] {
-                            preferences[.latestOGSOverviewOutdated] = true
-                        }
-                        failConditionalMoveSubmissionIfStale(
-                            gameID: ogsGameId,
-                            game: connectedGame
-                        )
-                    }
-                }
+            // A newly connected game always receives an authoritative
+            // `gamedata` snapshot. Incremental events that arrive before it
+            // cannot be applied safely, and reconnecting cannot repair a
+            // snapshot that this client is unable to decode.
+            guard connectedGame.gameData != nil else {
+                return
             }
+            guard let movedata = data as? [String: Any],
+                  let moveNumber = movedata["move_number"] as? Int,
+                  moveNumber == connectedGame.currentPosition.lastMoveNumber + 1,
+                  let move = movedata["move"] as? [Any],
+                  move.count >= 2,
+                  let column = move[0] as? Int,
+                  let row = move[1] as? Int else {
+                requestGameResynchronization(
+                    gameID: ogsGameId,
+                    reason: "missing or out-of-sequence move data"
+                )
+                return
+            }
+            do {
+                try connectedGame.makeMove(
+                    move: column == -1 ? .pass : .placeStone(row, column)
+                )
+            } catch {
+                requestGameResynchronization(
+                    gameID: ogsGameId,
+                    reason: "move application failed"
+                )
+                return
+            }
+            if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
+                connectedGame.latestPlayerUpdate = try? dictionaryDecoder.decode(
+                    OGSMoveExtra.self,
+                    from: playerUpdate
+                ).playerUpdate
+            } else {
+                connectedGame.latestPlayerUpdate = nil
+            }
+
+            if let _ = self.activeGames[ogsGameId] {
+                preferences[.latestOGSOverviewOutdated] = true
+            }
+            failConditionalMoveSubmissionIfStale(
+                gameID: ogsGameId,
+                game: connectedGame
+            )
         case "clock":
             if let clockdata = data as? [String: Any] {
                 do {
@@ -875,7 +912,10 @@ class OGSService: ObservableObject {
             )
             connectedGame.clearConditionalMoves()
             guard let undoRequest = connectedGame.undoRequest else {
-                resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: ogsGameId)
+                requestGameResynchronization(
+                    gameID: ogsGameId,
+                    reason: "undo accepted without a matching request"
+                )
                 return
             }
             let moveCount = OGSUndoRequest.positiveMoveCount(from: data) ?? undoRequest.moveCount
@@ -1863,7 +1903,7 @@ class OGSService: ObservableObject {
 
         desiredGameConnections.removeAll()
         locallyReservedVariationNumbersByGameID.removeAll()
-        cancelAllUndoResynchronizations()
+        cancelAllGameResynchronizations()
         publicGameConnectionIDs.removeAll()
 
         for cancellable in gameDetailCancellable.values {
@@ -1896,7 +1936,7 @@ class OGSService: ObservableObject {
         // callback that follows will then see the remaining owners, if any.
         if desired.chatByOwner.isEmpty {
             desiredGameConnections[gameID] = nil
-            finishUndoResynchronization(gameID: gameID)
+            finishGameResynchronization(gameID: gameID)
             gameDetailCancellable.removeValue(forKey: gameID)?.cancel()
             disconnectActualGame(gameID: gameID)
         } else {
@@ -1908,49 +1948,70 @@ class OGSService: ObservableObject {
     }
 
     /// Requests a fresh authoritative snapshot for one game without disturbing
-    /// the shared WebSocket or any other game subscriptions. Duplicate Undo
-    /// acceptance events are coalesced until the replacement `gamedata` arrives.
-    private func resynchronizeGameAfterUnexpectedUndoAcceptance(gameID: Int) {
-        guard desiredGameConnections[gameID] != nil,
-              gamesResynchronizingAfterUndo.insert(gameID).inserted else {
+    /// the shared WebSocket or any other game subscriptions. Duplicate recovery
+    /// requests are coalesced until replacement `gamedata` arrives. A recovery
+    /// episode can escalate to the shared socket only once; an incompatible
+    /// snapshot therefore cannot create a reconnect loop.
+    private func requestGameResynchronization(gameID: Int, reason: String) {
+        guard let desiredConnection = desiredGameConnections[gameID],
+              desiredConnection.game.gameData != nil,
+              gameResynchronizationStates[gameID] == nil else {
             return
         }
+        gameResynchronizationStates[gameID] = .awaitingTargetedSnapshot
 
-        print("Undo accepted for game \(gameID), but no undo was requested; resynchronizing the game")
+        print("Resynchronizing game \(gameID): \(reason)")
         disconnectActualGame(gameID: gameID)
         connectIfReady(gameID: gameID)
 
         let timeout = DispatchWorkItem { [weak self] in
             guard let self,
-                  self.gamesResynchronizingAfterUndo.remove(gameID) != nil else {
+                  self.gameResynchronizationStates[gameID] == .awaitingTargetedSnapshot else {
                 return
             }
-            self.undoResynchronizationTimeouts.removeValue(forKey: gameID)
-            print("Undo resynchronization timed out for game \(gameID); reconnecting the socket")
+            print("Game resynchronization timed out for game \(gameID); reconnecting the socket")
+            self.markPendingGameResynchronizationsAsEscalated()
             if self.ogsWebsocket.opened {
                 self.ogsWebsocket.closeThenReconnect()
             } else {
                 self.ogsWebsocket.reconnectIfNeeded()
             }
         }
-        undoResynchronizationTimeouts[gameID] = timeout
+        gameResynchronizationTimeouts[gameID] = timeout
         DispatchQueue.main.asyncAfter(
-            deadline: .now() + undoResynchronizationTimeout,
+            deadline: .now() + gameResynchronizationTimeout,
             execute: timeout
         )
     }
 
-    private func finishUndoResynchronization(gameID: Int) {
-        gamesResynchronizingAfterUndo.remove(gameID)
-        undoResynchronizationTimeouts.removeValue(forKey: gameID)?.cancel()
+    private func finishGameResynchronization(gameID: Int) {
+        gameResynchronizationStates.removeValue(forKey: gameID)
+        gameResynchronizationTimeouts.removeValue(forKey: gameID)?.cancel()
     }
 
-    private func cancelAllUndoResynchronizations() {
-        gamesResynchronizingAfterUndo.removeAll()
-        for timeout in undoResynchronizationTimeouts.values {
+    /// One shared reconnect already refreshes every desired game subscription.
+    /// Promote every targeted recovery together and cancel their individual
+    /// timers so one transport interruption cannot be multiplied by the number
+    /// of public games on screen.
+    private func markPendingGameResynchronizationsAsEscalated() {
+        let targetedGameIDs = gameResynchronizationStates.compactMap { gameID, state in
+            state == .awaitingTargetedSnapshot ? gameID : nil
+        }
+        for gameID in targetedGameIDs {
+            gameResynchronizationStates[gameID] = .awaitingSharedSocketSnapshot
+        }
+        for timeout in gameResynchronizationTimeouts.values {
             timeout.cancel()
         }
-        undoResynchronizationTimeouts.removeAll()
+        gameResynchronizationTimeouts.removeAll()
+    }
+
+    private func cancelAllGameResynchronizations() {
+        gameResynchronizationStates.removeAll()
+        for timeout in gameResynchronizationTimeouts.values {
+            timeout.cancel()
+        }
+        gameResynchronizationTimeouts.removeAll()
     }
 
     private func disconnectActualGame(gameID: Int) {

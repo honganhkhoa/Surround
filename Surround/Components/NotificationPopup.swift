@@ -37,7 +37,7 @@ struct NotificationPopup: View {
     var viewingLiveGames: Bool {
         if nav.main.rootView == .home {
             if let gameSpeed = nav.home.activeGame?.gameData?.timeControl.speed {
-                return gameSpeed == .live || gameSpeed == .blitz
+                return gameSpeed.isRealtime
             }
         }
         

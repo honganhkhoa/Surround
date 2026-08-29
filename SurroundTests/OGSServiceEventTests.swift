@@ -470,7 +470,10 @@ final class OGSServiceEventTests: XCTestCase {
         service.connect(to: game, owner: .explicit(UUID()))
         XCTAssertEqual(socket.emissions.map(\.command), ["game/connect"])
 
-        socket.deliver(name: "game/42/move", data: ["move": [0, 0, 125, false]])
+        socket.deliver(
+            name: "game/42/move",
+            data: ["move_number": 1, "move": [0, 0, 125, false]]
+        )
         XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
         XCTAssertEqual(game.currentPosition.lastMove, .placeStone(0, 0))
         XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
@@ -1084,7 +1087,7 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(
             socket: socket,
             installsObservers: false,
-            undoResynchronizationTimeout: 0
+            gameResynchronizationTimeout: 0
         )
         let game = Game(ogsGame: try makeEmptyGameData(id: 245))
         game.ogs = service
@@ -1348,6 +1351,224 @@ final class OGSServiceEventTests: XCTestCase {
             emission.command == "game/disconnect"
                 && (emission.data as? [String: Any])?["game_id"] as? Int == 51
         })
+    }
+
+    func testRapidPublicGameHydratesItsAuthoritativeBoard() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            cachedUsers: try makePublicGameUsers()
+        )
+        socket.gamelistResults = [makeShortGameData(id: 260, phase: "play")]
+
+        service.fetchPublicGames()
+
+        let game = try XCTUnwrap(service.publicGames[260])
+        XCTAssertNil(game.gameData)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+
+        var gameData = try makeEmptyGameDataPayload(id: 260)
+        var timeControl = try XCTUnwrap(gameData["time_control"] as? [String: Any])
+        timeControl["speed"] = "rapid"
+        gameData["time_control"] = timeControl
+        gameData["moves"] = [
+            [0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+        ]
+
+        socket.deliver(name: "game/260/gamedata", data: gameData)
+
+        XCTAssertEqual(game.gameData?.timeControl.speed, .rapid)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 3)
+        XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
+        XCTAssertEqual(game.currentPosition[0, 1], .hasStone(.white))
+        XCTAssertEqual(game.currentPosition[1, 0], .hasStone(.black))
+    }
+
+    func testMoveEventsRequireHydrationAndSequentialMoveNumbers() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            cachedUsers: try makePublicGameUsers()
+        )
+        socket.gamelistResults = [makeShortGameData(id: 261, phase: "play")]
+        service.fetchPublicGames()
+        let game = try XCTUnwrap(service.publicGames[261])
+        socket.emissions.removeAll()
+
+        socket.deliver(
+            name: "game/261/move",
+            data: ["move_number": 1, "move": [0, 0, 0]]
+        )
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        socket.deliver(
+            name: "game/261/move",
+            data: ["move_number": 1, "move": [0, 0, 0]]
+        )
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        var replacement = try makeEmptyGameDataPayload(id: 261)
+        replacement["moves"] = [[0, 0, 0]]
+        socket.deliver(name: "game/261/gamedata", data: replacement)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+
+        socket.deliver(
+            name: "game/261/move",
+            data: ["move_number": 2, "move": [1, 0, 0]]
+        )
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(game.currentPosition[0, 1], .hasStone(.white))
+
+        socket.emissions.removeAll()
+        socket.deliver(
+            name: "game/261/move",
+            data: ["move_number": 2, "move": [2, 0, 0]]
+        )
+        socket.deliver(
+            name: "game/261/move",
+            data: ["move_number": 4, "move": [3, 0, 0]]
+        )
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        replacement["moves"] = [[0, 0, 0], [1, 0, 0]]
+        socket.deliver(name: "game/261/gamedata", data: replacement)
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/261/move", data: ["move": [2, 0, 0]])
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        socket.deliver(name: "game/261/gamedata", data: replacement)
+    }
+
+    func testUndecodableInitialGameDataDoesNotStartReconnectRecovery() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            cachedUsers: try makePublicGameUsers(),
+            gameResynchronizationTimeout: 0
+        )
+        socket.gamelistResults = [makeShortGameData(id: 262, phase: "play")]
+        service.fetchPublicGames()
+        let game = try XCTUnwrap(service.publicGames[262])
+        socket.emissions.removeAll()
+        let reconnect = expectation(description: "Undecodable initial data must not reconnect")
+        reconnect.isInverted = true
+        socket.onCloseThenReconnect = { reconnect.fulfill() }
+
+        socket.deliver(name: "game/262/gamedata", data: ["game_id": 262])
+        socket.deliver(
+            name: "game/262/move",
+            data: ["move_number": 1, "move": [0, 0, 0]]
+        )
+        socket.deliver(
+            name: "game/262/move",
+            data: ["move_number": 2, "move": [1, 0, 0]]
+        )
+
+        wait(for: [reconnect], timeout: 0.05)
+        XCTAssertNil(game.gameData)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+        XCTAssertTrue(socket.emissions.isEmpty)
+        XCTAssertEqual(socket.closeThenReconnectCount, 0)
+    }
+
+    func testConcurrentResynchronizationsEscalateSharedSocketOnlyOnceUntilRecovery() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            gameResynchronizationTimeout: 0.01
+        )
+        let firstGame = Game(ogsGame: try makeEmptyGameData(id: 263))
+        let secondGame = Game(ogsGame: try makeEmptyGameData(id: 264))
+        firstGame.ogs = service
+        secondGame.ogs = service
+        service.connect(to: firstGame, owner: .explicit(UUID()))
+        service.connect(to: secondGame, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let firstFallback = expectation(description: "One shared reconnect fallback")
+        socket.onCloseThenReconnect = { firstFallback.fulfill() }
+
+        for gameID in [263, 264] {
+            socket.deliver(
+                name: "game/\(gameID)/move",
+                data: ["move_number": 2, "move": [0, 0, 0]]
+            )
+        }
+
+        wait(for: [firstFallback], timeout: 1)
+        XCTAssertEqual(socket.closeThenReconnectCount, 1)
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "game/connect", "game/disconnect", "game/connect"]
+        )
+
+        socket.openSocket()
+        socket.deliver(name: "game/263/gamedata", data: ["game_id": 263])
+        socket.deliver(name: "game/264/gamedata", data: ["game_id": 264])
+        socket.emissions.removeAll()
+        let repeatedFallback = expectation(description: "Incompatible snapshots must not re-arm fallback")
+        repeatedFallback.isInverted = true
+        socket.onCloseThenReconnect = { repeatedFallback.fulfill() }
+
+        for gameID in [263, 264] {
+            socket.deliver(
+                name: "game/\(gameID)/move",
+                data: ["move_number": 2, "move": [1, 0, 0]]
+            )
+        }
+
+        wait(for: [repeatedFallback], timeout: 0.05)
+        XCTAssertEqual(socket.closeThenReconnectCount, 1)
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        socket.deliver(
+            name: "game/263/gamedata",
+            data: try makeEmptyGameDataPayload(id: 263)
+        )
+        let fallbackAfterRecovery = expectation(description: "Valid data resets recovery cap")
+        socket.onCloseThenReconnect = { fallbackAfterRecovery.fulfill() }
+        socket.deliver(
+            name: "game/263/move",
+            data: ["move_number": 2, "move": [2, 0, 0]]
+        )
+
+        wait(for: [fallbackAfterRecovery], timeout: 1)
+        XCTAssertEqual(socket.closeThenReconnectCount, 2)
+    }
+
+    func testReplacementGameDataInvalidatesActiveGameOverviewCache() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(id: 265, phase: "play")
+        )
+        let game = try XCTUnwrap(service.activeGames[265])
+        socket.deliver(
+            name: "game/265/gamedata",
+            data: try makeEmptyGameDataPayload(id: 265)
+        )
+        service.preferences[.latestOGSOverviewOutdated] = false
+        socket.emissions.removeAll()
+
+        socket.deliver(
+            name: "game/265/move",
+            data: ["move_number": 2, "move": [0, 0, 0]]
+        )
+        var replacement = try makeEmptyGameDataPayload(id: 265)
+        replacement["moves"] = [[0, 0, 0], [1, 0, 0]]
+        socket.deliver(name: "game/265/gamedata", data: replacement)
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
+        XCTAssertEqual(game.currentPosition[0, 1], .hasStone(.white))
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+        XCTAssertEqual(service.preferences[.latestOGSOverviewOutdated], true)
     }
 
     func testDetailOwnersAreIndependentAndChatDowngradesToPublicConnection() throws {
@@ -1760,7 +1981,7 @@ final class OGSServiceEventTests: XCTestCase {
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],
         installsObservers: Bool = false,
-        undoResynchronizationTimeout: TimeInterval = 15,
+        gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
@@ -1791,7 +2012,7 @@ final class OGSServiceEventTests: XCTestCase {
             enablesAppSideEffects: false,
             startsTimers: false,
             installsObservers: installsObservers,
-            undoResynchronizationTimeout: undoResynchronizationTimeout,
+            gameResynchronizationTimeout: gameResynchronizationTimeout,
             conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout,
             initialState: initialState
         )

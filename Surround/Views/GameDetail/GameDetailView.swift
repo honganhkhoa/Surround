@@ -90,7 +90,7 @@ struct GameDetailView: View {
                         self.activeGameByOGSID[ogsID] = game
                     }
                 }
-            } else if gameSpeed == .live || gameSpeed == .blitz {
+            } else if gameSpeed.isRealtime {
                 if Set(self.activeGames.map { $0.ogsID }) == Set(ogs.liveGames.map { $0.ogsID }) {
                     return
                 }

@@ -65,7 +65,7 @@ struct QuickMatchForm: View {
                 switch challengeSpeed {
                 case .correspondence:
                     return timeControlSpeed == .correspondence
-                case .live:
+                case .live, .rapid:
                     return timeControlSpeed == .live && !blitz
                 case .blitz:
                     return timeControlSpeed == .live && blitz

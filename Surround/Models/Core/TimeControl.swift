@@ -167,12 +167,12 @@ enum TimeControlSystem: Equatable {
 
     var speed: TimeControlSpeed {
         let secondsPerMove = self.averageSecondsPerMove
-        if secondsPerMove < 10 {
-            return .blitz
-        } else if secondsPerMove <= 3600 {
-            return .live
-        } else {
+        if secondsPerMove == 0 || secondsPerMove > 3600 {
             return .correspondence
+        } else if secondsPerMove < 10 {
+            return .blitz
+        } else {
+            return .live
         }
     }
 
@@ -229,12 +229,17 @@ enum TimeControlSystem: Equatable {
 
 enum TimeControlSpeed: String, Codable, Hashable {
     case live
+    case rapid
     case correspondence
     case blitz
+
+    var isRealtime: Bool {
+        self != .correspondence
+    }
     
     func localizedString() -> String {
         switch self {
-        case .live: return String(localized: "live", comment: "TimeControlSpeed enum localization")
+        case .live, .rapid: return String(localized: "live", comment: "TimeControlSpeed enum localization")
         case .correspondence: return String(localized: "correspondence", comment: "TimeControlSpeed enum localization")
         case .blitz: return String(localized: "blitz", comment: "TimeControlSpeed enum localization")
         }
@@ -250,7 +255,7 @@ enum TimeControlSpeed: String, Codable, Hashable {
                 .Simple(perMove: 5),
                 .Absolute(totalTime: 300)
             ]
-        case .live:
+        case .live, .rapid:
             return [
                 .ByoYomi(mainTime: 10 * 60, periods: 5, periodTime: 30),
                 .Fischer(initialTime: 120, timeIncrement: 30, maxTime: 300),
@@ -286,7 +291,7 @@ struct TimeControl: Codable, Equatable, Hashable {
             self.perMove = perMove
             self.stonesPerPeriod = stonesPerPeriod
             self.totalTime = totalTime
-            self.speed = speed
+            self.speed = speed?.rawValue
             self.pauseOnWeekends = pauseOnWeekends
         }
         
@@ -301,7 +306,10 @@ struct TimeControl: Codable, Equatable, Hashable {
         var perMove: Int?
         var stonesPerPeriod: Int?
         var totalTime: Int?
-        var speed: TimeControlSpeed?
+        /// Raw OGS wire value. Keep the transport representation separate from
+        /// the app's supported speed classifications so future values remain
+        /// decodable without requiring a hand-written codec for every field.
+        var speed: String?
         var pauseOnWeekends: Bool?
     }
     
@@ -315,10 +323,25 @@ struct TimeControl: Codable, Equatable, Hashable {
     init(codingData: TimeControlCodingData) {
         self.codingData = codingData
     }
+
+    /// OGS's speed tag is presentation metadata. If the server introduces a
+    /// new tag, retain the authoritative clock fields and classify from them
+    /// instead of rejecting the entire game payload.
+    var speed: TimeControlSpeed? {
+        guard let wireSpeed = codingData.speed else {
+            return nil
+        }
+        return TimeControlSpeed(rawValue: wireSpeed) ?? system.speed
+    }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(codingData)
+        var encodableCodingData = codingData
+        if let wireSpeed = encodableCodingData.speed,
+           TimeControlSpeed(rawValue: wireSpeed) == nil {
+            encodableCodingData.speed = nil
+        }
+        try container.encode(encodableCodingData)
     }
 
     subscript<T>(dynamicMember keyPath: WritableKeyPath<TimeControlCodingData, T>) -> T {

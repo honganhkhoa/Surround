@@ -188,7 +188,11 @@ struct GameCell: View {
     private var boardContent: some View {
         ZStack {
             BoardView(boardPosition: game.currentPosition)
-            if game.gameData?.outcome != nil {
+            if game.gameData == nil {
+                Color(UIColor.systemBackground).opacity(0.65)
+                ProgressView()
+                    .accessibilityLabel(Text("Loading game…"))
+            } else if game.gameData?.outcome != nil {
                 gameOutCome
             }
         }

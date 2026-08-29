@@ -256,7 +256,7 @@ struct TimeSystemPickerView: View {
         switch finalTimeControlSpeed {
         case .blitz:
             return blitzTimeControl
-        case .live:
+        case .live, .rapid:
             return liveTimeControl
         case .correspondence:
             return correspondenceTimeControl

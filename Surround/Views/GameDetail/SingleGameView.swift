@@ -210,6 +210,10 @@ struct SingleGameView: View {
                     undoRequestCoordinates: game.undoRequestCoordinates
                 )
             }
+            if game.gameData == nil {
+                Color(UIColor.systemBackground).opacity(0.65)
+                ProgressView("Loading game…")
+            }
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {
                 // Canvas does not otherwise expose a stable element to XCTest.
