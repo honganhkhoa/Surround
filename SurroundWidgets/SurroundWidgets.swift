@@ -524,7 +524,30 @@ struct CorrespondenceGamesWidgetView: View {
         }
         return AnyView(EmptyView())
     }
-    
+
+    @ViewBuilder
+    private func board(game: Game, boardSize: CGFloat) -> some View {
+        let board = BoardView(
+            widgetRenderingMode: resolvedRenderingMode,
+            boardPosition: game.currentPosition,
+            cornerRadius: 10
+        )
+        .frame(width: boardSize, height: boardSize)
+
+        if resolvedRenderingMode == .accented {
+            // Clear and Tinted appearances replace every opaque view color
+            // with the same system color. Preserve the board's luminance as
+            // alpha so black and white stones remain distinguishable, matching
+            // the previous desaturated Image rendering without rasterizing.
+            board
+                .compositingGroup()
+                .luminanceToAlpha()
+                .widgetAccentable()
+        } else {
+            board
+        }
+    }
+
     private func gameCell(game: Game, boardSize: CGFloat) -> some View {
         return VStack(spacing: 0) {
             ZStack {
@@ -554,12 +577,7 @@ struct CorrespondenceGamesWidgetView: View {
                 // ImageRenderer can return a non-nil but transparent UIImage
                 // in a real widget, which suppresses a nil-only fallback and
                 // leaves just the turn-highlight backing visible.
-                BoardView(
-                    widgetRenderingMode: resolvedRenderingMode,
-                    boardPosition: game.currentPosition,
-                    cornerRadius: 10
-                )
-                .frame(width: boardSize, height: boardSize)
+                board(game: game, boardSize: boardSize)
                 .padding(CorrespondenceWidgetGridLayout.boardChrome / 2)
             }
             HStack {
@@ -649,8 +667,8 @@ struct CorrespondenceGamesWidgetView: View {
             }
         } else if resolvedRenderingMode == .accented {
             Color.white
-                .opacity(emphasis == .pending ? 0.75 : 0.3)
-                .luminanceToAlpha()
+                .opacity(emphasis == .pending ? 0.38 : 0.18)
+                .widgetAccentable()
         } else {
             Color.primary.opacity(emphasis == .pending ? 0.45 : 0.18)
         }
@@ -669,7 +687,7 @@ struct CorrespondenceGamesWidgetView: View {
             }
             .font(.subheadline.bold())
             .foregroundStyle(
-                resolvedRenderingMode == .fullColor ? Color.white : Color.primary
+                resolvedRenderingMode == .vibrant ? Color.primary : Color.white
             )
             .lineLimit(1)
             .frame(width: geometry.size.height, height: geometry.size.width)
