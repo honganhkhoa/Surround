@@ -65,7 +65,11 @@ struct ChatLog: View {
     @State private var inputDismissalRequest = 0
 
     func shouldMergeChat(at index: Int) -> Bool {
-        return index > 0 && game.chatLog[index].moveNumber == game.chatLog[index - 1].moveNumber && game.chatLog[index].user.id == game.chatLog[index - 1].user.id
+        return index > 0
+            && game.chatLog[index].moveNumber
+                == game.chatLog[index - 1].moveNumber
+            && game.chatLog[index].user.id == game.chatLog[index - 1].user.id
+            && game.chatLog[index].channel == game.chatLog[index - 1].channel
     }
 
     private func clearSelection() {
@@ -110,21 +114,41 @@ struct ChatLog: View {
         )
     }
 
+    static func moveDividerNumbers(for moveNumbers: [Int?]) -> [Int?] {
+        var lastMoveNumber: Int?
+        return moveNumbers.map { moveNumber -> Int? in
+            guard let moveNumber else {
+                return nil
+            }
+            guard moveNumber != lastMoveNumber else {
+                return nil
+            }
+            lastMoveNumber = moveNumber
+            return moveNumber
+        }
+    }
+
     var chatLines: some View {
-        ForEach(Array(game.chatLog.enumerated()), id: \.1) { index, chatLine in
-            if index == 0 || game.chatLog[index - 1].moveNumber != chatLine.moveNumber {
+        let moveDividerNumbers = Self.moveDividerNumbers(
+            for: game.chatLog.map(\.moveNumber)
+        )
+        return ForEach(
+            Array(game.chatLog.enumerated()),
+            id: \.1
+        ) { index, chatLine in
+            if let moveNumber = moveDividerNumbers[index] {
                 let moveTarget = ChatLogSelection.Target.move(
-                    chatLine.moveNumber
+                    moveNumber
                 )
                 Button {
-                    toggleMoveSelection(chatLine.moveNumber)
+                    toggleMoveSelection(moveNumber)
                 } label: {
                     ZStack {
                         Divider()
                             .allowsHitTesting(false)
                         HStack {
                             Spacer()
-                            Text("Move \(chatLine.moveNumber)")
+                            Text("Move \(moveNumber)")
                                 .font(.caption2)
                                 .padding(.leading, 5)
                                 .background {
@@ -160,7 +184,7 @@ struct ChatLog: View {
                 )
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameChatMove(
-                        chatLine.moveNumber
+                        moveNumber
                     )
                 )
                 Spacer().frame(height: 2)

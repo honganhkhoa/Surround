@@ -38,6 +38,8 @@ enum SurroundUITestContract {
         "--surround-widget-deep-link-routing"
     static let attachedSoftwareKeyboardVisibleLaunchArgument =
         "--surround-attached-software-keyboard-visible"
+    static let structuredChatFormatsLaunchArgument =
+        "--surround-structured-chat-formats"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -99,6 +101,22 @@ enum SurroundUITestContract {
         screenshotConditionalMovePaths.map {
             "\(screenshotConditionalMoveRootMoveNumber):\($0.joined())"
         }
+    static let structuredChatTranslatedLineID =
+        "ui-test-chat-translated"
+    static let structuredChatTranslatedText =
+        "/me Translated system announcement"
+    static let structuredChatAnalysisLineID =
+        "ui-test-chat-analysis"
+    static let structuredChatAnalysisText =
+        "/me Literal variation name"
+    static let structuredChatReviewLineID = "ui-test-chat-review"
+    static let structuredChatReviewID = 90_212_712
+    static let structuredChatHiddenLineID = "ui-test-chat-hidden"
+    static let structuredChatHiddenText = "Moderator fixture note"
+    static let structuredChatThirdPersonLineID =
+        "ui-test-chat-third-person"
+    static let structuredChatThirdPersonText =
+        "checks the third-person format"
 
     enum CompatibilityScene: String, CaseIterable {
         case welcome
@@ -187,6 +205,14 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 attachedSoftwareKeyboardVisibleLaunchArgument
+            )
+    }
+
+    static var addsStructuredChatFormatsToCompatibilityFixture: Bool {
+        isCapturingCompatibilityScreenshots
+            && !isCapturingAppStoreScreenshots
+            && ProcessInfo.processInfo.arguments.contains(
+                structuredChatFormatsLaunchArgument
             )
     }
 

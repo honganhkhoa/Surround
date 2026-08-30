@@ -7,7 +7,16 @@
 
 import SwiftUI
 
+private func gameChatReviewLabel(reviewID: Int) -> Text {
+    Text(
+        "Review: #\(String(reviewID))",
+        comment: "Link and accessibility label for a game review shared in chat. The number is the OGS review ID."
+    )
+}
+
 struct ChatLine: View {
+    @Environment(\.openURL) private var openURL
+
     var chatLine: OGSChatLine
     var showUsername = true
     var horizontalAlignment: HorizontalAlignment = .leading
@@ -15,26 +24,70 @@ struct ChatLine: View {
     var accessibilityIdentifier = ""
     var select: () -> Void = {}
 
+    private var isThirdPerson: Bool {
+        chatLine.isPlainTextBody && chatLine.body.hasPrefix("/me ")
+    }
+
+    private var displayedBody: String {
+        isThirdPerson ? String(chatLine.body.dropFirst(4)) : chatLine.body
+    }
+
+    private var reviewURL: URL? {
+        guard let reviewID = chatLine.reviewID else { return nil }
+        return URL(string: "\(OGSService.ogsRoot)/review/\(reviewID)")
+    }
+
     var chatBody: Text {
         Text(chatBodyAttributedString())
     }
 
     private func chatBodyAttributedString() -> AttributedString {
         var result = AttributedString()
-        var index = chatLine.body.startIndex
-        var mutableSelf = self
-        for coordinateRange in mutableSelf.chatLine.coordinatesRanges {
-            let coordinateStartIndex = chatLine.body.index(chatLine.body.startIndex, offsetBy: coordinateRange.location)
-            let coordinateEndIndex = chatLine.body.index(coordinateStartIndex, offsetBy: coordinateRange.length)
-            result.append(AttributedString(String(chatLine.body[index..<coordinateStartIndex])))
-            var highlighted = AttributedString(String(chatLine.body[coordinateStartIndex..<coordinateEndIndex]))
+        let body = displayedBody
+        let coordinateRanges = OGSChatLine.coordinatesRegex.matches(
+            in: body,
+            range: NSRange(body.startIndex..., in: body)
+        ).compactMap { Range($0.range, in: body) }
+        var index = body.startIndex
+        for coordinateRange in coordinateRanges {
+            result.append(AttributedString(String(body[index..<coordinateRange.lowerBound])))
+            var highlighted = AttributedString(String(body[coordinateRange]))
             highlighted.foregroundColor = Color(.systemIndigo)
             highlighted.font = .callout.bold()
             result.append(highlighted)
-            index = coordinateEndIndex
+            index = coordinateRange.upperBound
         }
-        result.append(AttributedString(String(chatLine.body[index..<chatLine.body.endIndex])))
+        result.append(AttributedString(String(body[index..<body.endIndex])))
         return result
+    }
+
+    @ViewBuilder
+    private var username: some View {
+        let username = Text(verbatim: "\(chatLine.user.usernameAndRank)")
+        if isThirdPerson {
+            username.italic()
+        } else {
+            username
+        }
+    }
+
+    @ViewBuilder
+    private var renderedChatBody: some View {
+        if let reviewID = chatLine.reviewID,
+           let reviewURL {
+            Link(destination: reviewURL) {
+                gameChatReviewLabel(reviewID: reviewID)
+            }
+        } else if chatLine.isAnalysis {
+            Text(
+                "Variation: \(displayedBody)",
+                comment: "Label for a variation shared in game chat"
+            )
+        } else if isThirdPerson {
+            chatBody.italic()
+        } else {
+            chatBody
+        }
     }
 
     private var bubbleColor: Color {
@@ -43,7 +96,9 @@ struct ChatLine: View {
             return Color(.systemGreen).opacity(0.2)
         case .personal:
             return Color(.systemBlue).opacity(0.2)
-        case .main, .spectator:
+        case .hidden:
+            return Color(.systemPurple).opacity(0.2)
+        case .main, .spectator, .shadowban:
             return Color(.systemGray4)
         }
     }
@@ -75,7 +130,22 @@ struct ChatLine: View {
                     comment: "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value"
                 )
             )
-        case .main, .spectator:
+        case .hidden:
+            Label {
+                Text(
+                    "Moderator-only",
+                    comment: "Badge on a game-chat message visible only to moderators"
+                )
+            } icon: {
+                Image(systemName: "eye.slash.fill")
+            }
+            .accessibilityValue(
+                Text(
+                    "Visible only to moderators",
+                    comment: "Hidden game-chat visibility; used as an accessibility value"
+                )
+            )
+        case .main, .spectator, .shadowban:
             EmptyView()
         }
     }
@@ -84,7 +154,7 @@ struct ChatLine: View {
         HStack {
             if chatLine.user.id == 0 && chatLine.user.username == "system" {
                 Spacer()
-                Text(chatLine.body)
+                renderedChatBody
                     .font(.callout.bold())
                     .textSelection(.enabled)
                     .padding(.horizontal, 10)
@@ -99,11 +169,18 @@ struct ChatLine: View {
                     .contentShape(Rectangle())
                     .onTapGesture(perform: select)
                     .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAddTraits(
+                        reviewURL == nil ? .isButton : .isLink
+                    )
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     .accessibilityIdentifier(accessibilityIdentifier)
+                    .reviewAccessibilityLabel(reviewID: chatLine.reviewID)
                     .accessibilityAction {
-                        select()
+                        if let reviewURL {
+                            openURL(reviewURL)
+                        } else {
+                            select()
+                        }
                     }
                 Spacer()
             } else {
@@ -112,7 +189,7 @@ struct ChatLine: View {
                 }
                 VStack(alignment: horizontalAlignment, spacing: 2) {
                     if showUsername {
-                        Text(verbatim: "\(chatLine.user.usernameAndRank)")
+                        username
                             .font(.caption2).bold()
                             .foregroundColor(chatLine.user.uiColor)
                     }
@@ -129,7 +206,7 @@ struct ChatLine: View {
                                 .frame(width: 176, height: 176)
                                 .padding(.top, 5)
                         }
-                        chatBody
+                        renderedChatBody
                             .font(.callout)
                             .textSelection(.enabled)
                     }
@@ -148,16 +225,36 @@ struct ChatLine: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: select)
                 .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
+                .accessibilityAddTraits(
+                    reviewURL == nil ? .isButton : .isLink
+                )
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .accessibilityIdentifier(accessibilityIdentifier)
+                .reviewAccessibilityLabel(reviewID: chatLine.reviewID)
                 .accessibilityAction {
-                    select()
+                    if let reviewURL {
+                        openURL(reviewURL)
+                    } else {
+                        select()
+                    }
                 }
                 if case .leading = horizontalAlignment {
                     Spacer()
                 }
             }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func reviewAccessibilityLabel(reviewID: Int?) -> some View {
+        if let reviewID {
+            accessibilityLabel(
+                gameChatReviewLabel(reviewID: reviewID)
+            )
+        } else {
+            self
         }
     }
 }

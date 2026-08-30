@@ -282,6 +282,108 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    func testReceivedTranslatedBotChatWithNullMoveNumberIsRetained() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 248))
+        game.ogs = service
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+
+        socket.deliver(
+            name: "game/248/chat",
+            data: [
+                "channel": "main",
+                "line": [
+                    "body": [
+                        "type": "translated",
+                        "en": "Undo requested",
+                    ],
+                    "chat_id": "translated-bot-line",
+                    "date": 1_700_000_000.0,
+                    "move_number": NSNull(),
+                    "player_id": 0,
+                    "username": "DangoApp",
+                ],
+            ]
+        )
+
+        let receivedLine = try XCTUnwrap(game.chatLog.last)
+        XCTAssertEqual(receivedLine.id, "translated-bot-line")
+        XCTAssertEqual(receivedLine.body, "Undo requested")
+        XCTAssertNil(receivedLine.moveNumber)
+        XCTAssertEqual(receivedLine.user.id, 0)
+        XCTAssertEqual(receivedLine.user.username, "DangoApp")
+    }
+
+    func testReceivedLegacyAnalysisUsesTypedDecoderInServicePath() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 249))
+        game.ogs = service
+        service.connect(
+            to: game,
+            withChat: true,
+            owner: .explicit(UUID())
+        )
+
+        socket.deliver(
+            name: "game/249/chat",
+            data: [
+                "channel": "main",
+                "line": [
+                    "body": [
+                        "type": "analysis",
+                        "branch_move": 1,
+                        "moves": "aa",
+                        "name": "Legacy branch",
+                    ],
+                    "chat_id": "legacy-analysis-line",
+                    "date": 1_700_000_000.0,
+                    "move_number": NSNull(),
+                    "player_id": 1,
+                    "username": "black",
+                ],
+            ]
+        )
+
+        let receivedLine = try XCTUnwrap(game.chatLog.last)
+        XCTAssertTrue(receivedLine.isAnalysis)
+        XCTAssertEqual(receivedLine.variationData?.fromMoveNumber, 0)
+        XCTAssertEqual(receivedLine.variationData?.moves, "aa")
+        XCTAssertNotNil(receivedLine.variation)
+
+        socket.deliver(
+            name: "game/249/chat",
+            data: [
+                "channel": "main",
+                "line": [
+                    "body": [
+                        "type": "analysis",
+                        "branch_move": Int.min,
+                        "from": 0,
+                        "moves": "bb",
+                        "name": "Checked legacy branch",
+                    ],
+                    "chat_id": "checked-legacy-analysis-line",
+                    "date": 1_700_000_001.0,
+                    "move_number": NSNull(),
+                    "player_id": 1,
+                    "username": "black",
+                ],
+            ]
+        )
+
+        let checkedLine = try XCTUnwrap(game.chatLog.last)
+        XCTAssertEqual(checkedLine.id, "checked-legacy-analysis-line")
+        XCTAssertEqual(checkedLine.variationData?.fromMoveNumber, 0)
+        XCTAssertEqual(checkedLine.variationData?.moves, "bb")
+        XCTAssertNotNil(checkedLine.variation)
+    }
+
     func testShareVariationAutoNamesFromReceivedAndReservedNumbersAndResolvesSpectatorChannel() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)

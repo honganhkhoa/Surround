@@ -1929,6 +1929,96 @@ final class SurroundUITests: SurroundUITestCase {
         }
     }
 
+    func testStructuredChatFormatsRenderAcrossMoveLessLines() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameChat.rawValue,
+            SurroundUITestContract.structuredChatFormatsLaunchArgument,
+        ])
+
+        @discardableResult
+        func assertChatLine(
+            _ fixtureID: String,
+            contains expectedText: String? = nil,
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) -> XCUIElement {
+            let accessibilityID = SurroundUITestContract.AccessibilityID
+                .gameChatLine(fixtureID)
+            let chatLine = revealChatItem(
+                accessibilityID,
+                in: app,
+                file: file,
+                line: line
+            )
+            if let expectedText {
+                XCTAssertTrue(
+                    chatLine.label.contains(expectedText),
+                    "Expected \(accessibilityID) to render "
+                        + "\(expectedText), got \(chatLine.label)",
+                    file: file,
+                    line: line
+                )
+            }
+            return chatLine
+        }
+
+        // The fixture opens at the bottom. Walk upward so lazy chat rows are
+        // materialized deterministically on both iOS and Mac Catalyst.
+        assertChatLine(
+            SurroundUITestContract.structuredChatAnalysisLineID,
+            contains: "Variation: "
+                + SurroundUITestContract.structuredChatAnalysisText
+        )
+        assertChatLine(
+            SurroundUITestContract.structuredChatThirdPersonLineID,
+            contains: SurroundUITestContract.structuredChatThirdPersonText
+        )
+        let hiddenLine = assertChatLine(
+            SurroundUITestContract.structuredChatHiddenLineID,
+            contains: SurroundUITestContract.structuredChatHiddenText
+        )
+        XCTAssertTrue(
+            String(describing: hiddenLine.value)
+                .contains("Visible only to moderators"),
+            "Expected the hidden chat row to describe its moderator-only visibility; got \(String(describing: hiddenLine.value))."
+        )
+        let reviewRowID = SurroundUITestContract.AccessibilityID.gameChatLine(
+            SurroundUITestContract.structuredChatReviewLineID
+        )
+        assertChatLine(SurroundUITestContract.structuredChatReviewLineID)
+        let reviewLabel =
+            "Review: #\(SurroundUITestContract.structuredChatReviewID)"
+        let reviewLink = app.links[reviewRowID].firstMatch
+        XCTAssertTrue(
+            reviewLink.waitForExistence(timeout: 10),
+            "Expected the structured review row to expose its review link."
+        )
+        XCTAssertTrue(
+            reviewLink.label.contains(reviewLabel),
+            "Expected the structured review link to render \(reviewLabel), "
+                + "got \(reviewLink.label)."
+        )
+        assertChatLine(
+            SurroundUITestContract.structuredChatTranslatedLineID,
+            contains: SurroundUITestContract.structuredChatTranslatedText
+        )
+
+        let repeatedMoveID = SurroundUITestContract.AccessibilityID
+            .gameChatMove(91)
+        revealChatItem(
+            repeatedMoveID,
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(
+            app.buttons.matching(identifier: repeatedMoveID).count,
+            1,
+            "Move-less chat lines must not create a duplicate move-91 divider."
+        )
+    }
+
     func testVariationSharingDraftSurvivesNavigationAndCanBeReplaced() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,

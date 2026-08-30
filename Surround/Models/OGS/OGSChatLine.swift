@@ -9,9 +9,17 @@ import Foundation
 
 enum OGSChatChannel: String, Decodable {
     case main
+    case hidden
     case malkovich
     case personal
+    case shadowban
     case spectator
+}
+
+extension CodingUserInfoKey {
+    static let ogsChatPreferredLanguageIdentifiers = CodingUserInfoKey(
+        rawValue: "ogsChatPreferredLanguageIdentifiers"
+    )!
 }
 
 enum OGSChatSendChannel: String, Codable {
@@ -32,6 +40,7 @@ struct OGSChatAnalysisBody: Codable, Equatable {
     
     enum CodingKeys: String, CodingKey {
         case type
+        case branchMove
         case from
         case moves
         case name
@@ -60,10 +69,18 @@ struct OGSChatAnalysisBody: Codable, Equatable {
                 debugDescription: "Unsupported structured chat body type"
             )
         }
-        fromMoveNumber = try container.decode(Int.self, forKey: .from)
+        if let legacyBranchMove = try? container.decode(
+            Int.self,
+            forKey: .branchMove
+        ), legacyBranchMove > Int.min {
+            // Legacy OGS chat bodies counted the branch point one move ahead.
+            fromMoveNumber = legacyBranchMove - 1
+        } else {
+            fromMoveNumber = try container.decode(Int.self, forKey: .from)
+        }
         moves = try container.decode(String.self, forKey: .moves)
-        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
-        marks = try? container.decodeIfPresent(
+        name = (try? container.decode(String.self, forKey: .name)) ?? ""
+        marks = try? container.decode(
             [String: String].self,
             forKey: .marks
         )
@@ -101,46 +118,217 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
     var id: String
     var channel: OGSChatChannel
     var timestamp: Date
-    var moveNumber: Int
+    var moveNumber: Int?
     var body: String
     var user: OGSUser
+    var isPlainTextBody: Bool
+    var isAnalysis: Bool
     var variationData: OGSChatLineVariation?
     var variation: Variation?
+    var reviewID: Int?
     
     struct OGSChatLineCodingData: Decodable, Hashable {
-        private struct NamedStructuredBody: Decodable {
-            var name: String?
+        private struct DynamicCodingKey: CodingKey {
+            let stringValue: String
+            let intValue: Int?
 
-            enum CodingKeys: String, CodingKey {
-                case type
-                case name
+            init(stringValue: String) {
+                self.stringValue = stringValue
+                intValue = nil
             }
 
+            init(intValue: Int) {
+                stringValue = String(intValue)
+                self.intValue = intValue
+            }
+        }
+
+        private struct StructuredBody: Decodable {
+            var type: String?
+            var name: String?
+            var reviewID: Int?
+            var translations: [(key: String, value: String)] = []
+
             init(from decoder: Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                let type = try container.decode(String.self, forKey: .type)
-                guard type == "analysis" else {
-                    throw DecodingError.dataCorruptedError(
-                        forKey: .type,
-                        in: container,
-                        debugDescription: "Unsupported structured chat body type"
+                let container = try decoder.container(
+                    keyedBy: DynamicCodingKey.self
+                )
+                func key(_ value: String) -> DynamicCodingKey {
+                    DynamicCodingKey(stringValue: value)
+                }
+
+                type = try? container.decode(String.self, forKey: key("type"))
+                name = try? container.decode(String.self, forKey: key("name"))
+                reviewID = try? container.decode(
+                    Int.self,
+                    forKey: key("reviewId")
+                )
+
+                // JSONDecoder does not promise source-key order, so sort the
+                // last-resort translations to keep fallback behavior stable.
+                translations = container.allKeys.compactMap { key in
+                    guard key.stringValue != "type",
+                          let value = try? container.decode(
+                            String.self,
+                            forKey: key
+                          ) else {
+                        return nil
+                    }
+                    return (key.stringValue, value)
+                }
+                .sorted { $0.key < $1.key }
+            }
+        }
+
+        private struct DecodedBody: Decodable {
+            var text: String
+            var isPlainTextBody = false
+            var isAnalysis = false
+            var variation: OGSChatLineVariation?
+            var reviewID: Int?
+
+            init(from decoder: Decoder) throws {
+                let singleValue = try decoder.singleValueContainer()
+                if let text = try? singleValue.decode(String.self) {
+                    self.text = text
+                    isPlainTextBody = true
+                    return
+                }
+
+                guard let structuredBody = try? StructuredBody(from: decoder)
+                else {
+                    text = String(
+                        localized: "[Unknown chat message]",
+                        comment: "Fallback for an unsupported structured game-chat body"
+                    )
+                    return
+                }
+
+                switch structuredBody.type {
+                case "translated":
+                    let preferredLanguages = decoder.userInfo[
+                        .ogsChatPreferredLanguageIdentifiers
+                    ] as? [String] ?? Locale.preferredLanguages
+                    text = Self.translatedText(
+                        structuredBody.translations,
+                        preferredLanguages: preferredLanguages
+                    )
+
+                case "analysis":
+                    isAnalysis = true
+                    text = structuredBody.name ?? ""
+                    variation = try? OGSChatAnalysisBody(from: decoder)
+
+                case "review":
+                    guard let reviewID = structuredBody.reviewID else {
+                        text = String(
+                            localized: "[Unknown chat message]",
+                            comment: "Fallback for an unsupported structured game-chat body"
+                        )
+                        return
+                    }
+                    self.reviewID = reviewID
+                    text = ""
+
+                default:
+                    text = String(
+                        localized: "[Unknown chat message]",
+                        comment: "Fallback for an unsupported structured game-chat body"
                     )
                 }
-                name = try container.decodeIfPresent(String.self, forKey: .name)
+            }
+
+            private static func translatedText(
+                _ translations: [(key: String, value: String)],
+                preferredLanguages: [String]
+            ) -> String {
+                let normalizedTranslations = translations.map {
+                    (
+                        key: normalizeLanguageIdentifier($0.key),
+                        value: $0.value
+                    )
+                }
+
+                func value(for language: String) -> String? {
+                    normalizedTranslations.first {
+                        $0.key == language && !$0.value.isEmpty
+                    }?.value
+                }
+
+                if let preferredLanguage = preferredLanguages.first {
+                    let normalized = normalizeLanguageIdentifier(
+                        preferredLanguage
+                    )
+                    if let exact = value(for: normalized) {
+                        return exact
+                    }
+                    if let alias = chineseAlias(for: normalized),
+                       let aliased = value(for: alias) {
+                        return aliased
+                    }
+                    if let base = normalized.split(separator: "-").first,
+                       let baseTranslation = value(for: String(base)) {
+                        return baseTranslation
+                    }
+                }
+
+                if let english = value(for: "en") {
+                    return english
+                }
+                if let firstAvailable = normalizedTranslations.first(
+                    where: { !$0.value.isEmpty }
+                ) {
+                    return firstAvailable.value
+                }
+                return String(
+                    localized: "[Message unavailable in this language]",
+                    comment: "Fallback for a translated game-chat body with no usable text"
+                )
+            }
+
+            private static func normalizeLanguageIdentifier(
+                _ identifier: String
+            ) -> String {
+                identifier.replacingOccurrences(of: "_", with: "-")
+                    .lowercased()
+            }
+
+            private static func chineseAlias(for language: String) -> String? {
+                let components = language.split(separator: "-").map(String.init)
+                guard components.first == "zh" else { return nil }
+
+                if components.contains("hans") {
+                    return "zh-cn"
+                }
+                if components.contains("hant") {
+                    return "zh-tw"
+                }
+                if components.contains("cn") || components.contains("sg") {
+                    return "zh-cn"
+                }
+                if components.contains("tw")
+                    || components.contains("hk")
+                    || components.contains("mo") {
+                    return "zh-tw"
+                }
+                return nil
             }
         }
 
         var body: String
         var chatId: String
         var date: Double
-        var moveNumber: Int
+        var moveNumber: Int?
         var playerId: Int
-        var professional: Bool
-        var ranking: Double
+        var professional: Bool?
+        var ranking: Double?
         var ratings: OGSRating?
-        var uiClass: String
+        var uiClass: String?
         var username: String
+        var isPlainTextBody: Bool
+        var isAnalysis: Bool
         var variation: OGSChatLineVariation?
+        var reviewID: Int?
         
         enum CodingKeys: String, CodingKey {
             case body, chatId, date, moveNumber, playerId, professional, ranking, ratings, uiClass, username
@@ -148,36 +336,25 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
         
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: OGSChatLineCodingData.CodingKeys.self)
-            if let variation = try? container.decode(OGSChatLineVariation.self, forKey: .body) {
-                self.body = variation.name
-                self.variation = variation
-            } else if let structuredBody = try? container.decode(
-                NamedStructuredBody.self,
-                forKey: .body
-            ) {
-                // Keep malformed analysis lines visible without inventing a
-                // playable variation from invalid wire data.
-                body = structuredBody.name ?? ""
-            } else {
-                body = try container.decode(String.self, forKey: .body)
-            }
+            let decodedBody = try container.decode(DecodedBody.self, forKey: .body)
+            body = decodedBody.text
+            isPlainTextBody = decodedBody.isPlainTextBody
+            isAnalysis = decodedBody.isAnalysis
+            variation = decodedBody.variation
+            reviewID = decodedBody.reviewID
             chatId = try container.decode(String.self, forKey: .chatId)
             date = try container.decode(Double.self, forKey: .date)
-            moveNumber = try container.decode(Int.self, forKey: .moveNumber)
+            moveNumber = try container.decodeIfPresent(Int.self, forKey: .moveNumber)
             if let playerIdString = try? container.decode(String.self, forKey: .playerId) {
-                if playerIdString == "0" {
-                    playerId = 0
-                } else {
-                    playerId = -1
-                }
+                playerId = Int(playerIdString) ?? -1
             } else {
                 playerId = try container.decode(Int.self, forKey: .playerId)
             }
-            professional = try container.decode(Bool.self, forKey: .professional)
-            ranking = try container.decode(Double.self, forKey: .ranking)
+            professional = try container.decodeIfPresent(Bool.self, forKey: .professional)
+            ranking = try container.decodeIfPresent(Double.self, forKey: .ranking)
             ratings = try container.decodeIfPresent(OGSRating.self, forKey: .ratings)
-            uiClass = try container.decode(String.self, forKey: .uiClass)
-            username = try container.decode(String.self, forKey: .username)
+            uiClass = try container.decodeIfPresent(String.self, forKey: .uiClass)
+            username = try container.decodeIfPresent(String.self, forKey: .username) ?? ""
         }
 
         static func == (lhs: OGSChatLine.OGSChatLineCodingData, rhs: OGSChatLine.OGSChatLineCodingData) -> Bool {
@@ -212,7 +389,10 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
             professional: codingData.line.professional,
             ratings: codingData.line.ratings
         )
+        isPlainTextBody = codingData.line.isPlainTextBody
+        isAnalysis = codingData.line.isAnalysis
         variationData = codingData.line.variation
+        reviewID = codingData.line.reviewID
     }
 
     static func == (lhs: OGSChatLine, rhs: OGSChatLine) -> Bool {
@@ -241,13 +421,17 @@ struct OGSChatLine: Decodable, Identifiable, Hashable {
     }()
     
     lazy var coordinates: [[Int]] = {
-        self.coordinatesRanges.map {
-            var startIndex = self.body.index(self.body.startIndex, offsetBy: $0.location)
-            let letter = self.body[startIndex].lowercased()
-            let endIndex = self.body.index(startIndex, offsetBy: $0.length)
-            startIndex = self.body.index(startIndex, offsetBy: 1)
-            let number = Int(self.body[startIndex..<endIndex])!
-            let column = Int(letter.first!.asciiValue! - "a".first!.asciiValue!)
+        self.coordinatesRanges.compactMap { nsRange in
+            guard let range = Range(nsRange, in: self.body) else {
+                return nil
+            }
+            let coordinate = self.body[range]
+            guard let letterASCII = coordinate.first?.lowercased().utf8.first,
+                  (97...122).contains(letterASCII),
+                  let number = Int(coordinate.dropFirst()) else {
+                return nil
+            }
+            let column = Int(letterASCII - 97)
             return [number - 1, column > 8 ? column - 1 : column]
         }
     }()

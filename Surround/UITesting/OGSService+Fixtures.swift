@@ -1322,18 +1322,24 @@ extension OGSService {
 
         func makeChatLine(
             id: String,
-            moveNumber: Int,
+            moveNumber: Int?,
             channel: OGSChatChannel = .main,
             body: Any,
             user: OGSUser
         ) -> OGSChatLine {
+            let encodedMoveNumber: Any
+            if let moveNumber {
+                encodedMoveNumber = moveNumber
+            } else {
+                encodedMoveNumber = NSNull()
+            }
             let payload: [String: Any] = [
                 "channel": channel.rawValue,
                 "line": [
                     "body": body,
                     "chat_id": id,
                     "date": 1_720_000_000,
-                    "move_number": moveNumber,
+                    "move_number": encodedMoveNumber,
                     "player_id": user.id,
                     "professional": false,
                     "ranking": user.ranking ?? 30,
@@ -1553,6 +1559,91 @@ extension OGSService {
                                 .screenshotConditionalMoveBranchIDs
                         ),
                 "The primary screenshot fixture must project exactly two root-101 conditional branches."
+            )
+        }
+
+        if SurroundUITestContract
+            .addsStructuredChatFormatsToCompatibilityFixture
+        {
+            var botUser = fixtureGame.whitePlayer!
+            botUser.id = 0
+            botUser.username = "DangoApp"
+            botUser.uiClass = "bot"
+
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: SurroundUITestContract
+                        .structuredChatTranslatedLineID,
+                    moveNumber: nil,
+                    body: [
+                        "type": "translated",
+                        "en": SurroundUITestContract
+                            .structuredChatTranslatedText,
+                        "ja": "翻訳済みのシステム通知",
+                    ] as [String: Any],
+                    user: botUser
+                )
+            )
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: SurroundUITestContract.structuredChatReviewLineID,
+                    moveNumber: nil,
+                    body: [
+                        "type": "review",
+                        "review_id": SurroundUITestContract
+                            .structuredChatReviewID,
+                    ] as [String: Any],
+                    user: fixtureUser
+                )
+            )
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: SurroundUITestContract.structuredChatHiddenLineID,
+                    moveNumber: nil,
+                    channel: .hidden,
+                    body: SurroundUITestContract.structuredChatHiddenText,
+                    user: fixtureUser
+                )
+            )
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: SurroundUITestContract
+                        .structuredChatThirdPersonLineID,
+                    moveNumber: nil,
+                    body: "/me " + SurroundUITestContract
+                        .structuredChatThirdPersonText,
+                    user: fixtureGame.whitePlayer!
+                )
+            )
+            fixtureGame.addChatLine(
+                makeChatLine(
+                    id: SurroundUITestContract
+                        .structuredChatAnalysisLineID,
+                    moveNumber: 91,
+                    body: [
+                        "type": "analysis",
+                        "name": SurroundUITestContract
+                            .structuredChatAnalysisText,
+                    ] as [String: Any],
+                    user: fixtureGame.whitePlayer!
+                )
+            )
+            precondition(
+                fixtureGame.chatLog.suffix(5).map(\.id) == [
+                    SurroundUITestContract.structuredChatTranslatedLineID,
+                    SurroundUITestContract.structuredChatReviewLineID,
+                    SurroundUITestContract.structuredChatHiddenLineID,
+                    SurroundUITestContract.structuredChatThirdPersonLineID,
+                    SurroundUITestContract.structuredChatAnalysisLineID,
+                ]
+                    && fixtureGame.chatLog.suffix(5).dropLast().allSatisfy {
+                        $0.moveNumber == nil
+                    }
+                    && fixtureGame.chatLog.last?.moveNumber == 91
+                    && ChatLog.moveDividerNumbers(
+                        for: fixtureGame.chatLog.map(\.moveNumber)
+                    ).filter { $0 == 91 }.count == 1,
+                "The structured-chat fixture must preserve move-less formats and avoid repeating its move-91 divider."
             )
         }
 

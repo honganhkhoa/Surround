@@ -13,11 +13,13 @@ final class OGSModelDecodingTests: XCTestCase {
     }()
     private let conditionalMovesDecoder = JSONDecoder()
 
-    func testChatLineDecodesFourPrimaryInboundChannels() throws {
+    func testChatLineDecodesAllInboundChannels() throws {
         let channels: [OGSChatChannel] = [
             .main,
+            .hidden,
             .malkovich,
             .personal,
+            .shadowban,
             .spectator,
         ]
 
@@ -147,17 +149,195 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertNil(missingBase.variation)
     }
 
-    func testUnsupportedStructuredChatBodiesFailLineDecoding() {
-        let unsupportedBodies = [
+    func testAnalysisChatBodyDecodesLegacyBranchMoveAndOptionalFields() throws {
+        let legacy = try decodeChatLine(
+            body: #"{"type":"analysis","branch_move":8,"moves":"aa","name":"Legacy line"}"#
+        )
+        XCTAssertEqual(legacy.body, "Legacy line")
+        XCTAssertTrue(legacy.isAnalysis)
+        XCTAssertEqual(legacy.variationData?.fromMoveNumber, 7)
+
+        let unnamed = try decodeChatLine(
+            body: #"{"type":"analysis","from":0,"moves":""}"#
+        )
+        XCTAssertEqual(unnamed.body, "")
+        XCTAssertEqual(unnamed.variationData?.name, "")
+
+        let nameOnly = try decodeChatLine(
+            body: #"{"type":"analysis","name":"Name only","pen_marks":[],"engine_analysis":{"win_rate":0.5}}"#
+        )
+        XCTAssertEqual(nameOnly.body, "Name only")
+        XCTAssertTrue(nameOnly.isAnalysis)
+        XCTAssertNil(nameOnly.variationData)
+
+        let malformedOptionalFields = try decodeChatLine(
+            body: #"{"type":"analysis","branch_move":"invalid","from":5,"moves":"aa","name":42,"marks":["not-a-map"]}"#
+        )
+        XCTAssertEqual(malformedOptionalFields.body, "")
+        XCTAssertTrue(malformedOptionalFields.isAnalysis)
+        let recoveredVariation = try XCTUnwrap(
+            malformedOptionalFields.variationData
+        )
+        XCTAssertEqual(recoveredVariation.fromMoveNumber, 5)
+        XCTAssertEqual(recoveredVariation.moves, "aa")
+        XCTAssertEqual(recoveredVariation.name, "")
+        XCTAssertTrue(
+            recoveredVariation.decodedMarkups(
+                boardWidth: 19,
+                boardHeight: 19
+            ).isEmpty
+        )
+
+        let underflowingLegacyBranch = try decodeChatLine(
+            body: #"{"type":"analysis","branch_move":\#(Int.min),"from":6,"moves":"aa","name":"Checked legacy branch"}"#
+        )
+        XCTAssertEqual(
+            underflowingLegacyBranch.variationData?.fromMoveNumber,
+            6
+        )
+    }
+
+    func testOnlyPlainStringBodiesCarryPlainTextSemantics() throws {
+        let plain = try decodeChatLine(body: #""/me waves""#)
+        let translated = try decodeChatLine(
+            body: #"{"type":"translated","en":"/me waves"}"#,
+            preferredLanguages: ["en"]
+        )
+        let analysis = try decodeChatLine(
+            body: #"{"type":"analysis","from":0,"moves":"aa","name":"/me variation"}"#
+        )
+
+        XCTAssertTrue(plain.isPlainTextBody)
+        XCTAssertEqual(plain.body, "/me waves")
+        XCTAssertFalse(translated.isPlainTextBody)
+        XCTAssertEqual(translated.body, "/me waves")
+        XCTAssertFalse(analysis.isPlainTextBody)
+        XCTAssertEqual(analysis.body, "/me variation")
+    }
+
+    func testChatCoordinatesHandleNonBMPTextBeforeCoordinate() throws {
+        var plain = try decodeChatLine(body: #""👍 c4 is good""#)
+        var translated = try decodeChatLine(
+            body: #"{"type":"translated","en":"👍 c4 is good"}"#,
+            preferredLanguages: ["en"]
+        )
+
+        XCTAssertEqual(plain.coordinates, [[3, 2]])
+        XCTAssertEqual(translated.coordinates, [[3, 2]])
+    }
+
+    func testTranslatedChatBodySelectsExactNormalizedAndBaseLanguages() throws {
+        let exact = try decodeChatLine(
+            body: #"{"type":"translated","fr-ca":"Allô","fr":"Bonjour","en":"Hello"}"#,
+            preferredLanguages: ["FR_ca"]
+        )
+        XCTAssertEqual(exact.body, "Allô")
+
+        let base = try decodeChatLine(
+            body: #"{"type":"translated","pt":"Olá","en":"Hello"}"#,
+            preferredLanguages: ["pt-BR"]
+        )
+        XCTAssertEqual(base.body, "Olá")
+
+        let englishBeforeSecondaryPreference = try decodeChatLine(
+            body: #"{"type":"translated","fr":"Bonjour","en":"Hello"}"#,
+            preferredLanguages: ["de-DE", "fr-FR"]
+        )
+        XCTAssertEqual(englishBeforeSecondaryPreference.body, "Hello")
+    }
+
+    func testTranslatedChatBodyMapsAppleChineseLocalesToOGSKeys() throws {
+        let traditional = try decodeChatLine(
+            body: #"{"type":"translated","zh-tw":"對局開始","en":"Game started"}"#,
+            preferredLanguages: ["zh-Hant-HK"]
+        )
+        XCTAssertEqual(traditional.body, "對局開始")
+
+        let simplified = try decodeChatLine(
+            body: #"{"type":"translated","zh-cn":"对局开始","en":"Game started"}"#,
+            preferredLanguages: ["zh_Hans_SG"]
+        )
+        XCTAssertEqual(simplified.body, "对局开始")
+
+        let scriptTakesPrecedenceOverRegion = try decodeChatLine(
+            body: #"{"type":"translated","zh-tw":"繁體","zh-cn":"简体"}"#,
+            preferredLanguages: ["zh-Hant-CN"]
+        )
+        XCTAssertEqual(scriptTakesPrecedenceOverRegion.body, "繁體")
+    }
+
+    func testTranslatedChatBodyUsesEnglishAvailableAndUnavailableFallbacks() throws {
+        let english = try decodeChatLine(
+            body: #"{"type":"translated","en":"Undo requested","fr":"Annulation demandée"}"#,
+            preferredLanguages: ["de-DE"]
+        )
+        XCTAssertEqual(english.body, "Undo requested")
+
+        let available = try decodeChatLine(
+            body: #"{"type":"translated","fr":"Annulation demandée"}"#,
+            preferredLanguages: ["de-DE"]
+        )
+        XCTAssertEqual(available.body, "Annulation demandée")
+
+        let unavailable = try decodeChatLine(
+            body: #"{"type":"translated","en":""}"#,
+            preferredLanguages: ["en"]
+        )
+        XCTAssertEqual(
+            unavailable.body,
+            String(localized: "[Message unavailable in this language]")
+        )
+    }
+
+    func testReviewAndUnknownStructuredChatBodiesRemainVisible() throws {
+        let review = try decodeChatLine(
+            body: #"{"type":"review","review_id":90212712}"#
+        )
+        XCTAssertEqual(review.reviewID, 90212712)
+        XCTAssertEqual(review.body, "")
+        XCTAssertFalse(review.isPlainTextBody)
+
+        let unknownBodies = [
             #"{"type":"future-analysis","from":0,"moves":"aa","name":"Future line"}"#,
-            #"{"type":"translated","en":"Undo requested"}"#,
-            #"{"type":"review","review_id":123}"#,
             #"{"type":"unknown","name":"Unknown line"}"#,
+            #"{"type":"review"}"#,
+            #"["unexpected", "shape"]"#,
         ]
 
-        for body in unsupportedBodies {
-            XCTAssertThrowsError(try decodeChatLine(body: body), body)
+        for body in unknownBodies {
+            XCTAssertEqual(
+                try decodeChatLine(body: body).body,
+                String(localized: "[Unknown chat message]"),
+                body
+            )
         }
+    }
+
+    func testChatLineAllowsNullMoveNumberAndMissingOptionalUserMetadata() throws {
+        let payload = #"""
+        {
+          "channel": "main",
+          "line": {
+            "body": {"type":"translated","en":"System message"},
+            "chat_id": "system-chat",
+            "date": 1700000000,
+            "move_number": null,
+            "player_id": "0"
+          }
+        }
+        """#
+        let line = try decoder.decode(
+            OGSChatLine.self,
+            from: Data(payload.utf8)
+        )
+
+        XCTAssertNil(line.moveNumber)
+        XCTAssertEqual(line.body, "System message")
+        XCTAssertEqual(line.user.id, 0)
+        XCTAssertEqual(line.user.username, "")
+        XCTAssertNil(line.user.ranking)
+        XCTAssertNil(line.user.professional)
+        XCTAssertNil(line.user.uiClass)
     }
 
     func testMoveDecodesMinimalPassAndFullPlayerUpdateShapes() throws {
@@ -187,7 +367,10 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams.white, [1769])
     }
 
-    private func decodeChatLine(body: String) throws -> OGSChatLine {
+    private func decodeChatLine(
+        body: String,
+        preferredLanguages: [String]? = nil
+    ) throws -> OGSChatLine {
         let payload = #"""
         {
           "channel": "main",
@@ -204,7 +387,12 @@ final class OGSModelDecodingTests: XCTestCase {
           }
         }
         """#
-        return try decoder.decode(OGSChatLine.self, from: Data(payload.utf8))
+        let chatDecoder = JSONDecoder()
+        chatDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        if let preferredLanguages {
+            chatDecoder.userInfo[.ogsChatPreferredLanguageIdentifiers] = preferredLanguages
+        }
+        return try chatDecoder.decode(OGSChatLine.self, from: Data(payload.utf8))
     }
 
     func testMoveRejectsIncompleteCoordinates() {
