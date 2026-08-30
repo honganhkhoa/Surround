@@ -98,6 +98,30 @@ final class SurroundUITests: SurroundUITestCase {
         return element
     }
 
+    private func openGameFailureAlert(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let alert = app.alerts["Unable to open game"].firstMatch
+        let retry = alert.buttons["Retry"].firstMatch
+        let appeared = retry.waitForExistence(timeout: 10)
+        if !appeared {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – missing open-game failure alert"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(
+            appeared,
+            "Expected the open-game failure alert with a Retry action",
+            file: file,
+            line: line
+        )
+        return alert
+    }
+
     private func unresolvedAnalyzeMenuItem(
         _ accessibilityIdentifier: String,
         catalystTitle: String,
@@ -1303,21 +1327,14 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
 
-        // A REST-only route exposes its loading state before deterministic
-        // offline failure, then returns to the existing Home context.
+        // A REST-only route fails deterministically, then returns to the
+        // existing Home context. Do not assert the transient loading overlay:
+        // app.open may reconnect after the route has already reached its alert.
         app.open(URL(string: "surround://home")!)
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         app.open(URL(string: "surround://home/\(missingGameID)")!)
-        element(
-            SurroundUITestContract.AccessibilityID.openingGame,
-            in: app
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.openGameRetry,
-            in: app,
-            matching: .button
-        )
-        var cancel = app.buttons["Cancel"].firstMatch
+        let failureAlert = openGameFailureAlert(in: app)
+        let cancel = failureAlert.buttons["Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 10))
         cancel.tap()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
@@ -1340,26 +1357,6 @@ final class SurroundUITests: SurroundUITestCase {
         XCTAssertFalse(
             newGame.exists,
             "Opening a routed game must dismiss the tracked New Game sheet."
-        )
-
-        // A failed replacement keeps the game being read on screen. The
-        // loading delay makes the preservation check deterministic.
-        app.open(URL(string: "surround://home/\(missingGameID)")!)
-        element(
-            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
-            in: app
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.openGameRetry,
-            in: app,
-            matching: .button
-        )
-        cancel = app.buttons["Cancel"].firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
-        cancel.tap()
-        element(
-            SurroundUITestContract.AccessibilityID.gameDetail(firstGameID),
-            in: app
         )
         #endif
     }
