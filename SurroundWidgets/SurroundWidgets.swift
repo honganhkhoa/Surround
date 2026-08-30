@@ -148,7 +148,7 @@ class Provider: TimelineProvider {
                 $0.gameData?.timeControl.speed == .correspondence
             },
             isUserTurn: {
-                $0.clock?.currentPlayerId == userId
+                $0.requiresUserAction(forPlayerWithId: userId)
             },
             timeLeft: { game in
                 guard let clock = game.clock else { return .infinity }
@@ -156,7 +156,8 @@ class Provider: TimelineProvider {
                     ofPlayerWithId: userId
                 ) == .black ? clock.blackTime : clock.whiteTime
                 return thinkingTime.thinkingTimeLeft ?? .infinity
-            }
+            },
+            gameID: { $0.ogsID ?? .max }
         )
     }
 
@@ -324,7 +325,7 @@ struct CorrespondenceGamesWidgetView: View {
 
     private var numberOfGamesOnUserTurn: Int {
         CorrespondenceWidgetContentPolicy.pendingCount(in: entry.games) {
-            $0.clock?.currentPlayerId == userId
+            $0.requiresUserAction(forPlayerWithId: userId)
         }
     }
 
@@ -551,7 +552,7 @@ struct CorrespondenceGamesWidgetView: View {
     private func gameCell(game: Game, boardSize: CGFloat) -> some View {
         return VStack(spacing: 0) {
             ZStack {
-                if game.clock?.currentPlayerId == userId {
+                if game.requiresUserAction(forPlayerWithId: userId) {
                     if resolvedRenderingMode == .fullColor {
                         Color(.systemTeal)
                             .frame(

@@ -478,15 +478,20 @@ class OGSService: ObservableObject {
                 liveGames.append(game)
             }
         }
-        let thinkingTimeLeftIncreasing: (Game, Game) -> Bool =  { game1, game2 in
-            if let clock1 = game1.clock, let clock2 = game2.clock, let user = self.user {
-                let time1 = game1.stoneColor(of: user) == .black ? clock1.blackTime : clock1.whiteTime
-                let time2 = game2.stoneColor(of: user) == .black ? clock2.blackTime : clock2.whiteTime
-                let timeLeft1 = time1.thinkingTimeLeft ?? .infinity
-                let timeLeft2 = time2.thinkingTimeLeft ?? .infinity
-                return timeLeft1 <= timeLeft2
+        let thinkingTimeLeft: (Game) -> Double = { game in
+            guard let clock = game.clock, let user = self.user else {
+                return .infinity
             }
-            return false
+            let time = game.stoneColor(of: user) == .black ? clock.blackTime : clock.whiteTime
+            return time.thinkingTimeLeft ?? .infinity
+        }
+        let thinkingTimeLeftIncreasing: (Game, Game) -> Bool = { game1, game2 in
+            let timeLeft1 = thinkingTimeLeft(game1)
+            let timeLeft2 = thinkingTimeLeft(game2)
+            if timeLeft1 != timeLeft2 {
+                return timeLeft1 < timeLeft2
+            }
+            return (game1.ogsID ?? .max) < (game2.ogsID ?? .max)
         }
         self.sortedActiveCorrespondenceGamesOnUserTurn = gamesOnUserTurn.sorted(by: thinkingTimeLeftIncreasing)
         self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOpponentTurn.sorted(by: thinkingTimeLeftIncreasing)
@@ -3149,24 +3154,10 @@ class OGSService: ObservableObject {
     }
 
     func isOnUserTurn(game: Game) -> Bool {
-        if game.gamePhase == .stoneRemoval {
-            if let userColor = game.userStoneColor {
-                if game.removedStonesAccepted[userColor] == nil || game.removedStonesAccepted[userColor] != game.currentPosition.removedStones {
-                    return true
-                } else {
-                    return false
-                }
-            }
-        } else if game.gamePhase != .finished {
-            if let clock = game.clock {
-                if clock.currentPlayerId == self.user?.id {
-                    return true
-                } else {
-                    return false
-                }
-            }
+        guard let userId = user?.id else {
+            return false
         }
-        return false
+        return game.requiresUserAction(forPlayerWithId: userId)
     }
     
     func findAutomatch(entry: OGSAutomatchEntry) {

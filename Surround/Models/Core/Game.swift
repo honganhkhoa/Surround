@@ -925,6 +925,24 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         
         return nil
     }
+
+    /// Whether the player must act by moving or reviewing the current
+    /// removed-stone set.
+    func requiresUserAction(forPlayerWithId playerId: Int) -> Bool {
+        if gamePhase == .stoneRemoval {
+            guard let playerColor = stoneColor(ofPlayerWithId: playerId) else {
+                return false
+            }
+            return removedStonesAccepted[playerColor] == nil
+                || removedStonesAccepted[playerColor]
+                    != currentPosition.removedStones
+        }
+
+        guard gamePhase != .finished else {
+            return false
+        }
+        return clock?.currentPlayerId == playerId
+    }
     
     var userStoneColor: StoneColor? {
         guard let user = ogs?.user else {

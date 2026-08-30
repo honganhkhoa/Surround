@@ -109,6 +109,45 @@ class GameTests: XCTestCase {
             XCTAssertTrue(game.analysisAvailable)
         }
     }
+
+    func testRequiresUserActionUsesAcceptanceDuringStoneRemoval() throws {
+        let game = GameTests.sampleGame(ogsId: 27_053_412)
+        let blackId = try XCTUnwrap(game.blackPlayer?.id)
+        let whiteId = try XCTUnwrap(game.whitePlayer?.id)
+        let removedStones = try XCTUnwrap(game.currentPosition.removedStones)
+
+        XCTAssertEqual(game.gamePhase, .stoneRemoval)
+        XCTAssertEqual(game.clock?.currentPlayerId, blackId)
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: blackId))
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: whiteId))
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: -1))
+
+        game.removedStonesAccepted[.black] = []
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: blackId))
+
+        game.removedStonesAccepted[.black] = removedStones
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: blackId))
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: whiteId))
+
+        game.removedStonesAccepted[.white] = removedStones
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: blackId))
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: whiteId))
+    }
+
+    func testRequiresUserActionUsesClockOutsideStoneRemoval() throws {
+        let game = GameTests.sampleGame(ogsId: 27_053_412)
+        let blackId = try XCTUnwrap(game.blackPlayer?.id)
+        let whiteId = try XCTUnwrap(game.whitePlayer?.id)
+
+        game.gamePhase = .play
+        XCTAssertEqual(game.clock?.currentPlayerId, blackId)
+        XCTAssertTrue(game.requiresUserAction(forPlayerWithId: blackId))
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: whiteId))
+
+        game.gamePhase = .finished
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: blackId))
+        XCTAssertFalse(game.requiresUserAction(forPlayerWithId: whiteId))
+    }
     
     static func sampleGame(ogsId: Int) -> Game {
         let fileURL = Bundle(for: GameTests.self).url(forResource: "game-\(ogsId)", withExtension: "json")!

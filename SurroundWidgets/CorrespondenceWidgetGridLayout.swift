@@ -22,25 +22,25 @@ struct CorrespondenceWidgetContentPolicy {
         _ games: [GameValue],
         isCorrespondence: (GameValue) -> Bool,
         isUserTurn: (GameValue) -> Bool,
-        timeLeft: (GameValue) -> TimeInterval
+        timeLeft: (GameValue) -> TimeInterval,
+        gameID: (GameValue) -> Int
     ) -> [GameValue] {
-        games.enumerated()
-            .filter { isCorrespondence($0.element) }
+        games
+            .filter(isCorrespondence)
             .sorted { first, second in
-                let firstIsUserTurn = isUserTurn(first.element)
-                let secondIsUserTurn = isUserTurn(second.element)
+                let firstIsUserTurn = isUserTurn(first)
+                let secondIsUserTurn = isUserTurn(second)
                 if firstIsUserTurn != secondIsUserTurn {
                     return firstIsUserTurn
                 }
 
-                let firstTimeLeft = timeLeft(first.element)
-                let secondTimeLeft = timeLeft(second.element)
+                let firstTimeLeft = timeLeft(first)
+                let secondTimeLeft = timeLeft(second)
                 if firstTimeLeft != secondTimeLeft {
                     return firstTimeLeft < secondTimeLeft
                 }
-                return first.offset < second.offset
+                return gameID(first) < gameID(second)
             }
-            .map(\.element)
     }
 
     static func pendingCount<GameValue>(

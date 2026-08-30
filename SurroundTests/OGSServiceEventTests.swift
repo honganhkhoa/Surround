@@ -2079,6 +2079,35 @@ final class OGSServiceEventTests: XCTestCase {
         }
     }
 
+    func testOverviewSortsTiedCorrespondenceGamesByGameID() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        let fixture = try makeEmptyGameData(id: 100)
+        service.user = fixture.players.black
+
+        let gameIDs = [308, 301, 306, 303, 305, 302, 307, 304]
+        service.processOverview(overview: [
+            "active_games": try gameIDs.map {
+                try makeOverviewGameData(
+                    id: $0,
+                    speed: "correspondence",
+                    currentPlayerID: fixture.players.black.id
+                )
+            },
+        ])
+
+        let sortedGames = service.sortedActiveCorrespondenceGamesOnUserTurn
+        let timesLeft = sortedGames.compactMap {
+            $0.clock?.blackTime.thinkingTimeLeft
+        }
+        XCTAssertEqual(timesLeft.count, gameIDs.count)
+        XCTAssertEqual(Set(timesLeft).count, 1)
+        XCTAssertEqual(
+            sortedGames.compactMap(\.ogsID),
+            gameIDs.sorted()
+        )
+    }
+
     private func makeService(
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],

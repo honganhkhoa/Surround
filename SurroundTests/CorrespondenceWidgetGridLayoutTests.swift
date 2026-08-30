@@ -244,9 +244,44 @@ final class CorrespondenceWidgetGridLayoutTests: XCTestCase {
                 games,
                 isCorrespondence: \SelectionGame.isCorrespondence,
                 isUserTurn: \SelectionGame.isUserTurn,
-                timeLeft: \SelectionGame.timeLeft
+                timeLeft: \SelectionGame.timeLeft,
+                gameID: \SelectionGame.id
             ).map(\.id),
             [4, 3, 1]
+        )
+    }
+
+    func testSelectionUsesGameIDToBreakTimeLeftTies() {
+        let games = [
+            SelectionGame(
+                id: 8,
+                isCorrespondence: true,
+                isUserTurn: true,
+                timeLeft: 10
+            ),
+            SelectionGame(
+                id: 3,
+                isCorrespondence: true,
+                isUserTurn: true,
+                timeLeft: 10
+            ),
+            SelectionGame(
+                id: 5,
+                isCorrespondence: true,
+                isUserTurn: true,
+                timeLeft: 10
+            ),
+        ]
+
+        XCTAssertEqual(
+            CorrespondenceWidgetContentPolicy.sortedCorrespondenceGames(
+                games,
+                isCorrespondence: \SelectionGame.isCorrespondence,
+                isUserTurn: \SelectionGame.isUserTurn,
+                timeLeft: \SelectionGame.timeLeft,
+                gameID: \SelectionGame.id
+            ).map(\.id),
+            [3, 5, 8]
         )
     }
 
