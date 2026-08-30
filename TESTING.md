@@ -211,6 +211,28 @@ Prepare the release:
 
 Preparation validates locally, takes a read-only snapshot of the target listing, preflights version state and first-time-localization metadata, then captures and validates all 260 screenshots. It creates a unique gitignored `.build/AppStoreRelease-*` artifact with the source snapshot, normalized release, screenshot gallery, metadata diff, and `publish-manifest.json`. Inspect both the capture's `index.html` and the artifact's `review.html` before publishing.
 
+For a patch release that changes only What's New and deliberately reuses every listing field and screenshot from an exact released version, use the metadata-only preparation path:
+
+```sh
+.github/ci-tools/app-store-release.sh prepare-metadata-only \
+  --release ../AppStoreReleases/2.2.1/release.json \
+  --source-version 2.2
+```
+
+This performs the same local release and shipping-version validation and takes a read-only App Store Connect snapshot, but it never launches screenshot capture. It requires the private release package to contain exactly `whatsNew` for all configured locales: version-wide, other version-localized, and App Info fields are rejected. It separately captures live and draft App Info and requires their localized fields, non-state attributes, categories, and age-rating declaration to match ID-free. It also verifies that the confirmed source has the exact locale/screenshot-family/count contract and that every screenshot has a file name, checksum, and `COMPLETE` processing state. The resulting artifact is named `.build/AppStoreRelease-MetadataOnly-<version>-<timestamp>` and contains the snapshot, normalized release, zero-screenshot manifest, and focused `review.html`.
+
+After reviewing the exact source version, target version, notes, and manifest digest shown there, publish with all three confirmations:
+
+```sh
+.github/ci-tools/app-store-release.sh publish-metadata-only \
+  --manifest .build/AppStoreRelease-MetadataOnly-2.2.1-<timestamp>/publish-manifest.json \
+  --confirm-source-version 2.2 \
+  --confirm-version 2.2.1 \
+  --confirm-manifest-digest <reviewed-sha256>
+```
+
+The metadata-only publisher may create the confirmed target version. It omits `releaseType` from that POST, waits for Apple's inheritance to settle, and compares the target with the source by locale, non-What's-New metadata, screenshot family, order, file name, checksum, and processing state. Resource IDs are excluded from the inheritance comparison because copied resources receive new IDs. After that gate, the only permitted writes are sparse version-localization PATCHes whose attributes contain exactly `whatsNew`. It has no screenshot, preview, App Info, build, submission, or DELETE write route. Mutations are single-attempt, and a stable bundle/platform/version advisory lock prevents distinct handoffs from racing. Its `metadata-only-publish-journal.json`, post-create snapshot, and final snapshot support bounded reconciliation; an ambiguous target-version POST is never replayed automatically.
+
 Publishing is deliberately a separate, explicit command:
 
 ```sh
@@ -219,7 +241,7 @@ Publishing is deliberately a separate, explicit command:
   --confirm-version 2.1
 ```
 
-Only `publish` mutates App Store Connect. It verifies the exact version, manifest checksums, and unchanged remote snapshot; uploads and orders exactly ten iPhone and ten iPad screenshots per locale; applies only reviewed metadata; and reads the result back. Its sibling `publish-journal.json` supports a reconciled rerun after a journaled interruption; an ambiguous create or upload-reservation outcome stops for inspection instead of being replayed blindly. The workflow does not upload or select an app build and does not submit the version for App Review.
+Only the two explicit publishing commands mutate App Store Connect. The full `publish` path verifies the exact version, manifest checksums, and unchanged remote snapshot; uploads and orders exactly ten iPhone and ten iPad screenshots per locale; applies only reviewed metadata; and reads the result back. Its sibling `publish-journal.json` supports a reconciled rerun after a journaled interruption; an ambiguous create or upload-reservation outcome stops for inspection instead of being replayed blindly. Neither workflow uploads or selects an app build or submits the version for App Review.
 
 Validate the public wrapper and tool without production requests:
 

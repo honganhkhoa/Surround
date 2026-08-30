@@ -50,6 +50,16 @@ public protocol HTTPTransport: Sendable {
     func send(_ request: URLRequest) throws -> TransportResponse
 }
 
+/// Controls whether an individual App Store Connect request may be retried.
+///
+/// Use ``singleAttempt`` for mutations whose outcome must be reconciled before
+/// another request is sent. The default preserves the client's existing retry
+/// behavior for idempotent requests while continuing to keep POST single-shot.
+public enum ASCRetryPolicy: Equatable, Sendable {
+    case automatic
+    case singleAttempt
+}
+
 public final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
 
@@ -109,7 +119,8 @@ public final class ASCAPIClient: @unchecked Sendable {
         path: String,
         query: [URLQueryItem] = [],
         body: JSONValue? = nil,
-        expectedStatus: Range<Int> = 200..<300
+        expectedStatus: Range<Int> = 200..<300,
+        retryPolicy: ASCRetryPolicy = .automatic
     ) throws -> JSONValue? {
         let url = try makeURL(path: path, query: query)
         var request = URLRequest(url: url)
@@ -120,7 +131,7 @@ public final class ASCAPIClient: @unchecked Sendable {
             request.httpBody = try JSONSerialization.data(withJSONObject: body.any, options: [])
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        let response = try sendWithRetry(request)
+        let response = try sendWithRetry(request, retryPolicy: retryPolicy)
         guard expectedStatus.contains(response.statusCode) else {
             throw apiError(method: method, url: url, response: response)
         }
@@ -281,39 +292,43 @@ public final class ASCAPIClient: @unchecked Sendable {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    private func sendWithRetry(_ request: URLRequest) throws -> TransportResponse {
+    private func sendWithRetry(
+        _ request: URLRequest,
+        retryPolicy: ASCRetryPolicy = .automatic
+    ) throws -> TransportResponse {
         let method = (request.httpMethod ?? "GET").uppercased()
+        let retryLimit = retryPolicy == .singleAttempt ? 0 : maxRetries
         var lastError: Error?
-        for attempt in 0...maxRetries {
+        for attempt in 0...retryLimit {
             let response: TransportResponse
             do {
                 response = try transport.send(request)
             } catch {
                 lastError = error
-                if method == "POST" {
+                if method == "POST" || retryPolicy == .singleAttempt {
                     throw ReleaseToolError.api(
-                        "POST \(request.url?.path ?? "<unknown>") failed with a network error "
+                        "\(method) \(request.url?.path ?? "<unknown>") failed with a network error "
                             + "and was not retried because its outcome is ambiguous. "
                             + "Inspect App Store Connect before resuming: \(error.localizedDescription)"
                     )
                 }
-                if attempt == maxRetries { break }
+                if attempt == retryLimit { break }
                 sleepBeforeRetry(attempt: attempt, headers: [:])
                 continue
             }
             if response.statusCode == 429 || response.statusCode >= 500 {
-                if method == "POST" {
+                if method == "POST" || retryPolicy == .singleAttempt {
                     let responseError = apiError(
                         method: method,
                         url: request.url ?? baseURL,
                         response: response
                     )
                     throw ReleaseToolError.api(
-                        "\(responseError.description). The POST was not retried because "
+                        "\(responseError.description). The \(method) was not retried because "
                             + "its outcome is ambiguous; inspect App Store Connect before resuming."
                     )
                 }
-                if attempt < maxRetries {
+                if attempt < retryLimit {
                     sleepBeforeRetry(attempt: attempt, headers: response.headers)
                     continue
                 }
@@ -321,7 +336,7 @@ public final class ASCAPIClient: @unchecked Sendable {
             return response
         }
         throw ReleaseToolError.api(
-            "Network request failed after \(maxRetries + 1) attempts: \(lastError?.localizedDescription ?? "unknown error")"
+            "Network request failed after \(retryLimit + 1) attempts: \(lastError?.localizedDescription ?? "unknown error")"
         )
     }
 

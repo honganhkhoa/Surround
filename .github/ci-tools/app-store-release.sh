@@ -14,7 +14,11 @@ Usage:
   app-store-release.sh init --version VERSION --output DIRECTORY
   app-store-release.sh validate --release FILE [--output FILE]
   app-store-release.sh prepare --release FILE
+  app-store-release.sh prepare-metadata-only --release FILE --source-version VERSION
   app-store-release.sh publish --manifest FILE --confirm-version VERSION
+  app-store-release.sh publish-metadata-only --manifest FILE \
+    --confirm-source-version VERSION --confirm-version VERSION \
+    --confirm-manifest-digest SHA256
   app-store-release.sh help
 
 Commands:
@@ -26,8 +30,14 @@ Commands:
             preflight localized metadata (including required fields for newly
             added languages), capture all localized screenshots, and build a
             review manifest.
-  publish   Apply one previously reviewed manifest. This is the only command
-            that mutates App Store Connect.
+  prepare-metadata-only
+            Validate a What's-New-only package, snapshot the exact released
+            source version, and build a zero-screenshot review manifest.
+  publish   Apply one reviewed screenshot-and-metadata manifest.
+  publish-metadata-only
+            Create or reuse the reviewed target version, verify that metadata
+            and screenshots inherit unchanged from the confirmed source, and
+            patch only localized What's New fields.
 
 Options:
   --version VERSION          App Store version used by init.
@@ -35,15 +45,22 @@ Options:
                              validate. The validate output is optional.
   --release FILE             Path to the private release.json input.
   --manifest FILE            Path to prepare's publish-manifest.json.
+  --source-version VERSION   Exact released version to inherit during
+                             prepare-metadata-only.
+  --confirm-source-version VERSION
+                             Exact reviewed source-version confirmation.
   --confirm-version VERSION  Required exact version confirmation for publish.
+  --confirm-manifest-digest SHA256
+                             Required exact reviewed manifest confirmation for
+                             publish-metadata-only.
   -h, --help                 Show this help.
 
-Authentication for prepare and publish:
+Authentication for both prepare and publish modes:
   ASC_KEY_ID
   ASC_ISSUER_ID
   ASC_PRIVATE_KEY_PATH
 
-Screenshot runtime for prepare:
+Screenshot runtime for prepare (not prepare-metadata-only):
   Captures default to the checked-in iOS 26.5 submission runtime. Set
   APP_STORE_IOS_RUNTIME only when deliberately changing that runtime.
 
@@ -111,6 +128,13 @@ validate_version_string() {
 
   [[ "$version" =~ ^[0-9]+([.][0-9]+){1,2}$ ]] \
     || usage_error "Version '${version}' must contain two or three dot-separated integer components."
+}
+
+validate_sha256_string() {
+  local digest="$1"
+
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] \
+    || usage_error "Manifest digest must be exactly 64 lowercase hexadecimal characters."
 }
 
 canonicalize_path_with_existing_parent() {
@@ -400,6 +424,26 @@ create_unique_artifact_path() {
   printf '%s\n' "$candidate_path"
 }
 
+create_unique_metadata_only_artifact_path() {
+  local version="$1"
+  local timestamp
+  local base_path
+  local candidate_path
+  local suffix
+
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  base_path="${repository_root}/.build/AppStoreRelease-MetadataOnly-${version}-${timestamp}"
+  candidate_path="$base_path"
+  suffix=2
+
+  while [[ -e "$candidate_path" || -L "$candidate_path" ]]; do
+    candidate_path="${base_path}-${suffix}"
+    suffix=$((suffix + 1))
+  done
+
+  printf '%s\n' "$candidate_path"
+}
+
 command_init() {
   local version=""
   local output_path=""
@@ -594,6 +638,106 @@ command_prepare() {
   echo "Publish manifest: ${manifest_path}"
 }
 
+command_prepare_metadata_only() {
+  local release_path=""
+  local source_version=""
+  local requested_version
+  local normalized_version
+  local artifact_path
+  local normalized_release_path
+  local remote_snapshot_path
+  local manifest_path
+  local review_html_path
+  local manifest_digest
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --release)
+        (( $# >= 2 )) || usage_error "--release requires a value."
+        release_path="$(absolute_path "$2")"
+        shift 2
+        ;;
+      --source-version)
+        (( $# >= 2 )) || usage_error "--source-version requires a value."
+        source_version="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        usage_error "Unknown prepare-metadata-only option: $1"
+        ;;
+    esac
+  done
+
+  [[ -n "$release_path" ]] || usage_error "prepare-metadata-only requires --release."
+  [[ -n "$source_version" ]] \
+    || usage_error "prepare-metadata-only requires --source-version."
+  validate_version_string "$source_version"
+  require_readable_file "Release input" "$release_path"
+  release_path="$(realpath "$release_path")" \
+    || fail "Release input could not be resolved: ${release_path}"
+  require_private_release_path "Release input" "$release_path"
+
+  requested_version="$(
+    jq -er '.version | select(type == "string" and length > 0)' "$release_path"
+  )" || fail "The release input does not contain a version string."
+  validate_version_string "$requested_version"
+  [[ "$requested_version" != "$source_version" ]] \
+    || usage_error "Target version and source version must differ."
+
+  artifact_path="$(create_unique_metadata_only_artifact_path "$requested_version")"
+  normalized_release_path="${artifact_path}/normalized-release.json"
+  mkdir -p "$artifact_path"
+
+  run_app_store_connect_tool validate-release \
+    --release "$release_path" \
+    --locales-config "$locale_configuration_path" \
+    --output "$normalized_release_path"
+
+  normalized_version="$(normalized_release_version "$normalized_release_path")"
+  [[ "$normalized_version" == "$requested_version" ]] \
+    || fail "Normalized release version '${normalized_version}' does not match '${requested_version}'."
+  validate_shipping_marketing_versions "$normalized_version"
+  require_app_store_credentials
+
+  remote_snapshot_path="${artifact_path}/remote-snapshot.json"
+  echo "Taking a read-only App Store Connect snapshot for metadata-only review..."
+  run_app_store_connect_tool snapshot \
+    --release "$normalized_release_path" \
+    --output "$remote_snapshot_path"
+
+  echo "Preflighting inherited metadata and screenshots without rendering captures..."
+  run_app_store_connect_tool validate-snapshot \
+    --release "$normalized_release_path" \
+    --snapshot "$remote_snapshot_path"
+
+  manifest_path="${artifact_path}/publish-manifest.json"
+  review_html_path="${artifact_path}/review.html"
+  run_app_store_connect_tool build-metadata-only-manifest \
+    --release "$normalized_release_path" \
+    --locales-config "$locale_configuration_path" \
+    --remote-snapshot "$remote_snapshot_path" \
+    --expected-source-version "$source_version" \
+    --output "$manifest_path" \
+    --review-html "$review_html_path"
+
+  manifest_digest="$(
+    jq -er '.manifestDigest | select(type == "string" and length == 64)' "$manifest_path"
+  )" || fail "The metadata-only manifest does not contain a SHA-256 digest."
+  validate_sha256_string "$manifest_digest"
+
+  echo "Metadata-only App Store release ${normalized_version} is prepared for review."
+  echo "Artifact:        ${artifact_path}"
+  echo "Metadata review: ${review_html_path}"
+  echo "Publish manifest: ${manifest_path}"
+  echo "Source version:  ${source_version}"
+  echo "Manifest digest: ${manifest_digest}"
+  echo "No screenshots were rendered or placed under management."
+}
+
 command_publish() {
   local manifest_path=""
   local confirmed_version=""
@@ -635,6 +779,9 @@ command_publish() {
       fail "Publish requires a reviewed manifest from .build/AppStoreRelease-*: ${manifest_path}"
       ;;
   esac
+  if [[ "$(jq -r '.captureMetadata.mode // empty' "$manifest_path")" == "metadata-only" ]]; then
+    fail "Metadata-only manifests require publish-metadata-only."
+  fi
   manifest_version="$(
     jq -er '.release.version | select(type == "string" and length > 0)' "$manifest_path"
   )" || fail "The publish manifest does not contain a release version."
@@ -651,6 +798,109 @@ command_publish() {
 
   echo "App Store release ${confirmed_version} was published and verified."
   echo "Publish journal: ${journal_path}"
+}
+
+command_publish_metadata_only() {
+  local manifest_path=""
+  local confirmed_source_version=""
+  local confirmed_version=""
+  local confirmed_manifest_digest=""
+  local manifest_version
+  local manifest_source_version
+  local manifest_digest
+  local journal_path
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --manifest)
+        (( $# >= 2 )) || usage_error "--manifest requires a value."
+        manifest_path="$(absolute_path "$2")"
+        shift 2
+        ;;
+      --confirm-source-version)
+        (( $# >= 2 )) || usage_error "--confirm-source-version requires a value."
+        confirmed_source_version="$2"
+        shift 2
+        ;;
+      --confirm-version)
+        (( $# >= 2 )) || usage_error "--confirm-version requires a value."
+        confirmed_version="$2"
+        shift 2
+        ;;
+      --confirm-manifest-digest)
+        (( $# >= 2 )) || usage_error "--confirm-manifest-digest requires a value."
+        confirmed_manifest_digest="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        usage_error "Unknown publish-metadata-only option: $1"
+        ;;
+    esac
+  done
+
+  [[ -n "$manifest_path" ]] || usage_error "publish-metadata-only requires --manifest."
+  [[ -n "$confirmed_source_version" ]] \
+    || usage_error "publish-metadata-only requires --confirm-source-version."
+  [[ -n "$confirmed_version" ]] \
+    || usage_error "publish-metadata-only requires --confirm-version."
+  [[ -n "$confirmed_manifest_digest" ]] \
+    || usage_error "publish-metadata-only requires --confirm-manifest-digest."
+  validate_version_string "$confirmed_source_version"
+  validate_version_string "$confirmed_version"
+  validate_sha256_string "$confirmed_manifest_digest"
+  [[ "$confirmed_source_version" != "$confirmed_version" ]] \
+    || usage_error "Confirmed source and target versions must differ."
+
+  require_readable_file "Publish manifest" "$manifest_path"
+  manifest_path="$(realpath "$manifest_path")" \
+    || fail "Publish manifest could not be resolved: ${manifest_path}"
+  case "$manifest_path" in
+    "${repository_root}/.build/AppStoreRelease-MetadataOnly-"*/publish-manifest.json)
+      ;;
+    *)
+      fail "Metadata-only publish requires a reviewed manifest from .build/AppStoreRelease-MetadataOnly-*: ${manifest_path}"
+      ;;
+  esac
+  [[ "$(jq -r '.captureMetadata.mode // empty' "$manifest_path")" == "metadata-only" ]] \
+    || fail "publish-metadata-only requires a metadata-only manifest."
+
+  manifest_version="$(
+    jq -er '.release.version | select(type == "string" and length > 0)' "$manifest_path"
+  )" || fail "The publish manifest does not contain a release version."
+  manifest_source_version="$(
+    jq -er '.captureMetadata.expectedSourceVersion | select(type == "string" and length > 0)' \
+      "$manifest_path"
+  )" || fail "The metadata-only manifest does not contain its reviewed source version."
+  manifest_digest="$(
+    jq -er '.manifestDigest | select(type == "string" and length == 64)' "$manifest_path"
+  )" || fail "The publish manifest does not contain its reviewed digest."
+  [[ "$manifest_version" == "$confirmed_version" ]] \
+    || fail "Confirmed version '${confirmed_version}' does not match manifest version '${manifest_version}'."
+  [[ "$manifest_source_version" == "$confirmed_source_version" ]] \
+    || fail "Confirmed source '${confirmed_source_version}' does not match manifest source '${manifest_source_version}'."
+  [[ "$manifest_digest" == "$confirmed_manifest_digest" ]] \
+    || fail "Confirmed digest does not match manifest digest '${manifest_digest}'."
+
+  validate_shipping_marketing_versions "$confirmed_version"
+  require_app_store_credentials
+
+  journal_path="$(dirname "$manifest_path")/metadata-only-publish-journal.json"
+  run_app_store_connect_tool publish-metadata-only \
+    --manifest "$manifest_path" \
+    --locales-config "$locale_configuration_path" \
+    --expected-source-version "$confirmed_source_version" \
+    --confirm-version "$confirmed_version" \
+    --confirm-manifest-digest "$confirmed_manifest_digest" \
+    --journal "$journal_path"
+
+  echo "Metadata-only App Store release ${confirmed_version} was published and verified."
+  echo "Inherited source: ${confirmed_source_version}"
+  echo "Publish journal: ${journal_path}"
+  echo "Screenshots, App Info, builds, and review submission were not mutated."
 }
 
 invocation_directory="$PWD"
@@ -712,9 +962,17 @@ case "$command_name" in
     require_command xcodebuild
     command_prepare "$@"
     ;;
+  prepare-metadata-only)
+    require_command xcodebuild
+    command_prepare_metadata_only "$@"
+    ;;
   publish)
     require_command xcodebuild
     command_publish "$@"
+    ;;
+  publish-metadata-only)
+    require_command xcodebuild
+    command_publish_metadata_only "$@"
     ;;
   help|-h|--help)
     usage

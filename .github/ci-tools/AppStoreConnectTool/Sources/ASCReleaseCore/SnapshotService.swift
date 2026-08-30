@@ -33,7 +33,8 @@ public final class SnapshotService {
         let source: RemoteVersion?
         if sourceSummary?.id == targetSummary?.id { source = target }
         else { source = try sourceSummary.map(loadVersion) }
-        let appInfo = try loadAppInfo(appId: appId)
+        let appInfos = try loadAppInfos(appId: appId)
+        let appInfo = appInfos.target ?? appInfos.source
 
         let fingerprint = try Self.fingerprint(
             appId: appId,
@@ -42,7 +43,9 @@ public final class SnapshotService {
             requestedVersion: release.version,
             targetVersion: target,
             sourceVersion: source,
-            appInfo: appInfo
+            appInfo: appInfo,
+            sourceAppInfo: appInfos.source,
+            targetAppInfo: appInfos.target
         )
         return RemoteSnapshot(
             capturedAt: ISO8601DateFormatter.releaseTool.string(from: Date()),
@@ -53,7 +56,9 @@ public final class SnapshotService {
             requestedVersion: release.version,
             targetVersion: target,
             sourceVersion: source,
-            appInfo: appInfo
+            appInfo: appInfo,
+            sourceAppInfo: appInfos.source,
+            targetAppInfo: appInfos.target
         )
     }
 
@@ -65,7 +70,9 @@ public final class SnapshotService {
             requestedVersion: snapshot.requestedVersion,
             targetVersion: snapshot.targetVersion,
             sourceVersion: snapshot.sourceVersion,
-            appInfo: snapshot.appInfo
+            appInfo: snapshot.appInfo,
+            sourceAppInfo: snapshot.sourceAppInfo,
+            targetAppInfo: snapshot.targetAppInfo
         )
     }
 
@@ -171,38 +178,261 @@ public final class SnapshotService {
         )
     }
 
-    private func loadAppInfo(appId: String) throws -> RemoteAppInfo? {
+    private struct AppInfoSummary {
+        let id: String
+        let state: String?
+    }
+
+    private struct AppInfoPair {
+        let source: RemoteAppInfo?
+        let target: RemoteAppInfo?
+    }
+
+    private struct IncludedResourceKey: Hashable {
+        let type: String
+        let id: String
+    }
+
+    private struct ResourceLinkage: Hashable {
+        let type: String
+        let id: String
+    }
+
+    private func loadAppInfos(appId: String) throws -> AppInfoPair {
         let rawInfos = try client.list(
             path: "/v1/apps/\(appId)/appInfos",
             query: [URLQueryItem(name: "limit", value: "200")]
         )
-        let parsed: [(id: String, state: String?, attributes: [String: JSONValue])] = try rawInfos.map {
+        let parsed: [AppInfoSummary] = try rawInfos.map {
             guard let id = $0["id"]?.stringValue,
                   let attributes = $0["attributes"]?.objectValue else {
                 throw ReleaseToolError.api("Malformed appInfos resource")
             }
-            return (id, (attributes["state"] ?? attributes["appStoreState"])?.stringValue, attributes)
+            return AppInfoSummary(
+                id: id,
+                state: (attributes["state"] ?? attributes["appStoreState"])?.stringValue
+            )
         }
-        guard let selected = parsed.first(where: { $0.state == "PREPARE_FOR_SUBMISSION" })
-            ?? parsed.first(where: { ["READY_FOR_DISTRIBUTION", "READY_FOR_SALE"].contains($0.state ?? "") })
-            else { return nil }
-        let rawLocalizations = try client.list(
-            path: "/v1/appInfos/\(selected.id)/appInfoLocalizations",
-            query: [URLQueryItem(name: "limit", value: "200")]
+
+        let drafts = parsed.filter { $0.state == "PREPARE_FOR_SUBMISSION" }
+        guard drafts.count <= 1 else {
+            throw ReleaseToolError.validation(
+                "App Store Connect returned multiple draft App Info resources"
+            )
+        }
+        let liveStates = Set(["READY_FOR_DISTRIBUTION", "READY_FOR_SALE"])
+        let live = parsed.filter { liveStates.contains($0.state ?? "") }
+        guard live.count <= 1 else {
+            throw ReleaseToolError.validation(
+                "App Store Connect returned multiple live App Info resources"
+            )
+        }
+
+        return AppInfoPair(
+            source: try live.first.map(loadAppInfo),
+            target: try drafts.first.map(loadAppInfo)
         )
-        let localizations = try rawLocalizations.map { item -> RemoteAppInfoLocalization in
-            guard let id = item["id"]?.stringValue,
-                  let attributes = item["attributes"]?.objectValue,
-                  let locale = attributes["locale"]?.stringValue else {
-                throw ReleaseToolError.api("Malformed appInfoLocalizations resource")
+    }
+
+    private func loadAppInfo(_ summary: AppInfoSummary) throws -> RemoteAppInfo {
+        let includedRelationshipNames = [
+            "ageRatingDeclaration",
+            "appInfoLocalizations",
+            "primaryCategory",
+            "primarySubcategoryOne",
+            "primarySubcategoryTwo",
+            "secondaryCategory",
+            "secondarySubcategoryOne",
+            "secondarySubcategoryTwo",
+        ]
+        let response = try client.request(
+            method: "GET",
+            path: "/v1/appInfos/\(summary.id)",
+            query: [
+                URLQueryItem(
+                    name: "include",
+                    value: includedRelationshipNames.joined(separator: ",")
+                ),
+                URLQueryItem(name: "limit[appInfoLocalizations]", value: "50"),
+            ]
+        )
+        guard let responseObject = response?.objectValue,
+              let resource = responseObject["data"]?.objectValue,
+              resource["id"]?.stringValue == summary.id,
+              let attributes = resource["attributes"]?.objectValue,
+              let relationships = resource["relationships"]?.objectValue else {
+            throw ReleaseToolError.api("Malformed appInfos detail resource \(summary.id)")
+        }
+
+        let detailState = (attributes["state"] ?? attributes["appStoreState"])?.stringValue
+        guard detailState == summary.state else {
+            throw ReleaseToolError.remoteDrift(
+                "App Info \(summary.id) state changed while the snapshot was captured"
+            )
+        }
+
+        var includedResources: [IncludedResourceKey: [String: JSONValue]] = [:]
+        for included in responseObject["included"]?.arrayValue ?? [] {
+            guard let object = included.objectValue,
+                  let type = object["type"]?.stringValue,
+                  let id = object["id"]?.stringValue else {
+                throw ReleaseToolError.api("Malformed included App Info resource")
             }
-            return RemoteAppInfoLocalization(id: id, locale: locale, attributes: attributes)
-        }.sorted { $0.locale < $1.locale }
-        return RemoteAppInfo(
-            id: selected.id,
-            state: selected.state,
-            localizations: localizations
+            let key = IncludedResourceKey(type: type, id: id)
+            guard includedResources.updateValue(object, forKey: key) == nil else {
+                throw ReleaseToolError.api(
+                    "Duplicate included App Info resource \(type)/\(id)"
+                )
+            }
+        }
+
+        let localizationLinkages = try toManyLinkages(
+            relationship: "appInfoLocalizations",
+            relationships: relationships
         )
+        guard Set(localizationLinkages).count == localizationLinkages.count else {
+            throw ReleaseToolError.api(
+                "App Info \(summary.id) contains duplicate localization linkages"
+            )
+        }
+        let localizations = try localizationLinkages.map { linkage -> RemoteAppInfoLocalization in
+            guard let included = includedResources[
+                IncludedResourceKey(type: linkage.type, id: linkage.id)
+            ], let localizationAttributes = included["attributes"]?.objectValue,
+               let locale = localizationAttributes["locale"]?.stringValue else {
+                throw ReleaseToolError.api(
+                    "App Info \(summary.id) is missing included localization \(linkage.id)"
+                )
+            }
+            return RemoteAppInfoLocalization(
+                id: linkage.id,
+                locale: locale,
+                attributes: localizationAttributes
+            )
+        }.sorted {
+            if $0.locale != $1.locale { return $0.locale < $1.locale }
+            return $0.id < $1.id
+        }
+        guard Set(localizations.map(\.locale)).count == localizations.count else {
+            throw ReleaseToolError.api(
+                "App Info \(summary.id) contains duplicate localization locales"
+            )
+        }
+
+        let primaryCategory = try toOneLinkage(
+            relationship: "primaryCategory",
+            relationships: relationships
+        )
+        let primarySubcategoryOne = try toOneLinkage(
+            relationship: "primarySubcategoryOne",
+            relationships: relationships
+        )
+        let primarySubcategoryTwo = try toOneLinkage(
+            relationship: "primarySubcategoryTwo",
+            relationships: relationships
+        )
+        let secondaryCategory = try toOneLinkage(
+            relationship: "secondaryCategory",
+            relationships: relationships
+        )
+        let secondarySubcategoryOne = try toOneLinkage(
+            relationship: "secondarySubcategoryOne",
+            relationships: relationships
+        )
+        let secondarySubcategoryTwo = try toOneLinkage(
+            relationship: "secondarySubcategoryTwo",
+            relationships: relationships
+        )
+        let categoryLinkages: [(String, ResourceLinkage?)] = [
+            ("primaryCategory", primaryCategory),
+            ("primarySubcategoryOne", primarySubcategoryOne),
+            ("primarySubcategoryTwo", primarySubcategoryTwo),
+            ("secondaryCategory", secondaryCategory),
+            ("secondarySubcategoryOne", secondarySubcategoryOne),
+            ("secondarySubcategoryTwo", secondarySubcategoryTwo),
+        ]
+        for (name, linkage) in categoryLinkages {
+            guard let linkage else { continue }
+            guard includedResources[
+                IncludedResourceKey(type: linkage.type, id: linkage.id)
+            ] != nil else {
+                throw ReleaseToolError.api(
+                    "App Info \(summary.id) is missing included \(name) \(linkage.id)"
+                )
+            }
+        }
+
+        let ageRatingLinkage = try toOneLinkage(
+            relationship: "ageRatingDeclaration",
+            relationships: relationships
+        )
+        let ageRatingAttributes: [String: JSONValue]
+        if let ageRatingLinkage {
+            guard let included = includedResources[
+                IncludedResourceKey(type: ageRatingLinkage.type, id: ageRatingLinkage.id)
+            ], let includedAttributes = included["attributes"]?.objectValue else {
+                throw ReleaseToolError.api(
+                    "App Info \(summary.id) is missing its included age rating declaration"
+                )
+            }
+            ageRatingAttributes = includedAttributes
+        } else {
+            ageRatingAttributes = [:]
+        }
+
+        return RemoteAppInfo(
+            id: summary.id,
+            state: detailState,
+            localizations: localizations,
+            details: RemoteAppInfoDetails(
+                attributes: Self.nonStateAttributes(attributes),
+                primaryCategoryId: primaryCategory?.id,
+                primarySubcategoryOneId: primarySubcategoryOne?.id,
+                primarySubcategoryTwoId: primarySubcategoryTwo?.id,
+                secondaryCategoryId: secondaryCategory?.id,
+                secondarySubcategoryOneId: secondarySubcategoryOne?.id,
+                secondarySubcategoryTwoId: secondarySubcategoryTwo?.id,
+                ageRatingDeclarationId: ageRatingLinkage?.id,
+                ageRatingDeclarationAttributes: ageRatingAttributes
+            )
+        )
+    }
+
+    private func toOneLinkage(
+        relationship name: String,
+        relationships: [String: JSONValue]
+    ) throws -> ResourceLinkage? {
+        guard let relationship = relationships[name]?.objectValue,
+              let data = relationship["data"] else {
+            throw ReleaseToolError.api("App Info relationship \(name) has no linkage data")
+        }
+        if case .null = data { return nil }
+        guard let object = data.objectValue,
+              let type = object["type"]?.stringValue,
+              let id = object["id"]?.stringValue else {
+            throw ReleaseToolError.api("App Info relationship \(name) has malformed linkage data")
+        }
+        return ResourceLinkage(type: type, id: id)
+    }
+
+    private func toManyLinkages(
+        relationship name: String,
+        relationships: [String: JSONValue]
+    ) throws -> [ResourceLinkage] {
+        guard let relationship = relationships[name]?.objectValue,
+              let data = relationship["data"]?.arrayValue else {
+            throw ReleaseToolError.api("App Info relationship \(name) has malformed linkage data")
+        }
+        return try data.map { value in
+            guard let object = value.objectValue,
+                  let type = object["type"]?.stringValue,
+                  let id = object["id"]?.stringValue else {
+                throw ReleaseToolError.api(
+                    "App Info relationship \(name) has malformed resource linkage"
+                )
+            }
+            return ResourceLinkage(type: type, id: id)
+        }
     }
 
     private static func fingerprint(
@@ -212,7 +442,9 @@ public final class SnapshotService {
         requestedVersion: String,
         targetVersion: RemoteVersion?,
         sourceVersion: RemoteVersion?,
-        appInfo: RemoteAppInfo?
+        appInfo: RemoteAppInfo?,
+        sourceAppInfo: RemoteAppInfo?,
+        targetAppInfo: RemoteAppInfo?
     ) throws -> String {
         let payload = FingerprintPayload(
             appId: appId,
@@ -221,22 +453,9 @@ public final class SnapshotService {
             requestedVersion: requestedVersion,
             targetVersion: sanitize(targetVersion),
             sourceVersion: sanitize(sourceVersion),
-            appInfo: appInfo.map { info in
-                RemoteAppInfo(
-                    id: info.id,
-                    state: info.state,
-                    localizations: info.localizations.map {
-                        RemoteAppInfoLocalization(
-                            id: $0.id,
-                            locale: $0.locale,
-                            attributes: filter($0.attributes, keys: [
-                                "locale", "name", "subtitle", "privacyPolicyUrl", "privacyChoicesUrl",
-                                "privacyPolicyText",
-                            ])
-                        )
-                    }
-                )
-            }
+            appInfo: sanitize(appInfo),
+            sourceAppInfo: sanitize(sourceAppInfo),
+            targetAppInfo: sanitize(targetAppInfo)
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -251,6 +470,40 @@ public final class SnapshotService {
         let targetVersion: RemoteVersion?
         let sourceVersion: RemoteVersion?
         let appInfo: RemoteAppInfo?
+        let sourceAppInfo: RemoteAppInfo?
+        let targetAppInfo: RemoteAppInfo?
+    }
+
+    private static func sanitize(_ appInfo: RemoteAppInfo?) -> RemoteAppInfo? {
+        appInfo.map { info in
+            RemoteAppInfo(
+                id: info.id,
+                state: info.state,
+                localizations: info.localizations.map {
+                    RemoteAppInfoLocalization(
+                        id: $0.id,
+                        locale: $0.locale,
+                        attributes: filter($0.attributes, keys: [
+                            "locale", "name", "subtitle", "privacyPolicyUrl", "privacyChoicesUrl",
+                            "privacyPolicyText",
+                        ])
+                    )
+                },
+                details: info.details.map { details in
+                    RemoteAppInfoDetails(
+                        attributes: nonStateAttributes(details.attributes),
+                        primaryCategoryId: details.primaryCategoryId,
+                        primarySubcategoryOneId: details.primarySubcategoryOneId,
+                        primarySubcategoryTwoId: details.primarySubcategoryTwoId,
+                        secondaryCategoryId: details.secondaryCategoryId,
+                        secondarySubcategoryOneId: details.secondarySubcategoryOneId,
+                        secondarySubcategoryTwoId: details.secondarySubcategoryTwoId,
+                        ageRatingDeclarationId: details.ageRatingDeclarationId,
+                        ageRatingDeclarationAttributes: details.ageRatingDeclarationAttributes
+                    )
+                }
+            )
+        }
     }
 
     private static func sanitize(_ version: RemoteVersion?) -> RemoteVersion? {
@@ -297,5 +550,11 @@ public final class SnapshotService {
         keys: Set<String>
     ) -> [String: JSONValue] {
         attributes.filter { keys.contains($0.key) }
+    }
+
+    private static func nonStateAttributes(
+        _ attributes: [String: JSONValue]
+    ) -> [String: JSONValue] {
+        attributes.filter { !["state", "appStoreState"].contains($0.key) }
     }
 }

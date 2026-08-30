@@ -50,9 +50,17 @@ private struct Arguments {
       build-manifest --release NORMALIZED_JSON --locales-config FILE \\
         --screenshots-root DIR --capture-metadata FILE --remote-snapshot FILE \\
         --output FILE --review-html FILE
+      build-metadata-only-manifest --release NORMALIZED_JSON --locales-config FILE \\
+        --remote-snapshot FILE --expected-source-version V \\
+        --output FILE --review-html FILE
+      verify-metadata-only-manifest --manifest FILE --locales-config FILE \\
+        --expected-source-version V
       publish --manifest FILE --confirm-version V --journal FILE
+      publish-metadata-only --manifest FILE --locales-config FILE \\
+        --expected-source-version V --confirm-version V \\
+        --confirm-manifest-digest SHA256 --journal FILE
 
-    snapshot and publish require ASC_KEY_ID, ASC_ISSUER_ID, and ASC_PRIVATE_KEY_PATH.
+    snapshot and both publish commands require ASC_KEY_ID, ASC_ISSUER_ID, and ASC_PRIVATE_KEY_PATH.
     """
 }
 
@@ -120,6 +128,37 @@ do {
         let count = manifest.localizations.flatMap(\.screenshotSets).flatMap(\.screenshots).count
         print("Built reviewed manifest \(manifest.manifestDigest) with \(count) screenshots")
 
+    case "build-metadata-only-manifest":
+        let values = try arguments.require(
+            "--release", "--locales-config", "--remote-snapshot",
+            "--expected-source-version", "--output", "--review-html"
+        )
+        let manifest = try MetadataOnlyManifestBuilder.build(
+            releaseURL: fileURL(values[0]),
+            configurationURL: fileURL(values[1]),
+            remoteSnapshotURL: fileURL(values[2]),
+            expectedSourceVersion: values[3],
+            outputURL: fileURL(values[4]),
+            reviewHTMLURL: fileURL(values[5])
+        )
+        print(
+            "Built reviewed metadata-only manifest \(manifest.manifestDigest) "
+                + "for \(manifest.localizations.count) locales and zero screenshots"
+        )
+
+    case "verify-metadata-only-manifest":
+        let values = try arguments.require(
+            "--manifest", "--locales-config", "--expected-source-version"
+        )
+        let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
+        let configuration = try LocaleConfiguration.load(from: fileURL(values[1]))
+        try MetadataOnlyManifestBuilder.verify(
+            manifest,
+            configuration: configuration,
+            expectedSourceVersion: values[2]
+        )
+        print("Verified metadata-only manifest \(manifest.manifestDigest)")
+
     case "publish":
         let values = try arguments.require("--manifest", "--confirm-version", "--journal")
         let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
@@ -131,6 +170,35 @@ do {
         )
         try publisher.publish(manifest: manifest, confirmedVersion: values[1])
         print("Published and verified App Store metadata for version \(manifest.release.version)")
+
+    case "publish-metadata-only":
+        let values = try arguments.require(
+            "--manifest", "--locales-config", "--expected-source-version",
+            "--confirm-version", "--confirm-manifest-digest", "--journal"
+        )
+        let manifest = try ManifestBuilder.decode(PublishManifest.self, at: fileURL(values[0]))
+        let configuration = try LocaleConfiguration.load(from: fileURL(values[1]))
+        try MetadataOnlyManifestBuilder.verify(
+            manifest,
+            configuration: configuration,
+            expectedSourceVersion: values[2]
+        )
+        let credentials = try ASCCredentials.fromEnvironment()
+        let publisher = MetadataOnlyPublisher(
+            client: ASCAPIClient(credentials: credentials),
+            journalURL: fileURL(values[5]),
+            configuration: configuration,
+            expectedSourceVersion: values[2]
+        )
+        try publisher.publish(
+            manifest: manifest,
+            confirmedVersion: values[3],
+            confirmedManifestDigest: values[4]
+        )
+        print(
+            "Published and verified exactly \(manifest.localizations.count) What's New fields "
+                + "for \(manifest.release.version); screenshots and App Info were unchanged"
+        )
 
     default:
         throw ReleaseToolError.usage("Unknown command \(arguments.command)\n\n\(Arguments.help)")

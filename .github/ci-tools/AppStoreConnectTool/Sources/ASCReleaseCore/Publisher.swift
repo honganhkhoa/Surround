@@ -38,6 +38,12 @@ public final class Publisher {
     }
 
     public func publish(manifest: PublishManifest, confirmedVersion: String) throws {
+        guard manifest.captureMetadata["mode"]?.stringValue
+            != MetadataOnlyManifestBuilder.mode else {
+            throw ReleaseToolError.validation(
+                "Metadata-only manifests require the dedicated metadata-only publisher"
+            )
+        }
         guard confirmedVersion == manifest.release.version else {
             throw ReleaseToolError.validation(
                 "--confirm-version must exactly match \(manifest.release.version)"

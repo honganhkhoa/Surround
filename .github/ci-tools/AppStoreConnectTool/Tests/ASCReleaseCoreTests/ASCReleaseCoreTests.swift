@@ -377,6 +377,98 @@ final class ASCReleaseCoreTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 1)
     }
 
+    func testSnapshotCapturesSeparateCompleteLiveAndDraftAppInfo() throws {
+        func appInfoDetail(id: String, state: String, suffix: String) -> String {
+            """
+            {"data":{"type":"appInfos","id":"\(id)","attributes":{
+              "state":"\(state)","appStoreAgeRating":"FOUR_PLUS","kidsAgeBand":null},
+              "relationships":{
+                "ageRatingDeclaration":{"data":{"type":"ageRatingDeclarations","id":"rating-\(suffix)"}},
+                "appInfoLocalizations":{"data":[{"type":"appInfoLocalizations","id":"info-loc-\(suffix)"}]},
+                "primaryCategory":{"data":{"type":"appCategories","id":"games"}},
+                "primarySubcategoryOne":{"data":{"type":"appCategories","id":"board"}},
+                "primarySubcategoryTwo":{"data":null},"secondaryCategory":{"data":null},
+                "secondarySubcategoryOne":{"data":null},"secondarySubcategoryTwo":{"data":null}
+              }},"included":[
+                {"type":"appInfoLocalizations","id":"info-loc-\(suffix)","attributes":{
+                  "locale":"en-US","name":"Example","subtitle":"Play Go",
+                  "privacyPolicyUrl":"https://example.com/privacy",
+                  "privacyChoicesUrl":null,"privacyPolicyText":null}},
+                {"type":"appCategories","id":"games","attributes":{}},
+                {"type":"appCategories","id":"board","attributes":{}},
+                {"type":"ageRatingDeclarations","id":"rating-\(suffix)","attributes":{
+                  "gambling":false,"unrestrictedWebAccess":false}}
+              ]}
+            """
+        }
+
+        let transport = MockTransport { request in
+            switch request.url?.path {
+            case "/v1/apps":
+                return .json(200, #"{"data":[{"type":"apps","id":"app"}]}"#)
+            case "/v1/apps/app/appStoreVersions":
+                return .json(200, #"{"data":[{"type":"appStoreVersions","id":"source-version","attributes":{"versionString":"2.2","platform":"IOS","appVersionState":"READY_FOR_DISTRIBUTION","releaseType":"AFTER_APPROVAL"}}]}"#)
+            case "/v1/appStoreVersions/source-version/appStoreVersionLocalizations":
+                return .json(200, #"{"data":[{"type":"appStoreVersionLocalizations","id":"source-locale","attributes":{"locale":"en-US","description":"Description","keywords":"go","supportUrl":"https://example.com/support","whatsNew":"Old"}}]}"#)
+            case "/v1/appStoreVersionLocalizations/source-locale/appScreenshotSets":
+                return .json(200, #"{"data":[]}"#)
+            case "/v1/apps/app/appInfos":
+                return .json(200, #"{"data":[{"type":"appInfos","id":"live-info","attributes":{"state":"READY_FOR_DISTRIBUTION"}},{"type":"appInfos","id":"draft-info","attributes":{"state":"PREPARE_FOR_SUBMISSION"}}]}"#)
+            case "/v1/appInfos/live-info":
+                XCTAssertEqual(
+                    URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+                        .queryItems?.first(where: { $0.name == "limit[appInfoLocalizations]" })?
+                        .value,
+                    "50"
+                )
+                return .json(200, appInfoDetail(
+                    id: "live-info",
+                    state: "READY_FOR_DISTRIBUTION",
+                    suffix: "live"
+                ))
+            case "/v1/appInfos/draft-info":
+                return .json(200, appInfoDetail(
+                    id: "draft-info",
+                    state: "PREPARE_FOR_SUBMISSION",
+                    suffix: "draft"
+                ))
+            default:
+                XCTFail("Unexpected snapshot request \(request.url?.absoluteString ?? "")")
+                return .json(500, #"{"errors":[{"detail":"unexpected"}]}"#)
+            }
+        }
+        let release = NormalizedRelease(
+            version: "2.2.1",
+            bundleId: "com.example.App",
+            platform: "IOS",
+            sourceReleasePath: "/release.json",
+            sourceDigest: "source",
+            localizations: [NormalizedLocaleRelease(
+                appStoreLocale: "en-US",
+                screenshotConfiguration: "en-US",
+                whatsNew: "New",
+                versionMetadata: ["whatsNew": .string("New")],
+                appMetadata: [:],
+                sourceFiles: [:]
+            )],
+            versionMetadata: [:]
+        )
+
+        let snapshot = try SnapshotService(
+            client: makeAPIClient(transport: transport, maxRetries: 0)
+        ).capture(release: release)
+        XCTAssertEqual(snapshot.sourceAppInfo?.id, "live-info")
+        XCTAssertEqual(snapshot.targetAppInfo?.id, "draft-info")
+        XCTAssertEqual(snapshot.appInfo?.id, "draft-info")
+        XCTAssertEqual(snapshot.sourceAppInfo?.details?.primaryCategoryId, "games")
+        XCTAssertEqual(snapshot.targetAppInfo?.details?.primarySubcategoryOneId, "board")
+        XCTAssertEqual(
+            snapshot.sourceAppInfo?.details?.ageRatingDeclarationAttributes["gambling"],
+            .bool(false)
+        )
+        XCTAssertEqual(try SnapshotService.fingerprint(snapshot: snapshot), snapshot.fingerprint)
+    }
+
     func testPOSTDoesNotRetryAmbiguousHTTPResponses() throws {
         for statusCode in [429, 503] {
             let transport = MockTransport { _ in
@@ -428,6 +520,69 @@ final class ASCReleaseCoreTests: XCTestCase {
 
         let response = try client.request(method: "GET", path: "/v1/widgets/one")
         XCTAssertEqual(response?["data"]?["id"]?.stringValue, "one")
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
+    func testSingleAttemptPATCHDoesNotRetryTransientResponse() throws {
+        let transport = MockTransport { _ in
+            TransportResponse(
+                data: Data(#"{"errors":[{"detail":"try later"}]}"#.utf8),
+                statusCode: 503,
+                headers: ["retry-after": "0"]
+            )
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 3)
+
+        XCTAssertThrowsError(try client.request(
+            method: "PATCH",
+            path: "/v1/appStoreVersionLocalizations/locale-one",
+            body: .object(["data": .object([:])]),
+            retryPolicy: .singleAttempt
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("HTTP 503"))
+            XCTAssertTrue(error.localizedDescription.contains("not retried"))
+            XCTAssertTrue(error.localizedDescription.contains("ambiguous"))
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func testSingleAttemptPATCHDoesNotRetryNetworkFailure() throws {
+        let transport = MockTransport { _ in throw URLError(.timedOut) }
+        let client = makeAPIClient(transport: transport, maxRetries: 3)
+
+        XCTAssertThrowsError(try client.request(
+            method: "PATCH",
+            path: "/v1/appStoreVersionLocalizations/locale-one",
+            body: .object(["data": .object([:])]),
+            retryPolicy: .singleAttempt
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("not retried"))
+            XCTAssertTrue(error.localizedDescription.contains("ambiguous"))
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func testDefaultPATCHStillRetriesTransientResponse() throws {
+        var callCount = 0
+        let transport = MockTransport { _ in
+            callCount += 1
+            if callCount == 1 {
+                return TransportResponse(
+                    data: Data(#"{"errors":[{"detail":"try later"}]}"#.utf8),
+                    statusCode: 503,
+                    headers: ["retry-after": "0"]
+                )
+            }
+            return .json(200, #"{"data":{"type":"appStoreVersionLocalizations","id":"locale-one"}}"#)
+        }
+        let client = makeAPIClient(transport: transport, maxRetries: 1)
+
+        let response = try client.request(
+            method: "PATCH",
+            path: "/v1/appStoreVersionLocalizations/locale-one",
+            body: .object(["data": .object([:])])
+        )
+        XCTAssertEqual(response?["data"]?["id"]?.stringValue, "locale-one")
         XCTAssertEqual(transport.requests.count, 2)
     }
 

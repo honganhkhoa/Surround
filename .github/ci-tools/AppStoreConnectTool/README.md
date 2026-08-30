@@ -29,7 +29,32 @@ app-store-connect-tool validate-snapshot \
   --snapshot .build/AppStoreRelease-2.1/remote-snapshot.json
 ```
 
-`publish` is the only mutating command and requires an exact `--confirm-version` value.
+Only `publish` and `publish-metadata-only` mutate App Store Connect. The former requires an exact
+`--confirm-version`; the latter also requires the reviewed source version and manifest digest.
+
+For a patch release that changes only localized What's New text, use the dedicated
+metadata-only manifest and publisher instead of capturing screenshots:
+
+```sh
+app-store-connect-tool build-metadata-only-manifest \
+  --release .build/AppStoreRelease-MetadataOnly-2.2.1/normalized-release.json \
+  --locales-config .github/ci-tools/app-store-release-locales.json \
+  --remote-snapshot .build/AppStoreRelease-MetadataOnly-2.2.1/remote-snapshot.json \
+  --expected-source-version 2.2 \
+  --output .build/AppStoreRelease-MetadataOnly-2.2.1/publish-manifest.json \
+  --review-html .build/AppStoreRelease-MetadataOnly-2.2.1/review.html
+
+app-store-connect-tool publish-metadata-only \
+  --manifest .build/AppStoreRelease-MetadataOnly-2.2.1/publish-manifest.json \
+  --locales-config .github/ci-tools/app-store-release-locales.json \
+  --expected-source-version 2.2 \
+  --confirm-version 2.2.1 \
+  --confirm-manifest-digest REVIEWED_SHA256 \
+  --journal .build/AppStoreRelease-MetadataOnly-2.2.1/metadata-only-publish-journal.json
+```
+
+The public wrapper described below is the supported user-facing entry point. These core
+commands document and test its exact contract.
 
 ## Locale configuration
 
@@ -148,6 +173,29 @@ asset drift still aborts.
 Uploads use Apple's exact byte ranges without a JWT, commit lowercase whole-file MD5 values, and
 must read back with `assetDeliveryState` `COMPLETE`. Ambiguous POST failures are never replayed
 automatically; inspect App Store Connect and prepare again as directed by the error.
+
+The metadata-only publisher has a deliberately narrower API surface. Its manifest must contain
+exactly one `whatsNew` field for every configured locale, no App Info or version-wide changes,
+and zero managed screenshot sets. It requires exact source-version, target-version, and manifest-
+digest confirmations. When it creates the target version, it sends `versionString`, `platform`,
+and the reviewed inherited copyright but deliberately omits `releaseType`. It then waits for
+App Store Connect to finish inheriting the source listing and proves that every locale, non-
+What's-New field, screenshot family, ordered file name, checksum, and `COMPLETE` state matches
+the reviewed source. Inherited resource IDs are intentionally excluded from that comparison
+because Apple creates new resources for the copied assets.
+
+Metadata-only snapshots separately capture the live and draft App Info resources. The gate
+compares all localized App Info fields, non-state App Info attributes, six category linkages,
+and the complete age-rating declaration while ignoring copied App Info/localization/age-rating
+resource IDs. Older handoffs without this evidence must be prepared again.
+
+Its only post-creation write is a sparse PATCH whose attributes object contains exactly
+`whatsNew` for one existing version localization. There are no screenshot, preview, App Info,
+build, submission, or DELETE write routes in this publisher. Each mutation is single-attempt;
+an ambiguous result remains pending until a later confirmed run reconciles fresh live state.
+A bundle/platform/version-scoped advisory lock serializes distinct handoffs and releases safely
+if a process exits. A possibly successful version-creation POST is never replayed automatically;
+an exact inherited target may be adopted under its existing journal, otherwise prepare again.
 
 ## Tests
 

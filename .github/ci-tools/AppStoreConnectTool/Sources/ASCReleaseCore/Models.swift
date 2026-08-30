@@ -312,10 +312,57 @@ public struct RemoteAppInfoLocalization: Codable, Equatable, Sendable {
     public let attributes: [String: JSONValue]
 }
 
+public struct RemoteAppInfoDetails: Codable, Equatable, Sendable {
+    public let attributes: [String: JSONValue]
+    public let primaryCategoryId: String?
+    public let primarySubcategoryOneId: String?
+    public let primarySubcategoryTwoId: String?
+    public let secondaryCategoryId: String?
+    public let secondarySubcategoryOneId: String?
+    public let secondarySubcategoryTwoId: String?
+    public let ageRatingDeclarationId: String?
+    public let ageRatingDeclarationAttributes: [String: JSONValue]
+
+    public init(
+        attributes: [String: JSONValue],
+        primaryCategoryId: String?,
+        primarySubcategoryOneId: String?,
+        primarySubcategoryTwoId: String?,
+        secondaryCategoryId: String?,
+        secondarySubcategoryOneId: String?,
+        secondarySubcategoryTwoId: String?,
+        ageRatingDeclarationId: String?,
+        ageRatingDeclarationAttributes: [String: JSONValue]
+    ) {
+        self.attributes = attributes
+        self.primaryCategoryId = primaryCategoryId
+        self.primarySubcategoryOneId = primarySubcategoryOneId
+        self.primarySubcategoryTwoId = primarySubcategoryTwoId
+        self.secondaryCategoryId = secondaryCategoryId
+        self.secondarySubcategoryOneId = secondarySubcategoryOneId
+        self.secondarySubcategoryTwoId = secondarySubcategoryTwoId
+        self.ageRatingDeclarationId = ageRatingDeclarationId
+        self.ageRatingDeclarationAttributes = ageRatingDeclarationAttributes
+    }
+}
+
 public struct RemoteAppInfo: Codable, Equatable, Sendable {
     public let id: String
     public let state: String?
     public let localizations: [RemoteAppInfoLocalization]
+    public let details: RemoteAppInfoDetails?
+
+    public init(
+        id: String,
+        state: String?,
+        localizations: [RemoteAppInfoLocalization],
+        details: RemoteAppInfoDetails? = nil
+    ) {
+        self.id = id
+        self.state = state
+        self.localizations = localizations
+        self.details = details
+    }
 }
 
 public struct RemoteSnapshot: Codable, Equatable, Sendable {
@@ -329,6 +376,8 @@ public struct RemoteSnapshot: Codable, Equatable, Sendable {
     public let targetVersion: RemoteVersion?
     public let sourceVersion: RemoteVersion?
     public let appInfo: RemoteAppInfo?
+    public let sourceAppInfo: RemoteAppInfo?
+    public let targetAppInfo: RemoteAppInfo?
 
     public init(
         schemaVersion: Int = 1,
@@ -340,7 +389,9 @@ public struct RemoteSnapshot: Codable, Equatable, Sendable {
         requestedVersion: String,
         targetVersion: RemoteVersion?,
         sourceVersion: RemoteVersion?,
-        appInfo: RemoteAppInfo?
+        appInfo: RemoteAppInfo?,
+        sourceAppInfo: RemoteAppInfo? = nil,
+        targetAppInfo: RemoteAppInfo? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capturedAt = capturedAt
@@ -352,6 +403,8 @@ public struct RemoteSnapshot: Codable, Equatable, Sendable {
         self.targetVersion = targetVersion
         self.sourceVersion = sourceVersion
         self.appInfo = appInfo
+        self.sourceAppInfo = sourceAppInfo
+        self.targetAppInfo = targetAppInfo
     }
 }
 
