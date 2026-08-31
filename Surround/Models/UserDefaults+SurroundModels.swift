@@ -287,6 +287,10 @@ extension SettingKey {
     static var lastAutomatchEntry: SettingKey<OGSAutomatchEntry> {
         return .init(name: "lastAutomatchEntry", encoded: true)
     }
+
+    static var lastQuickMatchDraft: SettingKey<OGSQuickMatchDraft> {
+        return .init(name: "lastQuickMatchDraft", encoded: true)
+    }
     
     static var lastSeenPrivateMessageByOGSUserId: SettingKey<[Int: Double]> {
         return .init(name: "lastSeenPrivateMessageByOGSUserId", encoded: true, defaultValue: [Int: Double]())

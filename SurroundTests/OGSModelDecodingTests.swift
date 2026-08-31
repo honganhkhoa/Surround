@@ -669,3 +669,838 @@ final class OGSModelDecodingTests: XCTestCase {
         )
     }
 }
+
+final class OGSQuickMatchContractTests: XCTestCase {
+    private struct LegacyStoredAutomatchEntry: Decodable {
+        let sizeOptions: Set<Int>
+        let timeControlSpeed: TimeControlSpeed
+        let uuid: String
+    }
+
+    func testOfficialPresetMatrixMatchesOGSReference() throws {
+        struct ExpectedPreset {
+            let size: Int
+            let speed: TimeControlSpeed
+            let system: OGSAutomatchClockSystem
+            let timeControl: TimeControlSystem
+            let duration: Int?
+        }
+
+        let expected = [
+            ExpectedPreset(
+                size: 9,
+                speed: .blitz,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 30, timeIncrement: 5, maxTime: 300),
+                duration: 300
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .blitz,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 30, periods: 5, periodTime: 10),
+                duration: 300
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .rapid,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 120, timeIncrement: 7, maxTime: 1200),
+                duration: 600
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .rapid,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 120, periods: 5, periodTime: 30),
+                duration: 600
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .live,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 180, timeIncrement: 10, maxTime: 1800),
+                duration: 900
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .live,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 300, periods: 5, periodTime: 30),
+                duration: 900
+            ),
+            ExpectedPreset(
+                size: 9,
+                speed: .correspondence,
+                system: .fischer,
+                timeControl: .Fischer(
+                    initialTime: 3 * 86400,
+                    timeIncrement: 86400,
+                    maxTime: 7 * 86400
+                ),
+                duration: nil
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .blitz,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 30, timeIncrement: 5, maxTime: 300),
+                duration: 600
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .blitz,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 30, periods: 5, periodTime: 10),
+                duration: 600
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .rapid,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 180, timeIncrement: 7, maxTime: 1800),
+                duration: 1200
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .rapid,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 180, periods: 5, periodTime: 30),
+                duration: 1200
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .live,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 300, timeIncrement: 10, maxTime: 1800),
+                duration: 1800
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .live,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 600, periods: 5, periodTime: 30),
+                duration: 1800
+            ),
+            ExpectedPreset(
+                size: 13,
+                speed: .correspondence,
+                system: .fischer,
+                timeControl: .Fischer(
+                    initialTime: 3 * 86400,
+                    timeIncrement: 86400,
+                    maxTime: 7 * 86400
+                ),
+                duration: nil
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .blitz,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 30, timeIncrement: 5, maxTime: 300),
+                duration: 900
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .blitz,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 30, periods: 5, periodTime: 10),
+                duration: 900
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .rapid,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 300, timeIncrement: 7, maxTime: 3000),
+                duration: 1500
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .rapid,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 300, periods: 5, periodTime: 30),
+                duration: 1500
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .live,
+                system: .fischer,
+                timeControl: .Fischer(initialTime: 600, timeIncrement: 10, maxTime: 3600),
+                duration: 2400
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .live,
+                system: .byoyomi,
+                timeControl: .ByoYomi(mainTime: 1200, periods: 5, periodTime: 30),
+                duration: 2400
+            ),
+            ExpectedPreset(
+                size: 19,
+                speed: .correspondence,
+                system: .fischer,
+                timeControl: .Fischer(
+                    initialTime: 3 * 86400,
+                    timeIncrement: 86400,
+                    maxTime: 7 * 86400
+                ),
+                duration: nil
+            ),
+        ]
+
+        XCTAssertEqual(expected.count, 21)
+        XCTAssertEqual(
+            OGSQuickMatchClockPreset.supportedBoardSizes.flatMap {
+                OGSQuickMatchClockPreset.presets(for: $0)
+            }.count,
+            21
+        )
+        for item in expected {
+            let preset = try XCTUnwrap(
+                OGSQuickMatchClockPreset.preset(
+                    boardSize: item.size,
+                    speed: item.speed,
+                    system: item.system
+                )
+            )
+            XCTAssertEqual(preset.boardSize, item.size)
+            XCTAssertEqual(preset.speed, item.speed)
+            XCTAssertEqual(preset.system, item.system)
+            XCTAssertEqual(preset.timeControl, item.timeControl)
+            XCTAssertEqual(preset.estimatedGameDuration, item.duration)
+        }
+    }
+
+    func testPresetRetainsDeclaredRapidSpeedInsteadOfHeuristicClassification() throws {
+        let preset = try XCTUnwrap(
+            OGSQuickMatchClockPreset.preset(
+                boardSize: 9,
+                speed: .rapid,
+                system: .fischer
+            )
+        )
+
+        XCTAssertEqual(preset.speed, .rapid)
+        XCTAssertEqual(preset.timeControl.speed, .blitz)
+        XCTAssertNil(
+            OGSQuickMatchClockPreset.preset(
+                boardSize: 9,
+                speed: .correspondence,
+                system: .byoyomi
+            )
+        )
+    }
+
+    func testDefaultDraftMatchesOGSQuickMatchDefaults() {
+        let draft = OGSQuickMatchDraft.ogsDefault
+
+        XCTAssertEqual(draft.schemaVersion, 1)
+        XCTAssertEqual(draft.mode, .flexible)
+        XCTAssertEqual(draft.boardSize, 9)
+        XCTAssertEqual(draft.speed, .rapid)
+        XCTAssertEqual(draft.system, .fischer)
+        XCTAssertTrue(draft.multipleBoardSizes.isEmpty)
+        XCTAssertTrue(draft.multipleClocks.isEmpty)
+        XCTAssertEqual(draft.handicap, .standard)
+        XCTAssertEqual(draft.lowerRankDifference, 3)
+        XCTAssertEqual(draft.upperRankDifference, 3)
+    }
+
+    func testExactBuildsOneOrderedTupleAndClampsRankDifferences() {
+        let draft = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .byoyomi,
+            handicap: .required,
+            lowerRankDifference: -2,
+            upperRankDifference: 12
+        )
+
+        let entry = draft.makeAutomatchEntry(uuid: "EXACT-ID")
+
+        XCTAssertEqual(entry.uuid, "exact-id")
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 13,
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ]
+        )
+        XCTAssertEqual(entry.lowerRankDifference, 0)
+        XCTAssertEqual(entry.upperRankDifference, 9)
+        XCTAssertEqual(entry.rules, .quickMatchDefault)
+        XCTAssertEqual(
+            entry.handicap,
+            OGSAutomatchHandicapPreference(
+                condition: .required,
+                value: .enabled
+            )
+        )
+    }
+
+    func testFlexibleBuildsPrimaryThenAlternateClockSystem() {
+        let entry = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 19,
+            speed: .live,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "flexible-id")
+
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .live,
+                    system: .byoyomi
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .live,
+                    system: .fischer
+                ),
+            ]
+        )
+    }
+
+    func testFlexibleCorrespondenceBuildsOnlyFischer() {
+        let entry = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 9,
+            speed: .correspondence,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "correspondence-id")
+
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .correspondence,
+                    system: .fischer
+                ),
+            ]
+        )
+    }
+
+    func testMultipleBuildsUniqueEighteenTupleCartesianProduct() {
+        let draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 13, 19],
+            multipleClocks: Set(OGSQuickMatchClockSelection.allRealtime)
+        )
+
+        let entry = draft.makeAutomatchEntry(
+            uuid: "multiple-id",
+            multipleOptionsShuffler: { _ in }
+        )
+        let expected = Set(
+            [9, 13, 19].flatMap { size in
+                OGSQuickMatchClockSelection.allRealtime.map { clock in
+                    OGSAutomatchSizeSpeedOption(
+                        size: size,
+                        speed: clock.speed,
+                        system: clock.system
+                    )
+                }
+            }
+        )
+
+        XCTAssertEqual(entry.sizeSpeedOptions.count, 18)
+        XCTAssertEqual(Set(entry.sizeSpeedOptions).count, 18)
+        XCTAssertEqual(Set(entry.sizeSpeedOptions), expected)
+        XCTAssertFalse(entry.sizeSpeedOptions.contains { $0.speed == .correspondence })
+    }
+
+    func testMultipleUsesTheInjectedShuffleOperation() {
+        let draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 13],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(speed: .blitz, system: .fischer),
+                OGSQuickMatchClockSelection(speed: .rapid, system: .byoyomi),
+            ]
+        )
+        let ordered = draft.makeAutomatchEntry(
+            uuid: "ordered-id",
+            multipleOptionsShuffler: { _ in }
+        ).sizeSpeedOptions
+        var invoked = false
+
+        let shuffled = draft.makeAutomatchEntry(
+            uuid: "shuffled-id",
+            multipleOptionsShuffler: {
+                invoked = true
+                $0.reverse()
+            }
+        ).sizeSpeedOptions
+
+        XCTAssertTrue(invoked)
+        XCTAssertEqual(shuffled, Array(ordered.reversed()))
+    }
+
+    func testEmptyMultipleSelectionsUseThePreviousSingleSelections() {
+        let entry = OGSQuickMatchDraft(
+            mode: .multiple,
+            boardSize: 13,
+            speed: .correspondence,
+            system: .byoyomi
+        ).makeAutomatchEntry(
+            uuid: "seeded-id",
+            multipleOptionsShuffler: { _ in }
+        )
+
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 13,
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ]
+        )
+    }
+
+    func testPayloadMatchesOfficialShape() throws {
+        let payload = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .fischer,
+            handicap: .standard,
+            lowerRankDifference: 2,
+            upperRankDifference: 5
+        ).makeAutomatchEntry(uuid: "PAYLOAD-ID").jsonObject
+
+        XCTAssertEqual(
+            Set(payload.keys),
+            Set([
+                "uuid",
+                "size_speed_options",
+                "lower_rank_diff",
+                "upper_rank_diff",
+                "rules",
+                "handicap",
+            ])
+        )
+        XCTAssertNil(payload["time_control"])
+        XCTAssertEqual(payload["uuid"] as? String, "payload-id")
+        XCTAssertEqual(payload["lower_rank_diff"] as? Int, 2)
+        XCTAssertEqual(payload["upper_rank_diff"] as? Int, 5)
+
+        let options = try XCTUnwrap(
+            payload["size_speed_options"] as? [[String: Any]]
+        )
+        XCTAssertEqual(options.count, 1)
+        XCTAssertEqual(options[0]["size"] as? String, "13x13")
+        XCTAssertEqual(options[0]["speed"] as? String, "rapid")
+        XCTAssertEqual(options[0]["system"] as? String, "fischer")
+
+        let rules = try XCTUnwrap(payload["rules"] as? [String: Any])
+        XCTAssertEqual(rules["condition"] as? String, "required")
+        XCTAssertEqual(rules["value"] as? String, "japanese")
+        let handicap = try XCTUnwrap(payload["handicap"] as? [String: Any])
+        XCTAssertEqual(handicap["condition"] as? String, "preferred")
+        XCTAssertEqual(handicap["value"] as? String, "enabled")
+    }
+
+    func testHandicapPayloadMappings() {
+        let expected: [
+            OGSQuickMatchHandicapPreference: OGSAutomatchHandicapPreference
+        ] = [
+            .required: OGSAutomatchHandicapPreference(
+                condition: .required,
+                value: .enabled
+            ),
+            .standard: OGSAutomatchHandicapPreference(
+                condition: .preferred,
+                value: .enabled
+            ),
+            .disabled: OGSAutomatchHandicapPreference(
+                condition: .required,
+                value: .disabled
+            ),
+        ]
+
+        for (selection, preference) in expected {
+            let entry = OGSQuickMatchDraft(
+                mode: .exact,
+                handicap: selection
+            ).makeAutomatchEntry(uuid: "handicap-id")
+            XCTAssertEqual(entry.handicap, preference)
+        }
+    }
+
+    func testInboundEntryRetainsAllModernPreferences() throws {
+        let payload: [String: Any] = [
+            "uuid": "incoming-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+                ["size": "19x19", "speed": "live", "system": "byoyomi"],
+            ],
+            "lower_rank_diff": 1,
+            "upper_rank_diff": 8,
+            "rules": ["condition": "required", "value": "japanese"],
+            "handicap": ["condition": "required", "value": "disabled"],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.sizeSpeedOptions.count, 2)
+        XCTAssertEqual(entry.sizeOptions, [9, 19])
+        XCTAssertEqual(entry.lowerRankDifference, 1)
+        XCTAssertEqual(entry.upperRankDifference, 8)
+        XCTAssertEqual(entry.rules.condition, .required)
+        XCTAssertEqual(entry.handicap.condition, .required)
+        XCTAssertEqual(entry.handicap.value, .disabled)
+    }
+
+    func testLegacyWireEntryUsesTopLevelClockAsSystemFallback() throws {
+        let payload: [String: Any] = [
+            "uuid": "legacy-wire-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "live"],
+                ["size": "13x13", "speed": "live"],
+            ],
+            "time_control": [
+                "condition": "no-preference",
+                "value": ["system": "byoyomi"],
+            ],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.sizeSpeedOptions.map(\.system), [.byoyomi, .byoyomi])
+        XCTAssertEqual(entry.rules.condition, .noPreference)
+        XCTAssertEqual(entry.handicap.condition, .noPreference)
+    }
+
+    func testInboundEntrySkipsUnknownOptionsAndKeepsValidOnes() throws {
+        let payload: [String: Any] = [
+            "uuid": "partially-readable-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+                ["size": "9x9", "speed": "rapid", "system": "canadian"],
+                ["size": "13x13", "speed": "hyper", "system": "fischer"],
+                ["size": "19x13", "speed": "rapid", "system": "byoyomi"],
+            ],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.uuid, "partially-readable-id")
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ]
+        )
+    }
+
+    func testInboundEntryRetainsUUIDWhenEveryOptionIsUnknown() throws {
+        let payload: [String: Any] = [
+            "uuid": "future-options-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "canadian"],
+                ["size": "13x13", "speed": "hyper", "system": "fischer"],
+            ],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.uuid, "future-options-id")
+        XCTAssertTrue(entry.sizeSpeedOptions.isEmpty)
+    }
+
+    func testInboundEntryStillRequiresANonblankUUID() {
+        let options: [[String: Any]] = [
+            ["size": "9x9", "speed": "rapid", "system": "fischer"],
+        ]
+
+        XCTAssertNil(OGSAutomatchEntry(["size_speed_options": options]))
+        XCTAssertNil(OGSAutomatchEntry([
+            "uuid": " \n\t ",
+            "size_speed_options": options,
+        ]))
+    }
+
+    func testInboundEntryDefaultsUnknownPreferenceFieldsIndependently() throws {
+        let payload: [String: Any] = [
+            "uuid": "future-preferences-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "rules": ["condition": "optional", "value": "chinese"],
+            "handicap": ["condition": "required", "value": "automatic"],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.rules.condition, .noPreference)
+        XCTAssertEqual(entry.rules.value, .chinese)
+        XCTAssertEqual(entry.handicap.condition, .required)
+        XCTAssertEqual(entry.handicap.value, .enabled)
+    }
+
+    func testInboundEntryDefaultsMalformedPreferenceObjectsIndependently() throws {
+        let malformedRulesPayload: [String: Any] = [
+            "uuid": "malformed-rules-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "rules": "future-rules-shape",
+            "handicap": ["condition": "required", "value": "disabled"],
+        ]
+        let malformedRulesEntry = try XCTUnwrap(
+            OGSAutomatchEntry(malformedRulesPayload)
+        )
+
+        XCTAssertEqual(malformedRulesEntry.rules.condition, .noPreference)
+        XCTAssertEqual(malformedRulesEntry.rules.value, .japanese)
+        XCTAssertEqual(malformedRulesEntry.handicap.condition, .required)
+        XCTAssertEqual(malformedRulesEntry.handicap.value, .disabled)
+
+        let malformedHandicapPayload: [String: Any] = [
+            "uuid": "malformed-handicap-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "rules": ["condition": "required", "value": "aga"],
+            "handicap": ["condition": 42, "value": ["future": true]],
+        ]
+        let malformedHandicapEntry = try XCTUnwrap(
+            OGSAutomatchEntry(malformedHandicapPayload)
+        )
+
+        XCTAssertEqual(malformedHandicapEntry.rules.condition, .required)
+        XCTAssertEqual(malformedHandicapEntry.rules.value, .aga)
+        XCTAssertEqual(malformedHandicapEntry.handicap.condition, .noPreference)
+        XCTAssertEqual(malformedHandicapEntry.handicap.value, .enabled)
+    }
+
+    func testInboundEntryIgnoresInvalidLegacyTimeControlMetadata() throws {
+        let payload: [String: Any] = [
+            "uuid": "invalid-legacy-time-control-id",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid"],
+                ["size": "13x13", "speed": "correspondence"],
+            ],
+            "time_control": [
+                "condition": "no-preference",
+                "value": ["system": "canadian"],
+            ],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(entry.uuid, "invalid-legacy-time-control-id")
+        XCTAssertEqual(entry.sizeSpeedOptions.map(\.system), [.byoyomi, .fischer])
+    }
+
+    func testCurrentUICompatibilityAdapterPreservesLegacyPreferences() {
+        let liveEntry = OGSAutomatchEntry(
+            sizeOptions: [9, 19],
+            timeControlSpeed: .live,
+            optionsShuffler: { _ in }
+        )
+        XCTAssertEqual(
+            liveEntry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .live,
+                    system: .fischer
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .live,
+                    system: .byoyomi
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .live,
+                    system: .fischer
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .live,
+                    system: .byoyomi
+                ),
+            ]
+        )
+        XCTAssertEqual(liveEntry.rules.condition, .noPreference)
+        XCTAssertEqual(liveEntry.handicap.condition, .noPreference)
+        XCTAssertEqual(liveEntry.handicap.value, .enabled)
+        XCTAssertNil(liveEntry.jsonObject["time_control"])
+
+        var invoked = false
+        _ = OGSAutomatchEntry(
+            sizeOptions: [9, 19],
+            timeControlSpeed: .live,
+            optionsShuffler: {
+                invoked = true
+                $0.reverse()
+            }
+        )
+        XCTAssertTrue(invoked)
+
+        let blitzEntry = OGSAutomatchEntry(
+            sizeOptions: [9],
+            timeControlSpeed: .blitz
+        )
+        XCTAssertEqual(blitzEntry.handicap.condition, .noPreference)
+        XCTAssertEqual(blitzEntry.handicap.value, .disabled)
+
+        let correspondenceEntry = OGSAutomatchEntry(
+            sizeOptions: [13],
+            timeControlSpeed: .correspondence
+        )
+        XCTAssertEqual(correspondenceEntry.sizeSpeedOptions.count, 1)
+        XCTAssertEqual(correspondenceEntry.sizeSpeedOptions.first?.system, .fischer)
+    }
+
+    func testModernEntryEncodingRemainsReadableByTheLegacyDecoder() throws {
+        let entry = OGSAutomatchEntry(
+            sizeOptions: [9, 19],
+            timeControlSpeed: .live
+        )
+
+        let data = try JSONEncoder().encode(entry)
+        let legacyEntry = try JSONDecoder().decode(
+            LegacyStoredAutomatchEntry.self,
+            from: data
+        )
+
+        XCTAssertEqual(legacyEntry.sizeOptions, [9, 19])
+        XCTAssertEqual(legacyEntry.timeControlSpeed, .live)
+        XCTAssertEqual(legacyEntry.uuid, entry.uuid)
+    }
+
+    func testEntryPersistenceRoundTripPreservesModernContract() throws {
+        let entry = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 19,
+            speed: .rapid,
+            system: .byoyomi,
+            handicap: .required,
+            lowerRankDifference: 0,
+            upperRankDifference: 9
+        ).makeAutomatchEntry(uuid: "round-trip-id")
+
+        let data = try JSONEncoder().encode(entry)
+        let decoded = try JSONDecoder().decode(OGSAutomatchEntry.self, from: data)
+
+        XCTAssertEqual(decoded, entry)
+    }
+
+    func testLegacyStoredEntryMigratesAndKeepsLegacyKey() throws {
+        let suiteName = "com.honganhkhoa.Surround.QuickMatchTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let legacyData = Data(
+            #"{"sizeOptions":[9,19],"timeControlSpeed":"live","uuid":"legacy-id"}"#.utf8
+        )
+        defaults.set(legacyData, forKey: SettingKey<OGSAutomatchEntry>.lastAutomatchEntry.name)
+
+        let draft = defaults.loadQuickMatchDraft()
+
+        XCTAssertEqual(draft.mode, .multiple)
+        XCTAssertEqual(draft.boardSize, 19)
+        XCTAssertEqual(draft.speed, .live)
+        XCTAssertEqual(draft.system, .byoyomi)
+        XCTAssertEqual(draft.multipleBoardSizes, [9, 19])
+        XCTAssertEqual(
+            draft.multipleClocks,
+            [
+                OGSQuickMatchClockSelection(speed: .live, system: .fischer),
+                OGSQuickMatchClockSelection(speed: .live, system: .byoyomi),
+            ]
+        )
+        XCTAssertEqual(draft.handicap, .standard)
+        XCTAssertEqual(draft.lowerRankDifference, 3)
+        XCTAssertEqual(draft.upperRankDifference, 3)
+        XCTAssertEqual(defaults.data(forKey: SettingKey<OGSAutomatchEntry>.lastAutomatchEntry.name), legacyData)
+        XCTAssertNotNil(
+            defaults[SettingKey<OGSQuickMatchDraft>.lastQuickMatchDraft]
+        )
+        XCTAssertEqual(defaults.loadQuickMatchDraft(), draft)
+    }
+
+    func testUnknownDraftSchemaIsPreservedWithoutLegacyOverwrite() throws {
+        let suiteName = "com.honganhkhoa.Surround.QuickMatchTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let futureDraft = OGSQuickMatchDraft(
+            schemaVersion: OGSQuickMatchDraft.currentSchemaVersion + 1,
+            mode: .exact,
+            boardSize: 19
+        )
+        let futureData = try JSONEncoder().encode(futureDraft)
+        let draftKey = SettingKey<OGSQuickMatchDraft>.lastQuickMatchDraft
+        defaults.set(futureData, forKey: draftKey.name)
+        defaults.set(
+            Data(
+                #"{"sizeOptions":[9],"timeControlSpeed":"blitz","uuid":"legacy-id"}"#.utf8
+            ),
+            forKey: SettingKey<OGSAutomatchEntry>.lastAutomatchEntry.name
+        )
+
+        let loaded = defaults.loadQuickMatchDraft()
+
+        XCTAssertEqual(loaded, .ogsDefault)
+        XCTAssertEqual(defaults.data(forKey: draftKey.name), futureData)
+    }
+
+    func testLegacyMultiSizeCorrespondenceMigratesToFlexibleLargestSize() throws {
+        let legacyData = Data(
+            #"{"sizeOptions":[9,13,19],"timeControlSpeed":"correspondence","uuid":"legacy-correspondence"}"#.utf8
+        )
+        let legacyEntry = try JSONDecoder().decode(
+            OGSAutomatchEntry.self,
+            from: legacyData
+        )
+
+        let draft = OGSQuickMatchDraft(migrating: legacyEntry)
+        let payload = draft.makeAutomatchEntry(uuid: "migrated-id")
+
+        XCTAssertEqual(draft.mode, .flexible)
+        XCTAssertEqual(draft.boardSize, 19)
+        XCTAssertEqual(draft.multipleBoardSizes, [9, 13, 19])
+        XCTAssertEqual(draft.speed, .correspondence)
+        XCTAssertEqual(draft.system, .fischer)
+        XCTAssertEqual(
+            payload.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .correspondence,
+                    system: .fischer
+                ),
+            ]
+        )
+    }
+
+    func testLegacyBlitzMigrationKeepsDisabledHandicap() throws {
+        let legacyData = Data(
+            #"{"sizeOptions":[9],"timeControlSpeed":"blitz","uuid":"legacy-blitz"}"#.utf8
+        )
+        let legacyEntry = try JSONDecoder().decode(
+            OGSAutomatchEntry.self,
+            from: legacyData
+        )
+
+        let draft = OGSQuickMatchDraft(migrating: legacyEntry)
+
+        XCTAssertEqual(draft.mode, .flexible)
+        XCTAssertEqual(draft.handicap, .disabled)
+    }
+}

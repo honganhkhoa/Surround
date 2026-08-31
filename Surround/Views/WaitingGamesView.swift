@@ -25,10 +25,19 @@ struct AutomatchEntryCell: View {
                 }
             }
             Divider()
-            Label(
-                entry.sizeOptions.sorted().map { "\($0)×\($0)" }.joined(separator: ", "),
-                systemImage: "squareshape.split.3x3"
-            ).font(.subheadline)
+            if entry.sizeOptions.isEmpty {
+                Label(
+                    "Unable to display match settings",
+                    systemImage: "exclamationmark.triangle"
+                )
+                    .font(.subheadline)
+            } else {
+                Label(
+                    entry.sizeOptions.sorted().map { "\($0)×\($0)" }.joined(separator: ", "),
+                    systemImage: "squareshape.split.3x3"
+                )
+                .font(.subheadline)
+            }
         }
     }
 }

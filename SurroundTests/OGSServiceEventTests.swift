@@ -2108,6 +2108,62 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    func testFindAutomatchEmitsOfficialPayloadOnlyWhileSocketIsOpen() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "service-test-id")
+
+        service.findAutomatch(entry: entry)
+
+        let emission = try XCTUnwrap(socket.emissions.last)
+        XCTAssertEqual(emission.command, "automatch/find_match")
+        let payload = try XCTUnwrap(emission.data as? [String: Any])
+        XCTAssertEqual(payload["uuid"] as? String, "service-test-id")
+        XCTAssertNil(payload["time_control"])
+        let options = try XCTUnwrap(
+            payload["size_speed_options"] as? [[String: Any]]
+        )
+        XCTAssertEqual(options.first?["size"] as? String, "9x9")
+        XCTAssertEqual(options.first?["speed"] as? String, "rapid")
+        XCTAssertEqual(options.first?["system"] as? String, "fischer")
+
+        socket.opened = false
+        service.findAutomatch(entry: entry)
+
+        XCTAssertEqual(socket.emissions.count, 1)
+    }
+
+    func testDegradedInboundAutomatchEntryRemainsCancellable() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let uuid = "future-automatch-id"
+
+        socket.deliver(name: "automatch/entry", data: [
+            "uuid": uuid,
+            "size_speed_options": [
+                ["size": "9x9", "speed": "hyper", "system": "canadian"],
+            ],
+            "rules": ["condition": "optional", "value": "future-rules"],
+            "handicap": "future-handicap-shape",
+        ])
+
+        let entry = try XCTUnwrap(service.autoMatchEntryById[uuid])
+        XCTAssertEqual(entry.uuid, uuid)
+        XCTAssertTrue(entry.sizeSpeedOptions.isEmpty)
+
+        service.cancelAutomatch(entry: entry)
+
+        let emission = try XCTUnwrap(socket.emissions.last)
+        XCTAssertEqual(emission.command, "automatch/cancel")
+        let payload = try XCTUnwrap(emission.data as? [String: String])
+        XCTAssertEqual(payload, ["uuid": uuid])
+    }
+
     private func makeService(
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],

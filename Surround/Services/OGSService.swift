@@ -1131,6 +1131,7 @@ class OGSService: ObservableObject {
         preferences.reset(.cachedOGSGames)
         preferences.reset(.lastSeenChatIdByOGSGameId)
         preferences.reset(.lastAutomatchEntry)
+        preferences.reset(.lastQuickMatchDraft)
         preferences.reset(.lastSeenPrivateMessageByOGSUserId)
         preferences.reset(.ogsRemoteStorageLastSync)
         FinishedGameCache.shared.clear()
