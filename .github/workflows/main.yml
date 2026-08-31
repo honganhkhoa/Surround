@@ -56,7 +56,7 @@ jobs:
 
   ipad-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -74,17 +74,36 @@ jobs:
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
             "${{ steps.simulator.outputs.id }}"
 
-      - name: Run iPad UI tests
+      - name: Build iPad UI tests
+        id: ipad_ui_build
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p TestResults
-          xcodebuild test \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
-            -only-testing:SurroundUITests \
-            -resultBundlePath TestResults/SurroundUITests-iPad.xcresult
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Verify iPadOS 26 hardware-keyboard behavior
+        id: ipad_keyboard_preflight
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh preflight \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run main iPad UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run isolated iPad composer UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh composer \
+            "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad UI test results
         if: ${{ always() }}
@@ -97,7 +116,7 @@ jobs:
 
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -122,35 +141,59 @@ jobs:
           simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
+      - name: Run unit tests on iOS 18
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          derived_data_path="$(
+            .github/ci-tools/run-ipad-ui-tests.sh derived-data-path \
+              "${{ steps.ipad_simulator.outputs.id }}"
+          )"
+          xcodebuild test \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
+            -derivedDataPath "$derived_data_path" \
+            -only-testing:SurroundTests \
+            -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
+
       - name: Configure the iPadOS 18 test keyboard
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
             "${{ steps.ipad_simulator.outputs.id }}"
 
-      - name: Run unit tests on iOS 18
+      - name: Build iPad UI tests on iPadOS 18
+        id: ipad_ui_build
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p TestResults
-          xcodebuild test \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
-            -only-testing:SurroundTests \
-            -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad UI tests on iPadOS 18
+      - name: Verify iPadOS 18 hardware-keyboard behavior
+        id: ipad_keyboard_preflight
+        timeout-minutes: 5
         shell: bash
         run: |
-          set -o pipefail
-          xcodebuild test \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=${{ steps.ipad_simulator.outputs.id }}" \
-            -only-testing:SurroundUITests \
-            -resultBundlePath TestResults/SurroundUITests-iPadOS18.xcresult
+          .github/ci-tools/run-ipad-ui-tests.sh preflight \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run main iPad UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run isolated iPad composer UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh composer \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iOS 18 test results
         if: ${{ always() }}

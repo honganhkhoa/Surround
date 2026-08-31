@@ -260,6 +260,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 .appStoreScreenshotWidgetProofTokenLaunchArgument,
             appStoreWidgetProofToken,
         ]
+        registerAppTermination(app)
         app.launch()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         if UIDevice.current.userInterfaceIdiom == .pad {

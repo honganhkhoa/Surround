@@ -36,22 +36,21 @@ itself:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+result_label="Local-$(date +%Y%m%d-%H%M%S)"
 .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh "$simulator_id"
-xcodebuild test \
-  -scheme Surround \
-  -project Surround.xcodeproj \
-  -configuration Debug \
-  -destination "platform=iOS Simulator,id=${simulator_id}" \
-  -only-testing:SurroundUITests
+.github/ci-tools/run-ipad-ui-tests.sh build "$simulator_id" "$result_label"
+.github/ci-tools/run-ipad-ui-tests.sh preflight "$simulator_id" "$result_label"
+.github/ci-tools/run-ipad-ui-tests.sh main "$simulator_id" "$result_label"
+.github/ci-tools/run-ipad-ui-tests.sh composer "$simulator_id" "$result_label"
 ```
 
-The UI-test harness enables the selected simulator's hardware-keyboard path so
-long journeys do not depend on XCTest receiving every software-keyboard
-animation-completion notification. Composer tests still require the specific
-chat field to report keyboard focus and accept the complete typed value, so
-automatic-focus coverage remains intact.
+The keyboard helper stops the Simulator.app host, shuts down only the selected simulator, updates its device-specific preference, then boots the device in a new Simulator.app process. It verifies the stored preference and records the guest's hardware-keyboard attachment state, warning if the undocumented state signal is absent. The separate XCUI preflight is authoritative: the specific chat field must gain focus while no software-keyboard frame is visible. Composer tests still require that field to accept the complete typed value, so automatic-focus and input coverage remain intact.
 
-CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains both result bundles in the `surround-ios-18-test-results` artifact.
+The runner builds once, verifies keyboard behavior, then separates the main journeys from the tests that intentionally focus a composer or exercise layout while it owns keyboard focus. Each test phase writes its own `.xcresult` bundle under `TestResults`. CI still runs the main and isolated composer phases when the preflight fails, preserving app-test diagnostics while reporting the environment failure directly. This keeps a lost XCTest keyboard-animation completion notification from slowing unrelated tests. Both UI-test phases use a 15-minute XCTest execution allowance per test. In CI, each phase also has a 30-minute step limit. The current-OS job has a 90-minute outer limit. The minimum-OS job reuses the UI derived-data directory for its sequential unit step and has a 120-minute outer limit, providing headroom for result upload even if both UI phases reach their own limits.
+
+The isolated selection is centralized in `.github/ci-tools/run-ipad-ui-tests.sh` so the iPadOS 26 and iPadOS 18 lanes cannot drift. The runner also validates every isolated test declaration before invoking Xcode, so a renamed test cannot silently execute in the wrong phase.
+
+CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains its unit, keyboard-preflight, main UI, and composer UI result bundles in the `surround-ios-18-test-results` artifact.
 
 ## Deployment target validation
 

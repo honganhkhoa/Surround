@@ -14,15 +14,82 @@ if ! [[ "$simulator_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:x
   exit 64
 fi
 
-if ! xcrun simctl list --json devices available \
-  | jq -e --arg simulator_id "$simulator_id" '
-      any(
-        .devices[][];
-        .udid == $simulator_id and .isAvailable == true
-      )
-    ' >/dev/null; then
+simulator_record="$(
+  xcrun simctl list --json devices available \
+    | jq -r --arg simulator_id "$simulator_id" '
+        first(
+          .devices
+          | to_entries[]
+          | .key as $runtime
+          | .value[]
+          | select(
+              .udid == $simulator_id and .isAvailable == true
+            )
+          | [$runtime, .name, .state]
+          | @tsv
+        ) // empty
+      '
+)"
+if [[ -z "$simulator_record" ]]; then
   echo "No available simulator has UDID $simulator_id." >&2
   exit 1
+fi
+
+IFS=$'\t' read -r simulator_runtime simulator_name simulator_state \
+  <<< "$simulator_record"
+
+developer_directory="$(xcode-select -p)"
+simulator_app="$developer_directory/Applications/Simulator.app"
+simulator_executable="$simulator_app/Contents/MacOS/Simulator"
+if [[ ! -x "$simulator_executable" ]]; then
+  echo "Could not find Simulator.app for the selected Xcode at $simulator_app." >&2
+  exit 1
+fi
+
+current_simulator_state() {
+  xcrun simctl list --json devices available \
+    | jq -r --arg simulator_id "$simulator_id" '
+        first(
+          .devices[][]
+          | select(.udid == $simulator_id)
+          | .state
+        ) // empty
+      '
+}
+
+# Simulator.app owns ConnectHardwareKeyboard and can cache it independently of
+# CoreSimulator. Stop the host before updating the preference so the new
+# process starts with the selected device's value.
+if pgrep -x Simulator >/dev/null 2>&1; then
+  echo "Stopping Simulator.app before changing its keyboard preference."
+  pkill -TERM -x Simulator
+  for _ in {1..30}; do
+    pgrep -x Simulator >/dev/null 2>&1 || break
+    sleep 1
+  done
+  if pgrep -x Simulator >/dev/null 2>&1; then
+    echo "Simulator.app did not stop before keyboard configuration." >&2
+    exit 1
+  fi
+fi
+
+simulator_state="$(current_simulator_state)"
+
+if [[ "$simulator_state" != "Shutdown" ]]; then
+  echo "Shutting down $simulator_name before changing its keyboard preference."
+  if [[ "$simulator_state" != "Shutting Down" ]]; then
+    xcrun simctl shutdown "$simulator_id"
+  fi
+
+  for _ in {1..60}; do
+    simulator_state="$(current_simulator_state)"
+    [[ "$simulator_state" == "Shutdown" ]] && break
+    sleep 1
+  done
+  if [[ "$simulator_state" != "Shutdown" ]]; then
+    echo "Simulator $simulator_id did not shut down before configuration." >&2
+    exit 1
+  fi
 fi
 
 preferences_plist="$(mktemp -t surround-simulator-preferences)"
@@ -84,4 +151,57 @@ if [[ "$configured_value" != "true" ]]; then
   exit 1
 fi
 
-echo "Enabled the hardware keyboard for simulator $simulator_id."
+echo "Enabled the hardware keyboard for $simulator_name ($simulator_id)."
+echo "Booting $simulator_name on $simulator_runtime with the new preference."
+xcrun simctl boot "$simulator_id"
+xcrun simctl bootstatus "$simulator_id" -b
+
+echo "Launching Simulator.app for $simulator_name."
+open "$simulator_app" --args -CurrentDeviceUDID "$simulator_id"
+osascript -e 'tell application id "com.apple.iphonesimulator" to activate' \
+  >/dev/null 2>&1 || true
+
+for _ in {1..30}; do
+  pgrep -f "$simulator_executable" >/dev/null 2>&1 && break
+  sleep 1
+done
+if ! pgrep -f "$simulator_executable" >/dev/null 2>&1; then
+  echo "Simulator.app did not launch for keyboard configuration." >&2
+  exit 1
+fi
+
+simulator_state="$(current_simulator_state)"
+if [[ "$simulator_state" != "Booted" ]]; then
+  echo "Simulator $simulator_id did not reach the Booted state." >&2
+  exit 1
+fi
+
+hardware_keyboard_state=""
+for attempt in 1 2; do
+  for _ in {1..15}; do
+    hardware_keyboard_state="$(
+      xcrun simctl notify_get_state \
+        "$simulator_id" GSEventHardwareKeyboardAttached \
+        2>/dev/null || true
+    )"
+    if [[ "$hardware_keyboard_state" =~ ^[0-9]+$ ]] \
+      && (( (hardware_keyboard_state & 255) != 0 )); then
+      break 2
+    fi
+    sleep 1
+  done
+
+  if (( attempt < 2 )); then
+    echo "Retrying Simulator.app activation for hardware-keyboard attachment."
+    open "$simulator_app" --args -CurrentDeviceUDID "$simulator_id"
+    osascript -e 'tell application id "com.apple.iphonesimulator" to activate' \
+      >/dev/null 2>&1 || true
+  fi
+done
+
+if ! [[ "$hardware_keyboard_state" =~ ^[0-9]+$ ]] \
+  || (( (hardware_keyboard_state & 255) == 0 )); then
+  echo "Warning: the booted simulator did not report an attached hardware keyboard; the XCUI preflight will verify the observable behavior." >&2
+fi
+
+echo "Simulator keyboard setup complete: name=$simulator_name state=$simulator_state preference=$configured_value guestState=$hardware_keyboard_state"

@@ -9,6 +9,18 @@ import XCTest
 import UIKit
 
 final class SurroundUITests: SurroundUITestCase {
+    private struct VariationSharingDraft {
+        let app: XCUIApplication
+        let selectedAnalysisPosition: String
+        let parentAnalysisPosition: String
+        let sharingTitle: XCUIElement
+        let sharingPreview: XCUIElement
+        let frozenPreviewValue: String?
+        let variationName: String
+        let mainBoard: XCUIElement
+        let sharedSourceBoardValue: String?
+    }
+
     private enum TextInputFocusMode {
         case acquireWithRetry
         case requireExistingFocus
@@ -63,6 +75,7 @@ final class SurroundUITests: SurroundUITestCase {
             "-AppleLocale", "en_US",
             SurroundUITestContract.launchArgument,
         ] + additionalLaunchArguments
+        registerAppTermination(app)
         app.launch()
         #if targetEnvironment(macCatalyst)
         app.activate()
@@ -1063,6 +1076,155 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    private func beginVariationSharingDraft(
+        named variationName: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> VariationSharingDraft {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let selectedAnalysisPosition =
+            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+                baseMoveNumber:
+                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
+                movePath:
+                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
+            )
+        let parentAnalysisPosition =
+            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+                baseMoveNumber:
+                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
+                movePath: Array(
+                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
+                        .dropLast()
+                )
+            )
+
+        tapAnalysisPosition(
+            selectedAnalysisPosition,
+            in: app,
+            file: file,
+            line: line
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app,
+            file: file,
+            line: line
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            catalystTitle: "Share variation in chat",
+            in: app,
+            file: file,
+            line: line
+        )
+        let variationNameInput = focusSharedVariationInput(
+            in: app,
+            file: file,
+            line: line
+        )
+        let sharingTitle = element(
+            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
+            in: app,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            sharingTitle.label,
+            "Sharing variation",
+            file: file,
+            line: line
+        )
+        let sharingPreview = element(
+            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
+            in: app,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            sharingPreview.frame.width,
+            120,
+            accuracy: 4,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            sharingPreview.frame.height,
+            120,
+            accuracy: 4,
+            file: file,
+            line: line
+        )
+        let frozenPreviewValue = sharingPreview.value as? String
+        XCTAssertNotNil(frozenPreviewValue, file: file, line: line)
+        enterText(
+            variationName,
+            into: variationNameInput,
+            in: app,
+            focusMode: .requireExistingFocus,
+            file: file,
+            line: line
+        )
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        let mainBoard = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app,
+            file: file,
+            line: line
+        )
+        let sharedSourceBoardValue = mainBoard.value as? String
+        XCTAssertNotNil(sharedSourceBoardValue, file: file, line: line)
+
+        return VariationSharingDraft(
+            app: app,
+            selectedAnalysisPosition: selectedAnalysisPosition,
+            parentAnalysisPosition: parentAnalysisPosition,
+            sharingTitle: sharingTitle,
+            sharingPreview: sharingPreview,
+            frozenPreviewValue: frozenPreviewValue,
+            variationName: variationName,
+            mainBoard: mainBoard,
+            sharedSourceBoardValue: sharedSourceBoardValue
+        )
+    }
+
+    private func assertVariationSharingDraftIsIntact(
+        _ draft: VariationSharingDraft,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(
+            draft.sharingTitle.exists,
+            "Expected Variation sharing to remain active.",
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            draft.sharingPreview.value as? String,
+            draft.frozenPreviewValue,
+            "Expected the composer preview to remain frozen.",
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            element(
+                SurroundUITestContract.AccessibilityID.gameChatInput,
+                in: draft.app,
+                matching: .textField,
+                file: file,
+                line: line
+            ).value as? String,
+            draft.variationName,
+            "Expected the draft variation name to be preserved.",
+            file: file,
+            line: line
+        )
+    }
+
     private func waitForValue(
         _ value: String,
         in textField: XCUIElement,
@@ -1434,6 +1596,88 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+    }
+
+    func testHardwareKeyboardPreflightKeepsSoftwareKeyboardHidden() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip(
+            "The Simulator hardware-keyboard preflight requires an iOS device."
+        )
+        #else
+        let app = launchApp(
+            additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.activeGameBoard
+                    .rawValue,
+                SurroundUITestContract.compactGameLayoutLaunchArgument,
+            ],
+            orientation: .portrait
+        )
+
+        selectSegment(
+            at: 2,
+            in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
+            app: app
+        )
+        let input = element(
+            SurroundUITestContract.AccessibilityID.gameChatInput,
+            in: app,
+            matching: .textField
+        )
+        let focusAcquired = waitForChatInputFocus(in: app, timeout: 10)
+        if !focusAcquired {
+            keepTextInputHierarchy(
+                input,
+                in: app,
+                reason: "hardware-keyboard preflight did not focus composer"
+            )
+        }
+        XCTAssertTrue(
+            focusAcquired,
+            "Expected the compact composer to receive focus during the hardware-keyboard preflight."
+        )
+
+        var focusRemainedActive = true
+        var visibleKeyboardFrames: [CGRect] = []
+        let observationDeadline = Date(timeIntervalSinceNow: 2)
+        repeat {
+            if !chatInputHasKeyboardFocus(in: app) {
+                focusRemainedActive = false
+                break
+            }
+            visibleKeyboardFrames = app.keyboards.allElementsBoundByIndex
+                .compactMap { keyboard in
+                    let intersection = keyboard.frame.intersection(app.frame)
+                    return intersection.width > 1 && intersection.height > 1
+                        ? intersection
+                        : nil
+                }
+            if !visibleKeyboardFrames.isEmpty {
+                break
+            }
+            RunLoop.current.run(
+                until: Date().addingTimeInterval(0.2)
+            )
+        } while Date() < observationDeadline
+
+        if !focusRemainedActive || !visibleKeyboardFrames.isEmpty {
+            keepTextInputHierarchy(
+                input,
+                in: app,
+                reason: "hardware-keyboard runtime preflight failed"
+            )
+            keepScreenshot("hardware-keyboard-runtime-preflight", in: app)
+        }
+        XCTAssertTrue(
+            focusRemainedActive,
+            "Expected the composer to remain focused throughout the hardware-keyboard preflight."
+        )
+        XCTAssertTrue(
+            visibleKeyboardFrames.isEmpty,
+            "Expected no visible software keyboard while the composer was focused; frames: \(visibleKeyboardFrames)"
+        )
+        #endif
     }
 
     func testCompactChatAutomaticallyFocusesComposer() throws {
@@ -2019,138 +2263,62 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
-    func testVariationSharingDraftSurvivesNavigationAndCanBeReplaced() {
-        let app = launchApp(additionalLaunchArguments: [
-            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
-            SurroundUITestContract.compatibilitySceneLaunchArgument,
-            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
-        ])
-        let selectedIdentifier =
-            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
-                baseMoveNumber:
-                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
-                movePath:
-                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
-            )
-
-        tapAnalysisPosition(selectedIdentifier, in: app)
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
-            in: app
-        )
-        tapAnalyzeMenuItem(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
-            catalystTitle: "Share variation in chat",
-            in: app
-        )
-        let variationNameInput = focusSharedVariationInput(in: app)
-
-        let parentIdentifier =
-            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
-                baseMoveNumber:
-                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
-                movePath: Array(
-                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
-                        .dropLast()
-                )
-            )
-        let sharingTitle = element(
-            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
-            in: app
-        )
-        XCTAssertEqual(sharingTitle.label, "Sharing variation")
-        let sharingPreview = element(
-            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
-            in: app
-        )
-        XCTAssertEqual(sharingPreview.frame.width, 120, accuracy: 4)
-        XCTAssertEqual(sharingPreview.frame.height, 120, accuracy: 4)
-        let frozenPreviewValue = sharingPreview.value as? String
-        XCTAssertNotNil(frozenPreviewValue)
-        let variationName = "Persistent variation"
-        enterText(
-            variationName,
-            into: variationNameInput,
-            in: app,
-            focusMode: .requireExistingFocus
-        )
-        dismissSoftwareKeyboardIfNeeded(in: app)
-        let mainBoard = element(
-            SurroundUITestContract.AccessibilityID.gameBoard,
-            in: app
-        )
-        let sharedSourceBoardValue = mainBoard.value as? String
-        XCTAssertNotNil(sharedSourceBoardValue)
-
-        func assertSharingDraftIsIntact(
-            file: StaticString = #filePath,
-            line: UInt = #line
-        ) {
-            XCTAssertTrue(
-                sharingTitle.exists,
-                "Expected Variation sharing to remain active.",
-                file: file,
-                line: line
-            )
-            XCTAssertEqual(
-                sharingPreview.value as? String,
-                frozenPreviewValue,
-                "Expected the composer preview to remain frozen.",
-                file: file,
-                line: line
-            )
-            XCTAssertEqual(
-                element(
-                    SurroundUITestContract.AccessibilityID.gameChatInput,
-                    in: app,
-                    matching: .textField,
-                    file: file,
-                    line: line
-                ).value as? String,
-                variationName,
-                "Expected the draft variation name to be preserved.",
-                file: file,
-                line: line
-            )
-        }
-
+    func testVariationSharingDraftSurvivesChatSelection() {
+        let draft = beginVariationSharingDraft(named: "Persistent variation")
+        let app = draft.app
         let lineID = SurroundUITestContract.AccessibilityID.gameChatLine(
             "app-store-chat-1"
         )
         tapChatItem(lineID, in: app, matching: .button)
         assertSelected(lineID, in: app)
-        let plainChatLineBoardValue = mainBoard.value as? String
+        let plainChatLineBoardValue = draft.mainBoard.value as? String
         XCTAssertNotNil(plainChatLineBoardValue)
         XCTAssertEqual(
             plainChatLineBoardValue,
             "position:101:cq",
             "Expected a plain chat line to render the current-game fallback board."
         )
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
 
         tapChatItem(lineID, in: app, matching: .button)
         assertNotSelected(lineID, in: app)
         XCTAssertEqual(
-            mainBoard.value as? String,
+            draft.mainBoard.value as? String,
             plainChatLineBoardValue,
             "Expected plain-line deselection to preserve the fallback board."
         )
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
 
         let moveID = SurroundUITestContract.AccessibilityID.gameChatMove(0)
         tapChatItem(moveID, in: app, matching: .button)
         assertSelected(moveID, in: app)
         XCTAssertNotEqual(
-            mainBoard.value as? String,
-            sharedSourceBoardValue,
+            draft.mainBoard.value as? String,
+            draft.sharedSourceBoardValue,
             "Expected a chat move selection to control the main board independently of the frozen composer preview."
         )
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
 
         tapChatItem(moveID, in: app, matching: .button)
         assertNotSelected(moveID, in: app)
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
+    }
 
+    func testVariationSharingDraftSurvivesAnalyzeNavigation() {
+        let draft = beginVariationSharingDraft(named: "Persistent variation")
+        let app = draft.app
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+            in: app
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
+            ].exists,
+            "Expected the first toggle to leave Analyze mode."
+        )
+        assertVariationSharingDraftIsIntact(draft)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
             in: app
@@ -2159,29 +2327,38 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
         )
-        tapAnalysisPosition(selectedIdentifier, in: app)
-        assertSelected(selectedIdentifier, in: app)
-        let selectedAnalyzeBoardValue = mainBoard.value as? String
+        tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
+        assertSelected(draft.selectedAnalysisPosition, in: app)
+        assertVariationSharingDraftIsIntact(draft)
+        let selectedAnalyzeBoardValue = draft.mainBoard.value as? String
         XCTAssertNotNil(selectedAnalyzeBoardValue)
-        assertSharingDraftIsIntact()
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
             in: app,
             matching: .button
         )
-        assertSelected(parentIdentifier, in: app)
+        assertSelected(draft.parentAnalysisPosition, in: app)
         XCTAssertNotEqual(
-            mainBoard.value as? String,
+            draft.mainBoard.value as? String,
             selectedAnalyzeBoardValue,
             "Expected Analyze navigation to update the main board independently of the frozen composer preview."
         )
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
+
+        tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
+        assertSelected(draft.selectedAnalysisPosition, in: app)
+        assertVariationSharingDraftIsIntact(draft)
+    }
+
+    func testVariationSharingDraftSurvivesZenModeRoundTrip() {
+        let draft = beginVariationSharingDraft(named: "Persistent variation")
+        let app = draft.app
 
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
             in: app
         )
-        assertSharingDraftIsIntact()
+        assertVariationSharingDraftIsIntact(draft)
         activateZenControl(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
             in: app
@@ -2192,26 +2369,28 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
         element(
-            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
-            in: app
-        )
-        _ = focusSharedVariationInput(in: app)
-        dismissSoftwareKeyboardIfNeeded(in: app)
-        element(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
             in: app,
             matching: .button
         )
-        assertSharingDraftIsIntact()
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
-            in: app
-        )
         element(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app
         )
-        tapAnalysisPosition(parentIdentifier, in: app)
+        _ = focusSharedVariationInput(in: app)
+        assertVariationSharingDraftIsIntact(draft)
+    }
+
+    func testSharingAnotherVariationReplacesDraft() {
+        let draft = beginVariationSharingDraft(named: "Persistent variation")
+        let app = draft.app
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+            in: app,
+            matching: .button
+        )
+        assertSelected(draft.parentAnalysisPosition, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -2229,12 +2408,11 @@ final class SurroundUITests: SurroundUITestCase {
         )
         XCTAssertNotEqual(
             replacementPreview.value as? String,
-            frozenPreviewValue,
+            draft.frozenPreviewValue,
             "Sharing another branch should replace the frozen composer preview."
         )
-        let replacementName = "Replacement variation"
         enterText(
-            replacementName,
+            "Replacement variation",
             into: replacementNameInput,
             in: app,
             focusMode: .requireExistingFocus
@@ -2850,7 +3028,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
-    func testAnalyzeControlBarNavigatesSharesAndDeletesBranch() {
+    func testAnalyzeControlBarNavigatesAndDeletesBranch() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
@@ -3000,139 +3178,6 @@ final class SurroundUITests: SurroundUITestCase {
             ).isEnabled
         )
         tapAnalyzeMenuItem(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
-            catalystTitle: "Share variation in chat",
-            in: app
-        )
-
-        let sharingTitle = element(
-            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
-            in: app
-        )
-        XCTAssertEqual(sharingTitle.label, "Sharing variation")
-        let sharingPreview = element(
-            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
-            in: app
-        )
-        XCTAssertEqual(sharingPreview.frame.width, 120, accuracy: 4)
-        XCTAssertEqual(sharingPreview.frame.height, 120, accuracy: 4)
-        let frozenPreviewValue = sharingPreview.value as? String
-        XCTAssertNotNil(frozenPreviewValue)
-        let variationNameInput = focusSharedVariationInput(in: app)
-        XCTAssertEqual(variationNameInput.label, "Variation name...")
-        enterText(
-            "Focused variation",
-            into: variationNameInput,
-            in: app,
-            focusMode: .requireExistingFocus
-        )
-        dismissSoftwareKeyboardIfNeeded(in: app)
-        element(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
-            in: app
-        )
-        assertSelected(selectedIdentifier, in: app)
-
-        func assertSharingDraftIsIntact(
-            file: StaticString = #filePath,
-            line: UInt = #line
-        ) {
-            XCTAssertTrue(
-                sharingTitle.exists,
-                "Expected Variation sharing to remain active.",
-                file: file,
-                line: line
-            )
-            XCTAssertEqual(
-                sharingPreview.value as? String,
-                frozenPreviewValue,
-                "Expected Analyze navigation to preserve the shared variation preview.",
-                file: file,
-                line: line
-            )
-            XCTAssertEqual(
-                element(
-                    SurroundUITestContract.AccessibilityID.gameChatInput,
-                    in: app,
-                    matching: .textField,
-                    file: file,
-                    line: line
-                ).value as? String,
-                "Focused variation",
-                "Expected Analyze navigation to preserve the draft name.",
-                file: file,
-                line: line
-            )
-        }
-
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
-            in: app,
-            matching: .button
-        )
-        assertSelected(parentIdentifier, in: app)
-        assertSharingDraftIsIntact()
-
-        tapAnalysisPosition(selectedIdentifier, in: app)
-        assertSelected(selectedIdentifier, in: app)
-        assertSharingDraftIsIntact()
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
-            in: app,
-            matching: .button
-        )
-        assertSelected(parentIdentifier, in: app)
-        assertSharingDraftIsIntact()
-
-        tap(
-            SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
-            in: app,
-            matching: .button
-        )
-
-        let sharingTitleGone = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: sharingTitle
-        )
-        let sharingPreviewGone = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: sharingPreview
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(
-                for: [sharingTitleGone, sharingPreviewGone],
-                timeout: 10
-            ),
-            .completed,
-            "Expected Cancel to dismiss the Variation sharing composer."
-        )
-        XCTAssertFalse(
-            app.descendants(matching: .any)[
-                SurroundUITestContract.AccessibilityID
-                    .gameVariationShareCancel
-            ].exists
-        )
-        XCTAssertEqual(
-            element(
-                SurroundUITestContract.AccessibilityID.gameChatInput,
-                in: app
-            ).label,
-            "Say hi!"
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
-            in: app
-        )
-        assertSelected(parentIdentifier, in: app)
-
-        tapAnalysisPosition(selectedIdentifier, in: app)
-        assertSelected(selectedIdentifier, in: app)
-
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
-            in: app
-        )
-        tapAnalyzeMenuItem(
             SurroundUITestContract.AccessibilityID.gameAnalyzeDeleteBranch,
             catalystTitle: "Delete branch",
             in: app,
@@ -3150,6 +3195,54 @@ final class SurroundUITests: SurroundUITestCase {
             "Expected the deleted analysis position to disappear"
         )
         assertSelected(parentIdentifier, in: app)
+    }
+
+    func testAnalyzeShareComposerAutomaticallyFocusesAndAcceptsName() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let selectedIdentifier =
+            SurroundUITestContract.AccessibilityID.gameAnalysisPosition(
+                baseMoveNumber:
+                    SurroundUITestContract.screenshotAnalysisBaseMoveNumber,
+                movePath:
+                    SurroundUITestContract.screenshotAnalysisSelectedMovePath
+            )
+
+        tapAnalysisPosition(selectedIdentifier, in: app)
+        assertSelected(selectedIdentifier, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
+            in: app
+        )
+        tapAnalyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare,
+            catalystTitle: "Share variation in chat",
+            in: app
+        )
+
+        let sharingTitle = element(
+            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
+            in: app
+        )
+        XCTAssertEqual(sharingTitle.label, "Sharing variation")
+        let sharingPreview = element(
+            SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
+            in: app
+        )
+        XCTAssertEqual(sharingPreview.frame.width, 120, accuracy: 4)
+        XCTAssertEqual(sharingPreview.frame.height, 120, accuracy: 4)
+        XCTAssertNotNil(sharingPreview.value as? String)
+        let variationNameInput = focusSharedVariationInput(in: app)
+        XCTAssertEqual(variationNameInput.label, "Variation name...")
+        enterText(
+            "Focused variation",
+            into: variationNameInput,
+            in: app,
+            focusMode: .requireExistingFocus
+        )
     }
 
     func testShareVariationUsesSelectedChannelAndStaysInChatAfterSending() {
@@ -3449,10 +3542,19 @@ final class SurroundUITests: SurroundUITestCase {
             "Expected marks on a main-branch position to be shareable."
         )
         share.tap()
+        let sharingTitle = element(
+            SurroundUITestContract.AccessibilityID.gameVariationShareStatus,
+            in: app
+        )
         _ = focusSharedVariationInput(in: app)
         let preview = element(
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app
+        )
+        let sharingCancel = element(
+            SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
+            in: app,
+            matching: .button
         )
         XCTAssertTrue(
             (preview.value as? String)?.contains(":|marks:A=") == true,
@@ -3463,6 +3565,46 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameVariationShareCancel,
             in: app,
             matching: .button
+        )
+
+        let sharingTitleGone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: sharingTitle
+        )
+        let sharingPreviewGone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: preview
+        )
+        let sharingCancelGone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: sharingCancel
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(
+                for: [
+                    sharingTitleGone,
+                    sharingPreviewGone,
+                    sharingCancelGone,
+                ],
+                timeout: 10
+            ),
+            .completed,
+            "Expected Cancel to dismiss the variation-sharing composer."
+        )
+        XCTAssertEqual(
+            element(
+                SurroundUITestContract.AccessibilityID.gameChatInput,
+                in: app
+            ).label,
+            "Say hi!"
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        XCTAssertTrue(
+            (board.value as? String)?.contains("|marks:A=") == true,
+            "Expected Cancel to preserve the active Analyze position."
         )
     }
 

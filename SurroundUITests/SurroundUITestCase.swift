@@ -9,6 +9,12 @@ import XCTest
 import UIKit
 
 class SurroundUITestCase: XCTestCase {
+    func registerAppTermination(_ app: XCUIApplication) {
+        addTeardownBlock {
+            app.terminate()
+        }
+    }
+
     func selectSegment(
         at index: Int,
         in identifier: String,

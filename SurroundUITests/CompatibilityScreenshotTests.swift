@@ -531,6 +531,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             ]
         }
         app.launchArguments = launchArguments
+        registerAppTermination(app)
         app.launch()
         activeApp = app
         #if targetEnvironment(macCatalyst)
