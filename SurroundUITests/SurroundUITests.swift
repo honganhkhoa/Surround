@@ -1426,6 +1426,234 @@ final class SurroundUITests: SurroundUITestCase {
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
     }
 
+    func testQuickMatchLiveSearchLocksTheFormAndCanBeCancelled() {
+        let app = launchApp()
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeNewGame,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.screenQuickMatch,
+            in: app
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.quickMatchRecap,
+            in: app
+        )
+        let boardSize = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app,
+            matching: .button
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.quickMatchFind,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.quickMatchSearching,
+            in: app
+        )
+        XCTAssertFalse(
+            boardSize.isEnabled,
+            "A live search must lock the editable match criteria."
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.quickMatchCancel,
+            in: app,
+            matching: .button
+        )
+        let findAgain = element(
+            SurroundUITestContract.AccessibilityID.quickMatchFind,
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(waitUntilHittable(findAgain, timeout: 5))
+        XCTAssertTrue(boardSize.isEnabled)
+    }
+
+    func testRestoredLiveAutomatchLocksQuickMatchForm() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
+
+        let homeSearchingBanner = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Searching for")
+        ).firstMatch
+        XCTAssertTrue(homeSearchingBanner.waitForExistence(timeout: 10))
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeNewGame,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.quickMatchSearching,
+            in: app
+        )
+        let cancel = element(
+            SurroundUITestContract.AccessibilityID.quickMatchCancel,
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(waitUntilHittable(cancel, timeout: 5))
+
+        let boardSize = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app,
+            matching: .button
+        )
+        XCTAssertFalse(
+            boardSize.isEnabled,
+            "A restored live search must lock the editable match criteria."
+        )
+
+        let find = app.buttons.matching(
+            identifier: SurroundUITestContract.AccessibilityID.quickMatchFind
+        ).firstMatch
+        XCTAssertFalse(
+            find.exists,
+            "A restored live search must replace Find with its searching state."
+        )
+    }
+
+    func testQuickMatchCorrespondenceAllowsAnotherSearch() {
+        let app = launchApp()
+
+        tap(
+            SurroundUITestContract.AccessibilityID.homeNewGame,
+            in: app,
+            matching: .button
+        )
+        element(
+            SurroundUITestContract.AccessibilityID.screenQuickMatch,
+            in: app
+        )
+
+        let correspondence = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "correspondence",
+                system: "fischer"
+            ),
+            in: app,
+            matching: .button
+        )
+        for _ in 0..<6 where !correspondence.isHittable {
+            app.swipeUp()
+        }
+        tap(
+            correspondence,
+            description: "Correspondence Fischer clock",
+            in: app
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.quickMatchFind,
+            in: app,
+            matching: .button
+        )
+        let banner = element(
+            SurroundUITestContract.AccessibilityID.quickMatchWaitingBanner,
+            in: app
+        )
+        let oneSearch = XCTNSPredicateExpectation(
+            predicate: NSPredicate(
+                format: "label CONTAINS %@",
+                "Searching for a game"
+            ),
+            object: banner
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [oneSearch], timeout: 5),
+            .completed,
+            "The active correspondence search should appear beside Find."
+        )
+        let findAnother = element(
+            SurroundUITestContract.AccessibilityID.quickMatchFind,
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            waitUntilHittable(findAnother, timeout: 5),
+            "Correspondence must leave Find a game available."
+        )
+        activate(findAnother)
+
+        let twoSearches = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS '2'"),
+            object: banner
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [twoSearches], timeout: 5),
+            .completed,
+            "Two correspondence searches should remain active together."
+        )
+    }
+
+    func testQuickMatchShowsMatchingOpenCustomGamesInline() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.quickMatch.rawValue,
+        ])
+
+        element(
+            SurroundUITestContract.AccessibilityID.screenQuickMatch,
+            in: app
+        )
+
+        let boardSize = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(boardSize, in: app)
+        activate(boardSize)
+
+        let correspondence = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "correspondence",
+                system: "fischer"
+            ),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(correspondence, in: app)
+        activate(correspondence)
+
+        let summary = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID
+                .quickMatchMatchingChallenges,
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            summary.label.contains("10 open custom games"),
+            "Only non-rengo custom games matching the selected size and speed should be suggested."
+        )
+        elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID
+                .quickMatchOpenChallenge(91_001),
+            in: app
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .screenQuickMatch
+                )
+                .firstMatch
+                .exists,
+            "Matching custom games should appear inline without leaving Quick Match."
+        )
+    }
+
     func testFixtureGameOpens() {
         let app = launchApp()
         let gameID = SurroundUITestContract.fixtureGameID

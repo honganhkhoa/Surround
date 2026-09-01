@@ -7,10 +7,132 @@
 
 import SwiftUI
 
+struct AutomatchEntryPresentation: Equatable {
+    let boardAndSpeed: String?
+    let clockLines: [String]
+    let rankRange: String
+    let handicap: String
+
+    init(entry: OGSAutomatchEntry, userRank: Double?) {
+        let options = entry.sizeSpeedOptions
+        let sizes = Set(options.map(\.size)).sorted()
+        let speeds = Self.sortedSpeeds(Set(options.map(\.speed)))
+
+        if sizes.isEmpty || speeds.isEmpty {
+            boardAndSpeed = nil
+        } else {
+            let sizeText = sizes.map { "\($0)×\($0)" }.joined(separator: ", ")
+            let speedText = speeds.map(\.quickMatchTitle).joined(separator: ", ")
+            boardAndSpeed = sizes.count == 1 && speeds.count == 1
+                ? "\(sizeText) \(speedText)"
+                : "\(sizeText) · \(speedText)"
+        }
+
+        let selections = Set(options.map {
+            OGSQuickMatchClockSelection(speed: $0.speed, system: $0.system)
+        })
+        .sorted(by: Self.clockSelectionPrecedes)
+        let qualifiesClockWithSpeed = speeds.count > 1
+        clockLines = selections.map { selection in
+            let matchingSizes = Set(
+                options
+                    .filter {
+                        $0.speed == selection.speed
+                            && $0.system == selection.system
+                    }
+                    .map(\.size)
+            )
+            .sorted()
+            let presets = matchingSizes.compactMap {
+                OGSQuickMatchClockPreset.preset(
+                    boardSize: $0,
+                    speed: selection.speed,
+                    system: selection.system
+                )
+            }
+            let value = presets.count == matchingSizes.count
+                ? OGSQuickMatchClockPreset.quickMatchDisplayDescription(
+                    for: presets
+                )
+                : String(localized: "Unknown clock")
+            let clockName = qualifiesClockWithSpeed
+                ? "\(selection.speed.quickMatchTitle) · \(selection.system.quickMatchTitle)"
+                : selection.system.quickMatchTitle
+            return "\(clockName): \(value)"
+        }
+
+        if let userRank {
+            let lower = RankUtils.formattedRank(
+                userRank - Double(entry.lowerRankDifference),
+                longFormat: true
+            )
+            let upper = RankUtils.formattedRank(
+                userRank + Double(entry.upperRankDifference),
+                longFormat: true
+            )
+            rankRange = "\(lower) - \(upper)"
+        } else {
+            rankRange = String(
+                localized: "\(entry.lowerRankDifference) ranks below to \(entry.upperRankDifference) ranks above"
+            )
+        }
+
+        let handicapPreference: OGSQuickMatchHandicapPreference?
+        switch (entry.handicap.condition, entry.handicap.value) {
+        case (.required, .enabled):
+            handicapPreference = .required
+        case (.preferred, .enabled):
+            handicapPreference = .standard
+        case (.required, .disabled):
+            handicapPreference = .disabled
+        default:
+            handicapPreference = nil
+        }
+        if let handicapPreference {
+            handicap = "\(handicapPreference.quickMatchTitle): \(handicapPreference.quickMatchDescription)"
+        } else {
+            handicap = String(
+                localized: "No preference: Accept any handicap setting."
+            )
+        }
+    }
+
+    private static func sortedSpeeds(
+        _ speeds: Set<TimeControlSpeed>
+    ) -> [TimeControlSpeed] {
+        let order: [TimeControlSpeed] = [
+            .blitz, .rapid, .live, .correspondence,
+        ]
+        return speeds.sorted {
+            (order.firstIndex(of: $0) ?? .max)
+                < (order.firstIndex(of: $1) ?? .max)
+        }
+    }
+
+    private static func clockSelectionPrecedes(
+        _ lhs: OGSQuickMatchClockSelection,
+        _ rhs: OGSQuickMatchClockSelection
+    ) -> Bool {
+        let speeds = sortedSpeeds(Set([lhs.speed, rhs.speed]))
+        if lhs.speed != rhs.speed {
+            return speeds.first == lhs.speed
+        }
+        let systems = OGSAutomatchClockSystem.allCases
+        return (systems.firstIndex(of: lhs.system) ?? .max)
+            < (systems.firstIndex(of: rhs.system) ?? .max)
+    }
+}
+
 struct AutomatchEntryCell: View {
     @EnvironmentObject var ogs: OGSService
+    @State private var isCancelling = false
+    @State private var cancellationFailed = false
     
     var entry: OGSAutomatchEntry
+
+    private var presentation: AutomatchEntryPresentation {
+        AutomatchEntryPresentation(entry: entry, userRank: ogs.user?.ranking)
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -18,27 +140,98 @@ struct AutomatchEntryCell: View {
                 Text("Quick match request")
                     .font(.headline)
                 Spacer()
-                Button(action: { ogs.cancelAutomatch(entry: entry) }) {
-                    Text("Withdraw")
-                        .bold()
-                        .foregroundColor(.red)
+                Button(action: requestCancellation) {
+                    if isCancelling {
+                        ProgressView()
+                            .accessibilityLabel("Cancelling quick match search")
+                    } else {
+                        Text("Withdraw")
+                            .bold()
+                            .foregroundColor(.red)
+                    }
                 }
+                .disabled(isCancelling)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel(
+                    isCancelling
+                        ? String(localized: "Cancelling quick match search")
+                        : String(localized: "Cancel quick match search")
+                )
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID
+                        .waitingGamesAutomatchWithdraw(entry.uuid)
+                )
             }
             Divider()
-            if entry.sizeOptions.isEmpty {
+            if let boardAndSpeed = presentation.boardAndSpeed {
+                Label(
+                    boardAndSpeed,
+                    systemImage: "squareshape.split.3x3"
+                )
+
+                Label {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(
+                            Array(presentation.clockLines.enumerated()),
+                            id: \.offset
+                        ) { _, clockLine in
+                            Text(clockLine)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "clock")
+                }
+            } else {
                 Label(
                     "Unable to display match settings",
                     systemImage: "exclamationmark.triangle"
                 )
-                    .font(.subheadline)
-            } else {
-                Label(
-                    entry.sizeOptions.sorted().map { "\($0)×\($0)" }.joined(separator: ", "),
-                    systemImage: "squareshape.split.3x3"
-                )
-                .font(.subheadline)
             }
+
+            Label(
+                presentation.rankRange,
+                systemImage: "arrow.up.and.down.square"
+            )
+
+            Label(
+                presentation.handicap,
+                systemImage: "square.grid.3x3.topleft.filled"
+            )
         }
+        .font(.subheadline)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID
+                .waitingGamesAutomatchEntry(entry.uuid)
+        )
+        .task(id: isCancelling) {
+            guard isCancelling else { return }
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled,
+                  ogs.autoMatchEntryById[entry.uuid] != nil else {
+                return
+            }
+            isCancelling = false
+            cancellationFailed = true
+        }
+        .alert(
+            "Couldn’t cancel the search",
+            isPresented: $cancellationFailed
+        ) {
+            Button("Retry", action: requestCancellation)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("OGS did not confirm the cancellation. The search is still shown so you can try again.")
+        }
+    }
+
+    private func requestCancellation() {
+        guard !isCancelling else { return }
+        guard ogs.cancelAutomatch(entry: entry) else {
+            cancellationFailed = true
+            return
+        }
+        isCancelling = true
     }
 }
 
@@ -91,8 +284,12 @@ struct WaitingGamesView: View {
     }
     
     var body: some View {
-        let liveAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed != .correspondence }
-        let correspondenceAutomatchEntries = ogs.autoMatchEntryById.values.filter { $0.timeControlSpeed == .correspondence }
+        let liveAutomatchEntries = ogs.autoMatchEntryById.values
+            .filter { $0.timeControlSpeed != .correspondence }
+            .sorted { $0.uuid < $1.uuid }
+        let correspondenceAutomatchEntries = ogs.autoMatchEntryById.values
+            .filter { $0.timeControlSpeed == .correspondence }
+            .sorted { $0.uuid < $1.uuid }
         let liveRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed != .correspondence }
         let correspondenceRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed == .correspondence }
         return ScrollView {
@@ -159,7 +356,7 @@ struct WaitingGamesView: View {
                 updateWaitingGamesList()
             }
         }
-        .navigationTitle("Waiting games")
+        .navigationTitle("Searching for games")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

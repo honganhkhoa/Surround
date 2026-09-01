@@ -260,6 +260,21 @@ struct OGSGameChatAnalysisPayload: Encodable {
     }
 }
 
+struct OGSAutomatchLifecycleEvent: Equatable {
+    enum Kind: Equatable {
+        case entry(uuid: String)
+        case started(
+            uuid: String,
+            gameID: Int?,
+            requestedLocally: Bool
+        )
+        case cancelled(uuid: String?, removedCount: Int)
+        case notFoundAfterReconciliation(uuid: String)
+    }
+
+    let kind: Kind
+}
+
 class OGSService: ObservableObject {
     /// Optional state supplied by previews and deterministic clients at
     /// construction time. The service applies this snapshot internally so its
@@ -304,6 +319,8 @@ class OGSService: ObservableObject {
     private let httpClient: OGSHTTPClient
     private let gameResynchronizationTimeout: TimeInterval
     private let conditionalMoveSubmissionTimeout: TimeInterval
+    private let automatchReconciliationTimeout: TimeInterval
+    private let automatchConfirmationTimeout: TimeInterval
 
     private struct PendingConditionalMoveSubmission {
         let expectedPlan: ConditionalMovePlan
@@ -421,8 +438,22 @@ class OGSService: ObservableObject {
     @Published private(set) public var challengesSent = [OGSDirectChallenge]()
     @Published private(set) public var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var autoMatchEntryById = [String: OGSAutomatchEntry]()
+    let automatchLifecycleEvents = PassthroughSubject<
+        OGSAutomatchLifecycleEvent,
+        Never
+    >()
+    @Published private(set) var isReconcilingAutomatches = false
+    private var automatchReconciliationGeneration = UUID()
+    private var automatchIDsAwaitingReplay = Set<String>()
+    private var unconfirmedAutomatchEntryIDs = Set<String>()
+    private var locallyRequestedLiveAutomatchUUID: String?
     var waitingGames: Int {
         return challengesSent.count + openChallengeSentById.count + autoMatchEntryById.count
+    }
+    var activeLiveAutomatchEntry: OGSAutomatchEntry? {
+        autoMatchEntryById.values
+            .filter { $0.timeControlSpeed != .correspondence }
+            .min { $0.uuid < $1.uuid }
     }
     @Published private(set) public var waitingLiveGames: Int = 0
     private var waitingLiveGamesCancellable: AnyCancellable?
@@ -631,6 +662,8 @@ class OGSService: ObservableObject {
         installsObservers: Bool = true,
         gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
+        automatchReconciliationTimeout: TimeInterval = 5,
+        automatchConfirmationTimeout: TimeInterval = 8,
         remoteSettings: OGSRemoteSetting? = nil,
         initialState: BootstrapState? = nil
     ) {
@@ -638,6 +671,8 @@ class OGSService: ObservableObject {
         self.httpClient = httpClient
         self.gameResynchronizationTimeout = gameResynchronizationTimeout
         self.conditionalMoveSubmissionTimeout = conditionalMoveSubmissionTimeout
+        self.automatchReconciliationTimeout = automatchReconciliationTimeout
+        self.automatchConfirmationTimeout = automatchConfirmationTimeout
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
         self.ogsWebsocket = ogsWebsocket
@@ -720,6 +755,9 @@ class OGSService: ObservableObject {
             failAllConditionalMoveSubmissions(
                 with: OGSServiceError.conditionalMovesUpdateInterrupted
             )
+            automatchReconciliationGeneration = UUID()
+            automatchIDsAwaitingReplay.removeAll()
+            isReconcilingAutomatches = false
             markPendingGameResynchronizationsAsEscalated()
             // The transport has gone away, so none of these subscriptions are
             // currently active. Keep only explicit desired state for reconnect.
@@ -731,8 +769,9 @@ class OGSService: ObservableObject {
             // Player chat waits for authentication so Malkovich lines are not
             // exposed through an anonymous subscription.
             self.reconcileDesiredGameConnections()
-            self.autoMatchEntryById.removeAll()
-            ogsWebsocket.emit(command: "automatch/list")
+            beginAutomatchReconciliation(
+                candidates: Set(autoMatchEntryById.keys)
+            )
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
             }
@@ -770,15 +809,55 @@ class OGSService: ObservableObject {
             if let data = data as? [String: Any] {
                 if let automatchEntry = OGSAutomatchEntry(data) {
                     self.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                    self.automatchIDsAwaitingReplay.remove(automatchEntry.uuid)
+                    self.unconfirmedAutomatchEntryIDs.remove(automatchEntry.uuid)
+                    self.publishAutomatchLifecycleEvent(
+                        .entry(uuid: automatchEntry.uuid)
+                    )
                 }
             }
         case "automatch/cancel":
-            if let uuid = (data as? [String: Any] ?? [:])["uuid"] as? String {
-                self.autoMatchEntryById.removeValue(forKey: uuid)
+            if let payload = data as? [String: Any] {
+                if let uuid = payload["uuid"] as? String {
+                    let removedCount = self.autoMatchEntryById.removeValue(
+                        forKey: uuid
+                    ) == nil ? 0 : 1
+                    if self.locallyRequestedLiveAutomatchUUID == uuid {
+                        self.locallyRequestedLiveAutomatchUUID = nil
+                    }
+                    self.automatchIDsAwaitingReplay.remove(uuid)
+                    self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                    self.publishAutomatchLifecycleEvent(
+                        .cancelled(uuid: uuid, removedCount: removedCount)
+                    )
+                } else if payload["uuid"] is NSNull {
+                    let removedCount = self.autoMatchEntryById.count
+                    self.autoMatchEntryById.removeAll()
+                    self.locallyRequestedLiveAutomatchUUID = nil
+                    self.automatchIDsAwaitingReplay.removeAll()
+                    self.unconfirmedAutomatchEntryIDs.removeAll()
+                    self.publishAutomatchLifecycleEvent(
+                        .cancelled(uuid: nil, removedCount: removedCount)
+                    )
+                }
             }
         case "automatch/start":
             if let uuid = (data as? [String: Any] ?? [:])["uuid"] as? String {
                 self.autoMatchEntryById.removeValue(forKey: uuid)
+                let requestedLocally = self.locallyRequestedLiveAutomatchUUID
+                    == uuid
+                if requestedLocally {
+                    self.locallyRequestedLiveAutomatchUUID = nil
+                }
+                self.automatchIDsAwaitingReplay.remove(uuid)
+                self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                self.publishAutomatchLifecycleEvent(
+                    .started(
+                        uuid: uuid,
+                        gameID: (data as? [String: Any])?["game_id"] as? Int,
+                        requestedLocally: requestedLocally
+                    )
+                )
             }
         case "private-message":
             if let messageData = data as? [String: Any] {
@@ -1028,6 +1107,12 @@ class OGSService: ObservableObject {
             let accountIdentityChanged = newValue?.user.id != previousConfig?.user.id
             if accountIdentityChanged {
                 advanceAuthenticationGeneration()
+                locallyRequestedLiveAutomatchUUID = nil
+                isReconcilingAutomatches = false
+                automatchReconciliationGeneration = UUID()
+                automatchIDsAwaitingReplay.removeAll()
+                unconfirmedAutomatchEntryIDs.removeAll()
+                autoMatchEntryById.removeAll()
                 // An in-place account change is equivalent to destroying every
                 // game controller in the official client. Remove intent before
                 // the socket closes so its close/open cycle cannot repopulate
@@ -3161,20 +3246,105 @@ class OGSService: ObservableObject {
         return game.requiresUserAction(forPlayerWithId: userId)
     }
     
-    func findAutomatch(entry: OGSAutomatchEntry) {
-        guard ogsWebsocket.opened else {
-            return
+    @discardableResult
+    func findAutomatch(entry: OGSAutomatchEntry) -> Bool {
+        guard ogsWebsocket.opened, ogsWebsocket.authenticated else {
+            return false
         }
-        
+
+        let isLiveSearch = entry.timeControlSpeed != .correspondence
+        // OGS permits several correspondence searches, but a new live UUID
+        // replaces the user's current live search. Recheck the reconciled
+        // collection here so a stale UI tap cannot perform that replacement.
+        guard !isLiveSearch
+                || (!isReconcilingAutomatches
+                    && activeLiveAutomatchEntry == nil) else {
+            return false
+        }
+
+        if isLiveSearch {
+            locallyRequestedLiveAutomatchUUID = entry.uuid
+        }
+        // Keep outbound entries in the same source used by banners and the
+        // management screen. A missing server echo is not proof of rejection;
+        // the entry remains until an explicit event or a bounded list replay
+        // confirms that OGS no longer knows the UUID.
+        autoMatchEntryById[entry.uuid] = entry
+        unconfirmedAutomatchEntryIDs.insert(entry.uuid)
         ogsWebsocket.emit(command: "automatch/find_match", data: entry.jsonObject)
+        scheduleAutomatchConfirmationCheck()
+        return true
+    }
+
+    private func scheduleAutomatchConfirmationCheck() {
+        let confirmationTimeout = automatchConfirmationTimeout
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(confirmationTimeout))
+            guard let self,
+                  !self.unconfirmedAutomatchEntryIDs.isEmpty,
+                  self.ogsWebsocket.opened,
+                  self.ogsWebsocket.authenticated,
+                  !self.isReconcilingAutomatches else {
+                return
+            }
+            self.beginAutomatchReconciliation(
+                candidates: self.unconfirmedAutomatchEntryIDs
+            )
+        }
+    }
+
+    private func beginAutomatchReconciliation(candidates: Set<String>) {
+        let reconciliationGeneration = UUID()
+        automatchReconciliationGeneration = reconciliationGeneration
+        automatchIDsAwaitingReplay = candidates.intersection(
+            Set(autoMatchEntryById.keys)
+        )
+        isReconcilingAutomatches = true
+        ogsWebsocket.emit(command: "automatch/list")
+
+        let reconciliationTimeout = automatchReconciliationTimeout
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(reconciliationTimeout))
+            guard let self,
+                  self.automatchReconciliationGeneration
+                    == reconciliationGeneration else {
+                return
+            }
+
+            let missingIDs = self.automatchIDsAwaitingReplay.sorted()
+            self.automatchIDsAwaitingReplay.removeAll()
+            self.isReconcilingAutomatches = false
+            for uuid in missingIDs {
+                guard self.autoMatchEntryById.removeValue(forKey: uuid)
+                        != nil else {
+                    continue
+                }
+                self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                if self.locallyRequestedLiveAutomatchUUID == uuid {
+                    self.locallyRequestedLiveAutomatchUUID = nil
+                }
+                self.publishAutomatchLifecycleEvent(
+                    .notFoundAfterReconciliation(uuid: uuid)
+                )
+            }
+        }
     }
     
-    func cancelAutomatch(entry: OGSAutomatchEntry) {
-        guard ogsWebsocket.opened else {
-            return
+    @discardableResult
+    func cancelAutomatch(entry: OGSAutomatchEntry) -> Bool {
+        guard ogsWebsocket.opened, ogsWebsocket.authenticated else {
+            return false
         }
         
         ogsWebsocket.emit(command: "automatch/cancel", data: ["uuid": entry.uuid])
+        return true
+    }
+
+    private func publishAutomatchLifecycleEvent(
+        _ kind: OGSAutomatchLifecycleEvent.Kind
+    ) {
+        let event = OGSAutomatchLifecycleEvent(kind: kind)
+        automatchLifecycleEvents.send(event)
     }
     
     private var _receivedMessagesKeysByPeerId = [Int: Set<String>]()

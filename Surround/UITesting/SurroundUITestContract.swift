@@ -418,6 +418,37 @@ enum SurroundUITestContract {
         static let homeNewGame = "home.newGame"
         static let homePreferredSettings = "home.preferredSettings"
 
+        static let quickMatchMode = "quickMatch.mode"
+        static let quickMatchRecap = "quickMatch.recap"
+        static let quickMatchFind = "quickMatch.find"
+        static let quickMatchCancel = "quickMatch.cancel"
+        static let quickMatchSearching = "quickMatch.searching"
+        static let quickMatchConnectionReason = "quickMatch.connectionReason"
+        static let quickMatchWaitingBanner = "quickMatch.waitingBanner"
+        static let quickMatchHandicap = "quickMatch.handicap"
+        static let quickMatchMatchingChallenges =
+            "quickMatch.matchingChallenges"
+
+        static func quickMatchBoardSize(_ size: Int) -> String {
+            "quickMatch.board.\(size)"
+        }
+
+        static func quickMatchClock(speed: String, system: String) -> String {
+            "quickMatch.clock.\(speed).\(system)"
+        }
+
+        static func quickMatchOpenChallenge(_ id: Int) -> String {
+            "quickMatch.openChallenge.\(id)"
+        }
+
+        static func waitingGamesAutomatchEntry(_ uuid: String) -> String {
+            "waitingGames.automatchEntry.\(uuid)"
+        }
+
+        static func waitingGamesAutomatchWithdraw(_ uuid: String) -> String {
+            "waitingGames.automatchWithdraw.\(uuid)"
+        }
+
         static func preferredSetting(_ index: Int) -> String {
             "preferredSettings.setting.\(index)"
         }

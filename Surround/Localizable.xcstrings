@@ -71,6 +71,9 @@
         }
       }
     },
+    " or " : {
+
+    },
     " SD" : {
       "comment" : "Final byo-yomi period (Sudden Death)",
       "localizations" : {
@@ -326,6 +329,9 @@
           }
         }
       }
+    },
+    "–" : {
+      "shouldTranslate" : false
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
       "localizations" : {
@@ -2132,6 +2138,7 @@
       }
     },
     "**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2412,6 +2419,7 @@
       }
     },
     "**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3177,6 +3185,15 @@
         }
       }
     },
+    "%@ handicap" : {
+
+    },
+    "%@, %@ plus %@ per move" : {
+
+    },
+    "%@, %@ plus %lld periods of %@" : {
+
+    },
     "%@/move" : {
       "comment" : "TimeControl - short description for simple system",
       "localizations" : {
@@ -3626,6 +3643,9 @@
         }
       }
     },
+    "%lld by %lld" : {
+
+    },
     "%lld captures" : {
       "comment" : "SingleGameView - vary for plural\nshow captures in player banner view",
       "localizations" : {
@@ -3810,6 +3830,9 @@
           }
         }
       }
+    },
+    "%lld clock options" : {
+
     },
     "%lld Dan" : {
       "comment" : "formattedRank - dan - long format",
@@ -5139,6 +5162,9 @@
           }
         }
       }
+    },
+    "%lld ranks below to %lld ranks above" : {
+
     },
     "%lld seconds" : {
       "comment" : "Duration - seconds part, long format",
@@ -7219,6 +7245,9 @@
         }
       }
     },
+    "≈ %@" : {
+
+    },
     "⚠️ OGS Moderator's official message. Please respond." : {
       "localizations" : {
         "de" : {
@@ -7288,6 +7317,9 @@
           }
         }
       }
+    },
+    "1 clock option" : {
+
     },
     "A **rengo** game is played between two teams, one taking the Black stones and the other taking the White stones. Each player in a team must play in turn." : {
       "localizations" : {
@@ -7712,6 +7744,9 @@
           }
         }
       }
+    },
+    "About a day a move" : {
+
     },
     "Absolute" : {
       "comment" : "TimeControl system name\nTimeControl system name - shorter",
@@ -8704,6 +8739,9 @@
           }
         }
       }
+    },
+    "Also accepted" : {
+
     },
     "Alternatively, there are %lld open custom games matching your preferences that you can accept to start a game immediately." : {
       "localizations" : {
@@ -11459,6 +11497,12 @@
         }
       }
     },
+    "Board size: %@" : {
+
+    },
+    "Both clocks accepted — %@ preferred." : {
+
+    },
     "Byo-Yomi" : {
       "comment" : "TimeControl system name - shorter",
       "localizations" : {
@@ -11812,6 +11856,12 @@
         }
       }
     },
+    "Cancel live game search" : {
+
+    },
+    "Cancel quick match search" : {
+
+    },
     "Cancel support" : {
       "localizations" : {
         "de" : {
@@ -12023,6 +12073,12 @@
           }
         }
       }
+    },
+    "Cancelling quick match search" : {
+
+    },
+    "Cancelling…" : {
+
     },
     "Captures" : {
       "localizations" : {
@@ -14163,6 +14219,9 @@
         }
       }
     },
+    "Couldn’t cancel the search" : {
+
+    },
     "Couldn’t load game history" : {
       "comment" : "GameHistoryView loading error",
       "localizations" : {
@@ -14304,6 +14363,9 @@
           }
         }
       }
+    },
+    "Couldn’t start the search" : {
+
     },
     "Couldn’t update conditional moves" : {
       "comment" : "Alert title shown when saving a conditional-move edit fails or times out.",
@@ -15366,6 +15428,9 @@
         }
       }
     },
+    "Disabled" : {
+
+    },
     "Disconnected" : {
       "comment" : "Connection status",
       "localizations" : {
@@ -16213,6 +16278,9 @@
         }
       }
     },
+    "Every board size and clock you select below." : {
+
+    },
     "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with many feedbacks and bug reports." : {
       "localizations" : {
         "de" : {
@@ -16282,6 +16350,9 @@
           }
         }
       }
+    },
+    "Exact" : {
+
     },
     "Exit Zen mode" : {
       "localizations" : {
@@ -16565,6 +16636,9 @@
           }
         }
       }
+    },
+    "Flexible" : {
+
     },
     "Forums" : {
       "comment" : "in navigation menu",
@@ -16920,6 +16994,9 @@
         }
       }
     },
+    "Game clock" : {
+
+    },
     "Game ended" : {
       "comment" : "Notification title",
       "localizations" : {
@@ -17060,6 +17137,9 @@
           }
         }
       }
+    },
+    "Game found" : {
+
     },
     "Game history" : {
       "comment" : "Homeview",
@@ -17273,6 +17353,7 @@
       }
     },
     "Game speed: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17916,6 +17997,9 @@
           }
         }
       }
+    },
+    "Handicap" : {
+
     },
     "Handicap: " : {
       "localizations" : {
@@ -20527,6 +20611,9 @@
         }
       }
     },
+    "Matching" : {
+
+    },
     "Max time" : {
       "localizations" : {
         "de" : {
@@ -20596,6 +20683,9 @@
           }
         }
       }
+    },
+    "Maximum opponent rank" : {
+
     },
     "Message organizer" : {
       "localizations" : {
@@ -20737,6 +20827,9 @@
           }
         }
       }
+    },
+    "Minimum opponent rank" : {
+
     },
     "Moderator" : {
       "comment" : "pause reason",
@@ -21302,6 +21395,9 @@
         }
       }
     },
+    "Multiple" : {
+
+    },
     "My turn" : {
       "comment" : "Correspondence games notification setting",
       "localizations" : {
@@ -21442,6 +21538,9 @@
           }
         }
       }
+    },
+    "Never play with handicap stones." : {
+
     },
     "New game" : {
       "localizations" : {
@@ -22377,6 +22476,9 @@
         }
       }
     },
+    "No handicap stones." : {
+
+    },
     "No players found." : {
       "localizations" : {
         "de" : {
@@ -22446,6 +22548,9 @@
           }
         }
       }
+    },
+    "No preference: Accept any handicap setting." : {
+
     },
     "No time control" : {
       "comment" : "TimeControl system name",
@@ -22666,6 +22771,9 @@
         }
       }
     },
+    "Not selected" : {
+
+    },
     "Note: Sounds and voice countdown will not play when your device is in **Silent** mode." : {
       "localizations" : {
         "de" : {
@@ -22735,6 +22843,9 @@
           }
         }
       }
+    },
+    "Nothing selected" : {
+
     },
     "Numbers" : {
       "comment" : "Analyze-board tool that places sequential number labels.",
@@ -22876,6 +22987,18 @@
           }
         }
       }
+    },
+    "OGS did not confirm the cancellation. The search is still shown so you can try again." : {
+
+    },
+    "OGS did not confirm this search. Your settings are unchanged, so you can search again." : {
+
+    },
+    "One board size, either clock at that pace." : {
+
+    },
+    "One board size, one clock. Matched on exactly that." : {
+
     },
     "Online-go.com Account" : {
       "localizations" : {
@@ -23369,6 +23492,12 @@
           }
         }
       }
+    },
+    "Opponent rank" : {
+
+    },
+    "Opponent rank from %@ to %@" : {
+
     },
     "Options" : {
       "localizations" : {
@@ -24285,6 +24414,9 @@
         }
       }
     },
+    "Prefer handicaps; allow even games." : {
+
+    },
     "Preferred Settings" : {
       "localizations" : {
         "de" : {
@@ -25131,6 +25263,12 @@
         }
       }
     },
+    "Rapid" : {
+
+    },
+    "Reconnect to OGS to cancel this search." : {
+
+    },
     "Reconnecting" : {
       "comment" : "Connection status",
       "localizations" : {
@@ -25201,6 +25339,9 @@
           }
         }
       }
+    },
+    "Reconnecting to OGS. Find a game will return when the connection does." : {
+
     },
     "Recording variation" : {
       "comment" : "Title shown beside a draft variation preview while it is being prepared for Malkovich or personal chat, where it is recorded privately rather than shared publicly.",
@@ -26049,6 +26190,12 @@
         }
       }
     },
+    "Require handicaps between players of different ranks." : {
+
+    },
+    "Required" : {
+
+    },
     "Resign" : {
       "localizations" : {
         "de" : {
@@ -26259,6 +26406,9 @@
           }
         }
       }
+    },
+    "Restoring active searches from OGS…" : {
+
     },
     "Restrict opponent rank" : {
       "localizations" : {
@@ -27243,7 +27393,29 @@
         }
       }
     },
+    "Searching for %lld games" : {
+
+    },
+    "Searching for a game" : {
+
+    },
+    "Searching for a game…" : {
+
+    },
+    "Searching for games" : {
+
+    },
+    "Select at least one board size and one clock." : {
+
+    },
+    "Select every clock you would accept. Correspondence is available in Exact or Flexible." : {
+
+    },
+    "Select every size you would accept." : {
+
+    },
     "Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27382,6 +27554,9 @@
           }
         }
       }
+    },
+    "Selected" : {
+
     },
     "Send a challenge directly to a friend (or a specific player) so they can accept to start a game." : {
       "localizations" : {
@@ -27806,6 +27981,9 @@
         }
       }
     },
+    "Show active searches" : {
+
+    },
     "Show in Analyze mode" : {
       "comment" : "VoiceOver hint for selecting a conditional variation board from the game-detail popover.",
       "localizations" : {
@@ -27946,6 +28124,9 @@
           }
         }
       }
+    },
+    "Show matching open games" : {
+
     },
     "Sign in to your Account" : {
       "localizations" : {
@@ -28369,6 +28550,9 @@
           }
         }
       }
+    },
+    "Standard" : {
+
     },
     "Standard 1v1 (%lld)" : {
       "localizations" : {
@@ -30631,6 +30815,9 @@
           }
         }
       }
+    },
+    "The request could not be sent to OGS. Check your connection and try again." : {
+
     },
     "There are %lld open challenges that you can accept to start a game immediately, and %lld open rengo game." : {
       "localizations" : {
@@ -33299,6 +33486,9 @@
         }
       }
     },
+    "Unknown clock" : {
+
+    },
     "Unranked" : {
       "comment" : "ChallengeCell rank status",
       "localizations" : {
@@ -33515,6 +33705,12 @@
           }
         }
       }
+    },
+    "Use handicaps by default, but accept games with handicaps off." : {
+
+    },
+    "Use handicaps when ranks differ." : {
+
     },
     "Vacation" : {
       "comment" : "pause reason",
@@ -34440,6 +34636,7 @@
     },
     "Waiting for opponent: %lld games " : {
       "comment" : "HomeView - vary for plural\nNewGameView - vary for plural",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "variations" : {
@@ -34836,6 +35033,7 @@
       }
     },
     "Waiting games" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36211,6 +36409,9 @@
         }
       }
     },
+    "Widening the range finds a game sooner; narrowing it finds a closer one." : {
+
+    },
     "Width" : {
       "localizations" : {
         "de" : {
@@ -36563,7 +36764,11 @@
         }
       }
     },
+    "You are %@. Widening the range finds a game sooner; narrowing it finds a closer one." : {
+
+    },
     "You can select multiple options." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36991,6 +37196,9 @@
         }
       }
     },
+    "Your active searches ended before games were found. Your settings are unchanged, so you can search again." : {
+
+    },
     "Your color" : {
       "localizations" : {
         "de" : {
@@ -37344,6 +37552,12 @@
           }
         }
       }
+    },
+    "Your rank" : {
+
+    },
+    "Your search ended before a game was found. Your settings are unchanged, so you can search again." : {
+
     },
     "Your turn" : {
       "comment" : "Notification title",

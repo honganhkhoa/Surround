@@ -29,164 +29,6 @@ struct MainActionButton: View {
     }
 }
 
-struct QuickMatchForm: View {
-    @State var boardSizes = Set<Int>([19])
-    @State var timeControlSpeed: TimeControlSpeed = .live
-    @State var blitz = false
-    var eligibleOpenChallenges = [OGSSeekgraphChallenge]()
-
-    @EnvironmentObject var ogs: OGSService
-    @EnvironmentObject var nav: NavigationService
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
-    @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
-
-    var finalTimeControlSpeed: TimeControlSpeed {
-        if timeControlSpeed == .correspondence {
-            return .correspondence
-        } else {
-            if blitz {
-                return .blitz
-            } else {
-                return timeControlSpeed
-            }
-        }
-    }
-
-    var customChallengesMatchingAutomatchCondition: [OGSSeekgraphChallenge] {
-        return Array(ogs.eligibleOpenChallengeById.values.filter { challenge in
-            let width = challenge.game.width
-            let height = challenge.game.height
-            if challenge.rengo || !boardSizes.contains(width) || !boardSizes.contains(height) {
-                return false
-            }
-            
-            if let challengeSpeed = challenge.game.timeControl.speed {
-                switch challengeSpeed {
-                case .correspondence:
-                    return timeControlSpeed == .correspondence
-                case .live, .rapid:
-                    return timeControlSpeed == .live && !blitz
-                case .blitz:
-                    return timeControlSpeed == .live && blitz
-                }
-            }
-            
-            return true
-        })
-    }
-    
-    var quickMatchOpenChallenges: some View {
-        let challenges = customChallengesMatchingAutomatchCondition
-        return VStack(alignment: .leading, spacing: 0) {
-            if challenges.count > 0 {
-                Text("Alternatively, there are \(challenges.count) open custom games matching your preferences that you can accept to start a game immediately.")
-                    .font(.subheadline)
-                    .leadingAlignedInScrollView()
-                Spacer().frame(height: 15)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 15, alignment: .top)], spacing: 15) {
-                    ForEach(challenges, id: \.id) { challenge in
-                        ChallengeCell(challenge: challenge)
-                            .padding()
-                            .background(
-                                Color(
-                                    colorScheme == .light ? UIColor.systemBackground : UIColor.systemGray5
-                                )
-                                .cornerRadius(8)
-                                .shadow(radius: 2)
-                            )
-                    }
-                }
-            }
-        }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading) {
-                GroupBox(label: Text(String(localized: "Board size") + (boardSizes.count == 0 ? " ⚠️" : ": \([9, 13, 19].filter { boardSizes.contains($0) }.map { "\($0)×\($0)" }.joined(separator: ", "))"))) {
-                    Text("You can select multiple options.")
-                        .font(.subheadline)
-                        .leadingAlignedInScrollView()
-                    HStack {
-                        ForEach([9, 13, 19], id: \.self) { size in
-                            VStack {
-                                Toggle(isOn: Binding(
-                                        get: { boardSizes.contains(size) },
-                                        set: { if $0 { boardSizes.insert(size) } else { boardSizes.remove(size) } })) {
-                                }
-                                BoardView(boardPosition: BoardPosition(width: size, height: size))
-                                    .aspectRatio(1, contentMode: .fill)
-                                    .opacity(boardSizes.contains(size) ? 1 : 0.2)
-                                Text(verbatim: "\(size)×\(size)")
-                                    .font(Font.footnote.bold())
-                            }
-                            .onTapGesture {
-                                withAnimation {
-                                    if boardSizes.contains(size) {
-                                        boardSizes.remove(size)
-                                    } else {
-                                        boardSizes.insert(size)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }.fixedSize(horizontal: false, vertical: true)
-                GroupBox(label: Text("Game speed: \(finalTimeControlSpeed.localizedString())")) {
-                    Picker(selection: $timeControlSpeed.animation(), label: Text("Game speed")) {
-                        Text("Live").tag(TimeControlSpeed.live)
-                        Text("Correspondence").tag(TimeControlSpeed.correspondence)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .frame(maxWidth: .infinity)
-                    if timeControlSpeed == .live {
-                        Toggle(isOn: $blitz, label: {
-                            Text("Blitz").font(.subheadline)
-                        })
-                        (Text("**Live games** generally finish in one sitting, around 30 seconds per move, or 10 seconds per move in **Blitz** mode."))
-                            .font(.subheadline)
-                            .leadingAlignedInScrollView()
-                    } else if timeControlSpeed == .correspondence {
-                        Text("**Correspondence games** are played over many days, around 1 day per move. Players often play multiple correspondence games at the same time.")
-                            .font(.subheadline)
-                            .leadingAlignedInScrollView()
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                MainActionButton(label: String(localized: "Find a game", comment: "New game view"), disabled: boardSizes.count == 0, action: {
-                    let automatchEntry = OGSAutomatchEntry(
-                        sizeOptions: self.boardSizes,
-                        timeControlSpeed: self.finalTimeControlSpeed
-                    )
-                    if allowsLocalPersistence {
-                        userDefaults[.lastAutomatchEntry] = automatchEntry
-                    }
-                    if allowsRemoteActivity {
-                        ogs.findAutomatch(entry: automatchEntry)
-                    }
-                    nav.home.showingNewGameView = false
-                })
-
-                quickMatchOpenChallenges
-            }
-            .padding()
-        }
-        .onAppear {
-            guard allowsLocalPersistence else { return }
-            if let lastAutomatchEntry = userDefaults[.lastAutomatchEntry] {
-                boardSizes = lastAutomatchEntry.sizeOptions
-                timeControlSpeed = lastAutomatchEntry.timeControlSpeed == .correspondence ? .correspondence : .live
-                blitz = lastAutomatchEntry.timeControlSpeed == .blitz
-            }
-        }
-        .accessibilityIdentifier(
-            SurroundUITestContract.AccessibilityID.screenQuickMatch
-        )
-    }
-}
-
-
 struct OpenChallengesForm: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -355,15 +197,51 @@ struct OpenChallengesForm: View {
 
 struct NewGameView: View {
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
+    @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @State var newGameOption: NewGameOption = .quickMatch
     @State var eligibleOpenChallenges = [OGSSeekgraphChallenge]()
+    @State private var quickMatchDraft = OGSQuickMatchDraft.ogsDefault
+    @State private var lastPersistedQuickMatchDraft: OGSQuickMatchDraft?
+    @State private var hasLoadedQuickMatchDraft = false
+    @State private var optimisticLiveEntry: OGSAutomatchEntry?
+    @State private var optimisticCorrespondenceEntries =
+        [String: OGSAutomatchEntry]()
+    @State private var cancellingEntryID: String?
+    @State private var quickMatchRequestFailure: QuickMatchRequestFailure?
+    @State private var quickMatchServerNotice: String?
 
     enum NewGameOption {
         case quickMatch
         case custom
         case openChallenges
+    }
+
+    private var serverLiveEntry: OGSAutomatchEntry? {
+        ogs.activeLiveAutomatchEntry
+    }
+
+    private var activeLiveEntry: OGSAutomatchEntry? {
+        serverLiveEntry ?? optimisticLiveEntry
+    }
+
+    private var quickMatchIsConnected: Bool {
+        !allowsRemoteActivity
+            || (ogs.socketStatus == .connected && ogs.isWebsocketAuthenticated)
+    }
+
+    private var displayedWaitingGames: Int {
+        var pendingIDs = Set<String>()
+        if let optimisticLiveEntry,
+           ogs.autoMatchEntryById[optimisticLiveEntry.uuid] == nil {
+            pendingIDs.insert(optimisticLiveEntry.uuid)
+        }
+        for uuid in optimisticCorrespondenceEntries.keys
+        where ogs.autoMatchEntryById[uuid] == nil {
+            pendingIDs.insert(uuid)
+        }
+        return ogs.waitingGames + pendingIDs.count
     }
     
     var newGameOptionsPicker: some View {
@@ -384,26 +262,28 @@ struct NewGameView: View {
         }
         
         return VStack(spacing: 0) {
-            if ogs.waitingGames > 0 {
+            if displayedWaitingGames > 0 {
                 Spacer().frame(height: 0.5)
                 NavigationLink(destination: WaitingGamesView()) {
-                    HStack {
-                        HStack(spacing: 4) {
-                            Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "NewGameView - vary for plural")
-                            Image(systemName: "chevron.forward")
-                        }
-                        .font(.subheadline)
-                        .bold()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundColor(Color.white)
-                        Spacer()
-                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: Color.white))
+                    HStack(spacing: 4) {
+                        Text(
+                            displayedWaitingGames == 1
+                                ? String(localized: "Searching for a game")
+                                : String(localized: "Searching for \(displayedWaitingGames) games")
+                        )
+                        Image(systemName: "chevron.forward")
                     }
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 8)
                 }
                 .background(Color(.systemIndigo))
                 .padding(.horizontal, -18)
+                .accessibilityHint("Show active searches")
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.quickMatchWaitingBanner
+                )
             }
             if ogs.pendingRengoGames > 0 {
                 Spacer().frame(height: 0.5)
@@ -436,39 +316,55 @@ struct NewGameView: View {
             .accessibilityIdentifier(
                 SurroundUITestContract.AccessibilityID.newGameOptionPicker
             )
-            Spacer().frame(height: 10)
             switch newGameOption {
             case .quickMatch:
-                Text("Select the board size(s) and time settings you want to play, and let the system match you with another similar ranked player.")
-                    .font(.subheadline)
-                    .leadingAlignedInScrollView()
+                Spacer().frame(height: 10)
             case .custom:
+                Spacer().frame(height: 10)
                 Text("Create a game precisely as you want.")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
+                Spacer().frame(height: 10)
             case .openChallenges:
+                Spacer().frame(height: 10)
                 Text(openChallengesSubheader)
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
+                Spacer().frame(height: 10)
             }
-            Spacer().frame(height: 10)
         }
         .padding(.horizontal)
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
-                newGameOptionsPicker.opacity(0)
-                if newGameOption == .quickMatch {
-                    QuickMatchForm(eligibleOpenChallenges: self.eligibleOpenChallenges)
-                } else if newGameOption == .custom {
-                    CustomGameForm()
-                } else if newGameOption == .openChallenges {
-                    OpenChallengesForm(eligibleOpenChallenges: self.eligibleOpenChallenges)
-                }
+        VStack(spacing: 0) {
+            newGameOptionsPicker
+                .background(Color(.systemGray6).shadow(radius: 2))
+
+            if newGameOption == .quickMatch {
+                QuickMatchForm(
+                    draft: $quickMatchDraft,
+                    eligibleOpenChallenges: eligibleOpenChallenges,
+                    activeLiveEntry: activeLiveEntry,
+                    cancellingEntryID: cancellingEntryID,
+                    isConnected: quickMatchIsConnected,
+                    isRestoringSearches: allowsRemoteActivity
+                        && ogs.isReconcilingAutomatches,
+                    serverNotice: quickMatchServerNotice,
+                    onFind: submitQuickMatch,
+                    onCancel: cancelQuickMatch,
+                    onShowOpenChallenges: {
+                        newGameOption = .openChallenges
+                    }
+                )
+            } else if newGameOption == .custom {
+                CustomGameForm()
+            } else if newGameOption == .openChallenges {
+                OpenChallengesForm(
+                    eligibleOpenChallenges: eligibleOpenChallenges
+                )
             }
-            newGameOptionsPicker.background(Color(.systemGray6).shadow(radius: 2))
+
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {
                 Text(verbatim: "New game")
@@ -482,8 +378,10 @@ struct NewGameView: View {
             #endif
         }
         .onAppear {
-            guard allowsRemoteActivity else { return }
-            ogs.subscribeToSeekGraph()
+            loadQuickMatchDraftIfNecessary()
+            if allowsRemoteActivity {
+                ogs.subscribeToSeekGraph()
+            }
         }
         .onDisappear {
             guard allowsRemoteActivity else { return }
@@ -495,6 +393,162 @@ struct NewGameView: View {
                     by: { ($0.challenger?.username ?? "") < ($1.challenger?.username ?? "") }
                 )
             )
+        }
+        .onChange(of: quickMatchDraft) { _, draft in
+            persistQuickMatchDraftIfNecessary(draft)
+        }
+        .onReceive(ogs.automatchLifecycleEvents) { event in
+            handleAutomatchLifecycleEvent(event)
+        }
+        .alert(item: $quickMatchRequestFailure) { failure in
+            switch failure.operation {
+            case .start:
+                return Alert(
+                    title: Text("Couldn’t start the search"),
+                    message: Text("The request could not be sent to OGS. Check your connection and try again."),
+                    primaryButton: .default(Text("Retry")) {
+                        submitQuickMatch(entry: failure.entry)
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .cancel, .cancelTimedOut:
+                return Alert(
+                    title: Text("Couldn’t cancel the search"),
+                    message: Text("OGS did not confirm the cancellation. The search is still shown so you can try again."),
+                    primaryButton: .default(Text("Retry")) {
+                        cancelQuickMatch(failure.entry)
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
+        }
+    }
+
+    private func loadQuickMatchDraftIfNecessary() {
+        guard !hasLoadedQuickMatchDraft else { return }
+        let draft = allowsLocalPersistence
+            ? ogs.preferences.loadQuickMatchDraft()
+            : OGSQuickMatchDraft.ogsDefault
+        quickMatchDraft = draft
+        lastPersistedQuickMatchDraft = draft
+        hasLoadedQuickMatchDraft = true
+    }
+
+    private func persistQuickMatchDraftIfNecessary(
+        _ draft: OGSQuickMatchDraft
+    ) {
+        guard hasLoadedQuickMatchDraft,
+              allowsLocalPersistence,
+              lastPersistedQuickMatchDraft != draft else {
+            return
+        }
+        ogs.preferences[.lastQuickMatchDraft] = draft
+        lastPersistedQuickMatchDraft = draft
+    }
+
+    private func submitQuickMatch() {
+        submitQuickMatch(entry: nil)
+    }
+
+    private func submitQuickMatch(entry retryEntry: OGSAutomatchEntry?) {
+        guard quickMatchDraft.quickMatchIsValid else { return }
+        let entry = retryEntry ?? quickMatchDraft.makeAutomatchEntry()
+        if entry.timeControlSpeed != .correspondence {
+            guard !ogs.isReconcilingAutomatches,
+                  activeLiveEntry == nil else {
+                return
+            }
+        }
+
+        if allowsRemoteActivity && !ogs.findAutomatch(entry: entry) {
+            quickMatchRequestFailure = QuickMatchRequestFailure(
+                operation: .start,
+                entry: entry
+            )
+            return
+        }
+
+        if allowsLocalPersistence {
+            ogs.preferences[.lastQuickMatchDraft] = quickMatchDraft
+            ogs.preferences[.lastAutomatchEntry] = entry
+            lastPersistedQuickMatchDraft = quickMatchDraft
+        }
+        quickMatchServerNotice = nil
+
+        if entry.timeControlSpeed == .correspondence {
+            optimisticCorrespondenceEntries[entry.uuid] = entry
+        } else {
+            optimisticLiveEntry = entry
+        }
+    }
+
+    private func cancelQuickMatch(_ entry: OGSAutomatchEntry) {
+        guard cancellingEntryID == nil else { return }
+        if allowsRemoteActivity && !ogs.cancelAutomatch(entry: entry) {
+            quickMatchRequestFailure = QuickMatchRequestFailure(
+                operation: .cancel,
+                entry: entry
+            )
+            return
+        }
+
+        cancellingEntryID = entry.uuid
+        if !allowsRemoteActivity {
+            finishCancellation(uuid: entry.uuid)
+            return
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(8))
+            guard cancellingEntryID == entry.uuid else { return }
+            cancellingEntryID = nil
+            quickMatchRequestFailure = QuickMatchRequestFailure(
+                operation: .cancelTimedOut,
+                entry: entry
+            )
+        }
+    }
+
+    private func finishCancellation(uuid: String) {
+        if optimisticLiveEntry?.uuid == uuid {
+            optimisticLiveEntry = nil
+        }
+        optimisticCorrespondenceEntries.removeValue(forKey: uuid)
+        if cancellingEntryID == uuid {
+            cancellingEntryID = nil
+        }
+    }
+
+    private func handleAutomatchLifecycleEvent(
+        _ event: OGSAutomatchLifecycleEvent
+    ) {
+        switch event.kind {
+        case .entry:
+            // Keep the local copy until a terminal event so the searching UI
+            // cannot briefly unlock while reconnecting and replaying the list.
+            break
+        case .started(let uuid, _, _):
+            finishCancellation(uuid: uuid)
+        case .cancelled(let uuid, let removedCount):
+            if let uuid {
+                finishCancellation(uuid: uuid)
+            } else {
+                optimisticLiveEntry = nil
+                optimisticCorrespondenceEntries.removeAll()
+                cancellingEntryID = nil
+                let notice = removedCount == 1
+                    ? String(localized: "Your search ended before a game was found. Your settings are unchanged, so you can search again.")
+                    : String(localized: "Your active searches ended before games were found. Your settings are unchanged, so you can search again.")
+                quickMatchServerNotice = notice
+                AccessibilityNotification.Announcement(notice).post()
+            }
+        case .notFoundAfterReconciliation(let uuid):
+            finishCancellation(uuid: uuid)
+            let notice = String(
+                localized: "OGS did not confirm this search. Your settings are unchanged, so you can search again."
+            )
+            quickMatchServerNotice = notice
+            AccessibilityNotification.Announcement(notice).post()
         }
     }
 }

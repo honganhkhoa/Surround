@@ -664,6 +664,14 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                 SurroundUITestContract.AccessibilityID.screenQuickMatch,
                 in: app
             )
+            element(
+                SurroundUITestContract.AccessibilityID.quickMatchRecap,
+                in: app
+            )
+            element(
+                SurroundUITestContract.AccessibilityID.quickMatchFind,
+                in: app
+            )
         case .openChallenges, .rengoOpenChallenges:
             element(
                 SurroundUITestContract.AccessibilityID.screenOpenChallenges,
@@ -682,6 +690,13 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             labeledElement("Advanced rules settings", in: app)
         case .waitingGames:
             labeledElement("Weekend 19×19", in: app)
+            element(
+                SurroundUITestContract.AccessibilityID
+                    .waitingGamesAutomatchEntry(
+                        "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
+                    ),
+                in: app
+            )
         case .preferredSettings:
             element(
                 SurroundUITestContract.AccessibilityID

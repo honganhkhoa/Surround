@@ -319,6 +319,7 @@
 		BCDD9B4A27797CB20072229C /* game-beta-11289.json in Resources */ = {isa = PBXBuildFile; fileRef = BCDD9B4927797CB20072229C /* game-beta-11289.json */; };
 		BCE530FE251DF65B00BF8E28 /* GameControlRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */; };
 		BCE913D125B9398D00065061 /* NewGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE913D025B9398D00065061 /* NewGameView.swift */; };
+		D10000012026083100000001 /* QuickMatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022026083100000002 /* QuickMatchView.swift */; };
 		BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */; };
 		BCFA11510000000000000002 /* GameHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000001 /* GameHistoryView.swift */; };
 		BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000005 /* HistoryGameCell.swift */; };
@@ -552,6 +553,7 @@
 		BCDD9B4927797CB20072229C /* game-beta-11289.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-beta-11289.json"; sourceTree = "<group>"; };
 		BCE530FD251DF65B00BF8E28 /* GameControlRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRow.swift; sourceTree = "<group>"; };
 		BCE913D025B9398D00065061 /* NewGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGameView.swift; sourceTree = "<group>"; };
+		D10000022026083100000002 /* QuickMatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickMatchView.swift; sourceTree = "<group>"; };
 		BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessagesView.swift; sourceTree = "<group>"; };
 		BCFA11510000000000000001 /* GameHistoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHistoryView.swift; sourceTree = "<group>"; };
 		BCFA11510000000000000005 /* HistoryGameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryGameCell.swift; sourceTree = "<group>"; };
@@ -775,6 +777,7 @@
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
 				BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */,
 				BCE913D025B9398D00065061 /* NewGameView.swift */,
+				D10000022026083100000002 /* QuickMatchView.swift */,
 				BC92007925CBDBA900C14433 /* TimeSystemPickerView.swift */,
 				BC92008125CE5BE400C14433 /* UserSelectionView.swift */,
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
@@ -1391,6 +1394,7 @@
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				AF3000013F00000000000001 /* ConditionalMovesPopover.swift in Sources */,
 				BCE913D125B9398D00065061 /* NewGameView.swift in Sources */,
+				D10000012026083100000001 /* QuickMatchView.swift in Sources */,
 				BC463AFE26624B6100D40D3A /* OGSPuzzle.swift in Sources */,
 				BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */,
 				BC08720725E504FB006CA8B9 /* WaitingGamesView.swift in Sources */,

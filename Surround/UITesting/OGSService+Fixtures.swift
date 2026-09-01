@@ -2134,18 +2134,22 @@ extension OGSService {
             // WaitingGamesView consumes this dictionary directly. A single
             // hosted fixture keeps the visual order stable across processes
             // and operating-system versions.
-            let waitingChallenges = [hostedStandardChallenge]
-            for challenge in waitingChallenges {
-                state.openChallengeSentById[challenge.id] = challenge
+            let showsIdleQuickMatch =
+                SurroundUITestContract.compatibilityScene == .quickMatch
+            if !showsIdleQuickMatch {
+                state.openChallengeSentById[hostedStandardChallenge.id] =
+                    hostedStandardChallenge
+                let automatchEntry = OGSAutomatchEntry.sampleEntry
+                state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
             }
-            let automatchEntry = OGSAutomatchEntry.sampleEntry
-            state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
             state.friends = standardChallenges.prefix(6).compactMap(
                 \.challenger
             )
             precondition(
-                state.openChallengeSentById.count == 1
-                    && state.autoMatchEntryById.count == 1
+                state.openChallengeSentById.count
+                    == (showsIdleQuickMatch ? 0 : 1)
+                    && state.autoMatchEntryById.count
+                        == (showsIdleQuickMatch ? 0 : 1)
                     && state.friends.count == 6,
                 "Compatibility secondary routes require stable waiting games and friends."
             )

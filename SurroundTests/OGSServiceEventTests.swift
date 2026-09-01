@@ -2108,9 +2108,14 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
-    func testFindAutomatchEmitsOfficialPayloadOnlyWhileSocketIsOpen() throws {
+    func testFindAutomatchRequiresAnOpenAuthenticatedSocket() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
+        var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            lifecycleEvents.append($0.kind)
+        }
+        defer { lifecycleCancellable.cancel() }
         let entry = OGSQuickMatchDraft(
             mode: .exact,
             boardSize: 9,
@@ -2118,7 +2123,7 @@ final class OGSServiceEventTests: XCTestCase {
             system: .fischer
         ).makeAutomatchEntry(uuid: "service-test-id")
 
-        service.findAutomatch(entry: entry)
+        XCTAssertTrue(service.findAutomatch(entry: entry))
 
         let emission = try XCTUnwrap(socket.emissions.last)
         XCTAssertEqual(emission.command, "automatch/find_match")
@@ -2131,11 +2136,272 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(options.first?["size"] as? String, "9x9")
         XCTAssertEqual(options.first?["speed"] as? String, "rapid")
         XCTAssertEqual(options.first?["system"] as? String, "fischer")
+        XCTAssertEqual(service.autoMatchEntryById[entry.uuid], entry)
+
+        socket.deliver(name: "automatch/start", data: [
+            "uuid": entry.uuid,
+            "game_id": 901,
+        ])
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .started(
+                uuid: entry.uuid,
+                gameID: 901,
+                requestedLocally: true
+            )
+        )
 
         socket.opened = false
-        service.findAutomatch(entry: entry)
+        XCTAssertFalse(service.findAutomatch(entry: entry))
+
+        socket.opened = true
+        socket.authenticated = false
+        XCTAssertFalse(service.findAutomatch(entry: entry))
+        XCTAssertFalse(service.cancelAutomatch(entry: entry))
+
+        socket.opened = false
+        socket.authenticated = true
+        XCTAssertFalse(service.cancelAutomatch(entry: entry))
 
         XCTAssertEqual(socket.emissions.count, 1)
+    }
+
+    func testFindAutomatchDoesNotReplaceRestoredLiveSearch() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let restoredEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-live-entry")
+        let replacementEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "replacement-live-entry")
+
+        socket.deliver(
+            name: "automatch/entry",
+            data: restoredEntry.jsonObject
+        )
+
+        XCTAssertEqual(service.activeLiveAutomatchEntry, restoredEntry)
+        XCTAssertFalse(service.findAutomatch(entry: replacementEntry))
+        XCTAssertTrue(socket.emissions.isEmpty)
+        XCTAssertEqual(
+            service.autoMatchEntryById,
+            [restoredEntry.uuid: restoredEntry]
+        )
+
+        let correspondenceEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "additional-correspondence-entry")
+        XCTAssertTrue(service.findAutomatch(entry: correspondenceEntry))
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "automatch/find_match"
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry, restoredEntry)
+        XCTAssertEqual(service.autoMatchEntryById.count, 2)
+    }
+
+    func testFindAutomatchWaitsForReconnectReconciliation() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "premature-live-entry")
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        XCTAssertTrue(service.isReconcilingAutomatches)
+        XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
+        let emissionCount = socket.emissions.count
+
+        XCTAssertFalse(service.findAutomatch(entry: entry))
+        XCTAssertEqual(socket.emissions.count, emissionCount)
+        XCTAssertTrue(service.autoMatchEntryById.isEmpty)
+    }
+
+    func testAutomatchLifecycleRemovesIndividualAndAllSearches() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            lifecycleEvents.append($0.kind)
+        }
+        defer { lifecycleCancellable.cancel() }
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "live-entry")
+        let firstCorrespondenceEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "correspondence-entry-1")
+        let secondCorrespondenceEntry = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 19,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "correspondence-entry-2")
+
+        for entry in [
+            liveEntry,
+            firstCorrespondenceEntry,
+            secondCorrespondenceEntry,
+        ] {
+            socket.deliver(name: "automatch/entry", data: entry.jsonObject)
+        }
+        XCTAssertEqual(service.autoMatchEntryById.count, 3)
+
+        socket.deliver(name: "automatch/start", data: [
+            "uuid": liveEntry.uuid,
+            "game_id": 123,
+        ])
+        XCTAssertNil(service.autoMatchEntryById[liveEntry.uuid])
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .started(
+                uuid: liveEntry.uuid,
+                gameID: 123,
+                requestedLocally: false
+            )
+        )
+
+        socket.deliver(name: "automatch/cancel", data: [
+            "uuid": firstCorrespondenceEntry.uuid,
+        ])
+        XCTAssertNil(
+            service.autoMatchEntryById[firstCorrespondenceEntry.uuid]
+        )
+        XCTAssertNotNil(
+            service.autoMatchEntryById[secondCorrespondenceEntry.uuid]
+        )
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .cancelled(
+                uuid: firstCorrespondenceEntry.uuid,
+                removedCount: 1
+            )
+        )
+
+        socket.deliver(name: "automatch/cancel", data: [
+            "uuid": "unknown-entry",
+        ])
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .cancelled(uuid: "unknown-entry", removedCount: 0)
+        )
+
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        XCTAssertEqual(service.autoMatchEntryById.count, 2)
+        socket.deliver(name: "automatch/cancel", data: [
+            "uuid": NSNull(),
+        ])
+
+        XCTAssertTrue(service.autoMatchEntryById.isEmpty)
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .cancelled(uuid: nil, removedCount: 2)
+        )
+    }
+
+    func testAutomatchListReplayRestoresEntriesAfterAuthentication() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .live,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "replayed-entry")
+
+        socket.deliver(name: "automatch/entry", data: entry.jsonObject)
+        XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        XCTAssertTrue(service.isReconcilingAutomatches)
+        XCTAssertEqual(service.autoMatchEntryById[entry.uuid], entry)
+        XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
+
+        socket.deliver(name: "automatch/entry", data: entry.jsonObject)
+        XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
+    }
+
+    func testAutomatchReconciliationRemovesAnEntryMissingFromReplay() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 60
+        )
+        var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            lifecycleEvents.append($0.kind)
+        }
+        defer { lifecycleCancellable.cancel() }
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .live,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "missing-replayed-entry")
+
+        socket.deliver(name: "automatch/entry", data: entry.jsonObject)
+        socket.deliver(name: "surround/socketAuthenticated")
+        try? await Task.sleep(for: .seconds(0.05))
+
+        XCTAssertNil(service.autoMatchEntryById[entry.uuid])
+        XCTAssertFalse(service.isReconcilingAutomatches)
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .notFoundAfterReconciliation(uuid: entry.uuid)
+        )
+    }
+
+    func testUnconfirmedOutboundAutomatchReconcilesInsteadOfStayingForever() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 0.01
+        )
+        var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            lifecycleEvents.append($0.kind)
+        }
+        defer { lifecycleCancellable.cancel() }
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "unconfirmed-outbound-entry")
+
+        XCTAssertTrue(service.findAutomatch(entry: entry))
+        XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
+        try? await Task.sleep(for: .seconds(0.08))
+
+        XCTAssertNil(service.autoMatchEntryById[entry.uuid])
+        XCTAssertTrue(
+            socket.emissions.contains { $0.command == "automatch/list" }
+        )
+        XCTAssertEqual(
+            lifecycleEvents.last,
+            .notFoundAfterReconciliation(uuid: entry.uuid)
+        )
     }
 
     func testDegradedInboundAutomatchEntryRemainsCancellable() throws {
@@ -2156,7 +2422,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(entry.uuid, uuid)
         XCTAssertTrue(entry.sizeSpeedOptions.isEmpty)
 
-        service.cancelAutomatch(entry: entry)
+        XCTAssertTrue(service.cancelAutomatch(entry: entry))
 
         let emission = try XCTUnwrap(socket.emissions.last)
         XCTAssertEqual(emission.command, "automatch/cancel")
@@ -2169,7 +2435,9 @@ final class OGSServiceEventTests: XCTestCase {
         cachedUsers: [OGSUser] = [],
         installsObservers: Bool = false,
         gameResynchronizationTimeout: TimeInterval = 15,
-        conditionalMoveSubmissionTimeout: TimeInterval = 10
+        conditionalMoveSubmissionTimeout: TimeInterval = 10,
+        automatchReconciliationTimeout: TimeInterval = 5,
+        automatchConfirmationTimeout: TimeInterval = 8
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -2201,6 +2469,8 @@ final class OGSServiceEventTests: XCTestCase {
             installsObservers: installsObservers,
             gameResynchronizationTimeout: gameResynchronizationTimeout,
             conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout,
+            automatchReconciliationTimeout: automatchReconciliationTimeout,
+            automatchConfirmationTimeout: automatchConfirmationTimeout,
             initialState: initialState
         )
     }

@@ -229,17 +229,19 @@ struct HomeView: View {
                 } else {
                     if ogs.waitingGames > 0 {
                         Button(action: { nav.main.showWaitingGames = true }) {
-                            HStack {
-                                Text("Waiting for opponent: \(ogs.waitingGames) games ", comment: "HomeView - vary for plural")
-                                    .font(.subheadline)
-                                    .bold()
-                                    .foregroundColor(.white)
-                                Spacer().frame(width: 10)
-                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            HStack(spacing: 6) {
+                                Text(
+                                    ogs.waitingGames == 1
+                                        ? String(localized: "Searching for a game")
+                                        : String(localized: "Searching for \(ogs.waitingGames) games")
+                                )
+                                Image(systemName: "chevron.forward")
                                 Spacer()
                             }
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 44)
                             .padding(.horizontal)
-                            .padding(.vertical, 8)
                             .background(Color(.systemIndigo))
                         }
                     }
@@ -641,6 +643,24 @@ struct HomeView: View {
             // A game leaving (or joining) the active list usually means one
             // just finished — refresh so it appears here immediately.
             loadRecentFinishedGames()
+        }
+        .onReceive(ogs.automatchLifecycleEvents) { event in
+            guard case .started(
+                _,
+                let gameID?,
+                requestedLocally: true
+            ) = event.kind,
+                  let route = AppRoute(
+                    rootView: .home,
+                    ogsGameID: gameID
+                  ) else {
+                return
+            }
+            AccessibilityNotification.Announcement(
+                String(localized: "Game found")
+            ).post()
+            nav.home.showingNewGameView = false
+            nav.requestGameOpen(route)
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
