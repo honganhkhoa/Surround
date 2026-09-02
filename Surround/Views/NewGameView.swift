@@ -345,6 +345,7 @@ struct NewGameView: View {
                 QuickMatchForm(
                     draft: $quickMatchDraft,
                     eligibleOpenChallenges: eligibleOpenChallenges,
+                    allowsRemoteActivity: allowsRemoteActivity,
                     activeLiveEntry: activeLiveEntry,
                     cancellingEntryID: cancellingEntryID,
                     isConnected: quickMatchIsConnected,
@@ -480,6 +481,13 @@ struct NewGameView: View {
         } else {
             optimisticLiveEntry = entry
         }
+        let announcement = entry.timeControlSpeed == .correspondence
+            ? String(
+                localized: "Searching for a correspondence game",
+                comment: "Accessibility announcement after starting a correspondence Quick Match search"
+            )
+            : String(localized: "Searching for a game")
+        AccessibilityNotification.Announcement(announcement).post()
     }
 
     private func cancelQuickMatch(_ entry: OGSAutomatchEntry) {
@@ -532,6 +540,12 @@ struct NewGameView: View {
         case .cancelled(let uuid, let removedCount):
             if let uuid {
                 finishCancellation(uuid: uuid)
+                AccessibilityNotification.Announcement(
+                    String(
+                        localized: "Search cancelled",
+                        comment: "Accessibility announcement after cancelling a Quick Match search"
+                    )
+                ).post()
             } else {
                 optimisticLiveEntry = nil
                 optimisticCorrespondenceEntries.removeAll()

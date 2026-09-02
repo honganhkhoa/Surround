@@ -166,6 +166,78 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         #endif
     }
 
+    func testWaitingGameRequestFixturePresentations() {
+        let app = launchApp(
+            for: .waitingGames,
+            forceEnglishLocale: true
+        )
+        let fixtures: [(uuid: String, labels: [String])] = [
+            (
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0",
+                [
+                    "13×13 Rapid",
+                    "Fischer: 3m + 7s",
+                    "4 Kyu - 3 Dan",
+                    "Required: Require handicaps between players of different ranks.",
+                ]
+            ),
+            (
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1",
+                [
+                    "19×19 Live",
+                    "Fischer: 10m + 10s",
+                    "Byo-Yomi: 20m + 5×30s",
+                    "5 Kyu - 2 Dan",
+                ]
+            ),
+            (
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2",
+                [
+                    "9×9 and 19×19 · Blitz and Rapid",
+                    "Blitz · Fischer: 30s + 5s",
+                    "Rapid · Byo-Yomi: 2m–5m + 5×30s",
+                    "3 Kyu - 4 Dan",
+                ]
+            ),
+            (
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d3",
+                [
+                    "9×9 and 13×13 · Live",
+                    "Byo-Yomi: 5m–10m + 5×30s",
+                    "5 Kyu - 2 Dan",
+                    "No preference: Accept any handicap setting.",
+                ]
+            ),
+            (
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d4",
+                [
+                    "19×19 Correspondence",
+                    "Fischer: 3d + 1d",
+                    "5 Kyu - 2 Dan",
+                    "Standard: Use handicaps by default, but accept games with handicaps off.",
+                ]
+            ),
+        ]
+
+        for fixture in fixtures {
+            let card = scrollToAutomatchEntry(fixture.uuid, in: app)
+            for label in fixture.labels {
+                let content = card.descendants(matching: .any)
+                    .matching(NSPredicate(format: "label == %@", label))
+                    .firstMatch
+                XCTAssertTrue(
+                    content.waitForExistence(timeout: 3),
+                    "Expected \(fixture.uuid) to present \(label)"
+                )
+            }
+        }
+
+        XCTAssertTrue(
+            app.staticTexts["Correspondence games"].exists,
+            "The correspondence fixture must be classified into its own section."
+        )
+    }
+
     func testAdaptiveWidgetRegressionScreenshots() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip(
@@ -487,7 +559,8 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         widgetProofToken: String? = nil,
         widgetGameCount: Int? = nil,
         catalystWindowSize: CGSize? = nil,
-        useCatalystDefaultWindowSize: Bool = false
+        useCatalystDefaultWindowSize: Bool = false,
+        forceEnglishLocale: Bool = false
     ) -> XCUIApplication {
         setCaptureOrientation()
 
@@ -500,6 +573,12 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             "-AppleInterfaceStyle",
             "Light",
         ]
+        if forceEnglishLocale {
+            launchArguments += [
+                "-AppleLanguages", "(en)",
+                "-AppleLocale", "en_US",
+            ]
+        }
         if let widgetProofToken {
             launchArguments += [
                 SurroundUITestContract
@@ -543,6 +622,31 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         )
         waitForSceneContent(scene, in: app)
         return app
+    }
+
+    private func scrollToAutomatchEntry(
+        _ uuid: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let identifier = SurroundUITestContract.AccessibilityID
+            .waitingGamesAutomatchEntry(uuid)
+        let entry = app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+        var attemptsRemaining = 10
+        while !entry.exists && attemptsRemaining > 0 {
+            app.swipeUp()
+            attemptsRemaining -= 1
+        }
+        XCTAssertTrue(
+            entry.exists,
+            "Expected waiting Quick Match fixture \(uuid)",
+            file: file,
+            line: line
+        )
+        return entry
     }
 
     #if targetEnvironment(macCatalyst)

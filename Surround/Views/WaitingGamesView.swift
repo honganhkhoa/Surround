@@ -13,7 +13,11 @@ struct AutomatchEntryPresentation: Equatable {
     let rankRange: String
     let handicap: String
 
-    init(entry: OGSAutomatchEntry, userRank: Double?) {
+    init(
+        entry: OGSAutomatchEntry,
+        userRank: Double?,
+        locale: Locale = .current
+    ) {
         let options = entry.sizeSpeedOptions
         let sizes = Set(options.map(\.size)).sorted()
         let speeds = Self.sortedSpeeds(Set(options.map(\.speed)))
@@ -21,11 +25,25 @@ struct AutomatchEntryPresentation: Equatable {
         if sizes.isEmpty || speeds.isEmpty {
             boardAndSpeed = nil
         } else {
-            let sizeText = sizes.map { "\($0)×\($0)" }.joined(separator: ", ")
-            let speedText = speeds.map(\.quickMatchTitle).joined(separator: ", ")
+            let sizeText = Self.localizedList(
+                sizes.map { "\($0)×\($0)" },
+                locale: locale
+            )
+            let speedText = Self.localizedList(
+                speeds.map(\.quickMatchTitle),
+                locale: locale
+            )
             boardAndSpeed = sizes.count == 1 && speeds.count == 1
-                ? "\(sizeText) \(speedText)"
-                : "\(sizeText) · \(speedText)"
+                ? String(
+                    localized: "\(sizeText) \(speedText)",
+                    locale: locale,
+                    comment: "Board size followed by game speed in a waiting Quick Match request."
+                )
+                : String(
+                    localized: "\(sizeText) · \(speedText)",
+                    locale: locale,
+                    comment: "Board sizes followed by game speeds in a waiting Quick Match request."
+                )
         }
 
         let selections = Set(options.map {
@@ -54,11 +72,19 @@ struct AutomatchEntryPresentation: Equatable {
                 ? OGSQuickMatchClockPreset.quickMatchDisplayDescription(
                     for: presets
                 )
-                : String(localized: "Unknown clock")
+                : String(localized: "Unknown clock", locale: locale)
             let clockName = qualifiesClockWithSpeed
-                ? "\(selection.speed.quickMatchTitle) · \(selection.system.quickMatchTitle)"
+                ? String(
+                    localized: "\(selection.speed.quickMatchTitle) · \(selection.system.quickMatchTitle)",
+                    locale: locale,
+                    comment: "Game speed followed by clock system in a waiting Quick Match request."
+                )
                 : selection.system.quickMatchTitle
-            return "\(clockName): \(value)"
+            return String(
+                localized: "\(clockName): \(value)",
+                locale: locale,
+                comment: "Clock name followed by its values in a waiting Quick Match request."
+            )
         }
 
         if let userRank {
@@ -70,10 +96,15 @@ struct AutomatchEntryPresentation: Equatable {
                 userRank + Double(entry.upperRankDifference),
                 longFormat: true
             )
-            rankRange = "\(lower) - \(upper)"
+            rankRange = String(
+                localized: "\(lower) - \(upper)",
+                locale: locale,
+                comment: "Lowest and highest opponent ranks accepted by a Quick Match request."
+            )
         } else {
             rankRange = String(
-                localized: "\(entry.lowerRankDifference) ranks below to \(entry.upperRankDifference) ranks above"
+                localized: "\(entry.lowerRankDifference) ranks below to \(entry.upperRankDifference) ranks above",
+                locale: locale
             )
         }
 
@@ -89,12 +120,26 @@ struct AutomatchEntryPresentation: Equatable {
             handicapPreference = nil
         }
         if let handicapPreference {
-            handicap = "\(handicapPreference.quickMatchTitle): \(handicapPreference.quickMatchDescription)"
+            handicap = String(
+                localized: "\(handicapPreference.quickMatchTitle): \(handicapPreference.quickMatchDescription)",
+                locale: locale,
+                comment: "Handicap preference name followed by its explanation in a waiting Quick Match request."
+            )
         } else {
             handicap = String(
-                localized: "No preference: Accept any handicap setting."
+                localized: "No preference: Accept any handicap setting.",
+                locale: locale
             )
         }
+    }
+
+    private static func localizedList(
+        _ values: [String],
+        locale: Locale
+    ) -> String {
+        let formatter = ListFormatter()
+        formatter.locale = locale
+        return formatter.string(from: values) ?? values.joined(separator: ", ")
     }
 
     private static func sortedSpeeds(
@@ -136,32 +181,7 @@ struct AutomatchEntryCell: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            HStack {
-                Text("Quick match request")
-                    .font(.headline)
-                Spacer()
-                Button(action: requestCancellation) {
-                    if isCancelling {
-                        ProgressView()
-                            .accessibilityLabel("Cancelling quick match search")
-                    } else {
-                        Text("Withdraw")
-                            .bold()
-                            .foregroundColor(.red)
-                    }
-                }
-                .disabled(isCancelling)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityLabel(
-                    isCancelling
-                        ? String(localized: "Cancelling quick match search")
-                        : String(localized: "Cancel quick match search")
-                )
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID
-                        .waitingGamesAutomatchWithdraw(entry.uuid)
-                )
-            }
+            requestHeader
             Divider()
             if let boardAndSpeed = presentation.boardAndSpeed {
                 Label(
@@ -225,6 +245,54 @@ struct AutomatchEntryCell: View {
         }
     }
 
+    private var requestHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                requestTitle
+                    .fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 0)
+                cancellationButton
+                    .fixedSize()
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                requestTitle
+                    .fixedSize(horizontal: false, vertical: true)
+                cancellationButton
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    private var requestTitle: some View {
+        Text("Quick match request")
+            .font(.headline)
+    }
+
+    private var cancellationButton: some View {
+        Button(action: requestCancellation) {
+            if isCancelling {
+                ProgressView()
+                    .accessibilityLabel("Cancelling quick match search")
+            } else {
+                Text("Withdraw")
+                    .bold()
+                    .foregroundColor(.red)
+            }
+        }
+        .disabled(isCancelling)
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel(
+            isCancelling
+                ? String(localized: "Cancelling quick match search")
+                : String(localized: "Cancel quick match search")
+        )
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID
+                .waitingGamesAutomatchWithdraw(entry.uuid)
+        )
+    }
+
     private func requestCancellation() {
         guard !isCancelling else { return }
         guard ogs.cancelAutomatch(entry: entry) else {
@@ -285,10 +353,10 @@ struct WaitingGamesView: View {
     
     var body: some View {
         let liveAutomatchEntries = ogs.autoMatchEntryById.values
-            .filter { $0.timeControlSpeed != .correspondence }
+            .filter { !$0.isCorrespondence }
             .sorted { $0.uuid < $1.uuid }
         let correspondenceAutomatchEntries = ogs.autoMatchEntryById.values
-            .filter { $0.timeControlSpeed == .correspondence }
+            .filter(\.isCorrespondence)
             .sorted { $0.uuid < $1.uuid }
         let liveRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed != .correspondence }
         let correspondenceRengoChallenges = ogs.participatingRengoChallengeById.values.filter { $0.game.timeControl.speed == .correspondence }

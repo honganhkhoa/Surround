@@ -904,6 +904,91 @@ private enum AppStoreScreenshotProfileData {
         """#
     )
 }
+
+/// A fixed cross-section of every Quick Match request shape shown by
+/// WaitingGamesView. Keeping the wire-era entry in the same fixture makes the
+/// compatibility scene exercise both modern and legacy parsing paths.
+private enum CompatibilityWaitingAutomatchFixtures {
+    static let exact = OGSQuickMatchDraft(
+        mode: .exact,
+        boardSize: 13,
+        speed: .rapid,
+        system: .fischer,
+        handicap: .required,
+        lowerRankDifference: 2,
+        upperRankDifference: 4
+    ).makeAutomatchEntry(
+        uuid: "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
+    )
+
+    static let flexible = OGSQuickMatchDraft(
+        mode: .flexible,
+        boardSize: 19,
+        speed: .live,
+        system: .byoyomi,
+        handicap: .standard,
+        lowerRankDifference: 3,
+        upperRankDifference: 3
+    ).makeAutomatchEntry(
+        uuid: "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1"
+    )
+
+    static let multiple = OGSQuickMatchDraft(
+        mode: .multiple,
+        multipleBoardSizes: [9, 19],
+        multipleClocks: [
+            OGSQuickMatchClockSelection(
+                speed: .blitz,
+                system: .fischer
+            ),
+            OGSQuickMatchClockSelection(
+                speed: .rapid,
+                system: .byoyomi
+            ),
+        ],
+        handicap: .disabled,
+        lowerRankDifference: 1,
+        upperRankDifference: 5
+    ).makeAutomatchEntry(
+        uuid: "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2",
+        multipleOptionsShuffler: { _ in }
+    )
+
+    static let legacyWire: OGSAutomatchEntry = {
+        let payload: [String: Any] = [
+            "uuid": "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d3",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "live"],
+                ["size": "13x13", "speed": "live"],
+            ],
+            "time_control": [
+                "condition": "no-preference",
+                "value": ["speed": "live", "system": "byoyomi"],
+            ],
+        ]
+        return OGSAutomatchEntry(payload)!
+    }()
+
+    static let correspondence = OGSQuickMatchDraft(
+        mode: .exact,
+        boardSize: 19,
+        speed: .correspondence,
+        system: .fischer,
+        handicap: .standard,
+        lowerRankDifference: 3,
+        upperRankDifference: 3
+    ).makeAutomatchEntry(
+        uuid: "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d4"
+    )
+
+    static let all = [
+        exact,
+        flexible,
+        multiple,
+        legacyWire,
+        correspondence,
+    ]
+}
 #endif
 
 #if DEBUG
@@ -1090,6 +1175,36 @@ extension OGSService {
         }
         state.socketStatus = .connected
         state.isLoadingOverview = false
+
+        if SurroundUITestContract.isCapturingCompatibilityScreenshots,
+           SurroundUITestContract.compatibilityScene == .quickMatch {
+            let available = OGSAutomatchAvailableEntry([
+                "uuid": "f0050bcf-f5fc-46c8-9ed6-01dfd898e100",
+                "player": [
+                    "id": 814_459,
+                    "bounded_rank": fixtureUser.ranking!,
+                ],
+                "preferences": [
+                    "lower_rank_diff": 3,
+                    "upper_rank_diff": 3,
+                    "size_speed_options": [[
+                        "size": "9x9",
+                        "speed": "rapid",
+                        "system": "fischer",
+                    ]],
+                ],
+            ])!
+            state.automatchAvailableEntryByID[available.uuid] = available
+            state.quickMatchPopularityStats =
+                OGSQuickMatchPopularityStats(jsonObject: [
+                    "9x9": [
+                        "rapid": ["fischer": 1, "byoyomi": 3],
+                        "live": ["fischer": 6],
+                    ],
+                    "13x13": ["rapid": ["fischer": 40]],
+                    "19x19": ["rapid": ["fischer": 50]],
+                ])!
+        }
 
         var correspondenceTimeControl =
             TimeControlSpeed.correspondence.defaultTimeOptions[0]
@@ -2131,25 +2246,39 @@ extension OGSService {
             hostedStandardChallenge.game.id = 103_001
             hostedStandardChallenge.game.name = "Weekend 19×19"
 
-            // WaitingGamesView consumes this dictionary directly. A single
-            // hosted fixture keeps the visual order stable across processes
-            // and operating-system versions.
+            // WaitingGamesView consumes these dictionaries directly. Its own
+            // compatibility scene covers every request shape; other scenes
+            // retain a single request so their established state is stable.
             let showsIdleQuickMatch =
                 SurroundUITestContract.compatibilityScene == .quickMatch
             if !showsIdleQuickMatch {
                 state.openChallengeSentById[hostedStandardChallenge.id] =
                     hostedStandardChallenge
-                let automatchEntry = OGSAutomatchEntry.sampleEntry
-                state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                let automatchEntries =
+                    SurroundUITestContract.compatibilityScene == .waitingGames
+                    ? CompatibilityWaitingAutomatchFixtures.all
+                    : [CompatibilityWaitingAutomatchFixtures.exact]
+                for automatchEntry in automatchEntries {
+                    state.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                }
             }
             state.friends = standardChallenges.prefix(6).compactMap(
                 \.challenger
             )
+            let expectedAutomatchCount: Int
+            if showsIdleQuickMatch {
+                expectedAutomatchCount = 0
+            } else if SurroundUITestContract.compatibilityScene == .waitingGames {
+                expectedAutomatchCount =
+                    CompatibilityWaitingAutomatchFixtures.all.count
+            } else {
+                expectedAutomatchCount = 1
+            }
             precondition(
                 state.openChallengeSentById.count
                     == (showsIdleQuickMatch ? 0 : 1)
                     && state.autoMatchEntryById.count
-                        == (showsIdleQuickMatch ? 0 : 1)
+                        == expectedAutomatchCount
                     && state.friends.count == 6,
                 "Compatibility secondary routes require stable waiting games and friends."
             )

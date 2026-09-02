@@ -88,9 +88,10 @@ struct MainView: View {
                 ogs.loadOverview(allowsCache: false, finishCallback: {
                     ogs.subscribeToSeekGraph()
                     DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(5)), execute: {
-                        if !nav.home.showingNewGameView {
-                            ogs.unsubscribeFromSeekGraphWhenDone()
-                        }
+                        // Release Home's short-lived refresh ownership. New
+                        // Game and Preferred Settings keep independent owners
+                        // while their screens remain visible.
+                        ogs.unsubscribeFromSeekGraphWhenDone()
                     })
                 })
             }

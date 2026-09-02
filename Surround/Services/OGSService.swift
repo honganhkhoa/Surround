@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import Alamofire
+import CoreFoundation
 import DictionaryCoding
 import WebKit
 import WidgetKit
@@ -190,7 +191,7 @@ final class OGSOfflineNoOpWebsocket: OGSWebsocketProtocol {
 
     func emit(
         command: String,
-        data: Any,
+        data: Any?,
         resultCallback: OGSWebsocketResultCallback?
     ) {
         if command == "game/conditional_moves/set",
@@ -275,6 +276,422 @@ struct OGSAutomatchLifecycleEvent: Equatable {
     let kind: Kind
 }
 
+enum OGSQuickMatchActivityStatus: Int, Equatable {
+    case none
+    case popular
+    case playersWaiting
+}
+
+/// One public search advertised through `automatch/available/add`.
+///
+/// OGS controls this payload and its declared web-client protocol currently
+/// omits fields that production sends (notably `player.bounded_rank`). Keep the
+/// parser deliberately tolerant and retain only the pieces needed to compute
+/// Quick Match activity.
+struct OGSAutomatchAvailableEntry: Equatable {
+    let uuid: String
+    let sizeSpeedOptions: Set<OGSAutomatchSizeSpeedOption>
+    let lowerRankDifference: Int?
+    let upperRankDifference: Int?
+    let playerID: Int?
+    let playerBoundedRank: Double?
+
+    init?(_ jsonObject: [String: Any]) {
+        guard
+            let uuid = jsonObject["uuid"] as? String,
+            !uuid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        let preferencesObject = jsonObject["preferences"] as? [String: Any]
+        let player = jsonObject["player"] as? [String: Any]
+        self.uuid = uuid
+        // Activity should be conservative. Unlike the waiting-request parser,
+        // do not infer a legacy clock system or rank range here: a guessed
+        // value could advertise a green "players waiting" badge for a match
+        // the server cannot actually make.
+        sizeSpeedOptions = Set(
+            (preferencesObject?["size_speed_options"] as? [Any] ?? [])
+                .compactMap { value in
+                guard let option = value as? [String: Any] else { return nil }
+                return Self.sizeSpeedOption(option)
+            }
+        )
+        lowerRankDifference = Self.integer(
+            preferencesObject?["lower_rank_diff"],
+            minimum: 0
+        )
+        upperRankDifference = Self.integer(
+            preferencesObject?["upper_rank_diff"],
+            minimum: 0
+        )
+        playerID = Self.integer(player?["id"], minimum: 1)
+        playerBoundedRank = Self.double(
+            player?["bounded_rank"],
+            range: 5...38
+        )
+    }
+
+    private static func sizeSpeedOption(
+        _ object: [String: Any]
+    ) -> OGSAutomatchSizeSpeedOption? {
+        guard
+            let sizeName = object["size"] as? String,
+            let size = boardSize(from: sizeName),
+            let speedName = object["speed"] as? String,
+            let speed = TimeControlSpeed(rawValue: speedName),
+            let systemName = object["system"] as? String,
+            let system = OGSAutomatchClockSystem(rawValue: systemName)
+        else {
+            return nil
+        }
+        return OGSAutomatchSizeSpeedOption(
+            size: size,
+            speed: speed,
+            system: system
+        )
+    }
+
+    private static func boardSize(from value: String) -> Int? {
+        let components = value.split(separator: "x")
+        guard
+            components.count == 2,
+            components[0] == components[1],
+            let size = Int(components[0]),
+            OGSQuickMatchClockPreset.supportedBoardSizes.contains(size)
+        else {
+            return nil
+        }
+        return size
+    }
+
+    private static func integer(_ value: Any?, minimum: Int) -> Int? {
+        guard let number = numericValue(value) else { return nil }
+        let double = number.doubleValue
+        let integer = number.int64Value
+        guard
+            double.isFinite,
+            double.rounded(.towardZero) == double,
+            Double(integer) == double,
+            integer >= Int64(minimum),
+            integer <= Int64(Int.max)
+        else {
+            return nil
+        }
+        return Int(integer)
+    }
+
+    private static func double(
+        _ value: Any?,
+        range: ClosedRange<Double>
+    ) -> Double? {
+        guard let number = numericValue(value) else { return nil }
+        let result = number.doubleValue
+        guard result.isFinite, range.contains(result) else {
+            return nil
+        }
+        return result
+    }
+
+    private static func numericValue(_ value: Any?) -> NSNumber? {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
+            return nil
+        }
+        return number
+    }
+}
+
+/// Recent match counts returned by `/termination-api/automatch-stats`.
+struct OGSQuickMatchPopularityStats: Equatable {
+    private(set) var countByOption = [OGSAutomatchSizeSpeedOption: Int]()
+    private(set) var totalByBoardSize = [Int: Int]()
+    private(set) var realtimeTotalByBoardSize = [Int: Int]()
+    private var totalAcrossBoardSizesValue = 0
+
+    static let empty = OGSQuickMatchPopularityStats()
+
+    static func rankQueryParameter(
+        userRank: Double,
+        lowerRankDifference: Int,
+        upperRankDifference: Int
+    ) -> String? {
+        guard
+            userRank.isFinite,
+            (0...9).contains(lowerRankDifference),
+            (0...9).contains(upperRankDifference)
+        else {
+            return nil
+        }
+        let firstRank = userRank - Double(lowerRankDifference)
+        return (0...(lowerRankDifference + upperRankDifference))
+            .map { Self.rankQueryValue(firstRank + Double($0)) }
+            .joined(separator: ",")
+    }
+
+    init() {}
+
+    init?(jsonObject: Any?) {
+        guard let sizes = jsonObject as? [String: Any] else { return nil }
+
+        for (sizeName, rawSpeeds) in sizes {
+            guard
+                let size = Self.boardSize(from: sizeName),
+                let speeds = rawSpeeds as? [String: Any]
+            else {
+                continue
+            }
+            for (speedName, rawSystems) in speeds {
+                guard let systems = rawSystems as? [String: Any] else {
+                    continue
+                }
+                for (systemName, rawCount) in systems {
+                    guard let count = Self.integer(rawCount) else {
+                        continue
+                    }
+
+                    let (newBoardTotal, boardOverflow) =
+                        totalByBoardSize[size, default: 0]
+                            .addingReportingOverflow(count)
+                    let (newOverallTotal, overallOverflow) =
+                        totalAcrossBoardSizesValue
+                            .addingReportingOverflow(count)
+                    guard !boardOverflow, !overallOverflow else {
+                        return nil
+                    }
+
+                    let speed = TimeControlSpeed(rawValue: speedName)
+                    let system = OGSAutomatchClockSystem(rawValue: systemName)
+                    var newRealtimeTotal: Int?
+                    if speed?.isRealtime == true, system != nil {
+                        let (total, overflow) =
+                            realtimeTotalByBoardSize[size, default: 0]
+                                .addingReportingOverflow(count)
+                        guard !overflow else { return nil }
+                        newRealtimeTotal = total
+                    }
+
+                    totalByBoardSize[size] = newBoardTotal
+                    totalAcrossBoardSizesValue = newOverallTotal
+                    if let newRealtimeTotal {
+                        realtimeTotalByBoardSize[size] = newRealtimeTotal
+                    }
+                    guard
+                        let speed,
+                        let system
+                    else {
+                        // Future enums still belong in the web client's board
+                        // popularity denominator, but cannot describe a known
+                        // native clock button.
+                        continue
+                    }
+                    let option = OGSAutomatchSizeSpeedOption(
+                        size: size,
+                        speed: speed,
+                        system: system
+                    )
+                    countByOption[option] = count
+                }
+            }
+        }
+    }
+
+    func count(
+        boardSize: Int,
+        speed: TimeControlSpeed,
+        system: OGSAutomatchClockSystem
+    ) -> Int {
+        countByOption[
+            OGSAutomatchSizeSpeedOption(
+                size: boardSize,
+                speed: speed,
+                system: system
+            ),
+            default: 0
+        ]
+    }
+
+    var totalAcrossBoardSizes: Int {
+        totalAcrossBoardSizesValue
+    }
+
+    func total(boardSize: Int) -> Int {
+        totalByBoardSize[boardSize, default: 0]
+    }
+
+    func realtimeTotal(boardSize: Int) -> Int {
+        realtimeTotalByBoardSize[boardSize, default: 0]
+    }
+
+    private static func boardSize(from value: String) -> Int? {
+        let components = value.split(separator: "x")
+        guard
+            components.count == 2,
+            components[0] == components[1],
+            let size = Int(components[0]),
+            OGSQuickMatchClockPreset.supportedBoardSizes.contains(size)
+        else {
+            return nil
+        }
+        return size
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
+            return nil
+        }
+        let double = number.doubleValue
+        let integer = number.int64Value
+        guard
+            double.isFinite,
+            double.rounded(.towardZero) == double,
+            Double(integer) == double,
+            integer >= 0,
+            integer <= Int64(Int.max)
+        else {
+            return nil
+        }
+        return Int(integer)
+    }
+
+    private static func rankQueryValue(_ value: Double) -> String {
+        if value.rounded(.towardZero) == value,
+           value >= Double(Int.min),
+           value <= Double(Int.max) {
+            return String(Int(value))
+        }
+        return String(value)
+    }
+}
+
+/// Activity derived from current public searches and recent match counts.
+/// Player-waiting activity always takes precedence over recent popularity.
+struct OGSQuickMatchActivitySnapshot: Equatable {
+    private var availableCountByOption = [OGSAutomatchSizeSpeedOption: Int]()
+    private var availableCountByBoardSize = [Int: Int]()
+    private let popularity: OGSQuickMatchPopularityStats
+
+    init(
+        availableEntries: some Sequence<OGSAutomatchAvailableEntry>,
+        popularity: OGSQuickMatchPopularityStats,
+        currentUserID: Int?,
+        currentRank: Double?,
+        lowerRankDifference: Int,
+        upperRankDifference: Int
+    ) {
+        self.popularity = popularity
+        for entry in availableEntries where Self.isEligible(
+            entry,
+            currentUserID: currentUserID,
+            currentRank: currentRank,
+            lowerRankDifference: lowerRankDifference,
+            upperRankDifference: upperRankDifference
+        ) {
+            for option in entry.sizeSpeedOptions
+            where option.speed != .correspondence {
+                availableCountByOption[option, default: 0] += 1
+                availableCountByBoardSize[option.size, default: 0] += 1
+            }
+        }
+    }
+
+    func status(forBoardSize boardSize: Int) -> OGSQuickMatchActivityStatus {
+        if availableCountByBoardSize[boardSize, default: 0] > 0 {
+            return .playersWaiting
+        }
+        let total = popularity.totalAcrossBoardSizes
+        guard total > 0 else { return .none }
+        return Double(popularity.total(boardSize: boardSize))
+            / Double(total) > 0.33
+            ? .popular
+            : .none
+    }
+
+    func status(
+        for speed: TimeControlSpeed,
+        system: OGSAutomatchClockSystem,
+        boardSizes: some Sequence<Int>
+    ) -> OGSQuickMatchActivityStatus {
+        // Correspondence searches take longer to match and the web client
+        // intentionally presents them as generally popular, never as someone
+        // waiting right now.
+        if speed == .correspondence { return .popular }
+
+        let sizes = Array(Set(boardSizes))
+        if sizes.contains(where: { size in
+            availableCountByOption[
+                OGSAutomatchSizeSpeedOption(
+                    size: size,
+                    speed: speed,
+                    system: system
+                ),
+                default: 0
+            ] > 0
+        }) {
+            return .playersWaiting
+        }
+
+        if sizes.contains(where: { size in
+            let total = popularity.realtimeTotal(boardSize: size)
+            guard total > 0 else { return false }
+            return Double(
+                popularity.count(
+                    boardSize: size,
+                    speed: speed,
+                    system: system
+                )
+            ) / Double(total) > 0.2
+        }) {
+            return .popular
+        }
+        return .none
+    }
+
+    private static func isEligible(
+        _ entry: OGSAutomatchAvailableEntry,
+        currentUserID: Int?,
+        currentRank: Double?,
+        lowerRankDifference: Int,
+        upperRankDifference: Int
+    ) -> Bool {
+        guard
+            lowerRankDifference >= 0,
+            upperRankDifference >= 0,
+            let currentUserID,
+            let currentRank,
+            currentRank.isFinite,
+            (5...38).contains(currentRank),
+            let opponentID = entry.playerID,
+            let opponentRank = entry.playerBoundedRank,
+            let entryLowerRankDifference = entry.lowerRankDifference,
+            let entryUpperRankDifference = entry.upperRankDifference,
+            opponentID != currentUserID
+        else {
+            return false
+        }
+
+        let lowerDifference = Double(max(0, lowerRankDifference))
+        let upperDifference = Double(max(0, upperRankDifference))
+        guard
+            opponentRank >= currentRank - lowerDifference,
+            opponentRank <= currentRank + upperDifference
+        else {
+            return false
+        }
+
+        let opponentLowerDifference = Double(
+            max(0, entryLowerRankDifference)
+        )
+        let opponentUpperDifference = Double(
+            max(0, entryUpperRankDifference)
+        )
+        return currentRank >= opponentRank - opponentLowerDifference
+            && currentRank <= opponentRank + opponentUpperDifference
+    }
+}
+
 class OGSService: ObservableObject {
     /// Optional state supplied by previews and deterministic clients at
     /// construction time. The service applies this snapshot internally so its
@@ -292,6 +709,9 @@ class OGSService: ObservableObject {
         var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
         var challengesReceived = [OGSDirectChallenge]()
         var autoMatchEntryById = [String: OGSAutomatchEntry]()
+        var automatchAvailableEntryByID =
+            [String: OGSAutomatchAvailableEntry]()
+        var quickMatchPopularityStats = OGSQuickMatchPopularityStats.empty
         var cachedUsersById = [Int: OGSUser]()
         var preferredGameSettings = Set<OGSChallengeTemplate>()
         var privateMessages = [OGSPrivateMessage]()
@@ -438,6 +858,10 @@ class OGSService: ObservableObject {
     @Published private(set) public var challengesSent = [OGSDirectChallenge]()
     @Published private(set) public var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
     @Published private(set) public var autoMatchEntryById = [String: OGSAutomatchEntry]()
+    @Published private(set) var automatchAvailableEntryByID =
+        [String: OGSAutomatchAvailableEntry]()
+    @Published private(set) var quickMatchPopularityStats =
+        OGSQuickMatchPopularityStats.empty
     let automatchLifecycleEvents = PassthroughSubject<
         OGSAutomatchLifecycleEvent,
         Never
@@ -447,6 +871,10 @@ class OGSService: ObservableObject {
     private var automatchIDsAwaitingReplay = Set<String>()
     private var unconfirmedAutomatchEntryIDs = Set<String>()
     private var locallyRequestedLiveAutomatchUUID: String?
+    private var wantsAutomatchAvailability = false
+    private var automatchAvailabilitySubscribed = false
+    private var quickMatchPopularityRequest: DataRequest?
+    private var quickMatchPopularityGeneration = UUID()
     var waitingGames: Int {
         return challengesSent.count + openChallengeSentById.count + autoMatchEntryById.count
     }
@@ -549,6 +977,8 @@ class OGSService: ObservableObject {
         openChallengeSentById = state.openChallengeSentById
         challengesReceived = state.challengesReceived
         autoMatchEntryById = state.autoMatchEntryById
+        automatchAvailableEntryByID = state.automatchAvailableEntryByID
+        quickMatchPopularityStats = state.quickMatchPopularityStats
         cachedUsersById = state.cachedUsersById
         preferredGameSettings = state.preferredGameSettings
         finishedGamesSnapshot = state.finishedGamesSnapshot
@@ -755,6 +1185,16 @@ class OGSService: ObservableObject {
             failAllConditionalMoveSubmissions(
                 with: OGSServiceError.conditionalMovesUpdateInterrupted
             )
+            automatchAvailabilitySubscribed = false
+            automatchAvailableEntryByID.removeAll()
+            seekGraphReconnectRequiresSnapshot =
+                seekGraphReconnectRequiresSnapshot
+                || seekGraphAwaitingInitialSnapshot
+                || !openChallengeSentById.isEmpty
+                || !participatingRengoChallengeById.isEmpty
+            seekGraphAwaitingInitialSnapshot = false
+            seekGraphConnected = false
+            clearSeekGraphSnapshot()
             automatchReconciliationGeneration = UUID()
             automatchIDsAwaitingReplay.removeAll()
             isReconcilingAutomatches = false
@@ -772,6 +1212,8 @@ class OGSService: ObservableObject {
             beginAutomatchReconciliation(
                 candidates: Set(autoMatchEntryById.keys)
             )
+            reconcileAutomatchAvailabilitySubscription()
+            reconcileSeekGraphSubscription()
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
             }
@@ -815,6 +1257,20 @@ class OGSService: ObservableObject {
                         .entry(uuid: automatchEntry.uuid)
                     )
                 }
+            }
+        case "automatch/available/add":
+            guard wantsAutomatchAvailability,
+                  let payload = data as? [String: Any],
+                  let entry = OGSAutomatchAvailableEntry(payload) else {
+                break
+            }
+            automatchAvailableEntryByID[entry.uuid] = entry
+        case "automatch/available/remove":
+            guard wantsAutomatchAvailability else { break }
+            let uuid = data as? String
+                ?? (data as? [String: Any])?["uuid"] as? String
+            if let uuid {
+                automatchAvailableEntryByID.removeValue(forKey: uuid)
             }
         case "automatch/cancel":
             if let payload = data as? [String: Any] {
@@ -1107,12 +1563,22 @@ class OGSService: ObservableObject {
             let accountIdentityChanged = newValue?.user.id != previousConfig?.user.id
             if accountIdentityChanged {
                 advanceAuthenticationGeneration()
+                automatchAvailabilitySubscribed = false
+                automatchAvailableEntryByID.removeAll()
+                quickMatchPopularityGeneration = UUID()
+                quickMatchPopularityRequest?.cancel()
+                quickMatchPopularityRequest = nil
+                quickMatchPopularityStats = .empty
                 locallyRequestedLiveAutomatchUUID = nil
                 isReconcilingAutomatches = false
                 automatchReconciliationGeneration = UUID()
                 automatchIDsAwaitingReplay.removeAll()
                 unconfirmedAutomatchEntryIDs.removeAll()
                 autoMatchEntryById.removeAll()
+                seekGraphConnected = false
+                seekGraphAwaitingInitialSnapshot = false
+                seekGraphReconnectRequiresSnapshot = false
+                clearSeekGraphSnapshot()
                 // An in-place account change is equivalent to destroying every
                 // game controller in the official client. Remove intent before
                 // the socket closes so its close/open cycle cannot repopulate
@@ -2908,33 +3374,18 @@ class OGSService: ObservableObject {
     }
     
     var playerCacheObservingCancellable: AnyCancellable?
+    private var seekGraphSubscriberCount = 0
+    private var seekGraphConnected = false
+    private var seekGraphAwaitingInitialSnapshot = false
+    private var seekGraphReconnectRequiresSnapshot = false
     
     func subscribeToSeekGraph() {
-        guard ogsWebsocket.authenticated else {
-            return
-        }
-        
+        seekGraphSubscriberCount += 1
         if seekGraphUnsubscribeCancellable != nil {
             seekGraphUnsubscribeCancellable?.cancel()
             seekGraphUnsubscribeCancellable = nil
         }
-        
-        self.ogsWebsocket.emit(command: "seek_graph/connect", data: ["channel": "global"])
-        
-        playerCacheObservingCancellable = self.$cachedUsersById.collect(.byTime(DispatchQueue.main, 0.2)).sink { values in
-            if let cachedUsersById = values.last {
-                print(cachedUsersById.keys)
-                for (id, challenge) in self.eligibleOpenChallengeById {
-                    if let challengerId = challenge.challenger?.id {
-                        if cachedUsersById[challengerId] != nil {
-                            var challenge = challenge
-                            challenge.challenger = OGSUser.mergeUserInfoFromCache(user: challenge.challenger, cachedUser: cachedUsersById[challengerId]!)
-                            self.eligibleOpenChallengeById[id] = challenge
-                        }
-                    }
-                }
-            }
-        }
+        reconcileSeekGraphSubscription()
     }
     
     func onSeekGraphEvent(data: Any?) {
@@ -2999,39 +3450,103 @@ class OGSService: ObservableObject {
                     }
                 }
             }
+
+            if seekGraphAwaitingInitialSnapshot {
+                seekGraphAwaitingInitialSnapshot = false
+                seekGraphReconnectRequiresSnapshot = false
+                reconcileSeekGraphSubscription()
+            }
         }
     }
     
     var seekGraphUnsubscribeCancellable: AnyCancellable?
     func unsubscribeFromSeekGraphWhenDone() {
-        guard ogsWebsocket.opened else {
+        seekGraphSubscriberCount = max(0, seekGraphSubscriberCount - 1)
+        reconcileSeekGraphSubscription()
+    }
+
+    private var needsSeekGraphSubscription: Bool {
+        seekGraphSubscriberCount > 0
+            || seekGraphAwaitingInitialSnapshot
+            || seekGraphReconnectRequiresSnapshot
+            || !openChallengeSentById.isEmpty
+            || !participatingRengoChallengeById.isEmpty
+    }
+
+    private func reconcileSeekGraphSubscription() {
+        guard needsSeekGraphSubscription else {
+            if seekGraphConnected && ogsWebsocket.opened {
+                ogsWebsocket.emit(
+                    command: "seek_graph/disconnect",
+                    data: ["channel": "global"]
+                )
+            }
+            seekGraphConnected = false
+            seekGraphAwaitingInitialSnapshot = false
+            seekGraphReconnectRequiresSnapshot = false
+            clearSeekGraphSnapshot()
+            playerCacheObservingCancellable?.cancel()
+            playerCacheObservingCancellable = nil
+            seekGraphUnsubscribeCancellable?.cancel()
             seekGraphUnsubscribeCancellable = nil
             return
         }
-        
-        guard openChallengeSentById.count + participatingRengoChallengeById.count == 0 else {
-            if seekGraphUnsubscribeCancellable == nil {
-                seekGraphUnsubscribeCancellable = self.$openChallengeSentById.combineLatest(self.$participatingRengoChallengeById).collect(.byTime(DispatchQueue.global(), 1.0)).sink { _ in
-                    DispatchQueue.main.async {
-                        self.unsubscribeFromSeekGraphWhenDone()
-                    }
+
+        installSeekGraphPlayerCacheObserverIfNeeded()
+        if seekGraphSubscriberCount == 0,
+           seekGraphUnsubscribeCancellable == nil {
+            seekGraphUnsubscribeCancellable = $openChallengeSentById
+                .combineLatest($participatingRengoChallengeById)
+                .dropFirst()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.reconcileSeekGraphSubscription()
                 }
-            }
-            return
         }
 
-        self.ogsWebsocket.emit(command: "seek_graph/disconnect", data: ["channel": "global"])
-        
-        self.openChallengeById.removeAll()
-        self.eligibleOpenChallengeById.removeAll()
-        self.participatingRengoChallengeById.removeAll()
-        self.hostingRengoChallengeById.removeAll()
-        
-        playerCacheObservingCancellable?.cancel()
-        playerCacheObservingCancellable = nil
-        
-        seekGraphUnsubscribeCancellable?.cancel()
-        seekGraphUnsubscribeCancellable = nil
+        guard ogsWebsocket.opened,
+              ogsWebsocket.authenticated,
+              !seekGraphConnected else {
+            return
+        }
+        clearSeekGraphSnapshot()
+        seekGraphAwaitingInitialSnapshot = true
+        ogsWebsocket.emit(
+            command: "seek_graph/connect",
+            data: ["channel": "global"]
+        )
+        seekGraphConnected = true
+    }
+
+    private func clearSeekGraphSnapshot() {
+        openChallengeById.removeAll()
+        eligibleOpenChallengeById.removeAll()
+        openChallengeSentById.removeAll()
+        participatingRengoChallengeById.removeAll()
+        hostingRengoChallengeById.removeAll()
+    }
+
+    private func installSeekGraphPlayerCacheObserverIfNeeded() {
+        guard playerCacheObservingCancellable == nil else { return }
+        playerCacheObservingCancellable = $cachedUsersById
+            .collect(.byTime(DispatchQueue.main, 0.2))
+            .sink { [weak self] values in
+                guard let self, let cachedUsersById = values.last else {
+                    return
+                }
+                for (id, challenge) in self.eligibleOpenChallengeById {
+                    guard let challengerID = challenge.challenger?.id,
+                          let cachedUser = cachedUsersById[challengerID] else {
+                        continue
+                    }
+                    var challenge = challenge
+                    challenge.challenger = OGSUser.mergeUserInfoFromCache(
+                        user: challenge.challenger,
+                        cachedUser: cachedUser
+                    )
+                    self.eligibleOpenChallengeById[id] = challenge
+                }
+            }
     }
     
     func fetchFriends() {
@@ -3246,7 +3761,86 @@ class OGSService: ObservableObject {
         return game.requiresUserAction(forPlayerWithId: userId)
     }
     
-    @discardableResult
+    func subscribeToAutomatchAvailability() {
+        wantsAutomatchAvailability = true
+        reconcileAutomatchAvailabilitySubscription()
+    }
+
+    func unsubscribeFromAutomatchAvailability() {
+        wantsAutomatchAvailability = false
+        quickMatchPopularityGeneration = UUID()
+        quickMatchPopularityRequest?.cancel()
+        quickMatchPopularityRequest = nil
+        quickMatchPopularityStats = .empty
+        automatchAvailableEntryByID.removeAll()
+
+        guard automatchAvailabilitySubscribed else { return }
+        if ogsWebsocket.opened {
+            ogsWebsocket.emit(
+                command: "automatch/available/unsubscribe"
+            )
+        }
+        automatchAvailabilitySubscribed = false
+    }
+
+    func refreshQuickMatchPopularityStats(
+        userRank: Double,
+        lowerRankDifference: Int,
+        upperRankDifference: Int
+    ) {
+        guard
+            wantsAutomatchAvailability,
+            let ranks = OGSQuickMatchPopularityStats.rankQueryParameter(
+                userRank: userRank,
+                lowerRankDifference: lowerRankDifference,
+                upperRankDifference: upperRankDifference
+            )
+        else {
+            return
+        }
+        let generation = UUID()
+        quickMatchPopularityGeneration = generation
+        quickMatchPopularityRequest?.cancel()
+
+        quickMatchPopularityRequest = httpClient.session.request(
+            "\(ogsRoot)/termination-api/automatch-stats",
+            parameters: [
+                "ranks": ranks
+            ]
+        )
+        .validate()
+        .responseJSON { [weak self] response in
+            guard let self,
+                  self.quickMatchPopularityGeneration == generation else {
+                return
+            }
+            self.quickMatchPopularityRequest = nil
+            guard case .success(let object) = response.result,
+                  let stats = OGSQuickMatchPopularityStats(
+                    jsonObject: object
+                  ) else {
+                // Preserve the last valid snapshot through transient or
+                // malformed responses. A valid empty object still clears it.
+                return
+            }
+            self.quickMatchPopularityStats = stats
+        }
+    }
+
+    private func reconcileAutomatchAvailabilitySubscription() {
+        guard
+            wantsAutomatchAvailability,
+            ogsWebsocket.opened,
+            ogsWebsocket.authenticated,
+            !automatchAvailabilitySubscribed
+        else {
+            return
+        }
+        automatchAvailableEntryByID.removeAll()
+        ogsWebsocket.emit(command: "automatch/available/subscribe")
+        automatchAvailabilitySubscribed = true
+    }
+
     func findAutomatch(entry: OGSAutomatchEntry) -> Bool {
         guard ogsWebsocket.opened, ogsWebsocket.authenticated else {
             return false
@@ -3300,7 +3894,10 @@ class OGSService: ObservableObject {
             Set(autoMatchEntryById.keys)
         )
         isReconcilingAutomatches = true
-        ogsWebsocket.emit(command: "automatch/list")
+        ogsWebsocket.emit(
+            command: "automatch/list",
+            data: [String: Any]()
+        )
 
         let reconciliationTimeout = automatchReconciliationTimeout
         Task { @MainActor [weak self] in
@@ -3475,7 +4072,10 @@ class OGSService: ObservableObject {
             return
         }
         
-        ogsWebsocket.emit(command: "gamelist/count/unsubscribe")
+        ogsWebsocket.emit(
+            command: "gamelist/count/unsubscribe",
+            data: ["channel": ""]
+        )
         sitewiseLiveGamesCount = nil
         sitewiseCorrespondenceGamesCount = nil
     }

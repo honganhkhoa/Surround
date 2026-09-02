@@ -987,6 +987,79 @@ final class OGSQuickMatchContractTests: XCTestCase {
         )
     }
 
+    func testWaitingRequestClassificationCoversEveryWireShape() throws {
+        let exact = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .fischer,
+            handicap: .required,
+            lowerRankDifference: 2,
+            upperRankDifference: 4
+        ).makeAutomatchEntry(uuid: "exact-presentation")
+        let flexible = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 19,
+            speed: .live,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "flexible-presentation")
+        let multiple = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 19],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(
+                    speed: .blitz,
+                    system: .fischer
+                ),
+                OGSQuickMatchClockSelection(
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ],
+            handicap: .disabled
+        ).makeAutomatchEntry(
+            uuid: "multiple-presentation",
+            multipleOptionsShuffler: { _ in }
+        )
+        let legacyWire = try XCTUnwrap(
+            OGSAutomatchEntry([
+                "uuid": "legacy-presentation",
+                "size_speed_options": [
+                    ["size": "9x9", "speed": "live"],
+                    ["size": "13x13", "speed": "live"],
+                ],
+                "time_control": [
+                    "condition": "no-preference",
+                    "value": ["speed": "live", "system": "byoyomi"],
+                ],
+            ])
+        )
+        let correspondence = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "correspondence-presentation")
+
+        XCTAssertEqual(exact.sizeOptions, [13])
+        XCTAssertEqual(exact.sizeSpeedOptions.count, 1)
+        XCTAssertEqual(flexible.sizeOptions, [19])
+        XCTAssertEqual(flexible.sizeSpeedOptions.count, 2)
+        XCTAssertEqual(multiple.sizeOptions, [9, 19])
+        XCTAssertEqual(multiple.sizeSpeedOptions.count, 4)
+        XCTAssertEqual(legacyWire.sizeOptions, [9, 13])
+        XCTAssertEqual(legacyWire.sizeSpeedOptions.map(\.system), [
+            .byoyomi,
+            .byoyomi,
+        ])
+        XCTAssertEqual(correspondence.sizeOptions, [19])
+        XCTAssertFalse(exact.isCorrespondence)
+        XCTAssertFalse(flexible.isCorrespondence)
+        XCTAssertFalse(multiple.isCorrespondence)
+        XCTAssertFalse(legacyWire.isCorrespondence)
+        XCTAssertTrue(correspondence.isCorrespondence)
+    }
+
     func testMultipleBuildsUniqueEighteenTupleCartesianProduct() {
         let draft = OGSQuickMatchDraft(
             mode: .multiple,
@@ -1219,6 +1292,35 @@ final class OGSQuickMatchContractTests: XCTestCase {
 
         XCTAssertEqual(entry.uuid, "future-options-id")
         XCTAssertTrue(entry.sizeSpeedOptions.isEmpty)
+        XCTAssertEqual(entry.timeControlSpeed, .rapid)
+        XCTAssertFalse(entry.isCorrespondence)
+    }
+
+    func testInboundUnknownClockSystemPreservesCorrespondenceClassification() throws {
+        let payload: [String: Any] = [
+            "uuid": "future-correspondence-id",
+            "size_speed_options": [
+                [
+                    "size": "19x19",
+                    "speed": "correspondence",
+                    "system": "future-correspondence-clock",
+                ],
+            ],
+        ]
+
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertTrue(entry.sizeSpeedOptions.isEmpty)
+        XCTAssertEqual(entry.timeControlSpeed, .correspondence)
+        XCTAssertTrue(entry.isCorrespondence)
+
+        let persisted = try JSONEncoder().encode(entry)
+        let restored = try JSONDecoder().decode(
+            OGSAutomatchEntry.self,
+            from: persisted
+        )
+        XCTAssertEqual(restored.timeControlSpeed, .correspondence)
+        XCTAssertTrue(restored.isCorrespondence)
     }
 
     func testInboundEntryStillRequiresANonblankUUID() {

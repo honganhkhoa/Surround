@@ -154,6 +154,36 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertThrowsError(try OGSWebsocketFrameCodec.decode("[]"))
     }
 
+    func testFrameCodecPreservesExactCommandArity() throws {
+        XCTAssertEqual(
+            try OGSWebsocketFrameCodec.encode(
+                command: "automatch/available/subscribe"
+            ),
+            #"["automatch\/available\/subscribe"]"#
+        )
+        XCTAssertEqual(
+            try OGSWebsocketFrameCodec.encode(
+                command: "command/with-data",
+                data: "payload"
+            ),
+            #"["command\/with-data","payload"]"#
+        )
+        XCTAssertEqual(
+            try OGSWebsocketFrameCodec.encode(
+                command: "command/with-empty-object",
+                data: [String: String]()
+            ),
+            #"["command\/with-empty-object",{}]"#
+        )
+        XCTAssertEqual(
+            try OGSWebsocketFrameCodec.encode(
+                command: "command/with-callback",
+                callbackID: 7
+            ),
+            #"["command\/with-callback",null,7]"#
+        )
+    }
+
     func testFrameCodecRedactsPushedJWTScalarAndUserJWTKeys() {
         let scalarSecret = "scalar-jwt-secret"
         let scalar = OGSWebsocketFrameCodec.redactedDescription(
@@ -203,11 +233,45 @@ final class OGSWebsocketTests: XCTestCase {
         let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(authentication.utf8)) as? [Any])
         XCTAssertEqual(frame[0] as? String, "authenticate")
         XCTAssertEqual((frame[1] as? [String: String])?["jwt"], "jwt-do-not-log")
-        XCTAssertTrue(transport.sentMessages.contains { message in
-            let frame = try? JSONSerialization.jsonObject(with: Data(message.utf8)) as? [Any]
-            return frame?.first as? String == "automatch/list"
-        })
+        XCTAssertTrue(
+            transport.sentMessages.contains(#"["automatch\/list",{}]"#)
+        )
         XCTAssertFalse(logs.joined(separator: "\n").contains("jwt-do-not-log"))
+    }
+
+    func testTransportSendsExactCommandDataAndCallbackFrames() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: {
+                try? self.makeConfig(jwt: "anonymous-jwt", anonymous: true)
+            },
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            logger: { _ in }
+        )
+        socket.connect()
+        let transport = try XCTUnwrap(factory.transports.first)
+        transport.open()
+
+        socket.emit(command: "command-only")
+        XCTAssertEqual(transport.sentMessages.last, #"["command-only"]"#)
+
+        socket.emit(command: "command/with-data", data: "payload")
+        XCTAssertEqual(
+            transport.sentMessages.last,
+            #"["command\/with-data","payload"]"#
+        )
+
+        socket.emit(
+            command: "command/with-callback",
+            data: nil
+        ) { _, _ in }
+        XCTAssertEqual(
+            transport.sentMessages.last,
+            #"["command\/with-callback",null,1]"#
+        )
     }
 
     func testCallbacksEventsAndTimeoutsAreDispatchedExactlyOnce() throws {

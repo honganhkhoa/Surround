@@ -86,16 +86,17 @@ protocol OGSWebsocketProtocol: AnyObject {
     /// Drops the current transport and enters the reconnection loop.
     func closeThenReconnect()
 
-    /// Sends one OGS command, optionally correlating a server callback.
-    func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?)
+    /// Sends one OGS command, optionally carrying data and correlating a
+    /// server callback.
+    func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?)
 }
 
 extension OGSWebsocketProtocol {
     func emit(command: String) {
-        emit(command: command, data: [String: String](), resultCallback: nil)
+        emit(command: command, data: nil, resultCallback: nil)
     }
 
-    func emit(command: String, data: Any) {
+    func emit(command: String, data: Any?) {
         emit(command: command, data: data, resultCallback: nil)
     }
 }
@@ -137,9 +138,20 @@ enum OGSWebsocketFrameCodecError: Error {
 /// authorization, cookie, and session fields. The scalar payload of the
 /// `user/jwt` event is also redacted before the frame reaches a logger.
 enum OGSWebsocketFrameCodec {
-    /// Encodes a command as `[command, data]` or `[command, data, callbackID]`.
-    static func encode(command: String, data: Any, callbackID: Int? = nil) throws -> String {
-        var components: [Any] = [command, data]
+    /// Encodes a command as `[command]`, `[command, data]`, or
+    /// `[command, data, callbackID]`. A callback without command data retains
+    /// the middle slot as JSON `null` so the callback ID stays in position 3.
+    static func encode(
+        command: String,
+        data: Any? = nil,
+        callbackID: Int? = nil
+    ) throws -> String {
+        var components: [Any] = [command]
+        if let data {
+            components.append(data)
+        } else if callbackID != nil {
+            components.append(NSNull())
+        }
         if let callbackID {
             components.append(callbackID)
         }
@@ -176,8 +188,15 @@ enum OGSWebsocketFrameCodec {
     }
 
     /// Encodes a log-only representation with known credential fields removed.
-    static func redactedDescription(command: String, data: Any, callbackID: Int?) -> String {
-        let redactedData = isSensitiveScalarPayloadEvent(command) ? "<redacted>" : redact(data)
+    static func redactedDescription(command: String, data: Any?, callbackID: Int?) -> String {
+        let redactedData: Any?
+        if let data {
+            redactedData = isSensitiveScalarPayloadEvent(command)
+                ? "<redacted>"
+                : redact(data)
+        } else {
+            redactedData = nil
+        }
         return (try? encode(command: command, data: redactedData, callbackID: callbackID))
             ?? "[\"\(command)\",\"<unprintable>\"]"
     }
@@ -605,7 +624,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
             authenticatedUserID = config.user.id
             emit(command: "authenticate", data: ["jwt": config.userJwt])
             if config.user.anonymous == false {
-                emit(command: "automatch/list")
+                emit(command: "automatch/list", data: [String: Any]())
             }
             scheduler.async {
                 self.authenticated = true
@@ -634,7 +653,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
 
     func emit(
         command: String,
-        data: Any = [String: String](),
+        data: Any? = nil,
         resultCallback: OGSWebsocketResultCallback? = nil
     ) {
         scheduler.async {

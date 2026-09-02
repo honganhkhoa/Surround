@@ -112,6 +112,7 @@ private struct OfflineUITestRootView: View {
             .environmentObject(sgs)
             .environmentObject(nav)
             .environment(\.openURL, OpenURLAction { _ in .discarded })
+            .environment(\.surroundAllowsRemoteActivity, false)
             #if targetEnvironment(macCatalyst)
             .background(CatalystUITestWindowPositioner())
             #endif

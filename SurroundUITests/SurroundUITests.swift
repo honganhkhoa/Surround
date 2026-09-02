@@ -1654,6 +1654,56 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    func testQuickMatchActivityIsExposedWithoutRelyingOnColor() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.quickMatch.rawValue,
+        ])
+
+        let waitingBoard = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            (waitingBoard.value as? String)?.contains("Players waiting") == true
+        )
+
+        let popularBoard = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            (popularBoard.value as? String)?.contains("Popular lately") == true
+        )
+
+        let waitingClock = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "rapid",
+                system: "fischer"
+            ),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            (waitingClock.value as? String)?.contains("Players waiting") == true
+        )
+
+        let popularClock = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "rapid",
+                system: "byoyomi"
+            ),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(
+            (popularClock.value as? String)?.contains("Popular lately") == true
+        )
+    }
+
     func testFixtureGameOpens() {
         let app = launchApp()
         let gameID = SurroundUITestContract.fixtureGameID

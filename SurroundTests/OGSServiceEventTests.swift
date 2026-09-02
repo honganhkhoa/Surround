@@ -23,10 +23,135 @@ final class OGSServiceEventTests: XCTestCase {
         override func stopLoading() {}
     }
 
+    private final class QuickMatchStatsURLProtocol: URLProtocol {
+        enum Plan {
+            case response(statusCode: Int, body: Data)
+            case failure(URLError)
+            case hold
+        }
+
+        private static let lock = NSLock()
+        private static var plans = [Plan]()
+        private static var heldProtocols = [QuickMatchStatsURLProtocol]()
+        private static var requests = [URLRequest]()
+        private static var stoppedRequestCount = 0
+        private static var requestObserver: ((URLRequest) -> Void)?
+        private static var stopObserver: (() -> Void)?
+
+        static func reset() {
+            lock.lock()
+            plans.removeAll()
+            heldProtocols.removeAll()
+            requests.removeAll()
+            stoppedRequestCount = 0
+            requestObserver = nil
+            stopObserver = nil
+            lock.unlock()
+        }
+
+        static func enqueue(_ plan: Plan) {
+            lock.lock()
+            plans.append(plan)
+            lock.unlock()
+        }
+
+        static func observeNextRequest(
+            _ observer: @escaping (URLRequest) -> Void
+        ) {
+            lock.lock()
+            requestObserver = observer
+            lock.unlock()
+        }
+
+        static func requestSnapshot() -> [URLRequest] {
+            lock.lock()
+            defer { lock.unlock() }
+            return requests
+        }
+
+        static func stoppedCount() -> Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return stoppedRequestCount
+        }
+
+        static func observeNextStop(_ observer: @escaping () -> Void) {
+            lock.lock()
+            stopObserver = observer
+            lock.unlock()
+        }
+
+        static func respondToFirstHeldRequest(
+            statusCode: Int = 200,
+            body: Data
+        ) {
+            lock.lock()
+            let held = heldProtocols.isEmpty
+                ? nil
+                : heldProtocols.removeFirst()
+            lock.unlock()
+            held?.respond(statusCode: statusCode, body: body)
+        }
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(
+            for request: URLRequest
+        ) -> URLRequest { request }
+
+        override func startLoading() {
+            Self.lock.lock()
+            Self.requests.append(request)
+            let plan = Self.plans.isEmpty
+                ? Plan.failure(URLError(.resourceUnavailable))
+                : Self.plans.removeFirst()
+            if case .hold = plan {
+                Self.heldProtocols.append(self)
+            }
+            let observer = Self.requestObserver
+            Self.requestObserver = nil
+            Self.lock.unlock()
+            observer?(request)
+
+            switch plan {
+            case .response(let statusCode, let body):
+                respond(statusCode: statusCode, body: body)
+            case .failure(let error):
+                client?.urlProtocol(self, didFailWithError: error)
+            case .hold:
+                break
+            }
+        }
+
+        override func stopLoading() {
+            Self.lock.lock()
+            Self.stoppedRequestCount += 1
+            let observer = Self.stopObserver
+            Self.stopObserver = nil
+            Self.lock.unlock()
+            observer?()
+        }
+
+        private func respond(statusCode: Int, body: Data) {
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(
+                self,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            client?.urlProtocol(self, didLoad: body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+
     private class FakeWebsocket: OGSWebsocketProtocol {
         struct Emission {
             let command: String
-            let data: Any
+            let data: Any?
             let hasResultCallback: Bool
         }
 
@@ -89,7 +214,7 @@ final class OGSServiceEventTests: XCTestCase {
             dropSocket()
         }
 
-        func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
+        func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
             emissions.append(.init(
                 command: command,
                 data: data,
@@ -110,6 +235,7 @@ final class OGSServiceEventTests: XCTestCase {
     private var preferenceSuite: String!
 
     override func tearDown() {
+        QuickMatchStatsURLProtocol.reset()
         if let preferenceSuite {
             UserDefaults.standard.removePersistentDomain(forName: preferenceSuite)
         }
@@ -1945,7 +2071,7 @@ final class OGSServiceEventTests: XCTestCase {
 
     func testMoveAcknowledgementErrorBecomesPublisherFailure() throws {
         final class RejectingWebsocket: FakeWebsocket {
-            override func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
+            override func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
                 emissions.append(.init(
                     command: command,
                     data: data,
@@ -2223,6 +2349,10 @@ final class OGSServiceEventTests: XCTestCase {
         socket.deliver(name: "surround/socketAuthenticated")
         XCTAssertTrue(service.isReconcilingAutomatches)
         XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
+        XCTAssertTrue(
+            (socket.emissions.last?.data as? [String: Any])?.isEmpty
+                == true
+        )
         let emissionCount = socket.emissions.count
 
         XCTAssertFalse(service.findAutomatch(entry: entry))
@@ -2335,6 +2465,10 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertTrue(service.isReconcilingAutomatches)
         XCTAssertEqual(service.autoMatchEntryById[entry.uuid], entry)
         XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
+        XCTAssertTrue(
+            (socket.emissions.last?.data as? [String: Any])?.isEmpty
+                == true
+        )
 
         socket.deliver(name: "automatch/entry", data: entry.jsonObject)
         XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
@@ -2396,7 +2530,10 @@ final class OGSServiceEventTests: XCTestCase {
 
         XCTAssertNil(service.autoMatchEntryById[entry.uuid])
         XCTAssertTrue(
-            socket.emissions.contains { $0.command == "automatch/list" }
+            socket.emissions.contains {
+                $0.command == "automatch/list"
+                    && ($0.data as? [String: Any])?.isEmpty == true
+            }
         )
         XCTAssertEqual(
             lifecycleEvents.last,
@@ -2430,9 +2567,855 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(payload, ["uuid": uuid])
     }
 
+    func testAvailableAutomatchParserKeepsOnlyStrictKnownOptions() throws {
+        let entry = try XCTUnwrap(OGSAutomatchAvailableEntry([
+            "uuid": "available-id",
+            "player": [
+                "id": 42,
+                "bounded_rank": 20.5,
+            ],
+            "preferences": [
+                "lower_rank_diff": 2,
+                "upper_rank_diff": 4,
+                "size_speed_options": [
+                    [
+                        "size": "9x9",
+                        "speed": "rapid",
+                        "system": "fischer",
+                    ],
+                    [
+                        "size": "9x9",
+                        "speed": "rapid",
+                        "system": "fischer",
+                    ],
+                    [
+                        "size": "13x13",
+                        "speed": "rapid",
+                        "system": "future-clock",
+                    ],
+                    [
+                        "size": "19x19",
+                        "speed": "live",
+                    ],
+                ],
+            ],
+        ]))
+
+        XCTAssertEqual(entry.uuid, "available-id")
+        XCTAssertEqual(entry.playerID, 42)
+        XCTAssertEqual(entry.playerBoundedRank, 20.5)
+        XCTAssertEqual(entry.lowerRankDifference, 2)
+        XCTAssertEqual(entry.upperRankDifference, 4)
+        XCTAssertEqual(
+            entry.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ]
+        )
+
+        let degraded = try XCTUnwrap(
+            OGSAutomatchAvailableEntry(["uuid": "degraded-id"])
+        )
+        XCTAssertTrue(degraded.sizeSpeedOptions.isEmpty)
+        XCTAssertNil(degraded.playerID)
+        XCTAssertNil(degraded.playerBoundedRank)
+        XCTAssertNil(degraded.lowerRankDifference)
+        XCTAssertNil(degraded.upperRankDifference)
+    }
+
+    func testAvailableAutomatchParserRejectsUnsafeNumericCoercions() throws {
+        let entry = try XCTUnwrap(OGSAutomatchAvailableEntry([
+            "uuid": "strict-numbers",
+            "player": [
+                "id": true,
+                "bounded_rank": Double.infinity,
+            ],
+            "preferences": [
+                "lower_rank_diff": 1.5,
+                "upper_rank_diff": -1,
+                "size_speed_options": [],
+            ],
+        ]))
+
+        XCTAssertNil(entry.playerID)
+        XCTAssertNil(entry.playerBoundedRank)
+        XCTAssertNil(entry.lowerRankDifference)
+        XCTAssertNil(entry.upperRankDifference)
+    }
+
+    func testActivityParsersDistinguishJSONNumbersFromBooleans() throws {
+        let availabilityObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(#"""
+            {
+              "uuid": "json-numbers",
+              "player": { "id": 1, "bounded_rank": 20 },
+              "preferences": {
+                "lower_rank_diff": 0,
+                "upper_rank_diff": 1,
+                "size_speed_options": [
+                  { "size": "9x9", "speed": "rapid", "system": "fischer" }
+                ]
+              }
+            }
+            """#.utf8)) as? [String: Any]
+        )
+        let entry = try XCTUnwrap(
+            OGSAutomatchAvailableEntry(availabilityObject)
+        )
+        XCTAssertEqual(entry.playerID, 1)
+        XCTAssertEqual(entry.playerBoundedRank, 20)
+        XCTAssertEqual(entry.lowerRankDifference, 0)
+        XCTAssertEqual(entry.upperRankDifference, 1)
+
+        let statsObject = try JSONSerialization.jsonObject(with: Data(#"""
+        {
+          "9x9": {
+            "rapid": { "fischer": 1, "byoyomi": 0 },
+            "live": { "fischer": true }
+          }
+        }
+        """#.utf8))
+        let stats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: statsObject)
+        )
+        XCTAssertEqual(stats.total(boardSize: 9), 1)
+        XCTAssertEqual(stats.realtimeTotal(boardSize: 9), 1)
+        XCTAssertEqual(
+            stats.count(
+                boardSize: 9,
+                speed: .rapid,
+                system: .fischer
+            ),
+            1
+        )
+    }
+
+    func testQuickMatchPopularityUsesOfficialStrictThresholds() throws {
+        let boundaryStats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": ["rapid": ["fischer": 33]],
+                "13x13": ["rapid": ["fischer": 33]],
+                "19x19": ["rapid": ["fischer": 34]],
+            ])
+        )
+        let aboveBoundaryStats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": ["rapid": ["fischer": 331]],
+                "13x13": ["rapid": ["fischer": 334]],
+                "19x19": ["rapid": ["fischer": 335]],
+            ])
+        )
+
+        XCTAssertEqual(
+            activitySnapshot(popularity: boundaryStats)
+                .status(forBoardSize: 9),
+            .none
+        )
+        XCTAssertEqual(
+            activitySnapshot(popularity: aboveBoundaryStats)
+                .status(forBoardSize: 9),
+            .popular
+        )
+
+        let clockBoundaryStats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": [
+                    "rapid": ["fischer": 2, "byoyomi": 2],
+                    "live": ["fischer": 3, "byoyomi": 3],
+                ],
+            ])
+        )
+        let clockAboveBoundaryStats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": [
+                    "rapid": ["fischer": 3, "byoyomi": 2],
+                    "live": ["fischer": 3, "byoyomi": 3],
+                ],
+            ])
+        )
+
+        XCTAssertEqual(
+            activitySnapshot(popularity: clockBoundaryStats).status(
+                for: .rapid,
+                system: .fischer,
+                boardSizes: [9]
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            activitySnapshot(popularity: clockAboveBoundaryStats).status(
+                for: .rapid,
+                system: .fischer,
+                boardSizes: [9]
+            ),
+            .popular
+        )
+    }
+
+    func testPopularityRankQueryPreservesTheUsersFractionalRank() {
+        XCTAssertEqual(
+            OGSQuickMatchPopularityStats.rankQueryParameter(
+                userRank: 28.25,
+                lowerRankDifference: 2,
+                upperRankDifference: 1
+            ),
+            "26.25,27.25,28.25,29.25"
+        )
+        XCTAssertNil(
+            OGSQuickMatchPopularityStats.rankQueryParameter(
+                userRank: 28.25,
+                lowerRankDifference: 10,
+                upperRankDifference: 1
+            )
+        )
+        XCTAssertEqual(
+            OGSQuickMatchPopularityStats.rankQueryParameter(
+                userRank: 28,
+                lowerRankDifference: 2,
+                upperRankDifference: 1
+            ),
+            "26,27,28,29"
+        )
+    }
+
+    func testPopularityParserRejectsOverflowingServerTotals() {
+        XCTAssertNil(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": [
+                    "rapid": [
+                        "fischer": Int.max,
+                        "byoyomi": 1,
+                    ],
+                ],
+            ])
+        )
+        XCTAssertNil(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": [
+                    "rapid": ["fischer": Int.max],
+                    "live": ["byoyomi": 1],
+                ],
+            ])
+        )
+        XCTAssertNil(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": ["future-speed": ["future-system": Int.max]],
+                "13x13": ["rapid": ["fischer": 1]],
+            ])
+        )
+    }
+
+    func testPopularityParserIsTolerantWithoutChangingDenominators() throws {
+        XCTAssertNil(OGSQuickMatchPopularityStats(jsonObject: "future-shape"))
+        let empty = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [:])
+        )
+        XCTAssertEqual(empty.totalAcrossBoardSizes, 0)
+
+        let stats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": [
+                    "rapid": [
+                        "fischer": 3,
+                        "byoyomi": true,
+                    ],
+                    "future-speed": [
+                        "future-system": 100,
+                    ],
+                    "live": [
+                        "fischer": -4,
+                        "byoyomi": 2.5,
+                    ],
+                ],
+            ])
+        )
+
+        XCTAssertEqual(stats.total(boardSize: 9), 103)
+        XCTAssertEqual(stats.realtimeTotal(boardSize: 9), 3)
+        XCTAssertEqual(
+            stats.count(
+                boardSize: 9,
+                speed: .rapid,
+                system: .fischer
+            ),
+            3
+        )
+    }
+
+    func testQuickMatchActivityAppliesMutualRankFilters() throws {
+        let cases: [(String, Int?, Double?, Int?, Int?, Bool)] = [
+            ("self", 10, 20, 3, 3, false),
+            ("lower-inclusive", 11, 17, 3, 3, true),
+            ("upper-inclusive", 12, 22, 2, 3, true),
+            ("below-range", 13, 16.9, 9, 9, false),
+            ("above-range", 14, 22.1, 9, 9, false),
+            ("peer-too-narrow-lower", 15, 22, 1, 9, false),
+            ("peer-lower-inclusive", 16, 22, 2, 9, true),
+            ("peer-too-narrow-upper", 17, 18, 9, 1, false),
+            ("peer-upper-inclusive", 18, 18, 9, 2, true),
+            ("missing-id", nil, 20, 3, 3, false),
+            ("missing-rank", 19, nil, 3, 3, false),
+            ("missing-lower", 20, 20, nil, 3, false),
+            ("missing-upper", 21, 20, 3, nil, false),
+        ]
+
+        for (uuid, playerID, rank, lower, upper, expectedWaiting) in cases {
+            let entry = try XCTUnwrap(
+                availableEntry(
+                    uuid: uuid,
+                    playerID: playerID,
+                    boundedRank: rank,
+                    lowerRankDifference: lower,
+                    upperRankDifference: upper
+                )
+            )
+            let snapshot = activitySnapshot(availableEntries: [entry])
+            XCTAssertEqual(
+                snapshot.status(forBoardSize: 9),
+                expectedWaiting ? .playersWaiting : .none,
+                uuid
+            )
+        }
+    }
+
+    func testQuickMatchActivityPrecedenceMultipleAndCorrespondence() throws {
+        let stats = try XCTUnwrap(
+            OGSQuickMatchPopularityStats(jsonObject: [
+                "9x9": ["rapid": ["fischer": 1, "byoyomi": 9]],
+                "13x13": ["rapid": ["fischer": 1, "byoyomi": 9]],
+                "19x19": ["rapid": ["fischer": 8, "byoyomi": 2]],
+            ])
+        )
+        let waitingOn13 = try XCTUnwrap(
+            availableEntry(
+                uuid: "waiting-13",
+                playerID: 11,
+                boundedRank: 20,
+                lowerRankDifference: 3,
+                upperRankDifference: 3,
+                options: [[
+                    "size": "13x13",
+                    "speed": "rapid",
+                    "system": "fischer",
+                ]]
+            )
+        )
+        let snapshot = activitySnapshot(
+            availableEntries: [waitingOn13],
+            popularity: stats
+        )
+
+        XCTAssertEqual(
+            snapshot.status(
+                for: .rapid,
+                system: .fischer,
+                boardSizes: [9, 13]
+            ),
+            .playersWaiting
+        )
+        XCTAssertEqual(
+            snapshot.status(
+                for: .rapid,
+                system: .fischer,
+                boardSizes: [9]
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            snapshot.status(
+                for: .rapid,
+                system: .fischer,
+                boardSizes: [19]
+            ),
+            .popular
+        )
+        XCTAssertEqual(
+            snapshot.status(
+                for: .rapid,
+                system: .byoyomi,
+                boardSizes: [13]
+            ),
+            .popular
+        )
+        XCTAssertEqual(
+            snapshot.status(
+                for: .correspondence,
+                system: .fischer,
+                boardSizes: [9, 13, 19]
+            ),
+            .popular
+        )
+    }
+
+    func testAutomatchAvailabilitySubscriptionReconnectsAndCleansUp() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let payload = availableEntryPayload(
+            uuid: "available-live",
+            playerID: 11,
+            boundedRank: 20,
+            lowerRankDifference: 3,
+            upperRankDifference: 3
+        )
+
+        service.subscribeToAutomatchAvailability()
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "automatch/available/subscribe"
+        )
+
+        socket.deliver(name: "automatch/available/add", data: payload)
+        XCTAssertNotNil(service.automatchAvailableEntryByID["available-live"])
+        socket.deliver(
+            name: "automatch/available/remove",
+            data: "available-live"
+        )
+        XCTAssertNil(service.automatchAvailableEntryByID["available-live"])
+
+        socket.deliver(name: "automatch/available/add", data: payload)
+        socket.dropSocket()
+        XCTAssertTrue(service.automatchAvailableEntryByID.isEmpty)
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(
+            socket.emissions.filter {
+                $0.command == "automatch/available/subscribe"
+            }.count,
+            2
+        )
+
+        service.unsubscribeFromAutomatchAvailability()
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "automatch/available/unsubscribe"
+        )
+        socket.deliver(name: "automatch/available/add", data: payload)
+        XCTAssertTrue(service.automatchAvailableEntryByID.isEmpty)
+    }
+
+    func testGameCountSubscriptionAndUnsubscriptionUseTheGlobalChannel() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+
+        service.subscribeToGameCount()
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "gamelist/count/subscribe"
+        )
+        XCTAssertEqual(
+            (socket.emissions.last?.data as? [String: String])?["channel"],
+            ""
+        )
+
+        service.unsubscribeFromGameCount()
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "gamelist/count/unsubscribe"
+        )
+        XCTAssertEqual(
+            (socket.emissions.last?.data as? [String: String])?["channel"],
+            ""
+        )
+    }
+
+    func testQuickMatchPopularityRequestLifecycle() throws {
+        QuickMatchStatsURLProtocol.reset()
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            urlProtocolClass: QuickMatchStatsURLProtocol.self
+        )
+        service.subscribeToAutomatchAvailability()
+
+        QuickMatchStatsURLProtocol.enqueue(.response(
+            statusCode: 200,
+            body: Data(#"{"9x9":{"rapid":{"fischer":4}}}"#.utf8)
+        ))
+        let validUpdate = expectation(description: "valid stats update")
+        var validCancellable: AnyCancellable? = service
+            .$quickMatchPopularityStats
+            .dropFirst()
+            .first { $0.totalAcrossBoardSizes == 4 }
+            .sink { _ in validUpdate.fulfill() }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 28,
+            lowerRankDifference: 2,
+            upperRankDifference: 1
+        )
+        wait(for: [validUpdate], timeout: 2)
+        withExtendedLifetime(validCancellable) {}
+        validCancellable = nil
+
+        let request = try XCTUnwrap(
+            QuickMatchStatsURLProtocol.requestSnapshot().last
+        )
+        let components = try XCTUnwrap(
+            URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+        )
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(components.path, "/termination-api/automatch-stats")
+        XCTAssertEqual(
+            components.queryItems?.first { $0.name == "ranks" }?.value,
+            "26,27,28,29"
+        )
+
+        QuickMatchStatsURLProtocol.enqueue(.response(
+            statusCode: 200,
+            body: Data("{}".utf8)
+        ))
+        let emptyUpdate = expectation(description: "valid empty stats clear")
+        var emptyCancellable: AnyCancellable? = service
+            .$quickMatchPopularityStats
+            .dropFirst()
+            .first { $0 == .empty }
+            .sink { _ in emptyUpdate.fulfill() }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 28,
+            lowerRankDifference: 2,
+            upperRankDifference: 1
+        )
+        wait(for: [emptyUpdate], timeout: 2)
+        withExtendedLifetime(emptyCancellable) {}
+        emptyCancellable = nil
+
+        QuickMatchStatsURLProtocol.enqueue(.response(
+            statusCode: 200,
+            body: Data(#"{"13x13":{"rapid":{"fischer":7}}}"#.utf8)
+        ))
+        let replacementUpdate = expectation(description: "replacement stats update")
+        var replacementCancellable: AnyCancellable? = service
+            .$quickMatchPopularityStats
+            .dropFirst()
+            .first { $0.totalAcrossBoardSizes == 7 }
+            .sink { _ in replacementUpdate.fulfill() }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 28,
+            lowerRankDifference: 2,
+            upperRankDifference: 1
+        )
+        wait(for: [replacementUpdate], timeout: 2)
+        withExtendedLifetime(replacementCancellable) {}
+        replacementCancellable = nil
+
+        for plan in [
+            QuickMatchStatsURLProtocol.Plan.response(
+                statusCode: 200,
+                body: Data("[]".utf8)
+            ),
+            .failure(URLError(.timedOut)),
+        ] {
+            QuickMatchStatsURLProtocol.enqueue(plan)
+            let noChange = expectation(
+                description: "malformed or failed response retains stats"
+            )
+            noChange.isInverted = true
+            let noChangeCancellable = service
+                .$quickMatchPopularityStats
+                .dropFirst()
+                .sink { _ in noChange.fulfill() }
+            service.refreshQuickMatchPopularityStats(
+                userRank: 28,
+                lowerRankDifference: 2,
+                upperRankDifference: 1
+            )
+            wait(for: [noChange], timeout: 0.25)
+            withExtendedLifetime(noChangeCancellable) {}
+            XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 7)
+        }
+
+        QuickMatchStatsURLProtocol.enqueue(.hold)
+        let firstStarted = expectation(description: "superseded request started")
+        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+            firstStarted.fulfill()
+        }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 20,
+            lowerRankDifference: 1,
+            upperRankDifference: 1
+        )
+        wait(for: [firstStarted], timeout: 2)
+        let stoppedBeforeSuperseding = QuickMatchStatsURLProtocol.stoppedCount()
+
+        QuickMatchStatsURLProtocol.enqueue(.response(
+            statusCode: 200,
+            body: Data(#"{"19x19":{"rapid":{"fischer":9}}}"#.utf8)
+        ))
+        let supersedingUpdate = expectation(description: "newer request wins")
+        let supersedingCancellable = service
+            .$quickMatchPopularityStats
+            .dropFirst()
+            .first { $0.totalAcrossBoardSizes == 9 }
+            .sink { _ in supersedingUpdate.fulfill() }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 21,
+            lowerRankDifference: 1,
+            upperRankDifference: 1
+        )
+        wait(for: [supersedingUpdate], timeout: 2)
+        XCTAssertGreaterThan(
+            QuickMatchStatsURLProtocol.stoppedCount(),
+            stoppedBeforeSuperseding
+        )
+
+        let noStaleUpdate = expectation(description: "stale response ignored")
+        noStaleUpdate.isInverted = true
+        let staleCancellable = service
+            .$quickMatchPopularityStats
+            .dropFirst()
+            .sink { _ in noStaleUpdate.fulfill() }
+        QuickMatchStatsURLProtocol.respondToFirstHeldRequest(
+            body: Data(#"{"9x9":{"rapid":{"fischer":99}}}"#.utf8)
+        )
+        wait(for: [noStaleUpdate], timeout: 0.25)
+        withExtendedLifetime(supersedingCancellable) {}
+        staleCancellable.cancel()
+        XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 9)
+
+        QuickMatchStatsURLProtocol.enqueue(.hold)
+        let cancellationStarted = expectation(description: "request before unsubscribe")
+        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+            cancellationStarted.fulfill()
+        }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 28,
+            lowerRankDifference: 2,
+            upperRankDifference: 1
+        )
+        wait(for: [cancellationStarted], timeout: 2)
+        let unsubscribeCancelled = expectation(description: "unsubscribe cancels request")
+        QuickMatchStatsURLProtocol.observeNextStop {
+            unsubscribeCancelled.fulfill()
+        }
+        service.unsubscribeFromAutomatchAvailability()
+        wait(for: [unsubscribeCancelled], timeout: 2)
+        XCTAssertEqual(service.quickMatchPopularityStats, .empty)
+
+        service.subscribeToAutomatchAvailability()
+        QuickMatchStatsURLProtocol.enqueue(.hold)
+        let accountRequestStarted = expectation(description: "request before account switch")
+        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+            accountRequestStarted.fulfill()
+        }
+        service.refreshQuickMatchPopularityStats(
+            userRank: 28,
+            lowerRankDifference: 2,
+            upperRankDifference: 1
+        )
+        wait(for: [accountRequestStarted], timeout: 2)
+        let accountSwitchCancelled = expectation(
+            description: "account switch cancels request"
+        )
+        QuickMatchStatsURLProtocol.observeNextStop {
+            accountSwitchCancelled.fulfill()
+        }
+        service.ogsUIConfig = try makeUIConfig(jwt: "new-account", userID: 2)
+        wait(for: [accountSwitchCancelled], timeout: 2)
+        XCTAssertEqual(service.quickMatchPopularityStats, .empty)
+    }
+
+    func testSeekGraphSubscriptionWaitsForAuthenticationAndReconnects() {
+        let socket = FakeWebsocket()
+        socket.authenticated = false
+        let service = makeService(socket: socket)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+
+        service.subscribeToSeekGraph()
+        XCTAssertFalse(
+            socket.emissions.contains { $0.command == "seek_graph/connect" }
+        )
+
+        socket.markAuthenticated()
+        XCTAssertEqual(
+            socket.emissions.filter {
+                $0.command == "seek_graph/connect"
+            }.count,
+            1
+        )
+
+        service.subscribeToSeekGraph()
+        service.unsubscribeFromSeekGraphWhenDone()
+        XCTAssertFalse(
+            socket.emissions.contains {
+                $0.command == "seek_graph/disconnect"
+            }
+        )
+
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(
+            socket.emissions.filter {
+                $0.command == "seek_graph/connect"
+            }.count,
+            2
+        )
+        service.onSeekGraphEvent(data: [])
+
+        service.unsubscribeFromSeekGraphWhenDone()
+        XCTAssertEqual(
+            socket.emissions.last?.command,
+            "seek_graph/disconnect"
+        )
+    }
+
+    func testSeekGraphReconnectReplacesThePreviousSnapshot() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 10)])
+        XCTAssertNotNil(service.eligibleOpenChallengeById[10])
+
+        socket.dropSocket()
+        XCTAssertTrue(service.eligibleOpenChallengeById.isEmpty)
+
+        socket.openSocket(authenticate: true)
+        service.onSeekGraphEvent(data: [])
+        XCTAssertTrue(service.eligibleOpenChallengeById.isEmpty)
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "seek_graph/connect" }.count,
+            2
+        )
+    }
+
+    func testSeekGraphAccountSwitchClearsAccountOwnedSnapshot() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        service.ogsUIConfig = try makeUIConfig(jwt: "old", userID: 1)
+        socket.openSocket(authenticate: true)
+        service.user = OGSUser(username: "old", id: 1, rank: 25)
+        service.subscribeToSeekGraph()
+        service.onSeekGraphEvent(
+            data: [seekGraphChallengePayload(id: 11, challengerID: 1)]
+        )
+        XCTAssertNotNil(service.openChallengeSentById[11])
+
+        service.ogsUIConfig = try makeUIConfig(jwt: "new", userID: 2)
+
+        XCTAssertTrue(service.openChallengeSentById.isEmpty)
+        XCTAssertTrue(service.eligibleOpenChallengeById.isEmpty)
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "seek_graph/connect" }.count,
+            2,
+            "The visible screen keeps ownership, but the old account's request does not."
+        )
+    }
+
+    private func activitySnapshot(
+        availableEntries: [OGSAutomatchAvailableEntry] = [],
+        popularity: OGSQuickMatchPopularityStats = .empty
+    ) -> OGSQuickMatchActivitySnapshot {
+        OGSQuickMatchActivitySnapshot(
+            availableEntries: availableEntries,
+            popularity: popularity,
+            currentUserID: 10,
+            currentRank: 20,
+            lowerRankDifference: 3,
+            upperRankDifference: 2
+        )
+    }
+
+    private func availableEntry(
+        uuid: String,
+        playerID: Int?,
+        boundedRank: Double?,
+        lowerRankDifference: Int?,
+        upperRankDifference: Int?,
+        options: [[String: Any]] = [[
+            "size": "9x9",
+            "speed": "rapid",
+            "system": "fischer",
+        ]]
+    ) -> OGSAutomatchAvailableEntry? {
+        OGSAutomatchAvailableEntry(
+            availableEntryPayload(
+                uuid: uuid,
+                playerID: playerID,
+                boundedRank: boundedRank,
+                lowerRankDifference: lowerRankDifference,
+                upperRankDifference: upperRankDifference,
+                options: options
+            )
+        )
+    }
+
+    private func availableEntryPayload(
+        uuid: String,
+        playerID: Int?,
+        boundedRank: Double?,
+        lowerRankDifference: Int?,
+        upperRankDifference: Int?,
+        options: [[String: Any]] = [[
+            "size": "9x9",
+            "speed": "rapid",
+            "system": "fischer",
+        ]]
+    ) -> [String: Any] {
+        var player = [String: Any]()
+        if let playerID { player["id"] = playerID }
+        if let boundedRank { player["bounded_rank"] = boundedRank }
+        var preferences: [String: Any] = [
+            "size_speed_options": options,
+        ]
+        if let lowerRankDifference {
+            preferences["lower_rank_diff"] = lowerRankDifference
+        }
+        if let upperRankDifference {
+            preferences["upper_rank_diff"] = upperRankDifference
+        }
+        return [
+            "uuid": uuid,
+            "player": player,
+            "preferences": preferences,
+        ]
+    }
+
+    private func seekGraphChallengePayload(
+        id: Int,
+        challengerID: Int = 2
+    ) -> [String: Any] {
+        [
+            "challenge_id": id,
+            "user_id": challengerID,
+            "username": "player-\(challengerID)",
+            "rank": 25.0,
+            "min_rank": 5,
+            "max_rank": 38,
+            "game_id": id + 1_000,
+            "name": "Event test",
+            "ranked": false,
+            "handicap": 0,
+            "komi": NSNull(),
+            "rules": "japanese",
+            "width": 9,
+            "height": 9,
+            "challenger_color": "black",
+            "disable_analysis": false,
+            "time_control_parameters": [
+                "per_move": 20,
+                "pause_on_weekends": false,
+                "speed": "live",
+                "system": "simple",
+                "time_control": "simple",
+            ],
+            "rengo": false,
+            "rengo_nominees": [],
+            "rengo_black_team": [],
+            "rengo_white_team": [],
+            "rengo_participants": [],
+            "rengo_casual_mode": false,
+            "rengo_auto_start": 0,
+        ]
+    }
+
     private func makeService(
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],
+        urlProtocolClass: AnyClass = RejectingURLProtocol.self,
         installsObservers: Bool = false,
         gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
@@ -2442,7 +3425,7 @@ final class OGSServiceEventTests: XCTestCase {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [RejectingURLProtocol.self]
+        configuration.protocolClasses = [urlProtocolClass]
         configuration.httpCookieStorage = nil
         let httpClient = AlamofireOGSHTTPClient(
             session: Session(configuration: configuration),

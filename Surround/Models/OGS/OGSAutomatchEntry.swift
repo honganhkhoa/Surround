@@ -180,6 +180,14 @@ struct OGSAutomatchEntry: Codable, Equatable {
     var handicap: OGSAutomatchHandicapPreference
     var uuid: String
 
+    /// Classification metadata retained from an inbound wire entry.
+    ///
+    /// OGS can add a clock system before this client knows how to display it.
+    /// In that case the individual option is deliberately skipped, but its
+    /// recognized speed still tells us whether the request belongs under Live
+    /// or Correspondence in Waiting Games.
+    private var inboundSpeedClassificationHint: TimeControlSpeed?
+
     private enum CodingKeys: String, CodingKey {
         case sizeSpeedOptions
         case lowerRankDifference
@@ -191,6 +199,9 @@ struct OGSAutomatchEntry: Codable, Equatable {
         // Legacy UserDefaults representation.
         case sizeOptions
         case timeControlSpeed
+
+        // Local persistence only; this is never included in `jsonObject`.
+        case inboundSpeedClassificationHint
     }
 
     init(
@@ -207,6 +218,7 @@ struct OGSAutomatchEntry: Codable, Equatable {
         self.rules = rules
         self.handicap = handicap
         self.uuid = uuid
+        inboundSpeedClassificationHint = nil
     }
 
     /// Compatibility adapter for the pre-redesign Quick Match screen.
@@ -250,6 +262,7 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 value: .enabled
             )
         uuid = UUID().uuidString.lowercased()
+        inboundSpeedClassificationHint = nil
     }
 
     init?(_ jsonObject: [String: Any]) {
@@ -284,6 +297,15 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 fallbackSystem: optionFallback
             )
         }
+        // The parsed options already carry their own speed. Retain a separate
+        // hint only for a fully degraded entry, where every option used a
+        // future clock system and was skipped.
+        let inboundSpeedClassificationHint = options.isEmpty
+            ? Self.speedClassification(
+                rawOptions: rawOptions,
+                legacyTimeControlValue: legacyTimeControlValue
+            )
+            : nil
 
         let rulesObject = jsonObject["rules"] as? [String: Any]
         let rulesCondition = Self.enumValue(
@@ -333,6 +355,7 @@ struct OGSAutomatchEntry: Codable, Equatable {
             ),
             uuid: uuid
         )
+        self.inboundSpeedClassificationHint = inboundSpeedClassificationHint
     }
 
     init(from decoder: Decoder) throws {
@@ -359,6 +382,10 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 forKey: .handicap
             ) ?? .quickMatchDefault
             uuid = try container.decode(String.self, forKey: .uuid)
+            inboundSpeedClassificationHint = try container.decodeIfPresent(
+                TimeControlSpeed.self,
+                forKey: .inboundSpeedClassificationHint
+            )
             return
         }
 
@@ -388,6 +415,7 @@ struct OGSAutomatchEntry: Codable, Equatable {
             value: legacySpeed == .blitz ? .disabled : .enabled
         )
         uuid = try container.decode(String.self, forKey: .uuid)
+        inboundSpeedClassificationHint = nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -398,6 +426,10 @@ struct OGSAutomatchEntry: Codable, Equatable {
         try container.encode(rules, forKey: .rules)
         try container.encode(handicap, forKey: .handicap)
         try container.encode(uuid, forKey: .uuid)
+        try container.encodeIfPresent(
+            inboundSpeedClassificationHint,
+            forKey: .inboundSpeedClassificationHint
+        )
 
         // Keep the active legacy key readable by older app versions. Their
         // synthesized decoder ignores the richer keys above.
@@ -410,8 +442,15 @@ struct OGSAutomatchEntry: Codable, Equatable {
     }
 
     var timeControlSpeed: TimeControlSpeed {
+        if let inboundSpeedClassificationHint {
+            return inboundSpeedClassificationHint
+        }
         let speeds = Set(sizeSpeedOptions.map(\.speed))
         return speeds.count == 1 ? speeds.first! : .live
+    }
+
+    var isCorrespondence: Bool {
+        timeControlSpeed == .correspondence
     }
 
     var jsonObject: [String: Any] {
@@ -433,6 +472,30 @@ struct OGSAutomatchEntry: Codable, Equatable {
             return number.intValue
         }
         return defaultValue
+    }
+
+    private static func speedClassification(
+        rawOptions: [Any],
+        legacyTimeControlValue: [String: Any]?
+    ) -> TimeControlSpeed? {
+        var speeds = Set(
+            rawOptions.compactMap { rawValue -> TimeControlSpeed? in
+                guard
+                    let rawOption = rawValue as? [String: Any],
+                    let rawSpeed = rawOption["speed"] as? String
+                else {
+                    return nil
+                }
+                return TimeControlSpeed(rawValue: rawSpeed)
+            }
+        )
+        if speeds.isEmpty,
+           let rawSpeed = legacyTimeControlValue?["speed"] as? String,
+           let speed = TimeControlSpeed(rawValue: rawSpeed) {
+            speeds.insert(speed)
+        }
+        guard !speeds.isEmpty else { return nil }
+        return speeds.count == 1 ? speeds.first : .live
     }
 
     private static func enumValue<Value>(

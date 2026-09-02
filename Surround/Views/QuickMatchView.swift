@@ -262,7 +262,10 @@ extension OGSQuickMatchClockPreset {
             longFormat: longFormat
         )
         return spoken
-            ? "\(firstDescription) to \(lastDescription)"
+            ? String(
+                localized: "\(firstDescription) to \(lastDescription)",
+                comment: "Spoken range between two Quick Match clock durations"
+            )
             : "\(firstDescription)–\(lastDescription)"
     }
 }
@@ -409,11 +412,17 @@ extension OGSQuickMatchDraft {
                 for: presets
             )
         }
-        let clocks = clockDescriptions.joined(
-            separator: mode == .flexible
-                ? String(localized: " or ")
-                : ", "
-        )
+        let clocks: String
+        if mode == .flexible, clockDescriptions.count == 2 {
+            clocks = String(
+                localized: "\(clockDescriptions[0]) or \(clockDescriptions[1])",
+                comment: "Two alternative Quick Match clock values"
+            )
+        } else {
+            clocks = ListFormatter.localizedString(
+                byJoining: clockDescriptions
+            )
+        }
 
         return OGSQuickMatchRecap(
             firstLine: [sizes, clocks]
@@ -443,7 +452,7 @@ extension OGSQuickMatchDraft {
 
         let sizes = quickMatchSelectedBoardSizes
             .map { String(localized: "\($0) by \($0)") }
-            .joined(separator: ", ")
+        let sizeDescription = ListFormatter.localizedString(byJoining: sizes)
         let clocks: String
         if mode == .multiple {
             let count = quickMatchSelectedClocks.count
@@ -451,18 +460,27 @@ extension OGSQuickMatchDraft {
                 ? String(localized: "1 clock option")
                 : String(localized: "\(count) clock options")
         } else {
-            clocks = quickMatchSelectedClocks.compactMap { selection in
+            let descriptions = quickMatchSelectedClocks.compactMap { selection in
                 OGSQuickMatchClockPreset.preset(
                     boardSize: boardSize,
                     speed: selection.speed,
                     system: selection.system
                 )?.quickMatchAccessibleDescription
             }
-            .joined(separator: String(localized: " or "))
+            if mode == .flexible, descriptions.count == 2 {
+                clocks = String(
+                    localized: "\(descriptions[0]) or \(descriptions[1])",
+                    comment: "Two alternative spoken Quick Match clocks"
+                )
+            } else {
+                clocks = ListFormatter.localizedString(
+                    byJoining: descriptions
+                )
+            }
         }
 
         return [
-            sizes,
+            sizeDescription,
             clocks,
             String(localized: "\(handicap.quickMatchTitle) handicap"),
             quickMatchAccessibleRankRange(userRank: userRank),
@@ -562,6 +580,12 @@ private extension QuickMatchCard where Accessory == EmptyView {
 }
 
 private struct QuickMatchActionArea: View {
+    private enum KeyboardFocus: Hashable {
+        case find
+        case cancel
+        case status
+    }
+
     let recap: OGSQuickMatchRecap
     let accessibleRecap: String
     let isSearching: Bool
@@ -573,20 +597,15 @@ private struct QuickMatchActionArea: View {
     let onCancel: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AccessibilityFocusState private var cancelIsFocused: Bool
+    @AccessibilityFocusState private var findIsFocused: Bool
+    @AccessibilityFocusState private var statusIsFocused: Bool
+    @FocusState private var keyboardFocus: KeyboardFocus?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(recap.firstLine)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                if !recap.secondLine.isEmpty {
-                    Text(recap.secondLine)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-            }
+            recapText
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -595,6 +614,7 @@ private struct QuickMatchActionArea: View {
                     SurroundUITestContract.AccessibilityID.quickMatchRecap
                 )
                 .accessibilityLabel(Text(verbatim: accessibleRecap))
+                .accessibilityAddTraits(.updatesFrequently)
 
             if isSearching {
                 HStack(spacing: 10) {
@@ -611,6 +631,7 @@ private struct QuickMatchActionArea: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.tint)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityFocused($statusIsFocused)
 
                     if !isCancelling {
                         Button("Cancel", role: .destructive, action: onCancel)
@@ -619,6 +640,7 @@ private struct QuickMatchActionArea: View {
                             .frame(minWidth: 44, minHeight: 44)
                             .accessibilityLabel("Cancel live game search")
                             .accessibilityFocused($cancelIsFocused)
+                            .focused($keyboardFocus, equals: .cancel)
                             .accessibilityIdentifier(
                                 SurroundUITestContract.AccessibilityID.quickMatchCancel
                             )
@@ -642,18 +664,28 @@ private struct QuickMatchActionArea: View {
                                 .quickMatchSearching
                         )
                 }
+                .focusable(isCancelling)
+                .focused($keyboardFocus, equals: .status)
             } else {
                 Button(action: onFind) {
                     Text("Find a game", comment: "New game view")
                         .font(.body.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(
+                            canFind ? Color.white : Color.secondary
+                        )
                         .frame(maxWidth: .infinity, minHeight: 50)
                 }
                 .buttonStyle(.plain)
-                .background(Color.accentColor.opacity(canFind ? 1 : 0.55))
+                .background(
+                    canFind
+                        ? Color.accentColor
+                        : Color(uiColor: .secondarySystemFill)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .disabled(!canFind)
                 .accessibilityHint(Text(verbatim: accessibleRecap))
+                .accessibilityFocused($findIsFocused)
+                .focused($keyboardFocus, equals: .find)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.quickMatchFind
                 )
@@ -672,11 +704,137 @@ private struct QuickMatchActionArea: View {
         .padding(.bottom, 12)
         .background(Color(uiColor: .systemGray6))
         .overlay(alignment: .bottom) { Divider() }
-        .onChange(of: isSearching) { _, searching in
-            if searching && !isCancelling {
-                cancelIsFocused = true
+        .onAppear {
+            if isSearching {
+                moveFocusToCurrentAction()
             }
         }
+        .onChange(of: isSearching) { _, _ in
+            moveFocusToCurrentAction()
+        }
+        .onChange(of: isCancelling) { _, _ in
+            moveFocusToCurrentAction()
+        }
+    }
+
+    @ViewBuilder
+    private var recapText: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if dynamicTypeSize.isAccessibilitySize {
+                Text(recap.firstLine)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !recap.secondLine.isEmpty {
+                    Text(recap.secondLine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text(recap.firstLine)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if !recap.secondLine.isEmpty {
+                    Text(recap.secondLine)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+        }
+    }
+
+    private func moveFocusToCurrentAction() {
+        Task { @MainActor in
+            if isCancelling {
+                statusIsFocused = true
+                keyboardFocus = .status
+            } else if isSearching {
+                cancelIsFocused = true
+                keyboardFocus = .cancel
+            } else {
+                findIsFocused = true
+                keyboardFocus = .find
+            }
+        }
+    }
+}
+
+private extension OGSQuickMatchActivityStatus {
+    var quickMatchDescription: String? {
+        switch self {
+        case .none:
+            return nil
+        case .popular:
+            return String(
+                localized: "Popular lately",
+                comment: "Quick Match option with many recent matches"
+            )
+        case .playersWaiting:
+            return String(
+                localized: "Players waiting",
+                comment: "Quick Match option currently requested by compatible players"
+            )
+        }
+    }
+}
+
+private struct QuickMatchActivityBadge: View {
+    let status: OGSQuickMatchActivityStatus
+    var size: CGFloat = 14
+
+    var body: some View {
+        Group {
+            switch status {
+            case .none:
+                EmptyView()
+            case .popular:
+                Circle()
+                    .fill(Color(uiColor: .systemBackground))
+                    .overlay {
+                        Circle()
+                            .strokeBorder(Color.secondary, lineWidth: 2)
+                    }
+            case .playersWaiting:
+                Circle()
+                    .fill(Color.green)
+                    .overlay {
+                        Circle()
+                            .strokeBorder(
+                                Color.primary.opacity(0.45),
+                                lineWidth: 1
+                            )
+                    }
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct QuickMatchActivityLegend: View {
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) {
+                legendItem(.playersWaiting)
+                legendItem(.popular)
+            }
+            VStack(alignment: .leading, spacing: 7) {
+                legendItem(.playersWaiting)
+                legendItem(.popular)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func legendItem(
+        _ status: OGSQuickMatchActivityStatus
+    ) -> some View {
+        HStack(spacing: 6) {
+            QuickMatchActivityBadge(status: status)
+            if let description = status.quickMatchDescription {
+                Text(description)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -685,51 +843,80 @@ private struct QuickMatchBoardSizeTile: View {
     let selected: Bool
     let multiple: Bool
     let disabled: Bool
+    let activity: OGSQuickMatchActivityStatus
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                BoardView(
-                    boardPosition: BoardPosition(width: size, height: size)
-                )
-                .aspectRatio(1, contentMode: .fit)
-                .opacity(selected ? 1 : 0.35)
-
-                HStack(spacing: 4) {
-                    if multiple {
-                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                            .accessibilityHidden(true)
-                    }
-                    Text(verbatim: "\(size)×\(size)")
-                        .font(.footnote.weight(.semibold))
-                }
-            }
-            .padding(7)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .foregroundStyle(selected ? Color.accentColor : .secondary)
-            .background(selected ? Color.accentColor.opacity(0.12) : .clear)
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(
-                        selected ? Color.accentColor : Color.secondary.opacity(0.25),
-                        lineWidth: selected ? 2 : 1
+        Group {
+            if multiple {
+                Toggle(
+                    isOn: Binding(
+                        get: { selected },
+                        set: { newValue in
+                            if newValue != selected {
+                                action()
+                            }
+                        }
                     )
+                ) {
+                    tileLabel
+                }
+                .toggleStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(size) by \(size)")
+                .accessibilityHint(
+                    Text(verbatim: activity.quickMatchDescription ?? "")
+                )
+            } else {
+                Button(action: action) {
+                    tileLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(size) by \(size)")
+                .accessibilityValue(activity.quickMatchDescription ?? "")
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .buttonStyle(.plain)
         .disabled(disabled)
-        .accessibilityLabel("\(size) by \(size)")
-        .accessibilityValue(
-            multiple
-                ? (selected ? String(localized: "Selected") : String(localized: "Not selected"))
-                : ""
-        )
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .opacity(disabled ? 0.5 : 1)
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(size)
         )
+    }
+
+    private var tileLabel: some View {
+        VStack(spacing: 6) {
+            BoardView(
+                boardPosition: BoardPosition(width: size, height: size)
+            )
+            .aspectRatio(1, contentMode: .fit)
+            .opacity(selected ? 1 : 0.55)
+
+            HStack(spacing: 4) {
+                if multiple {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: "\(size)×\(size)")
+                    .font(.footnote.weight(.semibold))
+            }
+        }
+        .padding(7)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .foregroundStyle(selected ? Color.accentColor : .secondary)
+        .background(selected ? Color.accentColor.opacity(0.12) : .clear)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    selected ? Color.accentColor : Color.secondary.opacity(0.25),
+                    lineWidth: selected ? 2 : 1
+                )
+        }
+        .overlay(alignment: .topTrailing) {
+            QuickMatchActivityBadge(status: activity)
+                .padding(5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -750,6 +937,7 @@ private struct QuickMatchClockButton: View {
     let state: QuickMatchClockButtonState
     let multiple: Bool
     let disabled: Bool
+    let activity: OGSQuickMatchActivityStatus
     let action: () -> Void
 
     var body: some View {
@@ -779,19 +967,22 @@ private struct QuickMatchClockButton: View {
                         )
                     )
             }
+            .overlay(alignment: .topTrailing) {
+                QuickMatchActivityBadge(status: activity, size: 12)
+                    .padding(5)
+            }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
-        .accessibilityLabel(Text(verbatim: accessibleDescription))
-        .accessibilityValue(
-            state == .alsoAccepted
-                ? String(localized: "Also accepted")
-                : (multiple
-                    ? (state.selected ? String(localized: "Selected") : String(localized: "Not selected"))
-                    : "")
+        .opacity(disabled ? 0.5 : 1)
+        .accessibilityLabel(
+            String(
+                localized: "\(preset.speed.quickMatchTitle), \(accessibleDescription)",
+                comment: "Accessible Quick Match clock including speed and values"
+            )
         )
+        .accessibilityValue(accessibilityValue)
         .accessibilityAddTraits(state.selected ? .isSelected : [])
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.quickMatchClock(
@@ -800,11 +991,37 @@ private struct QuickMatchClockButton: View {
             )
         )
     }
+
+    private var accessibilityValue: String {
+        var values = [String]()
+        if state == .alsoAccepted {
+            values.append(String(localized: "Also accepted"))
+        } else if multiple {
+            values.append(
+                state.selected
+                    ? String(localized: "Selected")
+                    : String(localized: "Not selected")
+            )
+        }
+        if let activityDescription = activity.quickMatchDescription {
+            values.append(activityDescription)
+        }
+        return ListFormatter.localizedString(byJoining: values)
+    }
+}
+
+private struct QuickMatchPopularityRequestKey: Hashable {
+    let enabled: Bool
+    let userID: Int?
+    let userRank: Double?
+    let lowerRankDifference: Int
+    let upperRankDifference: Int
 }
 
 struct QuickMatchForm: View {
     @Binding var draft: OGSQuickMatchDraft
     let eligibleOpenChallenges: [OGSSeekgraphChallenge]
+    let allowsRemoteActivity: Bool
     let activeLiveEntry: OGSAutomatchEntry?
     let cancellingEntryID: String?
     let isConnected: Bool
@@ -825,6 +1042,27 @@ struct QuickMatchForm: View {
 
     private var accessibleRecap: String {
         draft.quickMatchAccessibleRecap(userRank: ogs.user?.ranking)
+    }
+
+    private var activitySnapshot: OGSQuickMatchActivitySnapshot {
+        OGSQuickMatchActivitySnapshot(
+            availableEntries: ogs.automatchAvailableEntryByID.values,
+            popularity: ogs.quickMatchPopularityStats,
+            currentUserID: ogs.user?.id,
+            currentRank: ogs.user?.ranking,
+            lowerRankDifference: draft.lowerRankDifference,
+            upperRankDifference: draft.upperRankDifference
+        )
+    }
+
+    private var popularityRequestKey: QuickMatchPopularityRequestKey {
+        QuickMatchPopularityRequestKey(
+            enabled: allowsRemoteActivity,
+            userID: ogs.user?.id,
+            userRank: ogs.user?.ranking,
+            lowerRankDifference: draft.lowerRankDifference,
+            upperRankDifference: draft.upperRankDifference
+        )
     }
 
     private var formIsDisabled: Bool {
@@ -926,6 +1164,8 @@ struct QuickMatchForm: View {
                             }
                         }
 
+                        QuickMatchActivityLegend()
+
                         if !matchingOpenChallenges.isEmpty {
                             VStack(alignment: .leading, spacing: 14) {
                                 Button(action: onShowOpenChallenges) {
@@ -980,7 +1220,6 @@ struct QuickMatchForm: View {
                         }
                     }
                     .disabled(formIsDisabled)
-                    .opacity(formIsDisabled ? 0.55 : 1)
                 }
                 .padding()
             }
@@ -994,6 +1233,20 @@ struct QuickMatchForm: View {
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.screenQuickMatch
                 )
+        }
+        .task(id: popularityRequestKey) {
+            guard allowsRemoteActivity else { return }
+            ogs.subscribeToAutomatchAvailability()
+            guard let userRank = popularityRequestKey.userRank else { return }
+            ogs.refreshQuickMatchPopularityStats(
+                userRank: userRank,
+                lowerRankDifference: popularityRequestKey.lowerRankDifference,
+                upperRankDifference: popularityRequestKey.upperRankDifference
+            )
+        }
+        .onDisappear {
+            guard allowsRemoteActivity else { return }
+            ogs.unsubscribeFromAutomatchAvailability()
         }
     }
 
@@ -1049,6 +1302,9 @@ struct QuickMatchForm: View {
                 selected: selectedSizes.contains(size),
                 multiple: draft.mode == .multiple,
                 disabled: formIsDisabled,
+                activity: activitySnapshot.status(
+                    forBoardSize: size
+                ),
                 action: { draft.selectQuickMatchBoardSize(size) }
             )
         }
@@ -1078,7 +1334,10 @@ struct QuickMatchForm: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: speed.quickMatchSystemImage)
-                    .font(.subheadline)
+                    // This symbol is decorative. Keeping it at a stable size
+                    // preserves the aligned title column when Dynamic Type
+                    // makes the adjacent speed name much larger.
+                    .font(.system(size: 17, weight: .regular))
                     .frame(width: 20)
                     .foregroundStyle(
                         correspondenceDisabled ? .secondary : .primary
@@ -1140,12 +1399,22 @@ struct QuickMatchForm: View {
                     multiple: draft.mode == .multiple,
                     disabled: formIsDisabled
                         || (draft.mode == .multiple && speed == .correspondence),
+                    activity: activitySnapshot.status(
+                        for: speed,
+                        system: system,
+                        boardSizes: activityBoardSizes
+                    ),
                     action: {
                         draft.selectQuickMatchClock(speed: speed, system: system)
                     }
                 )
             }
         }
+    }
+
+    private var activityBoardSizes: [Int] {
+        let selected = draft.quickMatchSelectedBoardSizes
+        return selected.isEmpty ? [draft.boardSize] : selected
     }
 
     private func clockPresets(

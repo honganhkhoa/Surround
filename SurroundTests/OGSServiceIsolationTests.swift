@@ -26,7 +26,7 @@ final class OGSServiceIsolationTests: XCTestCase {
         func reconnectIfNeeded() {}
         func closeThenReconnect() { reconnectCount += 1 }
 
-        func emit(command: String, data: Any, resultCallback: OGSWebsocketResultCallback?) {
+        func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
             emittedCommands.append(command)
             resultCallback?(nil, nil)
         }
