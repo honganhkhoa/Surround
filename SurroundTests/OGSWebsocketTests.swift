@@ -201,10 +201,11 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertTrue(keyed.contains("visible"))
     }
 
-    func testConnectUsesInjectedOriginAuthenticatesAndNeverLogsJWT() throws {
+    func testConnectUsesInjectedOriginAuthenticatesWithoutListingAutomatchesAndNeverLogsJWT() throws {
         let scheduler = Scheduler()
         let factory = TransportFactory()
         let config = try makeConfig(jwt: "jwt-do-not-log", anonymous: false)
+        var currentTime = 2_000_000_000.25
         var logs = [String]()
         var events = [String]()
         let socket = OGSWebsocket(
@@ -213,6 +214,7 @@ final class OGSWebsocketTests: XCTestCase {
             transportFactory: factory.make,
             scheduler: scheduler,
             anonymousConfigLoader: { _, _ in XCTFail("A logged-in socket must not load anonymous config") },
+            currentTime: { currentTime },
             logger: { logs.append($0) }
         )
         socket.serverEventCallback = { name, _ in events.append(name) }
@@ -233,7 +235,41 @@ final class OGSWebsocketTests: XCTestCase {
         let frame = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(authentication.utf8)) as? [Any])
         XCTAssertEqual(frame[0] as? String, "authenticate")
         XCTAssertEqual((frame[1] as? [String: String])?["jwt"], "jwt-do-not-log")
-        XCTAssertTrue(
+        XCTAssertEqual(transport.sentMessages.count, 2)
+        let initialPing = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Data(transport.sentMessages[1].utf8)
+            ) as? [Any]
+        )
+        XCTAssertEqual(initialPing[0] as? String, "net/ping")
+        let initialPingTimestamp = try XCTUnwrap(
+            ((initialPing[1] as? [String: Any])?["client"] as? NSNumber)?
+                .doubleValue
+        )
+        XCTAssertEqual(
+            initialPingTimestamp,
+            2_000_000_000_250,
+            accuracy: 0.001
+        )
+
+        currentTime = 2_000_000_010.75
+        XCTAssertTrue(scheduler.runNext(after: 10))
+        let repeatingPing = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Data(transport.sentMessages[2].utf8)
+            ) as? [Any]
+        )
+        XCTAssertEqual(repeatingPing[0] as? String, "net/ping")
+        let repeatingPingTimestamp = try XCTUnwrap(
+            ((repeatingPing[1] as? [String: Any])?["client"] as? NSNumber)?
+                .doubleValue
+        )
+        XCTAssertEqual(
+            repeatingPingTimestamp,
+            2_000_000_010_750,
+            accuracy: 0.001
+        )
+        XCTAssertFalse(
             transport.sentMessages.contains(#"["automatch\/list",{}]"#)
         )
         XCTAssertFalse(logs.joined(separator: "\n").contains("jwt-do-not-log"))
@@ -462,6 +498,9 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertEqual(requestedRoot?.absoluteString, "https://beta.online-go.com")
         XCTAssertTrue(socket.authenticated)
         XCTAssertTrue(transport.sentMessages.contains { $0.contains("anonymous-jwt") })
+        XCTAssertFalse(
+            transport.sentMessages.contains(#"["automatch\/list",{}]"#)
+        )
     }
 
     private func makeConfig(jwt: String, anonymous: Bool) throws -> OGSUIConfig {

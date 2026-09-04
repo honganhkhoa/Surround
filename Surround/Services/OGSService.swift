@@ -741,6 +741,7 @@ class OGSService: ObservableObject {
     private let conditionalMoveSubmissionTimeout: TimeInterval
     private let automatchReconciliationTimeout: TimeInterval
     private let automatchConfirmationTimeout: TimeInterval
+    private let currentTime: () -> TimeInterval
 
     private struct PendingConditionalMoveSubmission {
         let expectedPlan: ConditionalMovePlan
@@ -870,7 +871,56 @@ class OGSService: ObservableObject {
     private var automatchReconciliationGeneration = UUID()
     private var automatchIDsAwaitingReplay = Set<String>()
     private var unconfirmedAutomatchEntryIDs = Set<String>()
+    private var automatchIDsPendingReconciliation = Set<String>()
     private var locallyRequestedLiveAutomatchUUID: String?
+    private var handledGameStartedNotificationIDs = Set<String>()
+    private var latestSocketAuthenticationTime: TimeInterval?
+    private var hasFreshServerClockSample = false
+    private var socketAuthenticationGeneration = UUID()
+    private var completedRealtimeGameIDsSinceAuthentication = Set<Int>()
+
+    private struct LocalAutomatchSubmissionTiming {
+        let clientTimestamp: TimeInterval
+        let serverTimestampAtSubmission: TimeInterval?
+    }
+    private var localAutomatchSubmissionTimingByUUID =
+        [String: LocalAutomatchSubmissionTiming]()
+
+    private struct PendingRealtimeGameStartedNotification {
+        let gameID: Int?
+        let timestamp: TimeInterval?
+        let receivedAtClientTime: TimeInterval
+    }
+
+    private enum RealtimeGameStartedDisposition {
+        case cancelAutomatch
+        case ignore
+        case awaitMoreEvidence
+    }
+
+    private struct OrphanRealtimeGameStartedNotification {
+        static let maximumAge: TimeInterval = 60
+        static let maximumCount = 16
+
+        let start: PendingRealtimeGameStartedNotification
+        let socketAuthenticationGeneration: UUID
+    }
+    private var orphanRealtimeGameStartedNotificationsByID =
+        [String: OrphanRealtimeGameStartedNotification]()
+
+    /// Reconnect notification replay, active games, and `automatch/list`
+    /// entries can arrive in any order. Keep them inside one authenticated
+    /// generation, then correlate starts with completions and the automatch's
+    /// server creation time before cancelling a restored search.
+    private struct PendingRealtimeGameStartedNotifications {
+        let reconciliationGeneration: UUID
+        var startsByID = [String: PendingRealtimeGameStartedNotification]()
+        var completedGameIDs = Set<Int>()
+
+        static let recencyTolerance: TimeInterval = 60
+    }
+    private var pendingRealtimeGameStartedNotifications:
+        PendingRealtimeGameStartedNotifications?
     private var wantsAutomatchAvailability = false
     private var automatchAvailabilitySubscribed = false
     private var quickMatchPopularityRequest: DataRequest?
@@ -1076,6 +1126,8 @@ class OGSService: ObservableObject {
     ///     narrowly scoped tests that must not initiate follow-up requests.
     ///   - gameResynchronizationTimeout: Time to wait for authoritative game
     ///     data after a targeted recovery before reconnecting the socket.
+    ///   - currentTime: Epoch-seconds provider used to classify replayed game
+    ///     notifications. Tests can inject a stable value.
     ///   - remoteSettings: Store for this identity's OGS remote settings. When
     ///     omitted, a store scoped to `preferences` is created automatically.
     ///   - initialState: Optional synchronous state for previews or injected
@@ -1094,6 +1146,9 @@ class OGSService: ObservableObject {
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
         automatchReconciliationTimeout: TimeInterval = 5,
         automatchConfirmationTimeout: TimeInterval = 8,
+        currentTime: @escaping () -> TimeInterval = {
+            Date().timeIntervalSince1970
+        },
         remoteSettings: OGSRemoteSetting? = nil,
         initialState: BootstrapState? = nil
     ) {
@@ -1103,6 +1158,7 @@ class OGSService: ObservableObject {
         self.conditionalMoveSubmissionTimeout = conditionalMoveSubmissionTimeout
         self.automatchReconciliationTimeout = automatchReconciliationTimeout
         self.automatchConfirmationTimeout = automatchConfirmationTimeout
+        self.currentTime = currentTime
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
         self.ogsWebsocket = ogsWebsocket
@@ -1197,6 +1253,13 @@ class OGSService: ObservableObject {
             clearSeekGraphSnapshot()
             automatchReconciliationGeneration = UUID()
             automatchIDsAwaitingReplay.removeAll()
+            pendingRealtimeGameStartedNotifications = nil
+            latestSocketAuthenticationTime = nil
+            hasFreshServerClockSample = false
+            socketAuthenticationGeneration = UUID()
+            handledGameStartedNotificationIDs.removeAll()
+            orphanRealtimeGameStartedNotificationsByID.removeAll()
+            completedRealtimeGameIDsSinceAuthentication.removeAll()
             isReconcilingAutomatches = false
             markPendingGameResynchronizationsAsEscalated()
             // The transport has gone away, so none of these subscriptions are
@@ -1204,13 +1267,25 @@ class OGSService: ObservableObject {
             self.connectedGames.removeAll()
             self.connectedWithChat.removeAll()
         case "surround/socketOpened":
+            hasFreshServerClockSample = false
+            socketAuthenticationGeneration = UUID()
+            orphanRealtimeGameStartedNotificationsByID.removeAll()
             self.reconcileDesiredGameConnections()
         case "surround/socketAuthenticated":
             // Player chat waits for authentication so Malkovich lines are not
             // exposed through an anonymous subscription.
             self.reconcileDesiredGameConnections()
+            latestSocketAuthenticationTime = currentTime()
+            socketAuthenticationGeneration = UUID()
+            handledGameStartedNotificationIDs.removeAll()
+            orphanRealtimeGameStartedNotificationsByID.removeAll()
+            completedRealtimeGameIDsSinceAuthentication.removeAll()
+            // Match the official OGS client by listing automatches for every
+            // socket identity, including anonymous configurations. Keep this
+            // in the service as the single owner of list reconciliation.
             beginAutomatchReconciliation(
-                candidates: Set(autoMatchEntryById.keys)
+                candidates: Set(autoMatchEntryById.keys),
+                queuesRealtimeGameStartedNotifications: true
             )
             reconcileAutomatchAvailabilitySubscription()
             reconcileSeekGraphSubscription()
@@ -1228,16 +1303,36 @@ class OGSService: ObservableObject {
                 preferences[.ogsUIConfig] = config
             }
         case "net/pong":
-            if let data = data as? [String: Double],
-               let clientTime = data["client"],
-               let serverTime = data["server"] {
-                let now = Date().timeIntervalSince1970 * 1000
-                ogsWebsocket.latency = now - clientTime
-                ogsWebsocket.drift = (now - ogsWebsocket.latency / 2) - serverTime
+            if let data = data as? [String: Any],
+               let clientTime = numericJSONDouble(data["client"]),
+               let serverTime = numericJSONDouble(data["server"]) {
+                let now = currentTime() * 1_000
+                let latency = now - clientTime
+                let drift = (now - latency / 2) - serverTime
+                if latency.isFinite, drift.isFinite {
+                    ogsWebsocket.latency = latency
+                    ogsWebsocket.drift = drift
+                    hasFreshServerClockSample = true
+                    if let activeLiveAutomatchEntry {
+                        reconsiderOrphanRealtimeGameStartedNotifications(
+                            for: activeLiveAutomatchEntry
+                        )
+                    }
+                }
             }
         case "active_game":
             if let activeGameData = data as? [String: Any] {
+                if let gameID = positiveInteger(activeGameData["id"]) {
+                    if activeGameData["phase"] as? String
+                        == OGSGamePhase.finished.rawValue {
+                        recordCompletedRealtimeGame(gameID)
+                    }
+                }
                 updateActiveGames(withShortGameData: activeGameData)
+            }
+        case "notification":
+            if let notification = data as? [String: Any] {
+                handleAutomatchGameLifecycleNotification(notification)
             }
         case "ui-push":
             if let data = data as? [String: Any] {
@@ -1250,9 +1345,23 @@ class OGSService: ObservableObject {
         case "automatch/entry":
             if let data = data as? [String: Any] {
                 if let automatchEntry = OGSAutomatchEntry(data) {
-                    self.autoMatchEntryById[automatchEntry.uuid] = automatchEntry
+                    var mergedEntry = automatchEntry
+                    if mergedEntry.creationTimestamp == nil {
+                        mergedEntry.creationTimestamp = self
+                            .autoMatchEntryById[automatchEntry.uuid]?
+                            .creationTimestamp
+                    }
+                    self.autoMatchEntryById[automatchEntry.uuid] = mergedEntry
+                    if !mergedEntry.isCorrespondence {
+                        self.reconsiderOrphanRealtimeGameStartedNotifications(
+                            for: mergedEntry
+                        )
+                    }
                     self.automatchIDsAwaitingReplay.remove(automatchEntry.uuid)
                     self.unconfirmedAutomatchEntryIDs.remove(automatchEntry.uuid)
+                    self.automatchIDsPendingReconciliation.remove(
+                        automatchEntry.uuid
+                    )
                     self.publishAutomatchLifecycleEvent(
                         .entry(uuid: automatchEntry.uuid)
                     )
@@ -1281,8 +1390,12 @@ class OGSService: ObservableObject {
                     if self.locallyRequestedLiveAutomatchUUID == uuid {
                         self.locallyRequestedLiveAutomatchUUID = nil
                     }
+                    self.localAutomatchSubmissionTimingByUUID.removeValue(
+                        forKey: uuid
+                    )
                     self.automatchIDsAwaitingReplay.remove(uuid)
                     self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                    self.automatchIDsPendingReconciliation.remove(uuid)
                     self.publishAutomatchLifecycleEvent(
                         .cancelled(uuid: uuid, removedCount: removedCount)
                     )
@@ -1290,8 +1403,10 @@ class OGSService: ObservableObject {
                     let removedCount = self.autoMatchEntryById.count
                     self.autoMatchEntryById.removeAll()
                     self.locallyRequestedLiveAutomatchUUID = nil
+                    self.localAutomatchSubmissionTimingByUUID.removeAll()
                     self.automatchIDsAwaitingReplay.removeAll()
                     self.unconfirmedAutomatchEntryIDs.removeAll()
+                    self.automatchIDsPendingReconciliation.removeAll()
                     self.publishAutomatchLifecycleEvent(
                         .cancelled(uuid: nil, removedCount: removedCount)
                     )
@@ -1305,8 +1420,12 @@ class OGSService: ObservableObject {
                 if requestedLocally {
                     self.locallyRequestedLiveAutomatchUUID = nil
                 }
+                self.localAutomatchSubmissionTimingByUUID.removeValue(
+                    forKey: uuid
+                )
                 self.automatchIDsAwaitingReplay.remove(uuid)
                 self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                self.automatchIDsPendingReconciliation.remove(uuid)
                 self.publishAutomatchLifecycleEvent(
                     .started(
                         uuid: uuid,
@@ -1570,10 +1689,19 @@ class OGSService: ObservableObject {
                 quickMatchPopularityRequest = nil
                 quickMatchPopularityStats = .empty
                 locallyRequestedLiveAutomatchUUID = nil
+                localAutomatchSubmissionTimingByUUID.removeAll()
+                handledGameStartedNotificationIDs.removeAll()
+                latestSocketAuthenticationTime = nil
+                hasFreshServerClockSample = false
+                socketAuthenticationGeneration = UUID()
+                orphanRealtimeGameStartedNotificationsByID.removeAll()
+                completedRealtimeGameIDsSinceAuthentication.removeAll()
                 isReconcilingAutomatches = false
                 automatchReconciliationGeneration = UUID()
                 automatchIDsAwaitingReplay.removeAll()
+                pendingRealtimeGameStartedNotifications = nil
                 unconfirmedAutomatchEntryIDs.removeAll()
+                automatchIDsPendingReconciliation.removeAll()
                 autoMatchEntryById.removeAll()
                 seekGraphConnected = false
                 seekGraphAwaitingInitialSnapshot = false
@@ -2424,6 +2552,483 @@ class OGSService: ObservableObject {
                 }
             }
         }
+    }
+
+    private func handleAutomatchGameLifecycleNotification(
+        _ notification: [String: Any]
+    ) {
+        switch notification["type"] as? String {
+        case "gameStarted":
+            cancelLiveAutomatchForGameStartedNotification(notification)
+        case "gameEnded":
+            if let gameID = realtimeGameNotificationGameID(notification) {
+                recordCompletedRealtimeGame(gameID)
+            }
+        default:
+            break
+        }
+    }
+
+    /// Match the official Quick Match client: a new non-correspondence game
+    /// retires the current live automatch even when that game started outside
+    /// this screen, such as by accepting a direct challenge. During an
+    /// authenticated replay, however, defer the decision until the bounded
+    /// reconciliation window has also observed matching completion events.
+    private func cancelLiveAutomatchForGameStartedNotification(
+        _ notification: [String: Any]
+    ) {
+        let notificationID = gameStartedNotificationID(notification)
+        if let notificationID,
+           handledGameStartedNotificationIDs.contains(notificationID) {
+            return
+        }
+
+        guard notification["speed"] as? String
+                != TimeControlSpeed.correspondence.rawValue else {
+            if let notificationID {
+                handledGameStartedNotificationIDs.insert(notificationID)
+            }
+            return
+        }
+
+        if let notificationID,
+           queueRealtimeGameStartedNotificationIfReconciling(
+            notification,
+            id: notificationID
+           ) {
+            return
+        }
+
+        // An unidentifiable notification inside authenticated replay cannot be
+        // correlated with a completion or safely deduplicated. Ignore it rather
+        // than applying historical server state to a restored search. A local
+        // confirmation reconciliation has no notification replay and must not
+        // suppress a genuine start arriving at the same time.
+        guard !isReplayingAutomatchNotifications else { return }
+
+        if let activeLiveAutomatchEntry {
+            let start = realtimeGameStartedNotification(notification)
+            switch gameStartedDisposition(
+                start,
+                relativeTo: activeLiveAutomatchEntry
+            ) {
+            case .cancelAutomatch:
+                if let notificationID {
+                    handledGameStartedNotificationIDs.insert(notificationID)
+                }
+                cancelAutomatch(entry: activeLiveAutomatchEntry)
+            case .ignore:
+                if let notificationID {
+                    handledGameStartedNotificationIDs.insert(notificationID)
+                }
+            case .awaitMoreEvidence:
+                if let notificationID {
+                    retainOrphanRealtimeGameStartedNotification(
+                        start,
+                        id: notificationID
+                    )
+                    handledGameStartedNotificationIDs.insert(notificationID)
+                }
+            }
+            return
+        }
+
+        if let notificationID {
+            retainOrphanRealtimeGameStartedNotification(
+                realtimeGameStartedNotification(notification),
+                id: notificationID
+            )
+            handledGameStartedNotificationIDs.insert(notificationID)
+        }
+    }
+
+    private func queueRealtimeGameStartedNotificationIfReconciling(
+        _ notification: [String: Any],
+        id notificationID: String
+    ) -> Bool {
+        guard isReconcilingAutomatches,
+              var pending = pendingRealtimeGameStartedNotifications,
+              pending.reconciliationGeneration
+                == automatchReconciliationGeneration else {
+            return false
+        }
+        pending.startsByID[notificationID] =
+            realtimeGameStartedNotification(notification)
+        pendingRealtimeGameStartedNotifications = pending
+        return true
+    }
+
+    private var isReplayingAutomatchNotifications: Bool {
+        guard isReconcilingAutomatches,
+              let pending = pendingRealtimeGameStartedNotifications else {
+            return false
+        }
+        return pending.reconciliationGeneration
+            == automatchReconciliationGeneration
+    }
+
+    private func recordCompletedRealtimeGame(_ gameID: Int) {
+        if latestSocketAuthenticationTime != nil {
+            completedRealtimeGameIDsSinceAuthentication.insert(gameID)
+        }
+        orphanRealtimeGameStartedNotificationsByID =
+            orphanRealtimeGameStartedNotificationsByID.filter {
+                $0.value.start.gameID != gameID
+            }
+        guard var pending = pendingRealtimeGameStartedNotifications,
+              pending.reconciliationGeneration
+                == automatchReconciliationGeneration else {
+            return
+        }
+        pending.completedGameIDs.insert(gameID)
+        pendingRealtimeGameStartedNotifications = pending
+    }
+
+    private func resolvePendingRealtimeGameStartedNotifications(
+        for reconciliationGeneration: UUID
+    ) {
+        guard let pending = pendingRealtimeGameStartedNotifications,
+              pending.reconciliationGeneration == reconciliationGeneration
+        else {
+            return
+        }
+
+        pendingRealtimeGameStartedNotifications = nil
+        handledGameStartedNotificationIDs.formUnion(pending.startsByID.keys)
+
+        guard let activeLiveAutomatchEntry else {
+            for (notificationID, start) in pending.startsByID {
+                guard start.gameID.map({
+                    !pending.completedGameIDs.contains($0)
+                }) ?? true else {
+                    continue
+                }
+                retainOrphanRealtimeGameStartedNotification(
+                    start,
+                    id: notificationID
+                )
+            }
+            return
+        }
+
+        var inconclusiveStarts =
+            [String: PendingRealtimeGameStartedNotification]()
+        let shouldCancel = pending.startsByID.contains {
+            notificationID, start in
+            if let gameID = start.gameID {
+                if pending.completedGameIDs.contains(gameID) {
+                    return false
+                }
+            }
+
+            // Server timestamps share one timebase, so their relative order is
+            // stronger evidence than device-clock recency or active-game
+            // membership. Missing ordering remains conservative during replay.
+            let applies = gameStartAppliesToAutomatch(
+                start,
+                entry: activeLiveAutomatchEntry
+            )
+            if applies == nil {
+                inconclusiveStarts[notificationID] = start
+            }
+            return applies == true
+        }
+
+        if shouldCancel {
+            cancelAutomatch(entry: activeLiveAutomatchEntry)
+        } else {
+            for (notificationID, start) in inconclusiveStarts {
+                retainOrphanRealtimeGameStartedNotification(
+                    start,
+                    id: notificationID
+                )
+            }
+        }
+    }
+
+    private func realtimeGameStartedNotification(
+        _ notification: [String: Any]
+    ) -> PendingRealtimeGameStartedNotification {
+        PendingRealtimeGameStartedNotification(
+            gameID: realtimeGameNotificationGameID(notification),
+            timestamp: realtimeGameNotificationTimestamp(notification),
+            receivedAtClientTime: currentTime()
+        )
+    }
+
+    private func retainOrphanRealtimeGameStartedNotification(
+        _ start: PendingRealtimeGameStartedNotification,
+        id notificationID: String
+    ) {
+        // Without a game ID and server start timestamp, a later entry cannot
+        // establish safe ordering and completion precedence. Keep these only
+        // within an authenticated connection.
+        guard latestSocketAuthenticationTime != nil,
+              start.gameID != nil,
+              start.timestamp != nil else {
+            return
+        }
+        pruneOrphanRealtimeGameStartedNotifications()
+        orphanRealtimeGameStartedNotificationsByID[notificationID] =
+            OrphanRealtimeGameStartedNotification(
+                start: start,
+                socketAuthenticationGeneration:
+                    socketAuthenticationGeneration
+            )
+
+        let overflow =
+            orphanRealtimeGameStartedNotificationsByID.count
+            - OrphanRealtimeGameStartedNotification.maximumCount
+        if overflow > 0 {
+            let oldestIDs = orphanRealtimeGameStartedNotificationsByID
+                .sorted {
+                    $0.value.start.receivedAtClientTime
+                        < $1.value.start.receivedAtClientTime
+                }
+                .prefix(overflow)
+                .map(\.key)
+            for id in oldestIDs {
+                orphanRealtimeGameStartedNotificationsByID.removeValue(
+                    forKey: id
+                )
+            }
+        }
+    }
+
+    private func reconsiderOrphanRealtimeGameStartedNotifications(
+        for entry: OGSAutomatchEntry
+    ) {
+        pruneOrphanRealtimeGameStartedNotifications()
+        var consumedIDs = Set<String>()
+        var shouldCancel = false
+
+        for (notificationID, orphan) in
+            orphanRealtimeGameStartedNotificationsByID {
+            if let gameID = orphan.start.gameID,
+               completedRealtimeGameIDsSinceAuthentication.contains(gameID) {
+                consumedIDs.insert(notificationID)
+                continue
+            }
+            switch gameStartedDisposition(
+                orphan.start,
+                relativeTo: entry
+            ) {
+            case .cancelAutomatch:
+                consumedIDs.insert(notificationID)
+                shouldCancel = true
+            case .ignore:
+                consumedIDs.insert(notificationID)
+            case .awaitMoreEvidence:
+                continue
+            }
+        }
+
+        for notificationID in consumedIDs {
+            orphanRealtimeGameStartedNotificationsByID.removeValue(
+                forKey: notificationID
+            )
+        }
+        if shouldCancel {
+            cancelAutomatch(entry: entry)
+        }
+    }
+
+    private func pruneOrphanRealtimeGameStartedNotifications() {
+        let now = currentTime()
+        orphanRealtimeGameStartedNotificationsByID =
+            orphanRealtimeGameStartedNotificationsByID.filter { orphan in
+                guard orphan.value.socketAuthenticationGeneration
+                        == socketAuthenticationGeneration else {
+                    return false
+                }
+                let age = now - orphan.value.start.receivedAtClientTime
+                return age >= 0
+                    && age
+                        <= OrphanRealtimeGameStartedNotification.maximumAge
+            }
+    }
+
+    private func gameStartedDisposition(
+        _ start: PendingRealtimeGameStartedNotification,
+        relativeTo entry: OGSAutomatchEntry
+    ) -> RealtimeGameStartedDisposition {
+        if let gameID = start.gameID,
+           completedRealtimeGameIDsSinceAuthentication.contains(gameID) {
+            return .ignore
+        }
+
+        if let applies = gameStartAppliesToAutomatch(start, entry: entry) {
+            return applies ? .cancelAutomatch : .ignore
+        }
+
+        // Preserve direct-challenge behavior for a timestamp-less live push
+        // tied to a request submitted by this process. A timestamped push still
+        // has to pass relative ordering or adjusted recency checks.
+        if start.timestamp == nil {
+            return locallyRequestedLiveAutomatchUUID == entry.uuid
+                    || latestSocketAuthenticationTime == nil
+                ? .cancelAutomatch
+                : .ignore
+        }
+
+        // Outside the bounded replay window, use recency only as a fallback.
+        // Authentication time is a client wall-clock value, so it is comparable
+        // with a server notification only after a pong from this connection has
+        // supplied the raw client-minus-server drift.
+        guard hasFreshServerClockSample,
+              let latestSocketAuthenticationTime else {
+            return .awaitMoreEvidence
+        }
+        return gameStartedTimestampIsRecent(
+            start.timestamp,
+            sinceClientTimestamp: latestSocketAuthenticationTime
+        ) ? .cancelAutomatch : .ignore
+    }
+
+    /// Returns whether a start is ordered at or after the automatch boundary.
+    /// `nil` means the ordering cannot be established safely.
+    private func gameStartAppliesToAutomatch(
+        _ start: PendingRealtimeGameStartedNotification,
+        entry: OGSAutomatchEntry
+    ) -> Bool? {
+        guard let startTimestamp = start.timestamp,
+              let creationTimestamp = automatchCreationTimestamp(for: entry)
+        else {
+            return nil
+        }
+        return startTimestamp >= creationTimestamp
+    }
+
+    private func automatchCreationTimestamp(
+        for entry: OGSAutomatchEntry
+    ) -> TimeInterval? {
+        if let serverEntryTimestamp = entry.creationTimestamp {
+            return serverEntryTimestamp
+        }
+        guard let localTiming =
+                localAutomatchSubmissionTimingByUUID[entry.uuid] else {
+            return nil
+        }
+        if let serverTimestampAtSubmission =
+                localTiming.serverTimestampAtSubmission {
+            return serverTimestampAtSubmission
+        }
+        return serverTime(forClientTimestamp: localTiming.clientTimestamp)
+    }
+
+    private func currentServerTime() -> TimeInterval? {
+        serverTime(forClientTimestamp: currentTime())
+    }
+
+    private func gameStartedTimestampIsRecent(
+        _ timestamp: TimeInterval?,
+        sinceClientTimestamp lowerBound: TimeInterval
+    ) -> Bool {
+        guard let timestamp,
+              let lowerBoundServerTime = serverTime(
+                forClientTimestamp: lowerBound
+              ),
+              let currentServerTime = currentServerTime() else {
+            return false
+        }
+        let tolerance =
+            PendingRealtimeGameStartedNotifications.recencyTolerance
+        return timestamp >= lowerBoundServerTime - tolerance
+            && timestamp <= currentServerTime + tolerance
+    }
+
+    private func serverTime(
+        forClientTimestamp clientTimestamp: TimeInterval
+    ) -> TimeInterval? {
+        guard hasFreshServerClockSample else { return nil }
+        return clientTimestamp - ogsWebsocket.drift / 1_000
+    }
+
+    private func realtimeGameNotificationGameID(
+        _ notification: [String: Any]
+    ) -> Int? {
+        positiveInteger(notification["game_id"])
+    }
+
+    /// Strictly parses a positive JSON integer without accepting bridged
+    /// booleans, fractions, or values that overflow the platform `Int`.
+    /// Internal visibility keeps boundary behavior directly testable.
+    func positiveInteger(_ rawValue: Any?) -> Int? {
+        if let gameID = rawValue as? NSNumber {
+            guard CFGetTypeID(gameID) != CFBooleanGetTypeID() else {
+                return nil
+            }
+            let double = gameID.doubleValue
+            let integer = gameID.int64Value
+            guard double.isFinite,
+                  double.rounded(.towardZero) == double,
+                  Double(integer) == double,
+                  integer > 0,
+                  integer <= Int64(Int.max) else {
+                return nil
+            }
+            return Int(integer)
+        }
+        if let value = rawValue as? String,
+           let gameID = Int(value),
+           gameID > 0 {
+            return gameID
+        }
+        return nil
+    }
+
+    private func realtimeGameNotificationTimestamp(
+        _ notification: [String: Any]
+    ) -> TimeInterval? {
+        for key in ["timestamp", "time"] {
+            let rawValue: Double?
+            if let number = notification[key] as? NSNumber,
+               CFGetTypeID(number) != CFBooleanGetTypeID() {
+                rawValue = number.doubleValue
+            } else if let string = notification[key] as? String {
+                rawValue = Double(string)
+            } else {
+                rawValue = nil
+            }
+
+            guard var timestamp = rawValue,
+                  timestamp.isFinite,
+                  timestamp > 0 else {
+                continue
+            }
+
+            // OGS notifications have used both seconds and milliseconds. Be
+            // tolerant of still-higher precision without accepting a future
+            // seconds value as an ancient notification.
+            while timestamp > 10_000_000_000 {
+                timestamp /= 1_000
+            }
+            return timestamp
+        }
+        return nil
+    }
+
+    private func numericJSONDouble(_ rawValue: Any?) -> Double? {
+        guard let number = rawValue as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue.isFinite else {
+            return nil
+        }
+        return number.doubleValue
+    }
+
+    private func gameStartedNotificationID(
+        _ notification: [String: Any]
+    ) -> String? {
+        if let identifier = notification["id"] as? String,
+           !identifier.isEmpty {
+            return identifier
+        }
+        if let identifier = notification["id"] as? NSNumber,
+           CFGetTypeID(identifier) != CFBooleanGetTypeID() {
+            return identifier.stringValue
+        }
+        return nil
     }
         
     func ensureConnect(thenExecute callback: (() -> ())? = nil) {
@@ -3859,6 +4464,14 @@ class OGSService: ObservableObject {
         if isLiveSearch {
             locallyRequestedLiveAutomatchUUID = entry.uuid
         }
+        let submissionClientTime = currentTime()
+        localAutomatchSubmissionTimingByUUID[entry.uuid] =
+            LocalAutomatchSubmissionTiming(
+                clientTimestamp: submissionClientTime,
+                serverTimestampAtSubmission: serverTime(
+                    forClientTimestamp: submissionClientTime
+                )
+            )
         // Keep outbound entries in the same source used by banners and the
         // management screen. A missing server echo is not proof of rejection;
         // the entry remains until an explicit event or a bounded list replay
@@ -3866,30 +4479,70 @@ class OGSService: ObservableObject {
         autoMatchEntryById[entry.uuid] = entry
         unconfirmedAutomatchEntryIDs.insert(entry.uuid)
         ogsWebsocket.emit(command: "automatch/find_match", data: entry.jsonObject)
-        scheduleAutomatchConfirmationCheck()
+        scheduleAutomatchConfirmationCheck(for: entry.uuid)
         return true
     }
 
-    private func scheduleAutomatchConfirmationCheck() {
+    private func scheduleAutomatchConfirmationCheck(for uuid: String) {
         let confirmationTimeout = automatchConfirmationTimeout
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(confirmationTimeout))
-            guard let self,
-                  !self.unconfirmedAutomatchEntryIDs.isEmpty,
-                  self.ogsWebsocket.opened,
-                  self.ogsWebsocket.authenticated,
-                  !self.isReconcilingAutomatches else {
+            do {
+                try await Task.sleep(for: .seconds(confirmationTimeout))
+            } catch {
                 return
             }
-            self.beginAutomatchReconciliation(
-                candidates: self.unconfirmedAutomatchEntryIDs
-            )
+            self?.handleAutomatchConfirmationTimeout(for: uuid)
         }
     }
 
-    private func beginAutomatchReconciliation(candidates: Set<String>) {
+    /// Handles one request's confirmation deadline. Keeping the UUID explicit
+    /// prevents an older request's timer from acting on a newer request that
+    /// happens to be the current member of the global unconfirmed set.
+    ///
+    /// Internal visibility provides a clock-free seam for lifecycle tests.
+    func handleAutomatchConfirmationTimeout(for uuid: String) {
+        guard unconfirmedAutomatchEntryIDs.contains(uuid),
+              autoMatchEntryById[uuid] != nil,
+              ogsWebsocket.opened,
+              ogsWebsocket.authenticated else {
+            return
+        }
+        automatchIDsPendingReconciliation.insert(uuid)
+        beginPendingAutomatchReconciliationIfPossible()
+    }
+
+    private func beginPendingAutomatchReconciliationIfPossible() {
+        guard ogsWebsocket.opened,
+              ogsWebsocket.authenticated,
+              !isReconcilingAutomatches else {
+            return
+        }
+
+        automatchIDsPendingReconciliation.formIntersection(
+            unconfirmedAutomatchEntryIDs
+        )
+        automatchIDsPendingReconciliation.formIntersection(
+            Set(autoMatchEntryById.keys)
+        )
+        guard !automatchIDsPendingReconciliation.isEmpty else { return }
+
+        let candidates = automatchIDsPendingReconciliation
+        automatchIDsPendingReconciliation.removeAll()
+        beginAutomatchReconciliation(candidates: candidates)
+    }
+
+    private func beginAutomatchReconciliation(
+        candidates: Set<String>,
+        queuesRealtimeGameStartedNotifications: Bool = false
+    ) {
         let reconciliationGeneration = UUID()
         automatchReconciliationGeneration = reconciliationGeneration
+        pendingRealtimeGameStartedNotifications =
+            queuesRealtimeGameStartedNotifications
+            ? PendingRealtimeGameStartedNotifications(
+                reconciliationGeneration: reconciliationGeneration
+            )
+            : nil
         automatchIDsAwaitingReplay = candidates.intersection(
             Set(autoMatchEntryById.keys)
         )
@@ -3917,6 +4570,10 @@ class OGSService: ObservableObject {
                     continue
                 }
                 self.unconfirmedAutomatchEntryIDs.remove(uuid)
+                self.automatchIDsPendingReconciliation.remove(uuid)
+                self.localAutomatchSubmissionTimingByUUID.removeValue(
+                    forKey: uuid
+                )
                 if self.locallyRequestedLiveAutomatchUUID == uuid {
                     self.locallyRequestedLiveAutomatchUUID = nil
                 }
@@ -3924,6 +4581,10 @@ class OGSService: ObservableObject {
                     .notFoundAfterReconciliation(uuid: uuid)
                 )
             }
+            self.resolvePendingRealtimeGameStartedNotifications(
+                for: reconciliationGeneration
+            )
+            self.beginPendingAutomatchReconciliationIfPossible()
         }
     }
     

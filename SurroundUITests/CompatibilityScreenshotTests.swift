@@ -206,6 +206,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                     "Byo-Yomi: 5m–10m + 5×30s",
                     "5 Kyu - 2 Dan",
                     "No preference: Accept any handicap setting.",
+                    "No rules preference",
                 ]
             ),
             (
@@ -764,10 +765,6 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
              .finishedGamePlayback, .publicGameSpectator, .gameChat:
             waitForGameSceneContent(scene, in: app)
         case .quickMatch:
-            element(
-                SurroundUITestContract.AccessibilityID.screenQuickMatch,
-                in: app
-            )
             element(
                 SurroundUITestContract.AccessibilityID.quickMatchRecap,
                 in: app

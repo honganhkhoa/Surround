@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreFoundation
 
 enum OGSAutomatchClockSystem: String, Codable, CaseIterable, Hashable {
     case fischer
@@ -180,6 +181,11 @@ struct OGSAutomatchEntry: Codable, Equatable {
     var handicap: OGSAutomatchHandicapPreference
     var uuid: String
 
+    /// When OGS created this search, normalized from the wire timestamp to Unix
+    /// epoch seconds. It is retained locally for lifecycle correlation, but is
+    /// never sent in `automatch/find_match`.
+    var creationTimestamp: TimeInterval?
+
     /// Classification metadata retained from an inbound wire entry.
     ///
     /// OGS can add a clock system before this client knows how to display it.
@@ -187,6 +193,11 @@ struct OGSAutomatchEntry: Codable, Equatable {
     /// recognized speed still tells us whether the request belongs under Live
     /// or Correspondence in Waiting Games.
     private var inboundSpeedClassificationHint: TimeControlSpeed?
+
+    /// Whether inbound criteria were only partially understood. The entry is
+    /// still retained so it remains cancellable, but a locked editor must not
+    /// present the surviving subset as the complete server request.
+    fileprivate var inboundQuickMatchDisplayWasDegraded: Bool
 
     private enum CodingKeys: String, CodingKey {
         case sizeSpeedOptions
@@ -201,7 +212,9 @@ struct OGSAutomatchEntry: Codable, Equatable {
         case timeControlSpeed
 
         // Local persistence only; this is never included in `jsonObject`.
+        case creationTimestamp
         case inboundSpeedClassificationHint
+        case inboundQuickMatchDisplayWasDegraded
     }
 
     init(
@@ -210,7 +223,8 @@ struct OGSAutomatchEntry: Codable, Equatable {
         upperRankDifference: Int = 3,
         rules: OGSAutomatchRulesPreference = .quickMatchDefault,
         handicap: OGSAutomatchHandicapPreference = .quickMatchDefault,
-        uuid: String = UUID().uuidString.lowercased()
+        uuid: String = UUID().uuidString.lowercased(),
+        creationTimestamp: TimeInterval? = nil
     ) {
         self.sizeSpeedOptions = sizeSpeedOptions
         self.lowerRankDifference = lowerRankDifference
@@ -218,7 +232,9 @@ struct OGSAutomatchEntry: Codable, Equatable {
         self.rules = rules
         self.handicap = handicap
         self.uuid = uuid
+        self.creationTimestamp = creationTimestamp
         inboundSpeedClassificationHint = nil
+        inboundQuickMatchDisplayWasDegraded = false
     }
 
     /// Compatibility adapter for the pre-redesign Quick Match screen.
@@ -262,7 +278,9 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 value: .enabled
             )
         uuid = UUID().uuidString.lowercased()
+        creationTimestamp = nil
         inboundSpeedClassificationHint = nil
+        inboundQuickMatchDisplayWasDegraded = false
     }
 
     init?(_ jsonObject: [String: Any]) {
@@ -307,7 +325,8 @@ struct OGSAutomatchEntry: Codable, Equatable {
             )
             : nil
 
-        let rulesObject = jsonObject["rules"] as? [String: Any]
+        let rawRules = jsonObject["rules"]
+        let rulesObject = rawRules as? [String: Any]
         let rulesCondition = Self.enumValue(
             OGSAutomatchCondition.self,
             in: rulesObject,
@@ -321,7 +340,8 @@ struct OGSAutomatchEntry: Codable, Equatable {
             defaultValue: .japanese
         )
 
-        let handicapObject = jsonObject["handicap"] as? [String: Any]
+        let rawHandicap = jsonObject["handicap"]
+        let handicapObject = rawHandicap as? [String: Any]
         let handicapCondition = Self.enumValue(
             OGSAutomatchCondition.self,
             in: handicapObject,
@@ -353,9 +373,42 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 condition: handicapCondition,
                 value: handicapValue
             ),
-            uuid: uuid
+            uuid: uuid,
+            creationTimestamp: Self.creationTimestamp(
+                fromWireValue: jsonObject["timestamp"]
+            )
         )
         self.inboundSpeedClassificationHint = inboundSpeedClassificationHint
+        self.inboundQuickMatchDisplayWasDegraded =
+            options.count != rawOptions.count
+            || Self.inboundContainerWasDegraded(rawRules)
+            || Self.inboundContainerWasDegraded(rawHandicap)
+            || Self.inboundEnumWasDegraded(
+                OGSAutomatchCondition.self,
+                in: handicapObject,
+                forKey: "condition"
+            )
+            || Self.inboundEnumWasDegraded(
+                OGSAutomatchHandicapValue.self,
+                in: handicapObject,
+                forKey: "value"
+            )
+            || Self.inboundEnumWasDegraded(
+                OGSAutomatchCondition.self,
+                in: rulesObject,
+                forKey: "condition"
+            )
+            || Self.inboundEnumWasDegraded(
+                OGSAutomatchRuleSet.self,
+                in: rulesObject,
+                forKey: "value"
+            )
+            || Self.inboundIntegerWasDegraded(
+                jsonObject["lower_rank_diff"]
+            )
+            || Self.inboundIntegerWasDegraded(
+                jsonObject["upper_rank_diff"]
+            )
     }
 
     init(from decoder: Decoder) throws {
@@ -382,10 +435,19 @@ struct OGSAutomatchEntry: Codable, Equatable {
                 forKey: .handicap
             ) ?? .quickMatchDefault
             uuid = try container.decode(String.self, forKey: .uuid)
+            creationTimestamp = try container.decodeIfPresent(
+                TimeInterval.self,
+                forKey: .creationTimestamp
+            )
             inboundSpeedClassificationHint = try container.decodeIfPresent(
                 TimeControlSpeed.self,
                 forKey: .inboundSpeedClassificationHint
             )
+            inboundQuickMatchDisplayWasDegraded = try container
+                .decodeIfPresent(
+                    Bool.self,
+                    forKey: .inboundQuickMatchDisplayWasDegraded
+                ) ?? false
             return
         }
 
@@ -415,7 +477,9 @@ struct OGSAutomatchEntry: Codable, Equatable {
             value: legacySpeed == .blitz ? .disabled : .enabled
         )
         uuid = try container.decode(String.self, forKey: .uuid)
+        creationTimestamp = nil
         inboundSpeedClassificationHint = nil
+        inboundQuickMatchDisplayWasDegraded = false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -427,9 +491,19 @@ struct OGSAutomatchEntry: Codable, Equatable {
         try container.encode(handicap, forKey: .handicap)
         try container.encode(uuid, forKey: .uuid)
         try container.encodeIfPresent(
+            creationTimestamp,
+            forKey: .creationTimestamp
+        )
+        try container.encodeIfPresent(
             inboundSpeedClassificationHint,
             forKey: .inboundSpeedClassificationHint
         )
+        if inboundQuickMatchDisplayWasDegraded {
+            try container.encode(
+                true,
+                forKey: .inboundQuickMatchDisplayWasDegraded
+            )
+        }
 
         // Keep the active legacy key readable by older app versions. Their
         // synthesized decoder ignores the richer keys above.
@@ -453,6 +527,11 @@ struct OGSAutomatchEntry: Codable, Equatable {
         timeControlSpeed == .correspondence
     }
 
+    /// Whether every inbound setting was decoded and is safe to summarize.
+    var quickMatchDisplayIsComplete: Bool {
+        !inboundQuickMatchDisplayWasDegraded
+    }
+
     var jsonObject: [String: Any] {
         [
             "uuid": uuid,
@@ -465,13 +544,41 @@ struct OGSAutomatchEntry: Codable, Equatable {
     }
 
     private static func integer(_ value: Any?, defaultValue: Int) -> Int {
-        if let integer = value as? Int {
-            return integer
+        guard let number = numericValue(value) else { return defaultValue }
+        let double = number.doubleValue
+        let integer = number.int64Value
+        guard
+            double.isFinite,
+            double.rounded(.towardZero) == double,
+            Double(integer) == double,
+            integer >= Int64(Int.min),
+            integer <= Int64(Int.max)
+        else {
+            return defaultValue
         }
-        if let number = value as? NSNumber {
-            return number.intValue
+        return Int(integer)
+    }
+
+    private static func creationTimestamp(
+        fromWireValue value: Any?
+    ) -> TimeInterval? {
+        guard var timestamp = numericValue(value)?.doubleValue,
+              timestamp.isFinite,
+              timestamp > 0 else {
+            return nil
         }
-        return defaultValue
+        while timestamp > 10_000_000_000 {
+            timestamp /= 1_000
+        }
+        return timestamp
+    }
+
+    private static func numericValue(_ value: Any?) -> NSNumber? {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
+            return nil
+        }
+        return number
     }
 
     private static func speedClassification(
@@ -511,6 +618,37 @@ struct OGSAutomatchEntry: Codable, Equatable {
             return defaultValue
         }
         return value
+    }
+
+    private static func inboundEnumWasDegraded<Value>(
+        _ type: Value.Type,
+        in object: [String: Any]?,
+        forKey key: String
+    ) -> Bool where Value: RawRepresentable, Value.RawValue == String {
+        // A missing whole container is valid legacy data. Once the container
+        // is present, however, both nested fields are required for a complete
+        // display of the server-side request.
+        guard let object else { return false }
+        guard let rawValue = object[key] else { return true }
+        guard let stringValue = rawValue as? String else { return true }
+        return Value(rawValue: stringValue) == nil
+    }
+
+    private static func inboundContainerWasDegraded(_ value: Any?) -> Bool {
+        guard let value else { return false }
+        return !(value is [String: Any])
+    }
+
+    private static func inboundIntegerWasDegraded(_ value: Any?) -> Bool {
+        guard let value else { return false }
+        guard let number = numericValue(value) else { return true }
+        let double = number.doubleValue
+        let integer = number.int64Value
+        return !double.isFinite
+            || double.rounded(.towardZero) != double
+            || Double(integer) != double
+            || integer < Int64(Int.min)
+            || integer > Int64(Int.max)
     }
 }
 
@@ -680,6 +818,225 @@ struct OGSQuickMatchClockSelection: Codable, Hashable {
         Self.allRealtime.firstIndex(of: self) ?? Int.max
     }
 }
+
+extension OGSQuickMatchHandicapPreference {
+    var quickMatchTitle: String {
+        switch self {
+        case .required:
+            return String(localized: "Required")
+        case .standard:
+            return String(localized: "Standard")
+        case .disabled:
+            return String(localized: "Disabled")
+        }
+    }
+
+    var quickMatchDescription: String {
+        switch self {
+        case .required:
+            return String(localized: "Require handicaps between players of different ranks.")
+        case .standard:
+            return String(localized: "Use handicaps by default, but accept games with handicaps off.")
+        case .disabled:
+            return String(localized: "Never play with handicap stones.")
+        }
+    }
+
+    var quickMatchPickerDescription: String {
+        switch self {
+        case .required:
+            return String(localized: "Use handicaps when ranks differ.")
+        case .standard:
+            return String(localized: "Prefer handicaps; allow even games.")
+        case .disabled:
+            return String(localized: "No handicap stones.")
+        }
+    }
+}
+
+extension OGSAutomatchClockSystem {
+    var quickMatchTitle: String {
+        switch self {
+        case .fischer:
+            return String(localized: "Fischer")
+        case .byoyomi:
+            return String(localized: "Byo-Yomi")
+        }
+    }
+}
+
+extension TimeControlSpeed {
+    /// Quick Match distinguishes Rapid from Live even though the rest of the
+    /// app intentionally groups both values under `localizedString()`.
+    var quickMatchTitle: String {
+        switch self {
+        case .blitz:
+            return String(localized: "Blitz")
+        case .rapid:
+            return String(localized: "Rapid")
+        case .live:
+            return String(localized: "Live")
+        case .correspondence:
+            return String(localized: "Correspondence")
+        }
+    }
+
+    var quickMatchSystemImage: String {
+        switch self {
+        case .blitz:
+            return "bolt"
+        case .rapid:
+            return "hare"
+        case .live:
+            return "clock"
+        case .correspondence:
+            return "calendar"
+        }
+    }
+}
+
+extension OGSQuickMatchClockPreset {
+    var quickMatchShortDescription: String {
+        switch timeControl {
+        case .Fischer(let initialTime, let timeIncrement, _):
+            return "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement))"
+        case .ByoYomi(let mainTime, let periods, let periodTime):
+            return "\(durationString(seconds: mainTime)) + \(periods)×\(durationString(seconds: periodTime))"
+        default:
+            return timeControl.shortDescription
+        }
+    }
+
+    var quickMatchAccessibleDescription: String {
+        switch timeControl {
+        case .Fischer(let initialTime, let timeIncrement, _):
+            return String(
+                localized: "\(system.quickMatchTitle), \(durationString(seconds: initialTime, longFormat: true)) plus \(durationString(seconds: timeIncrement, longFormat: true)) per move"
+            )
+        case .ByoYomi(let mainTime, let periods, let periodTime):
+            return String(
+                localized: "\(system.quickMatchTitle), \(durationString(seconds: mainTime, longFormat: true)) plus \(periods) periods of \(durationString(seconds: periodTime, longFormat: true))"
+            )
+        default:
+            return "\(system.quickMatchTitle), \(timeControl.shortDescription)"
+        }
+    }
+
+    static func quickMatchDisplayDescription(
+        for presets: [OGSQuickMatchClockPreset]
+    ) -> String {
+        guard let first = presets.first else { return "" }
+        switch first.timeControl {
+        case .Fischer:
+            let values = presets.compactMap { preset -> (Int, Int)? in
+                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
+                    return nil
+                }
+                return (initial, increment)
+            }
+            guard values.count == presets.count,
+                  Set(values.map(\.1)).count == 1,
+                  let increment = values.first?.1 else {
+                return first.quickMatchShortDescription
+            }
+            return "\(quickMatchDurationRange(values.map(\.0))) + \(durationString(seconds: increment))"
+        case .ByoYomi:
+            let values = presets.compactMap { preset -> (Int, Int, Int)? in
+                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
+                    return nil
+                }
+                return (main, periods, period)
+            }
+            guard values.count == presets.count,
+                  Set(values.map(\.1)).count == 1,
+                  Set(values.map(\.2)).count == 1,
+                  let periods = values.first?.1,
+                  let period = values.first?.2 else {
+                return first.quickMatchShortDescription
+            }
+            return "\(quickMatchDurationRange(values.map(\.0))) + \(periods)×\(durationString(seconds: period))"
+        default:
+            return first.quickMatchShortDescription
+        }
+    }
+
+    static func quickMatchAccessibleDescription(
+        for presets: [OGSQuickMatchClockPreset]
+    ) -> String {
+        guard let first = presets.first else { return "" }
+        switch first.timeControl {
+        case .Fischer:
+            let values = presets.compactMap { preset -> (Int, Int)? in
+                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
+                    return nil
+                }
+                return (initial, increment)
+            }
+            guard values.count == presets.count,
+                  Set(values.map(\.1)).count == 1,
+                  let increment = values.first?.1 else {
+                return first.quickMatchAccessibleDescription
+            }
+            let initial = quickMatchDurationRange(
+                values.map(\.0),
+                longFormat: true,
+                spoken: true
+            )
+            return String(
+                localized: "\(first.system.quickMatchTitle), \(initial) plus \(durationString(seconds: increment, longFormat: true)) per move"
+            )
+        case .ByoYomi:
+            let values = presets.compactMap { preset -> (Int, Int, Int)? in
+                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
+                    return nil
+                }
+                return (main, periods, period)
+            }
+            guard values.count == presets.count,
+                  Set(values.map(\.1)).count == 1,
+                  Set(values.map(\.2)).count == 1,
+                  let periods = values.first?.1,
+                  let period = values.first?.2 else {
+                return first.quickMatchAccessibleDescription
+            }
+            let main = quickMatchDurationRange(
+                values.map(\.0),
+                longFormat: true,
+                spoken: true
+            )
+            return String(
+                localized: "\(first.system.quickMatchTitle), \(main) plus \(periods) periods of \(durationString(seconds: period, longFormat: true))"
+            )
+        default:
+            return first.quickMatchAccessibleDescription
+        }
+    }
+
+    private static func quickMatchDurationRange(
+        _ values: [Int],
+        longFormat: Bool = false,
+        spoken: Bool = false
+    ) -> String {
+        let values = Array(Set(values)).sorted()
+        guard let first = values.first, let last = values.last else { return "" }
+        let firstDescription = durationString(
+            seconds: first,
+            longFormat: longFormat
+        )
+        guard first != last else { return firstDescription }
+        let lastDescription = durationString(
+            seconds: last,
+            longFormat: longFormat
+        )
+        return spoken
+            ? String(
+                localized: "\(firstDescription) to \(lastDescription)",
+                comment: "Spoken range between two Quick Match clock durations"
+            )
+            : "\(firstDescription)–\(lastDescription)"
+    }
+}
+
 
 /// Persisted Quick Match form state. It intentionally excludes submission UUIDs.
 struct OGSQuickMatchDraft: Codable, Equatable {
@@ -899,6 +1256,392 @@ struct OGSQuickMatchDraft: Codable, Equatable {
 
     private static func clampedRankDifference(_ value: Int) -> Int {
         min(max(value, 0), 9)
+    }
+}
+
+extension OGSQuickMatchDraft {
+    /// Whether this draft can create another request while a correspondence
+    /// search is already active. Multiple mode only exposes real-time clocks.
+    var quickMatchIsCorrespondenceOnly: Bool {
+        switch mode {
+        case .exact, .flexible:
+            return speed == .correspondence
+        case .multiple:
+            return false
+        }
+    }
+}
+
+/// A Waiting Games summary of the exact criteria OGS is matching.
+///
+/// Unlike the locked Quick Match editor projection below, this projection can
+/// represent older known preferences and arbitrary size/clock tuple pairings.
+/// It only rejects entries whose wire data was degraded or whose surviving
+/// values cannot be displayed truthfully.
+struct AutomatchEntryPresentation: Equatable {
+    /// This is a numeric-safety limit, not OGS's current product limit. The
+    /// editor currently offers 0...9, while restored server entries may use a
+    /// wider future range and should remain truthfully displayable.
+    private static let maximumSafelyDisplayableRankDifference = Int.max / 2
+
+    let boardAndSpeed: String
+    let clockLines: [String]
+    let rankRange: String
+    let handicap: String
+    let rules: String?
+
+    init?(
+        entry: OGSAutomatchEntry,
+        userRank: Double?,
+        locale: Locale = .current
+    ) {
+        let options = entry.sizeSpeedOptions
+        let supportedSizes = Set(OGSQuickMatchClockPreset.supportedBoardSizes)
+        guard entry.quickMatchDisplayIsComplete,
+              (0...Self.maximumSafelyDisplayableRankDifference)
+                .contains(entry.lowerRankDifference),
+              (0...Self.maximumSafelyDisplayableRankDifference)
+                .contains(entry.upperRankDifference),
+              !options.isEmpty,
+              options.allSatisfy({ option in
+                  supportedSizes.contains(option.size)
+                      && OGSQuickMatchClockPreset.preset(
+                          boardSize: option.size,
+                          speed: option.speed,
+                          system: option.system
+                      ) != nil
+              }) else {
+            return nil
+        }
+
+        let allSizes = Set(options.map(\.size))
+        let sizes = allSizes.sorted()
+        let speeds = Self.sortedSpeeds(Set(options.map(\.speed)))
+        let sizeText = Self.localizedList(
+            sizes.map { "\($0)×\($0)" },
+            locale: locale
+        )
+        let speedText = Self.localizedList(
+            speeds.map(\.quickMatchTitle),
+            locale: locale
+        )
+        boardAndSpeed = sizes.count == 1 && speeds.count == 1
+            ? String(
+                localized: "\(sizeText) \(speedText)",
+                locale: locale,
+                comment: "Board size followed by game speed in a waiting Quick Match request."
+            )
+            : String(
+                localized: "\(sizeText) · \(speedText)",
+                locale: locale,
+                comment: "Board sizes followed by game speeds in a waiting Quick Match request."
+            )
+
+        let selections = Set(options.map {
+            OGSQuickMatchClockSelection(speed: $0.speed, system: $0.system)
+        })
+        .sorted(by: Self.clockSelectionPrecedes)
+        clockLines = selections.map { selection in
+            let matchingSizes = Set(
+                options.lazy
+                    .filter {
+                        $0.speed == selection.speed
+                            && $0.system == selection.system
+                    }
+                    .map(\.size)
+            )
+            .sorted()
+            // Every tuple was validated above, so each matching size has a
+            // known preset and can be summarized without a lossy fallback.
+            let presets = matchingSizes.compactMap {
+                OGSQuickMatchClockPreset.preset(
+                    boardSize: $0,
+                    speed: selection.speed,
+                    system: selection.system
+                )
+            }
+            let clockNameParts = [
+                Set(matchingSizes) == allSizes
+                    ? nil
+                    : Self.localizedList(
+                        matchingSizes.map { "\($0)×\($0)" },
+                        locale: locale
+                    ),
+                speeds.count > 1 ? selection.speed.quickMatchTitle : nil,
+                selection.system.quickMatchTitle,
+            ]
+            .compactMap { $0 }
+            let clockName = clockNameParts.joined(separator: " · ")
+            let value = OGSQuickMatchClockPreset
+                .quickMatchDisplayDescription(for: presets)
+            return String(
+                localized: "\(clockName): \(value)",
+                locale: locale,
+                comment: "Clock name followed by its values in a waiting Quick Match request."
+            )
+        }
+
+        if let userRank {
+            let lower = RankUtils.formattedRank(
+                userRank - Double(entry.lowerRankDifference),
+                longFormat: true
+            )
+            let upper = RankUtils.formattedRank(
+                userRank + Double(entry.upperRankDifference),
+                longFormat: true
+            )
+            rankRange = String(
+                localized: "\(lower) - \(upper)",
+                locale: locale,
+                comment: "Lowest and highest opponent ranks accepted by a Quick Match request."
+            )
+        } else {
+            rankRange = String(
+                localized: "\(entry.lowerRankDifference) ranks below to \(entry.upperRankDifference) ranks above",
+                locale: locale
+            )
+        }
+
+        switch (entry.handicap.condition, entry.handicap.value) {
+        case (.required, .enabled):
+            handicap = Self.handicapDescription(.required, locale: locale)
+        case (.preferred, .enabled):
+            handicap = Self.handicapDescription(.standard, locale: locale)
+        case (.required, .disabled):
+            handicap = Self.handicapDescription(.disabled, locale: locale)
+        case (.preferred, .disabled):
+            handicap = String(
+                localized: "No handicap preferred: Accept games with or without handicap stones.",
+                locale: locale,
+                comment: "A waiting Quick Match request prefers an even game but accepts either handicap setting."
+            )
+        case (.noPreference, .enabled), (.noPreference, .disabled):
+            handicap = String(
+                localized: "No preference: Accept any handicap setting.",
+                locale: locale,
+                comment: "Fallback handicap description for an active Quick Match request without a recognized preference."
+            )
+        }
+
+        if entry.rules == .quickMatchDefault {
+            rules = nil
+        } else {
+            let ruleSet = Self.ruleSetTitle(entry.rules.value, locale: locale)
+            switch entry.rules.condition {
+            case .required:
+                rules = String(
+                    localized: "Rules: \(ruleSet)",
+                    locale: locale,
+                    comment: "Ruleset required by a waiting Quick Match request."
+                )
+            case .preferred:
+                rules = String(
+                    localized: "Preferred rules: \(ruleSet)",
+                    locale: locale,
+                    comment: "Ruleset preferred, but not required, by a waiting Quick Match request."
+                )
+            case .noPreference:
+                rules = String(
+                    localized: "No rules preference",
+                    locale: locale,
+                    comment: "A waiting Quick Match request accepts any supported ruleset."
+                )
+            }
+        }
+    }
+
+    private static func handicapDescription(
+        _ preference: OGSQuickMatchHandicapPreference,
+        locale: Locale
+    ) -> String {
+        String(
+            localized: "\(preference.quickMatchTitle): \(preference.quickMatchDescription)",
+            locale: locale,
+            comment: "Quick Match preference name followed by its values or explanation in an active-request card."
+        )
+    }
+
+    private static func ruleSetTitle(
+        _ ruleSet: OGSAutomatchRuleSet,
+        locale: Locale
+    ) -> String {
+        switch ruleSet {
+        case .japanese:
+            return String(localized: "Japanese", locale: locale, comment: "rules name")
+        case .chinese:
+            return String(localized: "Chinese", locale: locale, comment: "rules name")
+        case .aga:
+            return String(localized: "AGA", locale: locale, comment: "rules name")
+        case .korean:
+            return String(localized: "Korean", locale: locale, comment: "rules name")
+        case .newZealand:
+            return String(localized: "New Zealand", locale: locale, comment: "rules name")
+        case .ing:
+            return String(localized: "Ing SST", locale: locale, comment: "rules name")
+        }
+    }
+
+    private static func localizedList(
+        _ values: [String],
+        locale: Locale
+    ) -> String {
+        let formatter = ListFormatter()
+        formatter.locale = locale
+        return formatter.string(from: values) ?? values.joined(separator: ", ")
+    }
+
+    private static func sortedSpeeds(
+        _ speeds: Set<TimeControlSpeed>
+    ) -> [TimeControlSpeed] {
+        let order: [TimeControlSpeed] = [
+            .blitz, .rapid, .live, .correspondence,
+        ]
+        return speeds.sorted {
+            (order.firstIndex(of: $0) ?? .max)
+                < (order.firstIndex(of: $1) ?? .max)
+        }
+    }
+
+    private static func clockSelectionPrecedes(
+        _ lhs: OGSQuickMatchClockSelection,
+        _ rhs: OGSQuickMatchClockSelection
+    ) -> Bool {
+        let speeds = sortedSpeeds(Set([lhs.speed, rhs.speed]))
+        if lhs.speed != rhs.speed {
+            return speeds.first == lhs.speed
+        }
+        let systems = OGSAutomatchClockSystem.allCases
+        return (systems.firstIndex(of: lhs.system) ?? .max)
+            < (systems.firstIndex(of: rhs.system) ?? .max)
+    }
+}
+
+/// A read-only projection of the criteria OGS is actively matching.
+///
+/// This is intentionally separate from the persisted editor draft: an entry
+/// restored after reconnect, or created by another client, may not match the
+/// user's last local selections. It also must not use the legacy migration
+/// initializer, which deliberately broadens a one-clock entry for editing.
+struct OGSActiveQuickMatchPresentation: Equatable {
+    let draft: OGSQuickMatchDraft
+
+    init?(entry: OGSAutomatchEntry) {
+        let options = entry.sizeSpeedOptions
+        let supportedSizes = Set(OGSQuickMatchClockPreset.supportedBoardSizes)
+        guard entry.quickMatchDisplayIsComplete,
+              entry.rules == .quickMatchDefault,
+              (0...9).contains(entry.lowerRankDifference),
+              (0...9).contains(entry.upperRankDifference),
+              let preferred = options.first,
+              options.allSatisfy({ option in
+                  supportedSizes.contains(option.size)
+                      && OGSQuickMatchClockPreset.preset(
+                          boardSize: option.size,
+                          speed: option.speed,
+                          system: option.system
+                      ) != nil
+              }) else {
+            return nil
+        }
+
+        let distinctOptions = Set(options)
+        let boardSizes = Set(options.map(\.size))
+        let clocks = Set(options.map {
+            OGSQuickMatchClockSelection(speed: $0.speed, system: $0.system)
+        })
+        let speeds = Set(clocks.map(\.speed))
+        let systems = Set(clocks.map(\.system))
+
+        let mode: OGSQuickMatchMode
+        if distinctOptions.count == 1 {
+            mode = .exact
+        } else if boardSizes.count == 1,
+                  clocks.count == 2,
+                  speeds.count == 1,
+                  preferred.speed.isRealtime,
+                  systems == Set(OGSAutomatchClockSystem.allCases) {
+            mode = .flexible
+        } else {
+            // Multiple exposes the board-size/clock Cartesian product. Reject
+            // arbitrary pairings instead of displaying broader criteria than
+            // the server is actually matching.
+            let representedOptions = Set(boardSizes.flatMap { size in
+                clocks.map { clock in
+                    OGSAutomatchSizeSpeedOption(
+                        size: size,
+                        speed: clock.speed,
+                        system: clock.system
+                    )
+                }
+            })
+            guard clocks.allSatisfy({ $0.speed.isRealtime }),
+                  distinctOptions == representedOptions else {
+                return nil
+            }
+            mode = .multiple
+        }
+
+        let handicap: OGSQuickMatchHandicapPreference
+        switch (entry.handicap.condition, entry.handicap.value) {
+        case (.required, .enabled):
+            handicap = .required
+        case (.preferred, .enabled):
+            handicap = .standard
+        case (.required, .disabled):
+            handicap = .disabled
+        default:
+            return nil
+        }
+
+        draft = OGSQuickMatchDraft(
+            mode: mode,
+            boardSize: preferred.size,
+            speed: preferred.speed,
+            system: preferred.system,
+            multipleBoardSizes: boardSizes,
+            multipleClocks: clocks,
+            handicap: handicap,
+            lowerRankDifference: entry.lowerRankDifference,
+            upperRankDifference: entry.upperRankDifference
+        )
+    }
+}
+
+struct QuickMatchRequestFailure: Identifiable, Equatable {
+    enum Operation: Equatable {
+        case start
+        case cancel
+        case cancelTimedOut
+    }
+
+    let operation: Operation
+    let entry: OGSAutomatchEntry
+
+    var id: String {
+        "\(entry.uuid)-\(String(describing: operation))"
+    }
+
+    var isCancellationFailure: Bool {
+        switch operation {
+        case .cancel, .cancelTimedOut:
+            return true
+        case .start:
+            return false
+        }
+    }
+
+    /// Applies a server terminal event to an alert without clearing an
+    /// unrelated request failure.
+    func retainedAfterCancellationTerminal(uuid: String?) -> Self? {
+        guard isCancellationFailure,
+              uuid == nil || entry.uuid == uuid else {
+            return self
+        }
+        return nil
+    }
+
+    func canRetryCancellation(activeEntryIDs: Set<String>) -> Bool {
+        isCancellationFailure && activeEntryIDs.contains(entry.uuid)
     }
 }
 

@@ -210,7 +210,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 app: newGameApp
             )
             element(
-                SurroundUITestContract.AccessibilityID.screenQuickMatch,
+                SurroundUITestContract.AccessibilityID.quickMatchRecap,
                 in: newGameApp
             )
             capture("07-quick-match", in: newGameApp)

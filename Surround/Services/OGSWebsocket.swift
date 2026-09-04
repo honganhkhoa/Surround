@@ -478,6 +478,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     private let scheduler: OGSWebsocketScheduling
     private let anonymousConfigLoader: OGSAnonymousConfigLoader
     private let callbackTimeout: TimeInterval
+    private let currentTime: () -> TimeInterval
     private let logger: (String) -> Void
 
     private var transport: OGSWebsocketTransport?
@@ -535,6 +536,8 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     ///   - connectTimeout: Time before an unopened transport is treated as failed.
     ///   - maxReconnectDelay: Upper bound for exponential reconnect backoff.
     ///   - callbackTimeout: Time before an unanswered callback fails locally.
+    ///   - currentTime: Epoch-seconds provider used to timestamp `net/ping`.
+    ///     Tests can inject a stable value shared with pong processing.
     ///   - logger: Diagnostic sink. Frame descriptions passed by this class are
     ///     credential-redacted; custom loggers must not add raw payload capture.
     ///
@@ -550,6 +553,9 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         connectTimeout: TimeInterval = 15,
         maxReconnectDelay: TimeInterval = 30,
         callbackTimeout: TimeInterval = 30,
+        currentTime: @escaping () -> TimeInterval = {
+            Date().timeIntervalSince1970
+        },
         logger: @escaping (String) -> Void = { print($0) }
     ) {
         self.rootURL = rootURL
@@ -561,6 +567,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         self.connectTimeout = connectTimeout
         self.maxReconnectDelay = maxReconnectDelay
         self.callbackTimeout = callbackTimeout
+        self.currentTime = currentTime
         self.logger = logger
         super.init()
     }
@@ -623,9 +630,6 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         if let config {
             authenticatedUserID = config.user.id
             emit(command: "authenticate", data: ["jwt": config.userJwt])
-            if config.user.anonymous == false {
-                emit(command: "automatch/list", data: [String: Any]())
-            }
             scheduler.async {
                 self.authenticated = true
                 self.serverEventCallback?("surround/socketAuthenticated", nil)
@@ -747,23 +751,32 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
             self.opened = true
             self.log("Opened")
 
-            self.pingCancellable = self.scheduler.scheduleRepeating(every: 10) {
-                self.emit(
-                    command: "net/ping",
-                    data: [
-                        "client": Date().timeIntervalSince1970 * 1000,
-                        "drift": self.drift,
-                        "latency": self.latency
-                    ]
-                )
-            }
+            // Goban sends the first ping as soon as a transport opens. Besides
+            // keeping the clock estimate responsive, this gives authenticated
+            // replay reconciliation a current-connection server clock sample
+            // before its bounded window expires.
             self.authenticateWebsocket()
+            self.sendPing()
+            self.pingCancellable = self.scheduler.scheduleRepeating(every: 10) {
+                self.sendPing()
+            }
 
             let tasks = self.onConnectTasks
             self.onConnectTasks = []
             tasks.forEach { $0() }
             self.serverEventCallback?("surround/socketOpened", nil)
         }
+    }
+
+    private func sendPing() {
+        emit(
+            command: "net/ping",
+            data: [
+                "client": currentTime() * 1_000,
+                "drift": drift,
+                "latency": latency,
+            ]
+        )
     }
 
     func websocketTransport(_ transport: OGSWebsocketTransport, didReceive message: String) {

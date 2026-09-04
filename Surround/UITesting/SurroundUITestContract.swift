@@ -373,7 +373,6 @@ enum SurroundUITestContract {
         static let screenBrowser = "screen.browser"
         static let screenNewGame = "screen.newGame"
         static let screenOpenChallenges = "screen.openChallenges"
-        static let screenQuickMatch = "screen.quickMatch"
         static let screenCustomGame = "screen.customGame"
         static let screenGameOptions = "screen.gameOptions"
         static let screenPreferredSettings = "screen.preferredSettings"

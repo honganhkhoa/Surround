@@ -2336,6 +2336,1648 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.autoMatchEntryById.count, 2)
     }
 
+    func testRealtimeGameStartedNotificationCancelsLiveAutomatch() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "live-search-before-direct-game")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        socket.deliver(name: "notification", data: [
+            "id": "game-started-902",
+            "type": "gameStarted",
+            "game_id": 902,
+            "speed": "rapid",
+        ])
+
+        let cancellations = socket.emissions.filter {
+            $0.command == "automatch/cancel"
+        }
+        XCTAssertEqual(cancellations.count, 1)
+        XCTAssertEqual(
+            (try XCTUnwrap(cancellations.first?.data as? [String: Any]))["uuid"]
+                as? String,
+            liveEntry.uuid
+        )
+        socket.deliver(name: "automatch/start", data: [
+            "uuid": liveEntry.uuid,
+            "game_id": 902,
+        ])
+        XCTAssertNil(service.activeLiveAutomatchEntry)
+    }
+
+    func testCurrentStartDuringConfirmationReconciliationCancelsLiveSearch() {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 60,
+            automatchConfirmationTimeout: 60
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "live-search-awaiting-confirmation")
+
+        XCTAssertTrue(service.findAutomatch(entry: liveEntry))
+        service.handleAutomatchConfirmationTimeout(for: liveEntry.uuid)
+        XCTAssertTrue(service.isReconcilingAutomatches)
+
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-during-confirmation-list",
+            "type": "gameStarted",
+            "game_id": 915,
+            "speed": "rapid",
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testServerEchoWithoutTimestampKeepsLocalSubmissionBoundary() {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchConfirmationTimeout: 60,
+            currentTime: 2_000_000_120
+        )
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_120_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "local-entry-with-timestampless-echo")
+
+        XCTAssertTrue(service.findAutomatch(entry: liveEntry))
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        socket.deliver(name: "notification", data: [
+            "id": "start-before-local-submission",
+            "type": "gameStarted",
+            "game_id": 926,
+            "speed": "rapid",
+            "timestamp": 1_999_999_999,
+        ])
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        socket.deliver(name: "notification", data: [
+            "id": "start-after-local-submission",
+            "type": "gameStarted",
+            "game_id": 927,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testTimestampLessDuplicatePreservesKnownServerCreationTimestamp()
+        throws
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "timestamped-entry-then-duplicate")
+
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                service.autoMatchEntryById[liveEntry.uuid]?.creationTimestamp
+            ),
+            1_999_999_900,
+            accuracy: 0.001
+        )
+
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        XCTAssertEqual(
+            try XCTUnwrap(
+                service.autoMatchEntryById[liveEntry.uuid]?.creationTimestamp
+            ),
+            1_999_999_900,
+            accuracy: 0.001
+        )
+    }
+
+    func testRealtimeGameStartedNotificationBeforeRestoredEntryCancelsOnce()
+        async throws
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let notification: [String: Any] = [
+            "id": "game-started-before-restored-entry",
+            "type": "gameStarted",
+            "game_id": 908,
+            "speed": "rapid",
+            // Exercise the millisecond form used by some OGS notifications.
+            "timestamp": 2_000_000_000_000 as NSNumber,
+        ]
+        let correspondenceEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-correspondence-entry")
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-live-entry-after-notification")
+        let reconciliationFinished = expectation(
+            description: "Current game start replay was reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_000_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+        socket.deliver(name: "notification", data: notification)
+        socket.deliver(name: "notification", data: notification)
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        // A correspondence replay must not consume the pending realtime start.
+        socket.deliver(
+            name: "automatch/entry",
+            data: correspondenceEntry.jsonObject
+        )
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_999
+            )
+        )
+        socket.deliver(name: "notification", data: notification)
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let cancellations = socket.emissions.filter {
+            $0.command == "automatch/cancel"
+        }
+        XCTAssertEqual(cancellations.count, 1)
+        XCTAssertEqual(
+            (try XCTUnwrap(cancellations.first?.data as? [String: Any]))["uuid"]
+                as? String,
+            liveEntry.uuid
+        )
+    }
+
+    func testCompletedHistoricalGameBeforeRestoredEntryDoesNotCancelSearch()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "search-restored-after-finished-game")
+        let reconciliationFinished = expectation(
+            description: "Historical completed game replay was reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: [
+            "id": "historical-start-before-end",
+            "type": "gameStarted",
+            "game_id": 911,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(name: "notification", data: [
+            "id": "historical-end-before-entry",
+            "type": "gameEnded",
+            "game_id": 911,
+            "timestamp": 1_900_000_120,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testGameEndedAfterRestoredEntrySuppressesPendingCurrentStart() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "search-restored-before-game-ended")
+        let reconciliationFinished = expectation(
+            description: "Late completion in notification replay was observed"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: [
+            "id": "start-before-restored-entry",
+            "type": "gameStarted",
+            "game_id": 912,
+            "speed": "blitz",
+            "time": 2_000_000_000,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "end-after-restored-entry",
+            "type": "gameEnded",
+            "game_id": 912,
+            "time": 2_000_000_001,
+        ])
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testColdLaunchOldUnfinishedStartDoesNotCancelRestoredSearch() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "cold-launch-restored-search")
+        let reconciliationFinished = expectation(
+            description: "Cold-launch notification replay was reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: [
+            "id": "old-unfinished-game-start",
+            "type": "gameStarted",
+            "game_id": 913,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_950_000_000
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testStalePreDisconnectActiveGameDoesNotOverrideHistoricalStartAge()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let staleGameID = 917
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: staleGameID,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+        XCTAssertNotNil(service.activeGames[staleGameID])
+        socket.deliver(name: "surround/socketClosed")
+        XCTAssertNotNil(
+            service.activeGames[staleGameID],
+            "Active games remain visible while the socket reconnects."
+        )
+
+        let reconciliationFinished = expectation(
+            description: "Historical start ignored after reconnect"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+        let restoredEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "search-restored-with-stale-active-game")
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: [
+            "id": "old-start-for-stale-active-game",
+            "type": "gameStarted",
+            "game_id": staleGameID,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                restoredEntry,
+                creationTimestamp: 1_950_000_000
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, restoredEntry.uuid)
+    }
+
+    func testCurrentActiveGameDoesNotOverrideNewerAutomatchTimestamp()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let activeGameID = 918
+        let restoredEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "search-restored-with-current-active-game")
+        let reconciliationFinished = expectation(
+            description: "Current active game reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: activeGameID,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "old-start-for-current-active-game",
+            "type": "gameStarted",
+            "game_id": activeGameID,
+            "speed": "blitz",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                restoredEntry,
+                creationTimestamp: 1_950_000_000
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, restoredEntry.uuid)
+    }
+
+    func testActiveGameNewerThanAutomatchCancelsDespiteAbsoluteAge() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let activeGameID = 924
+        let restoredEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "older-search-with-current-active-game")
+        let reconciliationFinished = expectation(
+            description: "Ordered active game replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: activeGameID,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "newer-start-for-current-active-game",
+            "type": "gameStarted",
+            "game_id": activeGameID,
+            "speed": "blitz",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                restoredEntry,
+                creationTimestamp: 1_800_000_000
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testLateActiveGameStartOlderThanAutomatchDoesNotCancel() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let activeGameID = 919
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: activeGameID,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "late-search-with-current-active-game")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_950_000_000
+            )
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "late-old-start-for-current-active-game",
+            "type": "gameStarted",
+            "game_id": activeGameID,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testLateActiveGameStartNewerThanAutomatchCancels() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let activeGameID = 925
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: activeGameID,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "older-search-with-late-active-start")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_800_000_000
+            )
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "late-newer-start-for-current-active-game",
+            "type": "gameStarted",
+            "game_id": activeGameID,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testLateHistoricalStartAfterReplayWindowDoesNotCancelSearch() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay window finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_000_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "search-before-late-history")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "late-historical-game-start",
+            "type": "gameStarted",
+            "game_id": 914,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(name: "notification", data: [
+            "id": "invalid-future-game-start",
+            "type": "gameStarted",
+            "game_id": 916,
+            "speed": "rapid",
+            "timestamp": 2_100_000_000,
+        ])
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testPendingGameStartedNotificationExpiresBeforeNewLocalSearch() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 60
+        )
+        let notification: [String: Any] = [
+            "id": "game-started-without-restored-entry",
+            "type": "gameStarted",
+            "game_id": 909,
+            "speed": "blitz",
+        ]
+        let reconciliationFinished = expectation(
+            description: "Authenticated automatch replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: notification)
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let localEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "new-local-search-after-reconciliation")
+        XCTAssertTrue(service.findAutomatch(entry: localEntry))
+
+        socket.deliver(name: "notification", data: notification)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry, localEntry)
+    }
+
+    func testSocketCloseDiscardsPendingGameStartedNotificationGeneration()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let notification: [String: Any] = [
+            "id": "game-started-across-reconnect",
+            "type": "gameStarted",
+            "game_id": 910,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ]
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "live-entry-after-second-authentication")
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: notification)
+        socket.deliver(name: "surround/socketClosed")
+
+        let reconciliationFinished = expectation(
+            description: "Second authenticated replay was reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_000_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+        socket.deliver(name: "notification", data: notification)
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testReplayWithoutCreationTimestampKeepsSearchEvenForActiveGame()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-search-without-ordering")
+        let reconciliationFinished = expectation(
+            description: "Ambiguous replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(id: 920, phase: "play", timePerMove: 60)
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "active-start-without-search-ordering",
+            "type": "gameStarted",
+            "game_id": 920,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ])
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testFreshPongCorrectsDeviceClockForLateNotificationRecency() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished before late push"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_120_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "late-search-with-clock-skew")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-with-clock-skew",
+            "type": "gameStarted",
+            "game_id": 921,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+        XCTAssertEqual(socket.drift, 120_000, accuracy: 0.001)
+    }
+
+    func testFreshPongCorrectsSlowDeviceClockForLateNotificationRecency()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 1_999_999_880
+        )
+        let reconciliationFinished = expectation(
+            description: "Replay finished on a slow device clock"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+        socket.deliver(name: "net/pong", data: [
+            "client": 1_999_999_880_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "late-search-with-slow-clock")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-with-slow-clock",
+            "type": "gameStarted",
+            "game_id": 923,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+        XCTAssertEqual(socket.drift, -120_000, accuracy: 0.001)
+    }
+
+    func testLateNotificationWithoutCurrentConnectionPongIsConservative()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished without a pong"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "late-search-without-clock-sample")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "ambiguous-start-without-clock-sample",
+            "type": "gameStarted",
+            "game_id": 922,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testKnownNewerServerOrderingCancelsWithoutPongOrActiveGame()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished without a pong"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "ordered-search-without-clock-sample")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+        socket.deliver(name: "notification", data: [
+            "id": "ordered-start-without-clock-sample",
+            "type": "gameStarted",
+            "game_id": 928,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testLateServerEntryReconsidersNewerOrphanGameStart() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished before game start"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+        socket.deliver(name: "notification", data: [
+            "id": "orphan-start-before-entry",
+            "type": "gameStarted",
+            "game_id": 929,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ])
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "entry-after-current-start")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testLateServerEntryIgnoresOlderAndCompletedOrphanStarts() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished before orphan events"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+        socket.deliver(name: "notification", data: [
+            "id": "old-orphan-start-before-entry",
+            "type": "gameStarted",
+            "game_id": 930,
+            "speed": "rapid",
+            "timestamp": 1_900_000_000,
+        ])
+        socket.deliver(name: "notification", data: [
+            "id": "completed-orphan-start-before-entry",
+            "type": "gameStarted",
+            "game_id": 931,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ])
+        socket.deliver(name: "notification", data: [
+            "id": "completed-orphan-end-before-entry",
+            "type": "gameEnded",
+            "game_id": 931,
+            "timestamp": 2_000_000_001,
+        ])
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "entry-after-old-and-completed-starts")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_950_000_000
+            )
+        )
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
+    }
+
+    func testReconnectReplaysHandledOrphanBeforeRestoredEntry() async throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01
+        )
+        let firstReconciliationFinished = expectation(
+            description: "Initial authenticated replay finished"
+        )
+        let firstCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in firstReconciliationFinished.fulfill() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [firstReconciliationFinished], timeout: 1)
+        firstCancellable.cancel()
+
+        let notification: [String: Any] = [
+            "id": "orphan-replayed-after-reconnect",
+            "type": "gameStarted",
+            "game_id": 932,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ]
+        socket.deliver(name: "notification", data: notification)
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        socket.deliver(name: "surround/socketClosed")
+        let secondReconciliationFinished = expectation(
+            description: "Reconnect replay correlated restored entry"
+        )
+        let secondCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in secondReconciliationFinished.fulfill() }
+        defer { secondCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "notification", data: notification)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "entry-restored-after-orphan-replay")
+        socket.deliver(
+            name: "automatch/entry",
+            data: inboundAutomatchPayload(
+                liveEntry,
+                creationTimestamp: 1_999_999_900
+            )
+        )
+
+        await fulfillment(of: [secondReconciliationFinished], timeout: 1)
+
+        let cancellations = socket.emissions.filter {
+            $0.command == "automatch/cancel"
+        }
+        XCTAssertEqual(cancellations.count, 1)
+        XCTAssertEqual(
+            (try XCTUnwrap(cancellations.first?.data as? [String: Any]))["uuid"]
+                as? String,
+            liveEntry.uuid
+        )
+    }
+
+    func testFreshPongReconsidersInconclusiveStartForLocalSearch() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 60,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished before local search"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "local-search-before-first-pong")
+        XCTAssertTrue(service.findAutomatch(entry: liveEntry))
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-before-first-pong",
+            "type": "gameStarted",
+            "game_id": 933,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_120_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testFreshPongUsesRecencyForTimestampLessRestoredEntry() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Authenticated replay finished before restored entry"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-search-before-first-pong")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-for-timestampless-restored-entry",
+            "type": "gameStarted",
+            "game_id": 934,
+            "speed": "rapid",
+            "timestamp": 2_000_000_001,
+        ])
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_120_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testJSONNumberOneTimestampIsNotRejectedAsBoolean() async throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 1
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "numeric-one-timestamp-search")
+        let reconciliationFinished = expectation(
+            description: "Numeric-one timestamp replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(id: 2, phase: "play", timePerMove: 60)
+        )
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"numeric-one-time","type":"gameStarted","game_id":2,"speed":"blitz","timestamp":1}"#
+            )
+        )
+        var entryPayload = liveEntry.jsonObject
+        // Keep this deliberately in seconds: values this close to the epoch
+        // are ambiguous with the server's usual millisecond wire form, while
+        // this fixture specifically exercises JSON NSNumber(1) vs Bool.
+        entryPayload["timestamp"] = 0.5 as NSNumber
+        socket.deliver(name: "automatch/entry", data: entryPayload)
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testJSONBooleanTimestampIsRejected() async throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 1
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "boolean-timestamp-search")
+        let reconciliationFinished = expectation(
+            description: "Boolean timestamp replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(id: 2, phase: "play", timePerMove: 60)
+        )
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"boolean-time","type":"gameStarted","game_id":2,"speed":"blitz","timestamp":true}"#
+            )
+        )
+        var entryPayload = liveEntry.jsonObject
+        entryPayload["timestamp"] = 0.5 as NSNumber
+        socket.deliver(name: "automatch/entry", data: entryPayload)
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+    }
+
+    func testJSONNumberOneGameIDCorrelatesCompletion() async throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "numeric-one-game-id-search")
+        let reconciliationFinished = expectation(
+            description: "Numeric-one game completion replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000 as NSNumber,
+            "server": 2_000 as NSNumber,
+        ])
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"numeric-one-game-start","type":"gameStarted","game_id":1,"speed":"rapid","timestamp":2}"#
+            )
+        )
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"numeric-one-game-end","type":"gameEnded","game_id":1,"timestamp":2}"#
+            )
+        )
+        var entryPayload = liveEntry.jsonObject
+        entryPayload["timestamp"] = 1 as NSNumber
+        socket.deliver(name: "automatch/entry", data: entryPayload)
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+    }
+
+    func testJSONBooleanGameIDDoesNotCorrelateCompletionForGameOne()
+        async throws
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2
+        )
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "boolean-game-id-search")
+        let reconciliationFinished = expectation(
+            description: "Boolean game ID completion replay finished"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        socket.deliver(name: "surround/socketAuthenticated")
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"numeric-game-start-before-boolean-end","type":"gameStarted","game_id":1,"speed":"rapid","timestamp":2}"#
+            )
+        )
+        socket.deliver(
+            name: "notification",
+            data: try jsonDictionary(
+                #"{"id":"boolean-game-end","type":"gameEnded","game_id":true,"timestamp":2}"#
+            )
+        )
+        var entryPayload = liveEntry.jsonObject
+        entryPayload["timestamp"] = 1 as NSNumber
+        socket.deliver(name: "automatch/entry", data: entryPayload)
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+    }
+
+    func testPositiveIntegerRejectsJSONBridgeAndOverflowEdges() throws {
+        let service = makeService(socket: FakeWebsocket())
+        let values = try jsonDictionary(
+            #"{"one":1,"zero":0,"max":9223372036854775807,"overflow":9223372036854775808,"fraction":1.5,"boolean":true}"#
+        )
+
+        XCTAssertEqual(service.positiveInteger(values["one"]), 1)
+        XCTAssertNil(service.positiveInteger(values["zero"]))
+        XCTAssertEqual(service.positiveInteger(values["max"]), Int.max)
+        XCTAssertNil(service.positiveInteger(values["overflow"]))
+        XCTAssertNil(service.positiveInteger(values["fraction"]))
+        XCTAssertNil(service.positiveInteger(values["boolean"]))
+    }
+
+    func testCorrespondenceGameStartedNotificationDoesNotCancelLiveAutomatch() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "live-search-kept-for-correspondence")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        socket.deliver(
+            name: "notification",
+            data: [
+                "id": "game-started-903",
+                "type": "gameStarted",
+                "game_id": 903,
+                "speed": "correspondence",
+            ]
+        )
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry, liveEntry)
+    }
+
+    func testActiveGameReplayDoesNotCancelLiveAutomatch() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "live-search-during-reconnect")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+
+        socket.deliver(
+            name: "active_game",
+            data: makeShortGameData(
+                id: 905,
+                phase: "play",
+                timePerMove: 60
+            )
+        )
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry, liveEntry)
+        XCTAssertNotNil(service.activeGames[905])
+    }
+
+    func testAutomatchStartBeforeGameStartedNotificationDoesNotCancelAgain() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "automatch-starts-first")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "automatch/start", data: [
+            "uuid": liveEntry.uuid,
+            "game_id": 906,
+        ])
+
+        socket.deliver(name: "notification", data: [
+            "id": "game-started-906",
+            "type": "gameStarted",
+            "game_id": 906,
+            "speed": "rapid",
+        ])
+
+        XCTAssertTrue(
+            socket.emissions.allSatisfy { $0.command != "automatch/cancel" }
+        )
+        XCTAssertNil(service.activeLiveAutomatchEntry)
+    }
+
+    func testReplayedGameStartedNotificationDoesNotCancelNewerAutomatch() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let firstEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .blitz,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "search-before-notification")
+        let newerEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "search-after-notification")
+        let notification: [String: Any] = [
+            "id": "replayed-game-started",
+            "type": "gameStarted",
+            "game_id": 907,
+            "speed": "rapid",
+        ]
+
+        socket.deliver(name: "automatch/entry", data: firstEntry.jsonObject)
+        socket.deliver(name: "notification", data: notification)
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+        socket.deliver(name: "automatch/cancel", data: [
+            "uuid": firstEntry.uuid,
+        ])
+        socket.deliver(name: "automatch/entry", data: newerEntry.jsonObject)
+
+        socket.deliver(name: "notification", data: notification)
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
+        XCTAssertEqual(service.activeLiveAutomatchEntry, newerEntry)
+    }
+
     func testFindAutomatchWaitsForReconnectReconciliation() {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
@@ -2358,6 +4000,70 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertFalse(service.findAutomatch(entry: entry))
         XCTAssertEqual(socket.emissions.count, emissionCount)
         XCTAssertTrue(service.autoMatchEntryById.isEmpty)
+    }
+
+    func testAnonymousAuthenticationRequestsAutomatchListExactlyOnce() {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+
+        XCTAssertNil(socket.authenticationConfigProvider())
+
+        socket.deliver(name: "surround/socketAuthenticated")
+
+        XCTAssertTrue(service.isReconcilingAutomatches)
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/list" }.count,
+            1
+        )
+    }
+
+    func testPongBeforeDelayedAnonymousAuthenticationRemainsFresh()
+        async
+    {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            currentTime: 2_000_000_120
+        )
+        let reconciliationFinished = expectation(
+            description: "Delayed anonymous authentication reconciled"
+        )
+        let reconciliationCancellable = service.$isReconcilingAutomatches
+            .dropFirst()
+            .first { !$0 }
+            .sink { _ in reconciliationFinished.fulfill() }
+        defer { reconciliationCancellable.cancel() }
+
+        XCTAssertNil(socket.authenticationConfigProvider())
+        socket.openSocket()
+        socket.deliver(name: "net/pong", data: [
+            "client": 2_000_000_120_000 as NSNumber,
+            "server": 2_000_000_000_000 as NSNumber,
+        ])
+        socket.markAuthenticated()
+
+        await fulfillment(of: [reconciliationFinished], timeout: 1)
+
+        let liveEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "restored-after-delayed-anonymous-auth")
+        socket.deliver(name: "automatch/entry", data: liveEntry.jsonObject)
+        socket.deliver(name: "notification", data: [
+            "id": "current-start-after-delayed-anonymous-auth",
+            "type": "gameStarted",
+            "game_id": 927,
+            "speed": "rapid",
+            "timestamp": 2_000_000_000,
+        ])
+
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/cancel" }.count,
+            1
+        )
     }
 
     func testAutomatchLifecycleRemovesIndividualAndAllSearches() throws {
@@ -2482,8 +4188,16 @@ final class OGSServiceEventTests: XCTestCase {
             automatchConfirmationTimeout: 60
         )
         var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let reconciled = expectation(
+            description: "Missing automatch entry reconciled"
+        )
         let lifecycleCancellable = service.automatchLifecycleEvents.sink {
             lifecycleEvents.append($0.kind)
+            if $0.kind == .notFoundAfterReconciliation(
+                uuid: "missing-replayed-entry"
+            ) {
+                reconciled.fulfill()
+            }
         }
         defer { lifecycleCancellable.cancel() }
         let entry = OGSQuickMatchDraft(
@@ -2495,7 +4209,7 @@ final class OGSServiceEventTests: XCTestCase {
 
         socket.deliver(name: "automatch/entry", data: entry.jsonObject)
         socket.deliver(name: "surround/socketAuthenticated")
-        try? await Task.sleep(for: .seconds(0.05))
+        await fulfillment(of: [reconciled], timeout: 1)
 
         XCTAssertNil(service.autoMatchEntryById[entry.uuid])
         XCTAssertFalse(service.isReconcilingAutomatches)
@@ -2513,8 +4227,16 @@ final class OGSServiceEventTests: XCTestCase {
             automatchConfirmationTimeout: 0.01
         )
         var lifecycleEvents = [OGSAutomatchLifecycleEvent.Kind]()
+        let reconciled = expectation(
+            description: "Unconfirmed outbound automatch reconciled"
+        )
         let lifecycleCancellable = service.automatchLifecycleEvents.sink {
             lifecycleEvents.append($0.kind)
+            if $0.kind == .notFoundAfterReconciliation(
+                uuid: "unconfirmed-outbound-entry"
+            ) {
+                reconciled.fulfill()
+            }
         }
         defer { lifecycleCancellable.cancel() }
         let entry = OGSQuickMatchDraft(
@@ -2526,7 +4248,7 @@ final class OGSServiceEventTests: XCTestCase {
 
         XCTAssertTrue(service.findAutomatch(entry: entry))
         XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
-        try? await Task.sleep(for: .seconds(0.08))
+        await fulfillment(of: [reconciled], timeout: 1)
 
         XCTAssertNil(service.autoMatchEntryById[entry.uuid])
         XCTAssertTrue(
@@ -2538,6 +4260,92 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(
             lifecycleEvents.last,
             .notFoundAfterReconciliation(uuid: entry.uuid)
+        )
+    }
+
+    func testConfirmedRequestTimerCannotReconcileNewerRequest() {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 60,
+            automatchConfirmationTimeout: 60
+        )
+        let confirmedEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "confirmed-request-a")
+        let newerEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "unconfirmed-request-b")
+
+        XCTAssertTrue(service.findAutomatch(entry: confirmedEntry))
+        socket.deliver(
+            name: "automatch/entry",
+            data: confirmedEntry.jsonObject
+        )
+        XCTAssertTrue(service.findAutomatch(entry: newerEntry))
+        let emissionCount = socket.emissions.count
+
+        service.handleAutomatchConfirmationTimeout(for: confirmedEntry.uuid)
+
+        XCTAssertEqual(socket.emissions.count, emissionCount)
+        XCTAssertFalse(service.isReconcilingAutomatches)
+        XCTAssertEqual(service.autoMatchEntryById[newerEntry.uuid], newerEntry)
+
+        service.handleAutomatchConfirmationTimeout(for: newerEntry.uuid)
+
+        XCTAssertTrue(service.isReconcilingAutomatches)
+        XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
+    }
+
+    func testExpiredConfirmationWaitsForActiveReconciliation() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 60
+        )
+        let firstEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "first-expired-request")
+        let queuedEntry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "queued-expired-request")
+        let queuedReconciled = expectation(
+            description: "Queued automatch reconciliation completed"
+        )
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            if $0.kind == .notFoundAfterReconciliation(
+                uuid: queuedEntry.uuid
+            ) {
+                queuedReconciled.fulfill()
+            }
+        }
+        defer { lifecycleCancellable.cancel() }
+
+        XCTAssertTrue(service.findAutomatch(entry: firstEntry))
+        XCTAssertTrue(service.findAutomatch(entry: queuedEntry))
+        service.handleAutomatchConfirmationTimeout(for: firstEntry.uuid)
+        XCTAssertTrue(service.isReconcilingAutomatches)
+        service.handleAutomatchConfirmationTimeout(for: queuedEntry.uuid)
+
+        await fulfillment(of: [queuedReconciled], timeout: 1)
+
+        XCTAssertNil(service.autoMatchEntryById[queuedEntry.uuid])
+        XCTAssertEqual(
+            socket.emissions.filter { $0.command == "automatch/list" }.count,
+            2
         )
     }
 
@@ -3420,7 +5228,8 @@ final class OGSServiceEventTests: XCTestCase {
         gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
         automatchReconciliationTimeout: TimeInterval = 5,
-        automatchConfirmationTimeout: TimeInterval = 8
+        automatchConfirmationTimeout: TimeInterval = 8,
+        currentTime: TimeInterval = 2_000_000_000
     ) -> OGSService {
         preferenceSuite = "com.honganhkhoa.Surround.EventTests.\(UUID().uuidString)"
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
@@ -3454,7 +5263,24 @@ final class OGSServiceEventTests: XCTestCase {
             conditionalMoveSubmissionTimeout: conditionalMoveSubmissionTimeout,
             automatchReconciliationTimeout: automatchReconciliationTimeout,
             automatchConfirmationTimeout: automatchConfirmationTimeout,
+            currentTime: { currentTime },
             initialState: initialState
+        )
+    }
+
+    private func inboundAutomatchPayload(
+        _ entry: OGSAutomatchEntry,
+        creationTimestamp: TimeInterval
+    ) -> [String: Any] {
+        var payload = entry.jsonObject
+        payload["timestamp"] = creationTimestamp * 1_000
+        return payload
+    }
+
+    private func jsonDictionary(_ source: String) throws -> [String: Any] {
+        try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(source.utf8))
+                as? [String: Any]
         )
     }
 
@@ -3511,8 +5337,12 @@ final class OGSServiceEventTests: XCTestCase {
         ]
     }
 
-    private func makeShortGameData(id: Int, phase: String) -> [String: Any] {
-        [
+    private func makeShortGameData(
+        id: Int,
+        phase: String,
+        timePerMove: Int? = nil
+    ) -> [String: Any] {
+        var result: [String: Any] = [
             "id": id,
             "phase": phase,
             "width": 5,
@@ -3520,6 +5350,10 @@ final class OGSServiceEventTests: XCTestCase {
             "black": ["id": 1, "username": "black"],
             "white": ["id": 2, "username": "white"],
         ]
+        if let timePerMove {
+            result["time_per_move"] = timePerMove
+        }
+        return result
     }
 
     private func oneBranchConditionalMovesRoot() -> [Any] {

@@ -1435,10 +1435,6 @@ final class SurroundUITests: SurroundUITestCase {
             matching: .button
         )
         element(
-            SurroundUITestContract.AccessibilityID.screenQuickMatch,
-            in: app
-        )
-        element(
             SurroundUITestContract.AccessibilityID.quickMatchRecap,
             in: app
         )
@@ -1453,9 +1449,14 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .button
         )
-        element(
+        let searchingStatus = element(
             SurroundUITestContract.AccessibilityID.quickMatchSearching,
             in: app
+        )
+        XCTAssertEqual(
+            searchingStatus.label,
+            "Searching for a game…",
+            "The search identifier must use the visible localized status text."
         )
         XCTAssertFalse(
             boardSize.isEnabled,
@@ -1497,6 +1498,20 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.quickMatchSearching,
             in: app
         )
+        let recap = element(
+            SurroundUITestContract.AccessibilityID.quickMatchRecap,
+            in: app
+        )
+        XCTAssertTrue(
+            recap.label.contains("13 by 13"),
+            "A restored search must describe its server-owned board size."
+        )
+        XCTAssertFalse(
+            recap.label.contains("9 by 9"),
+            "A restored search must not describe the saved editor draft."
+        )
+        XCTAssertTrue(recap.label.contains("Fischer"))
+        XCTAssertTrue(recap.label.contains("Required handicap"))
         let cancel = element(
             SurroundUITestContract.AccessibilityID.quickMatchCancel,
             in: app,
@@ -1509,10 +1524,48 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             matching: .button
         )
+        let activeBoardSize = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
+            in: app,
+            matching: .button
+        )
         XCTAssertFalse(
             boardSize.isEnabled,
             "A restored live search must lock the editable match criteria."
         )
+        XCTAssertFalse(boardSize.isSelected)
+        XCTAssertTrue(
+            activeBoardSize.isSelected,
+            "The disabled form must select the board size from the active entry."
+        )
+
+        let activeClock = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "rapid",
+                system: "fischer"
+            ),
+            in: app,
+            matching: .button
+        )
+        let unselectedClock = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClock(
+                speed: "rapid",
+                system: "byoyomi"
+            ),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(activeClock.isSelected)
+        XCTAssertFalse(
+            unselectedClock.isSelected,
+            "An exact restored search must not display the saved flexible clock."
+        )
+
+        let handicap = element(
+            SurroundUITestContract.AccessibilityID.quickMatchHandicap,
+            in: app
+        )
+        XCTAssertEqual(handicap.value as? String, "Required")
 
         let find = app.buttons.matching(
             identifier: SurroundUITestContract.AccessibilityID.quickMatchFind
@@ -1532,7 +1585,7 @@ final class SurroundUITests: SurroundUITestCase {
             matching: .button
         )
         element(
-            SurroundUITestContract.AccessibilityID.screenQuickMatch,
+            SurroundUITestContract.AccessibilityID.quickMatchRecap,
             in: app
         )
 
@@ -1604,7 +1657,7 @@ final class SurroundUITests: SurroundUITestCase {
         ])
 
         element(
-            SurroundUITestContract.AccessibilityID.screenQuickMatch,
+            SurroundUITestContract.AccessibilityID.quickMatchRecap,
             in: app
         )
 
@@ -1646,7 +1699,7 @@ final class SurroundUITests: SurroundUITestCase {
             app.descendants(matching: .any)
                 .matching(
                     identifier: SurroundUITestContract.AccessibilityID
-                        .screenQuickMatch
+                        .quickMatchRecap
                 )
                 .firstMatch
                 .exists,

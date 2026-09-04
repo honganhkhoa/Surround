@@ -12,21 +12,6 @@ struct OGSQuickMatchRecap: Equatable {
     let secondLine: String
 }
 
-struct QuickMatchRequestFailure: Identifiable {
-    enum Operation {
-        case start
-        case cancel
-        case cancelTimedOut
-    }
-
-    let operation: Operation
-    let entry: OGSAutomatchEntry
-
-    var id: String {
-        "\(entry.uuid)-\(String(describing: operation))"
-    }
-}
-
 extension OGSQuickMatchMode {
     var quickMatchTitle: String {
         switch self {
@@ -50,224 +35,6 @@ extension OGSQuickMatchMode {
         }
     }
 
-}
-
-extension OGSQuickMatchHandicapPreference {
-    var quickMatchTitle: String {
-        switch self {
-        case .required:
-            return String(localized: "Required")
-        case .standard:
-            return String(localized: "Standard")
-        case .disabled:
-            return String(localized: "Disabled")
-        }
-    }
-
-    var quickMatchDescription: String {
-        switch self {
-        case .required:
-            return String(localized: "Require handicaps between players of different ranks.")
-        case .standard:
-            return String(localized: "Use handicaps by default, but accept games with handicaps off.")
-        case .disabled:
-            return String(localized: "Never play with handicap stones.")
-        }
-    }
-
-    var quickMatchPickerDescription: String {
-        switch self {
-        case .required:
-            return String(localized: "Use handicaps when ranks differ.")
-        case .standard:
-            return String(localized: "Prefer handicaps; allow even games.")
-        case .disabled:
-            return String(localized: "No handicap stones.")
-        }
-    }
-}
-
-extension OGSAutomatchClockSystem {
-    var quickMatchTitle: String {
-        switch self {
-        case .fischer:
-            return String(localized: "Fischer")
-        case .byoyomi:
-            return String(localized: "Byo-Yomi")
-        }
-    }
-}
-
-extension TimeControlSpeed {
-    /// Quick Match distinguishes Rapid from Live even though the rest of the
-    /// app intentionally groups both values under `localizedString()`.
-    var quickMatchTitle: String {
-        switch self {
-        case .blitz:
-            return String(localized: "Blitz")
-        case .rapid:
-            return String(localized: "Rapid")
-        case .live:
-            return String(localized: "Live")
-        case .correspondence:
-            return String(localized: "Correspondence")
-        }
-    }
-
-    var quickMatchSystemImage: String {
-        switch self {
-        case .blitz:
-            return "bolt"
-        case .rapid:
-            return "hare"
-        case .live:
-            return "clock"
-        case .correspondence:
-            return "calendar"
-        }
-    }
-}
-
-extension OGSQuickMatchClockPreset {
-    var quickMatchShortDescription: String {
-        switch timeControl {
-        case .Fischer(let initialTime, let timeIncrement, _):
-            return "\(durationString(seconds: initialTime)) + \(durationString(seconds: timeIncrement))"
-        case .ByoYomi(let mainTime, let periods, let periodTime):
-            return "\(durationString(seconds: mainTime)) + \(periods)×\(durationString(seconds: periodTime))"
-        default:
-            return timeControl.shortDescription
-        }
-    }
-
-    var quickMatchAccessibleDescription: String {
-        switch timeControl {
-        case .Fischer(let initialTime, let timeIncrement, _):
-            return String(
-                localized: "\(system.quickMatchTitle), \(durationString(seconds: initialTime, longFormat: true)) plus \(durationString(seconds: timeIncrement, longFormat: true)) per move"
-            )
-        case .ByoYomi(let mainTime, let periods, let periodTime):
-            return String(
-                localized: "\(system.quickMatchTitle), \(durationString(seconds: mainTime, longFormat: true)) plus \(periods) periods of \(durationString(seconds: periodTime, longFormat: true))"
-            )
-        default:
-            return "\(system.quickMatchTitle), \(timeControl.shortDescription)"
-        }
-    }
-
-    static func quickMatchDisplayDescription(
-        for presets: [OGSQuickMatchClockPreset]
-    ) -> String {
-        guard let first = presets.first else { return "" }
-        switch first.timeControl {
-        case .Fischer:
-            let values = presets.compactMap { preset -> (Int, Int)? in
-                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
-                    return nil
-                }
-                return (initial, increment)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  let increment = values.first?.1 else {
-                return first.quickMatchShortDescription
-            }
-            return "\(quickMatchDurationRange(values.map(\.0))) + \(durationString(seconds: increment))"
-        case .ByoYomi:
-            let values = presets.compactMap { preset -> (Int, Int, Int)? in
-                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
-                    return nil
-                }
-                return (main, periods, period)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  Set(values.map(\.2)).count == 1,
-                  let periods = values.first?.1,
-                  let period = values.first?.2 else {
-                return first.quickMatchShortDescription
-            }
-            return "\(quickMatchDurationRange(values.map(\.0))) + \(periods)×\(durationString(seconds: period))"
-        default:
-            return first.quickMatchShortDescription
-        }
-    }
-
-    static func quickMatchAccessibleDescription(
-        for presets: [OGSQuickMatchClockPreset]
-    ) -> String {
-        guard let first = presets.first else { return "" }
-        switch first.timeControl {
-        case .Fischer:
-            let values = presets.compactMap { preset -> (Int, Int)? in
-                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
-                    return nil
-                }
-                return (initial, increment)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  let increment = values.first?.1 else {
-                return first.quickMatchAccessibleDescription
-            }
-            let initial = quickMatchDurationRange(
-                values.map(\.0),
-                longFormat: true,
-                spoken: true
-            )
-            return String(
-                localized: "\(first.system.quickMatchTitle), \(initial) plus \(durationString(seconds: increment, longFormat: true)) per move"
-            )
-        case .ByoYomi:
-            let values = presets.compactMap { preset -> (Int, Int, Int)? in
-                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
-                    return nil
-                }
-                return (main, periods, period)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  Set(values.map(\.2)).count == 1,
-                  let periods = values.first?.1,
-                  let period = values.first?.2 else {
-                return first.quickMatchAccessibleDescription
-            }
-            let main = quickMatchDurationRange(
-                values.map(\.0),
-                longFormat: true,
-                spoken: true
-            )
-            return String(
-                localized: "\(first.system.quickMatchTitle), \(main) plus \(periods) periods of \(durationString(seconds: period, longFormat: true))"
-            )
-        default:
-            return first.quickMatchAccessibleDescription
-        }
-    }
-
-    private static func quickMatchDurationRange(
-        _ values: [Int],
-        longFormat: Bool = false,
-        spoken: Bool = false
-    ) -> String {
-        let values = Array(Set(values)).sorted()
-        guard let first = values.first, let last = values.last else { return "" }
-        let firstDescription = durationString(
-            seconds: first,
-            longFormat: longFormat
-        )
-        guard first != last else { return firstDescription }
-        let lastDescription = durationString(
-            seconds: last,
-            longFormat: longFormat
-        )
-        return spoken
-            ? String(
-                localized: "\(firstDescription) to \(lastDescription)",
-                comment: "Spoken range between two Quick Match clock durations"
-            )
-            : "\(firstDescription)–\(lastDescription)"
-    }
 }
 
 extension OGSQuickMatchDraft {
@@ -632,6 +399,10 @@ private struct QuickMatchActionArea: View {
                         .foregroundStyle(.tint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityFocused($statusIsFocused)
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID
+                                .quickMatchSearching
+                        )
 
                     if !isCancelling {
                         Button("Cancel", role: .destructive, action: onCancel)
@@ -654,16 +425,6 @@ private struct QuickMatchActionArea: View {
                         .stroke(Color.accentColor, lineWidth: 1)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .background(alignment: .topLeading) {
-                    Text(verbatim: "Searching")
-                        .foregroundStyle(.clear)
-                        .frame(width: 1, height: 1)
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier(
-                            SurroundUITestContract.AccessibilityID
-                                .quickMatchSearching
-                        )
-                }
                 .focusable(isCancelling)
                 .focused($keyboardFocus, equals: .status)
             } else {
@@ -1036,12 +797,33 @@ struct QuickMatchForm: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    private var activePresentation: OGSActiveQuickMatchPresentation? {
+        activeLiveEntry.flatMap(OGSActiveQuickMatchPresentation.init)
+    }
+
+    private var displayedDraft: OGSQuickMatchDraft {
+        activePresentation?.draft ?? draft
+    }
+
+    private var activeSettingsAreDisplayable: Bool {
+        activeLiveEntry == nil || activePresentation != nil
+    }
+
     private var recap: OGSQuickMatchRecap {
-        draft.quickMatchRecap(userRank: ogs.user?.ranking)
+        guard activeSettingsAreDisplayable else {
+            return OGSQuickMatchRecap(
+                firstLine: String(localized: "Unable to display match settings"),
+                secondLine: ""
+            )
+        }
+        return displayedDraft.quickMatchRecap(userRank: ogs.user?.ranking)
     }
 
     private var accessibleRecap: String {
-        draft.quickMatchAccessibleRecap(userRank: ogs.user?.ranking)
+        guard activeSettingsAreDisplayable else {
+            return String(localized: "Unable to display match settings")
+        }
+        return displayedDraft.quickMatchAccessibleRecap(userRank: ogs.user?.ranking)
     }
 
     private var activitySnapshot: OGSQuickMatchActivitySnapshot {
@@ -1050,8 +832,8 @@ struct QuickMatchForm: View {
             popularity: ogs.quickMatchPopularityStats,
             currentUserID: ogs.user?.id,
             currentRank: ogs.user?.ranking,
-            lowerRankDifference: draft.lowerRankDifference,
-            upperRankDifference: draft.upperRankDifference
+            lowerRankDifference: displayedDraft.lowerRankDifference,
+            upperRankDifference: displayedDraft.upperRankDifference
         )
     }
 
@@ -1060,17 +842,21 @@ struct QuickMatchForm: View {
             enabled: allowsRemoteActivity,
             userID: ogs.user?.id,
             userRank: ogs.user?.ranking,
-            lowerRankDifference: draft.lowerRankDifference,
-            upperRankDifference: draft.upperRankDifference
+            lowerRankDifference: displayedDraft.lowerRankDifference,
+            upperRankDifference: displayedDraft.upperRankDifference
         )
     }
 
     private var formIsDisabled: Bool {
-        activeLiveEntry != nil || isRestoringSearches
+        activeLiveEntry != nil || restorationBlocksDraft
+    }
+
+    private var restorationBlocksDraft: Bool {
+        isRestoringSearches && !draft.quickMatchIsCorrespondenceOnly
     }
 
     private var findDisabledReason: String? {
-        if isRestoringSearches {
+        if restorationBlocksDraft {
             return String(localized: "Restoring active searches from OGS…")
         }
         if !draft.quickMatchIsValid {
@@ -1083,8 +869,8 @@ struct QuickMatchForm: View {
     }
 
     private var matchingOpenChallenges: [OGSSeekgraphChallenge] {
-        let sizes = Set(draft.quickMatchSelectedBoardSizes)
-        let speeds = Set(draft.quickMatchSelectedClocks.map(\.speed))
+        let sizes = Set(displayedDraft.quickMatchSelectedBoardSizes)
+        let speeds = Set(displayedDraft.quickMatchSelectedClocks.map(\.speed))
         return eligibleOpenChallenges.filter { challenge in
             guard !challenge.rengo else { return false }
             let game = challenge.game
@@ -1109,7 +895,7 @@ struct QuickMatchForm: View {
                 canFind: draft.quickMatchIsValid
                     && activeLiveEntry == nil
                     && isConnected
-                    && !isRestoringSearches,
+                    && !restorationBlocksDraft,
                 canCancel: isConnected && cancellingEntryID == nil,
                 disabledReason: activeLiveEntry != nil
                     ? (!isConnected
@@ -1140,99 +926,104 @@ struct QuickMatchForm: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        matchingSection
+                    if activeSettingsAreDisplayable {
+                        VStack(alignment: .leading, spacing: 14) {
+                            matchingSection
 
-                        if horizontalSizeClass == .compact {
-                            VStack(spacing: 14) {
-                                boardSizeSection
-                                gameClockSection
-                                handicapSection
-                                rankSection
-                            }
-                        } else {
-                            HStack(alignment: .top, spacing: 14) {
+                            if horizontalSizeClass == .compact {
                                 VStack(spacing: 14) {
                                     boardSizeSection
+                                    gameClockSection
                                     handicapSection
                                     rankSection
                                 }
-                                .frame(maxWidth: .infinity)
-
-                                gameClockSection
+                            } else {
+                                HStack(alignment: .top, spacing: 14) {
+                                    VStack(spacing: 14) {
+                                        boardSizeSection
+                                        handicapSection
+                                        rankSection
+                                    }
                                     .frame(maxWidth: .infinity)
-                            }
-                        }
 
-                        QuickMatchActivityLegend()
-
-                        if !matchingOpenChallenges.isEmpty {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Button(action: onShowOpenChallenges) {
-                                    Text("Alternatively, there are \(matchingOpenChallenges.count) open custom games matching your preferences that you can accept to start a game immediately.")
-                                        .font(.footnote)
-                                        .multilineTextAlignment(.leading)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    gameClockSection
+                                        .frame(maxWidth: .infinity)
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.secondary)
-                                .accessibilityHint("Show matching open games")
-                                .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID
-                                        .quickMatchMatchingChallenges
-                                )
+                            }
 
-                                LazyVGrid(
-                                    columns: [
-                                        GridItem(
-                                            .adaptive(minimum: 300),
-                                            spacing: 15,
-                                            alignment: .top
-                                        )
-                                    ],
-                                    spacing: 15
-                                ) {
-                                    ForEach(matchingOpenChallenges) { challenge in
-                                        ChallengeCell(challenge: challenge)
-                                            .padding()
-                                            .background(
-                                                Color(
-                                                    colorScheme == .light
-                                                        ? UIColor.systemBackground
-                                                        : UIColor.systemGray5
-                                                )
-                                                .clipShape(
-                                                    RoundedRectangle(
-                                                        cornerRadius: 8,
-                                                        style: .continuous
+                            QuickMatchActivityLegend()
+
+                            if !matchingOpenChallenges.isEmpty {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Button(action: onShowOpenChallenges) {
+                                        Text("Alternatively, there are \(matchingOpenChallenges.count) open custom games matching your preferences that you can accept to start a game immediately.")
+                                            .font(.footnote)
+                                            .multilineTextAlignment(.leading)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityHint("Show matching open games")
+                                    .accessibilityIdentifier(
+                                        SurroundUITestContract.AccessibilityID
+                                            .quickMatchMatchingChallenges
+                                    )
+
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(
+                                                .adaptive(minimum: 300),
+                                                spacing: 15,
+                                                alignment: .top
+                                            )
+                                        ],
+                                        spacing: 15
+                                    ) {
+                                        ForEach(matchingOpenChallenges) { challenge in
+                                            ChallengeCell(challenge: challenge)
+                                                .padding()
+                                                .background(
+                                                    Color(
+                                                        colorScheme == .light
+                                                            ? UIColor.systemBackground
+                                                            : UIColor.systemGray5
                                                     )
+                                                    .clipShape(
+                                                        RoundedRectangle(
+                                                            cornerRadius: 8,
+                                                            style: .continuous
+                                                        )
+                                                    )
+                                                    .shadow(radius: 2)
                                                 )
-                                                .shadow(radius: 2)
-                                            )
-                                            .id(challenge.id)
-                                            .accessibilityIdentifier(
-                                                SurroundUITestContract.AccessibilityID
-                                                    .quickMatchOpenChallenge(challenge.id)
-                                            )
+                                                .id(challenge.id)
+                                                .accessibilityIdentifier(
+                                                    SurroundUITestContract.AccessibilityID
+                                                        .quickMatchOpenChallenge(challenge.id)
+                                                )
+                                        }
                                     }
                                 }
                             }
                         }
+                        .disabled(formIsDisabled)
+                    } else {
+                        Label(
+                            "Unable to display match settings",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Color(uiColor: .systemGray6))
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
                     }
-                    .disabled(formIsDisabled)
                 }
                 .padding()
             }
             .background(Color(uiColor: .systemBackground))
-        }
-        .background(alignment: .topLeading) {
-            Text(verbatim: "Quick match")
-                .foregroundStyle(.clear)
-                .frame(width: 1, height: 1)
-                .allowsHitTesting(false)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.screenQuickMatch
-                )
         }
         .task(id: popularityRequestKey) {
             guard allowsRemoteActivity else { return }
@@ -1255,7 +1046,7 @@ struct QuickMatchForm: View {
             Picker(
                 "Matching",
                 selection: Binding(
-                    get: { draft.mode },
+                    get: { displayedDraft.mode },
                     set: { draft.selectQuickMatchMode($0) }
                 )
             ) {
@@ -1268,16 +1059,16 @@ struct QuickMatchForm: View {
                 SurroundUITestContract.AccessibilityID.quickMatchMode
             )
 
-            Text(draft.mode.quickMatchDescription)
+            Text(displayedDraft.mode.quickMatchDescription)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
     }
 
     private var boardSizeSection: some View {
-        let selectedSizes = Set(draft.quickMatchSelectedBoardSizes)
-        return QuickMatchCard(draft.quickMatchBoardSizeTitle) {
-            if draft.mode == .multiple {
+        let selectedSizes = Set(displayedDraft.quickMatchSelectedBoardSizes)
+        return QuickMatchCard(displayedDraft.quickMatchBoardSizeTitle) {
+            if displayedDraft.mode == .multiple {
                 Text("Select every size you would accept.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -1300,7 +1091,7 @@ struct QuickMatchForm: View {
             QuickMatchBoardSizeTile(
                 size: size,
                 selected: selectedSizes.contains(size),
-                multiple: draft.mode == .multiple,
+                multiple: displayedDraft.mode == .multiple,
                 disabled: formIsDisabled,
                 activity: activitySnapshot.status(
                     forBoardSize: size
@@ -1312,7 +1103,7 @@ struct QuickMatchForm: View {
 
     private var gameClockSection: some View {
         QuickMatchCard(String(localized: "Game clock")) {
-            if draft.mode == .multiple {
+            if displayedDraft.mode == .multiple {
                 Text("Select every clock you would accept. Correspondence is available in Exact or Flexible.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -1329,7 +1120,7 @@ struct QuickMatchForm: View {
 
     @ViewBuilder
     private func clockSpeedRow(_ speed: TimeControlSpeed) -> some View {
-        let correspondenceDisabled = draft.mode == .multiple
+        let correspondenceDisabled = displayedDraft.mode == .multiple
             && speed == .correspondence
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -1372,8 +1163,10 @@ struct QuickMatchForm: View {
                 VStack(spacing: 8) { clockButtons(speed) }
             }
 
-            if draft.mode == .flexible, draft.speed == speed, speed.isRealtime {
-                Text("Both clocks accepted — \(draft.system.quickMatchTitle) preferred.")
+            if displayedDraft.mode == .flexible,
+               displayedDraft.speed == speed,
+               speed.isRealtime {
+                Text("Both clocks accepted — \(displayedDraft.system.quickMatchTitle) preferred.")
                     .font(.caption)
                     .foregroundStyle(.tint)
             }
@@ -1396,9 +1189,10 @@ struct QuickMatchForm: View {
                     accessibleDescription: OGSQuickMatchClockPreset
                         .quickMatchAccessibleDescription(for: presets),
                     state: clockButtonState(speed: speed, system: system),
-                    multiple: draft.mode == .multiple,
+                    multiple: displayedDraft.mode == .multiple,
                     disabled: formIsDisabled
-                        || (draft.mode == .multiple && speed == .correspondence),
+                        || (displayedDraft.mode == .multiple
+                            && speed == .correspondence),
                     activity: activitySnapshot.status(
                         for: speed,
                         system: system,
@@ -1413,16 +1207,18 @@ struct QuickMatchForm: View {
     }
 
     private var activityBoardSizes: [Int] {
-        let selected = draft.quickMatchSelectedBoardSizes
-        return selected.isEmpty ? [draft.boardSize] : selected
+        let selected = displayedDraft.quickMatchSelectedBoardSizes
+        return selected.isEmpty ? [displayedDraft.boardSize] : selected
     }
 
     private func clockPresets(
         speed: TimeControlSpeed,
         system: OGSAutomatchClockSystem
     ) -> [OGSQuickMatchClockPreset] {
-        let selectedSizes = draft.quickMatchSelectedBoardSizes
-        let sizes = selectedSizes.isEmpty ? [draft.boardSize] : selectedSizes
+        let selectedSizes = displayedDraft.quickMatchSelectedBoardSizes
+        let sizes = selectedSizes.isEmpty
+            ? [displayedDraft.boardSize]
+            : selectedSizes
         return sizes.compactMap {
             OGSQuickMatchClockPreset.preset(
                 boardSize: $0,
@@ -1457,19 +1253,19 @@ struct QuickMatchForm: View {
         speed: TimeControlSpeed,
         system: OGSAutomatchClockSystem
     ) -> QuickMatchClockButtonState {
-        if draft.mode == .multiple {
-            return draft.multipleClocks.contains(
+        if displayedDraft.mode == .multiple {
+            return displayedDraft.multipleClocks.contains(
                 OGSQuickMatchClockSelection(speed: speed, system: system)
             ) ? .preferred : .off
         }
-        guard draft.speed == speed else { return .off }
-        if draft.speed == .correspondence {
+        guard displayedDraft.speed == speed else { return .off }
+        if displayedDraft.speed == .correspondence {
             return system == .fischer ? .preferred : .off
         }
-        if draft.system == system {
+        if displayedDraft.system == system {
             return .preferred
         }
-        return draft.mode == .flexible ? .alsoAccepted : .off
+        return displayedDraft.mode == .flexible ? .alsoAccepted : .off
     }
 
     private var handicapSection: some View {
@@ -1483,7 +1279,7 @@ struct QuickMatchForm: View {
                     ) { option in
                         Toggle(
                             isOn: Binding(
-                                get: { draft.handicap == option },
+                                get: { displayedDraft.handicap == option },
                                 set: { selected in
                                     if selected {
                                         draft.handicap = option
@@ -1497,7 +1293,7 @@ struct QuickMatchForm: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(draft.handicap.quickMatchTitle)
+                        Text(displayedDraft.handicap.quickMatchTitle)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption2)
                     }
@@ -1507,13 +1303,13 @@ struct QuickMatchForm: View {
                 .buttonStyle(.bordered)
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Handicap")
-                .accessibilityValue(draft.handicap.quickMatchTitle)
+                .accessibilityValue(displayedDraft.handicap.quickMatchTitle)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.quickMatchHandicap
                 )
             }
         ) {
-            Text(draft.handicap.quickMatchDescription)
+            Text(displayedDraft.handicap.quickMatchDescription)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -1526,7 +1322,7 @@ struct QuickMatchForm: View {
                 HStack(spacing: 6) {
                     rankPicker(
                         title: String(localized: "Minimum opponent rank"),
-                        difference: $draft.lowerRankDifference,
+                        difference: displayedBinding(\.lowerRankDifference),
                         subtracts: true
                     )
                     Text("–")
@@ -1534,7 +1330,7 @@ struct QuickMatchForm: View {
                         .accessibilityHidden(true)
                     rankPicker(
                         title: String(localized: "Maximum opponent rank"),
-                        difference: $draft.upperRankDifference,
+                        difference: displayedBinding(\.upperRankDifference),
                         subtracts: false
                     )
                 }
@@ -1551,6 +1347,15 @@ struct QuickMatchForm: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func displayedBinding<Value>(
+        _ keyPath: WritableKeyPath<OGSQuickMatchDraft, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { displayedDraft[keyPath: keyPath] },
+            set: { draft[keyPath: keyPath] = $0 }
+        )
     }
 
     private func rankPicker(

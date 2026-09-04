@@ -1233,6 +1233,227 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(entry.handicap.value, .disabled)
     }
 
+    func testInboundJSONRankDifferencesDistinguishNumbersFromBooleans() throws {
+        for difference in 0...2 {
+            let data = Data(
+                """
+                {
+                  "uuid": "rank-\(difference)",
+                  "size_speed_options": [
+                    {"size": "9x9", "speed": "rapid", "system": "fischer"}
+                  ],
+                  "lower_rank_diff": \(difference),
+                  "upper_rank_diff": \(difference),
+                  "rules": {"condition": "required", "value": "japanese"},
+                  "handicap": {"condition": "preferred", "value": "enabled"}
+                }
+                """.utf8
+            )
+            let payload = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: data) as? [String: Any]
+            )
+            let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+            XCTAssertEqual(entry.lowerRankDifference, difference)
+            XCTAssertEqual(entry.upperRankDifference, difference)
+            XCTAssertTrue(entry.quickMatchDisplayIsComplete)
+            XCTAssertNotNil(OGSActiveQuickMatchPresentation(entry: entry))
+        }
+
+        for boolean in ["false", "true"] {
+            let data = Data(
+                """
+                {
+                  "uuid": "rank-\(boolean)",
+                  "size_speed_options": [
+                    {"size": "9x9", "speed": "rapid", "system": "fischer"}
+                  ],
+                  "lower_rank_diff": \(boolean),
+                  "upper_rank_diff": \(boolean),
+                  "rules": {"condition": "required", "value": "japanese"},
+                  "handicap": {"condition": "preferred", "value": "enabled"}
+                }
+                """.utf8
+            )
+            let payload = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: data) as? [String: Any]
+            )
+            let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+            XCTAssertEqual(entry.lowerRankDifference, 3)
+            XCTAssertEqual(entry.upperRankDifference, 3)
+            XCTAssertFalse(entry.quickMatchDisplayIsComplete)
+            XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+        }
+    }
+
+    func testInboundJSONMarksMalformedPreferenceContainersAsDegraded() throws {
+        let malformedValues = [#""future-shape""#, "[]", "null"]
+
+        for malformedValue in malformedValues {
+            for malformedKey in ["rules", "handicap"] {
+                let rules = malformedKey == "rules"
+                    ? malformedValue
+                    : #"{"condition":"required","value":"japanese"}"#
+                let handicap = malformedKey == "handicap"
+                    ? malformedValue
+                    : #"{"condition":"preferred","value":"enabled"}"#
+                let data = Data(
+                    """
+                    {
+                      "uuid": "malformed-\(malformedKey)",
+                      "size_speed_options": [
+                        {"size": "9x9", "speed": "rapid", "system": "fischer"}
+                      ],
+                      "lower_rank_diff": 3,
+                      "upper_rank_diff": 3,
+                      "rules": \(rules),
+                      "handicap": \(handicap)
+                    }
+                    """.utf8
+                )
+                let payload = try XCTUnwrap(
+                    JSONSerialization.jsonObject(with: data) as? [String: Any]
+                )
+                let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+                XCTAssertFalse(
+                    entry.quickMatchDisplayIsComplete,
+                    "\(malformedKey) value \(malformedValue) must degrade display."
+                )
+            }
+        }
+    }
+
+    func testInboundJSONMarksIncompletePreferenceContainersAsDegraded() throws {
+        let incompleteRules = [
+            "{}",
+            #"{"condition":"required"}"#,
+            #"{"value":"japanese"}"#,
+        ]
+        let incompleteHandicaps = [
+            "{}",
+            #"{"condition":"preferred"}"#,
+            #"{"value":"enabled"}"#,
+        ]
+
+        for (incompleteKey, incompleteValues) in [
+            ("rules", incompleteRules),
+            ("handicap", incompleteHandicaps),
+        ] {
+            for incompleteValue in incompleteValues {
+                let rules = incompleteKey == "rules"
+                    ? incompleteValue
+                    : #"{"condition":"required","value":"japanese"}"#
+                let handicap = incompleteKey == "handicap"
+                    ? incompleteValue
+                    : #"{"condition":"preferred","value":"enabled"}"#
+                let data = Data(
+                    """
+                    {
+                      "uuid": "incomplete-\(incompleteKey)",
+                      "size_speed_options": [
+                        {"size": "9x9", "speed": "rapid", "system": "fischer"}
+                      ],
+                      "lower_rank_diff": 3,
+                      "upper_rank_diff": 3,
+                      "rules": \(rules),
+                      "handicap": \(handicap)
+                    }
+                    """.utf8
+                )
+                let payload = try XCTUnwrap(
+                    JSONSerialization.jsonObject(with: data) as? [String: Any]
+                )
+                let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+                XCTAssertFalse(
+                    entry.quickMatchDisplayIsComplete,
+                    "\(incompleteKey) value \(incompleteValue) must degrade display."
+                )
+            }
+        }
+    }
+
+    func testInboundJSONKeepsAbsentPreferenceContainersAsLegacyDefaults() throws {
+        let data = Data(
+            """
+            {
+              "uuid": "legacy-missing-preferences",
+              "size_speed_options": [
+                {"size": "9x9", "speed": "rapid", "system": "fischer"}
+              ],
+              "lower_rank_diff": 3,
+              "upper_rank_diff": 3
+            }
+            """.utf8
+        )
+        let payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+        XCTAssertEqual(
+            entry.rules,
+            OGSAutomatchRulesPreference(
+                condition: .noPreference,
+                value: .japanese
+            )
+        )
+        XCTAssertEqual(
+            entry.handicap,
+            OGSAutomatchHandicapPreference(
+                condition: .noPreference,
+                value: .enabled
+            )
+        )
+        XCTAssertTrue(entry.quickMatchDisplayIsComplete)
+    }
+
+    func testInboundAutomatchTimestampIsNormalizedAndOnlyPersistedLocally() throws {
+        for wireTimestamp in ["1725312345.678", "1725312345678"] {
+            let data = Data(
+                """
+                {
+                  "uuid": "timestamped-entry",
+                  "timestamp": \(wireTimestamp),
+                  "size_speed_options": [
+                    {"size": "9x9", "speed": "rapid", "system": "fischer"}
+                  ],
+                  "lower_rank_diff": 3,
+                  "upper_rank_diff": 3,
+                  "rules": {"condition": "required", "value": "japanese"},
+                  "handicap": {"condition": "preferred", "value": "enabled"}
+                }
+                """.utf8
+            )
+            let payload = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: data) as? [String: Any]
+            )
+            let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+            XCTAssertEqual(
+                try XCTUnwrap(entry.creationTimestamp),
+                1_725_312_345.678,
+                accuracy: 0.000_001
+            )
+            XCTAssertNil(entry.jsonObject["timestamp"])
+            XCTAssertNil(entry.jsonObject["creationTimestamp"])
+
+            let persisted = try JSONEncoder().encode(entry)
+            let restored = try JSONDecoder().decode(
+                OGSAutomatchEntry.self,
+                from: persisted
+            )
+            XCTAssertEqual(restored, entry)
+            XCTAssertEqual(
+                try XCTUnwrap(restored.creationTimestamp),
+                1_725_312_345.678,
+                accuracy: 0.000_001
+            )
+        }
+    }
+
     func testLegacyWireEntryUsesTopLevelClockAsSystemFallback() throws {
         let payload: [String: Any] = [
             "uuid": "legacy-wire-id",
@@ -1502,6 +1723,635 @@ final class OGSQuickMatchContractTests: XCTestCase {
         let decoded = try JSONDecoder().decode(OGSAutomatchEntry.self, from: data)
 
         XCTAssertEqual(decoded, entry)
+    }
+
+    func testActivePresentationKeepsExactServerCriteriaWithoutBroadening() throws {
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 13,
+            speed: .rapid,
+            system: .fischer,
+            handicap: .required,
+            lowerRankDifference: 2,
+            upperRankDifference: 4
+        ).makeAutomatchEntry(uuid: "restored-exact")
+
+        let presentation = try XCTUnwrap(
+            OGSActiveQuickMatchPresentation(entry: entry)
+        )
+
+        XCTAssertEqual(presentation.draft.mode, .exact)
+        XCTAssertEqual(presentation.draft.boardSize, 13)
+        XCTAssertEqual(presentation.draft.speed, .rapid)
+        XCTAssertEqual(presentation.draft.system, .fischer)
+        XCTAssertEqual(presentation.draft.handicap, .required)
+        XCTAssertEqual(presentation.draft.lowerRankDifference, 2)
+        XCTAssertEqual(presentation.draft.upperRankDifference, 4)
+    }
+
+    func testActivePresentationReconstructsFlexibleAndMultipleEntries() throws {
+        let flexibleEntry = OGSQuickMatchDraft(
+            mode: .flexible,
+            boardSize: 19,
+            speed: .live,
+            system: .byoyomi
+        ).makeAutomatchEntry(uuid: "restored-flexible")
+        let flexible = try XCTUnwrap(
+            OGSActiveQuickMatchPresentation(entry: flexibleEntry)
+        )
+        XCTAssertEqual(flexible.draft.mode, .flexible)
+        XCTAssertEqual(flexible.draft.boardSize, 19)
+        XCTAssertEqual(flexible.draft.speed, .live)
+        XCTAssertEqual(flexible.draft.system, .byoyomi)
+
+        let multipleEntry = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 19],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(
+                    speed: .blitz,
+                    system: .fischer
+                ),
+                OGSQuickMatchClockSelection(
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ]
+        ).makeAutomatchEntry(
+            uuid: "restored-multiple",
+            multipleOptionsShuffler: { _ in }
+        )
+        let multiple = try XCTUnwrap(
+            OGSActiveQuickMatchPresentation(entry: multipleEntry)
+        )
+        XCTAssertEqual(multiple.draft.mode, .multiple)
+        XCTAssertEqual(multiple.draft.multipleBoardSizes, [9, 19])
+        XCTAssertEqual(
+            multiple.draft.multipleClocks,
+            Set([
+                OGSQuickMatchClockSelection(
+                    speed: .blitz,
+                    system: .fischer
+                ),
+                OGSQuickMatchClockSelection(
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ])
+        )
+    }
+
+    func testActivePresentationRejectsUnrepresentableSettings() {
+        let degraded = OGSAutomatchEntry(
+            sizeSpeedOptions: [],
+            uuid: "degraded-entry"
+        )
+
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: degraded))
+    }
+
+    func testActivePresentationRejectsNonCartesianMultipleCriteria() {
+        let entry = OGSAutomatchEntry(
+            sizeSpeedOptions: [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .blitz,
+                    system: .fischer
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 19,
+                    speed: .rapid,
+                    system: .byoyomi
+                ),
+            ],
+            uuid: "non-cartesian-entry"
+        )
+
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+    }
+
+    func testActivePresentationRejectsCriteriaTheEditorCannotRepresent() {
+        let legacyHandicap = OGSAutomatchEntry(
+            sizeSpeedOptions: [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ],
+            handicap: OGSAutomatchHandicapPreference(
+                condition: .noPreference,
+                value: .enabled
+            ),
+            uuid: "legacy-handicap-entry"
+        )
+        let broadRankRange = OGSAutomatchEntry(
+            sizeSpeedOptions: legacyHandicap.sizeSpeedOptions,
+            lowerRankDifference: 10,
+            handicap: .quickMatchDefault,
+            uuid: "broad-rank-entry"
+        )
+        let legacyRules = OGSAutomatchEntry(
+            sizeSpeedOptions: legacyHandicap.sizeSpeedOptions,
+            rules: OGSAutomatchRulesPreference(
+                condition: .noPreference,
+                value: .japanese
+            ),
+            uuid: "legacy-rules-entry"
+        )
+
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: legacyHandicap))
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: broadRankRange))
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: legacyRules))
+    }
+
+    func testActivePresentationRejectsPartiallyDegradedInboundOptions() throws {
+        let entry = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "partially-degraded-entry",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+                ["size": "9x9", "speed": "rapid", "system": "future-clock"],
+            ],
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+
+        XCTAssertEqual(entry.sizeSpeedOptions.count, 1)
+        XCTAssertEqual(entry.rules, .quickMatchDefault)
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+    }
+
+    func testActivePresentationRejectsDegradedInboundHandicap() throws {
+        let entry = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "degraded-handicap-entry",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "handicap": ["condition": "required", "value": "automatic"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+
+        XCTAssertEqual(entry.rules, .quickMatchDefault)
+        XCTAssertEqual(
+            entry.handicap,
+            OGSAutomatchHandicapPreference(
+                condition: .required,
+                value: .enabled
+            )
+        )
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+    }
+
+    func testActivePresentationRejectsDegradedInboundRankLimit() throws {
+        let entry = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "degraded-rank-entry",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "lower_rank_diff": "future-rank-limit",
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+
+        XCTAssertEqual(entry.lowerRankDifference, 3)
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+    }
+
+    func testWaitingGamesSummaryEligibilityRejectsEveryDegradedInboundSetting() throws {
+        let payloads: [[String: Any]] = [
+            [
+                "uuid": "waiting-future-clock",
+                "size_speed_options": [
+                    ["size": "9x9", "speed": "rapid", "system": "fischer"],
+                    ["size": "9x9", "speed": "rapid", "system": "future-clock"],
+                ],
+                "lower_rank_diff": 3,
+                "upper_rank_diff": 3,
+                "handicap": ["condition": "preferred", "value": "enabled"],
+                "rules": ["condition": "required", "value": "japanese"],
+            ],
+            [
+                "uuid": "waiting-malformed-rank",
+                "size_speed_options": [
+                    ["size": "13x13", "speed": "rapid", "system": "byoyomi"],
+                ],
+                "lower_rank_diff": "future-rank-limit",
+                "upper_rank_diff": 3,
+                "handicap": ["condition": "preferred", "value": "enabled"],
+                "rules": ["condition": "required", "value": "japanese"],
+            ],
+            [
+                "uuid": "waiting-unknown-handicap",
+                "size_speed_options": [
+                    ["size": "19x19", "speed": "correspondence", "system": "fischer"],
+                ],
+                "lower_rank_diff": 3,
+                "upper_rank_diff": 3,
+                "handicap": ["condition": "required", "value": "automatic"],
+                "rules": ["condition": "required", "value": "japanese"],
+            ],
+        ]
+
+        for payload in payloads {
+            let entry = try XCTUnwrap(OGSAutomatchEntry(payload))
+
+            XCTAssertFalse(
+                entry.quickMatchDisplayIsComplete,
+                "Waiting Games must not summarize degraded entry \(entry.uuid)."
+            )
+        }
+    }
+
+    func testWaitingGamesSummaryEligibilityKeepsFullyDecodedRequestDisplayable() throws {
+        let entry = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "waiting-valid-request",
+            "size_speed_options": [
+                ["size": "19x19", "speed": "correspondence", "system": "fischer"],
+            ],
+            "lower_rank_diff": 3,
+            "upper_rank_diff": 3,
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+
+        XCTAssertTrue(entry.quickMatchDisplayIsComplete)
+    }
+
+    func testWaitingGamesPresentationPreservesArbitrarySizeClockPairings() throws {
+        let presentation = try XCTUnwrap(
+            AutomatchEntryPresentation(
+                entry: OGSAutomatchEntry.sampleEntry,
+                userRank: nil,
+                locale: Locale(identifier: "en_US")
+            )
+        )
+
+        XCTAssertEqual(presentation.boardAndSpeed, "9×9 and 13×13 · Live")
+        XCTAssertEqual(
+            presentation.clockLines,
+            [
+                "9×9 · Fischer: 3m + 10s",
+                "13×13 · Byo-Yomi: 10m + 5×30s",
+            ]
+        )
+        XCTAssertEqual(
+            presentation.handicap,
+            "Standard: Use handicaps by default, but accept games with handicaps off."
+        )
+        XCTAssertNil(
+            presentation.rules,
+            "The standard required Japanese rules should keep the compact four-row card."
+        )
+    }
+
+    func testWaitingGamesPresentationSupportsLegacyAndNonEditorPreferences() throws {
+        let option = OGSAutomatchSizeSpeedOption(
+            size: 9,
+            speed: .rapid,
+            system: .fischer
+        )
+        let locale = Locale(identifier: "en_US")
+
+        let rulesCases: [
+            (OGSAutomatchRulesPreference, String?)
+        ] = [
+            (.quickMatchDefault, nil),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .required,
+                    value: .chinese
+                ),
+                "Rules: Chinese"
+            ),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .preferred,
+                    value: .aga
+                ),
+                "Preferred rules: AGA"
+            ),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .required,
+                    value: .korean
+                ),
+                "Rules: Korean"
+            ),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .required,
+                    value: .newZealand
+                ),
+                "Rules: New Zealand"
+            ),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .required,
+                    value: .ing
+                ),
+                "Rules: Ing SST"
+            ),
+            (
+                OGSAutomatchRulesPreference(
+                    condition: .noPreference,
+                    value: .japanese
+                ),
+                "No rules preference"
+            ),
+        ]
+        for (rules, expected) in rulesCases {
+            let entry = OGSAutomatchEntry(
+                sizeSpeedOptions: [option],
+                rules: rules,
+                uuid: "waiting-rules"
+            )
+            let presentation = try XCTUnwrap(
+                AutomatchEntryPresentation(
+                    entry: entry,
+                    userRank: nil,
+                    locale: locale
+                )
+            )
+            XCTAssertEqual(presentation.rules, expected)
+        }
+
+        let handicapCases: [
+            (OGSAutomatchHandicapPreference, String)
+        ] = [
+            (
+                OGSAutomatchHandicapPreference(
+                    condition: .required,
+                    value: .enabled
+                ),
+                "Required: Require handicaps between players of different ranks."
+            ),
+            (
+                .quickMatchDefault,
+                "Standard: Use handicaps by default, but accept games with handicaps off."
+            ),
+            (
+                OGSAutomatchHandicapPreference(
+                    condition: .required,
+                    value: .disabled
+                ),
+                "Disabled: Never play with handicap stones."
+            ),
+            (
+                OGSAutomatchHandicapPreference(
+                    condition: .preferred,
+                    value: .disabled
+                ),
+                "No handicap preferred: Accept games with or without handicap stones."
+            ),
+            (
+                OGSAutomatchHandicapPreference(
+                    condition: .noPreference,
+                    value: .enabled
+                ),
+                "No preference: Accept any handicap setting."
+            ),
+            (
+                OGSAutomatchHandicapPreference(
+                    condition: .noPreference,
+                    value: .disabled
+                ),
+                "No preference: Accept any handicap setting."
+            ),
+        ]
+        for (handicap, expected) in handicapCases {
+            let entry = OGSAutomatchEntry(
+                sizeSpeedOptions: [option],
+                handicap: handicap,
+                uuid: "waiting-handicap"
+            )
+            let presentation = try XCTUnwrap(
+                AutomatchEntryPresentation(
+                    entry: entry,
+                    userRank: nil,
+                    locale: locale
+                )
+            )
+            XCTAssertEqual(presentation.handicap, expected)
+        }
+
+        let expandedServerRankRange = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "waiting-expanded-rank-range",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "lower_rank_diff": 12,
+            "upper_rank_diff": 15,
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+        let broadRankPresentation = try XCTUnwrap(
+            AutomatchEntryPresentation(
+                entry: expandedServerRankRange,
+                userRank: nil,
+                locale: locale
+            )
+        )
+        XCTAssertEqual(
+            broadRankPresentation.rankRange,
+            "12 ranks below to 15 ranks above"
+        )
+        XCTAssertEqual(
+            AutomatchEntryPresentation(
+                entry: expandedServerRankRange,
+                userRank: 28,
+                locale: locale
+            )?.rankRange,
+            "14 Kyu - 9 Dan",
+            "A future OGS range wider than the current editor must still be displayed."
+        )
+
+        let veryLargeButSafeRankRange = OGSAutomatchEntry(
+            sizeSpeedOptions: [option],
+            lowerRankDifference: Int.max / 2,
+            upperRankDifference: Int.max / 2,
+            uuid: "waiting-safe-large-rank-range"
+        )
+        XCTAssertNotNil(
+            AutomatchEntryPresentation(
+                entry: veryLargeButSafeRankRange,
+                userRank: 1_037,
+                locale: locale
+            ),
+            "The display guard must leave ample room for future OGS ranges."
+        )
+    }
+
+    func testWaitingGamesPresentationRejectsOnlyDegradedOrInvalidEntries() throws {
+        let degraded = try XCTUnwrap(
+            OGSAutomatchEntry([
+                "uuid": "waiting-degraded",
+                "size_speed_options": [
+                    ["size": "9x9", "speed": "rapid", "system": "future-clock"],
+                ],
+                "rules": ["condition": "required", "value": "japanese"],
+                "handicap": ["condition": "preferred", "value": "enabled"],
+            ])
+        )
+        let empty = OGSAutomatchEntry(
+            sizeSpeedOptions: [],
+            uuid: "waiting-empty"
+        )
+        let unsupportedBoard = OGSAutomatchEntry(
+            sizeSpeedOptions: [
+                OGSAutomatchSizeSpeedOption(
+                    size: 7,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ],
+            uuid: "waiting-unsupported-board"
+        )
+        let negativeRankDifference = OGSAutomatchEntry(
+            sizeSpeedOptions: [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ],
+            lowerRankDifference: -1,
+            uuid: "waiting-negative-rank"
+        )
+        let unsafeLowerRankDifference = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "waiting-unsafe-lower-rank",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "lower_rank_diff": Int.max / 2 + 1,
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+        let unsafeUpperRankDifference = try XCTUnwrap(OGSAutomatchEntry([
+            "uuid": "waiting-unsafe-upper-rank",
+            "size_speed_options": [
+                ["size": "9x9", "speed": "rapid", "system": "fischer"],
+            ],
+            "upper_rank_diff": Int.max,
+            "handicap": ["condition": "preferred", "value": "enabled"],
+            "rules": ["condition": "required", "value": "japanese"],
+        ]))
+        XCTAssertTrue(unsafeLowerRankDifference.quickMatchDisplayIsComplete)
+        XCTAssertTrue(unsafeUpperRankDifference.quickMatchDisplayIsComplete)
+
+        for entry in [
+            degraded,
+            empty,
+            unsupportedBoard,
+            negativeRankDifference,
+            unsafeLowerRankDifference,
+            unsafeUpperRankDifference,
+        ] {
+            XCTAssertNil(
+                AutomatchEntryPresentation(
+                    entry: entry,
+                    // A legacy encoded professional rank exercises the
+                    // Double-to-Int conversion path that made Int.max unsafe.
+                    userRank: 1_037,
+                    locale: Locale(identifier: "en_US")
+                ),
+                "Entry \(entry.uuid) should retain the unavailable-settings fallback."
+            )
+        }
+    }
+
+    func testQuickMatchCorrespondenceOnlyClassificationUsesSelectedClocks() {
+        let exact = OGSQuickMatchDraft(
+            mode: .exact,
+            speed: .correspondence
+        )
+        let flexible = OGSQuickMatchDraft(
+            mode: .flexible,
+            speed: .correspondence
+        )
+        let rapid = OGSQuickMatchDraft(
+            mode: .exact,
+            speed: .rapid
+        )
+        let multiple = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(
+                    speed: .rapid,
+                    system: .fischer
+                ),
+            ]
+        )
+
+        XCTAssertTrue(exact.quickMatchIsCorrespondenceOnly)
+        XCTAssertTrue(flexible.quickMatchIsCorrespondenceOnly)
+        XCTAssertFalse(rapid.quickMatchIsCorrespondenceOnly)
+        XCTAssertFalse(multiple.quickMatchIsCorrespondenceOnly)
+    }
+
+    func testSharedActivePresentationOnlyAcceptsRepresentableSettings() {
+        let options = [
+            OGSAutomatchSizeSpeedOption(
+                size: 19,
+                speed: .correspondence,
+                system: .fischer
+            ),
+        ]
+        let japaneseEntry = OGSAutomatchEntry(
+            sizeSpeedOptions: options,
+            rules: .quickMatchDefault,
+            uuid: "waiting-japanese"
+        )
+        let agaEntry = OGSAutomatchEntry(
+            sizeSpeedOptions: options,
+            rules: OGSAutomatchRulesPreference(
+                condition: .required,
+                value: .aga
+            ),
+            uuid: "waiting-aga"
+        )
+        let unsupportedHandicapEntry = OGSAutomatchEntry(
+            sizeSpeedOptions: options,
+            handicap: OGSAutomatchHandicapPreference(
+                condition: .preferred,
+                value: .disabled
+            ),
+            uuid: "waiting-unsupported-handicap"
+        )
+
+        XCTAssertNotNil(OGSActiveQuickMatchPresentation(entry: japaneseEntry))
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: agaEntry))
+        XCTAssertNil(
+            OGSActiveQuickMatchPresentation(entry: unsupportedHandicapEntry)
+        )
+    }
+
+    func testLateCancellationTerminalClearsOnlyItsFailure() {
+        let entry = OGSQuickMatchDraft.ogsDefault.makeAutomatchEntry(
+            uuid: "cancelled-entry"
+        )
+        let timeout = QuickMatchRequestFailure(
+            operation: .cancelTimedOut,
+            entry: entry
+        )
+        let start = QuickMatchRequestFailure(operation: .start, entry: entry)
+
+        XCTAssertNil(
+            timeout.retainedAfterCancellationTerminal(uuid: entry.uuid)
+        )
+        XCTAssertNil(timeout.retainedAfterCancellationTerminal(uuid: nil))
+        XCTAssertEqual(
+            timeout.retainedAfterCancellationTerminal(uuid: "another-entry"),
+            timeout
+        )
+        XCTAssertEqual(
+            start.retainedAfterCancellationTerminal(uuid: entry.uuid),
+            start
+        )
+        XCTAssertFalse(timeout.canRetryCancellation(activeEntryIDs: []))
+        XCTAssertTrue(
+            timeout.canRetryCancellation(activeEntryIDs: [entry.uuid])
+        )
     }
 
     func testLegacyStoredEntryMigratesAndKeepsLegacyKey() throws {

@@ -83,7 +83,7 @@ final class AppRouteTests: XCTestCase {
     }
 
     @MainActor
-    func testHandlingGameRoutesDismissesTransientNavigationAndPreservesTargetGame() throws {
+    func testFoundGameRouteDismissesTrackedSheetsAndRemainsPending() throws {
         let navigation = NavigationService()
         let currentHomeGame = Game(
             width: 19,
@@ -110,6 +110,7 @@ final class AppRouteTests: XCTestCase {
         )
         navigation.main.showWaitingGames = true
         navigation.home.showingNewGameView = true
+        navigation.home.showingPreferredSettings = true
         navigation.home.showingGameHistory = true
         navigation.home.showingSettings = true
 
@@ -123,11 +124,13 @@ final class AppRouteTests: XCTestCase {
         XCTAssertNil(navigation.main.modalLiveGame)
         XCTAssertFalse(navigation.main.showWaitingGames)
         XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertFalse(navigation.home.showingPreferredSettings)
         XCTAssertFalse(navigation.home.showingGameHistory)
         XCTAssertFalse(navigation.home.showingSettings)
         XCTAssertTrue(navigation.home.activeGame === currentHomeGame)
         XCTAssertFalse(navigation.home.activeGameShowsCarousel)
         XCTAssertNil(navigation.publicGames.activeGame)
+        XCTAssertEqual(navigation.pendingGameOpen?.rootView, .home)
         XCTAssertEqual(navigation.pendingGameOpen?.ogsGameID, 42)
     }
 

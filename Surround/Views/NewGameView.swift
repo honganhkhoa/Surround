@@ -417,7 +417,7 @@ struct NewGameView: View {
                     title: Text("Couldn’t cancel the search"),
                     message: Text("OGS did not confirm the cancellation. The search is still shown so you can try again."),
                     primaryButton: .default(Text("Retry")) {
-                        cancelQuickMatch(failure.entry)
+                        retryCancellation(failure)
                     },
                     secondaryButton: .cancel()
                 )
@@ -525,6 +525,23 @@ struct NewGameView: View {
         if cancellingEntryID == uuid {
             cancellingEntryID = nil
         }
+        quickMatchRequestFailure = quickMatchRequestFailure?
+            .retainedAfterCancellationTerminal(uuid: uuid)
+    }
+
+    private func retryCancellation(_ failure: QuickMatchRequestFailure) {
+        var activeEntryIDs = Set(ogs.autoMatchEntryById.keys)
+        if let optimisticLiveEntry {
+            activeEntryIDs.insert(optimisticLiveEntry.uuid)
+        }
+        activeEntryIDs.formUnion(optimisticCorrespondenceEntries.keys)
+        guard failure.canRetryCancellation(
+            activeEntryIDs: activeEntryIDs
+        ) else {
+            quickMatchRequestFailure = nil
+            return
+        }
+        cancelQuickMatch(failure.entry)
     }
 
     private func handleAutomatchLifecycleEvent(
@@ -550,6 +567,8 @@ struct NewGameView: View {
                 optimisticLiveEntry = nil
                 optimisticCorrespondenceEntries.removeAll()
                 cancellingEntryID = nil
+                quickMatchRequestFailure = quickMatchRequestFailure?
+                    .retainedAfterCancellationTerminal(uuid: nil)
                 let notice = removedCount == 1
                     ? String(localized: "Your search ended before a game was found. Your settings are unchanged, so you can search again.")
                     : String(localized: "Your active searches ended before games were found. Your settings are unchanged, so you can search again.")

@@ -659,8 +659,7 @@ struct HomeView: View {
             AccessibilityNotification.Announcement(
                 String(localized: "Game found")
             ).post()
-            nav.home.showingNewGameView = false
-            nav.requestGameOpen(route)
+            nav.handle(route: route)
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {

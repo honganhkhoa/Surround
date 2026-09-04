@@ -7,167 +7,6 @@
 
 import SwiftUI
 
-struct AutomatchEntryPresentation: Equatable {
-    let boardAndSpeed: String?
-    let clockLines: [String]
-    let rankRange: String
-    let handicap: String
-
-    init(
-        entry: OGSAutomatchEntry,
-        userRank: Double?,
-        locale: Locale = .current
-    ) {
-        let options = entry.sizeSpeedOptions
-        let sizes = Set(options.map(\.size)).sorted()
-        let speeds = Self.sortedSpeeds(Set(options.map(\.speed)))
-
-        if sizes.isEmpty || speeds.isEmpty {
-            boardAndSpeed = nil
-        } else {
-            let sizeText = Self.localizedList(
-                sizes.map { "\($0)×\($0)" },
-                locale: locale
-            )
-            let speedText = Self.localizedList(
-                speeds.map(\.quickMatchTitle),
-                locale: locale
-            )
-            boardAndSpeed = sizes.count == 1 && speeds.count == 1
-                ? String(
-                    localized: "\(sizeText) \(speedText)",
-                    locale: locale,
-                    comment: "Board size followed by game speed in a waiting Quick Match request."
-                )
-                : String(
-                    localized: "\(sizeText) · \(speedText)",
-                    locale: locale,
-                    comment: "Board sizes followed by game speeds in a waiting Quick Match request."
-                )
-        }
-
-        let selections = Set(options.map {
-            OGSQuickMatchClockSelection(speed: $0.speed, system: $0.system)
-        })
-        .sorted(by: Self.clockSelectionPrecedes)
-        let qualifiesClockWithSpeed = speeds.count > 1
-        clockLines = selections.map { selection in
-            let matchingSizes = Set(
-                options
-                    .filter {
-                        $0.speed == selection.speed
-                            && $0.system == selection.system
-                    }
-                    .map(\.size)
-            )
-            .sorted()
-            let presets = matchingSizes.compactMap {
-                OGSQuickMatchClockPreset.preset(
-                    boardSize: $0,
-                    speed: selection.speed,
-                    system: selection.system
-                )
-            }
-            let value = presets.count == matchingSizes.count
-                ? OGSQuickMatchClockPreset.quickMatchDisplayDescription(
-                    for: presets
-                )
-                : String(localized: "Unknown clock", locale: locale)
-            let clockName = qualifiesClockWithSpeed
-                ? String(
-                    localized: "\(selection.speed.quickMatchTitle) · \(selection.system.quickMatchTitle)",
-                    locale: locale,
-                    comment: "Game speed followed by clock system in a waiting Quick Match request."
-                )
-                : selection.system.quickMatchTitle
-            return String(
-                localized: "\(clockName): \(value)",
-                locale: locale,
-                comment: "Clock name followed by its values in a waiting Quick Match request."
-            )
-        }
-
-        if let userRank {
-            let lower = RankUtils.formattedRank(
-                userRank - Double(entry.lowerRankDifference),
-                longFormat: true
-            )
-            let upper = RankUtils.formattedRank(
-                userRank + Double(entry.upperRankDifference),
-                longFormat: true
-            )
-            rankRange = String(
-                localized: "\(lower) - \(upper)",
-                locale: locale,
-                comment: "Lowest and highest opponent ranks accepted by a Quick Match request."
-            )
-        } else {
-            rankRange = String(
-                localized: "\(entry.lowerRankDifference) ranks below to \(entry.upperRankDifference) ranks above",
-                locale: locale
-            )
-        }
-
-        let handicapPreference: OGSQuickMatchHandicapPreference?
-        switch (entry.handicap.condition, entry.handicap.value) {
-        case (.required, .enabled):
-            handicapPreference = .required
-        case (.preferred, .enabled):
-            handicapPreference = .standard
-        case (.required, .disabled):
-            handicapPreference = .disabled
-        default:
-            handicapPreference = nil
-        }
-        if let handicapPreference {
-            handicap = String(
-                localized: "\(handicapPreference.quickMatchTitle): \(handicapPreference.quickMatchDescription)",
-                locale: locale,
-                comment: "Handicap preference name followed by its explanation in a waiting Quick Match request."
-            )
-        } else {
-            handicap = String(
-                localized: "No preference: Accept any handicap setting.",
-                locale: locale
-            )
-        }
-    }
-
-    private static func localizedList(
-        _ values: [String],
-        locale: Locale
-    ) -> String {
-        let formatter = ListFormatter()
-        formatter.locale = locale
-        return formatter.string(from: values) ?? values.joined(separator: ", ")
-    }
-
-    private static func sortedSpeeds(
-        _ speeds: Set<TimeControlSpeed>
-    ) -> [TimeControlSpeed] {
-        let order: [TimeControlSpeed] = [
-            .blitz, .rapid, .live, .correspondence,
-        ]
-        return speeds.sorted {
-            (order.firstIndex(of: $0) ?? .max)
-                < (order.firstIndex(of: $1) ?? .max)
-        }
-    }
-
-    private static func clockSelectionPrecedes(
-        _ lhs: OGSQuickMatchClockSelection,
-        _ rhs: OGSQuickMatchClockSelection
-    ) -> Bool {
-        let speeds = sortedSpeeds(Set([lhs.speed, rhs.speed]))
-        if lhs.speed != rhs.speed {
-            return speeds.first == lhs.speed
-        }
-        let systems = OGSAutomatchClockSystem.allCases
-        return (systems.firstIndex(of: lhs.system) ?? .max)
-            < (systems.firstIndex(of: rhs.system) ?? .max)
-    }
-}
-
 struct AutomatchEntryCell: View {
     @EnvironmentObject var ogs: OGSService
     @State private var isCancelling = false
@@ -175,7 +14,7 @@ struct AutomatchEntryCell: View {
     
     var entry: OGSAutomatchEntry
 
-    private var presentation: AutomatchEntryPresentation {
+    private var presentation: AutomatchEntryPresentation? {
         AutomatchEntryPresentation(entry: entry, userRank: ogs.user?.ranking)
     }
     
@@ -183,9 +22,9 @@ struct AutomatchEntryCell: View {
         VStack(alignment: .leading) {
             requestHeader
             Divider()
-            if let boardAndSpeed = presentation.boardAndSpeed {
+            if let presentation {
                 Label(
-                    boardAndSpeed,
+                    presentation.boardAndSpeed,
                     systemImage: "squareshape.split.3x3"
                 )
 
@@ -201,22 +40,25 @@ struct AutomatchEntryCell: View {
                 } icon: {
                     Image(systemName: "clock")
                 }
+                Label(
+                    presentation.rankRange,
+                    systemImage: "arrow.up.and.down.square"
+                )
+
+                Label(
+                    presentation.handicap,
+                    systemImage: "square.grid.3x3.topleft.filled"
+                )
+
+                if let rules = presentation.rules {
+                    Label(rules, systemImage: "doc.text")
+                }
             } else {
                 Label(
                     "Unable to display match settings",
                     systemImage: "exclamationmark.triangle"
                 )
             }
-
-            Label(
-                presentation.rankRange,
-                systemImage: "arrow.up.and.down.square"
-            )
-
-            Label(
-                presentation.handicap,
-                systemImage: "square.grid.3x3.topleft.filled"
-            )
         }
         .font(.subheadline)
         .accessibilityElement(children: .contain)
