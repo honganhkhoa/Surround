@@ -30,9 +30,7 @@ The simulator helper accepts an iOS major version and an optional exact family o
 
 ## Offline iPad UI tests
 
-The shared journeys cover top-level navigation, opening the bundled fixture
-game, and entering and leaving Zen mode. The suite selects landscape orientation
-itself:
+The shared journeys cover top-level navigation, opening the bundled fixture game, and entering and leaving Zen mode. The suite selects landscape orientation itself:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
@@ -44,13 +42,13 @@ result_label="Local-$(date +%Y%m%d-%H%M%S)"
 .github/ci-tools/run-ipad-ui-tests.sh composer "$simulator_id" "$result_label"
 ```
 
-The keyboard helper stops the Simulator.app host, shuts down only the selected simulator, updates its device-specific preference, then boots the device in a new Simulator.app process. It verifies the stored preference and records the guest's hardware-keyboard attachment state, warning if the undocumented state signal is absent. The separate XCUI preflight is authoritative: the specific chat field must gain focus while no software-keyboard frame is visible. Composer tests still require that field to accept the complete typed value, so automatic-focus and input coverage remain intact.
+The keyboard helper stops the Simulator.app host, shuts down only the selected simulator, updates its device-specific preference, then boots the device in a new Simulator.app process. Hardware-keyboard attachment is a best-effort optimization that can reduce software-keyboard transitions, not a test prerequisite; Simulator can keep its software keyboard visible while reporting that a hardware keyboard is attached. The helper warns when the preference or guest attachment cannot be verified, while lifecycle failures that prevent the selected simulator from returning to a booted state remain fatal. The separate XCUI preflight is authoritative and functional: the specific chat field must gain focus and accept the complete typed value regardless of which keyboard presentation Simulator chooses.
 
-The runner builds once, verifies keyboard behavior, then separates the main journeys from the tests that intentionally focus a composer or exercise layout while it owns keyboard focus. Each test phase writes its own `.xcresult` bundle under `TestResults`. CI still runs the main and isolated composer phases when the preflight fails, preserving app-test diagnostics while reporting the environment failure directly. This keeps a lost XCTest keyboard-animation completion notification from slowing unrelated tests. Both UI-test phases use a 15-minute XCTest execution allowance per test. In CI, each phase also has a 30-minute step limit. The current-OS job has a 90-minute outer limit. The minimum-OS job reuses the UI derived-data directory for its sequential unit step and has a 120-minute outer limit, providing headroom for result upload even if both UI phases reach their own limits.
+The runner builds once, verifies functional composer input, then separates the main journeys from the tests that intentionally focus a composer or exercise layout while it owns keyboard focus. Each test phase writes its own `.xcresult` bundle under `TestResults`. CI runs both the main and isolated composer phases whenever the shared build succeeds and the job is not cancelled, even when the preflight or preceding UI phase fails, preserving complete app-test diagnostics while reporting each failure directly. The runner does not retry failed tests or disable XCTest quiescence. This keeps a lost XCTest keyboard-animation completion notification from slowing unrelated tests. Both UI-test phases use a 15-minute XCTest execution allowance per test. In CI, each phase also has a 30-minute step limit. The current-OS job has a 90-minute outer limit. The minimum-OS job reuses the UI derived-data directory for its sequential unit step and has a 120-minute outer limit, providing headroom for result upload even if both UI phases reach their own limits.
 
 The isolated selection is centralized in `.github/ci-tools/run-ipad-ui-tests.sh` so the iPadOS 26 and iPadOS 18 lanes cannot drift. The runner also validates every isolated test declaration before invoking Xcode, so a renamed test cannot silently execute in the wrong phase.
 
-CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains its unit, keyboard-preflight, main UI, and composer UI result bundles in the `surround-ios-18-test-results` artifact.
+CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains its unit, composer-input preflight, main UI, and composer UI result bundles in the `surround-ios-18-test-results` artifact.
 
 ## Deployment target validation
 

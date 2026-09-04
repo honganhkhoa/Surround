@@ -60,7 +60,7 @@ readonly test_target="SurroundUITests"
 readonly test_class="SurroundUITests"
 readonly test_source="SurroundUITests/${test_class}.swift"
 readonly test_case="${test_target}/${test_class}"
-readonly keyboard_preflight_test_name="testHardwareKeyboardPreflightKeepsSoftwareKeyboardHidden"
+readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInput"
 
 # These tests intentionally focus a chat composer or exercise layout while that
 # composer owns keyboard focus. Run them after the rest of the suite so an
@@ -124,7 +124,7 @@ case "$phase" in
 
   preflight)
     mkdir -p TestResults
-    echo "Verifying the selected iPad's runtime keyboard behavior."
+    echo "Verifying that the selected iPad can focus the composer and accept complete keyboard input."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "-only-testing:${test_case}/${keyboard_preflight_test_name}" \

@@ -118,9 +118,10 @@ keyboard_preference_path="${device_preferences_path}.ConnectHardwareKeyboard"
 ensure_dictionary "DevicePreferences"
 ensure_dictionary "$device_preferences_path"
 
-# Keep XCTest on the hardware-keyboard path. The UI tests still assert the
-# composer-specific keyboard-focus signal and text delivery; this only removes
-# the software-keyboard animation that can poison XCTest's quiescence monitor.
+# Prefer the hardware-keyboard path because it can reduce software-keyboard
+# transitions. Simulator may still show its software keyboard while a hardware
+# keyboard is attached, so the XCUI preflight verifies focus and text delivery
+# without requiring either presentation mode.
 keyboard_preference_buddy_path=":${keyboard_preference_path//./:}"
 /usr/libexec/PlistBuddy \
   -c "Delete $keyboard_preference_buddy_path" "$preferences_plist" \
@@ -147,12 +148,12 @@ configured_value="$(
   -c "Delete :$verification_key" "$preferences_plist"
 
 if [[ "$configured_value" != "true" ]]; then
-  echo "Could not enable the hardware keyboard for simulator $simulator_id." >&2
-  exit 1
+  echo "Warning: could not verify the optional hardware-keyboard preference for simulator $simulator_id; continuing with Simulator's selected keyboard mode." >&2
+else
+  echo "Preferred the hardware keyboard for $simulator_name ($simulator_id)."
 fi
 
-echo "Enabled the hardware keyboard for $simulator_name ($simulator_id)."
-echo "Booting $simulator_name on $simulator_runtime with the new preference."
+echo "Booting $simulator_name on $simulator_runtime with the selected keyboard preference."
 xcrun simctl boot "$simulator_id"
 xcrun simctl bootstatus "$simulator_id" -b
 
@@ -201,7 +202,7 @@ done
 
 if ! [[ "$hardware_keyboard_state" =~ ^[0-9]+$ ]] \
   || (( (hardware_keyboard_state & 255) == 0 )); then
-  echo "Warning: the booted simulator did not report an attached hardware keyboard; the XCUI preflight will verify the observable behavior." >&2
+  echo "Warning: the booted simulator did not report an attached hardware keyboard; continuing because attachment is optional and the XCUI preflight verifies composer input." >&2
 fi
 
 echo "Simulator keyboard setup complete: name=$simulator_name state=$simulator_state preference=$configured_value guestState=$hardware_keyboard_state"

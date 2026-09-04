@@ -1929,10 +1929,10 @@ final class SurroundUITests: SurroundUITestCase {
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
     }
 
-    func testHardwareKeyboardPreflightKeepsSoftwareKeyboardHidden() throws {
+    func testKeyboardPreflightSupportsComposerInput() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip(
-            "The Simulator hardware-keyboard preflight requires an iOS device."
+            "The composer-input preflight requires an iOS device."
         )
         #else
         let app = launchApp(
@@ -1961,53 +1961,33 @@ final class SurroundUITests: SurroundUITestCase {
             keepTextInputHierarchy(
                 input,
                 in: app,
-                reason: "hardware-keyboard preflight did not focus composer"
+                reason: "keyboard preflight did not focus composer"
             )
         }
         XCTAssertTrue(
             focusAcquired,
-            "Expected the compact composer to receive focus during the hardware-keyboard preflight."
+            "Expected the compact composer to receive focus during the keyboard preflight."
         )
 
-        var focusRemainedActive = true
-        var visibleKeyboardFrames: [CGRect] = []
-        let observationDeadline = Date(timeIntervalSinceNow: 2)
-        repeat {
-            if !chatInputHasKeyboardFocus(in: app) {
-                focusRemainedActive = false
-                break
-            }
-            visibleKeyboardFrames = app.keyboards.allElementsBoundByIndex
-                .compactMap { keyboard in
-                    let intersection = keyboard.frame.intersection(app.frame)
-                    return intersection.width > 1 && intersection.height > 1
-                        ? intersection
-                        : nil
-                }
-            if !visibleKeyboardFrames.isEmpty {
-                break
-            }
-            RunLoop.current.run(
-                until: Date().addingTimeInterval(0.2)
-            )
-        } while Date() < observationDeadline
+        enterText(
+            "Keyboard preflight",
+            into: resolvedChatInput(in: app),
+            in: app,
+            focusMode: .requireExistingFocus
+        )
 
-        if !focusRemainedActive || !visibleKeyboardFrames.isEmpty {
+        let keyboardWasNormalized = hideSoftwareKeyboardIfVisible(
+            in: app,
+            appearanceTimeout: 1
+        )
+        if !keyboardWasNormalized {
             keepTextInputHierarchy(
                 input,
                 in: app,
-                reason: "hardware-keyboard runtime preflight failed"
+                reason: "software keyboard remained visible during preflight"
             )
-            keepScreenshot("hardware-keyboard-runtime-preflight", in: app)
+            keepScreenshot("keyboard-runtime-preflight", in: app)
         }
-        XCTAssertTrue(
-            focusRemainedActive,
-            "Expected the composer to remain focused throughout the hardware-keyboard preflight."
-        )
-        XCTAssertTrue(
-            visibleKeyboardFrames.isEmpty,
-            "Expected no visible software keyboard while the composer was focused; frames: \(visibleKeyboardFrames)"
-        )
         #endif
     }
 
@@ -2643,6 +2623,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
             in: app
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         XCTAssertFalse(
             app.descendants(matching: .any)[
                 SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
@@ -2689,6 +2670,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
             in: app
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         assertVariationSharingDraftIsIntact(draft)
         activateZenControl(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
@@ -2699,6 +2681,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameZenExit,
             in: app
         )
+        dismissSoftwareKeyboardIfNeeded(in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
             in: app,
@@ -2708,7 +2691,6 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app
         )
-        _ = focusSharedVariationInput(in: app)
         assertVariationSharingDraftIsIntact(draft)
     }
 

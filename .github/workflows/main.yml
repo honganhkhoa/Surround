@@ -68,7 +68,7 @@ jobs:
           simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
-      - name: Configure the iPadOS 26 test keyboard
+      - name: Prefer an iPadOS 26 hardware keyboard
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -81,7 +81,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Verify iPadOS 26 hardware-keyboard behavior
+      - name: Verify iPadOS 26 composer input
         id: ipad_keyboard_preflight
         timeout-minutes: 5
         shell: bash
@@ -158,7 +158,7 @@ jobs:
             -only-testing:SurroundTests \
             -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
 
-      - name: Configure the iPadOS 18 test keyboard
+      - name: Prefer an iPadOS 18 hardware keyboard
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -171,7 +171,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Verify iPadOS 18 hardware-keyboard behavior
+      - name: Verify iPadOS 18 composer input
         id: ipad_keyboard_preflight
         timeout-minutes: 5
         shell: bash
