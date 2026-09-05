@@ -34,35 +34,38 @@ final class OGSServiceEventTests: XCTestCase {
         }
 
         private static let lock = NSLock()
-        private static var plans = [Plan]()
-        private static var heldProtocols = [QuickMatchStatsURLProtocol]()
+        private static var plans = [String: [Plan]]()
         private static var requests = [URLRequest]()
-        private static var stoppedRequestCount = 0
-        private static var requestObserver: ((URLRequest) -> Void)?
-        private static var stopObserver: (() -> Void)?
+        private static var requestObservers = [String: () -> Void]()
+        private static var stopObservers = [String: () -> Void]()
 
         static func reset() {
             lock.lock()
             plans.removeAll()
-            heldProtocols.removeAll()
             requests.removeAll()
-            stoppedRequestCount = 0
-            requestObserver = nil
-            stopObserver = nil
+            requestObservers.removeAll()
+            stopObservers.removeAll()
             lock.unlock()
         }
 
-        static func enqueue(_ plan: Plan) {
+        static func ranks(in request: URLRequest) -> String? {
+            guard let url = request.url,
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  components.path == "/termination-api/automatch-stats" else {
+                return nil
+            }
+            return components.queryItems?.first { $0.name == "ranks" }?.value
+        }
+
+        static func enqueue(_ plan: Plan, ranks: String) {
             lock.lock()
-            plans.append(plan)
+            plans[ranks, default: []].append(plan)
             lock.unlock()
         }
 
-        static func observeNextRequest(
-            _ observer: @escaping (URLRequest) -> Void
-        ) {
+        static func observeNextRequest(ranks: String, _ observer: @escaping () -> Void) {
             lock.lock()
-            requestObserver = observer
+            requestObservers[ranks] = observer
             lock.unlock()
         }
 
@@ -72,28 +75,10 @@ final class OGSServiceEventTests: XCTestCase {
             return requests
         }
 
-        static func stoppedCount() -> Int {
+        static func observeNextStop(ranks: String, _ observer: @escaping () -> Void) {
             lock.lock()
-            defer { lock.unlock() }
-            return stoppedRequestCount
-        }
-
-        static func observeNextStop(_ observer: @escaping () -> Void) {
-            lock.lock()
-            stopObserver = observer
+            stopObservers[ranks] = observer
             lock.unlock()
-        }
-
-        static func respondToFirstHeldRequest(
-            statusCode: Int = 200,
-            body: Data
-        ) {
-            lock.lock()
-            let held = heldProtocols.isEmpty
-                ? nil
-                : heldProtocols.removeFirst()
-            lock.unlock()
-            held?.respond(statusCode: statusCode, body: body)
         }
 
         override class func canInit(with request: URLRequest) -> Bool { true }
@@ -102,18 +87,17 @@ final class OGSServiceEventTests: XCTestCase {
         ) -> URLRequest { request }
 
         override func startLoading() {
+            let ranks = Self.ranks(in: request) ?? ""
             Self.lock.lock()
             Self.requests.append(request)
-            let plan = Self.plans.isEmpty
+            var pendingPlans = Self.plans[ranks, default: []]
+            let plan = pendingPlans.isEmpty
                 ? Plan.failure(URLError(.resourceUnavailable))
-                : Self.plans.removeFirst()
-            if case .hold = plan {
-                Self.heldProtocols.append(self)
-            }
-            let observer = Self.requestObserver
-            Self.requestObserver = nil
+                : pendingPlans.removeFirst()
+            Self.plans[ranks] = pendingPlans
+            let observer = Self.requestObservers.removeValue(forKey: ranks)
             Self.lock.unlock()
-            observer?(request)
+            observer?()
 
             switch plan {
             case .response(let statusCode, let body):
@@ -126,10 +110,9 @@ final class OGSServiceEventTests: XCTestCase {
         }
 
         override func stopLoading() {
+            let ranks = Self.ranks(in: request) ?? ""
             Self.lock.lock()
-            Self.stoppedRequestCount += 1
-            let observer = Self.stopObserver
-            Self.stopObserver = nil
+            let observer = Self.stopObservers.removeValue(forKey: ranks)
             Self.lock.unlock()
             observer?()
         }
@@ -148,6 +131,31 @@ final class OGSServiceEventTests: XCTestCase {
             )
             client?.urlProtocol(self, didLoad: body)
             client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+
+    private final class QuickMatchStatsEventMonitor: EventMonitor {
+        let queue = DispatchQueue.main
+        private var observedRequests = Set<UUID>()
+        private var completionObservers = [String: (AFDataResponse<Data?>) -> Void]()
+
+        func observeCompletion(
+            ranks: String,
+            _ observer: @escaping (AFDataResponse<Data?>) -> Void
+        ) {
+            completionObservers[ranks] = observer
+        }
+
+        func request<Value>(_ request: DataRequest, didParseResponse response: DataResponse<Value, AFError>) {
+            guard let urlRequest = request.request,
+                  let ranks = QuickMatchStatsURLProtocol.ranks(in: urlRequest),
+                  observedRequests.insert(request.id).inserted,
+                  let observer = completionObservers.removeValue(forKey: ranks) else {
+                return
+            }
+            // didParseResponse precedes the service callback. A second response
+            // handler runs after responseJSON's handler on the same main queue.
+            request.response(queue: .main, completionHandler: observer)
         }
     }
 
@@ -4865,31 +4873,67 @@ final class OGSServiceEventTests: XCTestCase {
 
     func testQuickMatchPopularityRequestLifecycle() throws {
         QuickMatchStatsURLProtocol.reset()
+        let monitor = QuickMatchStatsEventMonitor()
         let socket = FakeWebsocket()
         let service = makeService(
             socket: socket,
-            urlProtocolClass: QuickMatchStatsURLProtocol.self
+            urlProtocolClass: QuickMatchStatsURLProtocol.self,
+            eventMonitors: [monitor]
         )
         service.subscribeToAutomatchAvailability()
+
+        // These are deadlines, not sleeps: a busy CI runner can take more than
+        // two seconds to start a request, while normal completions return early.
+        let requestTimeout: TimeInterval = 10
+        let normalRanks = "26,27,28,29"
+        var publishedTotals = [Int]()
+        let updates = service.$quickMatchPopularityStats.dropFirst().sink {
+            publishedTotals.append($0.totalAcrossBoardSizes)
+        }
+        defer { updates.cancel() }
+
+        func waitForRequests(
+            _ expectations: [XCTestExpectation],
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) -> Bool {
+            let result = XCTWaiter.wait(for: expectations, timeout: requestTimeout)
+            XCTAssertEqual(
+                result, .completed,
+                "Waiting for: \(expectations.map(\.expectationDescription).joined(separator: ", "))",
+                file: file, line: line
+            )
+            return result == .completed
+        }
+
+        func completion(
+            _ description: String,
+            ranks: String,
+            cancelled: Bool = false
+        ) -> XCTestExpectation {
+            let completed = XCTestExpectation(description: description)
+            monitor.observeCompletion(ranks: ranks) { response in
+                if cancelled {
+                    XCTAssertTrue(response.error?.isExplicitlyCancelledError == true)
+                }
+                completed.fulfill()
+            }
+            return completed
+        }
 
         QuickMatchStatsURLProtocol.enqueue(.response(
             statusCode: 200,
             body: Data(#"{"9x9":{"rapid":{"fischer":4}}}"#.utf8)
-        ))
-        let validUpdate = expectation(description: "valid stats update")
-        var validCancellable: AnyCancellable? = service
-            .$quickMatchPopularityStats
-            .dropFirst()
-            .first { $0.totalAcrossBoardSizes == 4 }
-            .sink { _ in validUpdate.fulfill() }
+        ), ranks: normalRanks)
+        let validUpdate = completion("valid stats processed", ranks: normalRanks)
         service.refreshQuickMatchPopularityStats(
             userRank: 28,
             lowerRankDifference: 2,
             upperRankDifference: 1
         )
-        wait(for: [validUpdate], timeout: 2)
-        withExtendedLifetime(validCancellable) {}
-        validCancellable = nil
+        guard waitForRequests([validUpdate]) else { return }
+        XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 4)
+        XCTAssertEqual(publishedTotals, [4])
 
         let request = try XCTUnwrap(
             QuickMatchStatsURLProtocol.requestSnapshot().last
@@ -4901,160 +4945,139 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(components.path, "/termination-api/automatch-stats")
         XCTAssertEqual(
             components.queryItems?.first { $0.name == "ranks" }?.value,
-            "26,27,28,29"
+            normalRanks
         )
 
         QuickMatchStatsURLProtocol.enqueue(.response(
             statusCode: 200,
             body: Data("{}".utf8)
-        ))
-        let emptyUpdate = expectation(description: "valid empty stats clear")
-        var emptyCancellable: AnyCancellable? = service
-            .$quickMatchPopularityStats
-            .dropFirst()
-            .first { $0 == .empty }
-            .sink { _ in emptyUpdate.fulfill() }
+        ), ranks: normalRanks)
+        let emptyUpdate = completion("valid empty stats processed", ranks: normalRanks)
         service.refreshQuickMatchPopularityStats(
             userRank: 28,
             lowerRankDifference: 2,
             upperRankDifference: 1
         )
-        wait(for: [emptyUpdate], timeout: 2)
-        withExtendedLifetime(emptyCancellable) {}
-        emptyCancellable = nil
+        guard waitForRequests([emptyUpdate]) else { return }
+        XCTAssertEqual(service.quickMatchPopularityStats, .empty)
+        XCTAssertEqual(publishedTotals, [4, 0])
 
         QuickMatchStatsURLProtocol.enqueue(.response(
             statusCode: 200,
             body: Data(#"{"13x13":{"rapid":{"fischer":7}}}"#.utf8)
-        ))
-        let replacementUpdate = expectation(description: "replacement stats update")
-        var replacementCancellable: AnyCancellable? = service
-            .$quickMatchPopularityStats
-            .dropFirst()
-            .first { $0.totalAcrossBoardSizes == 7 }
-            .sink { _ in replacementUpdate.fulfill() }
+        ), ranks: normalRanks)
+        let replacementUpdate = completion("replacement stats processed", ranks: normalRanks)
         service.refreshQuickMatchPopularityStats(
             userRank: 28,
             lowerRankDifference: 2,
             upperRankDifference: 1
         )
-        wait(for: [replacementUpdate], timeout: 2)
-        withExtendedLifetime(replacementCancellable) {}
-        replacementCancellable = nil
+        guard waitForRequests([replacementUpdate]) else { return }
+        XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 7)
+        XCTAssertEqual(publishedTotals, [4, 0, 7])
 
-        for plan in [
-            QuickMatchStatsURLProtocol.Plan.response(
+        for (description, plan) in [
+            ("malformed response processed", QuickMatchStatsURLProtocol.Plan.response(
                 statusCode: 200,
                 body: Data("[]".utf8)
-            ),
-            .failure(URLError(.timedOut)),
+            )),
+            ("failed response processed", .failure(URLError(.timedOut))),
         ] {
-            QuickMatchStatsURLProtocol.enqueue(plan)
-            let noChange = expectation(
-                description: "malformed or failed response retains stats"
-            )
-            noChange.isInverted = true
-            let noChangeCancellable = service
-                .$quickMatchPopularityStats
-                .dropFirst()
-                .sink { _ in noChange.fulfill() }
+            QuickMatchStatsURLProtocol.enqueue(plan, ranks: normalRanks)
+            let processed = completion(description, ranks: normalRanks)
             service.refreshQuickMatchPopularityStats(
                 userRank: 28,
                 lowerRankDifference: 2,
                 upperRankDifference: 1
             )
-            wait(for: [noChange], timeout: 0.25)
-            withExtendedLifetime(noChangeCancellable) {}
+            // Observe publications through the service callback, rather than
+            // letting an inverted timeout pass before the response is handled.
+            guard waitForRequests([processed]) else { return }
+            XCTAssertEqual(publishedTotals, [4, 0, 7])
             XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 7)
         }
 
-        QuickMatchStatsURLProtocol.enqueue(.hold)
-        let firstStarted = expectation(description: "superseded request started")
-        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+        let supersededRanks = "19,20,21"
+        QuickMatchStatsURLProtocol.enqueue(.hold, ranks: supersededRanks)
+        let firstStarted = XCTestExpectation(description: "superseded request started")
+        QuickMatchStatsURLProtocol.observeNextRequest(ranks: supersededRanks) {
             firstStarted.fulfill()
         }
+        let firstCompleted = completion(
+            "superseded cancellation processed", ranks: supersededRanks, cancelled: true
+        )
         service.refreshQuickMatchPopularityStats(
             userRank: 20,
             lowerRankDifference: 1,
             upperRankDifference: 1
         )
-        wait(for: [firstStarted], timeout: 2)
-        let stoppedBeforeSuperseding = QuickMatchStatsURLProtocol.stoppedCount()
+        guard waitForRequests([firstStarted]) else { return }
+        let firstStopped = XCTestExpectation(description: "superseded request stopped")
+        QuickMatchStatsURLProtocol.observeNextStop(ranks: supersededRanks) {
+            firstStopped.fulfill()
+        }
 
+        let supersedingRanks = "20,21,22"
         QuickMatchStatsURLProtocol.enqueue(.response(
             statusCode: 200,
             body: Data(#"{"19x19":{"rapid":{"fischer":9}}}"#.utf8)
-        ))
-        let supersedingUpdate = expectation(description: "newer request wins")
-        let supersedingCancellable = service
-            .$quickMatchPopularityStats
-            .dropFirst()
-            .first { $0.totalAcrossBoardSizes == 9 }
-            .sink { _ in supersedingUpdate.fulfill() }
+        ), ranks: supersedingRanks)
+        let supersedingUpdate = completion("newer response processed", ranks: supersedingRanks)
         service.refreshQuickMatchPopularityStats(
             userRank: 21,
             lowerRankDifference: 1,
             upperRankDifference: 1
         )
-        wait(for: [supersedingUpdate], timeout: 2)
-        XCTAssertGreaterThan(
-            QuickMatchStatsURLProtocol.stoppedCount(),
-            stoppedBeforeSuperseding
-        )
-
-        let noStaleUpdate = expectation(description: "stale response ignored")
-        noStaleUpdate.isInverted = true
-        let staleCancellable = service
-            .$quickMatchPopularityStats
-            .dropFirst()
-            .sink { _ in noStaleUpdate.fulfill() }
-        QuickMatchStatsURLProtocol.respondToFirstHeldRequest(
-            body: Data(#"{"9x9":{"rapid":{"fischer":99}}}"#.utf8)
-        )
-        wait(for: [noStaleUpdate], timeout: 0.25)
-        withExtendedLifetime(supersedingCancellable) {}
-        staleCancellable.cancel()
+        // Await both callbacks before checking that the cancelled predecessor
+        // cannot overwrite the replacement. URLSession discards responses sent
+        // through a URLProtocol after cancellation.
+        guard waitForRequests([firstStopped, firstCompleted, supersedingUpdate]) else { return }
+        XCTAssertEqual(publishedTotals, [4, 0, 7, 9])
         XCTAssertEqual(service.quickMatchPopularityStats.totalAcrossBoardSizes, 9)
 
-        QuickMatchStatsURLProtocol.enqueue(.hold)
-        let cancellationStarted = expectation(description: "request before unsubscribe")
-        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+        QuickMatchStatsURLProtocol.enqueue(.hold, ranks: normalRanks)
+        let cancellationStarted = XCTestExpectation(description: "request before unsubscribe")
+        QuickMatchStatsURLProtocol.observeNextRequest(ranks: normalRanks) {
             cancellationStarted.fulfill()
         }
+        let unsubscribeCompleted = completion(
+            "unsubscribe cancellation processed", ranks: normalRanks, cancelled: true
+        )
         service.refreshQuickMatchPopularityStats(
             userRank: 28,
             lowerRankDifference: 2,
             upperRankDifference: 1
         )
-        wait(for: [cancellationStarted], timeout: 2)
-        let unsubscribeCancelled = expectation(description: "unsubscribe cancels request")
-        QuickMatchStatsURLProtocol.observeNextStop {
+        guard waitForRequests([cancellationStarted]) else { return }
+        let unsubscribeCancelled = XCTestExpectation(description: "unsubscribe cancels request")
+        QuickMatchStatsURLProtocol.observeNextStop(ranks: normalRanks) {
             unsubscribeCancelled.fulfill()
         }
         service.unsubscribeFromAutomatchAvailability()
-        wait(for: [unsubscribeCancelled], timeout: 2)
+        guard waitForRequests([unsubscribeCancelled, unsubscribeCompleted]) else { return }
         XCTAssertEqual(service.quickMatchPopularityStats, .empty)
 
         service.subscribeToAutomatchAvailability()
-        QuickMatchStatsURLProtocol.enqueue(.hold)
-        let accountRequestStarted = expectation(description: "request before account switch")
-        QuickMatchStatsURLProtocol.observeNextRequest { _ in
+        QuickMatchStatsURLProtocol.enqueue(.hold, ranks: normalRanks)
+        let accountRequestStarted = XCTestExpectation(description: "request before account switch")
+        QuickMatchStatsURLProtocol.observeNextRequest(ranks: normalRanks) {
             accountRequestStarted.fulfill()
         }
+        let accountSwitchCompleted = completion(
+            "account switch cancellation processed", ranks: normalRanks, cancelled: true
+        )
         service.refreshQuickMatchPopularityStats(
             userRank: 28,
             lowerRankDifference: 2,
             upperRankDifference: 1
         )
-        wait(for: [accountRequestStarted], timeout: 2)
-        let accountSwitchCancelled = expectation(
-            description: "account switch cancels request"
-        )
-        QuickMatchStatsURLProtocol.observeNextStop {
+        guard waitForRequests([accountRequestStarted]) else { return }
+        let accountSwitchCancelled = XCTestExpectation(description: "account switch cancels request")
+        QuickMatchStatsURLProtocol.observeNextStop(ranks: normalRanks) {
             accountSwitchCancelled.fulfill()
         }
         service.ogsUIConfig = try makeUIConfig(jwt: "new-account", userID: 2)
-        wait(for: [accountSwitchCancelled], timeout: 2)
+        guard waitForRequests([accountSwitchCancelled, accountSwitchCompleted]) else { return }
         XCTAssertEqual(service.quickMatchPopularityStats, .empty)
     }
 
@@ -5258,6 +5281,7 @@ final class OGSServiceEventTests: XCTestCase {
         socket: OGSWebsocketProtocol,
         cachedUsers: [OGSUser] = [],
         urlProtocolClass: AnyClass = RejectingURLProtocol.self,
+        eventMonitors: [EventMonitor] = [],
         installsObservers: Bool = false,
         gameResynchronizationTimeout: TimeInterval = 15,
         conditionalMoveSubmissionTimeout: TimeInterval = 10,
@@ -5271,7 +5295,7 @@ final class OGSServiceEventTests: XCTestCase {
         configuration.protocolClasses = [urlProtocolClass]
         configuration.httpCookieStorage = nil
         let httpClient = AlamofireOGSHTTPClient(
-            session: Session(configuration: configuration),
+            session: Session(configuration: configuration, eventMonitors: eventMonitors),
             cookieStorage: nil
         )
         var initialState: OGSService.BootstrapState?
