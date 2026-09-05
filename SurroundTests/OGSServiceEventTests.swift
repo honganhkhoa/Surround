@@ -8,6 +8,9 @@ import Combine
 import DictionaryCoding
 import XCTest
 
+// Async tests share the main actor with service timers and socket callbacks.
+// @Published emits before storing its new value, so an expectation must not
+// resume a test midway through the callback's remaining state updates.
 final class OGSServiceEventTests: XCTestCase {
     private final class RejectingURLProtocol: URLProtocol {
         override class func canInit(with request: URLRequest) -> Bool { true }
@@ -838,6 +841,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertFalse(service.isConditionalMoveSubmissionPending(gameID: 125))
     }
 
+    @MainActor
     func testOfflineConditionalMoveSubmissionEchoesAuthoritativeUpdate() async throws {
         let service = makeService(
             socket: OGSOfflineNoOpWebsocket(),
@@ -2484,6 +2488,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testRealtimeGameStartedNotificationBeforeRestoredEntryCancelsOnce()
         async throws
     {
@@ -2566,6 +2571,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testCompletedHistoricalGameBeforeRestoredEntryDoesNotCancelSearch()
         async
     {
@@ -2619,6 +2625,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testGameEndedAfterRestoredEntrySuppressesPendingCurrentStart() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -2673,6 +2680,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testColdLaunchOldUnfinishedStartDoesNotCancelRestoredSearch() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -2718,6 +2726,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testStalePreDisconnectActiveGameDoesNotOverrideHistoricalStartAge()
         async
     {
@@ -2783,6 +2792,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, restoredEntry.uuid)
     }
 
+    @MainActor
     func testCurrentActiveGameDoesNotOverrideNewerAutomatchTimestamp()
         async
     {
@@ -2839,6 +2849,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, restoredEntry.uuid)
     }
 
+    @MainActor
     func testActiveGameNewerThanAutomatchCancelsDespiteAbsoluteAge() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -2893,6 +2904,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLateActiveGameStartOlderThanAutomatchDoesNotCancel() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -2947,6 +2959,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testLateActiveGameStartNewerThanAutomatchCancels() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3001,6 +3014,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLateHistoricalStartAfterReplayWindowDoesNotCancelSearch() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3051,6 +3065,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testPendingGameStartedNotificationExpiresBeforeNewLocalSearch() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3093,6 +3108,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry, localEntry)
     }
 
+    @MainActor
     func testSocketCloseDiscardsPendingGameStartedNotificationGeneration()
         async
     {
@@ -3150,6 +3166,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testReplayWithoutCreationTimestampKeepsSearchEvenForActiveGame()
         async
     {
@@ -3195,6 +3212,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testFreshPongCorrectsDeviceClockForLateNotificationRecency() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3240,6 +3258,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.drift, 120_000, accuracy: 0.001)
     }
 
+    @MainActor
     func testFreshPongCorrectsSlowDeviceClockForLateNotificationRecency()
         async
     {
@@ -3287,6 +3306,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.drift, -120_000, accuracy: 0.001)
     }
 
+    @MainActor
     func testLateNotificationWithoutCurrentConnectionPongIsConservative()
         async
     {
@@ -3329,6 +3349,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testKnownNewerServerOrderingCancelsWithoutPongOrActiveGame()
         async
     {
@@ -3377,6 +3398,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLateServerEntryReconsidersNewerOrphanGameStart() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3425,6 +3447,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLateServerEntryIgnoresOlderAndCompletedOrphanStarts() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3483,6 +3506,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(service.activeLiveAutomatchEntry?.uuid, liveEntry.uuid)
     }
 
+    @MainActor
     func testReconnectReplaysHandledOrphanBeforeRestoredEntry() async throws {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3552,6 +3576,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testFreshPongReconsidersInconclusiveStartForLocalSearch() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3601,6 +3626,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testFreshPongUsesRecencyForTimestampLessRestoredEntry() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3649,6 +3675,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testJSONNumberOneTimestampIsNotRejectedAsBoolean() async throws {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3697,6 +3724,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testJSONBooleanTimestampIsRejected() async throws {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3741,6 +3769,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testJSONNumberOneGameIDCorrelatesCompletion() async throws {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -3791,6 +3820,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testJSONBooleanGameIDDoesNotCorrelateCompletionForGameOne()
         async throws
     {
@@ -4017,6 +4047,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testPongBeforeDelayedAnonymousAuthenticationRemainsFresh()
         async
     {
@@ -4180,6 +4211,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertNotNil(service.autoMatchEntryById[entry.uuid])
     }
 
+    @MainActor
     func testAutomatchReconciliationRemovesAnEntryMissingFromReplay() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -4219,6 +4251,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testUnconfirmedOutboundAutomatchReconcilesInsteadOfStayingForever() async {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -4303,6 +4336,7 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.last?.command, "automatch/list")
     }
 
+    @MainActor
     func testExpiredConfirmationWaitsForActiveReconciliation() async {
         let socket = FakeWebsocket()
         let service = makeService(

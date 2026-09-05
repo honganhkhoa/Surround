@@ -107,10 +107,6 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
 
-        _ = hideSoftwareKeyboardIfVisible(
-            in: app,
-            appearanceTimeout: 1
-        )
         tapChatLogBackground(chatLog)
 
         var consecutiveDismissedChecks = 0
@@ -203,10 +199,6 @@ class SurroundUITestCase: XCTestCase {
             file: file,
             line: line
         )
-        _ = hideSoftwareKeyboardIfVisible(
-            in: app,
-            appearanceTimeout: 1
-        )
         tapChatLogBackground(chatLog)
         var consecutiveDismissedChecks = 0
         let dismissed = pollUntil(timeout: 10) {
@@ -237,6 +229,9 @@ class SurroundUITestCase: XCTestCase {
         #endif
     }
 
+    // The chat background clears FocusState and dismisses the keyboard in one
+    // app gesture. Tapping the system Hide keyboard control first introduces
+    // another transition that can leave XCTest waiting for keyboard animations.
     private func tapChatLogBackground(_ chatLog: XCUIElement) {
         chatLog
             .coordinate(withNormalizedOffset: .zero)
@@ -255,77 +250,6 @@ class SurroundUITestCase: XCTestCase {
             .firstMatch
         return input.exists
             && input.debugDescription.contains("Keyboard Focused")
-    }
-
-    @discardableResult
-    func hideSoftwareKeyboardIfVisible(
-        in app: XCUIApplication,
-        appearanceTimeout: TimeInterval = 0,
-        dismissalTimeout: TimeInterval = 3
-    ) -> Bool {
-        #if targetEnvironment(macCatalyst)
-        return true
-        #else
-        var keyboardIsVisible = softwareKeyboardIsVisible(
-            app.keyboards.firstMatch,
-            in: app
-        )
-        if !keyboardIsVisible && appearanceTimeout > 0 {
-            keyboardIsVisible = pollUntil(timeout: appearanceTimeout) {
-                softwareKeyboardIsVisible(
-                    app.keyboards.firstMatch,
-                    in: app
-                )
-            }
-        }
-        guard keyboardIsVisible else {
-            return true
-        }
-
-        let keyboard = app.keyboards.firstMatch
-        guard softwareKeyboardIsVisible(keyboard, in: app) else {
-            return true
-        }
-        // The iPadOS 18 and 26 keyboards expose this system control by
-        // label. UI tests launch in English, so the query is stable here.
-        let hideKeyboard = keyboard.buttons
-            .matching(NSPredicate(format: "label == %@", "Hide keyboard"))
-            .firstMatch
-        guard hideKeyboard.waitForExistence(timeout: 1),
-              hideKeyboard.isHittable else {
-            return false
-        }
-
-        // System keyboard elements are ephemeral during dismissal. Resolve
-        // their frame once, then synthesize the tap through the application.
-        let hideKeyboardFrame = hideKeyboard.frame
-        let appFrame = app.frame
-        let hideKeyboardCenter = CGPoint(
-            x: hideKeyboardFrame.midX,
-            y: hideKeyboardFrame.midY
-        )
-        guard !hideKeyboardFrame.isNull,
-              hideKeyboardFrame.width > 1,
-              hideKeyboardFrame.height > 1,
-              appFrame.contains(hideKeyboardCenter) else {
-            return false
-        }
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(
-                CGVector(
-                    dx: hideKeyboardCenter.x - appFrame.minX,
-                    dy: hideKeyboardCenter.y - appFrame.minY
-                )
-            )
-            .tap()
-
-        return pollUntil(timeout: dismissalTimeout) {
-            !softwareKeyboardIsVisible(
-                app.keyboards.firstMatch,
-                in: app
-            )
-        }
-        #endif
     }
 
     func softwareKeyboardIsVisible(

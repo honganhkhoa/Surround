@@ -1976,18 +1976,7 @@ final class SurroundUITests: SurroundUITestCase {
             focusMode: .requireExistingFocus
         )
 
-        let keyboardWasNormalized = hideSoftwareKeyboardIfVisible(
-            in: app,
-            appearanceTimeout: 1
-        )
-        if !keyboardWasNormalized {
-            keepTextInputHierarchy(
-                input,
-                in: app,
-                reason: "software keyboard remained visible during preflight"
-            )
-            keepScreenshot("keyboard-runtime-preflight", in: app)
-        }
+        dismissSoftwareKeyboardIfNeeded(in: app)
         #endif
     }
 

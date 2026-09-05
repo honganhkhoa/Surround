@@ -228,26 +228,21 @@ struct ChatLog: View {
                         LazyVStack(spacing: 0) {
                             chatLines
                             Spacer().frame(height: 8)
-                            GeometryReader { geometry -> AnyView in
-                                let endOfChatFrame = geometry.frame(in: .named(AnyHashable("scrollView")))
-                                if endOfChatFrame.origin.y >= 0 && endOfChatFrame.origin.y <= scrollViewGeometry.size.height {
-                                    if !self.atEndOfChat {
-                                        DispatchQueue.main.async {
-                                            self.atEndOfChat = true
-                                            game.markAllChatAsRead()
-                                        }
+                            // Observe visibility outside lazy layout evaluation.
+                            // Querying this marker's frame inside GeometryReader
+                            // can loop layout on iOS 18 when the composer shrinks.
+                            Color.clear
+                                .frame(width: 10, height: 1)
+                                .id("scrollViewBottom")
+                                .onScrollVisibilityChange { isVisible in
+                                    guard atEndOfChat != isVisible else {
+                                        return
                                     }
-                                } else {
-                                    if self.atEndOfChat {
-                                        DispatchQueue.main.async {
-                                            self.atEndOfChat = false
-                                        }
+                                    atEndOfChat = isVisible
+                                    if isVisible {
+                                        game.markAllChatAsRead()
                                     }
                                 }
-//                                    print("scroll \(geometry.frame(in: .named("scrollView")))")
-//                                    print("scrollView \(scrollViewGeometry.size)")
-                                return AnyView(EmptyView())
-                            }.frame(width: 10, height: 1).id("scrollViewBottom")
                         }
                         .padding(.horizontal, 10)
                         .padding(.top, 10)
@@ -266,7 +261,6 @@ struct ChatLog: View {
                                 .accessibilityHidden(true)
                         }
                         .onAppear {
-                            scrollView.scrollTo("scrollViewBottom")
                             game.markAllChatAsRead()
                         }
                         .onReceive(game.$chatLog) { newChatLog in
@@ -293,6 +287,7 @@ struct ChatLog: View {
                         }
                     }
                 }
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
                 .coordinateSpace(name: "scrollView")
                 .scrollDismissesKeyboard(.interactively)
                 .accessibilityIdentifier(
