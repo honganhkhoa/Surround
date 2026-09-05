@@ -3545,6 +3545,40 @@ final class SurroundUITests: SurroundUITestCase {
             in: app,
             focusMode: .requireExistingFocus
         )
+
+        #if !targetEnvironment(macCatalyst)
+        let keyboard = app.keyboards.firstMatch
+        let keyboardFrame = keyboard.exists ? keyboard.frame : .zero
+        let appFrame = app.frame
+        // Floating keyboards and hardware-keyboard strips leave the regular
+        // Analyze toolbar visible. XCTest's docked keyboard bounds can stop
+        // a few points above the screen edge.
+        if keyboardFrame.height > 100,
+           abs(keyboardFrame.minX - appFrame.minX) <= 1,
+           abs(keyboardFrame.width - appFrame.width) <= 1,
+           abs(keyboardFrame.maxY - appFrame.maxY) <= 10 {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Retained Analyze toolbar with keyboard"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            XCTAssertFalse(
+                app.buttons[
+                    SurroundUITestContract.AccessibilityID.gameAnalyzePrevious
+                ].isHittable,
+                "Hidden Analyze actions must not accept interaction while the keyboard is visible."
+            )
+            dismissSoftwareKeyboardIfNeeded(in: app)
+            XCTAssertTrue(
+                element(
+                    SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+                    in: app,
+                    matching: .button
+                ).isHittable,
+                "The Analyze toolbar must become usable again after keyboard dismissal."
+            )
+            assertSelected(selectedIdentifier, in: app)
+        }
+        #endif
     }
 
     func testShareVariationUsesSelectedChannelAndStaysInChatAfterSending() {

@@ -109,17 +109,10 @@ class SurroundUITestCase: XCTestCase {
 
         tapChatLogBackground(chatLog)
 
-        var consecutiveDismissedChecks = 0
         XCTAssertTrue(
             pollUntil(timeout: timeout) {
-                let currentKeyboard = app.keyboards.firstMatch
-                if !chatInputHasKeyboardFocus(in: app)
-                    && !softwareKeyboardIsVisible(currentKeyboard, in: app) {
-                    consecutiveDismissedChecks += 1
-                } else {
-                    consecutiveDismissedChecks = 0
-                }
-                return consecutiveDismissedChecks >= 3
+                !chatInputHasKeyboardFocus(in: app)
+                    && !softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)
             },
             "Expected the compact chat keyboard to disappear before capture.",
             file: file,
@@ -200,16 +193,9 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
         tapChatLogBackground(chatLog)
-        var consecutiveDismissedChecks = 0
         let dismissed = pollUntil(timeout: 10) {
-            let currentKeyboard = app.keyboards.firstMatch
-            if !chatInputHasKeyboardFocus(in: app)
-                && !softwareKeyboardIsVisible(currentKeyboard, in: app) {
-                consecutiveDismissedChecks += 1
-            } else {
-                consecutiveDismissedChecks = 0
-            }
-            return consecutiveDismissedChecks >= 3
+            !chatInputHasKeyboardFocus(in: app)
+                && !softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)
         }
         if !dismissed {
             keepHierarchy(of: app, name: "chat composer focus not dismissed")

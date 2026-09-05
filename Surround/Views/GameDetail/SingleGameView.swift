@@ -996,10 +996,18 @@ struct SingleGameView: View {
                         } else {
                             regularVerticalBody
                         }
-                        if analyzeMode.wrappedValue && !attachedKeyboardVisible {
+                        if analyzeMode.wrappedValue {
+                            // Keep the menu presenter alive while the keyboard
+                            // opens and the Share menu finishes dismissing.
                             analyzeControlBar
-                            AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
-                                .frame(maxHeight: 240)
+                                .frame(height: attachedKeyboardVisible ? 0 : nil)
+                                .clipped()
+                                .allowsHitTesting(!attachedKeyboardVisible)
+                                .accessibilityHidden(attachedKeyboardVisible)
+                            if !attachedKeyboardVisible {
+                                AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
+                                    .frame(maxHeight: 240)
+                            }
                         }
                     }
                 }
