@@ -175,35 +175,36 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             (
                 "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0",
                 [
-                    "13×13 Rapid",
-                    "Fischer: 3m + 7s",
-                    "4 Kyu - 3 Dan",
-                    "Required: Require handicaps between players of different ranks.",
+                    "13×13 · Rapid",
+                    "Fischer",
+                    "Opponent rank from 4 Kyu to 3 Dan",
+                    "Handicap required",
                 ]
             ),
             (
                 "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1",
                 [
-                    "19×19 Live",
-                    "Fischer: 10m + 10s",
-                    "Byo-Yomi: 20m + 5×30s",
-                    "5 Kyu - 2 Dan",
+                    "19×19 · Live",
+                    "Fischer or Byo-Yomi",
+                    "Opponent rank from 5 Kyu to 2 Dan",
+                    "Handicap allowed",
                 ]
             ),
             (
                 "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2",
                 [
                     "9×9 and 19×19 · Blitz and Rapid",
-                    "Blitz · Fischer: 30s + 5s",
-                    "Rapid · Byo-Yomi: 2m–5m + 5×30s",
+                    "Blitz · Fischer",
+                    "Rapid · Byo-Yomi",
                     "3 Kyu - 4 Dan",
+                    "No handicap",
                 ]
             ),
             (
                 "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d3",
                 [
                     "9×9 and 13×13 · Live",
-                    "Byo-Yomi: 5m–10m + 5×30s",
+                    "Byo-Yomi",
                     "5 Kyu - 2 Dan",
                     "No preference: Accept any handicap setting.",
                     "No rules preference",
@@ -212,10 +213,10 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             (
                 "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d4",
                 [
-                    "19×19 Correspondence",
-                    "Fischer: 3d + 1d",
-                    "5 Kyu - 2 Dan",
-                    "Standard: Use handicaps by default, but accept games with handicaps off.",
+                    "19×19 · Correspondence",
+                    "Fischer",
+                    "Opponent rank from 5 Kyu to 2 Dan",
+                    "Handicap allowed",
                 ]
             ),
         ]

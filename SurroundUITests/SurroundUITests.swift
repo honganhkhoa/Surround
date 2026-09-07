@@ -1256,10 +1256,22 @@ final class SurroundUITests: SurroundUITestCase {
     private func openQuickMatchAdvanced(in app: XCUIApplication) {
         let advanced = elementAfterScrolling(
             SurroundUITestContract.AccessibilityID.quickMatchAdvanced,
-            in: app
+            in: app,
+            matching: .button
         )
         scrollIntoTappableArea(advanced, in: app)
-        tap(advanced, description: "Quick Match advanced settings", in: app)
+        let clockSystem = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.quickMatchClockSystem)
+            .firstMatch
+        // A quick tab round-trip can preserve the disclosure state. Only tap
+        // when its content is absent, so this helper never closes Advanced.
+        if !clockSystem.exists {
+            tap(advanced, description: "Quick Match advanced settings", in: app)
+        }
+        XCTAssertTrue(
+            clockSystem.waitForExistence(timeout: 10),
+            "Expected Quick Match advanced settings to be expanded."
+        )
     }
 
     private func keepTextInputHierarchy(
@@ -1426,18 +1438,56 @@ final class SurroundUITests: SurroundUITestCase {
         add(attachment)
     }
 
-    private func dismissPopover(in app: XCUIApplication) {
+    private func popoverDismissalPoint(
+        in app: XCUIApplication,
+        navigationTitle: String
+    ) -> XCUICoordinate {
         #if targetEnvironment(macCatalyst)
-        let outside = app.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.02, dy: 0.98)
-        )
-        outside.click()
+        return app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.98))
         #else
-        let outside = app.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.02, dy: 0.12)
-        )
-        outside.tap()
+        let title = app.navigationBars.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", navigationTitle))
+            .firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertTrue(title.isHittable, "Expected the owning page's navigation title.")
+        let frame = title.frame
+        XCTAssertTrue(app.frame.contains(frame))
+        XCTAssertGreaterThan(frame.width, 0)
+        XCTAssertGreaterThan(frame.height, 0)
+        // Capture coordinates while the title is exposed. Resolving its query
+        // after the menu opens can fail because the menu obscures accessibility.
+        return app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: frame.midX - app.frame.minX,
+            dy: frame.midY - app.frame.minY
+        ))
         #endif
+    }
+
+    private func dismissPopover(
+        in app: XCUIApplication,
+        at point: XCUICoordinate,
+        containing presentedElement: XCUIElement,
+        restoring identifiers: [String]
+    ) {
+        XCTAssertTrue(presentedElement.exists, "Expected the popover or menu before dismissal.")
+        #if targetEnvironment(macCatalyst)
+        point.click()
+        #else
+        point.tap()
+        #endif
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: presentedElement
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [dismissed], timeout: 10), .completed,
+            "Expected the popover or menu to dismiss."
+        )
+        // Menu disappearance alone would also pass after an accidental tap on
+        // Home in the sidebar. Verify that the owning page remains displayed.
+        for identifier in identifiers {
+            element(identifier, in: app)
+        }
     }
 
     func testTopLevelNavigation() throws {
@@ -1627,8 +1677,28 @@ final class SurroundUITests: SurroundUITestCase {
         let options = app.segmentedControls[
             SurroundUITestContract.AccessibilityID.newGameOptionPicker
         ]
-        activate(options.buttons["Custom"])
-        activate(options.buttons["Quick match"])
+        let custom = options.buttons["Custom"]
+        let quickMatch = options.buttons["Quick match"]
+        let quickMatchScroll = app.scrollViews[SurroundUITestContract.AccessibilityID.quickMatchScroll]
+        activate(custom)
+        let customSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: custom
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [customSelected], timeout: 10), .completed)
+        element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
+        let quickMatchHidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: quickMatchScroll
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [quickMatchHidden], timeout: 10), .completed)
+        activate(quickMatch)
+        let quickMatchSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: quickMatch
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [quickMatchSelected], timeout: 10), .completed)
+        XCTAssertTrue(quickMatchScroll.waitForExistence(timeout: 10))
 
         let liveTab = element(
             SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("live"),
@@ -1647,6 +1717,8 @@ final class SurroundUITests: SurroundUITestCase {
         XCTAssertTrue(recap.label.contains("Byo-Yomi"))
         XCTAssertFalse(recap.label.contains("Fischer"))
 
+        // Calling twice must leave Advanced open, including after a tab round-trip.
+        openQuickMatchAdvanced(in: app)
         openQuickMatchAdvanced(in: app)
 
         let allowHandicap = SurroundUITestContract.AccessibilityID
@@ -2989,8 +3061,8 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
         )
+        // tapAnalysisPosition verifies the exact Button's stable selection.
         tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
-        assertSelected(draft.selectedAnalysisPosition, in: app)
         assertVariationSharingDraftIsIntact(draft)
         let selectedAnalyzeBoardValue = draft.mainBoard.value as? String
         XCTAssertNotNil(selectedAnalyzeBoardValue)
@@ -3007,8 +3079,8 @@ final class SurroundUITests: SurroundUITestCase {
         )
         assertVariationSharingDraftIsIntact(draft)
 
+        // tapAnalysisPosition verifies the exact Button's stable selection.
         tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
-        assertSelected(draft.selectedAnalysisPosition, in: app)
         assertVariationSharingDraftIsIntact(draft)
     }
 
@@ -3299,6 +3371,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         XCTAssertEqual(homeButton.label, "Conditional moves")
         scrollIntoTappableArea(homeButton, in: app)
+        let homeDismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "Active games")
         tap(homeButton, description: "Home Conditional button", in: app)
         XCTAssertFalse(
             app.descendants(matching: .any)
@@ -3343,15 +3416,11 @@ final class SurroundUITests: SurroundUITestCase {
         }
         keepScreenshot("conditional-popover-home-\(idiom)", in: app)
 
-        dismissPopover(in: app)
-        let dismissed = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: homePopover
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [dismissed], timeout: 10),
-            .completed,
-            "Expected the Home conditional popover to dismiss."
+        dismissPopover(
+            in: app,
+            at: homeDismissalPoint,
+            containing: homePopover,
+            restoring: [SurroundUITestContract.AccessibilityID.screenHome]
         )
 
         let gameButton = elementAfterScrolling(
@@ -3454,6 +3523,7 @@ final class SurroundUITests: SurroundUITestCase {
             )
         tapAnalysisPosition(conflictingNodeIdentifier, in: app)
         assertSelected(conflictingNodeIdentifier, in: app)
+        let detailDismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "vs ")
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -3472,7 +3542,15 @@ final class SurroundUITests: SurroundUITestCase {
             for: replacingAddItem,
             in: app
         )
-        dismissPopover(in: app)
+        dismissPopover(
+            in: app,
+            at: detailDismissalPoint,
+            containing: replacingAddItem,
+            restoring: [
+                SurroundUITestContract.AccessibilityID.gameDetail(gameID),
+                SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
+            ]
+        )
         tapAnalysisPosition(selectedNodeIdentifier, in: app)
         assertSelected(selectedNodeIdentifier, in: app)
 
@@ -3524,7 +3602,15 @@ final class SurroundUITests: SurroundUITestCase {
                 in: app
             ).isEnabled
         )
-        dismissPopover(in: app)
+        dismissPopover(
+            in: app,
+            at: detailDismissalPoint,
+            containing: addAfterRemoval,
+            restoring: [
+                SurroundUITestContract.AccessibilityID.gameDetail(gameID),
+                SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
+            ]
+        )
         XCTAssertFalse(
             quickAddConditional.exists,
             "Using Remove must not unlock conditional-move quick actions."
