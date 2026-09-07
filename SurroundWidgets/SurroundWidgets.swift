@@ -622,11 +622,12 @@ struct CorrespondenceGamesWidgetView: View {
     private func gameRow(
         row: Int,
         layout: CorrespondenceWidgetGridLayout,
-        boardSize: CGFloat
+        boardSize: CGFloat,
+        columnSpacing: CGFloat
     ) -> some View {
         let startIndex = row * layout.columns
         let endIndex = min(startIndex + layout.columns, gamesToDisplay.count)
-        HStack(spacing: CorrespondenceWidgetGridLayout.columnSpacing) {
+        HStack(spacing: columnSpacing) {
             ForEach(startIndex..<endIndex, id: \.self) { index in
                 displayedGameCell(
                     game: gamesToDisplay[index],
@@ -645,9 +646,15 @@ struct CorrespondenceGamesWidgetView: View {
                 availableSize: geometry.size
             )
             let boardSize = layout.boardSize(in: geometry.size)
+            let columnSpacing = layout.columnSpacing(in: geometry.size)
             VStack(spacing: CorrespondenceWidgetGridLayout.rowSpacing) {
                 ForEach(0..<layout.rows, id: \.self) { row in
-                    gameRow(row: row, layout: layout, boardSize: boardSize)
+                    gameRow(
+                        row: row,
+                        layout: layout,
+                        boardSize: boardSize,
+                        columnSpacing: columnSpacing
+                    )
                 }
             }
             .padding(CorrespondenceWidgetGridLayout.outerPadding)

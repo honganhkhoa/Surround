@@ -76,7 +76,7 @@ struct CorrespondenceWidgetContentPolicy {
 struct CorrespondenceWidgetGridLayout: Equatable {
     static let turnRailWidth: CGFloat = 25
     static let outerPadding: CGFloat = 6
-    static let columnSpacing: CGFloat = 6
+    static let minimumColumnSpacing: CGFloat = 6
     static let rowSpacing: CGFloat = 4
     static let boardChrome: CGFloat = 6
     static let timerHeight: CGFloat = 16
@@ -140,6 +140,19 @@ struct CorrespondenceWidgetGridLayout: Equatable {
         return max(0, min(columns, gameCount - firstIndex))
     }
 
+    /// Share spare width between the columns and the two outer margins.
+    /// Height-limited boards otherwise bunch together in the middle of wide
+    /// widgets. Use the full column count so incomplete rows keep the same gap.
+    func columnSpacing(in availableSize: CGSize) -> CGFloat {
+        guard columns > 1 else { return Self.minimumColumnSpacing }
+        let cellWidth = boardSize(in: availableSize) + Self.boardChrome
+        return max(
+            Self.minimumColumnSpacing,
+            (availableSize.width - cellWidth * CGFloat(columns))
+                / CGFloat(columns + 1)
+        )
+    }
+
     /// Expected cell frames for the centered SwiftUI grid. The renderer uses
     /// the same dimensions and spacing; exposing the math here lets tests
     /// verify bounds, overlap, and incomplete-row centering.
@@ -151,6 +164,7 @@ struct CorrespondenceWidgetGridLayout: Equatable {
         guard count > 0 else { return [] }
 
         let boardSize = boardSize(in: availableSize)
+        let columnSpacing = columnSpacing(in: availableSize)
         let cellSize = CGSize(
             width: boardSize + Self.boardChrome,
             height: boardSize + Self.boardChrome + Self.timerHeight
@@ -163,13 +177,13 @@ struct CorrespondenceWidgetGridLayout: Equatable {
             let rowCount = itemCount(inRow: row, gameCount: count)
             guard rowCount > 0 else { return [] }
             let occupiedWidth = cellSize.width * CGFloat(rowCount)
-                + Self.columnSpacing * CGFloat(rowCount - 1)
+                + columnSpacing * CGFloat(rowCount - 1)
             let firstX = (availableSize.width - occupiedWidth) / 2
             return (0..<rowCount).map { column in
                 CGRect(
                     x: firstX
                         + CGFloat(column)
-                            * (cellSize.width + Self.columnSpacing),
+                            * (cellSize.width + columnSpacing),
                     y: firstY
                         + CGFloat(row)
                             * (cellSize.height + Self.rowSpacing),
@@ -202,7 +216,7 @@ struct CorrespondenceWidgetGridLayout: Equatable {
         let usableWidth = max(
             0,
             availableSize.width - Self.outerPadding * 2
-                - Self.columnSpacing * CGFloat(columns - 1)
+                - Self.minimumColumnSpacing * CGFloat(columns - 1)
         )
         let usableHeight = max(
             0,

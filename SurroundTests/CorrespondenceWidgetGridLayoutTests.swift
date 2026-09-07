@@ -156,6 +156,65 @@ final class CorrespondenceWidgetGridLayoutTests: XCTestCase {
         }
     }
 
+    func testFullRowsBalanceCellGapsWithOuterMargins() {
+        for (family, defaultSize) in [
+            (WidgetFamily.systemSmall, smallSize),
+            (WidgetFamily.systemMedium, mediumSize),
+            (WidgetFamily.systemLarge, largeSize),
+            (WidgetFamily.systemExtraLarge, extraLargeSize),
+        ] {
+            let sizes = [
+                defaultSize,
+                CGSize(width: defaultSize.width - 30, height: defaultSize.height),
+                CGSize(width: defaultSize.width + 60, height: defaultSize.height - 20),
+            ]
+            for size in sizes {
+                for count in 1...CorrespondenceWidgetGridLayout.maximumGameCount(for: family) {
+                    let layout = CorrespondenceWidgetGridLayout.make(
+                        family: family,
+                        gameCount: count,
+                        availableSize: size
+                    )
+                    let firstRow = Array(layout.itemFrames(gameCount: count, in: size)
+                        .prefix(layout.columns))
+                    guard let first = firstRow.first, let last = firstRow.last else {
+                        return XCTFail("Missing first row frames")
+                    }
+                    let context = "\(family), \(count) games, \(size)"
+                    XCTAssertEqual(
+                        first.minX,
+                        size.width - last.maxX,
+                        accuracy: 0.001,
+                        context
+                    )
+                    for (left, right) in zip(firstRow, firstRow.dropFirst()) {
+                        let gap = right.minX - left.maxX
+                        XCTAssertGreaterThanOrEqual(gap, 6 - 0.001, context)
+                        XCTAssertEqual(gap, first.minX, accuracy: 0.001, context)
+                    }
+                }
+            }
+        }
+    }
+
+    func testBalancedSpacingPreservesBoardSizes() {
+        for (family, size, count, expectedBoardSize) in [
+            (WidgetFamily.systemMedium, mediumSize, 2, CGFloat(124)),
+            (WidgetFamily.systemExtraLarge, extraLargeSize, 5, CGFloat(147)),
+            (WidgetFamily.systemExtraLarge, extraLargeSize, 6, CGFloat(147)),
+        ] {
+            let layout = CorrespondenceWidgetGridLayout.make(
+                family: family,
+                gameCount: count,
+                availableSize: size
+            )
+            for board in layout.boardFrames(gameCount: count, in: size) {
+                XCTAssertEqual(board.width, expectedBoardSize, accuracy: 0.001)
+                XCTAssertEqual(board.height, expectedBoardSize, accuracy: 0.001)
+            }
+        }
+    }
+
     func testIncompleteRowsAreCentered() {
         for (family, size, count) in [
             (WidgetFamily.systemLarge, largeSize, 3),
@@ -181,6 +240,14 @@ final class CorrespondenceWidgetGridLayoutTests: XCTestCase {
                 size.width - lastFrame.maxX,
                 accuracy: 0.001
             )
+            let fullRowGap = frames[1].minX - frames[0].maxX
+            for (left, right) in zip(finalRow, finalRow.dropFirst()) {
+                XCTAssertEqual(
+                    right.minX - left.maxX,
+                    fullRowGap,
+                    accuracy: 0.001
+                )
+            }
         }
     }
 
