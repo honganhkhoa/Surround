@@ -1531,7 +1531,18 @@ final class SurroundUITests: SurroundUITestCase {
         element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationAbout, in: app)
-        element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
+        let about = element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
+        let reviewLink = element(
+            SurroundUITestContract.AccessibilityID.aboutWriteReview,
+            in: app
+        )
+        for _ in 0..<4 where !reviewLink.isHittable {
+            about.swipeUp()
+        }
+        XCTAssertEqual(reviewLink.label, "Write a Review")
+        tap(reviewLink, description: "Write a Review", in: app)
+        // The offline root discards URL actions; this must remain in the app.
+        XCTAssertTrue(about.exists)
 
         tap(SurroundUITestContract.AccessibilityID.navigationBrowser, in: app)
         element(SurroundUITestContract.AccessibilityID.screenBrowser, in: app)

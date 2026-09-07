@@ -615,6 +615,7 @@ struct ChallengeCell: View {
             }
             gameDetails
         }
+        .appReviewPresentationBlocked(ogsRequestCancellable != nil)
     }
 }
 

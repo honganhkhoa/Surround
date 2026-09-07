@@ -380,6 +380,7 @@ enum SurroundUITestContract {
         static let screenMessages = "screen.messages"
         static let screenSettings = "screen.settings"
         static let screenAbout = "screen.about"
+        static let aboutWriteReview = "about.writeReview"
         static let screenBrowser = "screen.browser"
         static let screenNewGame = "screen.newGame"
         static let screenOpenChallenges = "screen.openChallenges"

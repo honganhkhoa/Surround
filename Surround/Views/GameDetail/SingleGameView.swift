@@ -21,6 +21,11 @@ struct SingleGameView: View {
     
     @EnvironmentObject var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.appReviewCoordinator) private var appReviewCoordinator
+    @State private var isVisibleForAppReview = false
+    @State private var reviewObservationOwnerID = UUID()
+    @State private var observedReviewGameID: Int?
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
@@ -67,6 +72,24 @@ struct SingleGameView: View {
         var canRemove = false
         var canDeleteBranch = false
         var deletesVariations = false
+    }
+
+    private struct ReviewGameObservationIdentity: Equatable {
+        let gameID: GameID
+        let accountID: Int?
+        let scenePhase: ScenePhase
+        let isVisible: Bool
+        let sceneContextID: UUID?
+    }
+
+    private var reviewGameObservationIdentity: ReviewGameObservationIdentity {
+        ReviewGameObservationIdentity(
+            gameID: game.ID,
+            accountID: ogs.user?.id,
+            scenePhase: scenePhase,
+            isVisible: isVisibleForAppReview,
+            sceneContextID: appReviewCoordinator?.gameObservationContextID
+        )
     }
 
     private var chatSelection: Binding<ChatLogSelection?> {
@@ -136,6 +159,48 @@ struct SingleGameView: View {
                     || (compactDisplayMode == .chat
                         && !showsCompactChatBoard.wrappedValue)
             )
+    }
+
+    private var reviewGamePhase: AppReviewGamePhase? {
+        AppReviewGameActivity.phase(
+            game.gamePhase,
+            authoritativePhase: game.gameData?.phase,
+            outcome: game.gameData?.outcome
+        )
+    }
+
+    private func updateReviewGameObservation() {
+        guard isVisibleForAppReview,
+              scenePhase == .active,
+              let gameID = game.ogsID,
+              gameID > 0,
+              ogs.user != nil,
+              game.gameData?.timeControl.speed?.isRealtime == true else {
+            stopReviewGameObservation()
+            return
+        }
+        if observedReviewGameID != gameID {
+            stopReviewGameObservation()
+            observedReviewGameID = gameID
+        }
+        guard let phase = reviewGamePhase else {
+            return
+        }
+        appReviewCoordinator?.observeLiveGame(
+            ownerID: reviewObservationOwnerID,
+            gameID: gameID,
+            isParticipant: game.isUserPlaying,
+            phase: phase
+        )
+    }
+
+    private func stopReviewGameObservation() {
+        if let observedReviewGameID {
+            appReviewCoordinator?.stopObservingLiveGame(
+                ownerID: reviewObservationOwnerID, gameID: observedReviewGameID
+            )
+        }
+        observedReviewGameID = nil
     }
     
     var controlRow: some View {
@@ -1036,6 +1101,7 @@ struct SingleGameView: View {
             }
         }
         .onAppear {
+            isVisibleForAppReview = true
             if self.soundOnStonePlacement {
                 if let audioData = NSDataAsset(name: "stonePlacing")?.data {
                     self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
@@ -1059,7 +1125,17 @@ struct SingleGameView: View {
             }
             #endif
         }
+        .task(id: reviewGameObservationIdentity) {
+            // Visibility and parent context readiness both restart observation,
+            // including when this task starts before the view's onAppear.
+            guard !Task.isCancelled else {
+                return
+            }
+            updateReviewGameObservation()
+        }
         .onDisappear {
+            isVisibleForAppReview = false
+            stopReviewGameObservation()
             self.stonePlacingPlayer = nil
             selectedChatItem = nil
             analyzeMarkupsByPosition.removeAll()
@@ -1094,9 +1170,26 @@ struct SingleGameView: View {
             }
         }
         .onChange(of: game.ID) { _, _ in
+            updateReviewGameObservation()
             selectedChatItem = nil
             analyzeMarkupsByPosition.removeAll()
             resetAnalyzeBoardTool()
+        }
+        .onChange(of: reviewGamePhase) { _, _ in
+            updateReviewGameObservation()
+        }
+        .onChange(of: game.gameData?.timeControl.speed) { _, _ in
+            updateReviewGameObservation()
+        }
+        .onChange(of: game.isUserPlaying) { _, _ in
+            updateReviewGameObservation()
+        }
+        .onChange(of: ogs.user?.id) { _, _ in
+            stopReviewGameObservation()
+            updateReviewGameObservation()
+        }
+        .onChange(of: scenePhase) { _, _ in
+            updateReviewGameObservation()
         }
         .onChange(of: game.analysisAvailable) { _, newValue in
             if !newValue {

@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
+		D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
+		D907000B202609070000000B /* AppReviewGameActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D907000C202609070000000C /* AppReviewGameActivityTests.swift */; };
+
+		D90700012026090700000001 /* AppReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700022026090700000002 /* AppReviewPolicy.swift */; };
+		D90700032026090700000003 /* AppReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700022026090700000002 /* AppReviewPolicy.swift */; };
+		D90700042026090700000004 /* AppReviewPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700052026090700000005 /* AppReviewPresentation.swift */; };
+		D90700062026090700000006 /* AppReviewPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700072026090700000007 /* AppReviewPolicyTests.swift */; };
+
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
@@ -394,6 +403,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D90700092026090700000009 /* AppReviewGameActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivity.swift; sourceTree = "<group>"; };
+		D907000C202609070000000C /* AppReviewGameActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivityTests.swift; sourceTree = "<group>"; };
+
+		D90700022026090700000002 /* AppReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicy.swift; sourceTree = "<group>"; };
+		D90700052026090700000005 /* AppReviewPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentation.swift; sourceTree = "<group>"; };
+		D90700072026090700000007 /* AppReviewPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicyTests.swift; sourceTree = "<group>"; };
+
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
@@ -728,6 +744,8 @@
 		BC042B0324AB2CFA0050B2D1 /* SurroundTests */ = {
 			isa = PBXGroup;
 			children = (
+				D90700072026090700000007 /* AppReviewPolicyTests.swift */,
+				D907000C202609070000000C /* AppReviewGameActivityTests.swift */,
 				BC042B0424AB2CFA0050B2D1 /* SurroundTests.swift */,
 				C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */,
 				C0D100062026082900000006 /* AppRouteTests.swift */,
@@ -767,6 +785,7 @@
 		BC042B2924AB2DD00050B2D1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				D90700052026090700000005 /* AppReviewPresentation.swift */,
 				BC463B0B266353B400D40D3A /* GameDetail */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
@@ -870,6 +889,8 @@
 		BC042B4124AB2DD10050B2D1 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D90700022026090700000002 /* AppReviewPolicy.swift */,
+				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */,
@@ -1324,6 +1345,9 @@
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,
+				D90700012026090700000001 /* AppReviewPolicy.swift in Sources */,
+				D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */,
+				D90700042026090700000004 /* AppReviewPresentation.swift in Sources */,
 				AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
@@ -1423,6 +1447,10 @@
 				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
 				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
 				AE3100093A00000000000009 /* OGSService+Fixtures.swift in Sources */,
+				D90700032026090700000003 /* AppReviewPolicy.swift in Sources */,
+				D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */,
+				D907000B202609070000000B /* AppReviewGameActivityTests.swift in Sources */,
+				D90700062026090700000006 /* AppReviewPolicyTests.swift in Sources */,
 				AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,

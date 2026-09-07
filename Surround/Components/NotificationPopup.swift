@@ -206,6 +206,7 @@ struct NotificationPopup: View {
                 }
             }
         }
+        .appReviewPresentationBlocked(showingPrivateChatView)
     }
 }
 

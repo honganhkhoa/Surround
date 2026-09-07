@@ -725,6 +725,11 @@ struct HomeView: View {
             userDefaults[.homeViewDisplayMode] = newDisplayMode.rawValue
         }
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenHome)
+        .modifier(AppReviewHomePresentation(
+            isBlocked: openingGameRequestID != nil || failedGameOpen != nil
+                || recentFinishedLoadState == .loading
+                || recentFinishedLoadState == .failed
+        ))
     }
 }
 

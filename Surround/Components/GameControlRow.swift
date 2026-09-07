@@ -41,6 +41,7 @@ private struct RematchChallengeSheet: View {
 
 struct GameControlRow: View {
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.appReviewCoordinator) private var appReviewCoordinator
     @ObservedObject var game: Game
     var horizontal = true
     var pendingMove: Binding<Move?> = .constant(nil)
@@ -60,21 +61,69 @@ struct GameControlRow: View {
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
     func submitMove(move: Move) {
+        let submittedGame = game
+        let submittedGameID = game.ogsID
+        let submittedUserID = ogs.user?.id
+        let submittedPosition = game.currentPosition
+        let expectedMoveNumber = submittedPosition.lastMoveNumber + 1
+        let reviewCoordinator = appReviewCoordinator
+        let reviewSubmission: AppReviewSubmission?
+        if let submittedGameID,
+           submittedGameID > 0,
+           submittedUserID != nil,
+           game.gameData?.gameId == submittedGameID,
+           game.isUserPlaying,
+           game.isUserTurn {
+            reviewSubmission = reviewCoordinator?.beginMove(
+                gameID: submittedGameID,
+                correspondence: game.gameData?.timeControl.speed == .correspondence
+            )
+        } else {
+            reviewSubmission = nil
+        }
+
         self.ogsRequestCancellable = ogs.submitMove(move: move, forGame: game)
             .zip(game.$currentPosition.filter({ $0.lastMoveNumber != game.currentPosition.lastMoveNumber }).setFailureType(to: Error.self))
-            .sink(receiveCompletion: { _ in
+            .handleEvents(receiveCancel: {
                 DispatchQueue.main.async {
+                    if let reviewSubmission {
+                        reviewCoordinator?.finishMove(reviewSubmission, succeeded: false)
+                    }
+                }
+            })
+            .sink(receiveCompletion: { completion in
+                DispatchQueue.main.async {
+                    switch completion {
+                    case .failure:
+                        if let reviewSubmission {
+                            reviewCoordinator?.finishMove(reviewSubmission, succeeded: false)
+                        }
+                    case .finished:
+                        break
+                    }
                     self.ogsRequestCancellable = nil
                 }
-            }, receiveValue: { _ in
+            }, receiveValue: { _, confirmedPosition in
                 DispatchQueue.main.async {
+                    if let reviewSubmission {
+                        let confirmed = ogs.user?.id == submittedUserID
+                            && submittedGame.ogsID == submittedGameID
+                            && submittedGame.isUserPlaying
+                            && AppReviewGameActivity.confirmsSubmittedMove(
+                                move,
+                                moveNumber: expectedMoveNumber,
+                                from: submittedPosition,
+                                in: confirmedPosition
+                            )
+                        reviewCoordinator?.finishMove(reviewSubmission, succeeded: confirmed)
+                    }
                     self.pendingMove.wrappedValue = nil
                     self.pendingPosition.wrappedValue = nil
                     self.ogsRequestCancellable = nil
                 }
             })
     }
-    
+
     func toggleRemovedStones(stones: Set<[Int]>) {
         self.ogsRequestCancellable = ogs.toggleRemovedStones(stones: stones, forGame: game)
             .zip(game.currentPosition.$removedStones.setFailureType(to: Error.self))

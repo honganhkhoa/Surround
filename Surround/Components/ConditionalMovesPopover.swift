@@ -123,6 +123,7 @@ struct ConditionalMovesButton: View {
                 )
             }
         }
+        .appReviewPresentationBlocked(isPresented)
     }
 }
 

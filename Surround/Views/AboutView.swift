@@ -130,6 +130,16 @@ struct AboutView: View {
                             }
                         }
                         Divider()
+                        Link(destination: URL(string: "https://apps.apple.com/app/id1535010544?action=write-review")!) {
+                            HStack {
+                                Text("Write a Review").bold()
+                                Spacer()
+                            }
+                        }
+                        .accessibilityIdentifier(
+                            SurroundUITestContract.AccessibilityID.aboutWriteReview
+                        )
+                        Divider()
                     }
                 }
             }

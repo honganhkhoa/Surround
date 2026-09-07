@@ -55,7 +55,15 @@ struct MainViewWrapper: View {
         let ogs = OGSService.instance(forSceneWithID: sceneID)
         let sgs = SurroundService.shared
         let nav = NavigationService.instance(forSceneWithID: sceneID)
-        return MainView()
+        return Group {
+            #if OGS_BETA
+            MainView()
+            #else
+            AppReviewScene {
+                MainView()
+            }
+            #endif
+        }
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
