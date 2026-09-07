@@ -18,13 +18,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "- les participants peuvent quitter pendant la partie"
+            "value" : " — les participants peuvent quitter la partie en cours"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ー　プレーヤーは、途中でも対局を抜けられます。"
+            "value" : " — プレーヤーは、途中でも対局を抜けられます。"
           }
         },
         "ko" : {
@@ -89,7 +89,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MS"
+            "value" : " MS"
           }
         },
         "ja" : {
@@ -339,6 +339,12 @@
             "value" : "[**Alexandru Cristescu**](https://github.com/acristescu) für die Entwicklung der quelloffenen OGS-Android-App [**Sente**](https://github.com/acristescu/OnlineGo). Sowohl der Entwicklungsprozess als auch das Projekt selbst waren für mich während der Entwicklung wertvolle Referenzen."
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app and the project itself have been great reference materials for me during development."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -348,13 +354,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[**Alexandru Cristescu**](https://github.com/acristescu), pour la création du client OGS open-source [**Sente**](https://github.com/acristescu/OnlineGo) pour Android. Le procédé de création de cette application ainsi que du projet en tant que tel ont étés une précieuse aide pour moi pendant le développement."
+            "value" : "[**Alexandru Cristescu**](https://github.com/acristescu), pour la création du client OGS open-source [**Sente**](https://github.com/acristescu/OnlineGo) pour Android. Le processus de création de cette application et le projet lui-même m’ont été d’une grande aide pendant le développement."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[「**Sente**」](https://github.com/acristescu/OnlineGo) というAndroid用アプリを作り、オープンソースで提供してくれて、[**Alexandru Cristescu**](https://github.com/acristescu)にありがとうございます。このAndroidアプリのプロジェクトはSurroundの開発には大変参考なりました。"
+            "value" : "[「**Sente**」](https://github.com/acristescu/OnlineGo) というAndroid用アプリを作り、オープンソースで提供してくださった[**Alexandru Cristescu**](https://github.com/acristescu)さんに感謝します。このAndroidアプリのプロジェクトはSurroundの開発に大変参考になりました。"
           }
         },
         "ko" : {
@@ -424,7 +430,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アップ・アイコンの作成とデザインのご相談は、[**Linh Pham**](https://linhpham.me)さんにご提供いいただきました。"
+            "value" : "アプリアイコンの作成とデザインのご相談は、[**Linh Pham**](https://linhpham.me)さんにご提供いただきました。"
           }
         },
         "ko" : {
@@ -467,6 +473,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "[**Linh Pham**](https://linhpham.me)，感謝他設計應用程式圖示，並提供設計建議。"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advice for the app."
           }
         }
       }
@@ -536,7 +548,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "感谢 [**Raphaël Assenat**](https://www.raphnet.net/index_en.php) 推动本应用的多语言翻译工作，并完成日语翻译。"
+            "value" : "感谢 [**Raphaël Assenat**](https://www.raphnet.net/index_en.php) 推动本应用的多语言翻译工作，并完成日语和法语翻译。"
           }
         },
         "zh-Hant" : {
@@ -564,7 +576,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[**L'équipe d'OGS**](https://online-go.com/docs/team), pour la creation et la maintenance d'un excellent serveur de Go à API ouverte, et pour le support lors du développement de l'application."
+            "value" : "[**L'équipe d'OGS**](https://online-go.com/docs/team), pour la création et la maintenance d'un excellent serveur de Go à API ouverte, et pour le support lors du développement de l'application."
           }
         },
         "ja" : {
@@ -904,7 +916,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "**%1$@** pour chaque **%2$lld coups**."
+                  "value" : "**%1$@** pour chaque tranche de **%2$lld coups**."
                 }
               }
             }
@@ -1044,7 +1056,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**%@**切り抜け"
+            "value" : "各対局者の持ち時間は**%@**（切れ負け）です。"
           }
         },
         "ko" : {
@@ -1328,7 +1340,7 @@
                   "other" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "%arg parties par correspondence"
+                      "value" : "%arg parties par correspondance"
                     }
                   }
                 }
@@ -1751,7 +1763,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "考慮時間は**%2$@**(%1$lld回)。"
+                  "value" : "秒読みは1回**%2$@**、**%1$lld回**です。"
                 }
               }
             }
@@ -1942,7 +1954,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le nombre de pierres d'handicap sera déterminé en fonction du niveau des adversaires."
+            "value" : "Le nombre de pierres de handicap sera déterminé en fonction du niveau des adversaires."
           }
         },
         "ja" : {
@@ -2580,7 +2592,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Surroundには、こちらのOSSコンポーネントを含まれています："
+            "value" : "Surroundには、こちらのOSSコンポーネントが含まれています："
           }
         },
         "ko" : {
@@ -2644,13 +2656,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**Surround** est une application iOS visant à fournir une expérience OGS exceptionnelle sur les appareils iOS. Cette application utilise l'API ouverte d'OGS pour communiquer avec le serveur, et grace à l'exploitation des fonctionnalités uniques à iOS, Surround réussi même à surpasser OGS qui, étant une application web, doit fonctionner sur une plus grande variété d'appareils."
+            "value" : "**Surround** est une application iOS visant à fournir une expérience OGS exceptionnelle sur les appareils iOS. Cette application utilise l'API ouverte d'OGS pour communiquer avec le serveur, et grâce à l'exploitation des fonctionnalités uniques à iOS, Surround réussit même à surpasser OGS qui, étant une application web, doit fonctionner sur une plus grande variété d'appareils."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**Surround**は、最高のOGSエクスペリエンスを可能にするという目的を持ったiOSアプリです。このアプリは、OGSのオーペンなAPIを使ってサーバーと通信し、iOSネイティブ機能を使用する事によって、いくつかの側面でOGSのWEB版より良いエクスペリエンスを提供ができています。"
+            "value" : "**Surround**は、最高のOGSエクスペリエンスを可能にするという目的を持ったiOSアプリです。このアプリは、OGSのオープンなAPIを使ってサーバーと通信し、iOSネイティブ機能を使用する事によって、いくつかの側面でOGSのWEB版より良いエクスペリエンスを提供できています。"
           }
         },
         "ko" : {
@@ -2693,6 +2705,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**Surround** 是一款 iOS 應用程式，致力於在 iOS 裝置上提供最佳的 OGS 體驗。本應用程式透過 OGS 的開放 API 與伺服器溝通，並利用 iOS 原生功能，強化 OGS 作為需支援各式裝置的網頁應用程式所難以提供的部分體驗。"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting all kinds of devices."
           }
         }
       }
@@ -4698,7 +4716,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldDan"
+            "value" : "%lld Dan"
           }
         },
         "ja" : {
@@ -7549,7 +7567,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lldhs"
+                  "value" : "%lldh"
                 }
               }
             }
@@ -7585,7 +7603,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lldhs"
+                  "value" : "%lldh"
                 }
               }
             }
@@ -8295,7 +8313,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• 通信対局のプッシュ通知（推進）"
+            "value" : "• 通信対局のプッシュ通知（任意）"
           }
         },
         "ko" : {
@@ -8972,7 +8990,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**連語**対局とは、白チームと黒チームに分けて、プレーヤは順番に一人一手を打つ対局です。"
+            "value" : "**連碁**は、黒と白の2チームに分かれて打つ対局です。各チームの対局者が順番に1手ずつ打ちます。"
           }
         },
         "ko" : {
@@ -9037,7 +9055,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une partie prends fin"
+            "value" : "Une partie prend fin"
           }
         },
         "ja" : {
@@ -10574,6 +10592,12 @@
             "state" : "translated",
             "value" : "所有支持者方案均包含："
           }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Supporter tiers include:"
+          }
         }
       }
     },
@@ -10977,21 +11001,57 @@
     "Alternatively, there are %lld open custom games with similar settings that you can accept to start a game immediately." : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alternativ gibt es %lld offene benutzerdefinierte Partien mit ähnlichen Einstellungen, die du annehmen kannst, um sofort zu spielen."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternativ gibt es %lld offene benutzerdefinierte Partie mit ähnlichen Einstellungen, die du annehmen kannst, um sofort zu spielen."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternativ gibt es %lld offene benutzerdefinierte Partien mit ähnlichen Einstellungen, die du annehmen kannst, um sofort zu spielen."
+                }
+              }
+            }
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "También hay %lld partidas personalizadas abiertas con ajustes similares que puedes aceptar para jugar de inmediato."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "También hay %lld partida personalizada abierta con ajustes similares que puedes aceptar para jugar de inmediato."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "También hay %lld partidas personalizadas abiertas con ajustes similares que puedes aceptar para jugar de inmediato."
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il y a aussi %lld parties personnalisées ouvertes avec des réglages similaires que vous pouvez accepter pour jouer immédiatement."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a aussi %lld partie personnalisée ouverte avec des réglages similaires que vous pouvez accepter pour jouer immédiatement."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a aussi %lld parties personnalisées ouvertes avec des réglages similaires que vous pouvez accepter pour jouer immédiatement."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -11007,15 +11067,39 @@
           }
         },
         "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Como alternativa, há %lld partidas personalizadas abertas com configurações semelhantes que você pode aceitar para começar a jogar imediatamente."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Como alternativa, há %lld partida personalizada aberta com configurações semelhantes que você pode aceitar para começar a jogar imediatamente."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Como alternativa, há %lld partidas personalizadas abertas com configurações semelhantes que você pode aceitar para começar a jogar imediatamente."
+                }
+              }
+            }
           }
         },
         "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em alternativa, há %lld partidas personalizadas abertas com definições semelhantes que pode aceitar para começar a jogar imediatamente."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Em alternativa, há %lld partida personalizada aberta com definições semelhantes que pode aceitar para começar a jogar imediatamente."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Em alternativa, há %lld partidas personalizadas abertas com definições semelhantes que pode aceitar para começar a jogar imediatamente."
+                }
+              }
+            }
           }
         },
         "th" : {
@@ -11040,6 +11124,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "另外還有 %lld 局設定相近的公開自訂對局，接受挑戰即可立即開始。"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternatively, there is %lld open custom game with similar settings that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternatively, there are %lld open custom games with similar settings that you can accept to start a game immediately."
+                }
+              }
+            }
           }
         }
       }
@@ -11697,7 +11799,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "シングタップ着手"
+            "value" : "着手の自動送信"
           }
         },
         "ko" : {
@@ -11740,6 +11842,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動送出落子"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatically submit moves"
           }
         }
       }
@@ -12366,13 +12474,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "黑胜 %.1f 目"
+            "value" : "黑方领先 %.1f 目（估算）"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "黑勝 %.1f 目"
+            "value" : "黑方領先 %.1f 目（估算）"
           }
         }
       }
@@ -12509,13 +12617,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Noir a gagné par %.1fpoint"
+                  "value" : "Noir a gagné par %.1f point"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Noir a gagné par %.1fpoints"
+                  "value" : "Noir a gagné par %.1f points"
                 }
               }
             }
@@ -13144,7 +13252,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "黒の勝ち（死石除法フェーズでの時間切れ）"
+            "value" : "黒の勝ち（死石除去フェーズでの時間切れ）"
           }
         },
         "ko" : {
@@ -13174,7 +13282,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đen thắng vì Trắng hết giờ"
+            "value" : "Đen thắng vì Trắng hết giờ xác nhận quân chết"
           }
         },
         "zh-Hans" : {
@@ -13490,7 +13598,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Outil d’annotation du goban"
+            "value" : "Outil d’édition du goban"
           }
         },
         "ja" : {
@@ -14908,7 +15016,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Défi reçu"
+            "value" : "Défis reçus"
           }
         },
         "ja" : {
@@ -15418,13 +15526,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld move**."
+                  "value" : "Clock starts with **%1$@** main time, followed by **%2$@** for every **%3$lld move**."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Clock starts with **%1$@** main time, follows by **%2$@** for every **%3$lld moves**."
+                  "value" : "Clock starts with **%1$@** main time, followed by **%2$@** for every **%3$lld moves**."
                 }
               }
             }
@@ -15454,13 +15562,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lldcoup**."
+                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lld coup**."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lldcoups**."
+                  "value" : "L'horloge commence avec un temps principal de **%1$@**, et ensuite **%2$@** pour **%3$lld coups**."
                 }
               }
             }
@@ -15603,13 +15711,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Clock starts with **%1$@** main time, follows by **%2$lld period** of **%3$@**."
+                  "value" : "Clock starts with **%1$@** main time, followed by **%2$lld period** of **%3$@**."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Clock starts with **%1$@** main time, follows by **%2$lld periods** of **%3$@**."
+                  "value" : "Clock starts with **%1$@** main time, followed by **%2$lld periods** of **%3$@**."
                 }
               }
             }
@@ -15657,7 +15765,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "持ち時間は**%1$@**、考慮時間は**%3$@**(%2$lld回)。"
+                  "value" : "持ち時間は**%1$@**、その後は1回**%3$@**の秒読みが**%2$lld回**です。"
                 }
               }
             }
@@ -16842,7 +16950,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通信対局承知"
+            "value" : "通信対局の通知"
           }
         },
         "ko" : {
@@ -17331,7 +17439,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créé une partie exactement comme vous le voulez."
+            "value" : "Créez une partie exactement comme vous le voulez."
           }
         },
         "ja" : {
@@ -17617,7 +17725,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Surroundは、現在、一部だけのOGSの機能を対応していますが、少しずつ使える機能を増えていく予定です。OGS の精神に従い、ほとんどの機能は無料でご利用いただけますが、アプリの開発をサポートしていただければ感謝いたします。"
+            "value" : "Surroundは、現在、一部だけのOGSの機能に対応していますが、少しずつ使える機能を増やしていく予定です。OGS の精神に従い、ほとんどの機能は無料でご利用いただけますが、アプリの開発をサポートしていただければ感謝いたします。"
           }
         },
         "ko" : {
@@ -17687,7 +17795,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在、承知機能におけるサーバー・コストの為、サポーター限定です。"
+            "value" : "この機能には継続的なサーバー費用がかかるため、現在、通知機能はサポーター限定です。"
           }
         },
         "ko" : {
@@ -17752,7 +17860,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Personalisée"
+            "value" : "Personnalisée"
           }
         },
         "ja" : {
@@ -18251,13 +18359,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Déactivez l'option **Comptabilisée** si vous ne souhaitez pas que le résultat compte dans le calcul de votre niveau. Les parties **comptabilisées** ne peuvent pas être **privées** et offrent moins d'options de personnalisation."
+            "value" : "Désactivez l'option **Comptabilisée** si vous ne souhaitez pas que le résultat compte dans le calcul de votre niveau. Les parties **comptabilisées** ne peuvent pas être **privées** et offrent moins d'options de personnalisation."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**ランク戦**をOFFにすると、対局者のランクは、結果に影響されません。**ランク戦**は、**非公開**にすることができず、カスタマイズができるオプションがが限られています。"
+            "value" : "**ランク戦**をOFFにすると、対局者のランクは、結果に影響されません。**ランク戦**は、**非公開**にすることができず、カスタマイズができるオプションが限られています。"
           }
         },
         "ko" : {
@@ -19106,7 +19214,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エラー：現在、サプーター・データーを読み込めません。"
+            "value" : "エラー：現在、サポーター情報を読み込めません。"
           }
         },
         "ko" : {
@@ -19389,7 +19497,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[ベタ版をテスト](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437)の皆さんからのフィードバックとバッグレポートが大変助かりました。"
+            "value" : "[ベータ版のテスト](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437)に参加してくださった皆さんからのフィードバックとバグレポートは、アプリの改善に大変役立ちました。"
           }
         },
         "ko" : {
@@ -19432,6 +19540,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有參與[測試版測試](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437) 的人，感謝你們提供眾多意見與錯誤回報，協助我改進本應用程式。"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with feedback and bug reports."
           }
         }
       }
@@ -20658,7 +20772,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La partie s'est terminée a égalité"
+            "value" : "La partie s'est terminée à égalité"
           }
         },
         "ja" : {
@@ -22006,7 +22120,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avec handicap:%lld"
+            "value" : "Avec handicap : %lld"
           }
         },
         "ja" : {
@@ -22576,7 +22690,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Surroundサポーター・サブスクリプションを購入しますと、注文確認後、課金がApple Accountに請求されます。その後、１ヶ月ごとに自動更新します。サブスクリプションを削除されない限り、期間終了直前24時間以内に自動更新します。購入後、App Storeの設定からサブスクリプション管理と削除ができます。"
+            "value" : "Surroundサポーターのサブスクリプションを購入すると、購入の確認時にApple Accountに料金が請求されます。現在の期間が終了する24時間前までに解約しない限り、サブスクリプションは自動更新されます。更新料金は現在の期間が終了する前の24時間以内に請求されます。購入後は、App Storeのアカウント設定でサブスクリプションの管理と解約ができます。"
           }
         },
         "ko" : {
@@ -22606,7 +22720,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nếu bạn chọn trở thành nhà tài trợ, tiền tài trợ sẽ được thanh toán qua tài khoản Apple của bạn sau khi xác nhận. Sau đó tiền tài trợ sẽ được thanh toán tự động mỗi kì nếu bạn không huỷ hỗ trợ ít nhất 24 tiếng trước khi hết kì hiện tại. Bạn có thể quản lí hoặc huỷ tài trợ bằng cách vào mục quản lí tài khoản của App Store."
+            "value" : "Nếu bạn chọn trở thành nhà tài trợ, tiền tài trợ sẽ được thanh toán qua tài khoản Apple của bạn sau khi xác nhận. Sau đó tiền tài trợ sẽ được thanh toán tự động mỗi kì nếu bạn không huỷ hỗ trợ ít nhất 24 tiếng trước khi hết kì hiện tại. Tài khoản của bạn sẽ bị tính phí gia hạn trong vòng 24 tiếng trước khi kì hiện tại kết thúc. Bạn có thể quản lí hoặc huỷ tài trợ bằng cách vào mục quản lí tài khoản của App Store."
           }
         },
         "zh-Hans" : {
@@ -25184,7 +25298,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Actions additionelles"
+            "value" : "Actions additionnelles"
           }
         },
         "ja" : {
@@ -25395,7 +25509,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Déplacer vers l'équipe des noir"
+            "value" : "Déplacer vers l'équipe des noirs"
           }
         },
         "ja" : {
@@ -26655,7 +26769,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無時限"
+            "value" : "無"
           }
         }
       }
@@ -26967,7 +27081,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun joueurs trouvés."
+            "value" : "Aucun joueur trouvé."
           }
         },
         "ja" : {
@@ -28215,7 +28329,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chưa quyết"
+            "value" : "Công khai"
           }
         },
         "zh-Hans" : {
@@ -29165,7 +29279,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suspendre les fins de semaines"
+            "value" : "Suspendre les fins de semaine"
           }
         },
         "ja" : {
@@ -29299,9 +29413,21 @@
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En pausa, quedan %lld"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En pausa, queda %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En pausa, quedan %lld"
+                }
+              }
+            }
           }
         },
         "fr" : {
@@ -29313,7 +29439,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一時停止中、後%lld回一時停可能"
+            "value" : "一時停止中、後%lld回一時停止可能"
           }
         },
         "ko" : {
@@ -29323,15 +29449,39 @@
           }
         },
         "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pausada, restam %lld"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pausada, resta %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pausada, restam %lld"
+                }
+              }
+            }
           }
         },
         "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em pausa, restam %lld"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Em pausa, resta %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Em pausa, restam %lld"
+                }
+              }
+            }
           }
         },
         "th" : {
@@ -29588,7 +29738,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Profile du joueur"
+            "value" : "Profil du joueur"
           }
         },
         "ja" : {
@@ -30578,7 +30728,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Parties publiques"
+            "value" : "Parties publiques en temps réel"
           }
         },
         "ja" : {
@@ -30602,7 +30752,7 @@
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partidas públicas"
+            "value" : "Partidas públicas em direto"
           }
         },
         "th" : {
@@ -30719,7 +30869,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Demandes de partie rapide"
+            "value" : "Demande de partie rapide"
           }
         },
         "ja" : {
@@ -33630,7 +33780,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「hi」を言いって！"
+            "value" : "挨拶しましょう！"
           }
         },
         "ko" : {
@@ -35047,7 +35197,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "どんな時承知してほしい？"
+            "value" : "通知するタイミング…"
           }
         },
         "ko" : {
@@ -35824,7 +35974,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "online-go.comのアカウントにロギンすれば、ここに対局リストが表示されます。"
+            "value" : "online-go.comのアカウントにログインすれば、ここに対局リストが表示されます。"
           }
         },
         "ko" : {
@@ -36649,6 +36799,12 @@
             "state" : "translated",
             "value" : "每段手數： "
           }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stones per period: "
+          }
         }
       }
     },
@@ -37304,7 +37460,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Support OGS"
+            "value" : "Soutenir OGS"
           }
         },
         "ja" : {
@@ -37374,7 +37530,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supported Surround"
+            "value" : "Soutenir Surround"
           }
         },
         "ja" : {
@@ -37450,13 +37606,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niveau de support %1$@: %2$@par mois"
+            "value" : "Niveau de support %1$@ : %2$@ par mois"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "￼%1$@流サポーター：月に%2$@"
+            "value" : "サポーターティア%1$@：月額%2$@"
           }
         },
         "ko" : {
@@ -37626,7 +37782,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Surround là ứng dụng để chơi Cờ Vây trên mạng với những kì thủ khác trên website Onine-Go.com (Online Go Server - OGS)"
+            "value" : "Surround là ứng dụng để chơi cờ vây trực tuyến với những kỳ thủ khác trên website Online-Go.com, còn gọi là Online Go Server (OGS)."
           }
         },
         "zh-Hans" : {
@@ -37737,7 +37893,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "タップとドラッグで石を置けられます。碁盤外までドラッグすることで、キャンセルが出来ます。"
+            "value" : "タップとドラッグで石を置けます。碁盤外までドラッグすることで、キャンセルが出来ます。"
           }
         },
         "ko" : {
@@ -37949,7 +38105,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "タップでう表示"
+            "value" : "タップで対局一覧を表示"
           }
         },
         "ko" : {
@@ -38370,7 +38526,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "**Online Go Server** (OGS)は、使いやすいインテーフェスとフレンドリーなユーザーのあるインタネット囲碁サーバーです。https://online-go.comでアクセスができます。"
+            "value" : "**Online Go Server** (OGS)は、使いやすいインターフェースとフレンドリーなユーザーのいるインターネット囲碁サーバーです。https://online-go.comでアクセスができます。"
           }
         },
         "ko" : {
@@ -39076,15 +39232,39 @@
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hay %lld desafíos abiertos que puedes aceptar para empezar una partida de inmediato."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld desafío abierto que puedes aceptar para empezar una partida de inmediato."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld desafíos abiertos que puedes aceptar para empezar una partida de inmediato."
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il y a %lld défis ouverts que vous pouvez accepter pour commencer une partie immédiatement."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld défi ouvert que vous pouvez accepter pour commencer une partie immédiatement."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld défis ouverts que vous pouvez accepter pour commencer une partie immédiatement."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -39100,15 +39280,39 @@
           }
         },
         "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Há %lld desafios abertos que você pode aceitar para começar uma partida imediatamente."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Há %lld desafio aberto que você pode aceitar para começar uma partida imediatamente."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Há %lld desafios abertos que você pode aceitar para começar uma partida imediatamente."
+                }
+              }
+            }
           }
         },
         "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Existem %lld desafios abertos que pode aceitar para começar uma partida imediatamente."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Existe %lld desafio aberto que pode aceitar para começar uma partida imediatamente."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Existem %lld desafios abertos que pode aceitar para começar uma partida imediatamente."
+                }
+              }
+            }
           }
         },
         "th" : {
@@ -39133,6 +39337,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目前有 %lld 個公開挑戰可接受，接受後即可開始對局。"
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There is %lld open challenge that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
+                }
+              }
+            }
           }
         }
       }
@@ -39199,7 +39421,7 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Il y a %lld partie de rengo ouvertes."
+                  "value" : "Il y a %lld partie de rengo ouverte."
                 }
               },
               "other" : {
@@ -39813,6 +40035,12 @@
             "state" : "translated",
             "value" : "此小工具會顯示你在 online-go.com 上的非即時對局摘要。"
           }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This widget displays a summary of your correspondence games on online-go.com."
+          }
         }
       }
     },
@@ -39979,7 +40207,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一回の考慮時間"
+            "value" : "1回あたりの制限時間"
           }
         },
         "ko" : {
@@ -40397,7 +40625,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrir/Fermer le mode d'analyze"
+            "value" : "Activer/Désactiver le mode d'analyse"
           }
         },
         "ja" : {
@@ -40677,7 +40905,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Afficher/Cacher les thumbnails"
+            "value" : "Afficher/Masquer les miniatures"
           }
         },
         "ja" : {
@@ -41538,7 +41766,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "極端のサイズ： %1$lld×%2$lld"
+            "value" : "特殊な碁盤サイズ：%1$lld×%2$lld"
           }
         },
         "ko" : {
@@ -42926,7 +43154,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente d'adversaires/coéquipier"
+            "value" : "En attente d'adversaires/coéquipiers"
           }
         },
         "ja" : {
@@ -43602,13 +43830,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "白胜 %.1f 目"
+            "value" : "白方领先 %.1f 目（估算）"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "白勝 %.1f 目"
+            "value" : "白方領先 %.1f 目（估算）"
           }
         }
       }
@@ -43960,7 +44188,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "白の勝ち（対局廃棄）"
+            "value" : "白の勝ち（対局放棄）"
           }
         },
         "ko" : {
@@ -44410,7 +44638,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trắng thắng vì Đen hết giờ"
+            "value" : "Trắng thắng vì Đen hết giờ xác nhận quân chết"
           }
         },
         "zh-Hans" : {
@@ -45474,7 +45702,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bạn còn %1$lld tiếng thời gian trong ván đấu với %2$@."
+            "value" : "Bạn còn %1$lld giờ để đi nước tiếp theo trong ván đấu với %2$@."
           }
         },
         "zh-Hans" : {
@@ -45508,7 +45736,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vous devez choisir un adversaire ou rendre le défis publique."
+            "value" : "Vous devez choisir un adversaire ou rendre le défi public."
           }
         },
         "ja" : {
@@ -45544,7 +45772,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bạn chưa chọn đối thủ."
+            "value" : "Bạn cần chọn đối thủ hoặc tạo thách đấu công khai."
           }
         },
         "zh-Hans" : {
@@ -45866,7 +46094,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "％＠との対局は終了しました。"
+            "value" : "%@との対局が終了しました。"
           }
         },
         "ko" : {
