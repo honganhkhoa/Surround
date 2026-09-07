@@ -890,32 +890,49 @@ final class SurroundUITests: SurroundUITestCase {
         )
         currentTextField.typeText(text)
 
+        var observedValue: String?
+        var observedDescription = "not read"
+        var observationDuration: TimeInterval = 0
+        func observeCurrentValue() -> Bool {
+            let started = ProcessInfo.processInfo.systemUptime
+            let rawValue = currentTextField.value
+            observationDuration = ProcessInfo.processInfo.systemUptime - started
+            observedValue = rawValue as? String
+            observedDescription = observedValue?.debugDescription
+                ?? "nil or non-string: \(String(describing: rawValue))"
+            return observedValue == text
+        }
+
         var completed = waitForValue(text, in: currentTextField, timeout: 2)
         if !completed {
-            // Preserve the initial focus assertion above, then recover from a
-            // stale XCTest element snapshot only after text delivery fails.
-            // Re-resolving and explicitly focusing here lets the retry target
-            // the current composer without weakening automatic-focus tests.
-            let resolvedTextField = app.textFields
-                .matching(
-                    identifier:
-                        SurroundUITestContract.AccessibilityID.gameChatInput
+            // A slow accessibility lookup can outlast the predicate deadline
+            // even when it returns the exact value. Check before refocusing or
+            // retrying; the original automatic-focus requirement still applies.
+            currentTextField = resolvedChatInput(in: app)
+            completed = observeCurrentValue()
+            if !completed {
+                currentTextField = focusChatInput(
+                    currentTextField,
+                    in: app,
+                    mode: .acquireWithRetry,
+                    file: file,
+                    line: line
                 )
-                .firstMatch
-            currentTextField = focusChatInput(
-                resolvedTextField,
-                in: app,
-                mode: .acquireWithRetry,
-                file: file,
-                line: line
-            )
-            let actualValue = currentTextField.value as? String ?? ""
-            if text.hasPrefix(actualValue), actualValue != text {
-                currentTextField.typeText(
-                    String(text.dropFirst(actualValue.count))
-                )
+                completed = observeCurrentValue()
+                if !completed {
+                    if let actualValue = observedValue,
+                       text.hasPrefix(actualValue) {
+                        currentTextField.typeText(
+                            String(text.dropFirst(actualValue.count))
+                        )
+                    }
+                    completed = waitForValue(text, in: currentTextField, timeout: 5)
+                    if !completed {
+                        currentTextField = resolvedChatInput(in: app)
+                        completed = observeCurrentValue()
+                    }
+                }
             }
-            completed = waitForValue(text, in: currentTextField, timeout: 5)
         }
         if !completed {
             keepTextInputHierarchy(
@@ -926,7 +943,7 @@ final class SurroundUITests: SurroundUITestCase {
         }
         XCTAssertTrue(
             completed,
-            "Expected the chat composer value to become \(text.debugDescription); actual value: \(String(describing: currentTextField.value))",
+            "Expected the chat composer value to become \(text.debugDescription); observed value: \(observedDescription), read duration: \(observationDuration)s",
             file: file,
             line: line
         )
