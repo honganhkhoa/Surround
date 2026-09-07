@@ -203,6 +203,10 @@ struct NewGameView: View {
     @State var newGameOption: NewGameOption = .quickMatch
     @State var eligibleOpenChallenges = [OGSSeekgraphChallenge]()
     @State private var quickMatchDraft = OGSQuickMatchDraft.ogsDefault
+    @State private var realtimeClockPreference = OGSQuickMatchClockPreference.flexible
+    @State private var realtimeClocks = Set(
+        OGSQuickMatchDraft.ogsDefault.quickMatchSelectedClocks
+    )
     @State private var lastPersistedQuickMatchDraft: OGSQuickMatchDraft?
     @State private var hasLoadedQuickMatchDraft = false
     @State private var optimisticLiveEntry: OGSAutomatchEntry?
@@ -210,7 +214,12 @@ struct NewGameView: View {
         [String: OGSAutomatchEntry]()
     @State private var cancellingEntryID: String?
     @State private var quickMatchRequestFailure: QuickMatchRequestFailure?
+    @State private var failedQuickMatchStartEntries = [OGSAutomatchEntry]()
     @State private var quickMatchServerNotice: String?
+    @State private var correspondenceGameCount = 1
+    @State private var quickMatchSubmission = QuickMatchSubmissionState()
+    @State private var unconfirmedSearchIDs = Set<String>()
+    @State private var reconciliationNoticeGeneration = UUID()
 
     enum NewGameOption {
         case quickMatch
@@ -231,6 +240,10 @@ struct NewGameView: View {
             || (ogs.socketStatus == .connected && ogs.isWebsocketAuthenticated)
     }
 
+    private var isSubmittingQuickMatch: Bool {
+        quickMatchSubmission.isSubmitting
+    }
+
     private var displayedWaitingGames: Int {
         var pendingIDs = Set<String>()
         if let optimisticLiveEntry,
@@ -242,6 +255,16 @@ struct NewGameView: View {
             pendingIDs.insert(uuid)
         }
         return ogs.waitingGames + pendingIDs.count
+    }
+
+    private var activeCorrespondenceSearchCount: Int {
+        Set(
+            ogs.autoMatchEntryById.values
+                .filter(\.isCorrespondence)
+                .map(\.uuid)
+        )
+        .union(optimisticCorrespondenceEntries.keys)
+        .count
     }
     
     var newGameOptionsPicker: some View {
@@ -309,7 +332,7 @@ struct NewGameView: View {
             Spacer().frame(height: 10)
             Picker(selection: $newGameOption.animation(), label: Text("New game option")) {
                 Text("Quick match", comment: "NewGameView top Picker").tag(NewGameOption.quickMatch)
-                Text("Waiting (\(eligibleOpenChallengesCount))", comment: "NewGameView top Picker").tag(NewGameOption.openChallenges)
+                Text("Open (\(eligibleOpenChallengesCount))", comment: "NewGameView top Picker: open games offered by other players").tag(NewGameOption.openChallenges)
                 Text("Custom", comment: "NewGameView top Picker").tag(NewGameOption.custom)
             }
             .pickerStyle(SegmentedPickerStyle())
@@ -344,6 +367,11 @@ struct NewGameView: View {
             if newGameOption == .quickMatch {
                 QuickMatchForm(
                     draft: $quickMatchDraft,
+                    realtimeClockPreference: $realtimeClockPreference,
+                    realtimeClocks: $realtimeClocks,
+                    correspondenceGameCount: $correspondenceGameCount,
+                    activeCorrespondenceSearchCount: activeCorrespondenceSearchCount,
+                    isSubmitting: isSubmittingQuickMatch,
                     eligibleOpenChallenges: eligibleOpenChallenges,
                     allowsRemoteActivity: allowsRemoteActivity,
                     activeLiveEntry: activeLiveEntry,
@@ -398,6 +426,11 @@ struct NewGameView: View {
         .onChange(of: quickMatchDraft) { _, draft in
             persistQuickMatchDraftIfNecessary(draft)
         }
+        .onChange(of: ogs.user?.id) { _, _ in
+            // An identity change clears the service's searches without
+            // individual lifecycle events for the previous account.
+            quickMatchSubmission = QuickMatchSubmissionState()
+        }
         .onReceive(ogs.automatchLifecycleEvents) { event in
             handleAutomatchLifecycleEvent(event)
         }
@@ -406,11 +439,17 @@ struct NewGameView: View {
             case .start:
                 return Alert(
                     title: Text("Couldn’t start the search"),
-                    message: Text("The request could not be sent to OGS. Check your connection and try again."),
-                    primaryButton: .default(Text("Retry")) {
-                        submitQuickMatch(entry: failure.entry)
+                    message: Text(quickMatchStartFailureMessage),
+                    primaryButton: .default(
+                        Text(failedQuickMatchStartEntries.count > 1
+                            ? String(localized: "Retry failed searches")
+                            : String(localized: "Retry"))
+                    ) {
+                        retryQuickMatchStart(failure.entry)
                     },
-                    secondaryButton: .cancel()
+                    secondaryButton: .cancel(Text("Close")) {
+                        failedQuickMatchStartEntries.removeAll()
+                    }
                 )
             case .cancel, .cancelTimedOut:
                 return Alert(
@@ -448,46 +487,112 @@ struct NewGameView: View {
     }
 
     private func submitQuickMatch() {
-        submitQuickMatch(entry: nil)
+        guard quickMatchDraft.quickMatchIsValid else { return }
+        let count = quickMatchDraft.quickMatchIsCorrespondenceOnly
+            ? min(max(correspondenceGameCount, 1), 10)
+            : 1
+        submitQuickMatches(
+            entries: (0..<count).map { _ in quickMatchDraft.makeAutomatchEntry() }
+        )
     }
 
-    private func submitQuickMatch(entry retryEntry: OGSAutomatchEntry?) {
-        guard quickMatchDraft.quickMatchIsValid else { return }
-        let entry = retryEntry ?? quickMatchDraft.makeAutomatchEntry()
-        if entry.timeControlSpeed != .correspondence {
-            guard !ogs.isReconcilingAutomatches,
-                  activeLiveEntry == nil else {
-                return
-            }
-        }
-
-        if allowsRemoteActivity && !ogs.findAutomatch(entry: entry) {
-            quickMatchRequestFailure = QuickMatchRequestFailure(
-                operation: .start,
-                entry: entry
-            )
+    private func submitQuickMatches(
+        entries: [OGSAutomatchEntry],
+        retryingFailedEntries: Bool = false
+    ) {
+        guard !entries.isEmpty else { return }
+        if entries.contains(where: { !$0.isCorrespondence }),
+           ogs.isReconcilingAutomatches || activeLiveEntry != nil {
             return
         }
 
-        if allowsLocalPersistence {
+        // Register the whole batch before the first send: one fast echo must
+        // not release Find while another member is still being submitted.
+        guard quickMatchSubmission.begin(
+            entryIDs: entries.map(\.uuid),
+            retryingFailedEntries: retryingFailedEntries
+        ) else { return }
+
+        var submittedEntries = [OGSAutomatchEntry]()
+        var failedEntries = [OGSAutomatchEntry]()
+        for entry in entries {
+            if allowsRemoteActivity && !ogs.findAutomatch(entry: entry) {
+                quickMatchSubmission.finish(uuid: entry.uuid)
+                failedEntries.append(entry)
+                continue
+            }
+
+            if entry.isCorrespondence {
+                optimisticCorrespondenceEntries[entry.uuid] = entry
+            } else {
+                optimisticLiveEntry = entry
+            }
+            submittedEntries.append(entry)
+            if !allowsRemoteActivity && !SurroundUITestContract.holdsQuickMatchAcknowledgements {
+                // Offline previews have no server acknowledgement to await.
+                quickMatchSubmission.finish(uuid: entry.uuid)
+            }
+        }
+
+        if allowsLocalPersistence, let lastEntry = submittedEntries.last {
             ogs.preferences[.lastQuickMatchDraft] = quickMatchDraft
-            ogs.preferences[.lastAutomatchEntry] = entry
+            ogs.preferences[.lastAutomatchEntry] = lastEntry
             lastPersistedQuickMatchDraft = quickMatchDraft
         }
-        quickMatchServerNotice = nil
 
-        if entry.timeControlSpeed == .correspondence {
-            optimisticCorrespondenceEntries[entry.uuid] = entry
-        } else {
-            optimisticLiveEntry = entry
-        }
-        let announcement = entry.timeControlSpeed == .correspondence
-            ? String(
-                localized: "Searching for a correspondence game",
-                comment: "Accessibility announcement after starting a correspondence Quick Match search"
+        failedQuickMatchStartEntries = failedEntries
+        if let firstFailure = failedEntries.first {
+            quickMatchRequestFailure = QuickMatchRequestFailure(
+                operation: .start,
+                entry: firstFailure
             )
-            : String(localized: "Searching for a game")
+        }
+
+        guard !submittedEntries.isEmpty else { return }
+        quickMatchServerNotice = nil
+        unconfirmedSearchIDs.removeAll()
+        reconciliationNoticeGeneration = UUID()
+        let announcement: String
+        if submittedEntries.allSatisfy(\.isCorrespondence) {
+            announcement = submittedEntries.count == 1
+                ? String(
+                    localized: "Searching for a correspondence game",
+                    comment: "Accessibility announcement after starting a correspondence Quick Match search"
+                )
+                : String(
+                    localized: "Searching for \(submittedEntries.count) correspondence games",
+                    comment: "Accessibility announcement after starting multiple correspondence Quick Match searches"
+                )
+        } else {
+            announcement = String(localized: "Searching for a game")
+        }
         AccessibilityNotification.Announcement(announcement).post()
+    }
+
+    private func retryQuickMatchStart(_ entry: OGSAutomatchEntry) {
+        // Keep every failed UUID, but never retry batch members OGS already
+        // accepted. A partial retry replaces this list with its remaining
+        // failures, so repeated retries cannot duplicate successful searches.
+        let entries = failedQuickMatchStartEntries.isEmpty
+            ? [entry]
+            : failedQuickMatchStartEntries
+        failedQuickMatchStartEntries.removeAll()
+        quickMatchRequestFailure = nil
+        DispatchQueue.main.async {
+            // These UUIDs were never sent. They may be retried while other
+            // members of the original batch are awaiting acknowledgement.
+            submitQuickMatches(entries: entries, retryingFailedEntries: true)
+        }
+    }
+
+    private var quickMatchStartFailureMessage: String {
+        let failedCount = failedQuickMatchStartEntries.count
+        guard failedCount > 1 else {
+            return String(localized: "The request could not be sent to OGS. Check your connection and try again.")
+        }
+        return String(
+            localized: "\(failedCount) search requests could not be sent to OGS. Check your connection and try again. Searches that already started will continue."
+        )
     }
 
     private func cancelQuickMatch(_ entry: OGSAutomatchEntry) {
@@ -547,6 +652,7 @@ struct NewGameView: View {
     private func handleAutomatchLifecycleEvent(
         _ event: OGSAutomatchLifecycleEvent
     ) {
+        quickMatchSubmission.handle(event.kind)
         switch event.kind {
         case .entry:
             // Keep the local copy until a terminal event so the searching UI
@@ -577,11 +683,20 @@ struct NewGameView: View {
             }
         case .notFoundAfterReconciliation(let uuid):
             finishCancellation(uuid: uuid)
-            let notice = String(
-                localized: "OGS did not confirm this search. Your settings are unchanged, so you can search again."
-            )
-            quickMatchServerNotice = notice
-            AccessibilityNotification.Announcement(notice).post()
+            unconfirmedSearchIDs.insert(uuid)
+            let generation = UUID()
+            reconciliationNoticeGeneration = generation
+            // A list replay can retire several batch members together. Show
+            // one total instead of overwriting a singular notice for each UUID.
+            DispatchQueue.main.async {
+                guard reconciliationNoticeGeneration == generation else { return }
+                let count = unconfirmedSearchIDs.count
+                let notice = count == 1
+                    ? String(localized: "OGS did not confirm this search. Your settings are unchanged, so you can search again.")
+                    : String(localized: "OGS did not confirm \(count) searches. Your settings are unchanged, so you can search again.")
+                quickMatchServerNotice = notice
+                AccessibilityNotification.Announcement(notice).post()
+            }
         }
     }
 }

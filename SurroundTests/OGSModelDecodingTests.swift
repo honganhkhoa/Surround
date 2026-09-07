@@ -906,6 +906,165 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(draft.upperRankDifference, 3)
     }
 
+    func testBoardAndSpeedTogglesDeriveThePersistedMatchingMode() {
+        var draft = OGSQuickMatchDraft.ogsDefault
+
+        draft.toggleQuickMatchBoardSize(13)
+        XCTAssertEqual(draft.mode, .multiple)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [9, 13])
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.rapid])
+
+        draft.toggleQuickMatchSpeed(.live)
+        XCTAssertEqual(draft.mode, .multiple)
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.rapid, .live])
+        XCTAssertEqual(draft.quickMatchClockPreference, .flexible)
+
+        draft.toggleQuickMatchSpeed(.rapid)
+        draft.toggleQuickMatchBoardSize(9)
+        XCTAssertEqual(draft.mode, .flexible)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [13])
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.live])
+
+        draft.setQuickMatchClockPreference(.byoyomi)
+        XCTAssertEqual(draft.mode, .exact)
+        XCTAssertEqual(
+            draft.makeAutomatchEntry().sizeSpeedOptions,
+            [OGSAutomatchSizeSpeedOption(size: 13, speed: .live, system: .byoyomi)]
+        )
+    }
+
+    func testCorrespondenceToggleReplacesRealtimeSpeedsAndPreservesBoardSizes() {
+        var draft = OGSQuickMatchDraft.ogsDefault
+        draft.toggleQuickMatchBoardSize(19)
+        draft.setQuickMatchClockPreference(.byoyomi)
+        draft.toggleQuickMatchSpeed(.blitz)
+
+        draft.toggleQuickMatchSpeed(.correspondence)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [9, 19])
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.correspondence])
+        XCTAssertEqual(draft.quickMatchClockPreference, .fischer)
+        XCTAssertTrue(draft.quickMatchIsCorrespondenceOnly)
+        XCTAssertEqual(draft.mode, .multiple)
+        let correspondence = draft.makeAutomatchEntry(
+            multipleOptionsShuffler: { _ in }
+        )
+        XCTAssertEqual(
+            correspondence.sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(size: 9, speed: .correspondence, system: .fischer),
+                OGSAutomatchSizeSpeedOption(size: 19, speed: .correspondence, system: .fischer),
+            ]
+        )
+
+        draft.setQuickMatchClockPreference(.byoyomi)
+        XCTAssertEqual(draft.quickMatchClockPreference, .fischer)
+        draft.toggleQuickMatchSpeed(.rapid, clockPreference: .byoyomi)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [9, 19])
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.rapid])
+        XCTAssertEqual(draft.quickMatchClockPreference, .byoyomi)
+        XCTAssertFalse(draft.quickMatchIsCorrespondenceOnly)
+        XCTAssertTrue(draft.makeAutomatchEntry().sizeSpeedOptions.allSatisfy {
+            $0.speed == .rapid && $0.system == .byoyomi
+        })
+    }
+
+    func testClearingLastBoardOrSpeedRequiresAnotherSelection() {
+        var draft = OGSQuickMatchDraft.ogsDefault
+        draft.toggleQuickMatchBoardSize(9)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertTrue(draft.quickMatchSelectedBoardSizes.isEmpty)
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.rapid])
+
+        draft.toggleQuickMatchSpeed(.rapid)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertTrue(draft.quickMatchSelectedClocks.isEmpty)
+        draft.toggleQuickMatchBoardSize(13)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [13])
+
+        draft.toggleQuickMatchSpeed(.correspondence)
+        XCTAssertTrue(draft.quickMatchIsValid)
+        XCTAssertTrue(draft.quickMatchIsCorrespondenceOnly)
+        XCTAssertEqual(draft.mode, .exact)
+        draft.toggleQuickMatchSpeed(.correspondence)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertFalse(draft.quickMatchIsCorrespondenceOnly)
+        XCTAssertEqual(draft.quickMatchRecap(userRank: nil).firstLine, String(localized: "Nothing selected"))
+
+        draft.toggleQuickMatchSpeed(.live, clockPreference: .fischer)
+        XCTAssertTrue(draft.quickMatchIsValid)
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [13])
+        XCTAssertEqual(draft.quickMatchSelectedSpeeds, [.live])
+    }
+
+    func testGlobalClockPreferenceAppliesToEverySelectedSpeedAndSize() {
+        var draft = OGSQuickMatchDraft.ogsDefault
+        draft.toggleQuickMatchBoardSize(13)
+        draft.toggleQuickMatchSpeed(.live)
+
+        for preference in [OGSQuickMatchClockPreference.fischer, .byoyomi, .flexible] {
+            draft.setQuickMatchClockPreference(preference)
+            let entry = draft.makeAutomatchEntry()
+            XCTAssertEqual(entry.sizeOptions, [9, 13])
+            XCTAssertEqual(Set(entry.sizeSpeedOptions.map(\.speed)), [.rapid, .live])
+            XCTAssertEqual(entry.sizeSpeedOptions.count, preference == .flexible ? 8 : 4)
+            XCTAssertEqual(Set(entry.sizeSpeedOptions).count, entry.sizeSpeedOptions.count)
+            for size in [9, 13] {
+                for speed in [TimeControlSpeed.rapid, .live] {
+                    let systems = Set(entry.sizeSpeedOptions.filter {
+                        $0.size == size && $0.speed == speed
+                    }.map(\.system))
+                    switch preference {
+                    case .fischer: XCTAssertEqual(systems, [.fischer])
+                    case .byoyomi: XCTAssertEqual(systems, [.byoyomi])
+                    case .flexible: XCTAssertEqual(systems, [.fischer, .byoyomi])
+                    case .mixed: XCTFail("The editor does not assign mixed clocks globally.")
+                    }
+                }
+            }
+        }
+    }
+
+    func testBoardToggleKeepsRestoredPerSpeedClockPreferences() throws {
+        let entry = OGSAutomatchEntry(sizeSpeedOptions: [
+            OGSAutomatchSizeSpeedOption(size: 9, speed: .rapid, system: .fischer),
+            OGSAutomatchSizeSpeedOption(size: 9, speed: .live, system: .byoyomi),
+        ])
+        var draft = try XCTUnwrap(OGSActiveQuickMatchPresentation(entry: entry)).draft
+        XCTAssertEqual(draft.quickMatchClockPreference, .mixed)
+
+        draft.toggleQuickMatchBoardSize(13)
+        XCTAssertEqual(draft.quickMatchClockPreference, .mixed)
+        XCTAssertEqual(
+            draft.makeAutomatchEntry(multipleOptionsShuffler: { _ in }).sizeSpeedOptions,
+            [
+                OGSAutomatchSizeSpeedOption(size: 9, speed: .rapid, system: .fischer),
+                OGSAutomatchSizeSpeedOption(size: 9, speed: .live, system: .byoyomi),
+                OGSAutomatchSizeSpeedOption(size: 13, speed: .rapid, system: .fischer),
+                OGSAutomatchSizeSpeedOption(size: 13, speed: .live, system: .byoyomi),
+            ]
+        )
+    }
+
+    func testRecapDistinguishesAllowedAndRequiredHandicapGames() {
+        var draft = OGSQuickMatchDraft.ogsDefault
+        let allowed = draft.quickMatchRecap(userRank: nil)
+        XCTAssertEqual(allowed.firstLine, "9×9 · \(TimeControlSpeed.rapid.quickMatchTitle)")
+        XCTAssertTrue(allowed.secondLine.contains(String(localized: "Handicap allowed")))
+        XCTAssertTrue(allowed.secondLine.contains(String(localized: "Fischer or Byo-Yomi")))
+        XCTAssertTrue(draft.quickMatchAccessibleRecap(userRank: nil).contains(String(localized: "Handicap allowed")))
+
+        draft.handicap = .required
+        draft.setQuickMatchClockPreference(.fischer)
+        let required = draft.quickMatchRecap(userRank: nil)
+        XCTAssertTrue(required.secondLine.contains(String(localized: "Handicap required")))
+        XCTAssertTrue(required.secondLine.contains(OGSAutomatchClockSystem.fischer.quickMatchTitle))
+        XCTAssertFalse(required.secondLine.contains(String(localized: "Handicap allowed")))
+
+        draft.handicap = .disabled
+        XCTAssertTrue(draft.quickMatchRecap(userRank: nil).secondLine.contains(String(localized: "quickMatch.noHandicap", defaultValue: "No handicap")))
+    }
+
     func testExactBuildsOneOrderedTupleAndClampsRankDifferences() {
         let draft = OGSQuickMatchDraft(
             mode: .exact,
@@ -942,28 +1101,90 @@ final class OGSQuickMatchContractTests: XCTestCase {
         )
     }
 
-    func testFlexibleBuildsPrimaryThenAlternateClockSystem() {
-        let entry = OGSQuickMatchDraft(
-            mode: .flexible,
-            boardSize: 19,
-            speed: .live,
-            system: .byoyomi
-        ).makeAutomatchEntry(uuid: "flexible-id")
+    func testDefaultAndStoredFlexibleDraftsShuffleBothAcceptedClockSystems() throws {
+        let stored = try JSONDecoder().decode(
+            OGSQuickMatchDraft.self,
+            from: JSONEncoder().encode(OGSQuickMatchDraft(
+                mode: .flexible,
+                boardSize: 19,
+                speed: .live,
+                system: .byoyomi
+            ))
+        )
+        for draft in [OGSQuickMatchDraft.ogsDefault, stored] {
+            var shuffleCalled = false
+            let entry = draft.makeAutomatchEntry(
+                multipleOptionsShuffler: {
+                    shuffleCalled = true
+                    $0.reverse()
+                }
+            )
+            XCTAssertTrue(shuffleCalled)
+            XCTAssertEqual(entry.sizeSpeedOptions.count, 2)
+            XCTAssertEqual(entry.sizeSpeedOptions.map(\.system), [draft.system.alternate, draft.system])
+            XCTAssertEqual(draft.quickMatchClockSummary, String(localized: "Fischer or Byo-Yomi"))
+            let restored = try XCTUnwrap(OGSActiveQuickMatchPresentation(entry: entry))
+            XCTAssertEqual(restored.draft.quickMatchClockSummary, String(localized: "Fischer or Byo-Yomi"))
+        }
+    }
+
+    func testClockDetailsKeepDifferentBoardTimesSeparate() {
+        let draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 19],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(speed: .rapid, system: .fischer),
+                OGSQuickMatchClockSelection(speed: .rapid, system: .byoyomi),
+            ]
+        )
 
         XCTAssertEqual(
-            entry.sizeSpeedOptions,
+            draft.quickMatchClockDetailLines(for: .rapid, fallbackPreference: .fischer),
             [
-                OGSAutomatchSizeSpeedOption(
-                    size: 19,
-                    speed: .live,
-                    system: .byoyomi
-                ),
-                OGSAutomatchSizeSpeedOption(
-                    size: 19,
-                    speed: .live,
-                    system: .fischer
-                ),
+                "9×9 · Fischer: 2m + 7s",
+                "19×19 · Fischer: 5m + 7s",
+                "9×9 · Byo-Yomi: 2m + 5×30s",
+                "19×19 · Byo-Yomi: 5m + 5×30s",
             ]
+        )
+    }
+
+    func testClockDetailsGroupIdenticalTimesAndKeepCorrespondenceFischerOnly() {
+        let draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 13, 19],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(speed: .blitz, system: .fischer),
+                OGSQuickMatchClockSelection(speed: .blitz, system: .byoyomi),
+            ]
+        )
+
+        XCTAssertEqual(
+            draft.quickMatchClockDetailLines(for: .blitz, fallbackPreference: .fischer),
+            ["Fischer: 30s + 5s", "Byo-Yomi: 30s + 5×10s"]
+        )
+        XCTAssertEqual(
+            draft.quickMatchClockDetailLines(for: .correspondence, fallbackPreference: .byoyomi),
+            ["Fischer: 3d + 1d"]
+        )
+    }
+
+    func testClockDetailsUseSelectedSystemsBeforeFallbackAndRetainLastBoardSize() {
+        var draft = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 19,
+            speed: .rapid,
+            system: .fischer
+        )
+        draft.toggleQuickMatchBoardSize(19)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertEqual(
+            draft.quickMatchClockDetailLines(for: .rapid, fallbackPreference: .byoyomi),
+            ["Fischer: 5m + 7s"]
+        )
+        XCTAssertEqual(
+            draft.quickMatchClockDetailLines(for: .live, fallbackPreference: .byoyomi),
+            ["Byo-Yomi: 20m + 5×30s"]
         )
     }
 
@@ -1116,6 +1337,64 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(shuffled, Array(ordered.reversed()))
     }
 
+    func testMultipleCorrespondenceSurvivesDraftAndServerRestoration() throws {
+        let draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            boardSize: 9,
+            speed: .rapid,
+            system: .byoyomi,
+            multipleBoardSizes: [9, 13, 19],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(
+                    speed: .correspondence,
+                    system: .fischer
+                ),
+            ],
+            handicap: .required,
+            lowerRankDifference: 1,
+            upperRankDifference: 5
+        )
+        let storedDraft = try JSONDecoder().decode(
+            OGSQuickMatchDraft.self,
+            from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(storedDraft, draft)
+        XCTAssertEqual(storedDraft.schemaVersion, 1)
+        XCTAssertTrue(storedDraft.quickMatchIsCorrespondenceOnly)
+
+        let entry = storedDraft.makeAutomatchEntry(
+            uuid: "multiple-correspondence",
+            multipleOptionsShuffler: { _ in }
+        )
+        let expected = [9, 13, 19].map {
+            OGSAutomatchSizeSpeedOption(
+                size: $0,
+                speed: .correspondence,
+                system: .fischer
+            )
+        }
+        XCTAssertEqual(entry.sizeSpeedOptions, expected)
+        XCTAssertTrue(entry.isCorrespondence)
+
+        let restoredEntry = try XCTUnwrap(OGSAutomatchEntry(entry.jsonObject))
+        let presentation = try XCTUnwrap(
+            OGSActiveQuickMatchPresentation(entry: restoredEntry)
+        )
+        XCTAssertEqual(presentation.draft.mode, .multiple)
+        XCTAssertEqual(presentation.draft.multipleBoardSizes, [9, 13, 19])
+        XCTAssertTrue(presentation.draft.quickMatchIsCorrespondenceOnly)
+        XCTAssertEqual(presentation.draft.handicap, .required)
+        XCTAssertEqual(presentation.draft.lowerRankDifference, 1)
+        XCTAssertEqual(presentation.draft.upperRankDifference, 5)
+        XCTAssertEqual(
+            presentation.draft.makeAutomatchEntry(
+                uuid: entry.uuid,
+                multipleOptionsShuffler: { _ in }
+            ),
+            entry
+        )
+    }
+
     func testEmptyMultipleSelectionsUseThePreviousSingleSelections() {
         let entry = OGSQuickMatchDraft(
             mode: .multiple,
@@ -1132,8 +1411,8 @@ final class OGSQuickMatchContractTests: XCTestCase {
             [
                 OGSAutomatchSizeSpeedOption(
                     size: 13,
-                    speed: .rapid,
-                    system: .byoyomi
+                    speed: .correspondence,
+                    system: .fischer
                 ),
             ]
         )
@@ -1762,7 +2041,7 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(flexible.draft.mode, .flexible)
         XCTAssertEqual(flexible.draft.boardSize, 19)
         XCTAssertEqual(flexible.draft.speed, .live)
-        XCTAssertEqual(flexible.draft.system, .byoyomi)
+        XCTAssertEqual(flexible.draft.quickMatchClockSummary, String(localized: "Fischer or Byo-Yomi"))
 
         let multipleEntry = OGSQuickMatchDraft(
             mode: .multiple,
@@ -1828,6 +2107,29 @@ final class OGSQuickMatchContractTests: XCTestCase {
         )
 
         XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+    }
+
+    func testActivePresentationPreservesMixedSpeedEntryWithoutProjectingIt() {
+        let entry = OGSAutomatchEntry(
+            sizeSpeedOptions: [
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .rapid,
+                    system: .fischer
+                ),
+                OGSAutomatchSizeSpeedOption(
+                    size: 9,
+                    speed: .correspondence,
+                    system: .fischer
+                ),
+            ],
+            uuid: "mixed-realtime-correspondence-entry"
+        )
+
+        XCTAssertFalse(entry.isCorrespondence)
+        XCTAssertNil(OGSActiveQuickMatchPresentation(entry: entry))
+        XCTAssertNotNil(AutomatchEntryPresentation(entry: entry, userRank: nil))
+        XCTAssertEqual(entry.sizeSpeedOptions.count, 2)
     }
 
     func testActivePresentationRejectsCriteriaTheEditorCannotRepresent() {
@@ -1990,18 +2292,60 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(
             presentation.clockLines,
             [
-                "9×9 · Fischer: 3m + 10s",
-                "13×13 · Byo-Yomi: 10m + 5×30s",
+                "9×9 · Fischer",
+                "13×13 · Byo-Yomi",
             ]
         )
         XCTAssertEqual(
             presentation.handicap,
-            "Standard: Use handicaps by default, but accept games with handicaps off."
+            "Handicap allowed"
         )
         XCTAssertNil(
             presentation.rules,
             "The standard required Japanese rules should keep the compact four-row card."
         )
+    }
+
+    func testWaitingGamesNeutralClockSummaryPreservesUnevenSizeAndSpeedPairings() throws {
+        let options = [
+            OGSAutomatchSizeSpeedOption(size: 9, speed: .rapid, system: .fischer),
+            OGSAutomatchSizeSpeedOption(size: 9, speed: .rapid, system: .byoyomi),
+            OGSAutomatchSizeSpeedOption(size: 19, speed: .rapid, system: .fischer),
+            OGSAutomatchSizeSpeedOption(size: 9, speed: .live, system: .byoyomi),
+        ]
+        for handicap in OGSQuickMatchHandicapPreference.allCases {
+            let entry = OGSAutomatchEntry(
+                sizeSpeedOptions: Array(options.reversed()),
+                handicap: handicap.automatchPreference,
+                uuid: "uneven-clock-summary"
+            )
+            let presentation = try XCTUnwrap(AutomatchEntryPresentation(
+                entry: entry,
+                userRank: nil,
+                locale: Locale(identifier: "en_US")
+            ))
+            XCTAssertEqual(presentation.clockLines, [
+                "9×9 · Rapid · Fischer or Byo-Yomi",
+                "19×19 · Rapid · Fischer",
+                "9×9 · Live · Byo-Yomi",
+            ])
+            XCTAssertEqual(presentation.handicap, handicap.quickMatchSummary(locale: Locale(identifier: "en_US")))
+        }
+    }
+
+    func testWaitingGamesNeutralClockSummaryGroupsUniformAcceptedClocks() throws {
+        let entry = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 19],
+            multipleClocks: Set(OGSQuickMatchClockSelection.allRealtime)
+        ).makeAutomatchEntry()
+        let presentation = try XCTUnwrap(AutomatchEntryPresentation(
+            entry: entry,
+            userRank: nil,
+            locale: Locale(identifier: "en_US")
+        ))
+
+        XCTAssertEqual(presentation.clockLines, ["Fischer or Byo-Yomi"])
     }
 
     func testWaitingGamesPresentationSupportsLegacyAndNonEditorPreferences() throws {
@@ -2083,18 +2427,18 @@ final class OGSQuickMatchContractTests: XCTestCase {
                     condition: .required,
                     value: .enabled
                 ),
-                "Required: Require handicaps between players of different ranks."
+                "Handicap required"
             ),
             (
                 .quickMatchDefault,
-                "Standard: Use handicaps by default, but accept games with handicaps off."
+                "Handicap allowed"
             ),
             (
                 OGSAutomatchHandicapPreference(
                     condition: .required,
                     value: .disabled
                 ),
-                "Disabled: Never play with handicap stones."
+                "No handicap"
             ),
             (
                 OGSAutomatchHandicapPreference(
@@ -2259,6 +2603,33 @@ final class OGSQuickMatchContractTests: XCTestCase {
         }
     }
 
+    func testSwitchingBackFromCorrespondenceRestoresExactLiveClocks() {
+        let liveClocks: Set<OGSQuickMatchClockSelection> = [
+            .init(speed: .rapid, system: .fischer),
+            .init(speed: .live, system: .byoyomi),
+        ]
+        var draft = OGSQuickMatchDraft(
+            mode: .multiple,
+            multipleBoardSizes: [9, 13],
+            multipleClocks: liveClocks
+        )
+        draft.toggleQuickMatchSpeed(.correspondence)
+        draft.toggleQuickMatchBoardSize(19)
+        draft.setQuickMatchClocks(liveClocks)
+
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [9, 13, 19])
+        XCTAssertEqual(Set(draft.quickMatchSelectedClocks), liveClocks)
+        XCTAssertEqual(draft.quickMatchClockPreference, .mixed)
+        XCTAssertEqual(draft.mode, .multiple)
+
+        draft.toggleQuickMatchSpeed(.correspondence)
+        draft.setQuickMatchClocks([])
+        XCTAssertEqual(draft.quickMatchSelectedBoardSizes, [9, 13, 19])
+        XCTAssertTrue(draft.quickMatchSelectedClocks.isEmpty)
+        XCTAssertFalse(draft.quickMatchIsValid)
+        XCTAssertFalse(draft.quickMatchIsCorrespondenceOnly)
+    }
+
     func testQuickMatchCorrespondenceOnlyClassificationUsesSelectedClocks() {
         let exact = OGSQuickMatchDraft(
             mode: .exact,
@@ -2282,11 +2653,23 @@ final class OGSQuickMatchContractTests: XCTestCase {
                 ),
             ]
         )
+        let multipleCorrespondence = OGSQuickMatchDraft(
+            mode: .multiple,
+            speed: .live,
+            multipleBoardSizes: [9, 13],
+            multipleClocks: [
+                OGSQuickMatchClockSelection(
+                    speed: .correspondence,
+                    system: .fischer
+                ),
+            ]
+        )
 
         XCTAssertTrue(exact.quickMatchIsCorrespondenceOnly)
         XCTAssertTrue(flexible.quickMatchIsCorrespondenceOnly)
         XCTAssertFalse(rapid.quickMatchIsCorrespondenceOnly)
         XCTAssertFalse(multiple.quickMatchIsCorrespondenceOnly)
+        XCTAssertTrue(multipleCorrespondence.quickMatchIsCorrespondenceOnly)
     }
 
     func testSharedActivePresentationOnlyAcceptsRepresentableSettings() {
@@ -2412,7 +2795,7 @@ final class OGSQuickMatchContractTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: draftKey.name), futureData)
     }
 
-    func testLegacyMultiSizeCorrespondenceMigratesToFlexibleLargestSize() throws {
+    func testLegacyMultiSizeCorrespondenceMigrationPreservesEverySize() throws {
         let legacyData = Data(
             #"{"sizeOptions":[9,13,19],"timeControlSpeed":"correspondence","uuid":"legacy-correspondence"}"#.utf8
         )
@@ -2422,22 +2805,26 @@ final class OGSQuickMatchContractTests: XCTestCase {
         )
 
         let draft = OGSQuickMatchDraft(migrating: legacyEntry)
-        let payload = draft.makeAutomatchEntry(uuid: "migrated-id")
+        let payload = draft.makeAutomatchEntry(
+            uuid: "migrated-id",
+            multipleOptionsShuffler: { _ in }
+        )
 
-        XCTAssertEqual(draft.mode, .flexible)
+        XCTAssertEqual(draft.mode, .multiple)
         XCTAssertEqual(draft.boardSize, 19)
         XCTAssertEqual(draft.multipleBoardSizes, [9, 13, 19])
         XCTAssertEqual(draft.speed, .correspondence)
         XCTAssertEqual(draft.system, .fischer)
+        XCTAssertTrue(draft.quickMatchIsCorrespondenceOnly)
         XCTAssertEqual(
             payload.sizeSpeedOptions,
-            [
+            [9, 13, 19].map {
                 OGSAutomatchSizeSpeedOption(
-                    size: 19,
+                    size: $0,
                     speed: .correspondence,
                     system: .fischer
-                ),
-            ]
+                )
+            }
         )
     }
 
@@ -2454,5 +2841,86 @@ final class OGSQuickMatchContractTests: XCTestCase {
 
         XCTAssertEqual(draft.mode, .flexible)
         XCTAssertEqual(draft.handicap, .disabled)
+    }
+}
+
+final class QuickMatchSubmissionStateTests: XCTestCase {
+    func testCorrespondenceBatchBlocksFindUntilEveryRequestIsAcknowledged() {
+        var submission = QuickMatchSubmissionState()
+        XCTAssertTrue(submission.begin(entryIDs: ["first", "second", "third"]))
+        XCTAssertTrue(submission.isSubmitting)
+        XCTAssertFalse(submission.begin(entryIDs: ["accidental-second-batch"]))
+
+        submission.handle(.entry(uuid: "first"))
+        submission.handle(.entry(uuid: "unrelated-existing-search"))
+        submission.handle(.entry(uuid: "first"))
+        XCTAssertTrue(submission.isSubmitting)
+        XCTAssertFalse(submission.begin(entryIDs: ["accidental-second-batch"]))
+
+        submission.handle(.entry(uuid: "third"))
+        XCTAssertTrue(submission.isSubmitting)
+        submission.handle(.entry(uuid: "second"))
+        XCTAssertFalse(submission.isSubmitting)
+        XCTAssertTrue(submission.begin(entryIDs: ["intentional-next-batch"]))
+    }
+
+    func testFailedEnqueueCanRetryWhileOtherBatchMembersAwaitConfirmation() {
+        var submission = QuickMatchSubmissionState()
+        XCTAssertTrue(submission.begin(entryIDs: ["sent", "failed"]))
+        submission.finish(uuid: "failed")
+
+        // Retrying the entire original batch would duplicate the sent search.
+        XCTAssertFalse(submission.begin(
+            entryIDs: ["sent", "failed"],
+            retryingFailedEntries: true
+        ))
+        XCTAssertEqual(submission.pendingEntryIDs, ["sent"])
+        XCTAssertTrue(submission.begin(
+            entryIDs: ["failed"],
+            retryingFailedEntries: true
+        ))
+        XCTAssertFalse(submission.begin(
+            entryIDs: ["failed"],
+            retryingFailedEntries: true
+        ))
+
+        submission.handle(.entry(uuid: "sent"))
+        XCTAssertTrue(submission.isSubmitting)
+        submission.handle(.entry(uuid: "failed"))
+        XCTAssertFalse(submission.isSubmitting)
+    }
+
+    func testTerminalEventsBeforeEntryEchoAlsoCompleteBatchMembers() {
+        var submission = QuickMatchSubmissionState()
+        XCTAssertTrue(submission.begin(entryIDs: ["matched", "cancelled", "missing"]))
+
+        submission.handle(.started(
+            uuid: "matched",
+            gameID: 123,
+            requestedLocally: true
+        ))
+        submission.handle(.cancelled(uuid: "cancelled", removedCount: 1))
+        XCTAssertTrue(submission.isSubmitting)
+        submission.handle(.notFoundAfterReconciliation(uuid: "missing"))
+        XCTAssertFalse(submission.isSubmitting)
+
+        // A late echo from the finished batch must not lock the next batch.
+        submission.handle(.entry(uuid: "matched"))
+        XCTAssertFalse(submission.isSubmitting)
+        XCTAssertTrue(submission.begin(entryIDs: ["next"]))
+    }
+
+    func testGlobalCancellationAndAllLocalFailuresAllowNewSubmissions() {
+        var submission = QuickMatchSubmissionState()
+        XCTAssertFalse(submission.begin(entryIDs: []))
+        XCTAssertTrue(submission.begin(entryIDs: ["first", "second"]))
+        submission.handle(.cancelled(uuid: nil, removedCount: 2))
+        XCTAssertFalse(submission.isSubmitting)
+
+        XCTAssertTrue(submission.begin(entryIDs: ["offline-first", "offline-second"]))
+        submission.finish(uuid: "offline-first")
+        submission.finish(uuid: "offline-second")
+        XCTAssertFalse(submission.isSubmitting)
+        XCTAssertTrue(submission.begin(entryIDs: ["new-attempt"]))
     }
 }

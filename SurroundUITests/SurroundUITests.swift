@@ -1237,6 +1237,31 @@ final class SurroundUITests: SurroundUITestCase {
         return XCTWaiter.wait(for: [completeValue], timeout: timeout) == .completed
     }
 
+    private func assertQuickMatchToggle(
+        _ identifier: String,
+        isOn: Bool,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let toggle = element(identifier, in: app, file: file, line: line)
+        XCTAssertTrue(
+            waitForValue(isOn ? "1" : "0", in: toggle, timeout: 5),
+            "Expected \(identifier) to be \(isOn ? "on" : "off")",
+            file: file,
+            line: line
+        )
+    }
+
+    private func openQuickMatchAdvanced(in app: XCUIApplication) {
+        let advanced = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchAdvanced,
+            in: app
+        )
+        scrollIntoTappableArea(advanced, in: app)
+        tap(advanced, description: "Quick Match advanced settings", in: app)
+    }
+
     private func keepTextInputHierarchy(
         _ textField: XCUIElement,
         in app: XCUIApplication,
@@ -1310,6 +1335,21 @@ final class SurroundUITests: SurroundUITestCase {
         _ element: XCUIElement,
         in app: XCUIApplication
     ) {
+        if element.identifier.hasPrefix("quickMatch.") {
+            let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.quickMatchScroll]
+            if scroll.exists {
+                for _ in 0..<10 {
+                    let safeFrame = scroll.frame.insetBy(dx: 0, dy: 8)
+                    if element.isHittable && safeFrame.contains(element.frame) { return }
+                    if element.frame.minY < safeFrame.minY {
+                        scroll.swipeDown()
+                    } else {
+                        scroll.swipeUp()
+                    }
+                }
+                return
+            }
+        }
         for _ in 0..<4 {
             #if targetEnvironment(macCatalyst)
             guard !element.isHittable else {
@@ -1358,7 +1398,14 @@ final class SurroundUITests: SurroundUITestCase {
             .matching(identifier: identifier)
             .firstMatch
         for _ in 0..<8 where !candidate.exists {
-            app.swipeUp()
+            let quickMatchScroll = app.scrollViews[
+                SurroundUITestContract.AccessibilityID.quickMatchScroll
+            ]
+            if identifier.hasPrefix("quickMatch.") && quickMatchScroll.exists {
+                quickMatchScroll.swipeUp()
+            } else {
+                app.swipeUp()
+            }
         }
         return element(
             identifier,
@@ -1440,9 +1487,13 @@ final class SurroundUITests: SurroundUITestCase {
         )
         let boardSize = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
-            in: app,
-            matching: .button
+            in: app
         )
+        let rapid = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("rapid"),
+            in: app
+        )
+        keepScreenshot("Quick Match – default selections", in: app)
 
         tap(
             SurroundUITestContract.AccessibilityID.quickMatchFind,
@@ -1462,6 +1513,12 @@ final class SurroundUITests: SurroundUITestCase {
             boardSize.isEnabled,
             "A live search must lock the editable match criteria."
         )
+        XCTAssertFalse(rapid.isEnabled)
+        XCTAssertFalse(element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTabs,
+            in: app,
+            matching: .segmentedControl
+        ).isEnabled)
 
         tap(
             SurroundUITestContract.AccessibilityID.quickMatchCancel,
@@ -1475,6 +1532,142 @@ final class SurroundUITests: SurroundUITestCase {
         )
         XCTAssertTrue(waitUntilHittable(findAgain, timeout: 5))
         XCTAssertTrue(boardSize.isEnabled)
+        XCTAssertTrue(rapid.isEnabled)
+    }
+
+    func testQuickMatchMultiselectionAndAdvancedPreferences() {
+        let app = launchApp()
+        tap(
+            SurroundUITestContract.AccessibilityID.homeNewGame,
+            in: app,
+            matching: .button
+        )
+
+        let board9 = SurroundUITestContract.AccessibilityID
+            .quickMatchBoardSize(9)
+        let board13 = SurroundUITestContract.AccessibilityID
+            .quickMatchBoardSize(13)
+        assertSelected(board9, in: app)
+        tap(board13, in: app)
+        assertSelected(board9, in: app)
+        assertSelected(board13, in: app)
+        let recap = element(
+            SurroundUITestContract.AccessibilityID.quickMatchRecap,
+            in: app
+        )
+        XCTAssertTrue(recap.label.contains("9 by 9"))
+        XCTAssertTrue(recap.label.contains("13 by 13"))
+
+        let waitingLegend = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Players waiting")).firstMatch
+        let popularLegend = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Popular lately")).firstMatch
+        XCTAssertFalse(waitingLegend.exists)
+        XCTAssertFalse(popularLegend.exists)
+
+        let rapid = SurroundUITestContract.AccessibilityID
+            .quickMatchSpeed("rapid")
+        let live = SurroundUITestContract.AccessibilityID
+            .quickMatchSpeed("live")
+        assertQuickMatchToggle(rapid, isOn: true, in: app)
+        let liveToggle = element(live, in: app)
+        scrollIntoTappableArea(liveToggle, in: app)
+        // The switch accessibility frame includes its wide label. Target the
+        // trailing switch itself, since the center can be empty label space.
+        activate(liveToggle, at: CGVector(dx: 0.95, dy: 0.5))
+        assertQuickMatchToggle(rapid, isOn: true, in: app)
+        assertQuickMatchToggle(live, isOn: true, in: app)
+        let rapidToggle = element(rapid, in: app)
+        scrollIntoTappableArea(rapidToggle, in: app)
+        activate(rapidToggle, at: CGVector(dx: 0.95, dy: 0.5))
+        assertQuickMatchToggle(rapid, isOn: false, in: app)
+        assertQuickMatchToggle(live, isOn: true, in: app)
+
+        openQuickMatchAdvanced(in: app)
+        let eitherClock = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchClockPreference("flexible"),
+            in: app,
+            matching: .button
+        )
+        XCTAssertEqual(eitherClock.label, "Either clock")
+        let byoYomi = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID
+                .quickMatchClockPreference("byoyomi"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(byoYomi, in: app)
+        activate(byoYomi)
+        XCTAssertTrue(byoYomi.isSelected)
+        XCTAssertTrue(recap.label.contains("Byo-Yomi"))
+        XCTAssertFalse(recap.label.contains("Fischer"))
+        let rapidClocks = element(
+            SurroundUITestContract.AccessibilityID.quickMatchClockValues("rapid"),
+            in: app
+        )
+        XCTAssertTrue(rapidClocks.label.contains("9×9"))
+        XCTAssertTrue(rapidClocks.label.contains("13×13"))
+        XCTAssertTrue(rapidClocks.label.contains("Byo-Yomi"))
+        XCTAssertFalse(rapidClocks.label.contains("Fischer"))
+
+        let correspondenceTab = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(correspondenceTab, in: app)
+        activate(correspondenceTab)
+        XCTAssertTrue(correspondenceTab.isSelected)
+        XCTAssertFalse(app.switches.matching(identifier: live).firstMatch.exists)
+        XCTAssertTrue(recap.label.contains("Correspondence"))
+        XCTAssertTrue(recap.label.contains("Fischer"))
+        XCTAssertTrue(popularLegend.waitForExistence(timeout: 5))
+        XCTAssertFalse(waitingLegend.exists)
+
+        let options = app.segmentedControls[
+            SurroundUITestContract.AccessibilityID.newGameOptionPicker
+        ]
+        activate(options.buttons["Custom"])
+        activate(options.buttons["Quick match"])
+
+        let liveTab = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("live"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(liveTab, in: app)
+        activate(liveTab)
+        XCTAssertTrue(liveTab.isSelected)
+        XCTAssertFalse(waitingLegend.exists)
+        XCTAssertFalse(popularLegend.exists)
+        assertQuickMatchToggle(rapid, isOn: false, in: app)
+        assertQuickMatchToggle(live, isOn: true, in: app)
+        XCTAssertTrue(recap.label.contains("9 by 9"))
+        XCTAssertTrue(recap.label.contains("13 by 13"))
+        XCTAssertTrue(recap.label.contains("Byo-Yomi"))
+        XCTAssertFalse(recap.label.contains("Fischer"))
+
+        openQuickMatchAdvanced(in: app)
+
+        let allowHandicap = SurroundUITestContract.AccessibilityID
+            .quickMatchAllowHandicap
+        let strictHandicap = SurroundUITestContract.AccessibilityID
+            .quickMatchStrictHandicap
+        assertQuickMatchToggle(allowHandicap, isOn: true, in: app)
+        let strict = elementAfterScrolling(strictHandicap, in: app)
+        XCTAssertEqual(strict.label, "Require handicap")
+        scrollIntoTappableArea(strict, in: app)
+        activate(strict)
+        assertQuickMatchToggle(strictHandicap, isOn: true, in: app)
+        XCTAssertTrue(recap.label.contains("Handicap required"))
+
+        let allow = element(allowHandicap, in: app)
+        scrollIntoTappableArea(allow, in: app)
+        activate(allow)
+        assertQuickMatchToggle(allowHandicap, isOn: false, in: app)
+        XCTAssertTrue(recap.label.contains("No handicap"))
+        XCTAssertFalse(strict.isEnabled)
+        keepScreenshot("Quick Match – multiselection and Advanced", in: app)
     }
 
     func testRestoredLiveAutomatchLocksQuickMatchForm() {
@@ -1511,7 +1704,7 @@ final class SurroundUITests: SurroundUITestCase {
             "A restored search must not describe the saved editor draft."
         )
         XCTAssertTrue(recap.label.contains("Fischer"))
-        XCTAssertTrue(recap.label.contains("Required handicap"))
+        XCTAssertTrue(recap.label.contains("Handicap required"))
         let cancel = element(
             SurroundUITestContract.AccessibilityID.quickMatchCancel,
             in: app,
@@ -1521,13 +1714,11 @@ final class SurroundUITests: SurroundUITestCase {
 
         let boardSize = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
-            in: app,
-            matching: .button
+            in: app
         )
         let activeBoardSize = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
-            in: app,
-            matching: .button
+            in: app
         )
         XCTAssertFalse(
             boardSize.isEnabled,
@@ -1539,33 +1730,50 @@ final class SurroundUITests: SurroundUITestCase {
             "The disabled form must select the board size from the active entry."
         )
 
-        let activeClock = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "rapid",
-                system: "fischer"
-            ),
+        let rapid = SurroundUITestContract.AccessibilityID
+            .quickMatchSpeed("rapid")
+        assertQuickMatchToggle(rapid, isOn: true, in: app)
+        XCTAssertFalse(element(rapid, in: app).isEnabled)
+        XCTAssertFalse(element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTabs,
             in: app,
-            matching: .button
-        )
-        let unselectedClock = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "rapid",
-                system: "byoyomi"
-            ),
-            in: app,
-            matching: .button
-        )
-        XCTAssertTrue(activeClock.isSelected)
-        XCTAssertFalse(
-            unselectedClock.isSelected,
-            "An exact restored search must not display the saved flexible clock."
-        )
-
-        let handicap = element(
-            SurroundUITestContract.AccessibilityID.quickMatchHandicap,
+            matching: .segmentedControl
+        ).isEnabled)
+        assertQuickMatchToggle(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("live"),
+            isOn: false,
             in: app
         )
-        XCTAssertEqual(handicap.value as? String, "Required")
+
+        openQuickMatchAdvanced(in: app)
+        let clock = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID
+                .quickMatchClockPreference("fischer"),
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(clock.isSelected)
+        XCTAssertFalse(element(
+            SurroundUITestContract.AccessibilityID.quickMatchClockSystem,
+            in: app,
+            matching: .segmentedControl
+        ).isEnabled)
+        assertQuickMatchToggle(
+            SurroundUITestContract.AccessibilityID.quickMatchAllowHandicap,
+            isOn: true,
+            in: app
+        )
+        assertQuickMatchToggle(
+            SurroundUITestContract.AccessibilityID.quickMatchStrictHandicap,
+            isOn: true,
+            in: app
+        )
+        XCTAssertFalse(
+            element(
+                SurroundUITestContract.AccessibilityID.quickMatchStrictHandicap,
+                in: app
+            ).isEnabled
+        )
 
         let find = app.buttons.matching(
             identifier: SurroundUITestContract.AccessibilityID.quickMatchFind
@@ -1574,6 +1782,7 @@ final class SurroundUITests: SurroundUITestCase {
             find.exists,
             "A restored live search must replace Find with its searching state."
         )
+        keepScreenshot("Quick Match – restored live search", in: app)
     }
 
     func testQuickMatchCorrespondenceAllowsAnotherSearch() {
@@ -1589,43 +1798,70 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
 
-        let correspondence = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "correspondence",
-                system: "fischer"
-            ),
-            in: app,
-            matching: .button
+        tap(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
+            in: app
         )
-        for _ in 0..<6 where !correspondence.isHittable {
-            app.swipeUp()
-        }
+        let correspondenceID = SurroundUITestContract.AccessibilityID
+            .quickMatchSpeedTab("correspondence")
+        let correspondence = elementAfterScrolling(correspondenceID, in: app)
+        scrollIntoTappableArea(correspondence, in: app)
         tap(
             correspondence,
-            description: "Correspondence Fischer clock",
+            description: "Correspondence speed",
+            in: app
+        )
+        XCTAssertTrue(correspondence.isSelected)
+        XCTAssertFalse(
+            app.switches.matching(identifier:
+                SurroundUITestContract.AccessibilityID.quickMatchSpeed("rapid")
+            ).firstMatch.exists
+        )
+        assertSelected(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app
+        )
+        assertSelected(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
             in: app
         )
 
-        tap(
+        let gameCount = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchGameCount,
+            in: app,
+            matching: .stepper
+        )
+        scrollIntoTappableArea(gameCount, in: app)
+        XCTAssertTrue(waitForValue("1", in: gameCount, timeout: 5))
+        let increment = gameCount.buttons[
+            SurroundUITestContract.AccessibilityID.quickMatchGameCount + "-Increment"
+        ]
+        tap(increment, description: "Increase correspondence game count", in: app)
+        XCTAssertTrue(waitForValue("2", in: gameCount, timeout: 5))
+
+        let find = element(
             SurroundUITestContract.AccessibilityID.quickMatchFind,
             in: app,
             matching: .button
         )
+        XCTAssertEqual(find.label, "Find 2 games")
+
+        tap(find, description: "Find two correspondence games", in: app)
         let banner = element(
             SurroundUITestContract.AccessibilityID.quickMatchWaitingBanner,
             in: app
         )
-        let oneSearch = XCTNSPredicateExpectation(
+        let firstBatch = XCTNSPredicateExpectation(
             predicate: NSPredicate(
                 format: "label CONTAINS %@",
-                "Searching for a game"
+                "Searching for 2 games"
             ),
             object: banner
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [oneSearch], timeout: 5),
+            XCTWaiter.wait(for: [firstBatch], timeout: 5),
             .completed,
-            "The active correspondence search should appear beside Find."
+            "Each requested correspondence game must create a separate search."
         )
         let findAnother = element(
             SurroundUITestContract.AccessibilityID.quickMatchFind,
@@ -1634,19 +1870,84 @@ final class SurroundUITests: SurroundUITestCase {
         )
         XCTAssertTrue(
             waitUntilHittable(findAnother, timeout: 5),
-            "Correspondence must leave Find a game available."
+            "Correspondence must leave another batch available."
         )
+        XCTAssertEqual(findAnother.label, "Find 2 more games")
+        keepScreenshot("Quick Match – correspondence tab", in: app)
+
+        openQuickMatchAdvanced(in: app)
+        let clock = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchClockSystem,
+            in: app
+        )
+        XCTAssertTrue(
+            [clock.label, clock.value as? String ?? ""]
+                .joined(separator: " ").contains("Fischer")
+        )
+        XCTAssertFalse(
+            app.segmentedControls.matching(
+                identifier: SurroundUITestContract.AccessibilityID
+                    .quickMatchClockSystem
+            ).firstMatch.exists,
+            "Correspondence must describe its fixed Fischer clock without an editable clock picker."
+        )
+        XCTAssertTrue(gameCount.isEnabled)
+        XCTAssertTrue(correspondence.isEnabled)
         activate(findAnother)
 
-        let twoSearches = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label CONTAINS '2'"),
+        let bothBatches = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Searching for 4 games"),
             object: banner
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [twoSearches], timeout: 5),
+            XCTWaiter.wait(for: [bothBatches], timeout: 5),
             .completed,
-            "Two correspondence searches should remain active together."
+            "Repeating a batch must add searches without replacing the first batch."
         )
+        XCTAssertEqual(findAnother.label, "Find 2 more games")
+        // The offline runtime keeps these searches optimistic rather than
+        // inserting server entries, so the destination has no stored requests.
+        tap(banner, description: "Show empty active-search list", in: app)
+        XCTAssertTrue(app.staticTexts["No active searches"].waitForExistence(timeout: 5))
+        keepScreenshot("Waiting games – no active searches", in: app)
+    }
+
+    func testQuickMatchShowsPendingCorrespondenceSubmission() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.holdQuickMatchAcknowledgementsLaunchArgument,
+        ])
+        tap(SurroundUITestContract.AccessibilityID.homeNewGame, in: app, matching: .button)
+        let correspondence = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(correspondence, in: app)
+        activate(correspondence)
+
+        let gameCount = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchGameCount,
+            in: app,
+            matching: .stepper
+        )
+        scrollIntoTappableArea(gameCount, in: app)
+        tap(
+            gameCount.buttons[SurroundUITestContract.AccessibilityID.quickMatchGameCount + "-Increment"],
+            description: "Request two correspondence games",
+            in: app
+        )
+        let find = element(SurroundUITestContract.AccessibilityID.quickMatchFind, in: app, matching: .button)
+        tap(find, description: "Start correspondence searches", in: app)
+        let starting = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Starting searches…"),
+            object: find
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [starting], timeout: 5), .completed)
+        XCTAssertFalse(find.isEnabled, "Awaiting acknowledgement must prevent duplicate submissions.")
+        XCTAssertFalse(gameCount.isEnabled)
+        XCTAssertTrue(element(SurroundUITestContract.AccessibilityID.quickMatchWaitingBanner, in: app)
+            .label.contains("Searching for 2 games"))
+        keepScreenshot("Quick Match – starting correspondence searches", in: app)
     }
 
     func testQuickMatchShowsMatchingOpenCustomGamesInline() {
@@ -1656,6 +1957,9 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.CompatibilityScene.quickMatch.rawValue,
         ])
 
+        XCTAssertTrue(app.segmentedControls[SurroundUITestContract.AccessibilityID.newGameOptionPicker]
+            .buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Open (")).firstMatch.exists)
+
         element(
             SurroundUITestContract.AccessibilityID.quickMatchRecap,
             in: app
@@ -1663,19 +1967,18 @@ final class SurroundUITests: SurroundUITestCase {
 
         let boardSize = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19),
-            in: app,
-            matching: .button
+            in: app
         )
         scrollIntoTappableArea(boardSize, in: app)
         activate(boardSize)
+        tap(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app
+        )
 
         let correspondence = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "correspondence",
-                system: "fischer"
-            ),
-            in: app,
-            matching: .button
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
+            in: app
         )
         scrollIntoTappableArea(correspondence, in: app)
         activate(correspondence)
@@ -1707,6 +2010,51 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    func testWaitingQuickMatchRequestsShowNeutralClockSummaries() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.waitingGames.rawValue,
+        ])
+
+        let exact = element(
+            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d0"
+            ),
+            in: app
+        )
+        XCTAssertTrue(exact.staticTexts["Fischer"].exists)
+        XCTAssertFalse(exact.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "+")
+        ).firstMatch.exists, "Clock values belong in the speed picker, not request cards.")
+
+        let flexible = element(
+            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d1"
+            ),
+            in: app
+        )
+        XCTAssertTrue(flexible.staticTexts["Fischer or Byo-Yomi"].exists)
+        XCTAssertFalse(flexible.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", "+", "preferred")
+        ).firstMatch.exists)
+
+        let mixed = element(
+            SurroundUITestContract.AccessibilityID.waitingGamesAutomatchEntry(
+                "f0050bcf-f5fc-46c8-9ed6-01dfd898e0d2"
+            ),
+            in: app
+        )
+        XCTAssertTrue(mixed.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Blitz", "Fischer")
+        ).firstMatch.exists)
+        XCTAssertTrue(mixed.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Rapid", "Byo-Yomi")
+        ).firstMatch.exists)
+        XCTAssertTrue(mixed.staticTexts["No handicap"].exists)
+        keepScreenshot("Waiting games – neutral clock summaries", in: app)
+    }
+
     func testQuickMatchActivityIsExposedWithoutRelyingOnColor() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
@@ -1716,45 +2064,58 @@ final class SurroundUITests: SurroundUITestCase {
 
         let waitingBoard = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
-            in: app,
-            matching: .button
+            in: app
         )
         XCTAssertTrue(
-            (waitingBoard.value as? String)?.contains("Players waiting") == true
+            waitingBoard.label.contains("Players waiting")
         )
+        XCTAssertFalse((waitingBoard.value as? String ?? "").contains("Players waiting"))
 
         let popularBoard = element(
             SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
-            in: app,
-            matching: .button
+            in: app
         )
         XCTAssertTrue(
-            (popularBoard.value as? String)?.contains("Popular lately") == true
+            popularBoard.label.contains("Popular lately")
+        )
+        XCTAssertFalse((popularBoard.value as? String ?? "").contains("Popular lately"))
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Players waiting")).firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Popular lately")).firstMatch.exists)
+
+        let waitingSpeed = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("rapid"),
+            in: app
+        )
+        XCTAssertTrue(waitingSpeed.label.contains("Players waiting"))
+        assertQuickMatchToggle(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("rapid"),
+            isOn: true,
+            in: app
         )
 
-        let waitingClock = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "rapid",
-                system: "fischer"
-            ),
-            in: app,
-            matching: .button
+        let popularSpeed = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("live"),
+            in: app
         )
-        XCTAssertTrue(
-            (waitingClock.value as? String)?.contains("Players waiting") == true
+        XCTAssertTrue(popularSpeed.label.contains("Popular lately"))
+        assertQuickMatchToggle(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("live"),
+            isOn: false,
+            in: app
         )
 
-        let popularClock = element(
-            SurroundUITestContract.AccessibilityID.quickMatchClock(
-                speed: "rapid",
-                system: "byoyomi"
-            ),
-            in: app,
-            matching: .button
-        )
-        XCTAssertTrue(
-            (popularClock.value as? String)?.contains("Popular lately") == true
-        )
+        for speed in ["blitz", "rapid", "live"] {
+            let clocks = element(
+                SurroundUITestContract.AccessibilityID.quickMatchClockValues(speed),
+                in: app
+            )
+            XCTAssertTrue(clocks.label.contains("Fischer"))
+            XCTAssertTrue(clocks.label.contains("Byo-Yomi"))
+            XCTAssertTrue(clocks.label.contains("+"), "Every speed must expose actual clock values, even when off.")
+        }
+        keepScreenshot("Quick Match – clock values under all speeds", in: app)
     }
 
     func testFixtureGameOpens() {

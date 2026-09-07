@@ -17,29 +17,44 @@ struct AutomatchEntryCell: View {
     private var presentation: AutomatchEntryPresentation? {
         AutomatchEntryPresentation(entry: entry, userRank: ogs.user?.ranking)
     }
+
+    private var quickMatchDraft: OGSQuickMatchDraft? {
+        guard let presentation = OGSActiveQuickMatchPresentation(entry: entry),
+              presentation.draft.quickMatchClockPreference != .mixed else {
+            return nil
+        }
+        return presentation.draft
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
             requestHeader
             Divider()
-            if let presentation {
+            if let draft = quickMatchDraft, let presentation {
+                let recap = draft.quickMatchRecap(userRank: ogs.user?.ranking)
+                Label(
+                    recap.firstLine,
+                    systemImage: "squareshape.split.3x3"
+                )
+                clockSummary(presentation)
+                Label(
+                    presentation.handicap,
+                    systemImage: "square.grid.3x3.topleft.filled"
+                )
+                Label(
+                    draft.quickMatchRankRange(userRank: ogs.user?.ranking),
+                    systemImage: "arrow.up.and.down.square"
+                )
+                .accessibilityLabel(
+                    draft.quickMatchAccessibleRankRange(userRank: ogs.user?.ranking)
+                )
+            } else if let presentation {
                 Label(
                     presentation.boardAndSpeed,
                     systemImage: "squareshape.split.3x3"
                 )
 
-                Label {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(
-                            Array(presentation.clockLines.enumerated()),
-                            id: \.offset
-                        ) { _, clockLine in
-                            Text(clockLine)
-                        }
-                    }
-                } icon: {
-                    Image(systemName: "clock")
-                }
+                clockSummary(presentation)
                 Label(
                     presentation.rankRange,
                     systemImage: "arrow.up.and.down.square"
@@ -87,6 +102,24 @@ struct AutomatchEntryCell: View {
         }
     }
 
+    private func clockSummary(
+        _ presentation: AutomatchEntryPresentation
+    ) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(
+                    Array(presentation.clockLines.enumerated()),
+                    id: \.offset
+                ) { _, clockLine in
+                    Text(clockLine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } icon: {
+            Image(systemName: "clock")
+        }
+    }
+
     private var requestHeader: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
@@ -113,10 +146,11 @@ struct AutomatchEntryCell: View {
 
     private var cancellationButton: some View {
         Button(action: requestCancellation) {
-            if isCancelling {
-                ProgressView()
-                    .accessibilityLabel("Cancelling quick match search")
-            } else {
+            HStack(spacing: 6) {
+                if isCancelling {
+                    ProgressView()
+                        .accessibilityHidden(true)
+                }
                 Text("Withdraw")
                     .bold()
                     .foregroundColor(.red)
@@ -126,8 +160,8 @@ struct AutomatchEntryCell: View {
         .frame(minWidth: 44, minHeight: 44)
         .accessibilityLabel(
             isCancelling
-                ? String(localized: "Cancelling quick match search")
-                : String(localized: "Cancel quick match search")
+                ? String(localized: "Withdrawing quick match search")
+                : String(localized: "Withdraw quick match search")
         )
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID
@@ -252,6 +286,18 @@ struct WaitingGamesView: View {
                     }
                 }
             }.padding(.horizontal)
+        }
+        .overlay {
+            if ogs.autoMatchEntryById.isEmpty
+                && ogs.challengesSent.isEmpty
+                && ogs.openChallengeSentById.isEmpty
+                && ogs.participatingRengoChallengeById.isEmpty
+                && ogs.challengesReceived.isEmpty {
+                ContentUnavailableView(
+                    "No active searches",
+                    systemImage: "magnifyingglass"
+                )
+            }
         }
         .onAppear() {
             updateWaitingGamesList()

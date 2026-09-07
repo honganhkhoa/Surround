@@ -4304,6 +4304,46 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testSubmissionCompletesAfterDisconnectAndMissingReconnectReplay() async {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            automatchReconciliationTimeout: 0.01,
+            automatchConfirmationTimeout: 60
+        )
+        let entry = OGSQuickMatchDraft(
+            mode: .exact,
+            boardSize: 9,
+            speed: .correspondence,
+            system: .fischer
+        ).makeAutomatchEntry(uuid: "interrupted-correspondence-submission")
+        var submission = QuickMatchSubmissionState()
+        let reconciled = expectation(description: "Submission released after reconnect")
+        let lifecycleCancellable = service.automatchLifecycleEvents.sink {
+            submission.handle($0.kind)
+            if $0.kind == .notFoundAfterReconciliation(uuid: entry.uuid) {
+                reconciled.fulfill()
+            }
+        }
+        defer { lifecycleCancellable.cancel() }
+
+        XCTAssertTrue(submission.begin(entryIDs: [entry.uuid]))
+        XCTAssertTrue(service.findAutomatch(entry: entry))
+        XCTAssertTrue(submission.isSubmitting)
+        socket.dropSocket()
+        service.handleAutomatchConfirmationTimeout(for: entry.uuid)
+        XCTAssertTrue(submission.isSubmitting)
+        XCTAssertFalse(submission.begin(entryIDs: ["accidental-retry"]))
+
+        socket.openSocket(authenticate: true)
+        await fulfillment(of: [reconciled], timeout: 1)
+
+        XCTAssertFalse(submission.isSubmitting)
+        XCTAssertNil(service.autoMatchEntryById[entry.uuid])
+        XCTAssertTrue(submission.begin(entryIDs: ["new-attempt"]))
+    }
+
     func testConfirmedRequestTimerCannotReconcileNewerRequest() {
         let socket = FakeWebsocket()
         let service = makeService(

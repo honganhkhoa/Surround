@@ -674,13 +674,14 @@ struct HomeView: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(action: { nav.home.showingNewGameView = false }) {
-                                Text("Cancel")
+                                Text("Close")
                             }
                         }
                     }
                     .environmentObject(ogs)
                     .environmentObject(nav)
             }
+            .presentationSizing(.page)
         }
         .sheet(isPresented: $nav.home.showingPreferredSettings) {
             NavigationStack {

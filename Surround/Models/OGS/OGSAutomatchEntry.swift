@@ -814,42 +814,29 @@ struct OGSQuickMatchClockSelection: Codable, Hashable {
         OGSQuickMatchClockSelection(speed: .live, system: .byoyomi),
     ]
 
+    static let allSupported = allRealtime + [
+        OGSQuickMatchClockSelection(speed: .correspondence, system: .fischer),
+    ]
+
     fileprivate var sortIndex: Int {
-        Self.allRealtime.firstIndex(of: self) ?? Int.max
+        Self.allSupported.firstIndex(of: self) ?? Int.max
     }
 }
 
 extension OGSQuickMatchHandicapPreference {
-    var quickMatchTitle: String {
+    func quickMatchSummary(locale: Locale = .current) -> String {
         switch self {
         case .required:
-            return String(localized: "Required")
+            return String(localized: "Handicap required", locale: locale)
         case .standard:
-            return String(localized: "Standard")
+            return String(localized: "Handicap allowed", locale: locale)
         case .disabled:
-            return String(localized: "Disabled")
-        }
-    }
-
-    var quickMatchDescription: String {
-        switch self {
-        case .required:
-            return String(localized: "Require handicaps between players of different ranks.")
-        case .standard:
-            return String(localized: "Use handicaps by default, but accept games with handicaps off.")
-        case .disabled:
-            return String(localized: "Never play with handicap stones.")
-        }
-    }
-
-    var quickMatchPickerDescription: String {
-        switch self {
-        case .required:
-            return String(localized: "Use handicaps when ranks differ.")
-        case .standard:
-            return String(localized: "Prefer handicaps; allow even games.")
-        case .disabled:
-            return String(localized: "No handicap stones.")
+            return String(
+                localized: "quickMatch.noHandicap",
+                defaultValue: "No handicap",
+                locale: locale,
+                comment: "Quick Match recap: handicap games are not allowed"
+            )
         }
     }
 }
@@ -875,7 +862,11 @@ extension TimeControlSpeed {
         case .rapid:
             return String(localized: "Rapid")
         case .live:
-            return String(localized: "Live")
+            return String(
+                localized: "quickMatch.speed.live",
+                defaultValue: "Live",
+                comment: "Individual Quick Match speed, slower than Blitz and Rapid. Distinguish it from the Real-time category; Live remains the English name."
+            )
         case .correspondence:
             return String(localized: "Correspondence")
         }
@@ -907,134 +898,7 @@ extension OGSQuickMatchClockPreset {
         }
     }
 
-    var quickMatchAccessibleDescription: String {
-        switch timeControl {
-        case .Fischer(let initialTime, let timeIncrement, _):
-            return String(
-                localized: "\(system.quickMatchTitle), \(durationString(seconds: initialTime, longFormat: true)) plus \(durationString(seconds: timeIncrement, longFormat: true)) per move"
-            )
-        case .ByoYomi(let mainTime, let periods, let periodTime):
-            return String(
-                localized: "\(system.quickMatchTitle), \(durationString(seconds: mainTime, longFormat: true)) plus \(periods) periods of \(durationString(seconds: periodTime, longFormat: true))"
-            )
-        default:
-            return "\(system.quickMatchTitle), \(timeControl.shortDescription)"
-        }
-    }
 
-    static func quickMatchDisplayDescription(
-        for presets: [OGSQuickMatchClockPreset]
-    ) -> String {
-        guard let first = presets.first else { return "" }
-        switch first.timeControl {
-        case .Fischer:
-            let values = presets.compactMap { preset -> (Int, Int)? in
-                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
-                    return nil
-                }
-                return (initial, increment)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  let increment = values.first?.1 else {
-                return first.quickMatchShortDescription
-            }
-            return "\(quickMatchDurationRange(values.map(\.0))) + \(durationString(seconds: increment))"
-        case .ByoYomi:
-            let values = presets.compactMap { preset -> (Int, Int, Int)? in
-                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
-                    return nil
-                }
-                return (main, periods, period)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  Set(values.map(\.2)).count == 1,
-                  let periods = values.first?.1,
-                  let period = values.first?.2 else {
-                return first.quickMatchShortDescription
-            }
-            return "\(quickMatchDurationRange(values.map(\.0))) + \(periods)×\(durationString(seconds: period))"
-        default:
-            return first.quickMatchShortDescription
-        }
-    }
-
-    static func quickMatchAccessibleDescription(
-        for presets: [OGSQuickMatchClockPreset]
-    ) -> String {
-        guard let first = presets.first else { return "" }
-        switch first.timeControl {
-        case .Fischer:
-            let values = presets.compactMap { preset -> (Int, Int)? in
-                guard case .Fischer(let initial, let increment, _) = preset.timeControl else {
-                    return nil
-                }
-                return (initial, increment)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  let increment = values.first?.1 else {
-                return first.quickMatchAccessibleDescription
-            }
-            let initial = quickMatchDurationRange(
-                values.map(\.0),
-                longFormat: true,
-                spoken: true
-            )
-            return String(
-                localized: "\(first.system.quickMatchTitle), \(initial) plus \(durationString(seconds: increment, longFormat: true)) per move"
-            )
-        case .ByoYomi:
-            let values = presets.compactMap { preset -> (Int, Int, Int)? in
-                guard case .ByoYomi(let main, let periods, let period) = preset.timeControl else {
-                    return nil
-                }
-                return (main, periods, period)
-            }
-            guard values.count == presets.count,
-                  Set(values.map(\.1)).count == 1,
-                  Set(values.map(\.2)).count == 1,
-                  let periods = values.first?.1,
-                  let period = values.first?.2 else {
-                return first.quickMatchAccessibleDescription
-            }
-            let main = quickMatchDurationRange(
-                values.map(\.0),
-                longFormat: true,
-                spoken: true
-            )
-            return String(
-                localized: "\(first.system.quickMatchTitle), \(main) plus \(periods) periods of \(durationString(seconds: period, longFormat: true))"
-            )
-        default:
-            return first.quickMatchAccessibleDescription
-        }
-    }
-
-    private static func quickMatchDurationRange(
-        _ values: [Int],
-        longFormat: Bool = false,
-        spoken: Bool = false
-    ) -> String {
-        let values = Array(Set(values)).sorted()
-        guard let first = values.first, let last = values.last else { return "" }
-        let firstDescription = durationString(
-            seconds: first,
-            longFormat: longFormat
-        )
-        guard first != last else { return firstDescription }
-        let lastDescription = durationString(
-            seconds: last,
-            longFormat: longFormat
-        )
-        return spoken
-            ? String(
-                localized: "\(firstDescription) to \(lastDescription)",
-                comment: "Spoken range between two Quick Match clock durations"
-            )
-            : "\(firstDescription)–\(lastDescription)"
-    }
 }
 
 
@@ -1102,12 +966,12 @@ struct OGSQuickMatchDraft: Codable, Equatable {
 
         var migratedClocks = Set(
             legacyEntry.sizeSpeedOptions.compactMap { option in
-                option.speed.isRealtime
-                    ? OGSQuickMatchClockSelection(
-                        speed: option.speed,
-                        system: option.system
-                    )
-                    : nil
+                let clock = OGSQuickMatchClockSelection(
+                    speed: option.speed,
+                    system: option.system
+                )
+                return OGSQuickMatchClockSelection.allSupported.contains(clock)
+                    ? clock : nil
             }
         )
         if migratedSpeed.isRealtime {
@@ -1127,7 +991,7 @@ struct OGSQuickMatchDraft: Codable, Equatable {
         if migratedClocks.isEmpty {
             migratedClocks.insert(
                 OGSQuickMatchClockSelection(
-                    speed: migratedSpeed == .correspondence ? .rapid : migratedSpeed,
+                    speed: migratedSpeed,
                     system: migratedSystem
                 )
             )
@@ -1144,9 +1008,7 @@ struct OGSQuickMatchDraft: Codable, Equatable {
         }
 
         self.init(
-            mode: validSizes.count > 1 && migratedSpeed.isRealtime
-                ? .multiple
-                : .flexible,
+            mode: validSizes.count > 1 ? .multiple : .flexible,
             boardSize: migratedBoardSize,
             speed: migratedSpeed,
             system: migratedSystem,
@@ -1162,6 +1024,7 @@ struct OGSQuickMatchDraft: Codable, Equatable {
         )
     }
 
+    /// Shuffle every set of accepted alternatives so neither clock is preferred.
     func makeAutomatchEntry(
         uuid: String = UUID().uuidString.lowercased(),
         multipleOptionsShuffler: (inout [OGSAutomatchSizeSpeedOption]) -> Void = {
@@ -1200,6 +1063,7 @@ struct OGSQuickMatchDraft: Codable, Equatable {
                     )
                 )
             }
+            multipleOptionsShuffler(&options)
         case .multiple:
             let sizes = normalizedMultipleBoardSizes
             let clocks = normalizedMultipleClocks
@@ -1241,13 +1105,13 @@ struct OGSQuickMatchDraft: Codable, Equatable {
 
     private var normalizedMultipleClocks: [OGSQuickMatchClockSelection] {
         let validClocks = multipleClocks.intersection(
-            Set(OGSQuickMatchClockSelection.allRealtime)
+            Set(OGSQuickMatchClockSelection.allSupported)
         )
         if validClocks.isEmpty {
             return [
                 OGSQuickMatchClockSelection(
-                    speed: speed == .correspondence ? .rapid : speed,
-                    system: system
+                    speed: speed,
+                    system: speed == .correspondence ? .fischer : system
                 ),
             ]
         }
@@ -1261,13 +1125,19 @@ struct OGSQuickMatchDraft: Codable, Equatable {
 
 extension OGSQuickMatchDraft {
     /// Whether this draft can create another request while a correspondence
-    /// search is already active. Multiple mode only exposes real-time clocks.
+    /// search is already active. Multiple board sizes may share the single
+    /// correspondence clock, independently of the last primary speed.
     var quickMatchIsCorrespondenceOnly: Bool {
         switch mode {
         case .exact, .flexible:
             return speed == .correspondence
         case .multiple:
-            return false
+            let clocks = multipleClocks.intersection(
+                Set(OGSQuickMatchClockSelection.allSupported)
+            )
+            return !clocks.isEmpty && clocks.allSatisfy {
+                $0.speed == .correspondence
+            }
         }
     }
 }
@@ -1337,48 +1207,40 @@ struct AutomatchEntryPresentation: Equatable {
                 comment: "Board sizes followed by game speeds in a waiting Quick Match request."
             )
 
-        let selections = Set(options.map {
-            OGSQuickMatchClockSelection(speed: $0.speed, system: $0.system)
-        })
-        .sorted(by: Self.clockSelectionPrecedes)
-        clockLines = selections.map { selection in
-            let matchingSizes = Set(
-                options.lazy
-                    .filter {
-                        $0.speed == selection.speed
-                            && $0.system == selection.system
-                    }
-                    .map(\.size)
+        let groups = speeds.flatMap { speed -> [ClockSummaryGroup] in
+            let optionsBySize = Dictionary(
+                grouping: options.filter { $0.speed == speed },
+                by: \.size
             )
-            .sorted()
-            // Every tuple was validated above, so each matching size has a
-            // known preset and can be summarized without a lossy fallback.
-            let presets = matchingSizes.compactMap {
-                OGSQuickMatchClockPreset.preset(
-                    boardSize: $0,
-                    speed: selection.speed,
-                    system: selection.system
+            var sizesBySystems = [Set<OGSAutomatchClockSystem>: [Int]]()
+            for (size, sizeOptions) in optionsBySize {
+                sizesBySystems[Set(sizeOptions.map(\.system)), default: []].append(size)
+            }
+            return sizesBySystems.map { systems, matchingSizes in
+                ClockSummaryGroup(
+                    sizes: matchingSizes.sorted(),
+                    speed: speed,
+                    systems: systems
                 )
             }
-            let clockNameParts = [
-                Set(matchingSizes) == allSizes
-                    ? nil
-                    : Self.localizedList(
-                        matchingSizes.map { "\($0)×\($0)" },
+            .sorted { $0.sizes[0] < $1.sizes[0] }
+        }
+        if let first = groups.first,
+           groups.allSatisfy({ $0.sizes == sizes && $0.systems == first.systems }) {
+            clockLines = [Self.clockSystemSummary(first.systems, locale: locale)]
+        } else {
+            clockLines = groups.map { group in
+                [
+                    group.sizes == sizes ? nil : Self.localizedList(
+                        group.sizes.map { "\($0)×\($0)" },
                         locale: locale
                     ),
-                speeds.count > 1 ? selection.speed.quickMatchTitle : nil,
-                selection.system.quickMatchTitle,
-            ]
-            .compactMap { $0 }
-            let clockName = clockNameParts.joined(separator: " · ")
-            let value = OGSQuickMatchClockPreset
-                .quickMatchDisplayDescription(for: presets)
-            return String(
-                localized: "\(clockName): \(value)",
-                locale: locale,
-                comment: "Clock name followed by its values in a waiting Quick Match request."
-            )
+                    speeds.count > 1 ? group.speed.quickMatchTitle : nil,
+                    Self.clockSystemSummary(group.systems, locale: locale),
+                ]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            }
         }
 
         if let userRank {
@@ -1404,11 +1266,11 @@ struct AutomatchEntryPresentation: Equatable {
 
         switch (entry.handicap.condition, entry.handicap.value) {
         case (.required, .enabled):
-            handicap = Self.handicapDescription(.required, locale: locale)
+            handicap = OGSQuickMatchHandicapPreference.required.quickMatchSummary(locale: locale)
         case (.preferred, .enabled):
-            handicap = Self.handicapDescription(.standard, locale: locale)
+            handicap = OGSQuickMatchHandicapPreference.standard.quickMatchSummary(locale: locale)
         case (.required, .disabled):
-            handicap = Self.handicapDescription(.disabled, locale: locale)
+            handicap = OGSQuickMatchHandicapPreference.disabled.quickMatchSummary(locale: locale)
         case (.preferred, .disabled):
             handicap = String(
                 localized: "No handicap preferred: Accept games with or without handicap stones.",
@@ -1450,15 +1312,22 @@ struct AutomatchEntryPresentation: Equatable {
         }
     }
 
-    private static func handicapDescription(
-        _ preference: OGSQuickMatchHandicapPreference,
+    private struct ClockSummaryGroup {
+        let sizes: [Int]
+        let speed: TimeControlSpeed
+        let systems: Set<OGSAutomatchClockSystem>
+    }
+
+    private static func clockSystemSummary(
+        _ systems: Set<OGSAutomatchClockSystem>,
         locale: Locale
     ) -> String {
-        String(
-            localized: "\(preference.quickMatchTitle): \(preference.quickMatchDescription)",
-            locale: locale,
-            comment: "Quick Match preference name followed by its values or explanation in an active-request card."
-        )
+        if systems.count == 2 {
+            return String(localized: "Fischer or Byo-Yomi", locale: locale)
+        }
+        return systems.contains(.fischer)
+            ? String(localized: "Fischer", locale: locale)
+            : String(localized: "Byo-Yomi", locale: locale)
     }
 
     private static func ruleSetTitle(
@@ -1502,18 +1371,7 @@ struct AutomatchEntryPresentation: Equatable {
         }
     }
 
-    private static func clockSelectionPrecedes(
-        _ lhs: OGSQuickMatchClockSelection,
-        _ rhs: OGSQuickMatchClockSelection
-    ) -> Bool {
-        let speeds = sortedSpeeds(Set([lhs.speed, rhs.speed]))
-        if lhs.speed != rhs.speed {
-            return speeds.first == lhs.speed
-        }
-        let systems = OGSAutomatchClockSystem.allCases
-        return (systems.firstIndex(of: lhs.system) ?? .max)
-            < (systems.firstIndex(of: rhs.system) ?? .max)
-    }
+
 }
 
 /// A read-only projection of the criteria OGS is actively matching.
@@ -1574,7 +1432,9 @@ struct OGSActiveQuickMatchPresentation: Equatable {
                     )
                 }
             })
-            guard clocks.allSatisfy({ $0.speed.isRealtime }),
+            let hasCompatibleSpeeds = clocks.allSatisfy { $0.speed.isRealtime }
+                || clocks.allSatisfy { $0.speed == .correspondence }
+            guard hasCompatibleSpeeds,
                   distinctOptions == representedOptions else {
                 return nil
             }
@@ -1604,6 +1464,45 @@ struct OGSActiveQuickMatchPresentation: Equatable {
             lowerRankDifference: entry.lowerRankDifference,
             upperRankDifference: entry.upperRankDifference
         )
+    }
+}
+
+/// A send is only queued when `findAutomatch` returns. Keep each batch member
+/// pending until OGS echoes it or reports a terminal result, including the
+/// service's bounded reconciliation result for an unanswered request.
+struct QuickMatchSubmissionState: Equatable {
+    private(set) var pendingEntryIDs = Set<String>()
+
+    var isSubmitting: Bool { !pendingEntryIDs.isEmpty }
+
+    mutating func begin(
+        entryIDs: [String],
+        retryingFailedEntries: Bool = false
+    ) -> Bool {
+        let ids = Set(entryIDs)
+        guard !ids.isEmpty,
+              retryingFailedEntries || !isSubmitting,
+              pendingEntryIDs.isDisjoint(with: ids) else { return false }
+        pendingEntryIDs.formUnion(ids)
+        return true
+    }
+
+    mutating func finish(uuid: String) {
+        pendingEntryIDs.remove(uuid)
+    }
+
+    mutating func handle(_ event: OGSAutomatchLifecycleEvent.Kind) {
+        switch event {
+        case .entry(let uuid), .started(let uuid, _, _),
+             .notFoundAfterReconciliation(let uuid):
+            finish(uuid: uuid)
+        case .cancelled(let uuid, _):
+            if let uuid {
+                finish(uuid: uuid)
+            } else {
+                pendingEntryIDs.removeAll()
+            }
+        }
     }
 }
 
@@ -1703,5 +1602,281 @@ extension OGSAutomatchEntry {
             with: data.data(using: .utf8)!
         ) as! [String: Any]
         return OGSAutomatchEntry(jsonObject)!
+    }
+}
+
+struct OGSQuickMatchRecap: Equatable {
+    let firstLine: String
+    let secondLine: String
+}
+
+enum OGSQuickMatchClockPreference: String, CaseIterable {
+    case flexible, fischer, byoyomi, mixed
+
+    var quickMatchTitle: String {
+        switch self {
+        case .flexible:
+            return String(
+                localized: "Either clock",
+                comment: "Short option in a three-option segmented control. Accepts either Fischer or Byo-Yomi without preferring one."
+            )
+        case .fischer: return String(localized: "Fischer")
+        case .byoyomi: return String(localized: "Byo-Yomi")
+        case .mixed: return String(localized: "Mixed clocks")
+        }
+    }
+
+    var systems: [OGSAutomatchClockSystem] {
+        switch self {
+        case .fischer: return [.fischer]
+        case .byoyomi: return [.byoyomi]
+        case .flexible, .mixed: return [.fischer, .byoyomi]
+        }
+    }
+}
+
+extension OGSQuickMatchDraft {
+    var quickMatchSelectedBoardSizes: [Int] {
+        if mode == .multiple {
+            return multipleBoardSizes
+                .intersection(Set(OGSQuickMatchClockPreset.supportedBoardSizes))
+                .sorted()
+        }
+        return OGSQuickMatchClockPreset.supportedBoardSizes.contains(boardSize)
+            ? [boardSize]
+            : []
+    }
+
+    var quickMatchSelectedClocks: [OGSQuickMatchClockSelection] {
+        if mode == .multiple {
+            return multipleClocks
+                .intersection(Set(OGSQuickMatchClockSelection.allSupported))
+                .sorted { lhs, rhs in
+                    let all = OGSQuickMatchClockSelection.allSupported
+                    return (all.firstIndex(of: lhs) ?? .max)
+                        < (all.firstIndex(of: rhs) ?? .max)
+                }
+        }
+
+        let preferred = OGSQuickMatchClockSelection(
+            speed: speed,
+            system: speed == .correspondence ? .fischer : system
+        )
+        guard mode == .flexible, speed.isRealtime else {
+            return [preferred]
+        }
+        return [
+            preferred,
+            OGSQuickMatchClockSelection(
+                speed: speed,
+                system: preferred.system.alternate
+            ),
+        ]
+    }
+
+    var quickMatchIsValid: Bool {
+        !quickMatchSelectedBoardSizes.isEmpty && !quickMatchSelectedClocks.isEmpty
+    }
+
+    static let quickMatchSpeeds: [TimeControlSpeed] = [.blitz, .rapid, .live, .correspondence]
+
+    var quickMatchSelectedSpeeds: [TimeControlSpeed] {
+        let selected = Set(quickMatchSelectedClocks.map(\.speed))
+        return Self.quickMatchSpeeds.filter { selected.contains($0) }
+    }
+
+    var quickMatchClockPreference: OGSQuickMatchClockPreference {
+        let clocks = quickMatchSelectedClocks
+        let systems = Set(clocks.map(\.system))
+        if systems == [.fischer] { return .fischer }
+        if systems == [.byoyomi] { return .byoyomi }
+        let speeds = Set(clocks.map(\.speed))
+        if clocks.isEmpty || clocks.count == speeds.count * 2 { return .flexible }
+        return .mixed
+    }
+
+    var quickMatchClockSummary: String {
+        quickMatchClockPreference == .flexible
+            ? String(localized: "Fischer or Byo-Yomi")
+            : quickMatchClockPreference.quickMatchTitle
+    }
+
+    var quickMatchHandicapSummary: String {
+        handicap.quickMatchSummary()
+    }
+
+    func quickMatchClockDetailLines(
+        for selectedSpeed: TimeControlSpeed,
+        fallbackPreference: OGSQuickMatchClockPreference
+    ) -> [String] {
+        let selectedSizes = quickMatchSelectedBoardSizes
+        let sizes = selectedSizes.isEmpty ? [boardSize] : selectedSizes
+        let selectedSystems = Set(
+            quickMatchSelectedClocks
+                .filter { $0.speed == selectedSpeed }
+                .map(\.system)
+        )
+        let systems: [OGSAutomatchClockSystem]
+        if selectedSpeed == .correspondence {
+            systems = [.fischer]
+        } else if selectedSystems.isEmpty {
+            systems = fallbackPreference.systems
+        } else {
+            systems = OGSAutomatchClockSystem.allCases.filter {
+                selectedSystems.contains($0)
+            }
+        }
+
+        return systems.flatMap { system in
+            var groups = [(sizes: [Int], preset: OGSQuickMatchClockPreset)]()
+            for size in sizes {
+                guard let preset = OGSQuickMatchClockPreset.preset(
+                    boardSize: size,
+                    speed: selectedSpeed,
+                    system: system
+                ) else { continue }
+                if let index = groups.firstIndex(where: {
+                    $0.preset.timeControl == preset.timeControl
+                }) {
+                    groups[index].sizes.append(size)
+                } else {
+                    groups.append((sizes: [size], preset: preset))
+                }
+            }
+
+            return groups.map { group in
+                let clockName: String
+                if sizes.count > 1 && groups.count > 1 {
+                    let sizeNames = group.sizes.map { "\($0)×\($0)" }
+                    clockName = "\(ListFormatter.localizedString(byJoining: sizeNames)) · \(system.quickMatchTitle)"
+                } else {
+                    clockName = system.quickMatchTitle
+                }
+                return String(
+                    localized: "\(clockName): \(group.preset.quickMatchShortDescription)",
+                    comment: "Clock system and optional board sizes followed by the Quick Match clock values."
+                )
+            }
+        }
+    }
+
+    mutating func toggleQuickMatchBoardSize(_ size: Int) {
+        guard OGSQuickMatchClockPreset.supportedBoardSizes.contains(size) else { return }
+        var sizes = Set(quickMatchSelectedBoardSizes)
+        if sizes.contains(size) { sizes.remove(size) } else { sizes.insert(size) }
+        updateQuickMatchSelection(sizes: sizes, clocks: Set(quickMatchSelectedClocks))
+    }
+
+    mutating func toggleQuickMatchSpeed(
+        _ selectedSpeed: TimeControlSpeed,
+        clockPreference: OGSQuickMatchClockPreference? = nil
+    ) {
+        var clocks = Set(quickMatchSelectedClocks)
+        if clocks.contains(where: { $0.speed == selectedSpeed }) {
+            clocks = clocks.filter { $0.speed != selectedSpeed }
+        } else if selectedSpeed == .correspondence {
+            clocks = [OGSQuickMatchClockSelection(speed: .correspondence, system: .fischer)]
+        } else {
+            clocks = clocks.filter { $0.speed != .correspondence }
+            for system in (clockPreference ?? quickMatchClockPreference).systems {
+                clocks.insert(OGSQuickMatchClockSelection(speed: selectedSpeed, system: system))
+            }
+        }
+        updateQuickMatchSelection(sizes: Set(quickMatchSelectedBoardSizes), clocks: clocks)
+    }
+
+    mutating func setQuickMatchClockPreference(_ preference: OGSQuickMatchClockPreference) {
+        guard !quickMatchIsCorrespondenceOnly, preference != .mixed else { return }
+        let clocks = Set(quickMatchSelectedSpeeds.flatMap { speed in
+            preference.systems.map { OGSQuickMatchClockSelection(speed: speed, system: $0) }
+        })
+        updateQuickMatchSelection(sizes: Set(quickMatchSelectedBoardSizes), clocks: clocks)
+    }
+
+    mutating func setQuickMatchClocks(_ clocks: Set<OGSQuickMatchClockSelection>) {
+        updateQuickMatchSelection(
+            sizes: Set(quickMatchSelectedBoardSizes),
+            clocks: clocks.intersection(Set(OGSQuickMatchClockSelection.allSupported))
+        )
+    }
+
+    private mutating func updateQuickMatchSelection(
+        sizes: Set<Int>, clocks: Set<OGSQuickMatchClockSelection>
+    ) {
+        multipleBoardSizes = sizes
+        multipleClocks = clocks
+        if let size = sizes.sorted().last { boardSize = size }
+        let speeds = Set(clocks.map(\.speed))
+        if let selectedSpeed = Self.quickMatchSpeeds.first(where: { speeds.contains($0) }) {
+            speed = selectedSpeed
+        }
+        if clocks.count == 1, let clock = clocks.first { system = clock.system }
+        if sizes.count == 1 && speeds.count == 1 {
+            mode = clocks.count == 1 ? .exact : .flexible
+        } else {
+            mode = .multiple
+        }
+    }
+
+    func quickMatchRecap(userRank: Double?) -> OGSQuickMatchRecap {
+        guard quickMatchIsValid else {
+            return OGSQuickMatchRecap(firstLine: String(localized: "Nothing selected"), secondLine: "")
+        }
+        let sizes = quickMatchSelectedBoardSizes.map { "\($0)×\($0)" }.joined(separator: ", ")
+        let speeds = quickMatchSelectedSpeeds.map(\.quickMatchTitle).joined(separator: ", ")
+        let clock = quickMatchClockSummary
+        return OGSQuickMatchRecap(
+            firstLine: "\(sizes) · \(speeds)",
+            secondLine: [quickMatchHandicapSummary, clock, quickMatchRankRange(userRank: userRank)]
+                .filter { !$0.isEmpty }.joined(separator: " · ")
+        )
+    }
+
+    func quickMatchAccessibleRecap(userRank: Double?) -> String {
+        guard quickMatchIsValid else { return String(localized: "Nothing selected") }
+        let sizes = quickMatchSelectedBoardSizes.map { String(localized: "\($0) by \($0)") }
+        return [
+            ListFormatter.localizedString(byJoining: sizes),
+            ListFormatter.localizedString(byJoining: quickMatchSelectedSpeeds.map(\.quickMatchTitle)),
+            quickMatchHandicapSummary,
+            quickMatchClockSummary,
+            quickMatchAccessibleRankRange(userRank: userRank),
+        ].joined(separator: ", ")
+    }
+
+    func quickMatchRankRange(userRank: Double?) -> String {
+        guard let userRank else {
+            return String(
+                localized: "\(lowerRankDifference) ranks below to \(upperRankDifference) ranks above"
+            )
+        }
+        return "\(Self.quickMatchRankLabel(userRank - Double(lowerRankDifference)))–\(Self.quickMatchRankLabel(userRank + Double(upperRankDifference)))"
+    }
+
+    func quickMatchAccessibleRankRange(userRank: Double?) -> String {
+        guard let userRank else {
+            return String(
+                localized: "\(lowerRankDifference) ranks below to \(upperRankDifference) ranks above"
+            )
+        }
+        let lower = Self.quickMatchAccessibleRankLabel(
+            userRank - Double(lowerRankDifference)
+        )
+        let upper = Self.quickMatchAccessibleRankLabel(
+            userRank + Double(upperRankDifference)
+        )
+        return String(localized: "Opponent rank from \(lower) to \(upper)")
+    }
+
+    static func quickMatchRankLabel(_ rank: Double) -> String {
+        let boundedRank = min(max(rank, 5), 38)
+        if boundedRank < 30 {
+            return "\(Int(ceil(30 - boundedRank)))k"
+        }
+        return "\(Int(floor(boundedRank - 29)))d"
+    }
+
+    static func quickMatchAccessibleRankLabel(_ rank: Double) -> String {
+        RankUtils.formattedRank(rank, longFormat: true)
     }
 }

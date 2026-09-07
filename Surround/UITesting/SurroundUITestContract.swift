@@ -28,6 +28,8 @@ enum SurroundUITestContract {
         "--clear-app-store-screenshot-widget-fixture"
     static let homeHistoryFailsOnceLaunchArgument =
         "--surround-home-history-fails-once"
+    static let holdQuickMatchAcknowledgementsLaunchArgument =
+        "--surround-hold-quick-match-acknowledgements"
     static let analysisDisabledLaunchArgument =
         "--surround-analysis-disabled"
     static let compactGameLayoutLaunchArgument =
@@ -170,6 +172,13 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 homeHistoryFailsOnceLaunchArgument
+            )
+    }
+
+    static var holdsQuickMatchAcknowledgements: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                holdQuickMatchAcknowledgementsLaunchArgument
             )
     }
 
@@ -342,6 +351,7 @@ enum SurroundUITestContract {
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
+    static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
     static let simulatesWidgetDeepLinkRouting = false
     static let compatibilityWidgetFixtureGameCount =
@@ -417,14 +427,19 @@ enum SurroundUITestContract {
         static let homeNewGame = "home.newGame"
         static let homePreferredSettings = "home.preferredSettings"
 
-        static let quickMatchMode = "quickMatch.mode"
+        static let quickMatchScroll = "quickMatch.scroll"
         static let quickMatchRecap = "quickMatch.recap"
         static let quickMatchFind = "quickMatch.find"
         static let quickMatchCancel = "quickMatch.cancel"
         static let quickMatchSearching = "quickMatch.searching"
         static let quickMatchConnectionReason = "quickMatch.connectionReason"
         static let quickMatchWaitingBanner = "quickMatch.waitingBanner"
-        static let quickMatchHandicap = "quickMatch.handicap"
+        static let quickMatchAdvanced = "quickMatch.advanced"
+        static let quickMatchClockSystem = "quickMatch.clockSystem"
+        static let quickMatchGameCount = "quickMatch.gameCount"
+        static let quickMatchSpeedTabs = "quickMatch.speedTabs"
+        static let quickMatchAllowHandicap = "quickMatch.allowHandicap"
+        static let quickMatchStrictHandicap = "quickMatch.strictHandicap"
         static let quickMatchMatchingChallenges =
             "quickMatch.matchingChallenges"
 
@@ -432,8 +447,20 @@ enum SurroundUITestContract {
             "quickMatch.board.\(size)"
         }
 
-        static func quickMatchClock(speed: String, system: String) -> String {
-            "quickMatch.clock.\(speed).\(system)"
+        static func quickMatchSpeed(_ speed: String) -> String {
+            "quickMatch.speed.\(speed)"
+        }
+
+        static func quickMatchClockValues(_ speed: String) -> String {
+            "quickMatch.clockValues.\(speed)"
+        }
+
+        static func quickMatchSpeedTab(_ speed: String) -> String {
+            "quickMatch.speedTab.\(speed)"
+        }
+
+        static func quickMatchClockPreference(_ preference: String) -> String {
+            "quickMatch.clockPreference.\(preference)"
         }
 
         static func quickMatchOpenChallenge(_ id: Int) -> String {
