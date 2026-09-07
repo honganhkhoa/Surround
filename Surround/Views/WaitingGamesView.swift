@@ -324,7 +324,6 @@ private func waitingGamesPreview(
 ) -> some View {
     NavigationStack {
         WaitingGamesView()
-            .navigationTitle("Waiting")
             .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(
