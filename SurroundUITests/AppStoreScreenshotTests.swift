@@ -19,7 +19,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         "01-game-board",
         "02-active-games",
         "03-game-chat",
-        "04-open-challenges",
+        "04-quick-match",
         "05-game-analysis",
         "06-zen-mode",
         "07-preferred-settings",
@@ -45,6 +45,142 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         continueAfterFailure = false
         capturedSceneNames = []
         appStoreWidgetProofToken = UUID().uuidString
+    }
+
+    func testQuickMatchMarketingPilot() throws {
+        guard ProcessInfo.processInfo.environment[
+            "SURROUND_QUICK_MATCH_MARKETING_PILOT"
+        ] == "1" else {
+            throw XCTSkip("Select and opt in to the standalone Quick Match marketing pilot.")
+        }
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("Quick Match marketing capture requires an iOS Simulator.")
+        #else
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        let app = launchApp()
+        tap(SurroundUITestContract.AccessibilityID.homeNewGame, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenNewGame, in: app)
+        selectSegment(
+            at: 0,
+            in: SurroundUITestContract.AccessibilityID.newGameOptionPicker,
+            app: app
+        )
+        configureScreenshotQuickMatch(in: app)
+        capture(isPhone ? "04-quick-match" : "07-quick-match", in: app)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Quick Match marketing pilot hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        #endif
+    }
+
+    private func configureScreenshotQuickMatch(in app: XCUIApplication) {
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            configureCompactScreenshotQuickMatch(in: app)
+            return
+        }
+        let board19 = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19),
+            in: app
+        )
+        board19.tap()
+        let live = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("live"),
+            in: app
+        )
+        live.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        tap(SurroundUITestContract.AccessibilityID.quickMatchAdvanced, in: app)
+        selectSegment(
+            at: 1,
+            in: SurroundUITestContract.AccessibilityID.quickMatchClockSystem,
+            app: app
+        )
+        let board9 = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            in: app
+        )
+        XCTAssertTrue(board9.isSelected && board19.isSelected)
+        for speed in ["rapid", "live"] {
+            let toggle = element(
+                SurroundUITestContract.AccessibilityID.quickMatchSpeed(speed),
+                in: app
+            )
+            XCTAssertTrue(waitUntil(timeout: 5) { toggle.value as? String == "1" })
+        }
+        let strictHandicap = element(
+            SurroundUITestContract.AccessibilityID.quickMatchStrictHandicap,
+            in: app
+        )
+        XCTAssertTrue(strictHandicap.isHittable)
+    }
+
+    private func configureCompactScreenshotQuickMatch(in app: XCUIApplication) {
+        tap(SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19), in: app)
+        revealScreenshotQuickMatchControl(
+            SurroundUITestContract.AccessibilityID.quickMatchAdvanced,
+            matching: .button,
+            in: app
+        ).tap()
+        revealScreenshotQuickMatchControl(
+            SurroundUITestContract.AccessibilityID.quickMatchClockSystem,
+            matching: .segmentedControl,
+            in: app
+        )
+        selectSegment(
+            at: 1,
+            in: SurroundUITestContract.AccessibilityID.quickMatchClockSystem,
+            app: app
+        )
+        revealScreenshotQuickMatchControl(
+            SurroundUITestContract.AccessibilityID.quickMatchAdvanced,
+            matching: .button,
+            in: app
+        ).tap()
+        let live = revealScreenshotQuickMatchControl(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeed("live"),
+            matching: .switch,
+            in: app
+        )
+        live.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(waitUntil(timeout: 5) { live.value as? String == "1" })
+
+        let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.quickMatchScroll]
+        let board9 = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9))
+            .firstMatch
+        for _ in 0..<6 {
+            let previousFrame = board9.exists ? board9.frame : nil
+            scroll.swipeDown()
+            if board9.exists && board9.isHittable && board9.frame == previousFrame {
+                break
+            }
+        }
+        XCTAssertTrue(board9.isHittable && board9.isSelected)
+        XCTAssertTrue(element(SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19), in: app).isSelected)
+        XCTAssertTrue(live.isHittable)
+    }
+
+    @discardableResult
+    private func revealScreenshotQuickMatchControl(
+        _ identifier: String,
+        matching type: XCUIElement.ElementType,
+        in app: XCUIApplication
+    ) -> XCUIElement {
+        let control = app.descendants(matching: type).matching(identifier: identifier).firstMatch
+        let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.quickMatchScroll]
+        for _ in 0..<8 {
+            let visibleFrame = scroll.frame.insetBy(dx: 0, dy: 8)
+            if control.exists && control.isHittable && visibleFrame.contains(control.frame) {
+                return control
+            }
+            if control.exists && control.frame.minY < visibleFrame.minY {
+                scroll.swipeDown()
+            } else {
+                scroll.swipeUp()
+            }
+        }
+        XCTAssertTrue(control.exists && control.isHittable, "Expected Quick Match control \(identifier) to be visible.")
+        return control
     }
 
     func testAppStoreScreenshots() throws {
@@ -198,23 +334,17 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.screenOpenChallenges,
             in: newGameApp
         )
-        capture(
-            isPhone ? "04-open-challenges" : "08-open-challenges",
-            in: newGameApp
-        )
-
         if !isPhone {
-            selectSegment(
-                at: 0,
-                in: SurroundUITestContract.AccessibilityID.newGameOptionPicker,
-                app: newGameApp
-            )
-            element(
-                SurroundUITestContract.AccessibilityID.quickMatchRecap,
-                in: newGameApp
-            )
-            capture("07-quick-match", in: newGameApp)
+            capture("08-open-challenges", in: newGameApp)
         }
+        selectSegment(
+            at: 0,
+            in: SurroundUITestContract.AccessibilityID.newGameOptionPicker,
+            app: newGameApp
+        )
+        element(SurroundUITestContract.AccessibilityID.quickMatchRecap, in: newGameApp)
+        configureScreenshotQuickMatch(in: newGameApp)
+        capture(isPhone ? "04-quick-match" : "07-quick-match", in: newGameApp)
         newGameApp.terminate()
 
         let publicGamesApp = launchApp()

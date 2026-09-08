@@ -3,19 +3,14 @@
 Surround's automated tests are split into three groups:
 
 - `SurroundTests` contains deterministic unit and service tests. These run for every push and pull request and must not contact OGS.
-- `SurroundUITests` contains deterministic, offline journeys shared by iPadOS and
-  Mac Catalyst. Each test launches independently with bundled fixtures and the
-  Debug-only `--surround-ui-testing` argument.
+- `SurroundUITests` contains deterministic, offline journeys shared by iPadOS and Mac Catalyst. Each test launches independently with bundled fixtures and the Debug-only `--surround-ui-testing` argument.
 - `SurroundBetaTests` contains live integration scenarios against the isolated OGS beta service. Its separate shared scheme keeps it out of normal test runs; run it only by explicitly selecting that scheme locally or manually dispatching the **OGS beta integration tests** workflow.
 
-The offline UI-test runtime uses a dedicated preferences suite, rejecting HTTP
-transport, and a no-op WebSocket. It does not use the production or Beta
-account data and cannot contact OGS.
+The offline UI-test runtime uses a dedicated preferences suite, rejecting HTTP transport, and a no-op WebSocket. It does not use the production or Beta account data and cannot contact OGS.
 
 ## Deterministic unit tests
 
-Run `SurroundTests` from Xcode, or select an installed iOS 26 iPhone simulator
-and run the unit target from the command line:
+Run `SurroundTests` from Xcode, or select an installed iOS 26 iPhone simulator and run the unit target from the command line:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPhone)"
@@ -151,6 +146,32 @@ The output path must not already exist. Reusable build products default to the g
 The complete thirteen-locale run produces 260 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. The capture command remains useful on its own; the reviewed App Store Connect publishing workflow below invokes it automatically.
 
 To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 26.5 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
+
+### Scene-refresh
+
+When the shipping app and fixtures are unchanged, a supported scene replacement can reuse the remaining capture evidence. Review an English pilot first, then run:
+
+```sh
+.github/ci-tools/refresh-app-store-screenshots.sh \
+  --base-capture /absolute/path/to/complete-original-capture \
+  --base-input-context /absolute/path/to/original-input-context.json \
+  --base-input-verification /absolute/path/to/verified-original-inputs.json \
+  --output /absolute/path/to/new-scene-refresh-capture
+```
+
+This command requires Python 3.9+, Xcode, the original runtime and Xcode version, and a complete original thirteen-locale, two-family capture with its aggregate XCTest result, raw attachment manifest, source PNGs, log, and recorded source context. The currently supported replacement is defined by the scene contract in `.github/ci-tools/app-store-screenshot-provenance.py`; it is not an arbitrary scene selector. `--derived-data` selects a reusable build cache; `--device-name` selects an accepted iPhone template. It creates one disposable iPhone, builds the actual test products, selects the explicitly guarded scene-refresh test in a copied generated test plan, and captures all thirteen locales. It does not prepare or alter a Home Screen widget. Failure retains the sibling `<output>.refresh-work` evidence directory and deletes only its disposable device.
+
+The new capture has `mode: "scene-refresh"` and a hashed `screenshot-provenance.json`; it explicitly identifies both original result bundles and both iPhone destinations. Every one of its 260 source images is bound to its original device, locale, test attachment and bytes. The full base and fresh aggregate result bundles, raw attachments, source images and source contexts are copied under `origins/`; the base run is never modified. The current contract refreshes one iPhone scene per locale: exactly 247 sources must remain byte-identical, and only the thirteen declared replacements may change. Arbitrary screenshot mixing is rejected. Source context records permit only the bounded screenshot test/tool and testing guide changes; shipping source changes require a new complete capture instead.
+
+The offline verifier checks every evidence inventory and image hash and can be called by preparation and staging before their existing full matrix, decoded PNG, framing and manifest gates:
+
+```sh
+python3 .github/ci-tools/app-store-screenshot-provenance.py verify \
+  --capture-root /absolute/path/to/new-scene-refresh-capture
+python3 .github/ci-tools/tests/test_app_store_screenshot_provenance.py
+```
+
+Retained screenshots can retain their previous visual review only when their final framed bytes also match the reviewed hashes. Review every new localized output. The refresh never publishes metadata or screenshots.
 
 ## Reviewed App Store Connect publishing
 
@@ -332,17 +353,13 @@ xcodebuild test \
   -only-testing:SurroundUITests
 ```
 
-Hosted CI remains compile-only for Catalyst. The deterministic Catalyst UI
-journeys are run locally on an unlocked Mac.
+Hosted CI remains compile-only for Catalyst. The deterministic Catalyst UI journeys are run locally on an unlocked Mac.
 
 ## Unsigned Mac Catalyst builds
 
-The main app and widget support the Mac-optimized Catalyst interface. The
-notification content and notification service extensions remain iOS-only, so
-the Catalyst app intentionally excludes them.
+The main app and widget support the Mac-optimized Catalyst interface. The notification content and notification service extensions remain iOS-only, so the Catalyst app intentionally excludes them.
 
-Build the production configuration with the same unsigned compile-only check as
-CI:
+Build the production configuration with the same unsigned compile-only check as CI:
 
 ```sh
 xcodebuild build \
@@ -366,11 +383,7 @@ xcodebuild build \
 
 ## OGS service and WebSocket test seams
 
-The production client keeps its historical shared dependencies, while tests
-construct `OGSService` with explicitly scoped collaborators. Their complete
-API contracts live beside the declarations in
-[`OGSService.swift`](Surround/Services/OGSService.swift) and
-[`OGSWebsocket.swift`](Surround/Services/OGSWebsocket.swift).
+The production client keeps its historical shared dependencies, while tests construct `OGSService` with explicitly scoped collaborators. Their complete API contracts live beside the declarations in [`OGSService.swift`](Surround/Services/OGSService.swift) and [`OGSWebsocket.swift`](Surround/Services/OGSWebsocket.swift).
 
 | Type | Responsibility in tests |
 | --- | --- |
@@ -383,33 +396,20 @@ API contracts live beside the declarations in
 | `OGSWebsocketFrameCodec` | Tests framing and credential-redacted diagnostics independently of transport. |
 | `OGSAnonymousConfigLoader` | Prevents anonymous-config REST requests in offline socket tests. |
 
-Choose the narrowest seam for the behavior under test. `OGSService` event
-tests normally use an `OGSWebsocketProtocol` fake. `OGSWebsocket` tests use the
-real protocol engine with fake transport and scheduler implementations.
+Choose the narrowest seam for the behavior under test. `OGSService` event tests normally use an `OGSWebsocketProtocol` fake. `OGSWebsocket` tests use the real protocol engine with fake transport and scheduler implementations.
 
 Every simulated account must own all of the following for its full lifetime:
 
 - a distinct `AlamofireOGSHTTPClient.isolated()` instance;
 - a distinct `UserDefaults` suite, removed during teardown;
-- an `OGSRemoteSetting` scoped to those preferences (the service initializer
-  creates this automatically when none is supplied); and
+- an `OGSRemoteSetting` scoped to those preferences (the service initializer creates this automatically when none is supplied); and
 - a distinct `OGSWebsocket` configured for the same `OGSEnvironment`.
 
-Keep `usesSurroundOverviewService`, `enablesAppSideEffects`, and `startsTimers`
-disabled unless the test explicitly covers those production behaviors. A real
-`OGSWebsocket.close()` is terminal: teardown should close it, and a later
-session should create a new instance rather than attempting to restart it.
-Deterministic tests normally also set `connectsAutomatically` to false. Setting
-`installsObservers` to false additionally skips the initial login check and
-debounced model observers that can initiate follow-up requests.
+Keep `usesSurroundOverviewService`, `enablesAppSideEffects`, and `startsTimers` disabled unless the test explicitly covers those production behaviors. A real `OGSWebsocket.close()` is terminal: teardown should close it, and a later session should create a new instance rather than attempting to restart it. Deterministic tests normally also set `connectsAutomatically` to false. Setting `installsObservers` to false additionally skips the initial login check and debounced model observers that can initiate follow-up requests.
 
 ## Live OGS beta tests
 
-To explore the beta site interactively, select the shared **Surround Beta**
-scheme in Xcode and run the app normally. Its dedicated build configurations
-select `https://beta.online-go.com` for both REST and WebSocket traffic, use a
-separate bundle ID and app-group suite, and bypass the production-only Surround
-companion service. The scheme does not contain account names or credentials.
+To explore the beta site interactively, select the shared **Surround Beta** scheme in Xcode and run the app normally. Its dedicated build configurations select `https://beta.online-go.com` for both REST and WebSocket traffic, use a separate bundle ID and app-group suite, and bypass the production-only Surround companion service. The scheme does not contain account names or credentials.
 
 The beta workflow is intentionally absent from push, pull request, and scheduled triggers. Its concurrency group allows only one play-through to use the shared account pool at a time.
 

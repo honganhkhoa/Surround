@@ -36,7 +36,7 @@ readonly -a expected_iphone_scenes=(
   "01-game-board"
   "02-active-games"
   "03-game-chat"
-  "04-open-challenges"
+  "04-quick-match"
   "05-game-analysis"
   "06-zen-mode"
   "07-preferred-settings"
