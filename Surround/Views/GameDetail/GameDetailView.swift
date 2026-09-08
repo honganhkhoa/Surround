@@ -225,9 +225,8 @@ struct GameDetailView: View {
             compactLayout = true
         }
         #endif
-        // Keep navigation geometry stable while the keyboard changes the
-        // available content height. Zen mode still hides navigation chrome.
-        let navigationBarHidden = zenMode
+        let navigationBarHidden =
+            (effectiveAttachedKeyboardVisible && !compactLayout) || zenMode
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.usernameAndRank)"

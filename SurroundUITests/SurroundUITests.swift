@@ -929,31 +929,16 @@ final class SurroundUITests: SurroundUITestCase {
         var completed = waitForValue(text, in: currentTextField, timeout: 2)
         if !completed {
             // A slow accessibility lookup can outlast the predicate deadline
-            // even when it returns the exact value. Check before refocusing or
-            // retrying; the original automatic-focus requirement still applies.
+            // even when it returns the exact value. A stale empty or partial
+            // value can also precede delivery of the original typing request.
+            // Observe that request without submitting duplicate input.
             currentTextField = resolvedChatInput(in: app)
             completed = observeCurrentValue()
             if !completed {
-                currentTextField = focusChatInput(
-                    currentTextField,
-                    in: app,
-                    mode: .acquireWithRetry,
-                    file: file,
-                    line: line
-                )
-                completed = observeCurrentValue()
+                completed = waitForValue(text, in: currentTextField, timeout: 5)
                 if !completed {
-                    if let actualValue = observedValue,
-                       text.hasPrefix(actualValue) {
-                        currentTextField.typeText(
-                            String(text.dropFirst(actualValue.count))
-                        )
-                    }
-                    completed = waitForValue(text, in: currentTextField, timeout: 5)
-                    if !completed {
-                        currentTextField = resolvedChatInput(in: app)
-                        completed = observeCurrentValue()
-                    }
+                    currentTextField = resolvedChatInput(in: app)
+                    completed = observeCurrentValue()
                 }
             }
         }
@@ -1066,8 +1051,8 @@ final class SurroundUITests: SurroundUITestCase {
             return
         }
 
-        // Refocusing at the trailing edge preserves append semantics when a
-        // loaded CI runner delivered only a prefix of the requested text.
+        // Refocus at the trailing edge to keep the insertion point after any
+        // existing text.
         activate(textField, at: CGVector(dx: 0.98, dy: 0.5))
     }
 
@@ -3237,12 +3222,35 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameZenExit,
             in: app
         )
-        dismissSoftwareKeyboardIfNeeded(in: app)
+        #if !targetEnvironment(macCatalyst)
+        _ = focusSharedVariationInput(in: app)
+        let restoredPreview = draft.sharingPreview.frame
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Post-Zen focused variation composer layout"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let screenshot = XCTAttachment(
+            screenshot: XCUIScreen.main.screenshot(), quality: .original
+        )
+        screenshot.name = "Post-Zen focused variation composer layout"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        XCTAssertFalse(
+            app.buttons.matching(
+                identifier: SurroundUITestContract.AccessibilityID.gameZenExit
+            ).firstMatch.exists,
+            "Expected the normal composer layout to replace Zen mode."
+        )
+        XCTAssertEqual(draft.sharingTitle.label, "Sharing variation")
+        XCTAssertEqual(restoredPreview.width, 120, accuracy: 4)
+        XCTAssertEqual(restoredPreview.height, 120, accuracy: 4)
+        #else
         element(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
             in: app,
             matching: .button
         )
+        #endif
         element(
             SurroundUITestContract.AccessibilityID.gameVariationSharePreview,
             in: app

@@ -107,7 +107,9 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
 
-        tapChatLogBackground(chatLog)
+        guard tapChatLogBackground(
+            chatLog, in: app, file: file, line: line
+        ) else { return }
 
         XCTAssertTrue(
             pollUntil(timeout: timeout) {
@@ -192,7 +194,9 @@ class SurroundUITestCase: XCTestCase {
             file: file,
             line: line
         )
-        tapChatLogBackground(chatLog)
+        guard tapChatLogBackground(
+            chatLog, in: app, file: file, line: line
+        ) else { return }
         let dismissed = pollUntil(timeout: 10) {
             !chatInputHasKeyboardFocus(in: app)
                 && !softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)
@@ -218,13 +222,84 @@ class SurroundUITestCase: XCTestCase {
     // The chat background clears FocusState and dismisses the keyboard in one
     // app gesture. Tapping the system Hide keyboard control first introduces
     // another transition that can leave XCTest waiting for keyboard animations.
-    private func tapChatLogBackground(_ chatLog: XCUIElement) {
-        chatLog
+    private func tapChatLogBackground(
+        _ chatLog: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString,
+        line: UInt
+    ) -> Bool {
+        let frame = chatLog.frame
+        let viewport = visibleChatLogViewport(frame, in: app)
+        guard viewport.width > 8,
+              viewport.height > 8,
+              viewport.minX == frame.minX,
+              chatLog.isHittable else {
+            keepHierarchy(of: app, name: "chat background has no usable viewport")
+            XCTFail(
+                "Expected a visible, hittable chat gutter before dismissing focus; "
+                    + "frame: \(frame), visible viewport: \(viewport)",
+                file: file,
+                line: line
+            )
+            return false
+        }
+
+        // Use the validated rectangle, without resolving the log's origin again
+        // after a keyboard or layout transition has changed its dimensions.
+        let appFrame = app.frame
+        app
             .coordinate(withNormalizedOffset: .zero)
             .withOffset(
-                CGVector(dx: 4, dy: chatLog.frame.height / 2)
+                CGVector(
+                    dx: frame.minX + 4 - appFrame.minX,
+                    dy: viewport.midY - appFrame.minY
+                )
             )
             .tap()
+        return true
+    }
+
+    func visibleChatLogViewport(
+        _ frame: CGRect,
+        in app: XCUIApplication
+    ) -> CGRect {
+        let viewport = frame.intersection(app.frame)
+        guard !viewport.isNull, !viewport.isEmpty else { return .zero }
+
+        var top = viewport.minY
+        var bottom = viewport.maxY
+        let navigationBar = app.navigationBars.firstMatch
+        if navigationBar.exists {
+            let navigationFrame = navigationBar.frame
+            if navigationFrame.intersects(viewport) {
+                top = max(top, navigationFrame.maxY)
+            }
+        }
+        let preview = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID
+                .gameVariationSharePreview)
+            .firstMatch
+        let input = app.textFields
+            .matching(identifier: SurroundUITestContract.AccessibilityID
+                .gameChatInput)
+            .firstMatch
+        for composerElement in [preview, input] where composerElement.exists {
+            bottom = min(bottom, composerElement.frame.minY)
+        }
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.exists {
+            let keyboardFrame = keyboard.frame
+            let gutterX = frame.minX + 4
+            if !keyboardFrame.isEmpty,
+               keyboardFrame.intersects(viewport),
+               keyboardFrame.minX <= gutterX, gutterX <= keyboardFrame.maxX {
+                bottom = min(bottom, keyboardFrame.minY)
+            }
+        }
+        return CGRect(
+            x: viewport.minX, y: top, width: viewport.width,
+            height: max(0, bottom - top)
+        )
     }
 
     func chatInputHasKeyboardFocus(in app: XCUIApplication) -> Bool {

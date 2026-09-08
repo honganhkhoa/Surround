@@ -47,6 +47,8 @@ The isolated selection is centralized in `.github/ci-tools/run-ipad-ui-tests.sh`
 
 CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains its unit, composer-input preflight, main UI, and composer UI result bundles in the `surround-ios-18-test-results` artifact.
 
+For keyboard layout failures, match the device model as well as the runtime reported in the result bundle. An 11-inch iPad in landscape can exhaust chat space that remains available on a 13-inch iPad. The variation-sharing Zen round trip verifies that leaving Zen restores the automatically focused composer with its exact draft name, sharing status, and frozen 120-point preview, retaining a screenshot and accessibility hierarchy in that state. Keyboard dismissal remains covered by the separate preflight and composer interaction journeys.
+
 ### Opt-in animation-stall diagnostics
 
 For a focused reproduction, the Debug app can log draft creation, focus requests, keyboard notifications, and composer/Analyze-menu appearance and frame changes. Tracing requires both the offline UI-test launch argument and `--surround-animation-diagnostics`; the test runner forwards the latter only when its `SURROUND_UI_ANIMATION_DIAGNOSTICS` environment variable equals `1`. The logs contain event metadata rather than chat contents. Appearance callbacks and observation identifiers describe SwiftUI observations; they do not prove that a UIKit menu presenter was destroyed.
