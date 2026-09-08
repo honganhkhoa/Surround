@@ -1291,6 +1291,101 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    private func selectQuickMatchCorrespondence(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement? {
+        let correspondence = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        scrollIntoTappableArea(correspondence, in: app)
+        let realtime = app.buttons.matching(identifier:
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("live")
+        ).firstMatch
+        let gameCount = app.steppers.matching(identifier:
+            SurroundUITestContract.AccessibilityID.quickMatchGameCount
+        ).firstMatch
+
+        func observeSelection() -> (
+            correspondenceSelected: Bool, realtimeSelected: Bool,
+            gameCountExists: Bool, enabled: Bool, hittable: Bool, frame: CGRect
+        ) {
+            let exists = correspondence.exists
+            return (
+                exists && correspondence.isSelected,
+                realtime.exists && realtime.isSelected,
+                gameCount.exists,
+                exists && correspondence.isEnabled,
+                exists && correspondence.isHittable,
+                exists ? correspondence.frame : .zero
+            )
+        }
+
+        // This is setup for the pending-submission journey. Keep the separate
+        // correspondence journey's single-tap selection assertions unchanged.
+        for attempt in 1...2 {
+            // Re-observe after any diagnostic capture, which can itself take
+            // time. Never retry based only on the earlier failed wait.
+            let before = observeSelection()
+            if before.correspondenceSelected && before.gameCountExists {
+                return gameCount
+            }
+            guard !before.correspondenceSelected && before.realtimeSelected
+                    && before.enabled && before.hittable else {
+                let hierarchy = XCTAttachment(string: """
+                    Captured selection before attempt \(attempt): \(before)
+                    Application hierarchy:
+                    \(app.debugDescription)
+                    """)
+                hierarchy.name = "Quick Match – correspondence selection unavailable"
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+                keepScreenshot("Quick Match – correspondence selection unavailable", in: app)
+                XCTFail("Cannot select Correspondence from observed state: \(before)", file: file, line: line)
+                return nil
+            }
+
+            activate(correspondence)
+            let ready = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in
+                    correspondence.isSelected && gameCount.exists
+                },
+                object: nil
+            )
+            _ = XCTWaiter.wait(for: [ready], timeout: 10)
+            // An accessibility query can outlast the waiter's deadline even
+            // when the transition succeeded. Accept the fresh exact state.
+            let after = observeSelection()
+            if after.correspondenceSelected && after.gameCountExists {
+                return gameCount
+            }
+
+            let hierarchy = XCTAttachment(string: """
+                Captured selection after attempt \(attempt): \(after)
+                Application hierarchy:
+                \(app.debugDescription)
+                """)
+            hierarchy.name = "Quick Match – correspondence selection attempt \(attempt)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            keepScreenshot("Quick Match – correspondence selection attempt \(attempt)", in: app)
+
+            // Selecting a segment is idempotent. Retry only a confirmed missed
+            // selection; a selected tab without its Stepper must still fail.
+            guard attempt == 1, !after.correspondenceSelected,
+                  after.realtimeSelected, after.enabled, after.hittable else {
+                XCTFail("Expected selected Correspondence and its game-count Stepper; observed: \(after)", file: file, line: line)
+                return nil
+            }
+        }
+        return nil
+    }
+
     private func keepTextInputHierarchy(
         _ textField: XCUIElement,
         in app: XCUIApplication,
@@ -2017,19 +2112,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.holdQuickMatchAcknowledgementsLaunchArgument,
         ])
         tap(SurroundUITestContract.AccessibilityID.homeNewGame, in: app, matching: .button)
-        let correspondence = elementAfterScrolling(
-            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
-            in: app,
-            matching: .button
-        )
-        scrollIntoTappableArea(correspondence, in: app)
-        activate(correspondence)
-
-        let gameCount = elementAfterScrolling(
-            SurroundUITestContract.AccessibilityID.quickMatchGameCount,
-            in: app,
-            matching: .stepper
-        )
+        guard let gameCount = selectQuickMatchCorrespondence(in: app) else { return }
         scrollIntoTappableArea(gameCount, in: app)
         tap(
             gameCount.buttons[SurroundUITestContract.AccessibilityID.quickMatchGameCount + "-Increment"],
