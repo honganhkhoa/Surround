@@ -47,6 +47,45 @@ The isolated selection is centralized in `.github/ci-tools/run-ipad-ui-tests.sh`
 
 CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runtime. To reproduce the minimum-OS lane locally, substitute `18` in the two simulator selection commands above. The `minimum-ios-18` CI job runs on `macos-15`, explicitly selects Xcode 26.2, and retains its unit, composer-input preflight, main UI, and composer UI result bundles in the `surround-ios-18-test-results` artifact.
 
+### Opt-in animation-stall diagnostics
+
+For a focused reproduction, the Debug app can log draft creation, focus requests, keyboard notifications, and composer/Analyze-menu appearance and frame changes. Tracing requires both the offline UI-test launch argument and `--surround-animation-diagnostics`; the test runner forwards the latter only when its `SURROUND_UI_ANIMATION_DIAGNOSTICS` environment variable equals `1`. The logs contain event metadata rather than chat contents. Appearance callbacks and observation identifiers describe SwiftUI observations; they do not prove that a UIKit menu presenter was destroyed.
+
+After the shared build above, prepare a separate test configuration alongside the generated `.xctestrun`, preserving its relative product paths:
+
+```sh
+diagnostic_products="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "$simulator_id")/Build/Products"
+python3 - "$diagnostic_products" <<'PY'
+import plistlib
+import sys
+from pathlib import Path
+products = Path(sys.argv[1])
+sources = list(products.glob("Surround_*.xctestrun"))
+assert len(sources) == 1, "Expected one generated Surround test configuration"
+configuration = plistlib.loads(sources[0].read_bytes())
+configuration["SurroundUITests"].setdefault("EnvironmentVariables", {})[
+    "SURROUND_UI_ANIMATION_DIAGNOSTICS"
+] = "1"
+(products / "AnimationDiagnostics.xctestrun").write_bytes(plistlib.dumps(configuration))
+PY
+diagnostic_output="TestResults/AnimationDiagnostics-$(date +%Y%m%d-%H%M%S)"
+python3 .github/ci-tools/diagnose-ipad-animation-stalls.py \
+  --simulator "$simulator_id" --output "$diagnostic_output" -- \
+  xcodebuild test-without-building \
+  -xctestrun "$diagnostic_products/AnimationDiagnostics.xctestrun" \
+  -destination "platform=iOS Simulator,id=${simulator_id}" \
+  -parallel-testing-enabled NO \
+  -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 240 \
+  -maximum-test-execution-time-allowance 240 \
+  -only-testing:SurroundUITests/SurroundUITests/testShareVariationUsesSelectedChannelAndStaysInChatAfterSending \
+  -resultBundlePath "${diagnostic_output}.xcresult"
+```
+
+The wrapper preserves Xcode's exit status and writes raw console output, a bounded simulator log stream, and collector status into a fresh output directory. After a Share action, the first app-idle wait exceeding 15 seconds, or the first animation-completion warning, triggers one early screenshot and stack samples of the selected simulator's app and UI-test runner. Collection errors are retained in the status files. Collection does not query the accessibility hierarchy, dismiss the keyboard, or stop the app or runner. The diagnostic example limits each test to four minutes; normal CI allowances remain unchanged.
+
+Use a dedicated simulator when comparing traces, and record its runtime, Xcode version, and keyboard setup. Run at most three isolated attempts initially; if they all pass, run the existing ten-test composer selection once to check suite-state dependence. Inspect the first captured stall before expanding the run. Passing traces help establish the normal event order but do not demonstrate that an intermittent stall is fixed. Tracing itself can affect timing, so any resulting behavioral fix also needs verification with diagnostics disabled.
+
 ## Deployment target validation
 
 The iPhone and iPad app, widget, and notification extensions support iOS 18.0. The Mac Catalyst app and its embedded widget continue to require macOS 26. The project expresses the latter as an SDK-qualified iPhone deployment-target override, so validate the generated bundle metadata instead of adding a manual Info.plist key.

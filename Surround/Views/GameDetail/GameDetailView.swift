@@ -33,6 +33,9 @@ struct GameDetailView: View {
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
+    #if DEBUG && MAIN_APP
+    @State private var animationObservationID = UUID()
+    #endif
 
     @ObservedObject var settings = userDefaults
     
@@ -222,8 +225,9 @@ struct GameDetailView: View {
             compactLayout = true
         }
         #endif
-        let navigationBarHidden =
-            (effectiveAttachedKeyboardVisible && !compactLayout) || zenMode
+        // Keep navigation geometry stable while the keyboard changes the
+        // available content height. Zen mode still hides navigation chrome.
+        let navigationBarHidden = zenMode
         var title = currentGame.gameName
         if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.usernameAndRank)"
@@ -326,7 +330,28 @@ struct GameDetailView: View {
         .onReceive(SystemPlatformServices.shared.keyboardWillChangeFramePublisher) { notification in
             self.attachedKeyboardVisible = SystemPlatformServices.shared
                 .isAttachedSoftwareKeyboardVisible(from: notification)
+            #if DEBUG && MAIN_APP
+            SurroundAnimationDiagnostics.record(
+                "keyboard.attachedClassification", ownerID: animationObservationID,
+                focusRequestID: variationShareDraft?.focusRequestID,
+                fields: ["attached": String(attachedKeyboardVisible)],
+                deduplicated: true
+            )
+            #endif
         }
+        #if DEBUG && MAIN_APP
+        .surroundAnimationObservation(
+            "game.detail", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft?.focusRequestID
+        )
+        .surroundAnimationKeyboardObservations(ownerID: animationObservationID)
+        .surroundAnimationState(
+            "detail.visibilityState",
+            value: "attachedKeyboard=\(effectiveAttachedKeyboardVisible);navigationHidden=\(navigationBarHidden);compact=\(compactLayout)",
+            ownerID: animationObservationID,
+            focusRequestID: variationShareDraft?.focusRequestID
+        )
+        #endif
         
         if compactLayout {
             return AnyView(

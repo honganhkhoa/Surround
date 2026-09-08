@@ -22,6 +22,11 @@ struct VariationShareDraft {
         self.gameID = gameID
         self.variation = variation
         self.name = name
+        #if DEBUG && MAIN_APP
+        SurroundAnimationDiagnostics.record(
+            "draft.created", focusRequestID: focusRequestID
+        )
+        #endif
     }
 }
 
@@ -438,9 +443,31 @@ struct NewChatInput: View {
     @State private var chatSendingCancellable: AnyCancellable?
     @State private var variationShareFailure: VariationShareFailure?
     @FocusState private var isInputFocused: Bool
+    #if DEBUG && MAIN_APP
+    @State private var animationObservationID = UUID()
+    #endif
 
     private func focusInput() {
+        #if DEBUG && MAIN_APP
+        let requestedFocusID = variationShareDraft.wrappedValue?.focusRequestID
+        SurroundAnimationDiagnostics.record(
+            "composer.focusQueued", ownerID: animationObservationID,
+            focusRequestID: requestedFocusID,
+            fields: ["alreadyFocused": String(isInputFocused)]
+        )
+        #endif
         DispatchQueue.main.async {
+            #if DEBUG && MAIN_APP
+            SurroundAnimationDiagnostics.record(
+                "composer.focusExecuting", ownerID: animationObservationID,
+                focusRequestID: requestedFocusID,
+                fields: [
+                    "currentFocusRequest": variationShareDraft.wrappedValue?
+                        .focusRequestID.uuidString ?? "none",
+                    "alreadyFocused": String(isInputFocused),
+                ]
+            )
+            #endif
             isInputFocused = true
         }
     }
@@ -723,13 +750,37 @@ struct NewChatInput: View {
         }
         .onChange(of: variationShareDraft.wrappedValue?.focusRequestID) {
             _, focusRequestID in
+            #if DEBUG && MAIN_APP
+            SurroundAnimationDiagnostics.record(
+                "composer.draftChangeCallback", ownerID: animationObservationID,
+                focusRequestID: focusRequestID
+            )
+            #endif
             if focusRequestID != nil {
                 focusInput()
             }
         }
         .onChange(of: inputDismissalRequest) {
+            #if DEBUG && MAIN_APP
+            SurroundAnimationDiagnostics.record(
+                "composer.dismissalCallback", ownerID: animationObservationID,
+                focusRequestID: variationShareDraft.wrappedValue?.focusRequestID,
+                fields: ["request": String(inputDismissalRequest)]
+            )
+            #endif
             isInputFocused = false
         }
+        #if DEBUG && MAIN_APP
+        .surroundAnimationObservation(
+            "composer", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        .surroundAnimationState(
+            "composer.focusState", value: String(isInputFocused),
+            ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        #endif
         .alert(
             String(
                 localized: "Couldn’t share variation",

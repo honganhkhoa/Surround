@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */; };
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
@@ -401,6 +402,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundAnimationDiagnostics.swift; sourceTree = "<group>"; };
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
@@ -654,6 +656,7 @@
 		AE3100063A00000000000006 /* UITesting */ = {
 			isa = PBXGroup;
 			children = (
+				AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */,
 				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
 				AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */,
@@ -1335,6 +1338,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */,
 				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,

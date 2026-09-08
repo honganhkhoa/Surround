@@ -26,6 +26,9 @@ struct SingleGameView: View {
     @State private var isVisibleForAppReview = false
     @State private var reviewObservationOwnerID = UUID()
     @State private var observedReviewGameID: Int?
+    #if DEBUG && MAIN_APP
+    @State private var animationObservationID = UUID()
+    #endif
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
@@ -407,6 +410,14 @@ struct SingleGameView: View {
             return
         }
 
+        #if DEBUG && MAIN_APP
+        SurroundAnimationDiagnostics.record(
+            "share.begin", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID,
+            fields: ["compact": String(compact)]
+        )
+        #endif
+
         analyticsPendingMove = nil
         analyticsPendingPosition = nil
         selectedChatItem = nil
@@ -414,6 +425,12 @@ struct SingleGameView: View {
             gameID: game.ID,
             variation: variation
         )
+        #if DEBUG && MAIN_APP
+        SurroundAnimationDiagnostics.record(
+            "share.draftAssigned", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        #endif
         withAnimation {
             if compact {
                 showsCompactChatBoard.wrappedValue = false
@@ -424,10 +441,22 @@ struct SingleGameView: View {
     }
 
     private func cancelVariationSharing() {
+        #if DEBUG && MAIN_APP
+        SurroundAnimationDiagnostics.record(
+            "share.cancel", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        #endif
         variationShareDraft.wrappedValue = nil
     }
 
     private func finishVariationSharing() {
+        #if DEBUG && MAIN_APP
+        SurroundAnimationDiagnostics.record(
+            "share.finished", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        #endif
         variationShareDraft.wrappedValue = nil
     }
     
@@ -1069,6 +1098,13 @@ struct SingleGameView: View {
                                 .clipped()
                                 .allowsHitTesting(!attachedKeyboardVisible)
                                 .accessibilityHidden(attachedKeyboardVisible)
+                                #if DEBUG && MAIN_APP
+                                .surroundAnimationObservation(
+                                    "analyze.collapsibleRegion",
+                                    ownerID: animationObservationID,
+                                    focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+                                )
+                                #endif
                             if !attachedKeyboardVisible {
                                 AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
                                     .frame(maxHeight: 240)
@@ -1078,6 +1114,18 @@ struct SingleGameView: View {
                 }
             }
         }
+        #if DEBUG && MAIN_APP
+        .surroundAnimationObservation(
+            "game.content", ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        .surroundAnimationState(
+            "game.layoutState",
+            value: "compact=\(compact);horizontal=\(horizontal);analyze=\(analyzeMode.wrappedValue);attachedKeyboard=\(attachedKeyboardVisible);zen=\(zenMode)",
+            ownerID: animationObservationID,
+            focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+        )
+        #endif
         .onReceive(game.$currentPosition) { [game] newPosition in
             self.pendingMove = nil
             self.pendingPosition = nil

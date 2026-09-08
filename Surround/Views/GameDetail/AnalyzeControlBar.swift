@@ -31,6 +31,9 @@ struct AnalyzeControlBar: View {
     @State private var preferredNextPositionByPosition =
         [ObjectIdentifier: BoardPosition]()
     @State private var showingDeleteConfirmation = false
+    #if DEBUG && MAIN_APP
+    @State private var animationObservationID = UUID()
+    #endif
 
     private var previousPosition: BoardPosition? {
         guard let selectedPosition,
@@ -131,6 +134,11 @@ struct AnalyzeControlBar: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
         )
+        #if DEBUG && MAIN_APP
+        .surroundAnimationObservation(
+            "analyze.controlBar", ownerID: animationObservationID
+        )
+        #endif
         .onReceive(moveTree.objectWillChange) {
             DispatchQueue.main.async {
                 prunePreferredNextPositions()
@@ -165,6 +173,12 @@ struct AnalyzeControlBar: View {
         HStack(spacing: 2) {
             if analysisAvailable {
                 actionsMenu
+                    #if DEBUG && MAIN_APP
+                    .surroundAnimationObservation(
+                        "analyze.actionsMenu", ownerID: animationObservationID,
+                        context: "\(showsAdjacentBranches ? "adjacent" : "basic").\(conditionalMoveQuickActionPresentation)"
+                    )
+                    #endif
                 if selectedPosition != nil {
                     MarkerToolMenu(
                         markups: markups,
@@ -217,6 +231,12 @@ struct AnalyzeControlBar: View {
                 destination: nextPosition
             )
         }
+        #if DEBUG && MAIN_APP
+        .surroundAnimationObservation(
+            "analyze.variant", ownerID: animationObservationID,
+            context: "\(showsAdjacentBranches ? "adjacent" : "basic").\(conditionalMoveQuickActionPresentation)"
+        )
+        #endif
     }
 
     private var actionsMenu: some View {

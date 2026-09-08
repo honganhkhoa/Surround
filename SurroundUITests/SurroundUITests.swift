@@ -61,6 +61,19 @@ final class SurroundUITests: SurroundUITestCase {
         continueAfterFailure = false
     }
 
+    private var animationDiagnosticsEnabled: Bool {
+        ProcessInfo.processInfo.environment[
+            "SURROUND_UI_ANIMATION_DIAGNOSTICS"
+        ] == "1"
+    }
+
+    private func traceAnimationTest(_ event: String) {
+        guard animationDiagnosticsEnabled else { return }
+        let message =
+            "[SurroundAnimationTest] \(event) uptime=\(ProcessInfo.processInfo.systemUptime)\n"
+        FileHandle.standardOutput.write(Data(message.utf8))
+    }
+
     private func launchApp(
         additionalLaunchArguments: [String] = [],
         orientation: UIDeviceOrientation = .landscapeLeft
@@ -75,6 +88,12 @@ final class SurroundUITests: SurroundUITestCase {
             "-AppleLocale", "en_US",
             SurroundUITestContract.launchArgument,
         ] + additionalLaunchArguments
+        if animationDiagnosticsEnabled {
+            app.launchArguments.append(
+                SurroundUITestContract.animationDiagnosticsLaunchArgument
+            )
+            traceAnimationTest("launch tracing=enabled")
+        }
         registerAppTermination(app)
         app.launch()
         #if targetEnvironment(macCatalyst)
@@ -245,6 +264,10 @@ final class SurroundUITests: SurroundUITestCase {
                 catalystTitle: catalystTitle,
                 in: app
             )
+        }
+        if accessibilityIdentifier ==
+            SurroundUITestContract.AccessibilityID.gameAnalyzeShare {
+            traceAnimationTest("ARM share")
         }
         tap(
             menuItem,

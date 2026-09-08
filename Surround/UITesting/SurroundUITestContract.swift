@@ -9,6 +9,8 @@ import Foundation
 
 enum SurroundUITestContract {
     static let launchArgument = "--surround-ui-testing"
+    static let animationDiagnosticsLaunchArgument =
+        "--surround-animation-diagnostics"
     static let screenshotLaunchArgument = "--surround-app-store-screenshots"
     static let compatibilityScreenshotLaunchArgument =
         "--surround-compatibility-screenshots"
