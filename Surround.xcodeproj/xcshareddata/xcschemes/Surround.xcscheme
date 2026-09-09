@@ -68,19 +68,19 @@
                   Identifier = "AppStoreScreenshotTests/testAppStoreScreenshots()">
                </Test>
                <Test
-                  Identifier = "CompatibilityScreenshotTests/testCompatibilityScreenshots()">
-               </Test>
-               <Test
                   Identifier = "CompatibilityScreenshotTests/testAdaptiveWidgetRegressionScreenshots()">
                </Test>
                <Test
-                  Identifier = "CompatibilityScreenshotTests/testWidgetTapTargets()">
+                  Identifier = "CompatibilityScreenshotTests/testCompatibilityScreenshots()">
                </Test>
                <Test
                   Identifier = "CompatibilityScreenshotTests/testMacDesktopLayoutScreenshots()">
                </Test>
                <Test
                   Identifier = "CompatibilityScreenshotTests/testMacWindowSizingContract()">
+               </Test>
+               <Test
+                  Identifier = "CompatibilityScreenshotTests/testWidgetTapTargets()">
                </Test>
             </SkippedTests>
          </TestableReference>

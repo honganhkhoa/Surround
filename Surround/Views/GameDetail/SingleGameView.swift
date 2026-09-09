@@ -1222,6 +1222,11 @@ struct SingleGameView: View {
             selectedChatItem = nil
             analyzeMarkupsByPosition.removeAll()
             resetAnalyzeBoardTool()
+            if analyticsPosition != nil {
+                // The previous game's position is not in this game's move
+                // tree. Keep Analyze on the game that is actually on screen.
+                analyticsPosition = game.currentPosition
+            }
         }
         .onChange(of: reviewGamePhase) { _, _ in
             updateReviewGameObservation()

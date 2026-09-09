@@ -37,6 +37,8 @@
 		AE4200013C00000000000001 /* CompatibilityScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */; };
 		AE4400013C00000000000001 /* SurroundUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4400023C00000000000002 /* SurroundUITestCase.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
+		AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
+		AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000105 /* GameDetailDisplayReset.swift */; };
 		AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
 		AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
 		AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000063B00000000000006 /* GameHistoryPaginationState.swift */; };
@@ -431,6 +433,7 @@
 		AE4400023C00000000000002 /* SurroundUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestCase.swift; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		AE6000053B00000000000105 /* GameDetailDisplayReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDisplayReset.swift; sourceTree = "<group>"; };
 		AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailConnectionCoordinator.swift; sourceTree = "<group>"; };
 		AE6000063B00000000000006 /* GameHistoryPaginationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistoryPaginationState.swift; sourceTree = "<group>"; };
 		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
@@ -921,6 +924,7 @@
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */,
+				AE6000053B00000000000105 /* GameDetailDisplayReset.swift */,
 				BC463B0C266353D700D40D3A /* SingleGameView.swift */,
 				BC62A89B2664A6F500BF5F78 /* AnalyzeTreeView.swift */,
 			);
@@ -1338,6 +1342,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE6000013B00000000000101 /* GameDetailDisplayReset.swift in Sources */,
 				AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */,
 				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
@@ -1429,6 +1434,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE6000023B00000000000102 /* GameDetailDisplayReset.swift in Sources */,
 				C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				C0D100052026082900000005 /* CorrespondenceWidgetGridLayoutTests.swift in Sources */,
 				C0D100072026082900000007 /* AppRouteTests.swift in Sources */,

@@ -711,6 +711,12 @@ class OGSService: ObservableObject {
         var autoMatchEntryById = [String: OGSAutomatchEntry]()
         var automatchAvailableEntryByID =
             [String: OGSAutomatchAvailableEntry]()
+
+        /// Whether the service starts inside an automatch restoration window.
+        /// Previews and offline tests use this to render the in-flight state
+        /// without a transport that could answer `automatch/list`.
+        var isReconcilingAutomatches = false
+
         var quickMatchPopularityStats = OGSQuickMatchPopularityStats.empty
         var cachedUsersById = [Int: OGSUser]()
         var preferredGameSettings = Set<OGSChallengeTemplate>()
@@ -1028,6 +1034,7 @@ class OGSService: ObservableObject {
         challengesReceived = state.challengesReceived
         autoMatchEntryById = state.autoMatchEntryById
         automatchAvailableEntryByID = state.automatchAvailableEntryByID
+        isReconcilingAutomatches = state.isReconcilingAutomatches
         quickMatchPopularityStats = state.quickMatchPopularityStats
         cachedUsersById = state.cachedUsersById
         preferredGameSettings = state.preferredGameSettings

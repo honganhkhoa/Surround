@@ -304,10 +304,10 @@ struct GameDetailView: View {
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
                 showSettings = false
-                if newGame.gameData?.timeControl.speed?.isRealtime == true,
-                   oldGame.gameData?.timeControl.speed?.isRealtime != true {
-                    // Opening the live banner starts with the full game view.
-                    // Keep display choices when moving through correspondence games.
+                if GameDetailDisplayReset.restoresDisplayDefaults(
+                    from: oldGame.gameData?.timeControl.speed,
+                    to: newGame.gameData?.timeControl.speed
+                ) {
                     zenMode = false
                     analyzeMode = false
                     compactDisplayMode = .playerInfo

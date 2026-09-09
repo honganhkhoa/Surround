@@ -388,8 +388,10 @@ struct NewGameView: View {
                     activeLiveEntry: activeLiveEntry,
                     cancellingEntryID: cancellingEntryID,
                     isConnected: quickMatchIsConnected,
-                    isRestoringSearches: allowsRemoteActivity
-                        && ogs.isReconcilingAutomatches,
+                    // Matches the submission guard in `submitQuickMatches`,
+                    // which also refuses a live request while the restore is
+                    // in flight regardless of `allowsRemoteActivity`.
+                    isRestoringSearches: ogs.isReconcilingAutomatches,
                     serverNotice: quickMatchServerNotice,
                     onFind: submitQuickMatch,
                     onCancel: cancelQuickMatch,

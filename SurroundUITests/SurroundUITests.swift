@@ -2427,15 +2427,39 @@ final class SurroundUITests: SurroundUITestCase {
         openLiveGameFromBanner()
         backToHome()
 
-        let history = elementAfterScrolling(
-            SurroundUITestContract.AccessibilityID.homeHistoryViewAll,
-            in: app,
-            matching: .button
-        )
-        scrollIntoTappableArea(history, in: app)
-        tap(history, description: "Open game history", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenGameHistory, in: app)
+        func openGameHistory() {
+            let history = elementAfterScrolling(
+                SurroundUITestContract.AccessibilityID.homeHistoryViewAll,
+                in: app,
+                matching: .button
+            )
+            scrollIntoTappableArea(history, in: app)
+            tap(history, description: "Open game history", in: app)
+            element(SurroundUITestContract.AccessibilityID.screenGameHistory, in: app)
+        }
+
+        openGameHistory()
         openLiveGameFromBanner()
+        backToHome()
+
+        // Two levels deep. The banner has to pop Game history *and* its detail
+        // while pushing Home's own destination in the same update.
+        openGameHistory()
+        let historyGameID = SurroundUITestContract.liveBannerHistoryGameID
+        // Home keeps its own copy of the same row behind the pushed screen, so
+        // scope the query to Game history rather than taking a first match.
+        let historyGame = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.screenGameHistory)
+            .firstMatch
+            .descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.homeHistoryGame(historyGameID))
+            .firstMatch
+        XCTAssertTrue(historyGame.waitForExistence(timeout: 10))
+        scrollIntoTappableArea(historyGame, in: app)
+        tap(historyGame, description: "Open a finished game from history", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
+        openLiveGameFromBanner()
+        keepScreenshot("Live banner – replaces a history detail", in: app)
         backToHome()
     }
 
@@ -2483,6 +2507,113 @@ final class SurroundUITests: SurroundUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameChatBoardShow).firstMatch.exists)
         keepScreenshot("Live banner – restores the compact Chat board", in: app)
         #endif
+    }
+
+    func testQuickMatchRestorationKeepsSettingsEditable() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.quickMatch.rawValue,
+            SurroundUITestContract.automatchRestorationLaunchArgument,
+        ])
+
+        let speedTabs = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTabs,
+            in: app
+        )
+        XCTAssertTrue(
+            speedTabs.isEnabled,
+            "Restoration must not lock the match criteria."
+        )
+        let liveTab = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("live"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(liveTab, in: app)
+        activate(liveTab)
+        XCTAssertTrue(liveTab.isSelected)
+
+        // A live request could replace a search the restore has not reported
+        // yet, so Find waits — and says why.
+        let find = element(
+            SurroundUITestContract.AccessibilityID.quickMatchFind,
+            in: app,
+            matching: .button
+        )
+        XCTAssertFalse(find.isEnabled)
+        let reason = element(
+            SurroundUITestContract.AccessibilityID.quickMatchConnectionReason,
+            in: app
+        )
+        XCTAssertEqual(reason.label, "Restoring active searches from OGS…")
+
+        // The editor itself stays live: toggling a board size must take effect.
+        let thirteen = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(13),
+            in: app
+        )
+        scrollIntoTappableArea(thirteen, in: app)
+        XCTAssertTrue(thirteen.isEnabled)
+        let wasSelected = thirteen.isSelected
+        activate(thirteen)
+        let flipped = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == %@", NSNumber(value: !wasSelected)),
+            object: thirteen
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [flipped], timeout: 5),
+            .completed,
+            "A board size must respond while searches are being restored."
+        )
+
+        // Accepting someone else's live game is a submission too, so the
+        // matching custom games stay blocked.
+        let liveChallenge = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchOpenChallenge(
+                SurroundUITestContract.restorationLiveChallengeID
+            ),
+            in: app
+        )
+        XCTAssertFalse(
+            liveChallenge.isEnabled,
+            "A live restore must not allow accepting a matching live game."
+        )
+        keepScreenshot("Quick Match – editable while restoring", in: app)
+
+        // Correspondence is unaffected by a live restore.
+        let correspondenceTab = element(
+            SurroundUITestContract.AccessibilityID.quickMatchSpeedTab("correspondence"),
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(correspondenceTab, in: app)
+        activate(correspondenceTab)
+        XCTAssertTrue(waitUntilHittable(find, timeout: 5))
+        XCTAssertTrue(find.isEnabled)
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.quickMatchConnectionReason)
+                .firstMatch.exists,
+            "A correspondence request has nothing to wait for."
+        )
+        // The fixture's custom games are 19×19, which the saved draft leaves
+        // unselected, so select it to bring the suggestions into view.
+        let nineteen = element(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19),
+            in: app
+        )
+        scrollIntoTappableArea(nineteen, in: app)
+        XCTAssertFalse(nineteen.isSelected)
+        activate(nineteen)
+        let correspondenceChallenge = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.quickMatchOpenChallenge(91_001),
+            in: app
+        )
+        XCTAssertTrue(
+            correspondenceChallenge.isEnabled,
+            "A live restore must not block accepting a correspondence game."
+        )
     }
 
     func testWidgetDeepLinkRouting() throws {

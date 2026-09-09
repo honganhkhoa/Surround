@@ -262,6 +262,76 @@ final class AppRouteTests: XCTestCase {
         XCTAssertFalse(navigation.home.showingSettings)
     }
 
+    // MARK: - Game detail display reset
+
+    func testCrossingTheSpeedBoundaryRestoresDisplayDefaults() {
+        // The live-game banner and resolved routes are the only ways to jump
+        // between speed classes, and both start again from the full game view.
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(
+                from: .correspondence,
+                to: .live
+            )
+        )
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(
+                from: .correspondence,
+                to: .blitz
+            )
+        )
+        // The mirror case: a route into a correspondence game must not leave
+        // Zen mode or Analyze on from the live game that was open.
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(
+                from: .live,
+                to: .correspondence
+            )
+        )
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(
+                from: .blitz,
+                to: .correspondence
+            )
+        )
+    }
+
+    func testSwitchingInsideOneSpeedClassKeepsDisplayChoices() {
+        // These are the carousel and Next game, which never leave their speed
+        // class. A browsing session there keeps what the player chose.
+        XCTAssertFalse(
+            GameDetailDisplayReset.restoresDisplayDefaults(
+                from: .correspondence,
+                to: .correspondence
+            )
+        )
+        for from in [TimeControlSpeed.blitz, .rapid, .live] {
+            for to in [TimeControlSpeed.blitz, .rapid, .live] {
+                XCTAssertFalse(
+                    GameDetailDisplayReset.restoresDisplayDefaults(
+                        from: from,
+                        to: to
+                    ),
+                    "\(from.rawValue) to \(to.rawValue)"
+                )
+            }
+        }
+    }
+
+    func testUnknownSpeedIsTreatedAsACrossingOnlyAgainstAKnownOne() {
+        // A game whose detail has not arrived yet is an external jump, not a
+        // carousel move, so it restores the defaults…
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(from: .correspondence, to: nil)
+        )
+        XCTAssertTrue(
+            GameDetailDisplayReset.restoresDisplayDefaults(from: nil, to: .live)
+        )
+        // …while two unknowns say nothing, and must not disturb the view.
+        XCTAssertFalse(
+            GameDetailDisplayReset.restoresDisplayDefaults(from: nil, to: nil)
+        )
+    }
+
     @MainActor
     func testPublicGameRoutePreservesCurrentPublicDetail() throws {
         let navigation = NavigationService()

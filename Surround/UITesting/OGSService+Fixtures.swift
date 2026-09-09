@@ -1065,8 +1065,14 @@ extension OGSService {
     }
 
     static func offlineUITestInstance() -> OGSService {
-        func makeService(from state: BootstrapState) -> OGSService {
-            OGSService(
+        func makeService(from bootstrapState: BootstrapState) -> OGSService {
+            var state = bootstrapState
+            if SurroundUITestContract.simulatesAutomatchRestoration {
+                // The no-op websocket never answers `automatch/list`, so the
+                // window stays open for the whole test.
+                state.isReconcilingAutomatches = true
+            }
+            return OGSService(
                 environment: .current,
                 httpClient: SurroundUITestRejectingHTTPClient(),
                 preferences: userDefaults,
@@ -1144,6 +1150,17 @@ extension OGSService {
                     correspondenceGame.ogsRawData = [:]
                     state.activeGames[gameID] = correspondenceGame
                 }
+
+                // Game history needs one openable row so the journey can cover
+                // the two-level pop out of a finished game's detail.
+                guard var historyData = TestData.Scored19x19Korean.gameData else {
+                    preconditionFailure("The bundled history fixture must contain game data.")
+                }
+                historyData.gameId = SurroundUITestContract.liveBannerHistoryGameID
+                historyData.phase = .finished
+                let historyGame = Game(ogsGame: historyData)
+                historyGame.ogsRawData = [:]
+                state.finishedGamesSnapshot = [historyGame]
             }
 
             if SurroundUITestContract.simulatesWidgetDeepLinkRouting {
@@ -1177,7 +1194,11 @@ extension OGSService {
                 state.cachedUsersById[player.id] = player
             }
 
-            state.finishedGamesSnapshot = []
+            if state.finishedGamesSnapshot == nil {
+                // Default to a deterministic empty history. A journey that
+                // installed its own rows above keeps them.
+                state.finishedGamesSnapshot = []
+            }
             return makeService(from: state)
         }
 
@@ -2251,6 +2272,26 @@ extension OGSService {
         for challenge in openChallenges {
             state.eligibleOpenChallengeById[challenge.id] = challenge
             if let challenger = challenge.challenger {
+                state.cachedUsersById[challenger.id] = challenger
+            }
+        }
+        if SurroundUITestContract.simulatesAutomatchRestoration {
+            // The pool above is correspondence only. Add one realtime game so
+            // the restoration journey can check that accepting someone else's
+            // live game stays blocked while a live restore is in flight.
+            var liveChallenge = standardChallenges[0]
+            liveChallenge.id = SurroundUITestContract.restorationLiveChallengeID
+            liveChallenge.game.id = liveChallenge.id + 10_000
+            liveChallenge.game.name = "Live 9×9"
+            // 9×9 is selected by default, so the suggestion does not depend on
+            // whichever board size the journey toggles to prove it can edit.
+            liveChallenge.game.width = 9
+            liveChallenge.game.height = 9
+            liveChallenge.game.timeControl = TimeControlSystem
+                .ByoYomi(mainTime: 900, periods: 1, periodTime: 15)
+                .timeControlObject
+            state.eligibleOpenChallengeById[liveChallenge.id] = liveChallenge
+            if let challenger = liveChallenge.challenger {
                 state.cachedUsersById[challenger.id] = challenger
             }
         }

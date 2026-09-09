@@ -42,6 +42,8 @@ enum SurroundUITestContract {
         "--surround-widget-deep-link-routing"
     static let liveGameBannerNavigationLaunchArgument =
         "--surround-live-game-banner-navigation"
+    static let automatchRestorationLaunchArgument =
+        "--surround-automatch-restoration"
     static let attachedSoftwareKeyboardVisibleLaunchArgument =
         "--surround-attached-software-keyboard-visible"
     static let structuredChatFormatsLaunchArgument =
@@ -53,6 +55,8 @@ enum SurroundUITestContract {
     static let fixtureGameID = 26_268_404
     static let widgetRoutingSecondGameID = 26_268_396
     static let liveBannerCorrespondenceGameIDs = [26_268_398, 26_268_399]
+    static let liveBannerHistoryGameID = 26_268_397
+    static let restorationLiveChallengeID = 94_001
     static let widgetRoutingMissingGameID = 999_999_999
     static let widgetRoutingRESTDelayNanoseconds: UInt64 = 1_000_000_000
     static let homeHistoryRetryFixtureGameID = 18_759_438
@@ -219,6 +223,15 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 liveGameBannerNavigationLaunchArgument
+            )
+    }
+
+    /// Holds the automatch restoration window open so the offline tests can
+    /// check what Quick Match allows while reconciliation is still in flight.
+    static var simulatesAutomatchRestoration: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                automatchRestorationLaunchArgument
             )
     }
 
