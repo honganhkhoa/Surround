@@ -1131,6 +1131,21 @@ extension OGSService {
 
             state.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
 
+            if SurroundUITestContract.simulatesLiveGameBannerNavigation {
+                for gameID in SurroundUITestContract.liveBannerCorrespondenceGameIDs {
+                    var gameData = fixtureGame.gameData!
+                    gameData.gameId = gameID
+                    gameData.timeControl = TimeControlSystem.Fischer(
+                        initialTime: 3 * 86_400,
+                        timeIncrement: 86_400,
+                        maxTime: 7 * 86_400
+                    ).timeControlObject
+                    let correspondenceGame = Game(ogsGame: gameData)
+                    correspondenceGame.ogsRawData = [:]
+                    state.activeGames[gameID] = correspondenceGame
+                }
+            }
+
             if SurroundUITestContract.simulatesWidgetDeepLinkRouting {
                 let replacementGame = makeGeneratedGame(
                     from: TestData.Ongoing19x19wBot1,

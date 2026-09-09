@@ -304,8 +304,18 @@ struct GameDetailView: View {
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
                 showSettings = false
+                if newGame.gameData?.timeControl.speed?.isRealtime == true,
+                   oldGame.gameData?.timeControl.speed?.isRealtime != true {
+                    // Opening the live banner starts with the full game view.
+                    // Keep display choices when moving through correspondence games.
+                    zenMode = false
+                    analyzeMode = false
+                    compactDisplayMode = .playerInfo
+                    showsCompactChatBoard = true
+                }
                 variationShareDraft = nil
                 selectedChatChannel = .main
+                updateActiveGameList()
                 updateDetailOfCurrentGameIfNecessary()
             }
         }

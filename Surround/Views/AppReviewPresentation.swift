@@ -91,7 +91,6 @@ private func appReviewContext(
     let home = homeVisible && nav.main.rootView == .home
         && nav.home.activeGame == nil
         && !nav.home.showingGameHistory
-        && nav.main.modalLiveGame == nil
     let blocked = presentationBlocked
         || nav.pendingGameOpen != nil
         || nav.home.showingNewGameView

@@ -43,6 +43,7 @@ private enum RecentFinishedGamesLoadState: Equatable {
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.tabBarPlacement) private var tabBarPlacement
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
@@ -237,6 +238,15 @@ struct HomeView: View {
                                 )
                                 Image(systemName: "chevron.forward")
                                 Spacer()
+                                Group {
+                                    if reduceMotion {
+                                        Image(systemName: "hourglass")
+                                    } else {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    }
+                                }
+                                .accessibilityHidden(true)
                             }
                             .font(.subheadline.bold())
                             .foregroundStyle(.white)

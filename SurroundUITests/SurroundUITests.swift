@@ -1884,6 +1884,8 @@ final class SurroundUITests: SurroundUITestCase {
             NSPredicate(format: "label CONTAINS %@", "Searching for")
         ).firstMatch
         XCTAssertTrue(homeSearchingBanner.waitForExistence(timeout: 10))
+        XCTAssertTrue(homeSearchingBanner.isHittable)
+        keepScreenshot("Home – restored search progress", in: app)
 
         tap(
             SurroundUITestContract.AccessibilityID.homeNewGame,
@@ -2333,6 +2335,154 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameResign,
             in: app
         )
+    }
+
+    func testLiveGameBannerUsesHomeNavigationStack() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        let correspondenceID = SurroundUITestContract.liveBannerCorrespondenceGameIDs[0]
+        let correspondence = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(correspondenceID),
+            in: app
+        )
+        scrollIntoTappableArea(correspondence, in: app)
+        tap(correspondence, description: "Open correspondence game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(correspondenceID), in: app)
+        let carousel = element(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel, in: app)
+        let banner = element(SurroundUITestContract.AccessibilityID.liveGameBanner, in: app, matching: .button)
+
+        func openLiveGameFromBanner() {
+            tap(banner, description: "Open active live game", in: app)
+            element(
+                SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
+                in: app
+            )
+            XCTAssertFalse(banner.exists, "The live-game banner must disappear on the live board.")
+            XCTAssertFalse(carousel.exists, "The correspondence carousel must not remain on the only live game.")
+            XCTAssertFalse(app.navigationBars.buttons["Close"].exists, "Active games must open in the navigation stack.")
+            XCTAssertFalse(
+                app.buttons[SurroundUITestContract.AccessibilityID.gameZenExit].exists,
+                "The live game must open outside Zen mode."
+            )
+        }
+
+        func backToHome() {
+            // iOS 18 exposes the destination title; newer UIKit uses BackButton.
+            // Trailing toolbar controls can overflow, so match Back directly.
+            let back = app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@", "BackButton", "Active games"
+            )).firstMatch
+            tap(back, description: "Back to active games", in: app)
+            // Identify Home by its navigation bar and screen, even when its
+            // New game button is scrolled offscreen after returning from history.
+            XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10))
+            element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+            XCTAssertFalse(app.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.screenGameHistory)
+                .firstMatch.exists)
+        }
+
+        activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+        element(SurroundUITestContract.AccessibilityID.gameZenExit, in: app)
+        openLiveGameFromBanner()
+        keepScreenshot("Live banner – replaces correspondence detail", in: app)
+        backToHome()
+
+        let publicGamesTabs = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationPublicGames)
+        // The live banner can cover iPad's top tab bar. Use the sidebar when
+        // needed, and account for duplicate accessibility nodes in adaptive tabs.
+        let openedSidebar = !publicGamesTabs.allElementsBoundByIndex.contains { $0.isHittable }
+        if openedSidebar {
+            keepScreenshot("Live banner – overlaps iPad tabs", in: app)
+            tap(app.buttons["Toggle sidebar"], description: "Show navigation sidebar", in: app)
+        }
+        var publicGamesTab: XCUIElement?
+        let publicGamesReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                publicGamesTab = publicGamesTabs.allElementsBoundByIndex.first(where: { $0.isHittable })
+                return publicGamesTab != nil
+            },
+            object: nil
+        )
+        guard XCTWaiter.wait(for: [publicGamesReady], timeout: 10) == .completed,
+              let publicGamesTab else {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Accessibility hierarchy – Public games navigation unavailable"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            keepScreenshot("Live banner – Public games navigation unavailable", in: app)
+            XCTFail("Expected a hittable Public games tab or sidebar item.")
+            return
+        }
+        tap(publicGamesTab, description: "Open Public games", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+        if openedSidebar && app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationSettings)
+            .allElementsBoundByIndex.contains(where: { $0.isHittable }) {
+            // Restore the initial sidebar state so it cannot affect later tests.
+            tap(app.buttons["Toggle sidebar"], description: "Hide navigation sidebar", in: app)
+        }
+        openLiveGameFromBanner()
+        backToHome()
+
+        let history = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeHistoryViewAll,
+            in: app,
+            matching: .button
+        )
+        scrollIntoTappableArea(history, in: app)
+        tap(history, description: "Open game history", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenGameHistory, in: app)
+        openLiveGameFromBanner()
+        backToHome()
+    }
+
+    func testLiveGameBannerRestoresCompactChatBoard() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("The compact Chat layout requires an iOS device.")
+        #else
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+            SurroundUITestContract.compactGameLayoutLaunchArgument,
+        ], orientation: .portrait)
+        let correspondence = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(
+                SurroundUITestContract.liveBannerCorrespondenceGameIDs[0]
+            ),
+            in: app
+        )
+        scrollIntoTappableArea(correspondence, in: app)
+        tap(correspondence, description: "Open correspondence game", in: app)
+
+        selectSegment(at: 2, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
+        dismissCompactChatInputAndWaitForLayout(in: app)
+        tap(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app, matching: .button)
+        element(SurroundUITestContract.AccessibilityID.gameChatBoardShow, in: app, matching: .button)
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameBoard).firstMatch.exists)
+
+        selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
+        activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+        element(SurroundUITestContract.AccessibilityID.gameZenExit, in: app)
+        tap(SurroundUITestContract.AccessibilityID.liveGameBanner, in: app, matching: .button)
+        element(
+            SurroundUITestContract.AccessibilityID.gameDetail(SurroundUITestContract.fixtureGameID),
+            in: app
+        )
+        element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+
+        // Player info always shows the board, so reopen Chat to verify that
+        // the previous game's hidden-board choice was also cleared.
+        selectSegment(at: 2, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
+        dismissCompactChatInputAndWaitForLayout(in: app)
+        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        element(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app, matching: .button)
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameChatBoardShow).firstMatch.exists)
+        keepScreenshot("Live banner – restores the compact Chat board", in: app)
+        #endif
     }
 
     func testWidgetDeepLinkRouting() throws {

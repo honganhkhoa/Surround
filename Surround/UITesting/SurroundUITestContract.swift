@@ -40,6 +40,8 @@ enum SurroundUITestContract {
         "--surround-home-board-alignment"
     static let widgetDeepLinkRoutingLaunchArgument =
         "--surround-widget-deep-link-routing"
+    static let liveGameBannerNavigationLaunchArgument =
+        "--surround-live-game-banner-navigation"
     static let attachedSoftwareKeyboardVisibleLaunchArgument =
         "--surround-attached-software-keyboard-visible"
     static let structuredChatFormatsLaunchArgument =
@@ -50,6 +52,7 @@ enum SurroundUITestContract {
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
     static let widgetRoutingSecondGameID = 26_268_396
+    static let liveBannerCorrespondenceGameIDs = [26_268_398, 26_268_399]
     static let widgetRoutingMissingGameID = 999_999_999
     static let widgetRoutingRESTDelayNanoseconds: UInt64 = 1_000_000_000
     static let homeHistoryRetryFixtureGameID = 18_759_438
@@ -209,6 +212,13 @@ enum SurroundUITestContract {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
                 widgetDeepLinkRoutingLaunchArgument
+            )
+    }
+
+    static var simulatesLiveGameBannerNavigation: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                liveGameBannerNavigationLaunchArgument
             )
     }
 
@@ -428,6 +438,7 @@ enum SurroundUITestContract {
         static let gameHistoryEmpty = "gameHistory.empty"
 
         static let homeNewGame = "home.newGame"
+        static let liveGameBanner = "notification.liveGame"
         static let homePreferredSettings = "home.preferredSettings"
 
         static let quickMatchScroll = "quickMatch.scroll"
@@ -533,6 +544,7 @@ enum SurroundUITestContract {
             "game.conditional.variation.\(branchID)"
         }
         static let gameDisplayModePicker = "game.displayMode"
+        static let gameActiveGamesCarousel = "game.activeGamesCarousel"
         static let gameAnalyzeToggle = "game.analyze"
         static let gameAnalyzeControlBar = "game.analyze.controls"
         static let gameAnalyzeTreeScroll = "game.analyze.tree.scroll"

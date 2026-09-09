@@ -196,6 +196,7 @@ struct OpenChallengesForm: View {
 }
 
 struct NewGameView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
     @EnvironmentObject var ogs: OGSService
@@ -295,6 +296,16 @@ struct NewGameView: View {
                                 : String(localized: "Searching for \(displayedWaitingGames) games")
                         )
                         Image(systemName: "chevron.forward")
+                        Spacer()
+                        Group {
+                            if reduceMotion {
+                                Image(systemName: "hourglass")
+                            } else {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            }
+                        }
+                        .accessibilityHidden(true)
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

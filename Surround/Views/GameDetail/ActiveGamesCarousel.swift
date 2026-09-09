@@ -112,6 +112,7 @@ struct ActiveGamesCarousel: View {
             }
         }
         .frame(height: showsActiveGamesCarouselSetting.wrappedValue ? cellSize + selectionRingPadding * 2 + padding * 2 : showsToggleButton ? 44 : 0)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel)
         .onReceive(renderedCurrentGameCollected) { rendered in
             if rendered.allSatisfy({ !$0 }) {
                 if scrollTarget != currentGame.wrappedValue?.ID {

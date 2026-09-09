@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */; };
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000044000000000000004 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000054000000000000005 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000064000000000000006 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
+		AD0800012026090800000001 /* SurroundAnimationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */; };
 		AE20000139A0000000000001 /* TimeControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000139A0000000000001 /* TimeControlTests.swift */; };
 		AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000239A0000000000002 /* OGSModelDecodingTests.swift */; };
 		AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */; };
@@ -402,10 +402,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundAnimationDiagnostics.swift; sourceTree = "<group>"; };
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
+		AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundAnimationDiagnostics.swift; sourceTree = "<group>"; };
 		AE10000139A0000000000001 /* TimeControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeControlTests.swift; sourceTree = "<group>"; };
 		AE10000239A0000000000002 /* OGSModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSModelDecodingTests.swift; sourceTree = "<group>"; };
 		AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeBehaviorTests.swift; sourceTree = "<group>"; };
@@ -1679,7 +1679,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -1709,7 +1709,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -1734,7 +1734,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1757,7 +1757,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -1784,7 +1784,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -1812,7 +1812,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1837,7 +1837,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2031,7 +2031,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2201,7 +2201,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2233,7 +2233,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2343,7 +2343,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2366,7 +2366,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2391,7 +2391,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2421,7 +2421,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2491,7 +2491,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2516,7 +2516,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026090801;
+				CURRENT_PROJECT_VERSION = 2026090901;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;

@@ -3,6 +3,7 @@
 //  SurroundTests
 //
 
+import Combine
 import XCTest
 
 final class AppRouteTests: XCTestCase {
@@ -101,13 +102,6 @@ final class AppRouteTests: XCTestCase {
             whiteName: "Public White",
             gameId: .OGS(40)
         )
-        navigation.main.modalLiveGame = Game(
-            width: 9,
-            height: 9,
-            blackName: "Black",
-            whiteName: "White",
-            gameId: .OGS(99)
-        )
         navigation.main.showWaitingGames = true
         navigation.home.showingNewGameView = true
         navigation.home.showingPreferredSettings = true
@@ -121,7 +115,6 @@ final class AppRouteTests: XCTestCase {
         )
 
         XCTAssertEqual(navigation.main.rootView, .home)
-        XCTAssertNil(navigation.main.modalLiveGame)
         XCTAssertFalse(navigation.main.showWaitingGames)
         XCTAssertFalse(navigation.home.showingNewGameView)
         XCTAssertFalse(navigation.home.showingPreferredSettings)
@@ -154,6 +147,119 @@ final class AppRouteTests: XCTestCase {
         XCTAssertNil(navigation.home.activeGame)
         XCTAssertTrue(navigation.home.activeGameShowsCarousel)
         XCTAssertNil(navigation.pendingGameOpen)
+    }
+
+    @MainActor
+    func testActiveGameTapReplacesHomeDetailWithoutPoppingAndSupersedesPendingRoute() throws {
+        let navigation = NavigationService()
+        let currentGame = Game(
+            width: 19,
+            height: 19,
+            blackName: "Current Black",
+            whiteName: "Current White",
+            gameId: .OGS(41)
+        )
+        let liveGame = Game(
+            width: 9,
+            height: 9,
+            blackName: "Live Black",
+            whiteName: "Live White",
+            gameId: .OGS(42)
+        )
+        navigation.home.activeGame = currentGame
+        navigation.home.activeGameShowsCarousel = false
+        navigation.requestGameOpen(
+            try XCTUnwrap(AppRoute(rootView: .home, ogsGameID: 99))
+        )
+        XCTAssertNotNil(navigation.pendingGameOpen)
+
+        // The current Home destination must remain presented throughout the
+        // replacement; publishing nil would start a competing back navigation.
+        var publishedHomeGameIDs = [Int?]()
+        let observation = navigation.$home.sink {
+            publishedHomeGameIDs.append($0.activeGame?.ogsID)
+        }
+        defer { observation.cancel() }
+
+        navigation.goToActiveGame(game: liveGame)
+
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertTrue(navigation.home.activeGame === liveGame)
+        XCTAssertTrue(navigation.home.activeGameShowsCarousel)
+        XCTAssertNil(navigation.pendingGameOpen)
+        XCTAssertFalse(publishedHomeGameIDs.contains { $0 == nil })
+        XCTAssertEqual(publishedHomeGameIDs.last ?? nil, liveGame.ogsID)
+    }
+
+    @MainActor
+    func testActiveGameTapReturnsHomeFromEveryOtherSection() throws {
+        let liveGame = Game(
+            width: 9,
+            height: 9,
+            blackName: "Live Black",
+            whiteName: "Live White",
+            gameId: .OGS(42)
+        )
+
+        for section in RootView.allCases where section != .home {
+            let navigation = NavigationService()
+            navigation.publicGames.activeGame = Game(
+                width: 19,
+                height: 19,
+                blackName: "Public Black",
+                whiteName: "Public White",
+                gameId: .OGS(40)
+            )
+            navigation.requestGameOpen(
+                try XCTUnwrap(AppRoute(rootView: .publicGames, ogsGameID: 99))
+            )
+            navigation.main.rootView = section
+
+            navigation.goToActiveGame(game: liveGame)
+
+            XCTAssertEqual(navigation.main.rootView, .home, section.rawValue)
+            XCTAssertTrue(navigation.home.activeGame === liveGame, section.rawValue)
+            XCTAssertTrue(navigation.home.activeGameShowsCarousel, section.rawValue)
+            XCTAssertNil(navigation.publicGames.activeGame, section.rawValue)
+            XCTAssertNil(navigation.pendingGameOpen, section.rawValue)
+        }
+    }
+
+    @MainActor
+    func testActiveGameTapDismissesTrackedSheetsAndGameHistory() {
+        let navigation = NavigationService()
+        let liveGame = Game(
+            width: 9,
+            height: 9,
+            blackName: "Live Black",
+            whiteName: "Live White",
+            gameId: .OGS(42)
+        )
+        navigation.home.showingGameHistory = true
+        navigation.gameHistory.activeGame = Game(
+            width: 19,
+            height: 19,
+            blackName: "History Black",
+            whiteName: "History White",
+            gameId: .OGS(40)
+        )
+        navigation.home.activeGameShowsCarousel = false
+        navigation.main.showWaitingGames = true
+        navigation.home.showingNewGameView = true
+        navigation.home.showingPreferredSettings = true
+        navigation.home.showingSettings = true
+
+        navigation.goToActiveGame(game: liveGame)
+
+        XCTAssertEqual(navigation.main.rootView, .home)
+        XCTAssertTrue(navigation.home.activeGame === liveGame)
+        XCTAssertTrue(navigation.home.activeGameShowsCarousel)
+        XCTAssertFalse(navigation.home.showingGameHistory)
+        XCTAssertNil(navigation.gameHistory.activeGame)
+        XCTAssertFalse(navigation.main.showWaitingGames)
+        XCTAssertFalse(navigation.home.showingNewGameView)
+        XCTAssertFalse(navigation.home.showingPreferredSettings)
+        XCTAssertFalse(navigation.home.showingSettings)
     }
 
     @MainActor

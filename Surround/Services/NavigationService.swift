@@ -144,7 +144,6 @@ struct GameOpenResolver<GameValue> {
 
 struct MainViewParameters {
     var rootView: RootView = .home
-    var modalLiveGame: Game?
     var showWaitingGames = false
 }
 
@@ -238,7 +237,6 @@ class NavigationService: ObservableObject {
     ) {
         pendingGameOpen = nil
 
-        main.modalLiveGame = nil
         main.showWaitingGames = false
 
         if rootView != .home {
@@ -265,20 +263,12 @@ class NavigationService: ObservableObject {
     #endif
     
     func goToActiveGame(game: Game) {
-        if self.main.rootView == .home && self.home.showingNewGameView {
-            self.home.showingNewGameView = false
-        }
-        if self.main.rootView == .home
-            && !self.home.showingGameHistory
-            && self.home.activeGame == nil {
-            // Restore the default: the flag may still be false from a finished
-            // game opened out of Game history, which would otherwise suppress
-            // this live game's carousel.
-            self.home.activeGameShowsCarousel = true
-            self.home.activeGame = game
-            return
-        }
-        self.main.modalLiveGame = game
+        // Reuse Home's detail destination, including when another game is
+        // already open. Clear pending routes so they cannot replace this tap.
+        dismissTrackedNavigation(preservingActiveGameIn: .home)
+        main.rootView = .home
+        home.activeGameShowsCarousel = true
+        home.activeGame = game
     }
 }
 

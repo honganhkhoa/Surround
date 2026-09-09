@@ -41,7 +41,7 @@ struct NotificationPopup: View {
             }
         }
         
-        return nav.main.modalLiveGame != nil
+        return false
     }
     
     var viewingHomeView: Bool {
@@ -70,6 +70,7 @@ struct NotificationPopup: View {
             .background(Color(.systemTeal))
             .cornerRadius(10)
         }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.liveGameBanner)
     }
     
     var waitingGamesPopup: some View {

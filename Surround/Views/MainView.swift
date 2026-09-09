@@ -176,28 +176,6 @@ struct MainView: View {
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
-            .fullScreenCover(isPresented: Binding(
-                                get: { nav.main.modalLiveGame != nil },
-                                set: { if !$0 { nav.main.modalLiveGame = nil } })
-            ) {
-                ZStack(alignment: .top) {
-                    NavigationStack {
-                        GameDetailView(currentGame: $nav.main.modalLiveGame)
-                            .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button(action: { nav.main.modalLiveGame = nil }) {
-                                        Text("Close")
-                                    }
-                                }
-                            }
-                    }
-                    if ogs.isLoggedIn {
-                        NotificationPopup()
-                    }
-                }
-                .environmentObject(ogs)
-                .environmentObject(nav)
-            }
             .sheet(isPresented: $nav.main.showWaitingGames) {
                 NavigationStack {
                     WaitingGamesView()

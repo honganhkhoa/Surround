@@ -68,6 +68,7 @@ readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInpu
 readonly composer_test_names=(
   testCompactChatAutomaticallyFocusesComposer
   testCompactChatCanHideAndShowMainBoard
+  testLiveGameBannerRestoresCompactChatBoard
   testCompactVariationSharingHidesMainBoardAndShowsComposerPreview
   testVariationSharingDraftSurvivesChatSelection
   testVariationSharingDraftSurvivesAnalyzeNavigation

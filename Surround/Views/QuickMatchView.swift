@@ -35,7 +35,7 @@ private struct QuickMatchCard<Content: View>: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemGray6))
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
@@ -142,6 +142,7 @@ private struct QuickMatchActionArea: View {
                     .font(.body.weight(.bold))
                     .foregroundStyle(isSubmitting ? Color.primary : (canFind ? Color.white : Color.secondary))
                     .frame(maxWidth: .infinity, minHeight: 50)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(
@@ -468,15 +469,15 @@ struct QuickMatchForm: View {
     }
 
     private var formIsDisabled: Bool {
-        activeLiveEntry != nil || restorationBlocksDraft
+        activeLiveEntry != nil
     }
 
-    private var restorationBlocksDraft: Bool {
+    private var restorationBlocksFind: Bool {
         isRestoringSearches && !draft.quickMatchIsCorrespondenceOnly
     }
 
     private var findDisabledReason: String? {
-        if restorationBlocksDraft {
+        if restorationBlocksFind {
             return String(localized: "Restoring active searches from OGS…")
         }
         if !draft.quickMatchIsValid {
@@ -517,7 +518,7 @@ struct QuickMatchForm: View {
                 canFind: draft.quickMatchIsValid
                     && activeLiveEntry == nil
                     && isConnected
-                    && !restorationBlocksDraft
+                    && !restorationBlocksFind
                     && !isSubmitting,
                 canCancel: isConnected && cancellingEntryID == nil,
                 disabledReason: activeLiveEntry != nil
@@ -605,7 +606,7 @@ struct QuickMatchForm: View {
                                     ) {
                                         ForEach(matchingOpenChallenges) { challenge in
                                             ChallengeCell(challenge: challenge)
-                                                .disabled(formIsDisabled)
+                                                .disabled(formIsDisabled || restorationBlocksFind)
                                                 .padding()
                                                 .background(
                                                     Color(
@@ -639,7 +640,7 @@ struct QuickMatchForm: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(14)
-                        .background(Color(uiColor: .systemGray6))
+                        .background(Color(uiColor: .secondarySystemBackground))
                         .clipShape(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                         )
@@ -969,7 +970,7 @@ struct QuickMatchForm: View {
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.quickMatchAdvanced)
         }
         .padding(14)
-        .background(Color(uiColor: .systemGray6))
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
