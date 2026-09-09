@@ -336,15 +336,26 @@ class SurroundUITestCase: XCTestCase {
         let selectedItems = chatLog
             .descendants(matching: .any)
             .matching(NSPredicate(format: "selected == true"))
-        var consecutiveClearChecks = 0
+        // Settling is a duration, not a poll count. Each poll costs one
+        // accessibility query plus a fixed run-loop spin, so requiring a fixed
+        // number of consecutive clear polls inside a wall-clock deadline makes
+        // the outcome depend on how fast the snapshot happens to be: when
+        // queries slow down, the count cannot be reached before the deadline
+        // and the assertion fails even though nothing is selected. Requiring
+        // the selection to stay clear for `settleDuration` still rejects a
+        // transient clear during the dismissal animation, but costs the same
+        // wall-clock time whatever a query costs.
+        let settleDuration: TimeInterval = 0.75
+        var clearedAt: Date?
         XCTAssertTrue(
-            pollUntil(timeout: timeout) {
-                if selectedItems.firstMatch.exists {
-                    consecutiveClearChecks = 0
-                } else {
-                    consecutiveClearChecks += 1
+            pollUntil(timeout: timeout + settleDuration) {
+                guard !selectedItems.firstMatch.exists else {
+                    clearedAt = nil
+                    return false
                 }
-                return consecutiveClearChecks >= 3
+                let firstClear = clearedAt ?? Date()
+                clearedAt = firstClear
+                return Date().timeIntervalSince(firstClear) >= settleDuration
             },
             "Expected no selected chat line or move after tapping the chat log background.",
             file: file,

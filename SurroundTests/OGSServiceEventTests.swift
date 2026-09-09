@@ -4922,9 +4922,12 @@ final class OGSServiceEventTests: XCTestCase {
         )
         service.subscribeToAutomatchAvailability()
 
-        // These are deadlines, not sleeps: a busy CI runner can take more than
-        // two seconds to start a request, while normal completions return early.
-        let requestTimeout: TimeInterval = 10
+        // These are deadlines, not sleeps: normal completions return early.
+        // Each completion travels roughly eight queue hops, one of them
+        // Alamofire's .utility-QoS CompositeEventMonitor queue, which a
+        // saturated CI runner starves while this thread spins in XCTWaiter.
+        // Measured tail under 4x CPU oversubscription is ~12 seconds.
+        let requestTimeout: TimeInterval = 30
         let normalRanks = "26,27,28,29"
         var publishedTotals = [Int]()
         let updates = service.$quickMatchPopularityStats.dropFirst().sink {
