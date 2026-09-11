@@ -12,6 +12,11 @@ final class AppReviewPolicyTests: XCTestCase {
         var date: Date { start.addingTimeInterval(offset) }
     }
 
+    // Nested types do not inherit the test case's @MainActor. Without it,
+    // Swift 5 mode runs wait() and waitUntilStarted() on the global executor
+    // concurrently, and waitUntilStarted() can append its continuation after
+    // wait() has already drained the list, hanging the test forever.
+    @MainActor
     private final class DelayGate {
         private var continuation: CheckedContinuation<Void, Never>?
         private var startWaiters = [CheckedContinuation<Void, Never>]()
