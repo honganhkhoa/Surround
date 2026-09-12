@@ -144,17 +144,15 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         live.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         XCTAssertTrue(waitUntil(timeout: 5) { live.value as? String == "1" })
 
-        let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.quickMatchScroll]
-        let board9 = app.descendants(matching: .any)
-            .matching(identifier: SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9))
-            .firstMatch
-        for _ in 0..<6 {
-            let previousFrame = board9.exists ? board9.frame : nil
-            scroll.swipeDown()
-            if board9.exists && board9.isHittable && board9.frame == previousFrame {
-                break
-            }
-        }
+        // Reveal the board sizes, the topmost card, rather than swiping down
+        // until the content stops moving. iOS 27 hands a swipe down on a
+        // scroll view that is already at its top to the screen's interactive
+        // dismiss gesture, which closes Quick Match and leaves Home behind.
+        let board9 = revealScreenshotQuickMatchControl(
+            SurroundUITestContract.AccessibilityID.quickMatchBoardSize(9),
+            matching: .any,
+            in: app
+        )
         XCTAssertTrue(board9.isHittable && board9.isSelected)
         XCTAssertTrue(element(SurroundUITestContract.AccessibilityID.quickMatchBoardSize(19), in: app).isSelected)
         XCTAssertTrue(live.isHittable)

@@ -239,62 +239,65 @@ struct AnalyzeControlBar: View {
         #endif
     }
 
+    // Group these actions with Divider rather than Section. iOS 27 drops the
+    // accessibility identifier and value of every Menu item wrapped in a
+    // Section, leaving only its localized label, which no longer identifies an
+    // action across the App Store capture's thirteen languages. Divider draws
+    // the same separators in the same places and keeps the identifiers.
     private var actionsMenu: some View {
         Menu {
-            Section {
-                Button(action: shareVariation) {
-                    Label("Share variation in chat", systemImage: "message")
+            Button(action: shareVariation) {
+                Label("Share variation in chat", systemImage: "message")
+            }
+            .disabled(!canShareVariation)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeShare
+            )
+
+            Divider()
+
+            Button(action: addToConditionalMoves) {
+                Label(
+                    "Add to conditional moves",
+                    image: "custom.envelope.and.arrow.trianglehead.branch.badge.plus"
+                )
+                if addReplacesConditionalVariations {
+                    Text("Replaces conflicting variations")
                 }
-                .disabled(!canShareVariation)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameAnalyzeShare
+            }
+            .disabled(!canAddConditionalMoves)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional
+            )
+            .accessibilityLabel(
+                Text("Add to conditional moves")
+                    + Text(verbatim: ", ")
+                    + Text("Replaces conflicting variations"),
+                isEnabled: addReplacesConditionalVariations
+            )
+
+            Button(action: removeFromConditionalMoves) {
+                Label(
+                    "Remove from conditional moves",
+                    image: "custom.envelope.and.arrow.trianglehead.branch.badge.minus"
                 )
             }
+            .disabled(!canRemoveConditionalMoves)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional
+            )
 
-            Section {
-                Button(action: addToConditionalMoves) {
-                    Label(
-                        "Add to conditional moves",
-                        image: "custom.envelope.and.arrow.trianglehead.branch.badge.plus"
-                    )
-                    if addReplacesConditionalVariations {
-                        Text("Replaces conflicting variations")
-                    }
-                }
-                .disabled(!canAddConditionalMoves)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameAnalyzeAddConditional
-                )
-                .accessibilityLabel(
-                    Text("Add to conditional moves")
-                        + Text(verbatim: ", ")
-                        + Text("Replaces conflicting variations"),
-                    isEnabled: addReplacesConditionalVariations
-                )
+            Divider()
 
-                Button(action: removeFromConditionalMoves) {
-                    Label(
-                        "Remove from conditional moves",
-                        image: "custom.envelope.and.arrow.trianglehead.branch.badge.minus"
-                    )
-                }
-                .disabled(!canRemoveConditionalMoves)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameAnalyzeRemoveConditional
-                )
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                Label("Delete branch", systemImage: "trash")
             }
-
-            Section {
-                Button(role: .destructive) {
-                    showingDeleteConfirmation = true
-                } label: {
-                    Label("Delete branch", systemImage: "trash")
-                }
-                .disabled(!canDeleteSelectedBranch)
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameAnalyzeDeleteBranch
-                )
-            }
+            .disabled(!canDeleteSelectedBranch)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameAnalyzeDeleteBranch
+            )
         } label: {
             Label("More analysis actions", systemImage: "ellipsis.circle")
                 .labelStyle(IconOnlyLabelStyle())
