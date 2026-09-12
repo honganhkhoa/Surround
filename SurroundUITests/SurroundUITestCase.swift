@@ -230,9 +230,10 @@ class SurroundUITestCase: XCTestCase {
     ) -> Bool {
         let frame = chatLog.frame
         let viewport = visibleChatLogViewport(frame, in: app)
+        let gutterX = chatLogGutterX(frame, in: app)
         guard viewport.width > 8,
               viewport.height > 8,
-              viewport.minX == frame.minX,
+              viewport.minX <= gutterX, gutterX <= viewport.maxX,
               chatLog.isHittable else {
             keepHierarchy(of: app, name: "chat background has no usable viewport")
             XCTFail(
@@ -251,12 +252,27 @@ class SurroundUITestCase: XCTestCase {
             .coordinate(withNormalizedOffset: .zero)
             .withOffset(
                 CGVector(
-                    dx: frame.minX + 4 - appFrame.minX,
+                    dx: gutterX - appFrame.minX,
                     dy: viewport.midY - appFrame.minY
                 )
             )
             .tap()
         return true
+    }
+
+    // The log's 10-point horizontal padding leaves a background gutter on both
+    // sides. iPadOS 27 ignores taps in a strip along the screen's leading edge
+    // that is wider than that gutter, so a log that starts at the edge (the
+    // compact layout) is tapped in its trailing gutter instead.
+    private func chatLogGutterX(
+        _ frame: CGRect,
+        in app: XCUIApplication
+    ) -> CGFloat {
+        let leadingScreenEdgeInset: CGFloat = 24
+        if frame.minX - app.frame.minX < leadingScreenEdgeInset {
+            return frame.maxX - 4
+        }
+        return frame.minX + 4
     }
 
     func visibleChatLogViewport(
@@ -289,7 +305,7 @@ class SurroundUITestCase: XCTestCase {
         let keyboard = app.keyboards.firstMatch
         if keyboard.exists {
             let keyboardFrame = keyboard.frame
-            let gutterX = frame.minX + 4
+            let gutterX = chatLogGutterX(frame, in: app)
             if !keyboardFrame.isEmpty,
                keyboardFrame.intersects(viewport),
                keyboardFrame.minX <= gutterX, gutterX <= keyboardFrame.maxX {

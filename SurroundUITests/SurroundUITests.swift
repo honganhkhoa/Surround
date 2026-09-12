@@ -154,6 +154,55 @@ final class SurroundUITests: SurroundUITestCase {
         return alert
     }
 
+    // iPadOS 27 no longer forwards SwiftUI accessibility identifiers to the
+    // buttons inside a presented Menu. They keep only their label, which can
+    // append a subtitle ("Title, subtitle") or a count ("Title (2)"). Match
+    // the identifier, or else an unidentified button or menu item with that
+    // title, so identifiable controls outside the menu never match by label.
+    private func menuButton(
+        _ accessibilityIdentifier: String,
+        title: String,
+        in app: XCUIApplication
+    ) -> XCUIElement {
+        app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "(elementType == %lu OR elementType == %lu) AND (identifier == %@ OR (identifier == '' AND (label == %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@)))",
+                XCUIElement.ElementType.button.rawValue,
+                XCUIElement.ElementType.menuItem.rawValue,
+                accessibilityIdentifier,
+                title,
+                title + ", ",
+                title + " ("
+            )
+        ).firstMatch
+    }
+
+    @discardableResult
+    private func requiredMenuButton(
+        _ accessibilityIdentifier: String,
+        title: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let menuItem = menuButton(accessibilityIdentifier, title: title, in: app)
+        let appeared = menuItem.waitForExistence(timeout: 10)
+        if !appeared {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name =
+                "Accessibility hierarchy – missing menu item \(accessibilityIdentifier)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(
+            appeared,
+            "Expected menu item \(accessibilityIdentifier) titled \(title)",
+            file: file,
+            line: line
+        )
+        return menuItem
+    }
+
     private func unresolvedAnalyzeMenuItem(
         _ accessibilityIdentifier: String,
         catalystTitle: String,
@@ -182,9 +231,7 @@ final class SurroundUITests: SurroundUITestCase {
             )
         ).firstMatch
         #else
-        return app.buttons
-            .matching(identifier: accessibilityIdentifier)
-            .firstMatch
+        return menuButton(accessibilityIdentifier, title: catalystTitle, in: app)
         #endif
     }
 
@@ -384,7 +431,6 @@ final class SurroundUITests: SurroundUITestCase {
             file: file,
             line: line
         )
-        #if targetEnvironment(macCatalyst)
         tap(
             analyzeMenuItem(
                 accessibilityIdentifier,
@@ -398,15 +444,6 @@ final class SurroundUITests: SurroundUITestCase {
             file: file,
             line: line
         )
-        #else
-        tap(
-            accessibilityIdentifier,
-            in: app,
-            matching: .button,
-            file: file,
-            line: line
-        )
-        #endif
     }
 
     private func tap(
@@ -2331,8 +2368,9 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameActionsMenu,
             in: app
         )
-        element(
+        requiredMenuButton(
             SurroundUITestContract.AccessibilityID.gameResign,
+            title: "Resign",
             in: app
         )
     }
@@ -4864,23 +4902,20 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.gameActionsMenu,
             in: app
         )
-        element(
+        let next = requiredMenuButton(
             SurroundUITestContract.AccessibilityID.gameNext,
+            title: "Next",
             in: app
         )
         XCTAssertFalse(
-            app.descendants(matching: .any)
-                .matching(
-                    identifier: SurroundUITestContract.AccessibilityID.gameResign
-                )
-                .firstMatch
-                .exists,
+            menuButton(
+                SurroundUITestContract.AccessibilityID.gameResign,
+                title: "Resign",
+                in: app
+            ).exists,
             "Finished game actions should not offer Resign."
         )
-        tap(
-            SurroundUITestContract.AccessibilityID.gameNext,
-            in: app
-        )
+        tap(next, description: "Next", in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameDetail(
                 SurroundUITestContract.screenshotNextGameID
