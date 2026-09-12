@@ -565,7 +565,18 @@ struct HomeView: View {
         return true
         #endif
     }
-        
+
+    private var displayModePickerToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
+                Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
+                Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
+            }
+            .fixedSize()
+            .pickerStyle(SegmentedPickerStyle())
+        }
+    }
+
     var body: some View {
         return VStack {
             if ogs.isLoggedIn {
@@ -583,14 +594,11 @@ struct HomeView: View {
                         }
                     }
                 }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
-                        Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
-                        Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
-                    }
-                    .fixedSize()
-                    .pickerStyle(SegmentedPickerStyle())
-                    
+                if #available(iOS 26.0, *) {
+                    // The segmented picker already provides its own background.
+                    displayModePickerToolbarItem.sharedBackgroundVisibility(.hidden)
+                } else {
+                    displayModePickerToolbarItem
                 }
             }
         }
