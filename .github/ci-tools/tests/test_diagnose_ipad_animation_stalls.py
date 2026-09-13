@@ -64,6 +64,17 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(detector.feed(diagnostics.WARNING, 2)["reason"], "missing-animation-completion")
         self.assertIsNone(detector.feed(diagnostics.WARNING, 3))
 
+    def test_warning_captures_without_share_but_long_idle_still_needs_arming(self):
+        detector = diagnostics.StallDetector(15)
+        self.assertIsNone(detector.feed(diagnostics.WARNING, 0))
+        detector.feed(START, 1)
+        detector.feed(IDLE, 2)
+        self.assertIsNone(detector.check(30))
+        trigger = detector.feed(
+            "    t =    62.00s " + diagnostics.WARNING + ", will attempt to continue.", 62)
+        self.assertEqual(trigger["reason"], "missing-animation-completion")
+        self.assertIsNone(trigger["armSource"])
+
     def test_process_selection_uses_exact_jobs_and_rejects_ambiguity(self):
         text = ("11 0 UIKitApplication:com.honganhkhoa.Surround[abc][rb-legacy]\n"
                 "22 0 UIKitApplication:com.honganhkhoa.SurroundUITests.xctrunner[def]\n"
@@ -73,6 +84,55 @@ class DetectorTests(unittest.TestCase):
                          {"app": 11, "runner": 22})
         with self.assertRaisesRegex(ValueError, "Multiple matching app"):
             diagnostics.simulator_pids(text + "55 0 UIKitApplication:com.honganhkhoa.Surround[duplicate]\n")
+
+
+XCT = "[com.apple.dt.xctest:Default]"
+
+
+class AnimationIdleSummaryTests(unittest.TestCase):
+    def write(self, directory, name, lines):
+        path = Path(directory) / name
+        path.write_text("\n".join(lines) + "\n")
+        return path
+
+    def test_pairs_requests_per_process_and_reports_unanswered_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = self.write(directory, "simulator.log", [
+                "2026-09-13 17:44:20.000 Df Surround[100:1a] " + XCT + " Received request to notify when animations are idle",
+                "2026-09-13 17:44:20.200 Df Surround[200:2b] " + XCT + " Received request to notify when animations are idle",
+                "2026-09-13 17:44:20.300 Df Surround[100:1a] " + XCT + " Sending animations idle reply with error: (null)",
+                "2026-09-13 17:44:26.083 Df Surround[200:2b] [com.apple.UIKit:UIInputLayoutItem] Running state transition with normal animations",
+                "2026-09-13 17:44:26.100 Df Surround[200:2b] " + XCT + " Sending animations idle reply with error: (null)",
+                "2026-09-13 17:44:26.200 Df Surround[200:2b] [com.apple.TextInputUI:KeyboardTrackingCoordinator] Posted notification willHide with {",
+                "2026-09-13 17:44:26.255 Df Surround[200:2b] " + XCT + " Received request to notify when animations are idle",
+                "2026-09-13 17:44:26.521 Df Surround[200:2b] [com.apple.UIKit:UIInputLayoutItem] Finished state transition finalState:1",
+                "2026-09-13 17:45:26.719 Df Surround[200:2b] " + XCT + " Received request to fetch matches for query",
+                "SurroundAnimationCollectorPID=42",
+            ])
+            console = self.write(directory, "console.log", ["t = 64.00s " + diagnostics.WARNING + ", will attempt to continue."])
+            summary = diagnostics.summarize_animation_idle(log, console)
+        self.assertEqual((summary["requests"], summary["replies"], summary["repliesWithError"]), (3, 2, 0))
+        self.assertEqual(summary["consoleAnimationCompletionWarnings"], 1)
+        [stall] = summary["unanswered"]
+        self.assertEqual((stall["pid"], stall["requestedAt"]), (200, "2026-09-13 17:44:26.255"))
+        self.assertEqual(stall["secondsUntilNextXCTestActivity"], 60.464)
+        self.assertEqual(len(stall["precedingInputTransitions"]), 2)
+        self.assertIn("willHide", stall["precedingInputTransitions"][-1])
+
+    def test_reply_errors_open_requests_and_missing_logs_do_not_raise(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = self.write(directory, "simulator.log", [
+                "2026-09-13 17:44:20.000 Df Surround[300:3c] " + XCT + " Sending animations idle reply with error: Error Domain=XCTest Code=1",
+                "2026-09-13 17:44:21.000 Df Surround[300:3c] " + XCT + " Received request to notify when animations are idle",
+            ])
+            summary = diagnostics.summarize_animation_idle(log, Path(directory) / "missing-console.log")
+            missing = diagnostics.summarize_animation_idle(
+                Path(directory) / "missing.log", Path(directory) / "missing-console.log")
+        self.assertEqual((summary["replies"], summary["repliesWithError"]), (1, 1))
+        self.assertIsNone(summary["unanswered"][0]["secondsUntilNextXCTestActivity"])
+        self.assertIn("consoleError", summary)
+        self.assertIn("error", missing)
+        self.assertEqual(missing["unanswered"], [])
 
 
 FAKE_TOOL = r'''#!/usr/bin/env python3
@@ -154,6 +214,7 @@ class WrapperSubprocessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 65)
         self.assertEqual(status["commandExitCode"], 65)
         self.assertIsNone(status["capture"])
+        self.assertEqual((status["animationIdle"]["requests"], status["animationIdle"]["unanswered"]), (0, []))
         self.assertFalse(any(c[0] == "sample" for c in calls))
 
     def test_chunked_lines_long_wait_and_warning_capture_once_without_pausing_command(self):
@@ -232,6 +293,7 @@ class WrapperSubprocessTests(unittest.TestCase):
             self.assertEqual(diagnostics.run(args), 7)
         status = json.loads((self.output / "status.json").read_text())
         self.assertEqual(status["simulatorLog"]["error"], "synthetic log crash")
+        self.assertIn("error", status["animationIdle"])
 
 
 if __name__ == "__main__":

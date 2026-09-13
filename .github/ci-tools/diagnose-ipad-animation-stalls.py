@@ -8,6 +8,7 @@ diagnosis of an application deadlock. Python 3.9+; macOS sample, ps and xcrun.
 
 import argparse
 import concurrent.futures
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,77 @@ LOG_PREDICATE = (
     'OR eventMessage CONTAINS[c] "completion" '
     'OR eventMessage CONTAINS[c] "idle")'
 )
+LOG_LINE = re.compile(
+    r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+)\s+\S+\s+(\S+?)\[(\d+):[0-9a-fA-F]+\]\s+"
+    r"(?:\[([^\]]+)\]\s+)?(.*)$"
+)
+IDLE_REQUEST = "Received request to notify when animations are idle"
+IDLE_REPLY = "Sending animations idle reply"
+INPUT_TRANSITION = re.compile(r"state transition|Posted notification (?:will|did)(?:Show|Hide)|[Mm]enu")
+
+
+def summarize_animation_idle(simulator_log, console_log):
+    """Pair XCTest's in-app animation-idle requests with replies, per app process.
+
+    An unanswered request is what XCTest later reports as a missing animation
+    completion. Reads the collected logs only; never touches the simulator.
+    """
+    summary = {"requests": 0, "replies": 0, "repliesWithError": 0, "unanswered": [],
+               "consoleAnimationCompletionWarnings": None}
+    try:
+        summary["consoleAnimationCompletionWarnings"] = sum(
+            WARNING in line for line in Path(console_log).read_text(errors="replace").splitlines())
+    except OSError as error:
+        summary["consoleError"] = str(error)
+    try:
+        lines = Path(simulator_log).read_text(errors="replace").splitlines()
+    except OSError as error:
+        summary["error"] = str(error)
+        return summary
+
+    events = []
+    for line in lines:
+        match = LOG_LINE.match(line)
+        if match:
+            stamp, process, pid, category, message = match.groups()
+            events.append((stamp, process, int(pid), category or "", message))
+
+    def elapsed(later, earlier):
+        form = "%Y-%m-%d %H:%M:%S.%f"
+        return round((datetime.strptime(later, form) - datetime.strptime(earlier, form)).total_seconds(), 3)
+
+    pending, transitions, unanswered = {}, {}, []
+    for index, (stamp, process, pid, category, message) in enumerate(events):
+        if process != "Surround":
+            continue
+        if ("UIKit" in category or "TextInputUI" in category) and INPUT_TRANSITION.search(message):
+            transitions[pid] = (transitions.get(pid, []) + [stamp + " " + message[:120]])[-3:]
+        if not category.startswith("com.apple.dt.xctest"):
+            continue
+        if message.startswith(IDLE_REQUEST):
+            summary["requests"] += 1
+            if pid in pending:
+                unanswered.append(pending[pid])
+            pending[pid] = (index, stamp, pid, list(transitions.get(pid, [])))
+        elif message.startswith(IDLE_REPLY):
+            summary["replies"] += 1
+            if "error: (null)" not in message:
+                summary["repliesWithError"] += 1
+            pending.pop(pid, None)
+    unanswered.extend(pending.values())
+
+    for index, stamp, pid, preceding in sorted(unanswered):
+        following = next((event for event in events[index + 1:]
+                          if event[2] == pid and event[3].startswith("com.apple.dt.xctest")), None)
+        summary["unanswered"].append({
+            "requestedAt": stamp,
+            "pid": pid,
+            "precedingInputTransitions": preceding,
+            # Roughly XCTest's 60-second allowance when the reply never came; None
+            # when the log ended first, for example because the app was terminated.
+            "secondsUntilNextXCTestActivity": elapsed(following[0], stamp) if following else None,
+        })
+    return summary
 
 
 class StallDetector:
@@ -65,10 +137,15 @@ class StallDetector:
             r'Tap "game\.analyze\.share"(?:\s|$)', description
         )):
             self.arm_source = line.strip()
-        if not self.arm_source:
-            return None
+        # The missing completion notification is the stall signature itself,
+        # and a stall can begin without any Share action (compact chat's board
+        # toggle, for one). Capture it in any test. Only the shorter idle-wait
+        # threshold needs Share arming, so an ordinary slow wait elsewhere
+        # cannot spend the run's single capture.
         if WARNING in line:
             return self._fire("missing-animation-completion", now)
+        if not self.arm_source:
+            return None
         if description == IDLE:
             # Duplicate reports are not proof that the UI made progress.
             if self.wait_since is None:
@@ -358,6 +435,15 @@ def run(args):
         status["signal"] = interrupted
         code = status["commandExitCode"]
         status["exitCode"] = 128 + interrupted if interrupted else (128 - code if code is not None and code < 0 else code)
+        try:
+            status["animationIdle"] = summarize_animation_idle(output / "simulator.log", output / "console.log")
+        except Exception as error:  # A summary failure must never mask the wrapped exit status.
+            status["animationIdle"] = {"error": str(error)}
+        idle = status["animationIdle"]
+        if "requests" in idle:
+            print("[SurroundAnimation] Animation-idle requests={} replies={} unanswered={} consoleWarnings={}".format(
+                idle["requests"], idle["replies"], len(idle["unanswered"]),
+                idle["consoleAnimationCompletionWarnings"]), file=sys.stderr, flush=True)
         (output / "status.json").write_text(json.dumps(status, indent=2) + "\n")
     return status["exitCode"] if status["exitCode"] is not None else 1
 
