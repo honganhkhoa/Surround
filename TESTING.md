@@ -94,6 +94,8 @@ Use a dedicated simulator when comparing traces, and record its runtime, Xcode v
 
 The iPhone and iPad app, widget, and notification extensions support iOS 18.0. The Mac Catalyst app and its embedded widget continue to require macOS 26. The project expresses the latter as an SDK-qualified iPhone deployment-target override, so validate the generated bundle metadata instead of adding a manual Info.plist key.
 
+Both test bundles carry the same SDK-qualified override. The `Surround` scheme's test action builds every testable for whichever destination is selected, and `-only-testing` narrows what runs rather than what builds, so a Mac Catalyst destination always compiles `SurroundTests` and `SurroundUITests` against the macOS 26 `Surround` module. Without the override those targets compile for iOS 18.0 and the build fails with `compiling for iOS 18.0, but module 'Surround' has a minimum deployment target of iOS 26.0`. Marking a test target as unsupported on Mac Catalyst does not exclude it: the scheme still builds it, against the iOS SDK, where it then fails to resolve the `Surround` module. Keep the override on both test targets.
+
 Build both iOS configurations into a new derived-data directory:
 
 ```sh
@@ -395,6 +397,8 @@ xcodebuild test \
   -destination 'platform=macOS,variant=Mac Catalyst,name=My Mac' \
   -only-testing:SurroundUITests
 ```
+
+`-only-testing` selects which tests run, not which targets build, so this command also compiles `SurroundTests`; both test targets therefore need the Catalyst deployment-target override described under [Deployment target validation](#deployment-target-validation).
 
 Hosted CI remains compile-only for Catalyst. The deterministic Catalyst UI journeys are run locally on an unlocked Mac.
 
