@@ -4670,6 +4670,105 @@ final class SurroundUITests: SurroundUITestCase {
         }
     }
 
+    func testAnalyzeBoardQuickTaps() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        let baseline = "position:46:fl"
+        let placed = "variation:46:jj"
+        XCTAssertTrue(waitForValue(baseline, in: board, timeout: 10))
+
+        // The accessibility text is centered on the empty K10 intersection;
+        // its intrinsic frame does not describe the board's outer bounds.
+        let center = board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        )
+        center.tap()
+        XCTAssertTrue(
+            waitForValue(placed, in: board, timeout: 5),
+            "A quick tap must place a stone without requiring a hold."
+        )
+
+        center.tap()
+        XCTAssertEqual(
+            board.value as? String,
+            placed,
+            "Tapping the occupied intersection must not create another move."
+        )
+
+        tap(
+            SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+            in: app,
+            matching: .button
+        )
+        XCTAssertTrue(waitForValue(baseline, in: board, timeout: 5))
+        board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).press(forDuration: 0.01)
+        XCTAssertTrue(
+            waitForValue(placed, in: board, timeout: 5),
+            "A brief press must select the same point again after Previous."
+        )
+    }
+
+    func testAnalyzeBoardDragOutsideCancels() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let board = element(
+            SurroundUITestContract.AccessibilityID.gameBoard,
+            in: app
+        )
+        let controlBar = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
+            in: app
+        )
+        let baseline = "position:46:fl"
+        XCTAssertTrue(waitForValue(baseline, in: board, timeout: 10))
+
+        let center = board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        )
+        let appFrame = app.frame
+        let controlBarFrame = controlBar.frame
+        let outsidePoint = CGPoint(
+            x: controlBarFrame.midX,
+            y: controlBarFrame.midY
+        )
+        XCTAssertTrue(controlBarFrame.width > 0 && controlBarFrame.height > 0)
+        XCTAssertTrue(appFrame.contains(outsidePoint))
+        // The Analyze toolbar is outside the board in either layout. Use its
+        // center through app coordinates rather than the board text's width.
+        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(
+                dx: outsidePoint.x - appFrame.minX,
+                dy: outsidePoint.y - appFrame.minY
+            )
+        )
+        center.press(forDuration: 0.1, thenDragTo: outside)
+        XCTAssertEqual(
+            board.value as? String,
+            baseline,
+            "Releasing outside the board must cancel the hovered move."
+        )
+
+        board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
+        XCTAssertTrue(
+            waitForValue("variation:46:jj", in: board, timeout: 5),
+            "A cancelled drag must leave the board ready for a quick tap."
+        )
+    }
+
     func testAnalyzeBoardMarkerMenuPlacesAndTogglesSequentialLetters() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,

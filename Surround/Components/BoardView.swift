@@ -32,7 +32,7 @@ struct Goban: View {
     @Binding var highlightedColumn: Int
     var hoveredPoint: Binding<[Int]?> = .constant(nil)
     var isHoveredPointValid: Bool? = nil
-    var selectedPoint: Binding<[Int]?> = .constant(nil)
+    var selectPoint: ([Int]?) -> Bool = { _ in false }
     #if MAIN_APP
     @State var selectionFeedbackGenerator: UISelectionFeedbackGenerator? = nil
     #endif
@@ -123,7 +123,7 @@ struct Goban: View {
                             .makeSelectionFeedbackGenerator()
                     }
                     #endif
-                    selectedPoint.wrappedValue = nil
+                    _ = selectPoint(nil)
                     highlightedRow = Int((value.location.y / size - 0.5).rounded())
                     highlightedColumn = Int((value.location.x / size - 0.5).rounded())
                     if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
@@ -137,27 +137,21 @@ struct Goban: View {
                         hoveredPoint.wrappedValue = nil
                     }
                 })
-                .onEnded { _ in
+                .onEnded { value in
+                    let row = Int((value.location.y / size - 0.5).rounded())
+                    let column = Int((value.location.x / size - 0.5).rounded())
+                    let point = row >= 0 && row < height && column >= 0 && column < width
+                        ? [row, column] : nil
+                    // A quick tap can end before hover validation is rendered.
+                    // Commit the release point directly instead of consulting that state.
+                    let didSelectPoint = selectPoint(point)
                     highlightedRow = -1
                     highlightedColumn = -1
-                    if isHoveredPointValid ?? false {
-                        if let hoveredPoint = hoveredPoint.wrappedValue {
-                            selectedPoint.wrappedValue = hoveredPoint
-                            #if MAIN_APP
-                            if self.hapticsFeedbback {
-                                SystemPlatformServices.shared.playNotificationFeedback(.success)
-                            }
-                            #endif
-                        } else {
-                            #if MAIN_APP
-                            if self.hapticsFeedbback {
-                                SystemPlatformServices.shared.playNotificationFeedback(.warning)
-                            }
-                            #endif
-                        }
-                    }
                     hoveredPoint.wrappedValue = nil
                     #if MAIN_APP
+                    if didSelectPoint && self.hapticsFeedbback {
+                        SystemPlatformServices.shared.playNotificationFeedback(.success)
+                    }
                     self.selectionFeedbackGenerator = nil
                     #endif
                 }
@@ -731,7 +725,6 @@ struct BoardView: View {
     var allowsSelfCapture: Bool = false
     @State var hoveredPoint: [Int]? = nil
     @State var isHoveredPointValid: Bool? = nil
-    @State var selectedPoint: [Int]? = nil
     @State var highlightedRow = -1
     @State var highlightedColumn = -1
     var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
@@ -741,6 +734,22 @@ struct BoardView: View {
     var boardTool: Binding<AnalyzeBoardTool> = .constant(.moves)
     var markups: Binding<BoardMarkups> = .constant([:])
     
+    private func selectPoint(_ point: [Int]?) -> Bool {
+        guard let point,
+              let position = try? boardPosition.makeMove(
+                move: .placeStone(point[0], point[1]),
+                allowsSelfCapture: allowsSelfCapture
+              ) else {
+            newMove.wrappedValue = nil
+            newPosition.wrappedValue = nil
+            return false
+        }
+        // Consumers observe newMove, so publish its matching position first.
+        newPosition.wrappedValue = position
+        newMove.wrappedValue = .placeStone(point[0], point[1])
+        return true
+    }
+
     var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
             newPosition.wrappedValue! : boardPosition
@@ -757,7 +766,7 @@ struct BoardView: View {
                     highlightedColumn: $highlightedColumn,
                     hoveredPoint: $hoveredPoint,
                     isHoveredPointValid: isHoveredPointValid,
-                    selectedPoint: $selectedPoint
+                    selectPoint: selectPoint
                 )
                 .allowsHitTesting(
                     playable
@@ -773,13 +782,6 @@ struct BoardView: View {
                         } catch {
                             isHoveredPointValid = false
                         }
-                    }
-                }
-                .onChange(of: selectedPoint) { _, value in
-                    if let selectedPoint = value {
-                        newMove.wrappedValue = .placeStone(selectedPoint[0], selectedPoint[1])
-                    } else {
-                        newMove.wrappedValue = nil
                     }
                 }
                 Stones(
@@ -845,7 +847,6 @@ struct BoardView: View {
         }
         .onChange(of: boardTool.wrappedValue) { _, _ in
             hoveredPoint = nil
-            selectedPoint = nil
             isHoveredPointValid = nil
             newMove.wrappedValue = nil
             newPosition.wrappedValue = nil
