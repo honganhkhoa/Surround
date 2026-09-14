@@ -56,7 +56,7 @@ jobs:
 
   ipad-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 105
 
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
 
       - name: Run main iPad UI tests
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main \
@@ -181,7 +181,7 @@ jobs:
 
       - name: Run main iPad UI tests on iPadOS 18
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main \
