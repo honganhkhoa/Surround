@@ -869,6 +869,13 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.4))
         }
         XCTAssertTrue(topAnchor.isHittable, "Expected to return to the top of the home screen.")
+        // iOS 27 can report the anchor as hittable while the last swipe is
+        // still settling beneath the navigation bar. Finish returning to the
+        // scroll boundary before capturing the first active game's full row.
+        for _ in 0..<2 {
+            app.swipeDown(velocity: .slow)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 1))
+        }
     }
 
     private func capture(_ name: String, in app: XCUIApplication) {
