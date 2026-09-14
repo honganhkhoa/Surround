@@ -9,7 +9,7 @@ readonly test_identifier="SurroundUITests/AppStoreScreenshotTests/testAppStoreSc
 readonly app_bundle_identifier="com.honganhkhoa.Surround"
 readonly widget_bundle_identifier="com.honganhkhoa.Surround.SurroundWidgets"
 readonly widget_kind_identifier="com.honganhkhoa.Surround.CorrespondenceWidget"
-readonly default_app_store_ios_runtime="com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+readonly default_app_store_ios_runtime="com.apple.CoreSimulator.SimRuntime.iOS-27-0"
 readonly widget_fixture_cleanup_launch_argument="--clear-app-store-screenshot-widget-fixture"
 readonly status_bar_offset="$(
   date -j -f "%Y-%m-%d %H:%M:%S" "2007-01-09 09:41:00" "+%z"
@@ -106,7 +106,7 @@ Environment overrides:
   APP_STORE_IPAD_DEVICE    Exact name of an available 13-inch-bucket iPad
                            simulator to use as the disposable device template.
   APP_STORE_IOS_RUNTIME    Exact identifier, version, or name of an available
-                           iOS runtime. Defaults to the pinned iOS 26.5 App
+                           iOS runtime. Defaults to the pinned iOS 27.0 App
                            Store submission runtime. Override deliberately
                            when updating the submission runtime.
 

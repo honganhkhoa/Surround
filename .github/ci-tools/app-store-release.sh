@@ -61,7 +61,7 @@ Authentication for both prepare and publish modes:
   ASC_PRIVATE_KEY_PATH
 
 Screenshot runtime for prepare (not prepare-metadata-only):
-  Captures default to the checked-in iOS 26.5 submission runtime. Set
+  Captures default to the checked-in iOS 27.0 submission runtime. Set
   APP_STORE_IOS_RUNTIME only when deliberately changing that runtime.
 
 The private key and unpublished release package must remain outside this

@@ -156,7 +156,7 @@ done
 
 The `AppStoreScreenshots` scheme and test plan capture submission-ready, localized screenshots from deterministic offline fixtures without contacting OGS.
 
-Run the complete matrix from the repository root with Xcode 26 or newer, the pinned iOS 26.5 simulator runtime unless deliberately overridden, `jq`, `plutil`, `uuidgen`, Swift, and `sips`:
+Run the complete matrix from the repository root with Xcode 27 or newer, the pinned iOS 27.0 simulator runtime unless deliberately overridden, `jq`, `plutil`, `uuidgen`, Swift, and `sips`:
 
 ```sh
 output_path="/private/tmp/Surround-AppStore-$(date +%Y%m%d-%H%M%S)"
@@ -177,7 +177,7 @@ output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
 
 The output path must not already exist. Reusable build products default to the gitignored `.build/AppStoreScreenshotDerivedData` directory; pass `--derived-data` only to put that cache elsewhere. The runner:
 
-- uses the pinned iOS 26.5 runtime by default and fails if it is unavailable unless `APP_STORE_IOS_RUNTIME` deliberately selects another installed runtime;
+- uses the pinned iOS 27.0 runtime by default and fails if it is unavailable unless `APP_STORE_IOS_RUNTIME` deliberately selects another installed runtime;
 - selects an accepted 6.9-inch iPhone and 13-inch iPad from that runtime as device-type templates without booting or modifying them, then creates fresh disposable simulators for capture;
 - pins the status bar for repeatable output;
 - runs the selected test-plan configurations (`en-US`, `fr-FR`, `de-DE`, `ja-JP`, `vi-VN`, `th-TH`, `zh-Hans-CN`, `zh-Hant-TW`, `ko-KR`, `es-ES`, `es-MX`, `pt-BR`, and `pt-PT` by default);
@@ -190,7 +190,7 @@ The output path must not already exist. Reusable build products default to the g
 
 The complete thirteen-locale run produces 260 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. The capture command remains useful on its own; the reviewed App Store Connect publishing workflow below invokes it automatically.
 
-To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 26.5 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
+To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 27.0 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
 
 ### Scene-refresh
 
