@@ -1287,6 +1287,12 @@ final class SurroundUITests: SurroundUITestCase {
         )
     }
 
+    // Deadlines, not sleeps: each wait returns as soon as its condition holds.
+    // On hosted runners a single accessibility query can hang for about nine
+    // seconds before XCTest retries it, which used up the old 5- and 10-second
+    // windows while the app had already reached the expected state.
+    private let stateSettleTimeout: TimeInterval = 30
+
     private func waitForValue(
         _ value: String,
         in textField: XCUIElement,
@@ -1308,7 +1314,7 @@ final class SurroundUITests: SurroundUITestCase {
     ) {
         let toggle = element(identifier, in: app, file: file, line: line)
         XCTAssertTrue(
-            waitForValue(isOn ? "1" : "0", in: toggle, timeout: 5),
+            waitForValue(isOn ? "1" : "0", in: toggle, timeout: stateSettleTimeout),
             "Expected \(identifier) to be \(isOn ? "on" : "off")",
             file: file,
             line: line
@@ -1637,7 +1643,7 @@ final class SurroundUITests: SurroundUITestCase {
             object: presentedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [dismissed], timeout: 10), .completed,
+            XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed,
             "Expected the popover or menu to dismiss."
         )
         // Menu disappearance alone would also pass after an accidental tap on
@@ -4929,7 +4935,7 @@ final class SurroundUITests: SurroundUITestCase {
                     sharingPreviewGone,
                     sharingCancelGone,
                 ],
-                timeout: 10
+                timeout: stateSettleTimeout
             ),
             .completed,
             "Expected Cancel to dismiss the variation-sharing composer."
