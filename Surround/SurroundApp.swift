@@ -66,15 +66,20 @@ struct SurroundApp: App {
             )
             .background(CatalystWindowResizeConfigurator())
             #endif
-            .preferredColorScheme(
-                (
-                    SurroundUITestContract.isCapturingAppStoreScreenshots
-                        || SurroundUITestContract
-                            .isCapturingCompatibilityScreenshots
-                )
-                    ? .light
-                    : nil
-            )
+            .preferredColorScheme(fixtureColorScheme)
+    }
+
+    private var fixtureColorScheme: ColorScheme? {
+        #if DEBUG && MAIN_APP
+        if let appearance = SurroundUITestContract.appearanceOverride {
+            return appearance == .dark ? .dark : .light
+        }
+        #endif
+        if SurroundUITestContract.isCapturingAppStoreScreenshots
+            || SurroundUITestContract.isCapturingCompatibilityScreenshots {
+            return .light
+        }
+        return nil
     }
 }
 

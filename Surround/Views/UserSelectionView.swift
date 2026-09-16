@@ -47,6 +47,7 @@ struct SearchBar: UIViewRepresentable {
         searchBar.placeholder = placeholder
         searchBar.delegate = context.coordinator
         searchBar.autocapitalizationType = .none
+        searchBar.searchTextField.accessibilityIdentifier = SurroundUITestContract.AccessibilityID.opponentSearch
         return searchBar
     }
 
@@ -57,42 +58,76 @@ struct SearchBar: UIViewRepresentable {
 
 struct UserSelectionView: View {
     @EnvironmentObject var ogs: OGSService
-    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var navigation: StackRouter
     
     var user: Binding<OGSUser?> = .constant(nil)
+    var selection: OpponentSelection? = nil
     @State var searchText = ""
     @State var searchResultByKeyword = [String: [OGSUser]]()
     @State var searchRequestByKeyword = [String: AnyCancellable]()
+    @State private var rootSelection: RootOpponentSelection?
+
+    private var currentSelection: OpponentSelection? { selection ?? rootSelection?.selection }
+    private var selectedUser: OGSUser? { currentSelection?.selectedUser() ?? user.wrappedValue }
     
     func selectUser(_ user: OGSUser) {
-        if user.id != ogs.user?.id {
-            self.user.wrappedValue = user
-            dismiss()
+        if let selection = currentSelection {
+            navigation.selectOpponent(user, selectionID: selection.id, viewerID: ogs.user?.id)
         }
     }
     
     func userRow(_ user: OGSUser) -> some View {
-        Button(action: { self.selectUser(user) }) {
-            HStack {
-                if let iconURL = user.iconURL(ofSize: 64) {
-                    URLImage(url: iconURL) { $0.resizable() }
-                        .frame(width: 64, height: 64)
-                        .background(Color.gray)
-                        .cornerRadius(10)
-                }
-                VStack(alignment: .leading) {
-                    Text(verbatim: user.username).bold()
-                    if !Setting(.hidesRank).wrappedValue {
-                        Text(verbatim: "[\(user.formattedRank)]").font(.subheadline)
+        HStack(spacing: 0) {
+            Button(action: { self.selectUser(user) }) {
+                HStack {
+                    if let iconURL = user.iconURL(ofSize: 64) {
+                        URLImage(url: iconURL) { $0.resizable() }
+                            .frame(width: 64, height: 64)
+                            .background(Color.gray)
+                            .cornerRadius(10)
+                    }
+                    VStack(alignment: .leading) {
+                        Text(verbatim: user.username).bold()
+                        if !Setting(.hidesRank).wrappedValue {
+                            Text(verbatim: "[\(user.formattedRank)]").font(.subheadline)
+                        }
+                    }
+                    .foregroundColor(user.uiColor)
+                    Spacer()
+                    if user.id == selectedUser?.id {
+                        Image(systemName: "checkmark")
                     }
                 }
-                .foregroundColor(user.uiColor)
-                Spacer()
-                if user.id == self.user.wrappedValue?.id {
-                    Image(systemName: "checkmark")
-                }
+                .padding()
+                .contentShape(Rectangle())
             }
-            .padding()
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(
+                user.id == selectedUser?.id ? .isSelected : []
+            )
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.opponentSelection(user.id))
+
+            if user.id > 0 {
+                Button {
+                    if let selection = currentSelection {
+                        navigation.openProfile(user, selectionID: selection.id)
+                    }
+                } label: {
+                    Image(systemName: "info.circle")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .accessibilityLabel(
+                    Text(
+                        "View \(user.username)’s profile",
+                        comment: "Accessibility label for a button that opens a player's profile"
+                    )
+                )
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profilePickerEntry(user.id))
+                .padding(.trailing, 8)
+            }
         }
     }
     
@@ -154,6 +189,12 @@ struct UserSelectionView: View {
             Spacer()
         }
         .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenOpponentPicker)
+        .onAppear {
+            guard selection == nil else { return }
+            if let rootSelection, navigation.selections[rootSelection.selection.id] != nil { return }
+            rootSelection = navigation.registerRootPicker(user: user)
+        }
         .onChange(of: searchText) { _, keyword in
             if keyword.count > 0 {
                 if searchRequestByKeyword[keyword] == nil {
@@ -181,9 +222,10 @@ struct UserSelectionView: View {
         ranking: 27
     )
 
-    return NavigationStack {
+    return AppNavigationStack {
         UserSelectionView(user: $selectedUser)
     }
+    .environmentObject(NavigationService())
     .environmentObject(
         OGSService.previewInstance(
             friends: [friend]
@@ -199,13 +241,14 @@ struct UserSelectionView: View {
         OGSUser(username: "RinGo", id: 102, ranking: 18)
     ]
 
-    return NavigationStack {
+    return AppNavigationStack {
         UserSelectionView(
             user: $selectedUser,
             searchText: searchText,
             searchResultByKeyword: [searchText: users]
         )
     }
+    .environmentObject(NavigationService())
     .environmentObject(OGSService.previewInstance())
 }
 
@@ -213,25 +256,27 @@ struct UserSelectionView: View {
     @Previewable @State var selectedUser: OGSUser?
     let searchText = "rin"
 
-    return NavigationStack {
+    return AppNavigationStack {
         UserSelectionView(
             user: $selectedUser,
             searchText: searchText,
             searchRequestByKeyword: [searchText: AnyCancellable {}]
         )
     }
+    .environmentObject(NavigationService())
     .environmentObject(OGSService.previewInstance())
 }
 
 #Preview("Opponent selection — No results") {
     @Previewable @State var selectedUser: OGSUser?
 
-    return NavigationStack {
+    return AppNavigationStack {
         UserSelectionView(
             user: $selectedUser,
             searchText: "unknown-player"
         )
     }
+    .environmentObject(NavigationService())
     .environmentObject(OGSService.previewInstance())
 }
 #endif

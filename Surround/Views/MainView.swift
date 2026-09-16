@@ -177,7 +177,7 @@ struct MainView: View {
             }
             .tabViewStyle(.sidebarAdaptable)
             .sheet(isPresented: $nav.main.showWaitingGames) {
-                NavigationStack {
+                AppNavigationStack {
                     WaitingGamesView()
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {

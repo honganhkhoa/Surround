@@ -173,6 +173,8 @@ class NavigationService: ObservableObject {
     @Published var publicGames = PublicGamesViewParameter()
     @Published var gameHistory = GameHistoryViewParameters()
     @Published private(set) var pendingGameOpen: PendingGameOpen?
+    @Published private(set) var navigationResetID = UUID()
+    private(set) var preservingActiveGameOnReset: RootView?
 
     static func instance(forSceneWithID sceneID: String) -> NavigationService {
         if let result = instances[sceneID] {
@@ -227,6 +229,12 @@ class NavigationService: ObservableObject {
         )
     }
 
+    /// Home owns the history branch, including a detail removed by multi-level Back.
+    func closeGameHistory() {
+        home.showingGameHistory = false
+        gameHistory.activeGame = nil
+    }
+
     func clearPendingGameOpen(id: UUID? = nil) {
         guard id == nil || pendingGameOpen?.id == id else { return }
         pendingGameOpen = nil
@@ -252,6 +260,11 @@ class NavigationService: ObservableObject {
             publicGames.activeGame = nil
         }
         gameHistory.activeGame = nil
+
+        // Publish after the tracked state is reset so each stack can remove
+        // child destinations even when its existing game remains selected.
+        preservingActiveGameOnReset = rootView
+        navigationResetID = UUID()
     }
     
     #if MAIN_APP
@@ -349,7 +362,7 @@ enum RootView: String, CaseIterable, Identifiable {
     
     @ViewBuilder
     var navigationView : some View {
-        NavigationStack {
+        AppNavigationStack(rootView: self) {
             self.view
         }
     }

@@ -133,6 +133,7 @@ struct PlayersBannerView: View {
     @EnvironmentObject var ogs: OGSService
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     var topLeftPlayerColor = StoneColor.black
     var reducesVerticalPadding = false
     var playerIconSize: CGFloat = 64
@@ -260,7 +261,25 @@ struct PlayersBannerView: View {
     
     @ViewBuilder
     func playerIcon(color: StoneColor) -> some View {
-        if !game.rengo || game.orderedRengoTeam[color]?.count == 1 {
+        if !game.rengo,
+           let player = color == .black ? game.blackPlayer : game.whitePlayer,
+           player.id > 0,
+           let openPlayerProfile {
+            Button {
+                openPlayerProfile(player)
+            } label: {
+                singlePlayerIcon(color: color)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                Text(
+                    "View \(player.username)’s profile",
+                    comment: "Accessibility label for a button that opens a player's profile"
+                )
+            )
+            .accessibilityValue(Text(verbatim: player.usernameAndRank))
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(player.id))
+        } else if !game.rengo || game.orderedRengoTeam[color]?.count == 1 {
             singlePlayerIcon(color: color)
         } else {
             rengoTeamIcon(color: color)
@@ -283,7 +302,25 @@ struct PlayersBannerView: View {
                 EmptyView()
             }
         } else if let player = color == .black ? game.blackPlayer : game.whitePlayer {
-            Text(verbatim: player.usernameAndRank).font(Font.body.bold())
+            if player.id > 0, let openPlayerProfile {
+                Button {
+                    openPlayerProfile(player)
+                } label: {
+                    Text(verbatim: player.usernameAndRank)
+                        .font(Font.body.bold())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    Text(
+                        "View \(player.username)’s profile",
+                        comment: "Accessibility label for a button that opens a player's profile"
+                    )
+                )
+                .accessibilityValue(Text(verbatim: player.usernameAndRank))
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileBannerNameEntry(player.id))
+            } else {
+                Text(verbatim: player.usernameAndRank).font(Font.body.bold())
+            }
         } else {
             EmptyView()
         }

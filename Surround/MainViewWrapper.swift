@@ -240,7 +240,7 @@ private struct CompatibilityScreenshotRootView: View {
             MainView(allowsRemoteActivity: false)
         case .settings:
             if horizontalSizeClass == .compact {
-                NavigationStack {
+                AppNavigationStack {
                     SettingsView()
                 }
             } else {
@@ -248,61 +248,61 @@ private struct CompatibilityScreenshotRootView: View {
             }
         case .about:
             if horizontalSizeClass == .compact {
-                NavigationStack {
+                AppNavigationStack {
                     AboutView()
                 }
             } else {
                 MainView(allowsRemoteActivity: false)
             }
         case .gameHistory:
-            NavigationStack {
+            AppNavigationStack {
                 GameHistoryView()
             }
         case .messageThread:
-            NavigationStack {
+            AppNavigationStack {
                 PrivateMessageLog(peer: messagePeer)
                     .navigationTitle(messagePeer.username)
                     .navigationBarTitleDisplayMode(.inline)
             }
         case .thanks:
-            NavigationStack {
+            AppNavigationStack {
                 ThanksView()
             }
         case .supporter:
-            NavigationStack {
+            AppNavigationStack {
                 SupporterView()
             }
         case .unsupportedGoogle:
-            NavigationStack {
+            AppNavigationStack {
                 UnsupportedGoogleLoginView()
             }
         case .activeGameBoard:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(currentGame: .constant(primaryGame))
             }
         case .gameAnalysis:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(primaryGame),
                     analyzeMode: true
                 )
             }
         case .zenMode:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(primaryGame),
                     zenMode: true
                 )
             }
         case .gameOptions:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(primaryGame),
                     showSettings: true
                 )
             }
         case .finishedGamePlayback:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(finishedGame),
                     allowsActiveGamesCarousel: false,
@@ -310,7 +310,7 @@ private struct CompatibilityScreenshotRootView: View {
                 )
             }
         case .publicGameSpectator:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(publicGame),
                     allowsActiveGamesCarousel: false
@@ -323,13 +323,13 @@ private struct CompatibilityScreenshotRootView: View {
         case .customGame:
             newGameScene(option: .custom)
         case .opponentPicker:
-            NavigationStack {
+            AppNavigationStack {
                 UserSelectionView(user: $selectedOpponent)
                     .navigationTitle("Select your opponent ")
                     .navigationBarTitleDisplayMode(.inline)
             }
         case .advancedTime:
-            NavigationStack {
+            AppNavigationStack {
                 TimeSystemPickerView(
                     blitzTimeControl: $blitzTimeControl,
                     liveTimeControl: $liveTimeControl,
@@ -340,23 +340,23 @@ private struct CompatibilityScreenshotRootView: View {
                 )
             }
         case .advancedRules:
-            NavigationStack {
+            AppNavigationStack {
                 RulesPickerView(
                     rulesSet: $rulesSet,
                     komi: $komi
                 )
             }
         case .waitingGames:
-            NavigationStack {
+            AppNavigationStack {
                 WaitingGamesView()
             }
         case .preferredSettings:
-            NavigationStack {
+            AppNavigationStack {
                 PreferredSettingsView()
                     .navigationTitle("Preferred Settings")
             }
         case .preferredSettingEditor:
-            NavigationStack {
+            AppNavigationStack {
                 CustomGameForm(
                     initialChallenge: preferredSetting,
                     mode: .editPreferredSetting(original: preferredSetting)
@@ -365,7 +365,7 @@ private struct CompatibilityScreenshotRootView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
         case .gameChat:
-            NavigationStack {
+            AppNavigationStack {
                 GameDetailView(currentGame: .constant(primaryGame))
             }
         }
@@ -374,7 +374,7 @@ private struct CompatibilityScreenshotRootView: View {
     private func newGameScene(
         option: NewGameView.NewGameOption
     ) -> some View {
-        NavigationStack {
+        AppNavigationStack {
             NewGameView(newGameOption: option)
                 .navigationTitle("New game")
                 .navigationBarTitleDisplayMode(.inline)

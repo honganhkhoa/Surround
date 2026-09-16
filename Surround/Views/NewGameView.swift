@@ -196,6 +196,8 @@ struct OpenChallengesForm: View {
 }
 
 struct NewGameView: View {
+    @EnvironmentObject private var stackRouter: StackRouter
+    @StateObject private var customGameDraft = ChallengeDraft()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
@@ -400,7 +402,9 @@ struct NewGameView: View {
                     }
                 )
             } else if newGameOption == .custom {
-                CustomGameForm()
+                CustomGameForm(draft: customGameDraft, onChooseOpponent: {
+                    stackRouter.openOpponentPicker(for: customGameDraft)
+                })
             } else if newGameOption == .openChallenges {
                 OpenChallengesForm(
                     eligibleOpenChallenges: eligibleOpenChallenges
@@ -720,7 +724,7 @@ private func newGamePreview(
 ) -> some View {
     let openChallenge = OGSChallengeSampleData.sampleOpenChallenge
     let rengoChallenge = OGSChallengeSampleData.sampleRengoChallenge
-    return NavigationStack {
+    return AppNavigationStack {
         NewGameView(newGameOption: option)
             .navigationTitle("New game")
             .navigationBarTitleDisplayMode(.inline)

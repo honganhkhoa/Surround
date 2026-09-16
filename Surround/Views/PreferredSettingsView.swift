@@ -11,6 +11,7 @@ import Combine
 struct PreferredSettingsView: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @EnvironmentObject private var stackRouter: StackRouter
     @Environment(\.colorScheme) private var colorScheme
 
     private let preferredSettingsOverride: [OGSChallengeTemplate]?
@@ -18,8 +19,6 @@ struct PreferredSettingsView: View {
     @State var openChallengeCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
     @State var deleteSettingCancellableBySetting: [OGSChallengeTemplate: AnyCancellable] = [:]
     @State var settingBeingEdited: OGSChallengeTemplate?
-    @State var settingSelectingOpponent: OGSChallengeTemplate?
-    @State var selectedOpponent: OGSUser?
     @State var creatingNewPreferredSetting = false
 
     init(
@@ -153,8 +152,8 @@ struct PreferredSettingsView: View {
             if !setting.rengo {
                 Divider()
                 Button(action: {
-                    selectedOpponent = nil
-                    settingSelectingOpponent = setting
+                    let submit = challengeSubmission(for: setting)
+                    stackRouter.openSavedSettingsOpponentPicker { submit($0) }
                 }) {
                     HStack {
                         Text("Select your opponent ")
@@ -173,19 +172,28 @@ struct PreferredSettingsView: View {
     }
 
     private func createChallenge(for setting: OGSChallengeTemplate, opponent: OGSUser?) {
-        guard self.openChallengeCancellableBySetting[setting] == nil else {
-            return
-        }
-        self.openChallengeCancellableBySetting[setting] = ogs.sendChallenge(opponent: opponent, challenge: setting).sink(
-            receiveCompletion: { _ in
-                self.openChallengeCancellableBySetting.removeValue(forKey: setting)
-            },
-            receiveValue: { _ in
-                nav.home.showingPreferredSettings = false
-            }
-        )
+        challengeSubmission(for: setting)(opponent)
     }
-    
+
+    private func challengeSubmission(for setting: OGSChallengeTemplate) -> (OGSUser?) -> Void {
+        // The stack retains this callback while the picker is open. Capture
+        // only its dependencies, avoiding a cycle through this view's router.
+        let service = ogs
+        let appNavigation = nav
+        let requests = $openChallengeCancellableBySetting
+        return { opponent in
+            guard requests.wrappedValue[setting] == nil else { return }
+            requests.wrappedValue[setting] = service.sendChallenge(opponent: opponent, challenge: setting).sink(
+                receiveCompletion: { _ in
+                    requests.wrappedValue.removeValue(forKey: setting)
+                },
+                receiveValue: { _ in
+                    appNavigation.home.showingPreferredSettings = false
+                }
+            )
+        }
+    }
+
     var body: some View {
         preferredSettingsContent
             .accessibilityIdentifier(
@@ -197,30 +205,9 @@ struct PreferredSettingsView: View {
             .onDisappear {
                 ogs.unsubscribeFromSeekGraphWhenDone()
             }
-            .onChange(of: selectedOpponent) { _, opponent in
-                guard let opponent, let settingSelectingOpponent else {
-                    return
-                }
-                createChallenge(for: settingSelectingOpponent, opponent: opponent)
-                self.settingSelectingOpponent = nil
-                self.selectedOpponent = nil
-            }
             .navigationDestination(isPresented: $creatingNewPreferredSetting) {
                 CustomGameForm(mode: .createPreferredSetting)
                     .navigationTitle("New preferred setting")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .navigationDestination(isPresented: Binding(
-                get: { settingSelectingOpponent != nil },
-                set: { isActive in
-                    if !isActive {
-                        settingSelectingOpponent = nil
-                        selectedOpponent = nil
-                    }
-                }
-            )) {
-                UserSelectionView(user: $selectedOpponent)
-                    .navigationTitle("Select your opponent ")
                     .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(isPresented: Binding(
@@ -275,7 +262,7 @@ private func preferredSettingsPreview(
 ) -> some View {
     let user = OGSUser(username: "honganhkhoa", id: 1526)
     let nav = NavigationService()
-    return NavigationStack {
+    return AppNavigationStack {
         PreferredSettingsView(preferredSettingsOverride: settings)
             .navigationTitle("Preferred settings")
     }

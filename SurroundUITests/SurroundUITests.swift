@@ -1653,6 +1653,430 @@ final class SurroundUITests: SurroundUITestCase {
         }
     }
 
+    private func navigateBackFromPlayerProfile(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let navigationBar = app.navigationBars["Profile"].firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertFalse(app.navigationBars.buttons["Close"].exists,
+                       "Profiles must use stack navigation, without a modal Close action.",
+                       file: file, line: line)
+        XCTAssertFalse(navigationBar.buttons["Close"].exists, file: file, line: line)
+
+        // UIKit exposes BackButton on recent systems; older releases use
+        // the preceding page's title for the first navigation-bar button.
+        let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
+        let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
+        tap(back, description: "Back from profile", in: app, file: file, line: line)
+        let returned = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: navigationBar
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed,
+                       "Back must pop the profile and reveal its originating page.",
+                       file: file, line: line)
+    }
+
+    private func revealCustomGameControl(
+        _ identifier: String,
+        in app: XCUIApplication,
+        matching type: XCUIElement.ElementType = .any
+    ) -> XCUIElement {
+        let control = element(identifier, in: app, matching: type)
+        let scroll = app.scrollViews.containing(.textField, identifier: SurroundUITestContract.AccessibilityID.customGameName).firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        for _ in 0..<12 {
+            let safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
+            if control.isHittable && safeFrame.contains(control.frame) { return control }
+            if control.frame.minY < safeFrame.minY { scroll.swipeDown() }
+            else { scroll.swipeUp() }
+        }
+        XCTAssertTrue(control.isHittable, "Expected form control \(identifier) to be visible.")
+        return control
+    }
+
+    func testOwnProfileFromSettingsOffersAccountActions() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.settings.rawValue,
+        ])
+        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileShare, in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileMessage].exists)
+
+        keepScreenshot("Own profile – loaded from Settings", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+    }
+
+    func testOwnProfileFromMainNavigationUsesLightAppearance() {
+        assertOwnProfileAppearance(.light)
+    }
+
+    func testOwnProfileFromMainNavigationUsesDarkAppearance() {
+        assertOwnProfileAppearance(.dark)
+    }
+
+    private func assertOwnProfileAppearance(_ appearance: SurroundUITestContract.Appearance) {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.appearanceLaunchArgument,
+            appearance.rawValue,
+        ])
+        let homeSettings = app.navigationBars.buttons["Settings"].firstMatch
+        if homeSettings.waitForExistence(timeout: 2) {
+            tap(homeSettings, description: "Home Settings", in: app)
+        } else {
+            // An expanded navigation sidebar replaces the Home toolbar button.
+            tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
+        }
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: 10),
+                      "The profile must resolve the requested appearance, independent of the test host.")
+        keepScreenshot("Own profile – \(appearance.rawValue) appearance", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+    }
+
+    func testGameAnalysisSurvivesTabSwitchesWithAndWithoutProfile() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom == .phone,
+                      "This journey exercises the regular-width analysis controls and tabs.")
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
+        let game = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(
+                SurroundUITestContract.screenshotPrimaryGameID), in: app)
+        scrollIntoTappableArea(game, in: app)
+        tap(game, description: "Open game for analysis", in: app)
+        tap(SurroundUITestContract.AccessibilityID.gameAnalyzeToggle, in: app)
+        tap(SurroundUITestContract.AccessibilityID.gameAnalyzePrevious, in: app)
+        let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        let markerMenu = element(SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu, in: app)
+        tap(markerMenu, description: "Choose analysis tool", in: app)
+        tap(analyzeMenuItem(SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerTool("letters"),
+                            catalystTitle: "Letters", in: app), description: "Letters", in: app)
+        let markerPoint = board.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        #if targetEnvironment(macCatalyst)
+        markerPoint.click()
+        #else
+        markerPoint.tap()
+        #endif
+        let markedBoard = board.value as? String
+        XCTAssertTrue(markedBoard?.contains("|marks:A=") == true)
+
+        func selectTab(_ identifier: String) {
+            let tabs = app.descendants(matching: .any).matching(identifier: identifier)
+            if !tabs.allElementsBoundByIndex.contains(where: { $0.isHittable }) {
+                tap(app.buttons["Toggle sidebar"], description: "Show navigation sidebar", in: app)
+            }
+            var visibleTab: XCUIElement?
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                visibleTab = tabs.allElementsBoundByIndex.first(where: { $0.isHittable })
+                return visibleTab != nil
+            }, object: nil)
+            guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed,
+                  let tab = visibleTab else {
+                return XCTFail("Expected a visible tab: \(identifier)")
+            }
+            tap(tab, description: identifier, in: app)
+        }
+
+        for profileIsOpen in [false, true] {
+            if profileIsOpen {
+                tap(SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(
+                    SurroundUITestContract.profileFixtureOpponentID), in: app, matching: .button)
+                element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+            }
+            selectTab(SurroundUITestContract.AccessibilityID.navigationPublicGames)
+            element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+            selectTab(SurroundUITestContract.AccessibilityID.navigationHome)
+            if profileIsOpen {
+                element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+                navigateBackFromPlayerProfile(in: app)
+            }
+            element(SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar, in: app)
+            XCTAssertEqual(board.value as? String, markedBoard,
+                           "Switching tabs must preserve the retained game's position and markers.")
+            XCTAssertEqual(markerMenu.value as? String, "Letters, Next label: B")
+        }
+    }
+
+    func testProfileActionsPreserveGameAnalysisAndMarkers() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ])
+        let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        let initialBoardValue = board.value as? String
+        tap(SurroundUITestContract.AccessibilityID.gameAnalyzeNext, in: app)
+        XCTAssertNotEqual(board.value as? String, initialBoardValue,
+                          "Use a different position so a fixture reset cannot mimic preservation.")
+        let markerMenu = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerMenu,
+            in: app
+        )
+        tap(markerMenu, description: "Analysis marker menu", in: app)
+        let letters = analyzeMenuItem(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeMarkerTool("letters"),
+            catalystTitle: "Letters",
+            in: app
+        )
+        tap(letters, description: "Letters marker tool", in: app)
+        let markerPoint = board.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        )
+        #if targetEnvironment(macCatalyst)
+        markerPoint.click()
+        #else
+        markerPoint.tap()
+        #endif
+        let markedBoardValue = board.value as? String
+        XCTAssertTrue(markedBoardValue?.contains("|marks:A=") == true)
+
+        let opponentID = SurroundUITestContract.profileFixtureOpponentID
+        #if targetEnvironment(macCatalyst)
+        let profileEntryID = SurroundUITestContract.AccessibilityID
+            .profileBannerAvatarEntry(opponentID)
+        #else
+        // Compact analysis replaces the banner with the move tree; its
+        // opponent title opens the same profile without leaving analysis.
+        let profileEntryID = UIDevice.current.userInterfaceIdiom == .phone
+            ? SurroundUITestContract.AccessibilityID.profileGameTitleEntry(opponentID)
+            : SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(opponentID)
+        #endif
+        tap(
+            profileEntryID,
+            in: app,
+            matching: .button
+        )
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        keepScreenshot("Other profile – opened from analysis", in: app)
+
+        func backToProfile() {
+            let back = app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@", "BackButton", "Profile"
+            )).firstMatch
+            tap(back, description: "Back to profile", in: app)
+            element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        }
+
+        tap(SurroundUITestContract.AccessibilityID.profileChallenge, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
+        XCTAssertTrue(app.staticTexts["CopperKoi"].exists,
+                      "Challenge should preselect the profile's player.")
+        backToProfile()
+
+        tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileConversation, in: app)
+        XCTAssertTrue(app.navigationBars["CopperKoi"].exists,
+                      "Message should open the profile's conversation.")
+        backToProfile()
+        navigateBackFromPlayerProfile(in: app)
+
+        element(SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar, in: app)
+        XCTAssertEqual(board.value as? String, markedBoardValue,
+                       "Profile navigation must preserve the analysis position and markups.")
+        XCTAssertEqual(markerMenu.value as? String, "Letters, Next label: B",
+                       "The selected analysis tool must survive the profile round trip.")
+    }
+
+    func testChatSenderProfilePreservesSelectedChatPreview() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameChat.rawValue,
+        ])
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        let selectedLine = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-1"
+        )
+        let otherLine = SurroundUITestContract.AccessibilityID.gameChatLine(
+            "app-store-chat-2"
+        )
+        #if !targetEnvironment(macCatalyst)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // After dismissing the keyboard, the short compact chat viewport
+            // can retain an unmaterialized first lazy row even at scroll 0%.
+            // Expand chat with its normal control before selecting that row.
+            tap(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app)
+        }
+        #endif
+        tapChatItem(selectedLine, in: app, matching: .button)
+        assertSelected(selectedLine, in: app)
+        let selectedBubble = element(selectedLine, in: app, matching: .button)
+        XCTAssertTrue(selectedBubble.label.contains("JuniperStone"),
+                      "A message must announce its sender independently of the profile button.")
+        XCTAssertTrue(selectedBubble.label.contains("Good luck — have a great game!"))
+        #if !targetEnvironment(macCatalyst)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            tap(SurroundUITestContract.AccessibilityID.gameChatBoardShow, in: app)
+        }
+        #endif
+        let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        let previewValue = board.value as? String
+        XCTAssertNotNil(previewValue)
+
+        tapChatItem(
+            SurroundUITestContract.AccessibilityID.profileChatEntry("app-store-chat-2"),
+            in: app,
+            matching: .button
+        )
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        navigateBackFromPlayerProfile(in: app)
+
+        assertSelected(selectedLine, in: app)
+        assertNotSelected(otherLine, in: app)
+        XCTAssertEqual(board.value as? String, previewValue,
+                       "Opening a sender profile must keep the selected chat preview.")
+    }
+
+    func testPickerProfilePreservesSearchWithoutSelectingOpponent() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.opponentPicker.rawValue,
+        ])
+        let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+        tap(search, description: "Search opponents", in: app)
+        search.typeText("Bamboo\n")
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        let playerID = SurroundUITestContract.profileFixturePickerFriendID
+        let selectionID = SurroundUITestContract.AccessibilityID.opponentSelection(playerID)
+        assertNotSelected(selectionID, in: app)
+        tap(
+            SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID),
+            in: app,
+            matching: .button
+        )
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileSelectOpponent, in: app, matching: .button)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
+        navigateBackFromPlayerProfile(in: app)
+
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        XCTAssertEqual(search.value as? String, "Bamboo")
+        assertNotSelected(selectionID, in: app)
+        tap(selectionID, in: app, matching: .button)
+        assertSelected(selectionID, in: app)
+    }
+
+    func testPickerProfilesSelectDifferentOpponentsWithoutReplacingEditedChallenge() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.customGame.rawValue,
+        ])
+        let draftName = "Profile draft retained"
+        let name = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
+        tap(name, description: "Challenge game name", in: app)
+        let oldName = name.value as? String ?? ""
+        let trailingEdge = name.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+        #if targetEnvironment(macCatalyst)
+        trailingEdge.click()
+        #else
+        trailingEdge.tap()
+        #endif
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldName.count) + draftName + "\n")
+        XCTAssertTrue(waitForValue(draftName, in: name, timeout: 10))
+
+        _ = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameSpeed, in: app, matching: .segmentedControl)
+        selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.customGameSpeed, app: app)
+        _ = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponentMode, in: app, matching: .segmentedControl)
+        selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.customGameOpponentMode, app: app)
+
+        for (query, playerID, username) in [
+            ("Bamboo", 801_001, "BambooPath"),
+            ("Misty", 801_002, "MistyMountain"),
+        ] {
+            let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
+            tap(opponent, description: "Choose draft opponent", in: app)
+            let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+            tap(search, description: "Search draft opponents", in: app)
+            search.typeText(query + "\n")
+            XCTAssertTrue(waitForValue(query, in: search, timeout: 10))
+            tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+            element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+            XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
+            tap(SurroundUITestContract.AccessibilityID.profileSelectOpponent, in: app, matching: .button)
+
+            element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
+            XCTAssertFalse(app.navigationBars["Profile"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.screenOpponentPicker).firstMatch.exists)
+            let selectedOpponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
+            XCTAssertTrue(selectedOpponent.label.contains(username), "The existing draft should use the newly selected opponent.")
+            let preservedName = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
+            XCTAssertEqual(preservedName.value as? String, draftName)
+            let speed = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameSpeed, in: app, matching: .segmentedControl)
+            XCTAssertTrue(speed.buttons.element(boundBy: 1).isSelected,
+                          "Profile selection must retain the draft's correspondence setting.")
+        }
+    }
+
+    func testSavedSettingsProfileBackPreservesPickerWithoutSubmittingChallenge() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.preferredSettings.rawValue,
+        ])
+        // SwiftUI applies the card's identifier to its child buttons.
+        let chooseOpponent = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ AND label == %@",
+            SurroundUITestContract.AccessibilityID.preferredSetting(0), "Select your opponent "
+        )).firstMatch
+        tap(chooseOpponent, description: "Choose saved-setting opponent", in: app)
+        let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+        tap(search, description: "Search saved-setting opponents", in: app)
+        search.typeText("Bamboo\n")
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(801_001), in: app, matching: .button)
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileChallengeWithSettings, in: app, matching: .button)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileSelectOpponent].exists)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
+        navigateBackFromPlayerProfile(in: app)
+
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        XCTAssertEqual(search.value as? String, "Bamboo")
+        assertNotSelected(SurroundUITestContract.AccessibilityID.opponentSelection(801001), in: app)
+        let back = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@", "BackButton", "Preferred Settings"
+        )).firstMatch
+        tap(back, description: "Cancel saved-setting opponent selection", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
+        XCTAssertTrue(chooseOpponent.isEnabled)
+    }
+
+    func testUnavailableProfileCanRetryAndNavigateBack() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.settings.rawValue,
+            SurroundUITestContract.unavailableProfileLaunchArgument,
+        ])
+        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileError, in: app)
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.profileLoaded)
+            .firstMatch.exists)
+        tap(SurroundUITestContract.AccessibilityID.profileRetry, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileError, in: app)
+        keepScreenshot("Profile – unavailable with retry", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,
@@ -2690,12 +3114,23 @@ final class SurroundUITests: SurroundUITestCase {
             in: app
         )
 
-        // Repeating a route produces a fresh request and remains retryable.
+        let playerProfileEntry = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", SurroundUITestContract.AccessibilityID.profileBannerAvatarPrefix
+        )).firstMatch
+        tap(playerProfileEntry, description: "Open player profile above the active game", in: app)
+        let profile = element(SurroundUITestContract.AccessibilityID.screenPlayerProfile, in: app)
+
+        // Repeating the same game route must also remove its profile descendants
+        // even though the active-game presentation flag is already true.
         app.open(URL(string: "surround://home/\(secondGameID)")!)
         element(
             SurroundUITestContract.AccessibilityID.gameDetail(secondGameID),
             in: app
         )
+        let profileWasPopped = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: profile
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [profileWasPopped], timeout: 10), .completed)
 
         // A REST-only route fails deterministically, then returns to the
         // existing Home context. Do not assert the transient loading overlay:
@@ -3357,6 +3792,14 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.CompatibilityScene.gameChat.rawValue,
             SurroundUITestContract.structuredChatFormatsLaunchArgument,
         ])
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        #if !targetEnvironment(macCatalyst)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // Give older lazy rows room to appear while inspecting message
+            // formats; keyboard and compact-board behavior have separate tests.
+            tap(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app)
+        }
+        #endif
 
         @discardableResult
         func assertChatLine(
@@ -3387,11 +3830,12 @@ final class SurroundUITests: SurroundUITestCase {
 
         // The fixture opens at the bottom. Walk upward so lazy chat rows are
         // materialized deterministically on both iOS and Mac Catalyst.
-        assertChatLine(
+        let analysisLine = assertChatLine(
             SurroundUITestContract.structuredChatAnalysisLineID,
             contains: "Variation: "
                 + SurroundUITestContract.structuredChatAnalysisText
         )
+        XCTAssertTrue(analysisLine.label.contains("CopperKoi"))
         assertChatLine(
             SurroundUITestContract.structuredChatThirdPersonLineID,
             contains: SurroundUITestContract.structuredChatThirdPersonText
@@ -3400,6 +3844,8 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.structuredChatHiddenLineID,
             contains: SurroundUITestContract.structuredChatHiddenText
         )
+        XCTAssertTrue(hiddenLine.label.contains("JuniperStone"))
+        XCTAssertTrue(hiddenLine.label.contains("Moderator-only"))
         XCTAssertTrue(
             String(describing: hiddenLine.value)
                 .contains("Visible only to moderators"),
@@ -3421,6 +3867,8 @@ final class SurroundUITests: SurroundUITestCase {
             "Expected the structured review link to render \(reviewLabel), "
                 + "got \(reviewLink.label)."
         )
+        XCTAssertTrue(reviewLink.label.contains("JuniperStone"),
+                      "The review link must announce who shared it as well as the review ID.")
         assertChatLine(
             SurroundUITestContract.structuredChatTranslatedLineID,
             contains: SurroundUITestContract.structuredChatTranslatedText

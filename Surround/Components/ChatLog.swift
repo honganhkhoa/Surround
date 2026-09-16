@@ -57,6 +57,7 @@ struct ChatLogSelectionPreview {
 struct ChatLog: View {
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     var selection: Binding<ChatLogSelection?> = .constant(nil)
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
@@ -206,6 +207,9 @@ struct ChatLog: View {
                     .AccessibilityID.gameChatLine(chatLine.id),
                 select: {
                     toggleChatLineSelection(chatLine)
+                },
+                openProfile: openPlayerProfile.map { action in
+                    { action(chatLine.user) }
                 }
             )
             Spacer().frame(height: 2)
@@ -316,7 +320,6 @@ struct ChatLog: View {
             Color(colorScheme == .dark ? UIColor.systemBackground : UIColor.systemGray6)
                 .shadow(radius: 2)
         )
-        .onDisappear(perform: clearSelection)
         .onChange(of: game.ID) { _, _ in
             clearSelection()
         }
@@ -443,6 +446,7 @@ struct NewChatInput: View {
     @State private var chatSendingCancellable: AnyCancellable?
     @State private var variationShareFailure: VariationShareFailure?
     @FocusState private var isInputFocused: Bool
+    @State private var hasAppeared = false
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()
     #endif
@@ -744,6 +748,8 @@ struct NewChatInput: View {
         }
         .background(backgroundColor)
         .onAppear {
+            guard !hasAppeared else { return }
+            hasAppeared = true
             if focusInputOnAppear || variationShareDraft.wrappedValue != nil {
                 focusInput()
             }

@@ -79,12 +79,10 @@ struct PublicGamesList: View {
                 .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
             }
         }
-        .navigationDestination(isPresented: Binding(
+        .stackDestination(isPresented: Binding(
             get: { nav.publicGames.activeGame != nil },
             set: { if !$0 { nav.publicGames.activeGame = nil } }
-        ), destination: {
-            GameDetailView(currentGame: $nav.publicGames.activeGame)
-        })
+        ), route: .publicGame)
         .onAppear {
 //            print("Appeared \(self)")
             ogs.fetchPublicGames()
@@ -105,7 +103,7 @@ struct PublicGamesList: View {
 private func publicGamesPreview(games: [Game]) -> some View {
     let nav = NavigationService()
     nav.main.rootView = .publicGames
-    return NavigationStack {
+    return AppNavigationStack {
         PublicGamesList()
             .modifier(RootViewSwitchingMenu())
     }

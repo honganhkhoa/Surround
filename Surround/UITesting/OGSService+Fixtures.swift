@@ -1067,6 +1067,32 @@ extension OGSService {
     static func offlineUITestInstance() -> OGSService {
         func makeService(from bootstrapState: BootstrapState) -> OGSService {
             var state = bootstrapState
+            // Full profiles use the same generated identities as their entry
+            // points. A snapshot also keeps profile and picker searches on
+            // the offline side of the service's rejecting HTTP boundary.
+            var profileUsers = state.cachedUsersById
+            if let user = state.user {
+                profileUsers[user.id] = user
+            }
+            for friend in state.friends {
+                profileUsers[friend.id] = friend
+            }
+            for game in Array(state.activeGames.values) + state.sortedPublicGames {
+                for player in [game.blackPlayer, game.whitePlayer].compactMap({ $0 }) {
+                    profileUsers[player.id] = player
+                }
+                for line in game.chatLog {
+                    profileUsers[line.user.id] = line.user
+                }
+            }
+            state.playerProfilesById = SurroundUITestContract.simulatesUnavailableProfile
+                ? [:]
+                : profileUsers.mapValues { user in
+                    OGSPlayerProfile(
+                        user: user,
+                        registrationDate: Date(timeIntervalSince1970: 1_443_657_600)
+                    )
+                }
             if SurroundUITestContract.simulatesAutomatchRestoration {
                 // The no-op websocket never answers `automatch/list`, so the
                 // window stays open for the whole test.

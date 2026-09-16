@@ -23,6 +23,7 @@ struct ChatLine: View {
     var isSelected = false
     var accessibilityIdentifier = ""
     var select: () -> Void = {}
+    var openProfile: (() -> Void)?
 
     private var isThirdPerson: Bool {
         chatLine.isPlainTextBody && chatLine.body.hasPrefix("/me ")
@@ -35,6 +36,37 @@ struct ChatLine: View {
     private var reviewURL: URL? {
         guard let reviewID = chatLine.reviewID else { return nil }
         return URL(string: "\(OGSService.ogsRoot)/review/\(reviewID)")
+    }
+
+    private var messageAccessibilityLabel: Text {
+        // A merged row can omit its visible sender. Each message still needs
+        // that context when VoiceOver focuses the bubble independently.
+        let sender = Text(verbatim: chatLine.user.usernameAndRank)
+        let body: Text
+        if let reviewID = chatLine.reviewID {
+            body = gameChatReviewLabel(reviewID: reviewID)
+        } else if chatLine.isAnalysis {
+            body = Text(
+                "Variation: \(displayedBody)",
+                comment: "Label for a variation shared in game chat"
+            )
+        } else {
+            body = chatBody
+        }
+        if let channelTitle {
+            let channelAndBody = Text(
+                "\(channelTitle), \(body)",
+                comment: "Accessible chat description combining the channel and message."
+            )
+            return Text(
+                "\(sender), \(channelAndBody)",
+                comment: "Accessible chat description combining the sender and message, including its channel when present."
+            )
+        }
+        return Text(
+            "\(sender), \(body)",
+            comment: "Accessible chat description combining the sender and message, including its channel when present."
+        )
     }
 
     var chatBody: Text {
@@ -72,6 +104,27 @@ struct ChatLine: View {
     }
 
     @ViewBuilder
+    private var sender: some View {
+        if chatLine.user.id > 0, let openProfile {
+            Button(action: openProfile) {
+                username
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                Text(
+                    "View \(chatLine.user.username)’s profile",
+                    comment: "Accessibility label for a button that opens a player's profile"
+                )
+            )
+            .accessibilityValue(Text(verbatim: chatLine.user.usernameAndRank))
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileChatEntry(chatLine.id))
+        } else {
+            username
+        }
+    }
+
+    @ViewBuilder
     private var renderedChatBody: some View {
         if let reviewID = chatLine.reviewID,
            let reviewURL {
@@ -103,50 +156,53 @@ struct ChatLine: View {
         }
     }
 
-    @ViewBuilder
-    private var channelBadge: some View {
+    private var channelTitle: Text? {
         switch chatLine.channel {
         case .malkovich:
-            Label {
-                Text("Malkovich", comment: "Name of the game-chat channel whose messages are hidden from the opponent during the game")
-            } icon: {
-                Image(systemName: "eye.slash.fill")
-            }
-            .accessibilityValue(
-                Text(
-                    "Hidden from opponent, visible to spectators",
-                    comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
-                )
-            )
+            Text("Malkovich", comment: "Name of the game-chat channel whose messages are hidden from the opponent during the game")
         case .personal:
-            Label {
-                Text("Personal", comment: "Name of the private game-chat channel visible only to the message author")
-            } icon: {
-                Image(systemName: "lock.fill")
-            }
-            .accessibilityValue(
-                Text(
-                    "Visible only to you",
-                    comment: "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value"
-                )
-            )
+            Text("Personal", comment: "Name of the private game-chat channel visible only to the message author")
         case .hidden:
-            Label {
-                Text(
-                    "Moderator-only",
-                    comment: "Badge on a game-chat message visible only to moderators"
-                )
-            } icon: {
-                Image(systemName: "eye.slash.fill")
-            }
-            .accessibilityValue(
-                Text(
-                    "Visible only to moderators",
-                    comment: "Hidden game-chat visibility; used as an accessibility value"
-                )
+            Text(
+                "Moderator-only",
+                comment: "Badge on a game-chat message visible only to moderators"
             )
         case .main, .spectator, .shadowban:
-            EmptyView()
+            nil
+        }
+    }
+
+    private var channelVisibility: Text {
+        switch chatLine.channel {
+        case .malkovich:
+            Text(
+                "Hidden from opponent, visible to spectators",
+                comment: "Malkovich game-chat visibility; used as the channel subtitle and accessibility value"
+            )
+        case .personal:
+            Text(
+                "Visible only to you",
+                comment: "Personal game-chat visibility; used as the channel subtitle, message-field placeholder, and accessibility value"
+            )
+        case .hidden:
+            Text(
+                "Visible only to moderators",
+                comment: "Hidden game-chat visibility; used as an accessibility value"
+            )
+        case .main, .spectator, .shadowban:
+            Text(verbatim: "")
+        }
+    }
+
+    @ViewBuilder
+    private var channelBadge: some View {
+        if let channelTitle {
+            Label {
+                channelTitle
+            } icon: {
+                Image(systemName: chatLine.channel == .personal ? "lock.fill" : "eye.slash.fill")
+            }
+            .accessibilityValue(channelVisibility)
         }
     }
     
@@ -189,7 +245,7 @@ struct ChatLine: View {
                 }
                 VStack(alignment: horizontalAlignment, spacing: 2) {
                     if showUsername {
-                        username
+                        sender
                             .font(.caption2).bold()
                             .foregroundColor(chatLine.user.uiColor)
                     }
@@ -221,21 +277,22 @@ struct ChatLine: View {
                                 lineWidth: 2
                             )
                     }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture(perform: select)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(
-                    reviewURL == nil ? .isButton : .isLink
-                )
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .accessibilityIdentifier(accessibilityIdentifier)
-                .reviewAccessibilityLabel(reviewID: chatLine.reviewID)
-                .accessibilityAction {
-                    if let reviewURL {
-                        openURL(reviewURL)
-                    } else {
-                        select()
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: select)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(
+                        reviewURL == nil ? .isButton : .isLink
+                    )
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityIdentifier(accessibilityIdentifier)
+                    .accessibilityLabel(messageAccessibilityLabel)
+                    .accessibilityValue(channelVisibility)
+                    .accessibilityAction {
+                        if let reviewURL {
+                            openURL(reviewURL)
+                        } else {
+                            select()
+                        }
                     }
                 }
                 if case .leading = horizontalAlignment {

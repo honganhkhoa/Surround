@@ -15,34 +15,46 @@ struct SettingsView: View {
     @State var notificationEnabled = Setting(.notificationEnabled).wrappedValue
     @State var showSupporterView = false
     @State var hidesRank: Bool = Setting(.hidesRank).wrappedValue
+    @EnvironmentObject private var stackRouter: StackRouter
     
     var accountSettings: some View {
         Group {
             if let user = ogs.user {
                 GroupBox(label: Text("Online-go.com Account")) {
-                    HStack(alignment: .top) {
-                        if let url = user.iconURL(ofSize: 64) {
-                            URLImage(url: url) { $0.resizable() }
-                                .frame(width: 64, height: 64)
-                                .background(Color.gray)
-                                .cornerRadius(10)
-                        }
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                if hidesRank {
-                                    Text(verbatim: user.username)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Button {
+                            stackRouter.openProfile(user)
+                        } label: {
+                            HStack(spacing: 12) {
+                                if let url = user.iconURL(ofSize: 64) {
+                                    URLImage(url: url) { $0.resizable() }
+                                        .frame(width: 64, height: 64)
+                                        .background(Color.gray)
+                                        .cornerRadius(10)
                                 } else {
-                                    Text(verbatim: "\(user.username) [\(user.formattedRank)]") 
+                                    Image(systemName: "person.crop.square.fill")
+                                        .resizable()
+                                        .frame(width: 64, height: 64)
+                                        .foregroundStyle(.secondary)
                                 }
+                                Text(verbatim: user.usernameAndRank(hidesRank: hidesRank))
+                                    .font(.title3)
+                                    .foregroundStyle(user.uiColor)
+                                Spacer()
+                                Image(systemName: "chevron.forward")
+                                    .foregroundStyle(.secondary)
                             }
-                            .font(.title3)
-                            Button(action: { ogs.logout() }) {
-                                Text("Logout")
-                            }
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .hoverEffect()
+                            .contentShape(Rectangle())
                         }
-                        Spacer()
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("View your profile")
+                        .accessibilityValue(Text(verbatim: user.usernameAndRank(hidesRank: hidesRank)))
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileSettingsEntry)
+                        Button(action: { ogs.logout() }) {
+                            Text("Logout")
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                        .hoverEffect()
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -217,7 +229,7 @@ struct GameplaySettings: View {
 #Preview("Settings — Signed out, Dark") {
     let nav = NavigationService()
     nav.main.rootView = .settings
-    return NavigationStack {
+    return AppNavigationStack {
         SettingsView()
             .modifier(RootViewSwitchingMenu())
     }
@@ -230,7 +242,7 @@ struct GameplaySettings: View {
 #Preview("Settings — Signed in") {
     let nav = NavigationService()
     nav.main.rootView = .settings
-    return NavigationStack {
+    return AppNavigationStack {
         SettingsView()
             .modifier(RootViewSwitchingMenu())
     }

@@ -725,6 +725,10 @@ class OGSService: ObservableObject {
         /// A complete deterministic first page. A non-nil value suppresses
         /// network-backed history loading and has no subsequent page.
         var finishedGamesSnapshot: [Game]?
+
+        /// A non-nil dictionary makes every profile lookup deterministic,
+        /// including missing profiles, without falling back to HTTP.
+        var playerProfilesById: [Int: OGSPlayerProfile]? = nil
     }
 
     static var instances = [String: OGSService]()
@@ -743,6 +747,7 @@ class OGSService: ObservableObject {
     private var ogsRoot: String { environment.rootURL.absoluteString }
 
     private let httpClient: OGSHTTPClient
+    private var playerProfilesById: [Int: OGSPlayerProfile]?
     private let gameResynchronizationTimeout: TimeInterval
     private let conditionalMoveSubmissionTimeout: TimeInterval
     private let automatchReconciliationTimeout: TimeInterval
@@ -1039,6 +1044,7 @@ class OGSService: ObservableObject {
         cachedUsersById = state.cachedUsersById
         preferredGameSettings = state.preferredGameSettings
         finishedGamesSnapshot = state.finishedGamesSnapshot
+        playerProfilesById = state.playerProfilesById
 
         for game in activeGames.values {
             game.ogs = self
@@ -1903,6 +1909,50 @@ class OGSService: ObservableObject {
         }
     }
     
+    /// Loads one profile without changing the logged-in user or shared game state.
+    /// Each subscriber owns its request, so leaving a profile cancels its HTTP work.
+    func fetchPlayerProfile(playerId: Int) -> AnyPublisher<OGSPlayerProfile, Error> {
+        Deferred { () -> AnyPublisher<OGSPlayerProfile, Error> in
+            guard playerId > 0 else {
+                return Fail<OGSPlayerProfile, Error>(error: OGSServiceError.invalidJSON)
+                    .eraseToAnyPublisher()
+            }
+
+            if let profiles = self.playerProfilesById {
+                guard let profile = profiles[playerId], profile.id == playerId else {
+                    return Fail<OGSPlayerProfile, Error>(error: OGSServiceError.invalidJSON)
+                        .eraseToAnyPublisher()
+                }
+                return Just(profile)
+                    .setFailureType(to: Error.self)
+                    .eraseToAnyPublisher()
+            }
+
+            let requestAuthenticationGeneration = self.authenticationGeneration
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+            return self.httpClient.session.request(
+                "\(self.ogsRoot)/api/v1/players/\(playerId)/full"
+            )
+                .validate()
+                .publishData()
+                .tryMap { response in
+                    guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                        throw OGSServiceError.staleAuthenticationContext
+                    }
+                    let data = try response.result.get()
+                    guard let profile = try? decoder.decode(OGSPlayerProfile.self, from: data),
+                          profile.id == playerId else {
+                        throw OGSServiceError.invalidJSON
+                    }
+                    return profile
+                }
+                .eraseToAnyPublisher()
+        }
+        .eraseToAnyPublisher()
+    }
+
     func fetchPlayerInfo(userIds: [Int]) -> AnyPublisher<[OGSUser], Error> {
         guard userIds.count > 0 else {
             return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
@@ -4180,6 +4230,14 @@ class OGSService: ObservableObject {
     }
     
     func searchByUsername(keyword: String) -> AnyPublisher<[OGSUser], Error> {
+        if let profiles = playerProfilesById {
+            let matches = profiles.values.map(\.user).filter {
+                $0.username.range(of: keyword, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }.sorted {
+                $0.username.localizedStandardCompare($1.username) == .orderedAscending
+            }
+            return Just(matches).setFailureType(to: Error.self).eraseToAnyPublisher()
+        }
         return Future<[OGSUser], Error> { promise in
             self.httpClient.session.request("\(self.ogsRoot)/api/v1/ui/omniSearch", parameters: ["q": keyword])
                 .validate().responseJSON { response in

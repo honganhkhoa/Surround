@@ -1859,7 +1859,7 @@ final class OGSServiceEventTests: XCTestCase {
         )
         socket.emissions.removeAll()
 
-        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+        let coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
         let firstAcquisition = coordinator.connect(to: staleGame, using: service)
         let secondAcquisition = coordinator.connect(to: staleGame, using: service)
 
@@ -1876,7 +1876,7 @@ final class OGSServiceEventTests: XCTestCase {
         let secondGame = Game(ogsGame: try makeEmptyGameData(id: 57))
         firstGame.ogs = service
         secondGame.ogs = service
-        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+        let coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
 
         coordinator.connect(to: firstGame, using: service)
         socket.emissions.removeAll()
@@ -1917,16 +1917,16 @@ final class OGSServiceEventTests: XCTestCase {
         let service = makeService(socket: socket)
         let game = Game(ogsGame: try makeEmptyGameData(id: 58))
         game.ogs = service
-        var coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
+        let coordinator = GameDetailConnectionCoordinator(ownerID: UUID())
 
         coordinator.connect(to: game, using: service)
         socket.emissions.removeAll()
 
-        coordinator.release(using: service)
+        coordinator.release()
         XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
         XCTAssertNil(coordinator.connectedGameID)
 
-        coordinator.release(using: service)
+        coordinator.release()
         XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
 
         socket.emissions.removeAll()
@@ -1935,6 +1935,173 @@ final class OGSServiceEventTests: XCTestCase {
 
         XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
         XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testGameDetailCoordinatorDestructionReleasesFinalOwnerAndPreventsReconnect() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 59, phase: "finished"))
+        game.ogs = service
+        var coordinator: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
+        weak var retainedCoordinator = coordinator
+
+        coordinator?.connect(to: game, using: service)
+        socket.emissions.removeAll()
+
+        // A covered game route can disappear without another onDisappear call.
+        coordinator = nil
+
+        XCTAssertNil(retainedCoordinator)
+        socket.deliver(name: "game/59/phase", data: "play")
+        XCTAssertEqual(game.gamePhase, .finished)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+        XCTAssertEqual(
+            (socket.emissions.first?.data as? [String: Any])?["game_id"] as? Int,
+            59
+        )
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+    }
+
+    func testGameDetailCoordinatorDestructionPreservesOtherDetailAndPublicOwners() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 60, phase: "finished"))
+        game.ogs = service
+        var first: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
+        var second: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
+        service.connect(to: game, owner: .publicGames)
+        first?.connect(to: game, using: service)
+        second?.connect(to: game, using: service)
+        socket.emissions.removeAll()
+
+        first = nil
+
+        socket.deliver(name: "game/60/phase", data: "stone removal")
+        XCTAssertEqual(game.gamePhase, .stoneRemoval)
+        XCTAssertTrue(socket.emissions.isEmpty)
+        XCTAssertEqual(second?.connectedGameID, 60)
+
+        second = nil
+
+        socket.deliver(name: "game/60/phase", data: "play")
+        XCTAssertEqual(game.gamePhase, .play)
+        XCTAssertEqual(
+            socket.emissions.map(\.command),
+            ["game/disconnect", "chat/part", "game/connect"]
+        )
+        XCTAssertEqual(
+            (socket.emissions.last?.data as? [String: Any])?["chat"] as? Bool,
+            false
+        )
+
+        socket.emissions.removeAll()
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+        XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 1)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "chat/join" })
+
+        socket.emissions.removeAll()
+        service.releaseConnection(gameID: 60, owner: .publicGames)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect"])
+    }
+
+    func testCoveredGameSuspendsForInactiveStackAndResumesUntilRouteIsRemoved() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 61))
+        let router = StackRouter()
+        router.present(.homeGame)
+        router.setActive(true)
+        let coordinator = GameDetailConnectionCoordinator()
+        var acquiredGames: [Game] = []
+        coordinator.observeLifetime(in: router, route: .homeGame) { acquiredGames.append($0) }
+        coordinator.connect(to: game, using: service)
+        router.openProfile(OGSUser(username: "Opponent", id: 101))
+        socket.emissions.removeAll()
+
+        router.setActive(false)
+
+        XCTAssertNil(coordinator.connectedGameID)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+        XCTAssertEqual(router.path.count, 2, "Tab changes preserve the covered game and profile.")
+        socket.emissions.removeAll()
+        let acquisitionCount = acquiredGames.count
+
+        router.setActive(true)
+
+        XCTAssertEqual(coordinator.connectedGameID, 61)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/connect", "chat/join"])
+        XCTAssertEqual(acquiredGames.count, acquisitionCount + 1)
+        XCTAssertTrue(acquiredGames.last === game)
+
+        router.setActive(false)
+        router.remove(.homeGame)
+        socket.emissions.removeAll()
+        router.setActive(true)
+        router.present(.homeGame)
+        socket.dropSocket()
+        socket.openSocket(authenticate: true)
+
+        XCTAssertNil(coordinator.connectedGameID)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" || $0.command == "chat/join" })
+    }
+
+    func testRootGameDefersAcquisitionUntilStackAppearsAndReleasesWithOwner() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 62))
+        let router = StackRouter()
+        var coordinator: GameDetailConnectionCoordinator? = GameDetailConnectionCoordinator()
+        weak var retainedCoordinator = coordinator
+        var acquisitions = 0
+        coordinator?.observeLifetime(in: router, route: nil) { _ in acquisitions += 1 }
+        coordinator?.connect(to: game, using: service)
+        XCTAssertNil(coordinator?.connectedGameID)
+        XCTAssertEqual(acquisitions, 0)
+        socket.emissions.removeAll()
+
+        router.setActive(true)
+
+        XCTAssertEqual(coordinator?.connectedGameID, 62)
+        XCTAssertEqual(acquisitions, 1, "Deferred acquisition must deliver the canonical game for detail loading.")
+        router.openProfile(OGSUser(username: "Opponent", id: 101))
+        XCTAssertEqual(coordinator?.connectedGameID, 62)
+        socket.emissions.removeAll()
+        router.setActive(false)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "chat/part"])
+
+        coordinator = nil
+
+        XCTAssertNil(retainedCoordinator, "The router's subscription must not retain the game owner.")
+        socket.emissions.removeAll()
+        router.setActive(true)
+        XCTAssertFalse(socket.emissions.contains { $0.command == "game/connect" })
+    }
+
+    func testMissingOwningRouteCannotAcquireOrReconnect() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 63))
+        let router = StackRouter()
+        router.setActive(true)
+        let coordinator = GameDetailConnectionCoordinator()
+        var acquisitions = 0
+        coordinator.observeLifetime(in: router, route: .historyGame) { _ in acquisitions += 1 }
+        socket.emissions.removeAll()
+
+        coordinator.connect(to: game, using: service)
+        router.present(.historyGame)
+        router.setActive(false)
+        router.setActive(true)
+
+        XCTAssertNil(coordinator.connectedGameID)
+        XCTAssertEqual(acquisitions, 0)
+        XCTAssertTrue(socket.emissions.isEmpty)
     }
 
     func testPublicRefreshReusesDesiredCanonicalModelWhileSocketIsDown() throws {

@@ -28,6 +28,7 @@ struct SingleGameView: View {
     @State private var observedReviewGameID: Int?
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()
+    @State private var hasAppliedUITestScene = false
     #endif
     @State var pendingMove: Move? = nil
     @State var pendingPosition: BoardPosition? = nil
@@ -1156,20 +1157,23 @@ struct SingleGameView: View {
                 }
             }
             #if DEBUG && MAIN_APP
-            switch SurroundUITestContract.compatibilityScene {
-            case .gameAnalysis, .finishedGamePlayback:
-                compactDisplayMode = .analyze
-                analyzeMode.wrappedValue = true
-                DispatchQueue.main.async {
-                    analyticsPosition = game.positionByLastMoveNumber[
-                        SurroundUITestContract
-                            .screenshotAnalysisSelectedMoveNumber
-                    ] ?? game.currentPosition
+            if !hasAppliedUITestScene {
+                hasAppliedUITestScene = true
+                switch SurroundUITestContract.compatibilityScene {
+                case .gameAnalysis, .finishedGamePlayback:
+                    compactDisplayMode = .analyze
+                    analyzeMode.wrappedValue = true
+                    DispatchQueue.main.async {
+                        analyticsPosition = game.positionByLastMoveNumber[
+                            SurroundUITestContract
+                                .screenshotAnalysisSelectedMoveNumber
+                        ] ?? game.currentPosition
+                    }
+                case .gameChat:
+                    compactDisplayMode = .chat
+                default:
+                    break
                 }
-            case .gameChat:
-                compactDisplayMode = .chat
-            default:
-                break
             }
             #endif
         }
@@ -1185,9 +1189,9 @@ struct SingleGameView: View {
             isVisibleForAppReview = false
             stopReviewGameObservation()
             self.stonePlacingPlayer = nil
-            selectedChatItem = nil
-            analyzeMarkupsByPosition.removeAll()
-            resetAnalyzeBoardTool()
+            // Preserve analysis, markups, and chat selection across both pushed
+            // destinations and tab switches. Game/mode changes below reset
+            // them; removing this game route destroys the retained view state.
         }
         .onReceive(game.moveTree.objectWillChange) {
             DispatchQueue.main.async {

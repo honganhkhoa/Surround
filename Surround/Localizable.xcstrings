@@ -415,6 +415,12 @@
             "value" : "[**Linh Pham**](https://linhpham.me) für die Gestaltung des App-Symbols und die Designberatung für die App."
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advice for the app."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -473,12 +479,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "[**Linh Pham**](https://linhpham.me)，感謝他設計應用程式圖示，並提供設計建議。"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "[**Linh Pham**](https://linhpham.me), for creating the app icon, and providing design advice for the app."
           }
         }
       }
@@ -2505,6 +2505,12 @@
             "value" : "**Surround** ist eine iOS-App mit dem Ziel, das bestmögliche OGS-Erlebnis auf iOS-Geräten zu bieten. Die App kommuniziert über die offene API mit OGS und nutzt native iOS-Funktionen, um einige Bereiche zu verbessern, die OGS als Web-App für unterschiedlichste Geräte nicht bieten kann."
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting all kinds of devices."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2563,12 +2569,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**Surround** 是一款 iOS 應用程式，致力於在 iOS 裝置上提供最佳的 OGS 體驗。本應用程式透過 OGS 的開放 API 與伺服器溝通，並利用 iOS 原生功能，強化 OGS 作為需支援各式裝置的網頁應用程式所難以提供的部分體驗。"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "**Surround** is an iOS app that aims to provide the best OGS experience on iOS devices. This app uses OGS's open API to talk to the server, and uses iOS native features to improve some aspects that OGS cannot provide due to their nature being a web app supporting all kinds of devices."
           }
         }
       }
@@ -3202,7 +3202,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "Accessible Quick Match clock description. The first placeholder is the speed and the second contains its clock values.",
+      "comment" : "Accessible chat description combining the channel and message.\nAccessible chat description combining the sender and message, including its channel when present.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -9815,6 +9815,12 @@
             "value" : "Alle Supporter-Stufen umfassen:"
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Supporter tiers include:"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9873,12 +9879,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有支持者方案均包含："
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All Supporter tiers include:"
           }
         }
       }
@@ -10043,6 +10043,24 @@
             }
           }
         },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternatively, there is %lld open custom game with similar settings that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Alternatively, there are %lld open custom games with similar settings that you can accept to start a game immediately."
+                }
+              }
+            }
+          }
+        },
         "es" : {
           "variations" : {
             "plural" : {
@@ -10149,24 +10167,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "另外還有 %lld 局設定相近的公開自訂對局，接受挑戰即可立即開始。"
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Alternatively, there is %lld open custom game with similar settings that you can accept to start a game immediately."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Alternatively, there are %lld open custom games with similar settings that you can accept to start a game immediately."
-                }
-              }
-            }
           }
         }
       }
@@ -10809,6 +10809,12 @@
             "value" : "Züge automatisch absenden"
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatically submit moves"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10867,12 +10873,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動送出落子"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Automatically submit moves"
           }
         }
       }
@@ -13523,6 +13523,77 @@
         }
       }
     },
+    "Challenge" : {
+      "comment" : "Button and destination title for inviting this player to a Go game.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herausfordern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défier"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局を申し込む"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대국 신청"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ท้าแข่ง"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thách đấu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "挑战"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "挑戰"
+          }
+        }
+      }
+    },
     "Challenge received!" : {
       "localizations" : {
         "de" : {
@@ -13659,6 +13730,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "挑戰類型"
+          }
+        }
+      }
+    },
+    "Challenge with these settings" : {
+      "comment" : "Profile action that sends a game challenge to this player using the previously selected preferred game settings.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit diesen Einstellungen herausfordern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar con esta configuración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défier avec ces paramètres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この設定で対局を申し込む"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 설정으로 대국 신청"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar com estes ajustes"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desafiar com estas definições"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ท้าแข่งด้วยการตั้งค่านี้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thách đấu với cài đặt này"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按这些设置发起挑战"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用這些設定發起挑戰"
           }
         }
       }
@@ -13871,6 +14013,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聊天頻道"
+          }
+        }
+      }
+    },
+    "Check your connection and try again. The player may no longer be available." : {
+      "comment" : "Explanation when loading a player profile fails.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe deine Verbindung und versuche es erneut. Das Profil ist möglicherweise nicht mehr verfügbar."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprueba tu conexión e inténtalo de nuevo. Es posible que el perfil de este jugador ya no esté disponible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez votre connexion et réessayez. Le profil de ce joueur n’est peut-être plus disponible."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続を確認して、もう一度お試しください。このプレーヤーのプロフィールは利用できなくなっている可能性があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연결을 확인하고 다시 시도하세요. 이 플레이어의 프로필이 더 이상 제공되지 않을 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifique sua conexão e tente novamente. O perfil deste jogador pode não estar mais disponível."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifique a sua ligação e tente novamente. O perfil deste jogador poderá já não estar disponível."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง โปรไฟล์ของผู้เล่นนี้อาจไม่สามารถเข้าถึงได้แล้ว"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy kiểm tra kết nối rồi thử lại. Hồ sơ của người chơi này có thể không còn truy cập được."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查连接后重试。此棋手的资料可能已无法访问。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請檢查連線後再試一次。此棋手的個人檔案可能已無法存取。"
           }
         }
       }
@@ -17572,6 +17785,77 @@
         }
       }
     },
+    "Edit on OGS" : {
+      "comment" : "Button that opens the signed-in player’s profile on the OGS website for editing.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf OGS bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar en OGS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier sur OGS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSで編集"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS에서 수정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar no OGS"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar no OGS"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แก้ไขบน OGS"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉnh sửa trên OGS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 OGS 上编辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 OGS 上編輯"
+          }
+        }
+      }
+    },
     "Edit preferred setting" : {
       "localizations" : {
         "de" : {
@@ -18003,6 +18287,12 @@
             "value" : "Allen, die am [Betatest](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437) teilgenommen und mir mit zahlreichen Rückmeldungen und Fehlerberichten geholfen haben, die App zu verbessern."
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with feedback and bug reports."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18061,12 +18351,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有參與[測試版測試](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437) 的人，感謝你們提供眾多意見與錯誤回報，協助我改進本應用程式。"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Everyone who participated in the [beta testing](https://forums.online-go.com/t/surround-ios-client-for-ogs/34437), for helping me to improve the app with feedback and bug reports."
           }
         }
       }
@@ -22596,6 +22880,77 @@
         }
       }
     },
+    "Loading profile…" : {
+      "comment" : "Progress label while loading a player profile.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil wird geladen…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando perfil…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement du profil…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールを読み込み中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필 불러오는 중…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregando perfil…"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A carregar o perfil…"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "กำลังโหลดโปรไฟล์…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tải hồ sơ…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载个人资料…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入個人檔案…"
+          }
+        }
+      }
+    },
     "Logout" : {
       "localizations" : {
         "de" : {
@@ -23015,6 +23370,148 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "對手最高棋力"
+          }
+        }
+      }
+    },
+    "Member since %@" : {
+      "comment" : "Player registration month and year. The placeholder is an already localized date.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied seit %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Miembro desde %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membre depuis %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に登録"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에 가입"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membro desde %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membro desde %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เป็นสมาชิกตั้งแต่ %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thành viên từ %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入时间：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入時間：%@"
+          }
+        }
+      }
+    },
+    "Message" : {
+      "comment" : "Button that opens a private conversation with this player.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nachricht senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar mensaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un message"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージを送る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메시지 보내기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar mensagem"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar mensagem"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ส่งข้อความ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhắn tin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送私信"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳送訊息"
           }
         }
       }
@@ -26078,6 +26575,77 @@
         }
       }
     },
+    "OGS Supporter" : {
+      "comment" : "Badge for a supporter of OGS, separate from a Surround subscription.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS-Supporter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colaborador de OGS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supporteur OGS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGSサポーター"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS 후원자"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoiador do OGS"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoiante do OGS"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supporter ของ OGS"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhà tài trợ OGS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS 支持者"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OGS 支持者"
+          }
+        }
+      }
+    },
     "Online-go.com Account" : {
       "localizations" : {
         "de" : {
@@ -26219,76 +26787,6 @@
         }
       }
     },
-    "Open in browser" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Im Browser öffnen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir en el navegador"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir dans le navigateur"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ブラウザーで開く"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "브라우저에서 열기"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir no navegador"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir no navegador"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "เปิดในเบราว์เซอร์"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mở bằng trình duyệt"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在浏览器中打开"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在瀏覽器中開啟"
-          }
-        }
-      }
-    },
     "Open (%lld)" : {
       "comment" : "NewGameView top Picker: open games offered by other players",
       "localizations" : {
@@ -26356,6 +26854,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "公開（%lld）"
+          }
+        }
+      }
+    },
+    "Open in browser" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Browser öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir en el navegador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans le navigateur"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザーで開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브라우저에서 열기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir no navegador"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir no navegador"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เปิดในเบราว์เซอร์"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở bằng trình duyệt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中開啟"
           }
         }
       }
@@ -28437,6 +29005,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "私人訊息只會保留幾天，請務必將任何重要資訊儲存在其他地方。"
+          }
+        }
+      }
+    },
+    "Profile" : {
+      "comment" : "Title of a player profile.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perfil"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perfil"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โปรไฟล์"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hồ sơ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人檔案"
           }
         }
       }
@@ -32404,6 +33043,77 @@
         }
       }
     },
+    "Select opponent" : {
+      "comment" : "Profile action that selects this player as the opponent in the existing challenge draft, then returns to the form without sending a challenge.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Gegner auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seleccionar como oponente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir comme adversaire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対戦相手に選ぶ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상대로 선택"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecionar como adversário"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecionar como adversário"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เลือกเป็นคู่แข่ง"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn làm đối thủ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选为对手"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選為對手"
+          }
+        }
+      }
+    },
     "Select your opponent " : {
       "localizations" : {
         "de" : {
@@ -32751,6 +33461,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
+          }
+        }
+      }
+    },
+    "Share profile" : {
+      "comment" : "Button that shares the player’s OGS profile link.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil teilen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager le profil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールを共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필 공유"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar perfil"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partilhar perfil"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แชร์โปรไฟล์"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chia sẻ hồ sơ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享个人资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享個人檔案"
           }
         }
       }
@@ -34030,12 +34811,89 @@
         }
       }
     },
+    "Starting searches…" : {
+      "comment" : "Correspondence Quick Match button status while the submitted batch awaits confirmation.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suchen werden gestartet…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando búsquedas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancement des recherches…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対局検索を開始中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대국 검색 시작 중…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando buscas…"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A iniciar pesquisas…"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "กำลังเริ่มค้นหาเกม…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang bắt đầu tìm kiếm…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在发起搜索…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在發起搜尋…"
+          }
+        }
+      }
+    },
     "Stone per period: " : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steine pro Periode: "
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stones per period: "
           }
         },
         "es" : {
@@ -34096,12 +34954,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每段手數： "
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stones per period: "
           }
         }
       }
@@ -34243,77 +35095,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "死子標記方式"
-          }
-        }
-      }
-    },
-    "Starting searches…" : {
-      "comment" : "Correspondence Quick Match button status while the submitted batch awaits confirmation.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suchen werden gestartet…"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciando búsquedas…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lancement des recherches…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "対局検索を開始中…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "대국 검색 시작 중…"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciando buscas…"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A iniciar pesquisas…"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "กำลังเริ่มค้นหาเกม…"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đang bắt đầu tìm kiếm…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在发起搜索…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在發起搜尋…"
           }
         }
       }
@@ -36529,6 +37310,24 @@
             "value" : "Du kannst eine offene Herausforderung annehmen, um sofort eine Partie zu beginnen (%lld verfügbar)."
           }
         },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There is %lld open challenge that you can accept to start a game immediately."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
+                }
+              }
+            }
+          }
+        },
         "es" : {
           "variations" : {
             "plural" : {
@@ -36635,24 +37434,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目前有 %lld 個公開挑戰可接受，接受後即可開始對局。"
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "There is %lld open challenge that you can accept to start a game immediately."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "There are %lld open challenges that you can accept to start a game immediately."
-                }
-              }
-            }
           }
         }
       }
@@ -37274,6 +38055,12 @@
             "value" : "Dieses Widget zeigt eine Zusammenfassung deiner Korrespondenzpartien auf online-go.com."
           }
         },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This widget displays a summary of your correspondence games on online-go.com."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -37332,12 +38119,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此小工具會顯示你在 online-go.com 上的非即時對局摘要。"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This widget displays a summary of your correspondence games on online-go.com."
           }
         }
       }
@@ -38468,6 +39249,77 @@
         }
       }
     },
+    "Try again" : {
+      "comment" : "Button to retry loading a player profile.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut versuchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tentar novamente"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tentar novamente"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลองอีกครั้ง"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử lại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試一次"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "comment" : "GameHistoryView retry loading",
       "localizations" : {
@@ -38677,6 +39529,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法顯示對局設定"
+          }
+        }
+      }
+    },
+    "Unable to load profile" : {
+      "comment" : "Title shown when a player profile cannot be loaded.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil konnte nicht geladen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo cargar el perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger le profil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールを読み込めません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로필을 불러올 수 없습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível carregar o perfil"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível carregar o perfil"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โหลดโปรไฟล์ไม่ได้"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể tải hồ sơ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载个人资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入個人檔案"
           }
         }
       }
@@ -39322,6 +40245,77 @@
         }
       }
     },
+    "View %@’s profile" : {
+      "comment" : "Accessibility label for a button that opens a player's profile",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil von %@ anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver el perfil de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir le profil de %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のプロフィールを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@님의 프로필 보기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver perfil de %@"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver perfil de %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ดูโปรไฟล์ของ %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem hồ sơ của %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看 %@ 的个人资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看 %@ 的個人檔案"
+          }
+        }
+      }
+    },
     "View full history" : {
       "comment" : "Homeview",
       "localizations" : {
@@ -39389,6 +40383,77 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看完整紀錄"
+          }
+        }
+      }
+    },
+    "View your profile" : {
+      "comment" : "Accessibility label for opening the signed-in player’s profile.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Profil anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver tu perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir votre profil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分のプロフィールを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내 프로필 보기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver seu perfil"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver o meu perfil"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ดูโปรไฟล์ของคุณ"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem hồ sơ của bạn"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看您的个人资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看你的個人檔案"
           }
         }
       }

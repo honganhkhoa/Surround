@@ -30,6 +30,9 @@ enum SurroundUITestContract {
         "--clear-app-store-screenshot-widget-fixture"
     static let homeHistoryFailsOnceLaunchArgument =
         "--surround-home-history-fails-once"
+    static let unavailableProfileLaunchArgument =
+        "--surround-profile-unavailable"
+    static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
     static let analysisDisabledLaunchArgument =
@@ -53,6 +56,9 @@ enum SurroundUITestContract {
     static let compatibilityWidgetGameCount = 4
     static let compatibilityWidgetGameID = 25_089_235
     static let fixtureGameID = 26_268_404
+    static let profileFixtureOwnerID = 314_459
+    static let profileFixtureOpponentID = 429_553
+    static let profileFixturePickerFriendID = 801_001
     static let widgetRoutingSecondGameID = 26_268_396
     static let liveBannerCorrespondenceGameIDs = [26_268_398, 26_268_399]
     static let liveBannerHistoryGameID = 26_268_397
@@ -129,6 +135,11 @@ enum SurroundUITestContract {
     static let structuredChatThirdPersonText =
         "checks the third-person format"
 
+    enum Appearance: String, CaseIterable {
+        case light
+        case dark
+    }
+
     enum CompatibilityScene: String, CaseIterable {
         case welcome
         case home
@@ -182,6 +193,26 @@ enum SurroundUITestContract {
             && ProcessInfo.processInfo.arguments.contains(
                 homeHistoryFailsOnceLaunchArgument
             )
+    }
+
+    static var simulatesUnavailableProfile: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                unavailableProfileLaunchArgument
+            )
+    }
+
+    static var appearanceOverride: Appearance? {
+        guard isEnabled else { return nil }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let argumentIndex = arguments.firstIndex(of: appearanceLaunchArgument) else {
+            return nil
+        }
+        guard arguments.indices.contains(argumentIndex + 1),
+              let appearance = Appearance(rawValue: arguments[argumentIndex + 1]) else {
+            preconditionFailure("\(appearanceLaunchArgument) requires light or dark.")
+        }
+        return appearance
     }
 
     static var holdsQuickMatchAcknowledgements: Bool {
@@ -376,6 +407,8 @@ enum SurroundUITestContract {
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
+    static let simulatesUnavailableProfile = false
+    static let appearanceOverride: Appearance? = nil
     static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
     static let simulatesWidgetDeepLinkRouting = false
@@ -404,6 +437,51 @@ enum SurroundUITestContract {
         static let screenPublicGames = "screen.publicGames"
         static let screenMessages = "screen.messages"
         static let screenSettings = "screen.settings"
+        static let screenPlayerProfile = "screen.player-profile"
+        static let profileLoaded = "profile.loaded"
+        static let profileIdentity = "profile.identity"
+        static let profileLoading = "profile.loading"
+        static let profileError = "profile.error"
+        static let profileRetry = "profile.retry"
+        static let profileChallenge = "profile.challenge"
+        static let profileMessage = "profile.message"
+        static let profileSettingsEntry = "profile.entry.settings"
+        static let profileEdit = "profile.edit"
+        static let profileShare = "profile.share"
+        static let profileConversation = "profile.conversation"
+        static let profileSelectOpponent = "profile.select-opponent"
+        static let profileChallengeWithSettings = "profile.challenge-with-settings"
+        static let profileBannerAvatarPrefix = "profile.entry.banner.avatar."
+        static let screenOpponentPicker = "screen.opponent-picker"
+        static let opponentSearch = "opponent.search"
+        static let customGameName = "customGame.name"
+        static let customGameSpeed = "customGame.speed"
+        static let customGameOpponentMode = "customGame.opponent-mode"
+        static let customGameOpponent = "customGame.opponent"
+
+        static func opponentSelection(_ id: Int) -> String {
+            "opponent.select.\(id)"
+        }
+
+        static func profileBannerAvatarEntry(_ id: Int) -> String {
+            "\(profileBannerAvatarPrefix)\(id)"
+        }
+
+        static func profileBannerNameEntry(_ id: Int) -> String {
+            "profile.entry.banner.name.\(id)"
+        }
+
+        static func profileGameTitleEntry(_ id: Int) -> String {
+            "profile.entry.game-title.\(id)"
+        }
+
+        static func profileChatEntry(_ id: String) -> String {
+            "profile.entry.chat.\(id)"
+        }
+
+        static func profilePickerEntry(_ id: Int) -> String {
+            "profile.entry.picker.\(id)"
+        }
         static let screenAbout = "screen.about"
         static let aboutWriteReview = "about.writeReview"
         static let screenBrowser = "screen.browser"

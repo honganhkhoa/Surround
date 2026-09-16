@@ -21,7 +21,7 @@ private struct RematchChallengeSheet: View {
     let challenge: OGSChallengeTemplate
 
     var body: some View {
-        NavigationStack {
+        AppNavigationStack {
             CustomGameForm(
                 initialChallenge: challenge,
                 mode: .rematch
@@ -522,6 +522,7 @@ private func gameControlRowPreviewData() -> (games: [Game], ogs: OGSService) {
     let previewData = gameControlRowPreviewData()
     GameControlRow(game: previewData.games[2])
         .environmentObject(previewData.ogs)
+        .environmentObject(NavigationService())
 }
 
 #Preview("Vertical controls", traits: .fixedLayout(width: 320, height: 120)) {
@@ -531,6 +532,7 @@ private func gameControlRowPreviewData() -> (games: [Game], ogs: OGSService) {
         GameControlRow(game: previewData.games[2], horizontal: false)
     }
     .environmentObject(previewData.ogs)
+    .environmentObject(NavigationService())
 }
 
 #endif

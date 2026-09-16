@@ -634,7 +634,7 @@ struct HomeView: View {
         } message: {
             Text("The game may have ended or could not be loaded. Please try again.")
         }
-        .navigationDestination(isPresented: Binding(
+        .stackDestination(isPresented: Binding(
             get: { nav.home.activeGame != nil },
             set: {
                 if !$0 {
@@ -642,15 +642,17 @@ struct HomeView: View {
                     nav.home.activeGameShowsCarousel = true
                 }
             }
-        ), destination: {
-            GameDetailView(
-                currentGame: $nav.home.activeGame,
-                allowsActiveGamesCarousel: nav.home.activeGameShowsCarousel
-            )
-        })
-        .navigationDestination(isPresented: $nav.home.showingGameHistory) {
-            GameHistoryView()
-        }
+        ), route: .homeGame)
+        .stackDestination(
+            isPresented: Binding(
+                get: { nav.home.showingGameHistory },
+                set: { presented in
+                    if presented { nav.home.showingGameHistory = true }
+                    else { nav.closeGameHistory() }
+                }
+            ),
+            route: .gameHistory
+        )
         .onAppear {
             loadRecentFinishedGames()
         }
@@ -681,7 +683,7 @@ struct HomeView: View {
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
-            NavigationStack {
+            AppNavigationStack {
                 NewGameView(
                     newGameOption: SurroundUITestContract.isCapturingAppStoreScreenshots
                         ? .openChallenges
@@ -702,7 +704,7 @@ struct HomeView: View {
             .presentationSizing(.page)
         }
         .sheet(isPresented: $nav.home.showingPreferredSettings) {
-            NavigationStack {
+            AppNavigationStack {
                 PreferredSettingsView()
                     .navigationTitle("Preferred Settings")
                     .toolbar {
@@ -717,7 +719,7 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $nav.home.showingSettings) {
-            NavigationStack {
+            AppNavigationStack {
                 SettingsView()
                     .navigationTitle("Settings")
                     .toolbar {
@@ -753,7 +755,7 @@ struct HomeView: View {
 
 #if DEBUG && MAIN_APP
 #Preview("Home — Signed in") {
-    NavigationStack {
+    AppNavigationStack {
         HomeView(
             previewGames: [
                 TestData.Scored19x19Korean,
@@ -779,7 +781,7 @@ struct HomeView: View {
 }
 
 #Preview("Home — Signed out") {
-    NavigationStack {
+    AppNavigationStack {
         HomeView()
             .modifier(RootViewSwitchingMenu())
     }

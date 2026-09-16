@@ -11,6 +11,7 @@ import Combine
 struct GameDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.owningStackRoute) private var owningStackRoute
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
 
@@ -33,6 +34,7 @@ struct GameDetailView: View {
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
+    @EnvironmentObject private var stackRouter: StackRouter
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()
     #endif
@@ -67,16 +69,23 @@ struct GameDetailView: View {
     
     func updateDetailOfCurrentGameIfNecessary() {
         guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
-            detailConnection.release(using: ogs)
+            detailConnection.release()
             return
         }
 
+        let gameBinding = $currentGame
+        detailConnection.observeLifetime(in: stackRouter, route: owningStackRoute) { [weak service = ogs] canonicalGame in
+            guard gameBinding.wrappedValue?.ID == canonicalGame.ID else { return }
+            if gameBinding.wrappedValue !== canonicalGame {
+                gameBinding.wrappedValue = canonicalGame
+            }
+            if canonicalGame.ogsRawData == nil {
+                service?.updateDetailsOfConnectedGame(game: canonicalGame)
+            }
+        }
         let canonicalGame = detailConnection.connect(to: requestedGame, using: ogs)
         if canonicalGame !== requestedGame {
             currentGame = canonicalGame
-        }
-        if canonicalGame.ogsRawData == nil {
-            ogs.updateDetailsOfConnectedGame(game: canonicalGame)
         }
     }
     
@@ -269,7 +278,7 @@ struct GameDetailView: View {
                 Color.white.edgesIgnoringSafeArea(.bottom)
         )
         .sheet(isPresented: self.$showSettings) {
-            NavigationStack {
+            AppNavigationStack {
                 VStack {
                     GameplaySettings()
                     Spacer()
@@ -290,6 +299,9 @@ struct GameDetailView: View {
                     }
                 }
             }
+        }
+        .environment(\.openPlayerProfile) { player in
+            stackRouter.openProfile(player)
         }
         // Catalyst keeps this useful as the Mac window title even when Zen
         // mode hides the in-window navigation chrome.
@@ -322,9 +334,6 @@ struct GameDetailView: View {
         .onChange(of: ogs.user?.id) { _, _ in
             variationShareDraft = nil
             selectedChatChannel = .main
-        }
-        .onDisappear {
-            detailConnection.release(using: ogs)
         }
         .onReceive(ogs.$sortedActiveCorrespondenceGames) { _ in
             DispatchQueue.main.async {
@@ -365,6 +374,31 @@ struct GameDetailView: View {
         if compactLayout {
             return AnyView(
                 result.toolbar {
+                    if !navigationBarHidden,
+                       currentGame.isUserPlaying,
+                       !currentGame.rengo,
+                       let userColor = currentGame.userStoneColor,
+                       let opponent = currentGame.currentPlayer(with: userColor.opponentColor()),
+                       opponent.id > 0 {
+                        ToolbarItem(placement: .principal) {
+                            Button {
+                                stackRouter.openProfile(opponent)
+                            } label: {
+                                Text(verbatim: navigationTitle)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                Text(
+                                    "View \(opponent.username)’s profile",
+                                    comment: "Accessibility label for a button that opens a player's profile"
+                                )
+                            )
+                            .accessibilityValue(Text(verbatim: opponent.usernameAndRank))
+                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileGameTitleEntry(opponent.id))
+                        }
+                    }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
                             HStack {
@@ -514,7 +548,7 @@ private func gameDetailPreviewFixture() -> (
 #Preview("Phone — Zen mode", traits: .fixedLayout(width: 390, height: 844)) {
     let fixture = gameDetailPreviewFixture()
 
-    NavigationView {
+    AppNavigationStack {
         GameDetailView(
             currentGame: .constant(fixture.games[0]),
             activeGames: fixture.games,
@@ -528,7 +562,7 @@ private func gameDetailPreviewFixture() -> (
 #Preview("Phone — Active games", traits: .fixedLayout(width: 390, height: 844)) {
     let fixture = gameDetailPreviewFixture()
 
-    NavigationView {
+    AppNavigationStack {
         GameDetailView(
             currentGame: .constant(fixture.games[0]),
             activeGames: fixture.games
@@ -541,18 +575,22 @@ private func gameDetailPreviewFixture() -> (
 #Preview("Regular landscape — Zen mode", traits: .fixedLayout(width: 960, height: 754)) {
     let fixture = gameDetailPreviewFixture()
 
-    GameDetailView(currentGame: .constant(fixture.games[0]), zenMode: true)
-        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
-        .environmentObject(fixture.ogs)
-        .environmentObject(fixture.navigation)
+    AppNavigationStack {
+        GameDetailView(currentGame: .constant(fixture.games[0]), zenMode: true)
+    }
+    .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+    .environmentObject(fixture.ogs)
+    .environmentObject(fixture.navigation)
 }
 
 #Preview("Regular portrait — Active game", traits: .fixedLayout(width: 750, height: 1024)) {
     let fixture = gameDetailPreviewFixture()
 
-    GameDetailView(currentGame: .constant(fixture.games[0]))
-        .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
-        .environmentObject(fixture.ogs)
-        .environmentObject(fixture.navigation)
+    AppNavigationStack {
+        GameDetailView(currentGame: .constant(fixture.games[0]))
+    }
+    .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
+    .environmentObject(fixture.ogs)
+    .environmentObject(fixture.navigation)
 }
 #endif

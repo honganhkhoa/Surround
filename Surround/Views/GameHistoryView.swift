@@ -133,15 +133,10 @@ struct GameHistoryView: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.screenGameHistory
         )
-        .navigationDestination(isPresented: Binding(
+        .stackDestination(isPresented: Binding(
             get: { nav.gameHistory.activeGame != nil },
             set: { if !$0 { nav.gameHistory.activeGame = nil } }
-        ), destination: {
-            GameDetailView(
-                currentGame: $nav.gameHistory.activeGame,
-                allowsActiveGamesCarousel: false
-            )
-        })
+        ), route: .historyGame)
         .onAppear {
             if !pagination.loadedOnce {
                 loadNextPage()
@@ -243,7 +238,7 @@ private func gameHistoryPreview(
         result: result
     )
 
-    return NavigationStack {
+    return AppNavigationStack {
         GameHistoryView(pagination: pagination)
     }
     .environmentObject(OGSService.previewInstance(user: user))

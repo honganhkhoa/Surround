@@ -10,6 +10,7 @@ import Combine
 struct CustomGameForm: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @EnvironmentObject private var stackRouter: StackRouter
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -21,145 +22,25 @@ struct CustomGameForm: View {
     }
     
     static var defaultChallengeTemplate: OGSChallengeTemplate {
-        OGSChallengeTemplate(
-            game: OGSChallengeTemplate.GameDetail(
-                width: 19,
-                height: 19,
-                ranked: true,
-                isPrivate: false,
-                handicap: 0,
-                disableAnalysis: false,
-                name: defaultGameName,
-                rules: .japanese,
-                timeControl: TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
-            )
-        )
-    }
-    
-    let mode: Mode
-    
-    @State var challenge: OGSChallengeTemplate
-    
-    @State var gameName: String
-    
-    @State var isPrivate: Bool
-    @State var isRanked: Bool
-    
-    @State var boardWidth: Int
-    @State var boardHeight: Int
-    @State var standardBoardSize: Bool
-    
-    @State var timeControlSpeed: TimeControlSpeed
-    @State var isBlitz: Bool
-    var finalTimeControlSpeed: TimeControlSpeed {
-        if timeControlSpeed == .correspondence {
-            return .correspondence
-        } else {
-            if isBlitz {
-                return .blitz
-            } else {
-                return timeControlSpeed
-            }
-        }
+        ChallengeDraft.defaultChallengeTemplate
     }
 
-    @State var blitzTimeControl: TimeControl
-    @State var liveTimeControl: TimeControl
-    @State var correspondenceTimeControl: TimeControl
-    var finalTimeControl: TimeControl {
-        switch finalTimeControlSpeed {
-        case .blitz:
-            return blitzTimeControl
-        case .live, .rapid:
-            return liveTimeControl
-        case .correspondence:
-            return correspondenceTimeControl
-        }
-    }
-    
-    @State var pauseOnWeekend: Bool
-    
-    @State var isOpen: Bool
-    @State var rankRestricted: Bool
-    @State var maxRank: Int
-    @State var minRank: Int
-    
-    @State var opponent: OGSUser?
-    @State var selectingOpponent: Bool
-    
-    @State var handicap: Int
-    @State var automaticColor: Bool
-    @State var yourColor: StoneColor
-    
-    @State var rulesSet: OGSRule
-    @State var komi: Double
-    
-    @State var analysisDisabled: Bool
-    
-    init(initialChallenge: OGSChallengeTemplate? = nil, mode: Mode = .createChallenge) {
+    let mode: Mode
+    private let onChallengeCreated: (() -> Void)?
+    private let onChooseOpponent: (() -> Void)?
+    @StateObject private var draft: ChallengeDraft
+
+    init(
+        initialChallenge: OGSChallengeTemplate? = nil,
+        mode: Mode = .createChallenge,
+        onChallengeCreated: (() -> Void)? = nil,
+        draft: ChallengeDraft? = nil,
+        onChooseOpponent: (() -> Void)? = nil
+    ) {
         self.mode = mode
-        
-        let baseChallenge = initialChallenge ?? Self.defaultChallengeTemplate
-        let ruleSet = baseChallenge.game.rules
-        let gameName = baseChallenge.game.name.isEmpty ? defaultGameName : baseChallenge.game.name
-        
-        let boardWidth = baseChallenge.game.width
-        let boardHeight = baseChallenge.game.height
-        let standardBoardSize = boardWidth == boardHeight && [9, 13, 19].contains(boardWidth)
-        
-        let timeControl = baseChallenge.game.timeControl
-        let speed = timeControl.speed
-        let timeControlSpeed: TimeControlSpeed = speed == .correspondence ? .correspondence : .live
-        let isBlitz = speed == .blitz
-        var blitzTimeControl = TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
-        var liveTimeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
-        var correspondenceTimeControl = TimeControlSpeed.correspondence.defaultTimeOptions[0].timeControlObject
-        switch speed {
-        case .blitz:
-            blitzTimeControl = timeControl
-        case .live:
-            liveTimeControl = timeControl
-        case .correspondence:
-            correspondenceTimeControl = timeControl
-        default:
-            liveTimeControl = timeControl
-        }
-        
-        let isOpen = baseChallenge.challenged == nil
-        let restrictedMin = baseChallenge.game.minRank ?? -1000
-        let restrictedMax = baseChallenge.game.maxRank ?? 1000
-        let rankRestricted = isOpen && (restrictedMin != -1000 || restrictedMax != 1000)
-        let minRank = rankRestricted ? min(max(restrictedMin, 5), 38) : 5
-        let maxRank = rankRestricted ? min(max(restrictedMax, 5), 38) : 36
-        
-        let automaticColor = baseChallenge.challengerColor == nil
-        let yourColor = baseChallenge.challengerColor ?? .black
-        
-        _challenge = State(initialValue: baseChallenge)
-        _gameName = State(initialValue: gameName)
-        _isPrivate = State(initialValue: baseChallenge.game.isPrivate)
-        _isRanked = State(initialValue: baseChallenge.game.ranked)
-        _boardWidth = State(initialValue: boardWidth)
-        _boardHeight = State(initialValue: boardHeight)
-        _standardBoardSize = State(initialValue: standardBoardSize)
-        _timeControlSpeed = State(initialValue: timeControlSpeed)
-        _isBlitz = State(initialValue: isBlitz)
-        _blitzTimeControl = State(initialValue: blitzTimeControl)
-        _liveTimeControl = State(initialValue: liveTimeControl)
-        _correspondenceTimeControl = State(initialValue: correspondenceTimeControl)
-        _pauseOnWeekend = State(initialValue: timeControl.pauseOnWeekends ?? true)
-        _isOpen = State(initialValue: isOpen)
-        _rankRestricted = State(initialValue: rankRestricted)
-        _maxRank = State(initialValue: maxRank)
-        _minRank = State(initialValue: minRank)
-        _opponent = State(initialValue: baseChallenge.challenged)
-        _selectingOpponent = State(initialValue: false)
-        _handicap = State(initialValue: baseChallenge.game.handicap)
-        _automaticColor = State(initialValue: automaticColor)
-        _yourColor = State(initialValue: yourColor)
-        _rulesSet = State(initialValue: ruleSet)
-        _komi = State(initialValue: baseChallenge.game.komi ?? ruleSet.defaultKomi)
-        _analysisDisabled = State(initialValue: baseChallenge.game.disableAnalysis)
+        self.onChallengeCreated = onChallengeCreated
+        self.onChooseOpponent = onChooseOpponent
+        _draft = StateObject(wrappedValue: draft ?? ChallengeDraft(initialChallenge: initialChallenge))
     }
 
     private struct ChangeHandlersBase: ViewModifier {
@@ -248,9 +129,9 @@ struct CustomGameForm: View {
     
     func revertToStandardTimeSetting() {
         withAnimation {
-            blitzTimeControl = TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
-            liveTimeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
-            correspondenceTimeControl = TimeControlSpeed.correspondence.defaultTimeOptions[0].timeControlObject
+            draft.blitzTimeControl = TimeControlSpeed.blitz.defaultTimeOptions[0].timeControlObject
+            draft.liveTimeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
+            draft.correspondenceTimeControl = TimeControlSpeed.correspondence.defaultTimeOptions[0].timeControlObject
         }
     }
 
@@ -259,10 +140,10 @@ struct CustomGameForm: View {
     }
     
     func updateForRankedGames() {
-        isPrivate = false
-        standardBoardSize = true
-        komi = rulesSet.defaultKomi
-        handicap = min(handicap, 9)
+        draft.isPrivate = false
+        draft.standardBoardSize = true
+        draft.komi = draft.rulesSet.defaultKomi
+        draft.handicap = min(draft.handicap, 9)
     }
 
     private func handicapAttributedLabel(handicap: Int) -> AttributedString {
@@ -281,17 +162,17 @@ struct CustomGameForm: View {
     
     var opponentRankOptions: some View {
         Group {
-            Toggle(isOn: $rankRestricted.animation()) {
+            Toggle(isOn: $draft.rankRestricted.animation()) {
                 Text("Restrict opponent rank")
                     .font(.subheadline)
             }
-            if rankRestricted {
-                Stepper(value: $minRank, in: rankRestrictionRange) {
-                    Text("From **\(RankUtils.formattedRank(Double(minRank), longFormat: true))**", comment: "Custom game rank restriction")
+            if draft.rankRestricted {
+                Stepper(value: $draft.minRank, in: rankRestrictionRange) {
+                    Text("From **\(RankUtils.formattedRank(Double(draft.minRank), longFormat: true))**", comment: "Custom game rank restriction")
                         .font(.subheadline)
                 }
-                Stepper(value: $maxRank, in: rankRestrictionRange) {
-                    Text("To **\(RankUtils.formattedRank(Double(maxRank), longFormat: true))**", comment: "Custom game rank restriction")
+                Stepper(value: $draft.maxRank, in: rankRestrictionRange) {
+                    Text("To **\(RankUtils.formattedRank(Double(draft.maxRank), longFormat: true))**", comment: "Custom game rank restriction")
                         .font(.subheadline)
                 }
             }
@@ -302,12 +183,13 @@ struct CustomGameForm: View {
         GroupBox(label: Text("Opponent")) {
             if !isPreferredSettingMode {
                 if !isRematchMode {
-                    Picker(selection: $isOpen.animation(), label: Text("Is open")) {
+                    Picker(selection: $draft.isOpen.animation(), label: Text("Is open")) {
                         Text("Open", comment: "Opponent section of NewGameView, 'Open' here means anyone").tag(true)
                         Text("vs. Friend", comment: "Opponent section of NewGameView").tag(false)
                     }.pickerStyle(SegmentedPickerStyle())
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.customGameOpponentMode)
                 }
-                if isOpen && !isRematchMode {
+                if draft.isOpen && !isRematchMode {
                     Text("Create and show a challenge publicly, then wait for other players to accept.")
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
@@ -325,22 +207,30 @@ struct CustomGameForm: View {
                                 SurroundUITestContract.AccessibilityID
                                     .gameRematchOpponent
                             )
-                    } else {
-                        NavigationLink(destination: UserSelectionView(user: $opponent)) {
+                    } else if let onChooseOpponent {
+                        Button(action: onChooseOpponent) {
                             selectedOpponentRow
                         }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.customGameOpponent)
+                    } else {
+                        Button {
+                            stackRouter.openOpponentPicker(for: draft)
+                        } label: {
+                            selectedOpponentRow
+                        }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.customGameOpponent)
                     }
                 }
                 Divider()
             } else {
                 opponentRankOptions
             }
-            Toggle(isOn: Binding ( get: { handicap == -1 }, set: { handicap = ($0 ? -1 : 0) })) {
+            Toggle(isOn: Binding ( get: { draft.handicap == -1 }, set: { draft.handicap = ($0 ? -1 : 0) })) {
                 Text("Automatically decide handicap").font(.subheadline)
             }
-            if handicap > -1 {
-                Stepper(value: $handicap, in: 0...(isRanked ? 9 : 36)) {
-                    Text(handicapAttributedLabel(handicap: handicap))
+            if draft.handicap > -1 {
+                Stepper(value: $draft.handicap, in: 0...(draft.isRanked ? 9 : 36)) {
+                    Text(handicapAttributedLabel(handicap: draft.handicap))
                 }
             } else {
                 (Text("**Automatic** setting will determine the number of handicap stones based on your and your opponent's rank."))
@@ -348,14 +238,14 @@ struct CustomGameForm: View {
                     .leadingAlignedInScrollView()
             }
             Divider()
-            Toggle(isOn: $automaticColor) {
+            Toggle(isOn: $draft.automaticColor) {
                 Text("Automatically assign stone colors").font(.subheadline)
                     .leadingAlignedInScrollView()
             }
-            if !automaticColor {
+            if !draft.automaticColor {
                 HStack {
                     Text("Your color").font(.subheadline)
-                    Picker(selection: $yourColor, label: Text("Your color")) {
+                    Picker(selection: $draft.yourColor, label: Text("Your color")) {
                         Text("Black").tag(StoneColor.black)
                         Text("White").tag(StoneColor.white)
                     }.pickerStyle(SegmentedPickerStyle())
@@ -366,17 +256,17 @@ struct CustomGameForm: View {
                     .leadingAlignedInScrollView()
             }
         }
-        .onChange(of: maxRank) { _, newValue in
-            minRank = min(minRank, newValue)
+        .onChange(of: draft.maxRank) { _, newValue in
+            draft.minRank = min(draft.minRank, newValue)
         }
-        .onChange(of: minRank) { _, newValue in
-            maxRank = max(maxRank, newValue)
+        .onChange(of: draft.minRank) { _, newValue in
+            draft.maxRank = max(draft.maxRank, newValue)
         }
     }
 
     var selectedOpponentRow: some View {
         HStack {
-            if let opponent = opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
+            if let opponent = draft.opponent, let opponentIconURL = opponent.iconURL(ofSize: 64) {
                 URLImage(url: opponentIconURL) { $0.resizable() }
                     .frame(width: 64, height: 64)
                     .background(Color.gray)
@@ -387,7 +277,7 @@ struct CustomGameForm: View {
                     .frame(width: 64, height: 64)
                     .cornerRadius(10)
             }
-            if let opponent = opponent {
+            if let opponent = draft.opponent {
                 VStack(alignment: .leading) {
                     Text(verbatim: opponent.username).bold()
                     if !Setting(.hidesRank).wrappedValue {
@@ -409,27 +299,27 @@ struct CustomGameForm: View {
     
     var boardSizeOptions: some View {
         GroupBox(label: Text("Board size")) {
-            Picker(selection: $standardBoardSize.animation(), label: Text("Standard board size")) {
+            Picker(selection: $draft.standardBoardSize.animation(), label: Text("Standard board size")) {
                 Text("Standard size", comment: "refers to standard board sizes").tag(true)
                 Text("Custom size", comment: "refers to custom board sizes").tag(false)
             }
             .pickerStyle(SegmentedPickerStyle())
-            .disabled(isRanked)
+            .disabled(draft.isRanked)
             HStack(alignment: .top) {
-                BoardView(boardPosition: BoardPosition(width: boardWidth, height: boardHeight))
+                BoardView(boardPosition: BoardPosition(width: draft.boardWidth, height: draft.boardHeight))
                     .aspectRatio(1, contentMode: .fill)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Width").font(.subheadline).bold()
                     Stepper(
                         value: Binding(
-                            get: { standardBoardSize ? ([9, 13, 19].firstIndex(of: boardWidth) ?? 2) : boardWidth },
+                            get: { draft.standardBoardSize ? ([9, 13, 19].firstIndex(of: draft.boardWidth) ?? 2) : draft.boardWidth },
                             set: {
-                                boardWidth = (standardBoardSize ? [9, 13, 19][$0] : $0)
-                                if standardBoardSize { boardHeight = boardWidth }
+                                draft.boardWidth = (draft.standardBoardSize ? [9, 13, 19][$0] : $0)
+                                if draft.standardBoardSize { draft.boardHeight = draft.boardWidth }
                             }
                         ),
-                        in: standardBoardSize ? 0...2 : 2...25, step: 1) {
-                            Text(verbatim: "\(boardWidth)")
+                        in: draft.standardBoardSize ? 0...2 : 2...25, step: 1) {
+                            Text(verbatim: "\(draft.boardWidth)")
                     }
                     Spacer().frame(height: 10)
                     Divider()
@@ -437,54 +327,55 @@ struct CustomGameForm: View {
                     Text("Height").font(.subheadline).bold()
                     Stepper(
                         value: Binding(
-                            get: { standardBoardSize ? ([9, 13, 19].firstIndex(of: boardHeight) ?? 2) : boardHeight },
+                            get: { draft.standardBoardSize ? ([9, 13, 19].firstIndex(of: draft.boardHeight) ?? 2) : draft.boardHeight },
                             set: {
-                                boardHeight = (standardBoardSize ? [9, 13, 19][$0] : $0)
-                                if standardBoardSize { boardWidth = boardHeight }
+                                draft.boardHeight = (draft.standardBoardSize ? [9, 13, 19][$0] : $0)
+                                if draft.standardBoardSize { draft.boardWidth = draft.boardHeight }
                             }
                         ),
-                        in: standardBoardSize ? 0...2 : 2...25, step: 1) {
-                            Text(verbatim: "\(boardHeight)")
+                        in: draft.standardBoardSize ? 0...2 : 2...25, step: 1) {
+                            Text(verbatim: "\(draft.boardHeight)")
                     }
                 }
             }
-            if isRanked {
+            if draft.isRanked {
                 (Text("**Custom** board sizes are not available in **ranked** games."))
                     .font(.caption)
                     .leadingAlignedInScrollView()
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: standardBoardSize) { _, standard in
-            if standard && (boardWidth != boardHeight || ![9, 13, 19].contains(boardWidth)) {
-                self.boardWidth = 19
-                self.boardHeight = 19
+        .onChange(of: draft.standardBoardSize) { _, standard in
+            if standard && (draft.boardWidth != draft.boardHeight || ![9, 13, 19].contains(draft.boardWidth)) {
+                draft.boardWidth = 19
+                draft.boardHeight = 19
             }
         }
     }
     
     var gameSpeedOptions: some View {
         GroupBox(label: Text("Game speed")) {
-            Picker(selection: $timeControlSpeed.animation(), label: Text("Game speed")) {
+            Picker(selection: $draft.timeControlSpeed.animation(), label: Text("Game speed")) {
                 Text("Live").tag(TimeControlSpeed.live)
                 Text("Correspondence").tag(TimeControlSpeed.correspondence)
             }
             .pickerStyle(SegmentedPickerStyle())
-            if timeControlSpeed == .live {
-                Toggle(isOn: $isBlitz) {
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.customGameSpeed)
+            if draft.timeControlSpeed == .live {
+                Toggle(isOn: $draft.isBlitz) {
                     Text("Blitz").font(.subheadline)
                 }
-            } else if timeControlSpeed == .correspondence {
-                Toggle(isOn: $pauseOnWeekend) {
+            } else if draft.timeControlSpeed == .correspondence {
+                Toggle(isOn: $draft.pauseOnWeekend) {
                     Text("Pause on weekend").font(.subheadline)
                 }
             }
             Divider()
-            Text("**\(finalTimeControl.systemName):** \(finalTimeControl.system.descriptionText)")
+            Text("**\(draft.finalTimeControl.systemName):** \(draft.finalTimeControl.system.descriptionText)")
                 .font(.subheadline)
                 .leadingAlignedInScrollView()
             Spacer().frame(height: 10)
-            if finalTimeControl.system != finalTimeControlSpeed.defaultTimeOptions[0] {
+            if draft.finalTimeControl.system != draft.finalTimeControlSpeed.defaultTimeOptions[0] {
                 Button(action: revertToStandardTimeSetting) {
                     Text("Revert to standard time setting.")
                         .font(.subheadline).bold()
@@ -494,12 +385,12 @@ struct CustomGameForm: View {
             Spacer().frame(height: 10)
             NavigationLink(
                 destination: TimeSystemPickerView(
-                    blitzTimeControl: $blitzTimeControl,
-                    liveTimeControl: $liveTimeControl,
-                    correspondenceTimeControl: $correspondenceTimeControl,
-                    timeControlSpeed: $timeControlSpeed,
-                    isBlitz: $isBlitz,
-                    pauseOnWeekend: $pauseOnWeekend)
+                    blitzTimeControl: $draft.blitzTimeControl,
+                    liveTimeControl: $draft.liveTimeControl,
+                    correspondenceTimeControl: $draft.correspondenceTimeControl,
+                    timeControlSpeed: $draft.timeControlSpeed,
+                    isBlitz: $draft.isBlitz,
+                    pauseOnWeekend: $draft.pauseOnWeekend)
             ) {
                 HStack(spacing: 4) {
                     Text("Advanced time settings")
@@ -516,15 +407,15 @@ struct CustomGameForm: View {
             HStack {
                 Text("Rules set: ")
                     .font(.subheadline).padding(.vertical, 10)
-                if rulesSet == .japanese || rulesSet == .chinese {
-                    Picker(selection: $rulesSet, label: Text("Rule set")) {
+                if draft.rulesSet == .japanese || draft.rulesSet == .chinese {
+                    Picker(selection: $draft.rulesSet, label: Text("Rule set")) {
                         Text("Japanese").tag(OGSRule.japanese)
                         Text("Chinese").tag(OGSRule.chinese)
                     }.pickerStyle(SegmentedPickerStyle())
                 } else {
-                    NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
+                    NavigationLink(destination: RulesPickerView(rulesSet: $draft.rulesSet, komi: $draft.komi, isRanked: draft.isRanked)) {
                         HStack(spacing: 4) {
-                            Text(verbatim: "\(rulesSet.fullName) ").bold()
+                            Text(verbatim: "\(draft.rulesSet.fullName) ").bold()
                             Image(systemName: "chevron.forward")
                         }
                         .font(.subheadline)
@@ -532,17 +423,17 @@ struct CustomGameForm: View {
                 }
                 Spacer()
             }
-            if komi == rulesSet.defaultKomi {
-                Text("**Standard** komi: **\(komi, specifier: "%.1f")**")
+            if draft.komi == draft.rulesSet.defaultKomi {
+                Text("**Standard** komi: **\(draft.komi, specifier: "%.1f")**")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             } else {
-                Text("**Custom** komi: **\(komi, specifier: "%.1f")**")
+                Text("**Custom** komi: **\(draft.komi, specifier: "%.1f")**")
                     .font(.subheadline)
                     .leadingAlignedInScrollView()
             }
             Spacer().frame(height: 10)
-            NavigationLink(destination: RulesPickerView(rulesSet: $rulesSet, komi: $komi, isRanked: isRanked)) {
+            NavigationLink(destination: RulesPickerView(rulesSet: $draft.rulesSet, komi: $draft.komi, isRanked: draft.isRanked)) {
                 HStack(spacing: 4) {
                     Text("Advanced rules settings")
                     Image(systemName: "chevron.forward")
@@ -551,25 +442,25 @@ struct CustomGameForm: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .onChange(of: rulesSet) { _, newValue in
-            komi = newValue.defaultKomi
+        .onChange(of: draft.rulesSet) { _, newValue in
+            draft.komi = newValue.defaultKomi
         }
     }
     
     var gameTypeOptions: some View {
         GroupBox(label: Text("Game type")) {
-            Toggle(isOn: $isRanked) {
+            Toggle(isOn: $draft.isRanked) {
                 Text("Ranked").font(.subheadline)
             }
-            Toggle(isOn: $isPrivate) {
+            Toggle(isOn: $draft.isPrivate) {
                 Text("Private").font(.subheadline)
             }
-            .disabled(isRanked)
+            .disabled(draft.isRanked)
             (Text("Disable the **ranked** option above if you don't want the result to count towards your rating. **Ranked** games cannot be **private** and have fewer customizing options."))
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }
-        .onChange(of: isRanked) { _, newValue in
+        .onChange(of: draft.isRanked) { _, newValue in
             if newValue {
                 withAnimation {
                     updateForRankedGames()
@@ -584,17 +475,18 @@ struct CustomGameForm: View {
             HStack {
                 Text("Game name:")
                     .font(.subheadline)
-                TextField(defaultGameName, text: $gameName)
+                TextField(defaultGameName, text: $draft.gameName)
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.customGameName)
                     .submitLabel(.done)
                     .textFieldStyle(.roundedBorder)
                     .font(.subheadline)
                     .onSubmit {
-                        if gameName.count == 0 {
-                            gameName = defaultGameName
+                        if draft.gameName.count == 0 {
+                            draft.gameName = defaultGameName
                         }
                     }
             }
-            Toggle(isOn: $analysisDisabled) {
+            Toggle(isOn: $draft.analysisDisabled) {
                 Text("Disable analysis").font(.subheadline)
             }
             (Text("**Analysis mode** allows you and your opponent to test out variations during the game. It's like a separate virtual board where you can try things out."))
@@ -604,14 +496,14 @@ struct CustomGameForm: View {
     }
 
     func updateTimeControl() {
-        challenge.game.timeControl = finalTimeControl
-        if challenge.game.timeControl.speed == .correspondence {
-            challenge.game.timeControl.pauseOnWeekends = pauseOnWeekend
+        draft.challenge.game.timeControl = draft.finalTimeControl
+        if draft.challenge.game.timeControl.speed == .correspondence {
+            draft.challenge.game.timeControl.pauseOnWeekends = draft.pauseOnWeekend
         }
     }
     
     var createButtonDisabled: Bool {
-        return !isOpen && opponent == nil
+        return !draft.isOpen && draft.opponent == nil
     }
     
     var isEditingPreferredSetting: Bool {
@@ -674,7 +566,7 @@ struct CustomGameForm: View {
                         action: createChallenge
                     )
                 }
-                if !isOpen && opponent == nil {
+                if !draft.isOpen && draft.opponent == nil {
                     Text("You need to choose an opponent or make the challenge open.")
                         .font(.caption)
                         .leadingAlignedInScrollView()
@@ -685,12 +577,14 @@ struct CustomGameForm: View {
     }
     
     func createChallenge() {
-        if isOpen || opponent != nil {
-            self.challengeCreatingCancellable = ogs.sendChallenge(opponent: isOpen ? nil : opponent, challenge: challenge).sink(
+        if draft.isOpen || draft.opponent != nil {
+            self.challengeCreatingCancellable = ogs.sendChallenge(opponent: draft.isOpen ? nil : draft.opponent, challenge: draft.challenge).sink(
                 receiveCompletion: { _ in
                     self.challengeCreatingCancellable = nil
                 }, receiveValue: { _ in
-                    if isRematchMode {
+                    if let onChallengeCreated {
+                        onChallengeCreated()
+                    } else if isRematchMode {
                         dismiss()
                     } else {
                         nav.home.showingNewGameView = false
@@ -709,7 +603,7 @@ struct CustomGameForm: View {
         
         self.editPreferredSettingCancellable = ogs.replacePreferredGameSetting(
             oldChallenge: originalPreferredSetting,
-            newChallenge: challenge
+            newChallenge: draft.challenge
         ).sink(
             receiveCompletion: { _ in
                 self.editPreferredSettingCancellable = nil
@@ -725,7 +619,7 @@ struct CustomGameForm: View {
             return
         }
         
-        self.createPreferredSettingCancellable = ogs.addPreferredGameSetting(challenge: challenge).sink(
+        self.createPreferredSettingCancellable = ogs.addPreferredGameSetting(challenge: draft.challenge).sink(
             receiveCompletion: { _ in
                 self.createPreferredSettingCancellable = nil
             },
@@ -737,7 +631,7 @@ struct CustomGameForm: View {
     
     @ViewBuilder
     var previewSection: some View {
-        ChallengeCell(challenge: challenge, hidePlayerDetails: isPreferredSettingMode)
+        ChallengeCell(challenge: draft.challenge, hidePlayerDetails: isPreferredSettingMode)
             .padding()
             .background(
                 Color(
@@ -783,41 +677,41 @@ struct CustomGameForm: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .modifier(ChangeHandlersBase(
-            challenge: $challenge,
-            gameName: $gameName,
-            isRanked: $isRanked,
-            isPrivate: $isPrivate,
-            rankRestricted: $rankRestricted,
-            isOpen: $isOpen,
-            maxRank: $maxRank,
-            minRank: $minRank,
-            handicap: $handicap,
-            automaticColor: $automaticColor,
-            yourColor: $yourColor,
-            boardWidth: $boardWidth,
-            boardHeight: $boardHeight,
-            opponent: $opponent
+            challenge: $draft.challenge,
+            gameName: $draft.gameName,
+            isRanked: $draft.isRanked,
+            isPrivate: $draft.isPrivate,
+            rankRestricted: $draft.rankRestricted,
+            isOpen: $draft.isOpen,
+            maxRank: $draft.maxRank,
+            minRank: $draft.minRank,
+            handicap: $draft.handicap,
+            automaticColor: $draft.automaticColor,
+            yourColor: $draft.yourColor,
+            boardWidth: $draft.boardWidth,
+            boardHeight: $draft.boardHeight,
+            opponent: $draft.opponent
         ))
         .modifier(ChangeHandlersTime(
-            challenge: $challenge,
-            timeControlSpeed: $timeControlSpeed,
-            isBlitz: $isBlitz,
-            liveTimeControl: $liveTimeControl,
-            blitzTimeControl: $blitzTimeControl,
-            correspondenceTimeControl: $correspondenceTimeControl,
-            pauseOnWeekend: $pauseOnWeekend,
+            challenge: $draft.challenge,
+            timeControlSpeed: $draft.timeControlSpeed,
+            isBlitz: $draft.isBlitz,
+            liveTimeControl: $draft.liveTimeControl,
+            blitzTimeControl: $draft.blitzTimeControl,
+            correspondenceTimeControl: $draft.correspondenceTimeControl,
+            pauseOnWeekend: $draft.pauseOnWeekend,
             updateTimeControl: updateTimeControl
         ))
         .modifier(ChangeHandlersRules(
-            challenge: $challenge,
-            rulesSet: $rulesSet,
-            komi: $komi,
-            analysisDisabled: $analysisDisabled
+            challenge: $draft.challenge,
+            rulesSet: $draft.rulesSet,
+            komi: $draft.komi,
+            analysisDisabled: $draft.analysisDisabled
         ))
         .onAppear {
             if !isPreferredSettingMode {
-                challenge.challenger = ogs.user
-                if isRanked {
+                draft.challenge.challenger = ogs.user
+                if draft.isRanked {
                     updateForRankedGames()
                 }
             }
@@ -846,7 +740,7 @@ private func customGameFormPreview(
     mode: CustomGameForm.Mode = .createChallenge,
     title: LocalizedStringKey
 ) -> some View {
-    NavigationStack {
+    AppNavigationStack {
         CustomGameForm(
             initialChallenge: initialChallenge,
             mode: mode
