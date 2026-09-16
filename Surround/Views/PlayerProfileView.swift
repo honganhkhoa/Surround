@@ -10,11 +10,21 @@ private struct OpenPlayerProfileKey: EnvironmentKey {
     static let defaultValue: ((OGSUser) -> Void)? = nil
 }
 
+private struct OpenPlayerConversationKey: EnvironmentKey {
+    static let defaultValue: ((OGSUser) -> Void)? = nil
+}
+
 extension EnvironmentValues {
-    /// Game descendants share the detail screen's route and connection lifetime.
+    /// Actions belong to the nearest app navigation stack. Standalone content
+    /// has no action, so it does not expose buttons that cannot navigate.
     var openPlayerProfile: ((OGSUser) -> Void)? {
         get { self[OpenPlayerProfileKey.self] }
         set { self[OpenPlayerProfileKey.self] = newValue }
+    }
+
+    var openPlayerConversation: ((OGSUser) -> Void)? {
+        get { self[OpenPlayerConversationKey.self] }
+        set { self[OpenPlayerConversationKey.self] = newValue }
     }
 }
 

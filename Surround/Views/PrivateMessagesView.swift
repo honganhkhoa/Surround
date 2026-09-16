@@ -10,6 +10,8 @@ import URLImage
 
 struct PrivateMessagesView: View {
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
+    @Environment(\.openPlayerConversation) private var openPlayerConversation
 
     private let privateMessagesOverride: [OGSPrivateMessage]?
     private let unreadPeerIdsOverride: Set<Int>?
@@ -81,46 +83,80 @@ struct PrivateMessagesView: View {
             < lastMessage.content.timestamp
     }
 
+    @ViewBuilder
+    private func conversationRow(peer: OGSUser, lastMessage: OGSPrivateMessage) -> some View {
+        if privateMessagesOverride == nil, let openPlayerConversation {
+            Button {
+                openPlayerConversation(peer)
+            } label: {
+                HStack {
+                    messageSummary(peer: peer, lastMessage: lastMessage)
+                    Spacer()
+                    Image(systemName: "chevron.forward")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink {
+                PrivateMessageLog(
+                    peer: peer,
+                    messages: privateMessagesOverride == nil ? nil : privateMessagesByPeerId[peer.id],
+                    marksThreadAsRead: marksThreadsAsRead
+                )
+                .navigationTitle(peer.username)
+                .navigationBarTitleDisplayMode(.inline)
+            } label: {
+                messageSummary(peer: peer, lastMessage: lastMessage)
+            }
+        }
+    }
+
+    private func messageSummary(peer: OGSUser, lastMessage: OGSPrivateMessage) -> some View {
+        HStack {
+            if let iconURL = peer.iconURL(ofSize: 64) {
+                URLImage(url: iconURL) { $0.resizable() }
+                    .frame(width: 48, height: 48)
+            } else {
+                Text(verbatim: String(peer.username.prefix(1)))
+                    .font(.system(size: 32)).bold()
+                    .frame(width: 48, height: 48)
+                    .background(Color.gray)
+            }
+            let hasUnread = hasUnreadMessage(from: peer, lastMessage: lastMessage)
+            VStack(alignment: .leading) {
+                Text(peer.username)
+                    .foregroundColor(peer.uiColor)
+                    .font(hasUnread ? Font.body.bold() : .body)
+                Text(lastMessage.content.message)
+                    .font(hasUnread ? Font.subheadline.bold() : .subheadline)
+                    .foregroundColor(Color(.secondaryLabel))
+                    .lineLimit(1)
+            }
+        }
+    }
+
     var body: some View {
         List {
             Section(footer: Text("Private messages are only stored for a few days, so please make sure to save any important information somewhere else.").font(.caption)) {
                 ForEach(data, id: \.peer.id) { peer, lastMessage in
-                    NavigationLink(destination:
-                                    PrivateMessageLog(
-                                        peer: peer,
-                                        messages: privateMessagesOverride == nil
-                                            ? nil
-                                            : privateMessagesByPeerId[peer.id],
-                                        marksThreadAsRead: marksThreadsAsRead
-                                    )
-                                    .navigationBarTitle(peer.username)
-                                    .navigationBarTitleDisplayMode(.inline)
-                    ) {
-                        HStack {
-                            if let iconURL = peer.iconURL(ofSize: 64) {
-                                URLImage(url: iconURL) { $0.resizable() }
-                                    .frame(width: 48, height: 48)
-                            } else {
-                                Text(verbatim: "\(String(peer.username.first!))")
-                                    .font(.system(size: 32)).bold()
-                                    .frame(width: 48, height: 48)
-                                    .background(Color.gray)
-                            }
-                            let hasUnread = hasUnreadMessage(
-                                from: peer,
-                                lastMessage: lastMessage
-                            )
-                            VStack(alignment: .leading) {
-                                Text(peer.username)
-                                    .foregroundColor(peer.uiColor)
-                                    .font(hasUnread ? Font.body.bold() : .body)
-                                Text(lastMessage.content.message)
-                                    .font(hasUnread ? Font.subheadline.bold() : .subheadline)
-                                    .foregroundColor(Color(.secondaryLabel))
-                                    .lineLimit(1)
+                    conversationRow(peer: peer, lastMessage: lastMessage)
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.privateMessageRow(peer.id))
+                        .contextMenu {
+                            if peer.id > 0, let openPlayerProfile {
+                                Button {
+                                    openPlayerProfile(peer)
+                                } label: {
+                                    Text("View Profile")
+                                    Text(verbatim: peer.usernameAndRank)
+                                    Image(systemName: "person.crop.circle")
+                                }
+                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessageMenuEntry(peer.id))
                             }
                         }
-                    }
                 }
             }
         }

@@ -274,11 +274,67 @@ struct GameCell: View {
     }
 
     var body: some View {
-        if let opensGame {
-            cellContent
-                .onTapGesture(perform: opensGame)
+        Group {
+            if let opensGame {
+                cellContent
+                    .onTapGesture(perform: opensGame)
+            } else {
+                cellContent
+            }
+        }
+        .modifier(GamePlayerProfileMenu(game: game))
+    }
+}
+
+/// Game rows keep their normal tap action, with player navigation available
+/// through the same contextual menu on touch and pointer platforms.
+struct GamePlayerProfileMenu: ViewModifier {
+    @ObservedObject var game: Game
+    @EnvironmentObject private var ogs: OGSService
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
+
+    private var players: [OGSUser] {
+        var seen = Set<Int>()
+        return [StoneColor.black, .white].flatMap { color -> [OGSUser] in
+            if game.rengo,
+               let team = game.orderedRengoTeam[color]
+                ?? game.gameData?.rengoTeams?[color],
+               !team.isEmpty {
+                return team
+            }
+            let player = color == .black ? game.blackPlayer : game.whitePlayer
+            return player.map { [$0] } ?? []
+        }
+        .filter { player in
+            player.id > 0
+                && player.id != ogs.user?.id
+                && seen.insert(player.id).inserted
+        }
+    }
+
+    func body(content: Content) -> some View {
+        let profilePlayers = players
+        if let openPlayerProfile,
+           let gameID = game.ogsID,
+           gameID > 0,
+           !profilePlayers.isEmpty {
+            content.contextMenu {
+                ForEach(profilePlayers, id: \.id) { player in
+                    Button {
+                        openPlayerProfile(player)
+                    } label: {
+                        Label("View Profile", systemImage: "person.crop.circle")
+                        Text(verbatim: player.usernameAndRank)
+                    }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.profileGameMenuEntry(
+                            gameID, player.id
+                        )
+                    )
+                }
+            }
         } else {
-            cellContent
+            content
         }
     }
 }

@@ -300,9 +300,6 @@ struct GameDetailView: View {
                 }
             }
         }
-        .environment(\.openPlayerProfile) { player in
-            stackRouter.openProfile(player)
-        }
         // Catalyst keeps this useful as the Mac window title even when Zen
         // mode hides the in-window navigation chrome.
         .navigationTitle(navigationTitle)

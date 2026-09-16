@@ -452,6 +452,40 @@ enum SurroundUITestContract {
         static let profileSelectOpponent = "profile.select-opponent"
         static let profileChallengeWithSettings = "profile.challenge-with-settings"
         static let profileBannerAvatarPrefix = "profile.entry.banner.avatar."
+        static let privateMessageComposer = "messages.composer"
+        static let profileRengoMenuPrefix = "profile.menu.rengo."
+
+        static func privateMessageRow(_ playerID: Int) -> String {
+            "messages.row.\(playerID)"
+        }
+
+        static func profileGameMenuEntry(_ gameID: Int, _ playerID: Int) -> String {
+            "profile.entry.game-menu.\(gameID).\(playerID)"
+        }
+
+        static func profileChallengeEntry(_ challengeID: some CustomStringConvertible, _ playerID: Int) -> String {
+            "profile.entry.challenge.\(challengeID).\(playerID)"
+        }
+
+        static func profileChallengeAvatarEntry(_ challengeID: some CustomStringConvertible, _ playerID: Int) -> String {
+            "profile.entry.challenge-avatar.\(challengeID).\(playerID)"
+        }
+
+        static func profileRengoEntry(_ challengeID: some CustomStringConvertible, _ playerID: Int) -> String {
+            "profile.entry.rengo.\(challengeID).\(playerID)"
+        }
+
+        static func profileRengoMenu(_ challengeID: some CustomStringConvertible, _ playerID: Int) -> String {
+            "\(profileRengoMenuPrefix)\(challengeID).\(playerID)"
+        }
+
+        static func profileMessageToolbarEntry(_ playerID: Int) -> String {
+            "profile.entry.message-toolbar.\(playerID)"
+        }
+
+        static func profileMessageMenuEntry(_ playerID: Int) -> String {
+            "profile.entry.message-menu.\(playerID)"
+        }
         static let screenOpponentPicker = "screen.opponent-picker"
         static let opponentSearch = "opponent.search"
         static let customGameName = "customGame.name"

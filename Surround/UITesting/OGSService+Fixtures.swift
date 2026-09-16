@@ -1077,12 +1077,19 @@ extension OGSService {
             for friend in state.friends {
                 profileUsers[friend.id] = friend
             }
-            for game in Array(state.activeGames.values) + state.sortedPublicGames {
+            for game in Array(state.activeGames.values) + state.sortedPublicGames
+                + (state.finishedGamesSnapshot ?? []) {
                 for player in [game.blackPlayer, game.whitePlayer].compactMap({ $0 }) {
                     profileUsers[player.id] = player
                 }
                 for line in game.chatLog {
                     profileUsers[line.user.id] = line.user
+                }
+            }
+            for message in state.privateMessages {
+                for participant in [message.from, message.to]
+                    where profileUsers[participant.id] == nil {
+                    profileUsers[participant.id] = participant
                 }
             }
             state.playerProfilesById = SurroundUITestContract.simulatesUnavailableProfile

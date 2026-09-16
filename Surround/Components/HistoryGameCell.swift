@@ -274,6 +274,7 @@ struct HistoryGameCell: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .modifier(GamePlayerProfileMenu(game: game))
     }
 }
 

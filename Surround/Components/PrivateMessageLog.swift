@@ -52,6 +52,7 @@ struct PrivateMessageLine: View {
 
 struct PrivateMessageLog: View {
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     var peer: OGSUser
 
@@ -76,6 +77,7 @@ struct PrivateMessageLog: View {
     @State var shouldScrollToEndAfterKeyboardChange = false
     @State var newChat = ""
     @State var chatSendingCancellable: AnyCancellable?
+    @State private var hasAppeared = false
     
     func sendMessage() {
         guard allowsRemoteActivity else { return }
@@ -128,8 +130,13 @@ struct PrivateMessageLog: View {
                     .padding(.vertical, 5)
                     .onAppear {
                         ogs.setUpNewPeerIfNecessary(peerId: peer.id)
-                        scrollView.scrollTo("scrollViewBottom")
-                        markThreadAsRead()
+                        if !hasAppeared {
+                            hasAppeared = true
+                            scrollView.scrollTo("scrollViewBottom")
+                            markThreadAsRead()
+                        } else if atEndOfChat {
+                            markThreadAsRead()
+                        }
                     }
                     .onChange(of: messages) {
                         if atEndOfChat {
@@ -155,9 +162,11 @@ struct PrivateMessageLog: View {
     var body: some View {
         VStack(spacing: 0) {
             messagesScrollView
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileConversation)
             Divider()
             HStack {
                 TextField(String("Aa"), text: $newChat, onCommit: sendMessage)
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.privateMessageComposer)
                 if self.chatSendingCancellable == nil {
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
@@ -168,6 +177,33 @@ struct PrivateMessageLog: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+        }
+        .toolbar {
+            if peer.id > 0, let openPlayerProfile {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        openPlayerProfile(peer)
+                    } label: {
+                        AsyncImage(url: allowsRemoteActivity ? peer.iconURL(ofSize: 64) : nil) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Image(systemName: "person.crop.square.fill")
+                                .resizable()
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(Text(
+                        "View \(peer.username)’s profile",
+                        comment: "Accessibility label for a button that opens a player's profile"
+                    ))
+                    .accessibilityValue(Text(verbatim: peer.usernameAndRank))
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(peer.id))
+                }
+            }
         }
     }
 }

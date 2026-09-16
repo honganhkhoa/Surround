@@ -10,10 +10,35 @@ import Combine
 
 struct RengoPlayerCard: View {
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     var challenge: any OGSChallenge
     var player: OGSUser
     var color: StoneColor?
     @State var playerAsssignCancellable: AnyCancellable?
+    @State private var draftAccessibilityID = UUID()
+
+    private var canManageTeams: Bool {
+        player.id > 0
+            && challenge is OGSSeekgraphChallenge
+            && ogs.user?.id != nil
+            && challenge.challenger?.id == ogs.user?.id
+    }
+
+    private var canOpenProfile: Bool {
+        player.id > 0 && openPlayerProfile != nil
+    }
+
+    private var challengeAccessibilityID: String {
+        if let challenge = challenge as? any OGSSubmittedChallenge {
+            return String(challenge.id)
+        }
+        return "draft-\(draftAccessibilityID.uuidString)"
+    }
+
+    private var avatar: some View {
+        AsyncImage(url: player.iconURL(ofSize: 40)) { $0.resizable() } placeholder: { Color.gray }
+            .frame(width: 40, height: 40)
+    }
     
     func assignPlayer(to newColor: StoneColor?) {
         if let challenge = challenge as? OGSSeekgraphChallenge {
@@ -27,35 +52,53 @@ struct RengoPlayerCard: View {
     
     var body: some View {
         HStack(spacing: 1) {
-            Menu {
-                Text(verbatim: "\(player.usernameAndRank)")
-                if let userId = ogs.user?.id, challenge.challenger?.id == userId {
-                    Divider()
-                    if color != .black {
-                        Button(action: { assignPlayer(to: .black) }) {
-                            Label("Move to Black team", systemImage: "arrow.up")
+            if canOpenProfile || canManageTeams {
+                Menu {
+                    if player.id > 0, let openPlayerProfile {
+                        Button {
+                            openPlayerProfile(player)
+                        } label: {
+                            Text("View Profile")
+                            Text(verbatim: player.usernameAndRank)
+                            Image(systemName: "person.crop.circle")
                         }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRengoEntry(challengeAccessibilityID, player.id))
+                    } else {
+                        Text(verbatim: player.usernameAndRank)
                     }
-                    if color != .white {
-                        if color == nil {
-                            Button(action: { assignPlayer(to: .white) }) {
-                                Label("Move to White team", systemImage: "arrow.up")
+                    if canManageTeams {
+                        Divider()
+                        if color != .black {
+                            Button(action: { assignPlayer(to: .black) }) {
+                                Label("Move to Black team", systemImage: "arrow.up")
                             }
-                        } else {
-                            Button(action: { assignPlayer(to: .white) }) {
-                                Label("Move to White team", systemImage: "arrow.down")
+                        }
+                        if color != .white {
+                            if color == nil {
+                                Button(action: { assignPlayer(to: .white) }) {
+                                    Label("Move to White team", systemImage: "arrow.up")
+                                }
+                            } else {
+                                Button(action: { assignPlayer(to: .white) }) {
+                                    Label("Move to White team", systemImage: "arrow.down")
+                                }
+                            }
+                        }
+                        if color != nil {
+                            Button(action: { assignPlayer(to: nil) }) {
+                                Label("Unassign", systemImage: "arrow.down")
                             }
                         }
                     }
-                    if color != nil {
-                        Button(action: { assignPlayer(to: nil) }) {
-                            Label("Unassign", systemImage: "arrow.down")
-                        }
-                    }
+                } label: {
+                    avatar
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
-            } label: {
-                AsyncImage(url: player.iconURL(ofSize: 40)) { $0.resizable() } placeholder: { Color.gray }
-                .frame(width: 40, height: 40)
+                .accessibilityLabel(Text(verbatim: player.usernameAndRank))
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRengoMenu(challengeAccessibilityID, player.id))
+            } else {
+                avatar
             }
             if playerAsssignCancellable == nil {
                 if !Setting(.hidesRank).wrappedValue {
@@ -190,6 +233,16 @@ struct RengoActions: View {
     @EnvironmentObject var ogs: OGSService
     @State var ogsRequestCancellable: AnyCancellable?
     @EnvironmentObject var nav: NavigationService
+    @Environment(\.openPlayerConversation) private var openPlayerConversation
+
+    private var messageOrganizerLabel: some View {
+        HStack(spacing: 4) {
+            Text("Message organizer")
+            Image(systemName: "chevron.forward")
+        }
+        .font(.subheadline.bold())
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     func joinRengoChallenge() {
         self.ogsRequestCancellable = ogs.joinRengoChallenge(challenge: challenge)
@@ -285,17 +338,22 @@ struct RengoActions: View {
                     Text("Waiting for players to join and the organizer to start the game.")
                         .font(.subheadline)
                         .leadingAlignedInScrollView()
-                    NavigationLink(
-                        destination: PrivateMessageLog(peer: host)
-                            .navigationBarTitle(host.username)
-                            .navigationBarTitleDisplayMode(.inline)
-                    ) {
-                        HStack(spacing: 4) {
-                            Text("Message organizer")
-                            Image(systemName: "chevron.forward")
+                    if host.id > 0 {
+                        if let openPlayerConversation {
+                            Button {
+                                openPlayerConversation(host)
+                            } label: {
+                                messageOrganizerLabel
+                            }
+                        } else {
+                            NavigationLink(
+                                destination: PrivateMessageLog(peer: host)
+                                    .navigationBarTitle(host.username)
+                                    .navigationBarTitleDisplayMode(.inline)
+                            ) {
+                                messageOrganizerLabel
+                            }
                         }
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -306,9 +364,50 @@ struct RengoActions: View {
 struct ChallengeCell: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     var challenge: any OGSChallenge
     var hidePlayerDetails: Bool = false
     @State var ogsRequestCancellable: AnyCancellable?
+    @State private var draftAccessibilityID = UUID()
+
+    private var challengeAccessibilityID: String {
+        if let challenge = challenge as? any OGSSubmittedChallenge {
+            return String(challenge.id)
+        }
+        return "draft-\(draftAccessibilityID.uuidString)"
+    }
+
+    /// Keeps every identity target comfortably tappable. Callers group their
+    /// content so the minimum is already covered, leaving the card's height
+    /// unchanged while small text sizes still get a full-height target.
+    @ViewBuilder
+    private func profileEntry<Content: View>(
+        for player: OGSUser,
+        accessibilityIdentifier: String,
+        accessibilityValue: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if player.id > 0, let openPlayerProfile {
+            Button {
+                openPlayerProfile(player)
+            } label: {
+                content()
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                Text(
+                    "View \(player.username)’s profile",
+                    comment: "Accessibility label for a button that opens a player's profile"
+                )
+            )
+            .accessibilityValue(Text(verbatim: accessibilityValue ?? player.usernameAndRank))
+            .accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            content()
+        }
+    }
 
     private func rulesAttributedLabel(for rulesName: String) -> AttributedString {
         var rulesLabel = AttributedString(String(localized: "Rules: "))
@@ -386,43 +485,60 @@ struct ChallengeCell: View {
                         if SurroundUITestContract.isCapturingAppStoreScreenshots
                             || challenger.iconURL(ofSize: 64) != nil
                         {
-                            ZStack(alignment: .bottomTrailing) {
-                                Group {
-                                    #if DEBUG && MAIN_APP
-                                    if SurroundUITestContract.isCapturingAppStoreScreenshots {
-                                        AppStoreScreenshotAvatar(player: challenger, size: 64)
-                                    } else if let iconURL = challenger.iconURL(ofSize: 64) {
-                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                            profileEntry(
+                                for: challenger,
+                                accessibilityIdentifier: SurroundUITestContract.AccessibilityID.profileChallengeAvatarEntry(challengeAccessibilityID, challenger.id)
+                            ) {
+                                ZStack(alignment: .bottomTrailing) {
+                                    Group {
+                                        #if DEBUG && MAIN_APP
+                                        if SurroundUITestContract.isCapturingAppStoreScreenshots {
+                                            AppStoreScreenshotAvatar(player: challenger, size: 64)
+                                        } else if let iconURL = challenger.iconURL(ofSize: 64) {
+                                            AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                        }
+                                        #else
+                                        if let iconURL = challenger.iconURL(ofSize: 64) {
+                                            AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
+                                        }
+                                        #endif
                                     }
-                                    #else
-                                    if let iconURL = challenger.iconURL(ofSize: 64) {
-                                        AsyncImage(url: iconURL) { $0.resizable() } placeholder: { Color.gray }
-                                    }
-                                    #endif
-                                }
-                                    .frame(width: 64, height: 64)
-                                    .background(Color.gray)
-                                Stone(color: challengerStoneColor, shadowRadius: 1)
-                                    .frame(width: 20, height: 20)
-                                    .offset(x: 10, y: 10)
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(challenge.game.name)
-                                .font(.headline)
-                            HStack {
-                                if !SurroundUITestContract.isCapturingAppStoreScreenshots
-                                    && challenger.icon == nil
-                                {
+                                        .frame(width: 64, height: 64)
+                                        .background(Color.gray)
                                     Stone(color: challengerStoneColor, shadowRadius: 1)
                                         .frame(width: 20, height: 20)
+                                        .offset(x: 10, y: 10)
                                 }
-                                Text(verbatim: challenger.usernameAndRank)
                             }
-                            if challenge.game.isPrivate {
-                                Text("Private")
-                                    .italic()
-                                    .font(.subheadline)
+                        }
+                        // Keep the title and name in one target so the 44-point
+                        // minimum does not add a second full-height text row.
+                        profileEntry(
+                            for: challenger,
+                            accessibilityIdentifier: SurroundUITestContract.AccessibilityID.profileChallengeEntry(challengeAccessibilityID, challenger.id),
+                            accessibilityValue: [
+                                challenge.game.name,
+                                challenger.usernameAndRank,
+                                challenge.game.isPrivate ? String(localized: "Private") : nil,
+                            ].compactMap { $0 }.joined(separator: ", ")
+                        ) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(challenge.game.name)
+                                    .font(.headline)
+                                HStack {
+                                    if !SurroundUITestContract.isCapturingAppStoreScreenshots
+                                        && challenger.icon == nil
+                                    {
+                                        Stone(color: challengerStoneColor, shadowRadius: 1)
+                                            .frame(width: 20, height: 20)
+                                    }
+                                    Text(verbatim: challenger.usernameAndRank)
+                                }
+                                if challenge.game.isPrivate {
+                                    Text("Private")
+                                        .italic()
+                                        .font(.subheadline)
+                                }
                             }
                         }
                         Spacer()

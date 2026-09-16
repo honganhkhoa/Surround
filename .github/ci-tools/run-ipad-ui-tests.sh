@@ -77,6 +77,7 @@ readonly composer_test_names=(
   testAnalyzeShareComposerAutomaticallyFocusesAndAcceptsName
   testShareVariationUsesSelectedChannelAndStaysInChatAfterSending
   testAnalyzeTrunkMarkersShareWithoutLeakingToLiveBoard
+  testPrivateMessageProfileEntriesPreserveConversationDraft
 )
 
 # xcodebuild accepts an unknown -only-testing selector and exits successfully

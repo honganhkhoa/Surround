@@ -290,7 +290,7 @@ struct NewGameView: View {
         return VStack(spacing: 0) {
             if displayedWaitingGames > 0 {
                 Spacer().frame(height: 0.5)
-                NavigationLink(destination: WaitingGamesView()) {
+                NavigationLink(value: StackRoute.waitingGames) {
                     HStack(spacing: 4) {
                         Text(
                             displayedWaitingGames == 1
@@ -323,7 +323,7 @@ struct NewGameView: View {
             }
             if ogs.pendingRengoGames > 0 {
                 Spacer().frame(height: 0.5)
-                NavigationLink(destination: WaitingGamesView()) {
+                NavigationLink(value: StackRoute.waitingGames) {
                     HStack {
                         HStack(spacing: 4) {
                             Text("\(ogs.pendingRengoGames) pending Rengo games ")

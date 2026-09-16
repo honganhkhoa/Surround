@@ -10,6 +10,29 @@ final class StackRouterTests: XCTestCase {
     private var firstPlayer: User { User(username: "First player", id: 101) }
     private var secondPlayer: User { User(username: "Second player", id: 102) }
 
+    func testMessageFromConversationProfileReturnsToExistingConversation() {
+        let router = Router()
+        router.openConversation(firstPlayer)
+        router.openProfile(firstPlayer)
+        router.openConversation(firstPlayer)
+
+        XCTAssertEqual(router.path, [.conversation(firstPlayer.id)])
+        XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+    }
+
+    func testConversationAvatarReturnsToExistingProfileWithoutStacking() {
+        let router = Router()
+        router.present(.waitingGames)
+        router.openProfile(firstPlayer)
+        router.openConversation(firstPlayer)
+        router.openProfile(firstPlayer)
+
+        XCTAssertEqual(router.path, [.waitingGames, .profile(playerID: firstPlayer.id, selectionID: nil)])
+        router.path.removeLast()
+        XCTAssertEqual(router.path, [.waitingGames])
+        XCTAssertTrue(router.users.isEmpty)
+    }
+
     private func pickerID(in router: Router) throws -> UUID {
         let id: UUID?
         if case .opponentPicker(let pickerID) = router.path.last { id = pickerID }

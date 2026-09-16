@@ -7,6 +7,7 @@ enum StackRoute: Hashable {
     case gameHistory
     case historyGame
     case publicGame
+    case waitingGames
     case profile(playerID: Int, selectionID: UUID?)
     case challenge(UUID)
     case opponentPicker(UUID)
@@ -90,12 +91,17 @@ final class StackRouter: ObservableObject {
         guard user.id > 0 else { return }
         if let selectionID, selections[selectionID] == nil { return }
         users[user.id] = user
-        present(.profile(playerID: user.id, selectionID: selectionID))
+        let route = StackRoute.profile(playerID: user.id, selectionID: selectionID)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
     }
 
     func openConversation(_ user: OGSUser) {
+        guard user.id > 0 else { return }
         users[user.id] = user
-        present(.conversation(user.id))
+        let route = StackRoute.conversation(user.id)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
     }
 
     func openChallenge(for user: OGSUser) {
@@ -244,6 +250,8 @@ struct AppNavigationStack<Content: View>: View {
                 }
         }
         .environmentObject(navigation)
+        .environment(\.openPlayerProfile) { navigation.openProfile($0) }
+        .environment(\.openPlayerConversation) { navigation.openConversation($0) }
         .onAppear {
             isVisible = true
             updateActivity()
@@ -287,6 +295,8 @@ struct AppNavigationStack<Content: View>: View {
                            allowsActiveGamesCarousel: false)
         case .publicGame:
             GameDetailView(currentGame: $nav.publicGames.activeGame)
+        case .waitingGames:
+            WaitingGamesView()
         case .profile(let playerID, let selectionID):
             if let user = navigation.users[playerID] {
                 PlayerProfileView(user: user, selectionID: selectionID)
@@ -296,7 +306,6 @@ struct AppNavigationStack<Content: View>: View {
                 PrivateMessageLog(peer: user)
                     .navigationTitle(user.username)
                     .navigationBarTitleDisplayMode(.inline)
-                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileConversation)
             }
         case .challenge(let id):
             if let draft = navigation.drafts[id] {

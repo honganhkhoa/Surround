@@ -1697,6 +1697,233 @@ final class SurroundUITests: SurroundUITestCase {
         return control
     }
 
+    private func openProfileContextMenu(
+        for row: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        scrollIntoTappableArea(row, in: app)
+        XCTAssertTrue(row.isHittable, "The row must be visible before opening its context menu.")
+        #if targetEnvironment(macCatalyst)
+        row.rightClick()
+        #else
+        row.press(forDuration: 1)
+        #endif
+    }
+
+    private func assertLoadedProfile(
+        named username: String,
+        in app: XCUIApplication
+    ) {
+        let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        let identity = header.descendants(matching: .staticText).matching(
+            NSPredicate(format: "label == %@ OR label BEGINSWITH %@", username, username + " [")
+        ).firstMatch
+        XCTAssertTrue(identity.waitForExistence(timeout: 10),
+                      "The selected player's identity must appear in the loaded profile.")
+    }
+
+    func testHomeGameMenusOpenOpponentProfilesWithoutOpeningGames() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
+        let games = [
+            (SurroundUITestContract.screenshotPrimaryGameID,
+             SurroundUITestContract.AccessibilityID.homeGame(SurroundUITestContract.screenshotPrimaryGameID),
+             SurroundUITestContract.profileFixtureOpponentID, "CopperKoi"),
+            (SurroundUITestContract.screenshotHistoryGameIDs[0],
+             SurroundUITestContract.AccessibilityID.homeHistoryGame(SurroundUITestContract.screenshotHistoryGameIDs[0]),
+             851_001, "CedarWave"),
+        ]
+        for (gameID, rowID, playerID, username) in games {
+            let row = elementAfterScrolling(rowID, in: app)
+            openProfileContextMenu(for: row, in: app)
+            let profileAction = requiredMenuButton(
+                SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, playerID),
+                title: "View Profile", in: app
+            )
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+                SurroundUITestContract.AccessibilityID.profileGameMenuEntry(
+                    gameID, SurroundUITestContract.profileFixtureOwnerID
+                )
+            ).firstMatch.exists, "Game menus should offer the opponent, excluding the viewer.")
+            tap(profileAction, description: "View \(username)'s profile", in: app)
+            assertLoadedProfile(named: username, in: app)
+            navigateBackFromPlayerProfile(in: app)
+            element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+            XCTAssertTrue(row.exists)
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+                SurroundUITestContract.AccessibilityID.gameDetail(gameID)
+            ).firstMatch.exists, "Opening the context-menu profile must not also open the game.")
+        }
+    }
+
+    func testGameHistoryMenuOpensOpponentProfile() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameHistory.rawValue,
+        ])
+        let gameID = SurroundUITestContract.screenshotHistoryGameIDs[0]
+        let row = element(SurroundUITestContract.AccessibilityID.homeHistoryGame(gameID), in: app)
+        openProfileContextMenu(for: row, in: app)
+        tap(requiredMenuButton(
+            SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 851_001),
+            title: "View Profile", in: app
+        ), description: "View the historical opponent's profile", in: app)
+        assertLoadedProfile(named: "CedarWave", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenGameHistory, in: app)
+        XCTAssertTrue(row.exists)
+        // A normal row tap must keep its existing game-navigation behavior.
+        tap(row, description: "Open the historical game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+    }
+
+    func testPublicGameMenuOffersBothPlayers() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.publicGames.rawValue,
+        ])
+        let gameID = SurroundUITestContract.screenshotPublicGameID
+        let row = element(SurroundUITestContract.AccessibilityID.publicGame(gameID), in: app)
+        for (playerID, username) in [(901_001, "MapleLeaf"), (901_002, "SilverPine")] {
+            openProfileContextMenu(for: row, in: app)
+            // The shared title is intentionally identical. Resolve by player
+            // ID so this proves that each item selects its own participant.
+            let black = element(SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 901_001), in: app)
+            let white = element(SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 901_002), in: app)
+            XCTAssertTrue(black.exists && white.exists)
+            if playerID == 901_001 {
+                keepScreenshot("Public game – profile actions for both players", in: app)
+            }
+            tap(element(
+                SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, playerID), in: app
+            ), description: "View \(username)'s profile", in: app)
+            assertLoadedProfile(named: username, in: app)
+            navigateBackFromPlayerProfile(in: app)
+            element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+            XCTAssertTrue(row.exists)
+        }
+        tap(row, description: "Open the public game normally", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+    }
+
+    func testChallengeIdentityOpensProfileWithoutAccepting() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.openChallenges.rawValue,
+        ])
+        let entryID = SurroundUITestContract.AccessibilityID.profileChallengeEntry(91_001, 801_001)
+        let entry = elementAfterScrolling(entryID, in: app, matching: .button)
+        scrollIntoTappableArea(entry, in: app)
+        keepScreenshot("Challenge card – compact profile target", in: app)
+        tap(entry, description: "View the challenger", in: app)
+        assertLoadedProfile(named: "BambooPath", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpenChallenges, in: app)
+        element(entryID, in: app, matching: .button)
+        XCTAssertTrue(app.buttons["Accept"].firstMatch.exists,
+                      "Viewing a challenger must leave their challenge available.")
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+
+    func testRengoPlayerMenuOpensProfileForNonOrganizer() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.rengoOpenChallenges.rawValue,
+        ])
+        let prefix = SurroundUITestContract.AccessibilityID.profileRengoMenuPrefix
+        let avatars = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        XCTAssertTrue(avatars.firstMatch.waitForExistence(timeout: 10))
+        // The fixture's twenty challenges are grouped and sorted by clock.
+        // Exercise the first visible participant, without hunting a specific
+        // card across the entire challenge list.
+        let avatar = avatars.allElementsBoundByIndex.first(where: { $0.isHittable })
+            ?? avatars.firstMatch
+        scrollIntoTappableArea(avatar, in: app)
+        let menuID = avatar.identifier
+        let identifiers = menuID.dropFirst(prefix.count).split(separator: ".")
+        guard identifiers.count == 2,
+              let challengeID = Int(identifiers[0]),
+              let playerID = Int(identifiers[1]) else {
+            XCTFail("Expected a Rengo menu identifying its challenge and player: \(menuID)")
+            return
+        }
+        let playerLabel = avatar.label
+        let username = playerLabel.range(of: " [", options: .backwards)
+            .map { String(playerLabel[..<$0.lowerBound]) } ?? playerLabel
+        tap(avatar, description: "Open the Rengo player's menu", in: app)
+        let profileAction = requiredMenuButton(
+            SurroundUITestContract.AccessibilityID.profileRengoEntry(challengeID, playerID),
+            title: "View Profile", in: app
+        )
+        XCTAssertFalse(app.buttons["Move to White team"].exists)
+        XCTAssertFalse(app.menuItems["Move to White team"].exists,
+                       "A nonorganizer must not gain team-management actions.")
+        tap(profileAction, description: "View the Rengo player's profile", in: app)
+        assertLoadedProfile(named: username, in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpenChallenges, in: app)
+        element(menuID, in: app)
+    }
+
+    func testPrivateMessageProfileEntriesPreserveConversationDraft() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.messagesInbox.rawValue,
+        ])
+        let peerID = 765_826
+        let rowID = SurroundUITestContract.AccessibilityID.privateMessageRow(peerID)
+        let toolbarID = SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(peerID)
+        let row = element(rowID, in: app)
+        openProfileContextMenu(for: row, in: app)
+        tap(requiredMenuButton(
+            SurroundUITestContract.AccessibilityID.profileMessageMenuEntry(peerID),
+            title: "View Profile", in: app
+        ), description: "View the message-list peer's profile", in: app)
+        assertLoadedProfile(named: "hakhoa", in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileConversation, in: app)
+        tap(toolbarID, in: app, matching: .button)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        // The toolbar must return to the existing profile, whose Back still
+        // reaches the inbox, rather than growing profile/conversation loops.
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+
+        tap(rowID, in: app)
+        let composer = element(SurroundUITestContract.AccessibilityID.privateMessageComposer, in: app, matching: .textField)
+        let draft = "Keep this private message draft"
+        tap(composer, description: "Private-message composer", in: app)
+        composer.typeText(draft)
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        keepScreenshot("Private message – unsent draft and profile toolbar", in: app)
+        tap(toolbarID, in: app, matching: .button)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10),
+                      "Back from the toolbar profile must retain the unsent draft.")
+
+        tap(toolbarID, in: app, matching: .button)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10),
+                      "Message must reuse the existing conversation and its unsent draft.")
+        let navigationBar = app.navigationBars["hakhoa"].firstMatch
+        let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
+        let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
+        tap(back, description: "Return from the conversation to the inbox", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+        element(rowID, in: app)
+    }
+
     func testOwnProfileFromSettingsOffersAccountActions() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
