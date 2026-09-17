@@ -54,6 +54,7 @@ struct PlayerProfileView: View {
     @State private var attempt = 0
     @State private var loadedFor: LoadIdentity?
     @State private var refreshAfterEditing = false
+    @State private var activeGames: ProfileActiveGames?
 
     private var loadIdentity: LoadIdentity {
         LoadIdentity(playerID: user.id, viewerID: ogs.user?.id, attempt: attempt)
@@ -68,6 +69,11 @@ struct PlayerProfileView: View {
     private var loadedProfile: OGSPlayerProfile? {
         guard case .loaded(let profile) = state else { return nil }
         return profile
+    }
+
+    private var title: Text {
+        let player = loadedProfile?.user ?? user
+        return player.id == ogs.user?.id ? Text("Profile") : Text(verbatim: player.username)
     }
 
     private var identityHeader: some View {
@@ -93,6 +99,7 @@ struct PlayerProfileView: View {
             for try await profile in ogs.fetchPlayerProfile(playerId: identity.playerID).values {
                 try Task.checkCancellation()
                 guard identity == loadIdentity else { return }
+                activeGames = ogs.profileActiveGames(from: profile)
                 state = .loaded(profile)
                 loadedFor = identity
                 return
@@ -105,8 +112,10 @@ struct PlayerProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 0) {
                 identityHeader
+                    .profileContentMargins()
+                    .padding(.vertical, 12)
                 switch state {
                 case .loading:
                     ProgressView("Loading profile…")
@@ -115,6 +124,11 @@ struct PlayerProfileView: View {
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileLoading)
                 case .loaded(let profile):
                     actions(for: profile.user)
+                        .profileContentMargins()
+                        .padding(.bottom, 16)
+                    PlayerProfileRatings(user: profile.user)
+                    PlayerProfileGames(profile: profile, activeGames: activeGames,
+                                       refreshID: attempt)
                 case .failed:
                     ContentUnavailableView {
                         Label("Unable to load profile", systemImage: "person.crop.circle.badge.exclamationmark")
@@ -128,12 +142,11 @@ struct PlayerProfileView: View {
                     }
                 }
             }
-            .padding(24)
-            .frame(maxWidth: 720, alignment: .leading)
+            .padding(.bottom, 16)
             .frame(maxWidth: .infinity)
         }
         .background(Color(.systemBackground))
-        .navigationTitle("Profile")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
         .toolbar(.visible, for: .navigationBar)
@@ -152,7 +165,7 @@ struct PlayerProfileView: View {
     @ViewBuilder
     private func actions(for player: OGSUser) -> some View {
         if player.id == ogs.user?.id {
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 Button {
                     refreshAfterEditing = true
                     openURL(profileURL)
@@ -170,7 +183,7 @@ struct PlayerProfileView: View {
                 .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileShare)
             }
         } else if ogs.isLoggedIn {
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 if let selectionID, let selection = navigation.selections[selectionID] {
                     Button {
                         navigation.selectOpponent(player, selectionID: selectionID, viewerID: ogs.user?.id)
@@ -211,6 +224,7 @@ struct PlayerProfileView: View {
 }
 
 private struct PlayerProfileIdentity: View {
+    @ObservedObject private var settings = userDefaults
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -233,8 +247,8 @@ private struct PlayerProfileIdentity: View {
 
     private var nameColor: Color {
         // The standard orange/green role colors are too light on white.
-        if colorScheme == .light, !user.isOGSModerator {
-            if user.uiClass?.contains("professional") == true {
+        if colorScheme == .light, !user.isOGSModerator, !user.isOGSAdmin {
+            if user.isOGSProfessional {
                 return Color(red: 0.06, green: 0.42, blue: 0.20)
             }
             if user.isOGSSupporter {
@@ -263,7 +277,7 @@ private struct PlayerProfileIdentity: View {
         if dynamicTypeSize.isAccessibilitySize || (availableWidth > 0 && availableWidth < 320) {
             return AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
         }
-        return AnyLayout(HStackLayout(alignment: .top, spacing: 20))
+        return AnyLayout(HStackLayout(alignment: .top, spacing: 16))
     }
 
     private var avatar: some View {
@@ -282,7 +296,7 @@ private struct PlayerProfileIdentity: View {
     }
 
     private var details: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: user.usernameAndRank)
                 .font(.title2.bold())
                 .foregroundStyle(nameColor)
@@ -294,7 +308,7 @@ private struct PlayerProfileIdentity: View {
                     .padding(.vertical, 4)
                     .background(.tint.opacity(0.12), in: Capsule())
             }
-            if user.isOGSSupporter || user.supporter == true {
+            if user.isOGSSupporter {
                 Label("OGS Supporter", systemImage: "heart.fill")
                     .font(.caption)
             }

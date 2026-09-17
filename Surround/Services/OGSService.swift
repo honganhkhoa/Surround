@@ -32,6 +32,66 @@ struct FinishedGameDetail {
     let rawData: [String: Any]
 }
 
+/// A profile retains wire entries for its complete active list, but replays
+/// boards only as rows appear. The preview and full list share resolved models.
+final class ProfileActiveGames: ObservableObject {
+    let playerID: Int
+    @Published private(set) var entries: [OGSProfileActiveGame]
+    private(set) var resolvedGames: [Int: Game] = [:]
+    private weak var service: OGSService?
+
+    fileprivate init(playerID: Int, entries: [OGSProfileActiveGame], service: OGSService) {
+        self.playerID = playerID
+        self.service = service
+        var seenIDs = Set<Int>()
+        self.entries = entries.filter {
+            $0.id > 0 && $0.gameData.gameId == $0.id && seenIDs.insert($0.id).inserted
+        }
+        refreshMembership()
+    }
+
+    func game(for entry: OGSProfileActiveGame) -> Game {
+        let game = service?.knownProfileGame(gameID: entry.id)
+            ?? resolvedGames[entry.id]
+            ?? Game(ogsGame: entry.gameData)
+        // A summary can precede its detail response. Never replace an existing
+        // live snapshot or undo a finished phase received before full detail.
+        if game.gameData == nil, game.gamePhase != .finished {
+            game.gameData = entry.gameData
+        }
+        if let service, game.ogs !== service {
+            game.ogs = service
+        }
+        resolvedGames[entry.id] = game
+        return game
+    }
+
+    /// Returning from a game can reveal a finished game or changed Rengo team.
+    /// Unseen rows remain cheap: only their decoded membership fields are read.
+    func refreshMembership() {
+        let currentEntries = entries.filter { entry in
+            let data = entry.gameData
+            guard data.phase != .finished else { return false }
+            if let known = service?.knownProfileGame(gameID: entry.id) ?? resolvedGames[entry.id] {
+                guard known.gamePhase != .finished else { return false }
+                if known.gameData != nil {
+                    return known.stoneColor(ofPlayerWithId: playerID) != nil
+                }
+            }
+            if data.rengo == true {
+                return data.rengoTeams?.black.contains(where: { $0.id == playerID }) == true
+                    || data.rengoTeams?.white.contains(where: { $0.id == playerID }) == true
+            }
+            return data.players.black.id == playerID || data.players.white.id == playerID
+        }
+        let currentIDs = Set(currentEntries.map(\.id))
+        resolvedGames = resolvedGames.filter { currentIDs.contains($0.key) }
+        if currentEntries.map(\.id) != entries.map(\.id) {
+            entries = currentEntries
+        }
+    }
+}
+
 /// The HTTP and WebSocket endpoints that make up one OGS environment.
 ///
 /// Pass the same value to every dependency owned by an `OGSService`. Keeping
@@ -722,9 +782,12 @@ class OGSService: ObservableObject {
         var preferredGameSettings = Set<OGSChallengeTemplate>()
         var privateMessages = [OGSPrivateMessage]()
 
-        /// A complete deterministic first page. A non-nil value suppresses
-        /// network-backed history loading and has no subsequent page.
+        /// A complete deterministic history feed, filtered and paginated locally.
+        /// A non-nil value suppresses network-backed history loading.
         var finishedGamesSnapshot: [Game]?
+
+        /// Optional per-player feeds keep profile fixtures independent of Home.
+        var finishedGamesByPlayerId: [Int: [Game]]? = nil
 
         /// A non-nil dictionary makes every profile lookup deterministic,
         /// including missing profiles, without falling back to HTTP.
@@ -859,9 +922,13 @@ class OGSService: ObservableObject {
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
     private var finishedGamesSnapshot: [Game]?
+    private var finishedGamesByPlayerId: [Int: [Game]]?
     #if DEBUG && MAIN_APP
     var offlineUITestFinishedGames: [Game] {
-        finishedGamesSnapshot ?? []
+        Self.mergingFinishedGames(
+            finishedGamesSnapshot ?? [],
+            with: finishedGamesByPlayerId?.values.flatMap { $0 } ?? []
+        )
     }
     #endif
     private var activeGamesSortingCancellable: AnyCancellable?
@@ -1044,6 +1111,7 @@ class OGSService: ObservableObject {
         cachedUsersById = state.cachedUsersById
         preferredGameSettings = state.preferredGameSettings
         finishedGamesSnapshot = state.finishedGamesSnapshot
+        finishedGamesByPlayerId = state.finishedGamesByPlayerId
         playerProfilesById = state.playerProfilesById
 
         for game in activeGames.values {
@@ -1054,7 +1122,8 @@ class OGSService: ObservableObject {
             game.ogs = self
             game.ogsRawData = game.ogsRawData ?? [:]
         }
-        for game in state.finishedGamesSnapshot ?? [] {
+        for game in (state.finishedGamesSnapshot ?? [])
+            + (state.finishedGamesByPlayerId?.values.flatMap { $0 } ?? []) {
             game.ogs = self
             game.ogsRawData = game.ogsRawData ?? [:]
         }
@@ -1953,6 +2022,19 @@ class OGSService: ObservableObject {
         .eraseToAnyPublisher()
     }
 
+    /// Keeps profile thumbnails lazy without acquiring realtime connections.
+    func profileActiveGames(from profile: OGSPlayerProfile) -> ProfileActiveGames? {
+        guard let entries = profile.activeGames else { return nil }
+        return ProfileActiveGames(playerID: profile.id, entries: entries, service: self)
+    }
+
+    fileprivate func knownProfileGame(gameID: Int) -> Game? {
+        desiredGameConnections[gameID]?.game
+            ?? connectedGames[gameID]
+            ?? activeGames[gameID]
+            ?? publicGames[gameID]
+    }
+
     func fetchPlayerInfo(userIds: [Int]) -> AnyPublisher<[OGSUser], Error> {
         guard userIds.count > 0 else {
             return Just([OGSUser]()).setFailureType(to: Error.self).eraseToAnyPublisher()
@@ -2269,68 +2351,98 @@ class OGSService: ObservableObject {
     ///   present here is returned as-is instead of being rebuilt, so repeated
     ///   refreshes do not pile up duplicate `Game` objects (each of which owns
     ///   a board-position tree and a player-cache subscription).
-    func fetchFinishedGames(playerId: Int, page: Int, pageSize: Int = 50, reusing existingGames: [Int: Game] = [:]) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
-        if let finishedGamesSnapshot {
-            let games = page == 1
-                ? Array(finishedGamesSnapshot.prefix(pageSize))
-                : []
-            return Just((games: games, hasNextPage: false))
+    func fetchFinishedGames(
+        playerId: Int,
+        page: Int,
+        pageSize: Int = 50,
+        opponentId: Int? = nil,
+        botGames: Bool = false,
+        reusing existingGames: [Int: Game] = [:]
+    ) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
+        Deferred { () -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> in
+            guard playerId > 0, page > 0, pageSize > 0,
+                  opponentId.map({ $0 > 0 }) ?? true else {
+                return Fail(error: OGSServiceError.invalidJSON).eraseToAnyPublisher()
+            }
+            let offset = (page - 1).multipliedReportingOverflow(by: pageSize)
+            guard !offset.overflow else {
+                return Fail(error: OGSServiceError.invalidJSON).eraseToAnyPublisher()
+            }
+            if let snapshot = self.finishedGamesByPlayerId?[playerId] ?? self.finishedGamesSnapshot {
+                let matchingGames = snapshot.filter { game in
+                    guard game.stoneColor(ofPlayerWithId: playerId) != nil,
+                          opponentId.map({ game.stoneColor(ofPlayerWithId: $0) != nil }) ?? true else {
+                        return false
+                    }
+                    let hasBot = game.playerByOGSId.values.contains {
+                        $0.isBot == true || $0.uiClass?.contains("bot") == true
+                    }
+                    return hasBot == botGames
+                }
+                let games = Array(matchingGames.dropFirst(offset.partialValue).prefix(pageSize))
+                return Just((
+                    games: games,
+                    hasNextPage: offset.partialValue < matchingGames.count
+                        && games.count < matchingGames.count - offset.partialValue
+                ))
                 .setFailureType(to: Error.self)
                 .eraseToAnyPublisher()
-        }
+            }
 
-        let requestAuthenticationGeneration = authenticationGeneration
-        return Future<(games: [Game], hasNextPage: Bool), Error> { promise in
-            let parameters: [String: Any] = [
-                // The official history view defaults to human games. Bot games
-                // are a separately paginated feed on this endpoint.
-                // Match the official web client's literal spelling. Django's
-                // BooleanWidget also accepts Alamofire's numeric `0`.
-                "bot_game": "false",
+            let requestAuthenticationGeneration = self.authenticationGeneration
+            var parameters: [String: Any] = [
+                "bot_game": botGames ? "true" : "false",
                 "ordering": "-ended",
                 "page": page,
                 "page_size": pageSize
             ]
-            self.httpClient.session.request("\(self.ogsRoot)/api/v1/players/\(playerId)/game_history", parameters: parameters).validate().responseData { response in
-                guard self.authenticationGeneration == requestAuthenticationGeneration else {
-                    promise(.failure(OGSServiceError.staleAuthenticationContext))
-                    return
-                }
-                switch response.result {
-                case .success:
-                    guard let responseValue = response.value,
-                          let data = try? JSONSerialization.jsonObject(with: responseValue) as? [String: Any],
-                          let results = data["results"] as? [[String: Any]] else {
-                        promise(.failure(OGSServiceError.invalidJSON))
-                        return
-                    }
-                    let hasNextPage = (data["next"] as? String) != nil
-                    var games = [Game]()
-                    for var result in results {
-                        if let gameId = result["id"] as? Int,
-                           let existing = self.desiredGameConnections[gameId]?.game
-                            ?? self.connectedGames[gameId]
-                            ?? existingGames[gameId] {
-                            games.append(existing)
-                            continue
-                        }
-                        // The listing nests player dicts under `players`, but
-                        // `createGame(fromShortGameData:)` expects them at the
-                        // top level (like the overview payload does).
-                        if let players = result["players"] as? [String: Any] {
-                            result["black"] = players["black"]
-                            result["white"] = players["white"]
-                        }
-                        if let game = self.createGame(fromShortGameData: result) {
-                            games.append(game)
-                        }
-                    }
-                    promise(.success((games: games, hasNextPage: hasNextPage)))
-                case .failure(let error):
-                    promise(.failure(error))
-                }
+            if let opponentId {
+                parameters["opponent"] = opponentId
             }
-        }.eraseToAnyPublisher()
+            return self.httpClient.session.request(
+                "\(self.ogsRoot)/api/v1/players/\(playerId)/game_history",
+                parameters: parameters
+            )
+            .validate()
+            .publishData()
+            .tryMap { response in
+                guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                    throw OGSServiceError.staleAuthenticationContext
+                }
+                let responseValue = try response.result.get()
+                guard let data = try JSONSerialization.jsonObject(with: responseValue) as? [String: Any],
+                      let results = data["results"] as? [[String: Any]] else {
+                    throw OGSServiceError.invalidJSON
+                }
+                let hasNextPage = (data["next"] as? String) != nil
+                var games = [Game]()
+                for var result in results {
+                    if let gameId = result["id"] as? Int,
+                       let existing = self.desiredGameConnections[gameId]?.game
+                        ?? self.connectedGames[gameId]
+                        ?? existingGames[gameId] {
+                        if let annulled = result["annulled"] as? Bool {
+                            existing.historyAnnulled = annulled
+                        }
+                        games.append(existing)
+                        continue
+                    }
+                    // History nests players; the overview-shaped constructor
+                    // takes black and white at the top level.
+                    if let players = result["players"] as? [String: Any] {
+                        result["black"] = players["black"]
+                        result["white"] = players["white"]
+                    }
+                    if let game = self.createGame(fromShortGameData: result) {
+                        game.historyAnnulled = result["annulled"] as? Bool
+                        games.append(game)
+                    }
+                }
+                return (games: games, hasNextPage: hasNextPage)
+            }
+            .eraseToAnyPublisher()
+        }
+        .eraseToAnyPublisher()
     }
 
     /// Fetches a history page and fills every row with full game detail before
@@ -2344,6 +2456,8 @@ class OGSService: ObservableObject {
         playerId: Int,
         page: Int,
         pageSize: Int,
+        opponentId: Int? = nil,
+        botGames: Bool = false,
         reusing existingGames: [Int: Game] = [:],
         maximumConcurrentDetailRequests: Int = 4
     ) -> AnyPublisher<(games: [Game], hasNextPage: Bool), Error> {
@@ -2352,6 +2466,8 @@ class OGSService: ObservableObject {
             playerId: playerId,
             page: page,
             pageSize: pageSize,
+            opponentId: opponentId,
+            botGames: botGames,
             reusing: existingGames
         )
         .flatMap { page in
@@ -2435,7 +2551,12 @@ class OGSService: ObservableObject {
     static func applyFinishedGameDetail(_ detail: FinishedGameDetail, to game: Game) {
         let listedBlackPlayer = game.blackPlayer
         let listedWhitePlayer = game.whitePlayer
-        game.ogsRawData = detail.rawData
+        var rawData = detail.rawData
+        if let listedAnnulled = game.historyAnnulled {
+            // A newly fetched listing can postdate the cached game detail.
+            rawData["annulled"] = listedAnnulled
+        }
+        game.ogsRawData = rawData
         if let listedBlackPlayer {
             game.blackPlayer = listedBlackPlayer
         }
@@ -3119,6 +3240,7 @@ class OGSService: ObservableObject {
         activeGames.values.forEach(invalidate)
         publicGames.values.forEach(invalidate)
         finishedGamesSnapshot?.forEach(invalidate)
+        finishedGamesByPlayerId?.values.flatMap { $0 }.forEach(invalidate)
 
         desiredGameConnections.removeAll()
         locallyReservedVariationNumbersByGameID.removeAll()

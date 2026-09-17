@@ -271,6 +271,10 @@ extension SettingKey {
     static var hidesRank: SettingKey<Bool> {
         return .init(name: "hidesRank", defaultValue: false)
     }
+
+    static var profileShowsRatings: SettingKey<Bool> {
+        return .init(name: "profileShowsRatings", defaultValue: false)
+    }
     
     static var sgsAccessToken: SettingKey<String> {
         return .init(name: "sgsAccessToken")

@@ -327,6 +327,105 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertTrue(socket.emittedCommands.isEmpty)
     }
 
+    func testProfileActiveGamesReuseConnectedModelsWithoutConnectionOwnership() throws {
+        var gameData = try makeFinishedGameDetail(gameID: 50).ogsGame
+        gameData.phase = .play
+        gameData.outcome = nil
+        gameData.winner = nil
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "canonical-profile-active-game"
+        )
+        let game = Game(ogsGame: gameData)
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        socket.resetEmittedCommands()
+        let profile = OGSPlayerProfile(
+            user: gameData.players.black,
+            activeGames: [.init(gameData: gameData)]
+        )
+
+        let store = try XCTUnwrap(service.profileActiveGames(from: profile))
+        XCTAssertTrue(store.resolvedGames.isEmpty)
+        XCTAssertTrue(store.game(for: try XCTUnwrap(store.entries.first)) === game)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+        game.gamePhase = .finished
+        store.refreshMembership()
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertTrue(store.resolvedGames.isEmpty)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+        service.disconnect(from: game, owner: owner)
+        XCTAssertTrue(socket.emittedCommands.contains("game/disconnect"),
+                      "The profile must not retain its own connection owner")
+    }
+
+    func testProfileActiveGamesHydrateCanonicalSummaryWithoutReplacingLiveDetail() throws {
+        var gameData = try makeFinishedGameDetail(gameID: 51).ogsGame
+        gameData.phase = .play
+        gameData.outcome = nil
+        gameData.winner = nil
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "hydrate-canonical-profile-summary"
+        )
+        let game = Game(
+            width: gameData.width, height: gameData.height,
+            blackName: gameData.players.black.username,
+            whiteName: gameData.players.white.username,
+            gameId: .OGS(gameData.gameId)
+        )
+        game.blackPlayer = gameData.players.black
+        game.whitePlayer = gameData.players.white
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        socket.resetEmittedCommands()
+        let profile = OGSPlayerProfile(
+            user: gameData.players.black,
+            activeGames: [.init(gameData: gameData)]
+        )
+
+        let store = try XCTUnwrap(service.profileActiveGames(from: profile))
+        XCTAssertTrue(store.resolvedGames.isEmpty)
+        XCTAssertNil(game.gameData, "Initial counting must not hydrate canonical summaries")
+        let entry = try XCTUnwrap(store.entries.first)
+        XCTAssertTrue(store.game(for: entry) === game)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, gameData.moves.count)
+        XCTAssertNotNil(game.gameData)
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+        var fresherData = gameData
+        fresherData.gameName = "Fresher live detail"
+        game.gameData = fresherData
+        XCTAssertTrue(store.game(for: entry) === game)
+        XCTAssertEqual(game.gameData?.gameName, "Fresher live detail")
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+
+        // A phase event can arrive before detail. Its finished state must not
+        // be overwritten by an older playing snapshot from the profile.
+        game.gameData = nil
+        game.gamePhase = .finished
+        store.refreshMembership()
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertTrue(store.resolvedGames.isEmpty)
+        XCTAssertEqual(service.profileActiveGames(from: profile)?.entries.count, 0)
+        XCTAssertNil(game.gameData)
+        service.disconnect(from: game, owner: owner)
+        XCTAssertTrue(socket.emittedCommands.contains("game/disconnect"))
+    }
+
     func testFinishedGamesUseOfficialHistoryEndpointAndReuseExistingModels() throws {
         let response = try JSONSerialization.data(withJSONObject: [
             "count": 3,
@@ -697,6 +796,23 @@ final class OGSServiceIsolationTests: XCTestCase {
             detail.ogsGame.moves.count
         )
         XCTAssertNotNil(game.ogsRawData)
+    }
+
+    func testApplyingCachedFinishedDetailRetainsFreshListingAnnulment() throws {
+        let detail = try makeFinishedGameDetail(gameID: 732)
+        let game = makeHistoryGame(id: 732)
+        game.historyAnnulled = true
+        var cachedRawData = detail.rawData
+        cachedRawData["annulled"] = false
+
+        OGSService.applyFinishedGameDetail(
+            FinishedGameDetail(ogsGame: detail.ogsGame, rawData: cachedRawData),
+            to: game
+        )
+
+        XCTAssertEqual(game.historyAnnulled, true)
+        XCTAssertEqual(game.ogsRawData?["annulled"] as? Bool, true)
+        XCTAssertNotNil(game.ogsRawData?["gamedata"])
     }
 
     func testMergingFinishedGamesPreservesFirstInstanceAndDeduplicatesPages() {

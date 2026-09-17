@@ -8,6 +8,8 @@ Surround's automated tests are split into three groups:
 
 The offline UI-test runtime uses a dedicated preferences suite, rejecting HTTP transport, and a no-op WebSocket. It does not use the production or Beta account data and cannot contact OGS.
 
+Profile journeys opt into `--surround-profile-content` for populated ratings, active games, and paginated history without changing the screenshot scenes. They cover profile-owner history results, viewer-relative head-to-head results, game/profile route reuse, missing and provisional rating categories, persisted Rank/Rating display, hidden ratings, and dark appearance at the largest text size. `--surround-profile-sections-unavailable` exercises independent section retries while keeping the profile identity, selected rating, and actions available. `--surround-profile-short-history` verifies that a complete history preview does not offer a redundant “See all games” action.
+
 ## Deterministic unit tests
 
 Run `SurroundTests` from Xcode, or select an installed iOS 26 iPhone simulator and run the unit target from the command line:

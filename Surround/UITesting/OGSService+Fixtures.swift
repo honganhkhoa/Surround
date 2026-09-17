@@ -1094,12 +1094,93 @@ extension OGSService {
             }
             state.playerProfilesById = SurroundUITestContract.simulatesUnavailableProfile
                 ? [:]
-                : profileUsers.mapValues { user in
-                    OGSPlayerProfile(
+                : profileUsers.mapValues { originalUser in
+                    var user = originalUser
+                    if SurroundUITestContract.includesProfileContent {
+                        if user.id == SurroundUITestContract.profileFixtureOwnerID {
+                            // /full can provide role flags without a ui_class.
+                            user.uiClass = nil
+                            user.supporter = true
+                        }
+                        let stableOverall = user.id != SurroundUITestContract.profileFixturePickerFriendID
+                        user.ratings = OGSRating(ratingByCategory: [
+                            .overall: OGSCategoryRating(rating: 1875, deviation: stableOverall ? 45 : 200, volatility: 0.06),
+                            .overall_19x19: OGSCategoryRating(rating: 1900, deviation: 55, volatility: 0.06),
+                            .overall_9x9: OGSCategoryRating(rating: 1650, deviation: 160, volatility: 0.06),
+                            .live_overall: OGSCategoryRating(rating: 1800, deviation: 60, volatility: 0.06),
+                            .blitz_overall: OGSCategoryRating(rating: 1525, deviation: 175, volatility: 0.06),
+                            .correspondence_overall: OGSCategoryRating(rating: 1950, deviation: 75, volatility: 0.06),
+                        ])
+                    }
+                    return OGSPlayerProfile(
                         user: user,
-                        registrationDate: Date(timeIntervalSince1970: 1_443_657_600)
+                        registrationDate: Date(timeIntervalSince1970: 1_443_657_600),
+                        activeGames: SurroundUITestContract.simulatesUnavailableProfileSections ? nil : [],
+                        versus: SurroundUITestContract.simulatesUnavailableProfileSections
+                            ? nil : OGSProfileVersus(wins: 0, losses: 0, draws: 0)
                     )
                 }
+            if SurroundUITestContract.includesProfileContent,
+               !SurroundUITestContract.simulatesUnavailableProfile,
+               !SurroundUITestContract.simulatesUnavailableProfileSections,
+               let profile = state.playerProfilesById?[SurroundUITestContract.profileFixtureOpponentID],
+               let viewer = state.user,
+               let source = state.activeGames[SurroundUITestContract.screenshotPrimaryGameID]?.gameData {
+                func profileGame(id: Int, index: Int, finished: Bool) -> OGSGame {
+                    var game = source
+                    game.gameId = id
+                    game.gameName = finished ? "Profile history \(index + 1)" : "Profile active game \(index + 1)"
+                    let opponent = index == 5
+                        ? OGSUser(username: "HistoryOtter", id: 910_001, ranking: 22)
+                        : viewer
+                    game.players.black = index.isMultiple(of: 2) ? profile.user : opponent
+                    game.players.white = index.isMultiple(of: 2) ? opponent : profile.user
+                    game.blackPlayerId = game.players.black.id
+                    game.whitePlayerId = game.players.white.id
+                    game.playerPool = [game.players.black.id: game.players.black, game.players.white.id: game.players.white]
+                    game.clock.currentPlayerId = game.players.black.id
+                    game.clock.currentPlayerColor = .black
+                    game.phase = finished ? .finished : .play
+                    game.outcome = finished ? (index == 2 ? "0 points" : "Resignation") : nil
+                    // Recent outcomes are W/L/D/W/L from the viewer's
+                    // perspective, reversing the profile's result on W/L.
+                    game.winner = finished ? (index == 2 ? 0 : ([0, 3].contains(index) ? viewer.id : profile.id)) : nil
+                    return game
+                }
+                let activeGames = SurroundUITestContract.profileFixtureActiveGameIDs.enumerated().map {
+                    OGSProfileActiveGame(gameData: profileGame(id: $0.element, index: $0.offset, finished: false))
+                }
+                let historyIDs = SurroundUITestContract.usesShortProfileHistory
+                    ? Array(SurroundUITestContract.profileFixtureHistoryGameIDs.prefix(2))
+                    : SurroundUITestContract.profileFixtureHistoryGameIDs
+                let historyGames = historyIDs.enumerated().map {
+                    let game = Game(ogsGame: profileGame(id: $0.element, index: $0.offset, finished: true))
+                    game.ogsRawData = [:]
+                    return game
+                }
+                let recentResults: [OGSProfileVersusGame.Result] = [.win, .loss, .draw, .win, .loss]
+                let recent = Array(zip(SurroundUITestContract.profileFixtureHistoryGameIDs, recentResults)).map {
+                    OGSProfileVersusGame(gameID: $0.0, result: $0.1)
+                }
+                // Totals deliberately differ from the five recent results:
+                // the profile must display the server record, not recount it.
+                state.playerProfilesById?[profile.id] = OGSPlayerProfile(
+                    user: profile.user,
+                    registrationDate: profile.registrationDate,
+                    activeGames: activeGames,
+                    versus: OGSProfileVersus(wins: 14, losses: 9, draws: 1, history: recent)
+                )
+                state.finishedGamesByPlayerId = [
+                    profile.id: historyGames,
+                    SurroundUITestContract.profileFixturePickerFriendID: [],
+                ]
+            }
+            if SurroundUITestContract.simulatesUnavailableProfileSections {
+                // Reuse the rejecting transport to exercise independent
+                // history failure without breaking the loaded identity.
+                state.finishedGamesSnapshot = nil
+                state.finishedGamesByPlayerId = nil
+            }
             if SurroundUITestContract.simulatesAutomatchRestoration {
                 // The no-op websocket never answers `automatch/list`, so the
                 // window stays open for the whole test.

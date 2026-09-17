@@ -157,6 +157,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         return nil
     }
+    /// Fresh history metadata can be newer than the cached finished-game detail.
+    @Published var historyAnnulled: Bool?
     @Published var ogsRawData: [String: Any]? {
         didSet {
             if let players = (ogsRawData ?? [:])["players"] as? [String: Any] {

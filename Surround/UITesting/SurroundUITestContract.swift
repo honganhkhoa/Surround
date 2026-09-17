@@ -32,6 +32,10 @@ enum SurroundUITestContract {
         "--surround-home-history-fails-once"
     static let unavailableProfileLaunchArgument =
         "--surround-profile-unavailable"
+    static let profileSectionsUnavailableLaunchArgument =
+        "--surround-profile-sections-unavailable"
+    static let profileContentLaunchArgument = "--surround-profile-content"
+    static let profileShortHistoryLaunchArgument = "--surround-profile-short-history"
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
@@ -59,6 +63,10 @@ enum SurroundUITestContract {
     static let profileFixtureOwnerID = 314_459
     static let profileFixtureOpponentID = 429_553
     static let profileFixturePickerFriendID = 801_001
+    static let profileFixtureActiveGameIDs = [91_001_001, 91_001_002, 91_001_003, 91_001_004]
+    // Both the complete feed (12) and the pairwise feed (11) exceed a
+    // ten-game page; the sixth game alone has a different opponent.
+    static let profileFixtureHistoryGameIDs = Array(91_002_001...91_002_012)
     static let widgetRoutingSecondGameID = 26_268_396
     static let liveBannerCorrespondenceGameIDs = [26_268_398, 26_268_399]
     static let liveBannerHistoryGameID = 26_268_397
@@ -200,6 +208,18 @@ enum SurroundUITestContract {
             && ProcessInfo.processInfo.arguments.contains(
                 unavailableProfileLaunchArgument
             )
+    }
+
+    static var simulatesUnavailableProfileSections: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(profileSectionsUnavailableLaunchArgument)
+    }
+
+    static var includesProfileContent: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(profileContentLaunchArgument)
+    }
+
+    static var usesShortProfileHistory: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(profileShortHistoryLaunchArgument)
     }
 
     static var appearanceOverride: Appearance? {
@@ -408,6 +428,9 @@ enum SurroundUITestContract {
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
     static let simulatesUnavailableProfile = false
+    static let simulatesUnavailableProfileSections = false
+    static let includesProfileContent = false
+    static let usesShortProfileHistory = false
     static let appearanceOverride: Appearance? = nil
     static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
@@ -454,6 +477,38 @@ enum SurroundUITestContract {
         static let profileBannerAvatarPrefix = "profile.entry.banner.avatar."
         static let privateMessageComposer = "messages.composer"
         static let profileRengoMenuPrefix = "profile.menu.rengo."
+        static let profileActiveGames = "profile.active-games"
+        static let profileActiveGamesRetry = "profile.active-games.retry"
+        static let profileActiveGamesLoading = "profile.active-games.loading"
+        static let profileAllActiveGames = "profile.all-active-games"
+        static let profileGameHistory = "profile.game-history"
+        static let profileAllHistory = "profile.all-history"
+        static let profileHeadToHead = "profile.head-to-head"
+        static let profileHeadToHeadRetry = "profile.head-to-head.retry"
+        static let profileHeadToHeadLoading = "profile.head-to-head.loading"
+        static let profileHeadToHeadSummary = "profile.head-to-head-summary"
+        static let profileHeadToHeadHistory = "profile.head-to-head-history"
+        static let screenProfileActiveGames = "screen.profile-active-games"
+        static let screenProfileGameHistory = "screen.profile-game-history"
+        static let profileRatings = "profile.ratings"
+        static let profileRatingMode = "profile.rating-mode"
+        static let profileRatingHeadline = "profile.rating-headline"
+
+        static func profileActiveGame(_ gameID: Int) -> String {
+            "profile.active-game.\(gameID)"
+        }
+
+        static func profileHistoryGame(_ gameID: Int) -> String {
+            "profile.history-game.\(gameID)"
+        }
+
+        static func profileHeadToHeadRecent(_ gameID: Int) -> String {
+            "profile.head-to-head-recent.\(gameID)"
+        }
+
+        static func profileRatingCategory(_ category: String) -> String {
+            "profile.rating-category.\(category)"
+        }
 
         static func privateMessageRow(_ playerID: Int) -> String {
             "messages.row.\(playerID)"

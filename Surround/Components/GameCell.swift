@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PlayerInfoLine: View {
     @ObservedObject var game: Game
+    @ObservedObject private var preferences = userDefaults
     var color: StoneColor
     var displayMode: GameCell.CellDisplayMode
     var conditionalMovesContext: ConditionalMovesPresentationContext?
@@ -121,6 +122,7 @@ struct PlayerInfoLine: View {
 
 struct GameCell: View {
     @ObservedObject var game: Game
+    @ObservedObject private var preferences = userDefaults
     var displayMode: CellDisplayMode = .full
     var opensGame: (() -> Void)?
     var showsConditionalMoves = false

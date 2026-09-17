@@ -1658,7 +1658,28 @@ final class SurroundUITests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let navigationBar = app.navigationBars["Profile"].firstMatch
+        let profileScreen = element(SurroundUITestContract.AccessibilityID.screenPlayerProfile, in: app,
+                                    file: file, line: line)
+        let loadedHeader = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.profileLoaded).firstMatch
+        let header = loadedHeader.exists ? loadedHeader
+            : element(SurroundUITestContract.AccessibilityID.profileIdentity, in: app, file: file, line: line)
+        let navigationBar: XCUIElement
+        if header.staticTexts["You"].exists {
+            navigationBar = app.navigationBars["Profile"].firstMatch
+        } else {
+            // Match the title to the identity already rendered by this
+            // profile. Its rank can be appended to the identity label.
+            let identity = header.staticTexts.firstMatch.label
+            let matchingBar = app.navigationBars.allElementsBoundByIndex.first { bar in
+                [bar.identifier, bar.label].contains { title in
+                    !title.isEmpty && (identity == title || identity.hasPrefix(title + " ["))
+                }
+            }
+            XCTAssertNotNil(matchingBar, "The other player's username must title its navigation bar.", file: file, line: line)
+            guard let matchingBar else { return }
+            navigationBar = matchingBar
+        }
         XCTAssertTrue(navigationBar.waitForExistence(timeout: 10), file: file, line: line)
         XCTAssertFalse(app.navigationBars.buttons["Close"].exists,
                        "Profiles must use stack navigation, without a modal Close action.",
@@ -1672,7 +1693,9 @@ final class SurroundUITests: SurroundUITestCase {
         tap(back, description: "Back from profile", in: app, file: file, line: line)
         let returned = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"),
-            object: navigationBar
+            // A conversation can have the same username title. The profile
+            // content, rather than the title, must leave the visible stack.
+            object: profileScreen
         )
         XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed,
                        "Back must pop the profile and reveal its originating page.",
@@ -1712,6 +1735,7 @@ final class SurroundUITests: SurroundUITestCase {
 
     private func assertLoadedProfile(
         named username: String,
+        isOwnProfile: Bool = false,
         in app: XCUIApplication
     ) {
         let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
@@ -1720,6 +1744,351 @@ final class SurroundUITests: SurroundUITestCase {
         ).firstMatch
         XCTAssertTrue(identity.waitForExistence(timeout: 10),
                       "The selected player's identity must appear in the loaded profile.")
+        XCTAssertTrue(app.navigationBars[isOwnProfile ? "Profile" : username].waitForExistence(timeout: 10),
+                      "Own profiles use Profile; other profiles use the player's username as their title.")
+    }
+
+    private func launchProfileContent(
+        scene: SurroundUITestContract.CompatibilityScene = .home,
+        additionalLaunchArguments: [String] = []
+    ) -> XCUIApplication {
+        launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            scene.rawValue,
+            SurroundUITestContract.profileContentLaunchArgument,
+        ] + additionalLaunchArguments, orientation: UIDevice.current.userInterfaceIdiom == .phone ? .portrait : .landscapeLeft)
+    }
+
+    private func openProfileContentFromHome(in app: XCUIApplication) {
+        let gameID = SurroundUITestContract.screenshotPrimaryGameID
+        let row = elementAfterScrolling(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
+        openProfileContextMenu(for: row, in: app)
+        tap(requiredMenuButton(
+            SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, SurroundUITestContract.profileFixtureOpponentID),
+            title: "View Profile", in: app
+        ), description: "Open CopperKoi's profile", in: app)
+        assertLoadedProfile(named: "CopperKoi", in: app)
+    }
+
+    @discardableResult
+    private func revealProfileControl(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let control = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        let scroll = app.scrollViews[SurroundUITestContract.AccessibilityID.screenPlayerProfile].firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+        for _ in 0..<14 {
+            let safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
+            guard control.exists else {
+                // A lazy grid does not expose the target's position until
+                // its row approaches the viewport.
+                scroll.swipeUp()
+                continue
+            }
+            let targetFrame = control.frame
+            let center = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
+            let visibleEnough = safeFrame.contains(targetFrame)
+                || (targetFrame.height > safeFrame.height && safeFrame.contains(center))
+            if visibleEnough && control.isHittable { return control }
+            // Full swipes can repeatedly overshoot a large Dynamic Type
+            // headline. Move toward its measured center in bounded steps.
+            guard dragScrollView(
+                scroll,
+                axis: .vertical,
+                targetFrame: validInteractionFrame(targetFrame, interactionPoint: interactionPoint),
+                containerFrame: safeFrame,
+                interactionPoint: interactionPoint
+            ) else { break }
+        }
+        keepInteractionHierarchy(control, container: scroll, in: app,
+                                 reason: "unable to reveal profile control \(identifier)")
+        XCTFail("Expected visible profile control \(identifier).")
+        return control
+    }
+
+    private func backToProfile(from navigationTitle: String, destinationID: String, in app: XCUIApplication) {
+        // Regular-width layouts also expose the sidebar's navigation bar.
+        // Scope Back to the destination we actually opened.
+        let destination = element(destinationID, in: app)
+        let navigationBar = app.navigationBars[navigationTitle].firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
+        let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
+        tap(back, description: "Return to profile", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPlayerProfile, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        XCTAssertFalse(destination.exists, "Back must leave the \(navigationTitle) destination, even when the profile shares its title.")
+    }
+
+    func testProfileActiveGamesPreviewAndNavigationReuse() {
+        let app = launchProfileContent()
+        openProfileContentFromHome(in: app)
+        keepScreenshot("Profile – identity and ratings", in: app)
+        let activeIDs = SurroundUITestContract.profileFixtureActiveGameIDs
+        for gameID in activeIDs.prefix(3) {
+            revealProfileControl(SurroundUITestContract.AccessibilityID.profileActiveGame(gameID), in: app)
+        }
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileActiveGame(activeIDs[3])).firstMatch.exists,
+            "The profile preview must stop after three active games.")
+        keepScreenshot("Profile – active games preview", in: app)
+        let seeAll = revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllActiveGames, in: app)
+        tap(seeAll, description: "See all profile active games", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenProfileActiveGames, in: app)
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileActiveGame(activeIDs[3]), in: app)
+        let firstGame = element(SurroundUITestContract.AccessibilityID.profileActiveGame(activeIDs[0]), in: app)
+        scrollIntoTappableArea(firstGame, in: app)
+        tap(firstGame, description: "Open a profile's active game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(activeIDs[0]), in: app)
+        tap(SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(
+            SurroundUITestContract.profileFixtureOpponentID), in: app, matching: .button)
+        assertLoadedProfile(named: "CopperKoi", in: app)
+        // Reuse the earlier profile. Its Back must reach Home directly,
+        // rather than stacking a second profile over the game and list.
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+    }
+
+    func testProfileHistoryAndHeadToHeadUseCorrectPerspective() {
+        let app = launchProfileContent()
+        openProfileContentFromHome(in: app)
+        let summary = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHeadToHeadSummary, in: app)
+        let summaryText = summary.label + " " + (summary.value as? String ?? "")
+        for total in ["14", "9", "1"] {
+            XCTAssertTrue(summaryText.contains(total), "Head-to-head must display server totals, independently of its five recent results.")
+        }
+        let historyIDs = SurroundUITestContract.profileFixtureHistoryGameIDs
+        for (gameID, result) in zip(historyIDs, ["Win", "Loss", "Draw", "Win", "Loss"]) {
+            let recent = element(SurroundUITestContract.AccessibilityID.profileHeadToHeadRecent(gameID), in: app)
+            XCTAssertTrue((recent.label + " " + (recent.value as? String ?? "")).contains(result),
+                          "Recent results must use the signed-in viewer's perspective.")
+        }
+        keepScreenshot("Profile – viewer-relative head-to-head", in: app)
+        let previewCount = UIDevice.current.userInterfaceIdiom == .phone ? 2 : 4
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[0]), in: app)
+        for gameID in historyIDs.prefix(previewCount) {
+            element(SurroundUITestContract.AccessibilityID.profileHistoryGame(gameID), in: app)
+        }
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[previewCount])).firstMatch.exists,
+            "The profile history preview must show two games on phone and four at regular width.")
+        let history = revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app)
+        tap(history, description: "See the player's complete game history", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
+        let generalFirst = element(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[0]), in: app)
+        XCTAssertTrue(generalFirst.label.contains("Loss"), "General history must use CopperKoi's result, not the viewer's win.")
+        XCTAssertTrue(generalFirst.label.contains("You"), "The signed-in player must use the You identity in another player's history.")
+        XCTAssertFalse(generalFirst.label.contains("JuniperStone"), "The self-opponent row should not replace You with the signed-in username.")
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs.last!), in: app)
+        backToProfile(from: "Game history", destinationID: SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
+        let headToHeadHistory = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHeadToHeadHistory, in: app)
+        XCTAssertTrue(headToHeadHistory.label.contains("See all games"))
+        XCTAssertFalse(headToHeadHistory.label.contains("24"),
+                       "The filtered history link must not imply its feed has the server record's total number of games.")
+        tap(headToHeadHistory, description: "Open history against this player", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
+        let filteredFirst = element(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[0]), in: app)
+        XCTAssertTrue(filteredFirst.label.contains("Win"), "Head-to-head history must agree with the viewer's record.")
+        XCTAssertTrue(filteredFirst.label.contains("CopperKoi"))
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs.last!), in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[5])).firstMatch.exists,
+            "The filtered history must exclude CopperKoi's game against a different player.")
+    }
+
+    func testShortProfileHistoryDoesNotOfferRedundantSeeAll() {
+        let app = launchProfileContent(additionalLaunchArguments: [
+            SurroundUITestContract.profileShortHistoryLaunchArgument,
+        ])
+        openProfileContentFromHome(in: app)
+        let historyIDs = SurroundUITestContract.profileFixtureHistoryGameIDs
+        for gameID in historyIDs.prefix(2) {
+            _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHistoryGame(gameID), in: app)
+        }
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[2])).firstMatch.exists)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileAllHistory].exists,
+                       "When every finished game is already in the preview, neither phone nor wide layouts should offer See all games.")
+        keepScreenshot("Profile history – complete two-game preview", in: app)
+    }
+
+    func testProfileRatingsCategoriesAndPreferencePersistence() {
+        let app = launchProfileContent()
+        openProfileContentFromHome(in: app)
+        for category in ["overall", "19x19", "13x13", "9x9", "blitz", "live", "correspondence"] {
+            element(SurroundUITestContract.AccessibilityID.profileRatingCategory(category), in: app)
+        }
+        let nine = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
+        XCTAssertTrue((nine.value as? String ?? "").contains("Provisional"), "A category at deviation 160 is provisional even with a stable overall rating.")
+        let overall = element(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app)
+        XCTAssertFalse((overall.value as? String ?? "").contains("Provisional"))
+        tap(nine, description: "Select provisional 9×9 rating", in: app)
+        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertTrue(headline.label.contains("Provisional"))
+        XCTAssertFalse(headline.label.contains("±"), "A provisional Rank headline uses its likely range instead of a deviation subtitle.")
+        keepScreenshot("Profile ratings – category-specific provisional rank", in: app)
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
+        selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.profileRatingMode, app: app)
+        XCTAssertTrue(headline.label.contains("1650") || headline.label.contains("1,650"))
+        XCTAssertTrue(headline.label.contains("±"), "Numeric Rating mode keeps the category's deviation, including provisional categories.")
+        navigateBackFromPlayerProfile(in: app)
+        openProfileContentFromHome(in: app)
+        let mode = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
+        XCTAssertTrue(mode.buttons.element(boundBy: 1).isSelected, "The Rank/Rating preference must survive reopening a profile.")
+        let reloadedHeadline = element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertTrue(reloadedHeadline.label.contains("1875") || reloadedHeadline.label.contains("1,875"))
+        let thirteen = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
+        XCTAssertEqual(thirteen.value as? String, "No rated games")
+        tap(thirteen, description: "Select the unrated 13×13 category", in: app)
+        let missingHeadline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertEqual(missingHeadline.label, "No rated games", "A missing category needs only its explanation, without a placeholder or subtitle.")
+        keepScreenshot("Profile ratings – missing 13×13 data", in: app)
+    }
+
+    func testOwnProfileOmitsOpponentSectionsAndHonorsHiddenRatings() {
+        let app = launchProfileContent(scene: .settings)
+        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileRatings, in: app)
+        keepScreenshot("Own profile – supporter identity and section margins", in: app)
+        for identifier in [SurroundUITestContract.AccessibilityID.profileActiveGames,
+                           SurroundUITestContract.AccessibilityID.profileHeadToHead] {
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists)
+        }
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app)
+        keepScreenshot("Own profile – ratings and game history", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        let hideRatings = app.switches["Hide ranks and ratings"].firstMatch
+        XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
+        scrollIntoTappableArea(hideRatings, in: app)
+        // SwiftUI includes the wide label in a switch's accessibility frame.
+        // Activate the trailing switch rather than empty label space.
+        activate(hideRatings, at: CGVector(dx: 0.95, dy: 0.5))
+        XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: 10))
+        let profileEntry = element(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        scrollIntoTappableArea(profileEntry, in: app)
+        tap(profileEntry, description: "Reopen own profile with ratings hidden", in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileRatings).firstMatch.exists,
+            "Hide ranks and ratings must remove the entire rating section.")
+        element(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileGameHistory, in: app)
+    }
+
+    func testProfileRatingsRemainUsableInDarkModeAtLargestDynamicType() {
+        let app = launchProfileContent(scene: .settings, additionalLaunchArguments: [
+            SurroundUITestContract.appearanceLaunchArgument, "dark",
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ])
+        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 10), "The own-profile title remains Profile.")
+        XCTAssertTrue(waitForValue("dark", in: identity, timeout: 10))
+        keepScreenshot("Own profile – supporter identity in dark and largest Dynamic Type", in: app)
+        let provisional = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
+        XCTAssertTrue((provisional.value as? String ?? "").contains("Provisional"))
+        tap(provisional, description: "Choose provisional category at the largest text size", in: app)
+        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertTrue(headline.label.contains("Provisional"))
+        XCTAssertFalse(headline.label.contains("±"))
+        keepScreenshot("Profile ratings – dark and largest Dynamic Type headline", in: app)
+
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
+        selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.profileRatingMode, app: app)
+        XCTAssertTrue(headline.label.contains("1650") || headline.label.contains("1,650"))
+        let missing = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
+        XCTAssertEqual(missing.value as? String, "No rated games")
+        tap(missing, description: "Choose missing category at the largest text size", in: app)
+        XCTAssertEqual(element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app).label, "No rated games")
+        let correspondence = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("correspondence"), in: app)
+        XCTAssertTrue((correspondence.value as? String ?? "").contains("1950")
+            || (correspondence.value as? String ?? "").contains("1,950"))
+        keepScreenshot("Profile ratings – dark and largest Dynamic Type rows", in: app)
+        tap(correspondence, description: "Choose the longest category label at the largest text size", in: app)
+        let finalHeadline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertTrue(finalHeadline.label.contains("1950") || finalHeadline.label.contains("1,950"))
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHistoryGame(
+            SurroundUITestContract.screenshotHistoryGameIDs[0]), in: app)
+        keepScreenshot("Profile history – dark and largest Dynamic Type", in: app)
+    }
+
+    func testEmptyProfileSectionsAndIndependentCategoryRating() {
+        let app = launchProfileContent(scene: .opponentPicker)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(
+            SurroundUITestContract.profileFixturePickerFriendID), in: app, matching: .button)
+        assertLoadedProfile(named: "BambooPath", in: app)
+        for message in ["No active games", "No games together yet", "No finished games yet"] {
+            XCTAssertTrue(app.staticTexts[message].firstMatch.waitForExistence(timeout: 10),
+                          "An empty section must have a clear explanation: \(message).")
+        }
+        let overall = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app)
+        XCTAssertTrue((overall.value as? String ?? "").contains("Provisional"))
+        let live = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("live"), in: app)
+        XCTAssertFalse((live.value as? String ?? "").contains("Provisional"),
+                       "A stable category must remain stable when the overall rating is provisional.")
+        tap(live, description: "Select the independently stable live rating", in: app)
+        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        XCTAssertFalse(headline.label.contains("Provisional"))
+        keepScreenshot("Profile – stable category despite provisional overall", in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileAllHistory].exists,
+                       "An empty preview should not offer a redundant See all games action.")
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        assertNotSelected(SurroundUITestContract.AccessibilityID.opponentSelection(
+            SurroundUITestContract.profileFixturePickerFriendID), in: app)
+    }
+
+    func testProfileSectionFailuresPreserveIdentityRatingsAndActions() {
+        let app = launchProfileContent(scene: .activeGameBoard, additionalLaunchArguments: [
+            SurroundUITestContract.profileSectionsUnavailableLaunchArgument,
+        ])
+        tap(SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(
+            SurroundUITestContract.profileFixtureOpponentID), in: app, matching: .button)
+        assertLoadedProfile(named: "CopperKoi", in: app)
+        element(SurroundUITestContract.AccessibilityID.profileChallenge, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileRatings, in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileError).firstMatch.exists,
+            "An unavailable section must not replace the loaded profile with a whole-page error.")
+        for message in ["Couldn’t load active games", "Couldn’t load head-to-head record", "Couldn’t load game history"] {
+            XCTAssertTrue(app.staticTexts[message].firstMatch.waitForExistence(timeout: 10),
+                          "Missing section data must report its own error: \(message).")
+        }
+        let nine = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
+        tap(nine, description: "Select 9×9 before retrying independent profile sections", in: app)
+        let headline = element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
+        let selectedHeadline = headline.label
+        XCTAssertTrue(selectedHeadline.contains("Provisional"))
+        for retryID in [SurroundUITestContract.AccessibilityID.profileHeadToHeadRetry,
+                        SurroundUITestContract.AccessibilityID.profileActiveGamesRetry,
+                        SurroundUITestContract.AccessibilityID.gameHistoryRetry] {
+            let retry = revealProfileControl(retryID, in: app)
+            tap(retry, description: "Retry the failed profile section", in: app)
+            element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+                SurroundUITestContract.AccessibilityID.profileLoading).firstMatch.exists,
+                "A section retry must retain the loaded profile instead of restarting its page load.")
+            XCTAssertEqual(headline.label, selectedHeadline,
+                           "A section retry must preserve the independently selected 9×9 rating category.")
+            element(SurroundUITestContract.AccessibilityID.profileChallenge, in: app)
+            element(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        }
+        element(SurroundUITestContract.AccessibilityID.gameHistoryError, in: app)
+        keepScreenshot("Profile – independent section errors retain useful content", in: app)
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileConversation, in: app)
+        backToProfile(from: "CopperKoi", destinationID: SurroundUITestContract.AccessibilityID.profileConversation, in: app)
+        assertLoadedProfile(named: "CopperKoi", in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.profileConversation).firstMatch.exists,
+            "Returning from Message must reveal the retained profile, not an unrelated history screen.")
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(
+            SurroundUITestContract.screenshotPrimaryGameID), in: app)
     }
 
     func testHomeGameMenusOpenOpponentProfilesWithoutOpeningGames() {
@@ -1931,7 +2300,7 @@ final class SurroundUITests: SurroundUITestCase {
             SurroundUITestContract.CompatibilityScene.settings.rawValue,
         ])
         tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
-        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
         element(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
         element(SurroundUITestContract.AccessibilityID.profileShare, in: app)
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
@@ -2090,25 +2459,17 @@ final class SurroundUITests: SurroundUITestCase {
         element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         keepScreenshot("Other profile – opened from analysis", in: app)
 
-        func backToProfile() {
-            let back = app.navigationBars.buttons.matching(NSPredicate(
-                format: "identifier == %@ OR label == %@", "BackButton", "Profile"
-            )).firstMatch
-            tap(back, description: "Back to profile", in: app)
-            element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
-        }
-
         tap(SurroundUITestContract.AccessibilityID.profileChallenge, in: app)
         element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
         XCTAssertTrue(app.staticTexts["CopperKoi"].exists,
                       "Challenge should preselect the profile's player.")
-        backToProfile()
+        backToProfile(from: "Challenge", destinationID: SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
         element(SurroundUITestContract.AccessibilityID.profileConversation, in: app)
         XCTAssertTrue(app.navigationBars["CopperKoi"].exists,
                       "Message should open the profile's conversation.")
-        backToProfile()
+        backToProfile(from: "CopperKoi", destinationID: SurroundUITestContract.AccessibilityID.profileConversation, in: app)
         navigateBackFromPlayerProfile(in: app)
 
         element(SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar, in: app)
@@ -2238,7 +2599,8 @@ final class SurroundUITests: SurroundUITestCase {
             tap(SurroundUITestContract.AccessibilityID.profileSelectOpponent, in: app, matching: .button)
 
             element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
-            XCTAssertFalse(app.navigationBars["Profile"].exists)
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+                SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
             XCTAssertFalse(app.descendants(matching: .any)
                 .matching(identifier: SurroundUITestContract.AccessibilityID.screenOpponentPicker).firstMatch.exists)
             let selectedOpponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)

@@ -17,14 +17,18 @@ struct OGSCategoryRating: Codable, Equatable, Hashable {
 enum OGSRatingCategory: String, Codable, CodingKey, CaseIterable {
     case overall = "overall"
     case overall_9x9 = "9x9"
+    case overall_13x13 = "13x13"
     case overall_19x19 = "19x19"
     case live_9x9 = "live-9x9"
+    case live_13x13 = "live-13x13"
     case live_19x19 = "live-19x19"
     case live_overall = "live"
     case blitz_9x9 = "blitz-9x9"
+    case blitz_13x13 = "blitz-13x13"
     case blitz_19x19 = "blitz-19x19"
     case blitz_overall = "blitz"
     case correspondence_9x9 = "correspondence-9x9"
+    case correspondence_13x13 = "correspondence-13x13"
     case correspondence_19x19 = "correspondence-19x19"
     case correspondence_overall = "correspondence"
 }
@@ -77,6 +81,9 @@ struct OGSUser : Codable, Equatable, Hashable {
     var ratings: OGSRating?
     var iconUrl: String?
     var anonymous: Bool?
+    var isBot: Bool?
+    var isModerator: Bool?
+    var isSuperuser: Bool?
     
     // In-game
     var acceptedStones: String?
@@ -98,6 +105,9 @@ struct OGSUser : Codable, Equatable, Hashable {
         case ratings
         case iconUrl = "icon-url"
         case anonymous
+        case isBot
+        case isModerator
+        case isSuperuser
         case acceptedStones
         case acceptedStrictSekiMode
     }
@@ -106,26 +116,32 @@ struct OGSUser : Codable, Equatable, Hashable {
         return self.formattedRank()
     }
     
+    // Full profiles provide role flags; lightweight user payloads may only
+    // provide ui_class. Both describe the same role across native surfaces.
     var isOGSSupporter: Bool {
-        return uiClass?.contains("supporter") == true
+        supporter == true || uiClass?.contains("supporter") == true
     }
-    
+
+    var isOGSProfessional: Bool {
+        professional == true || uiClass?.contains("professional") == true
+    }
+
     var isOGSModerator: Bool {
-        return uiClass?.contains("moderator") == true
+        isModerator == true || uiClass?.contains("moderator") == true
     }
-    
+
     var isOGSAdmin: Bool {
-        return uiClass?.contains("admin") == true
+        isSuperuser == true || uiClass?.contains("admin") == true
     }
-    
+
     var uiColor: Color {
-        if uiClass?.contains("moderator") == true {
+        if isOGSModerator || isOGSAdmin {
             return .purple
-        } else if uiClass?.contains("professional") == true {
+        } else if isOGSProfessional {
             return .green
-        } else if uiClass?.contains("supporter") == true {
+        } else if isOGSSupporter {
             return .orange
-        } else if uiClass?.contains("bot") == true {
+        } else if isBot == true || uiClass?.contains("bot") == true {
             return .gray
         }
         return .blue
@@ -216,7 +232,12 @@ struct OGSUser : Codable, Equatable, Hashable {
         if user.uiClass?.count ?? 0 == 0 && cachedUser.uiClass?.count ?? 0 > 0 {
             user.uiClass = cachedUser.uiClass
         }
-        
+        if user.supporter == nil { user.supporter = cachedUser.supporter }
+        if user.professional == nil { user.professional = cachedUser.professional }
+        if user.isModerator == nil { user.isModerator = cachedUser.isModerator }
+        if user.isSuperuser == nil { user.isSuperuser = cachedUser.isSuperuser }
+        if user.isBot == nil { user.isBot = cachedUser.isBot }
+
         return user
     }
 }

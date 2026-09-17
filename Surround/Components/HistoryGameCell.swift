@@ -15,21 +15,23 @@ struct HistoryGameCell: View {
         case win
         case loss
         case draw
+        case annulled
     }
 
     @ObservedObject var game: Game
+    var perspectivePlayerID: Int? = nil
     var action: () -> Void
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var settings = userDefaults
 
-    /// Derive the user's colour from the injected service instead of
-    /// `game.userStoneColor`, whose weak service reference is intentionally
-    /// absent from standalone preview fixtures.
+    /// Profile history uses its owner's perspective; Home defaults to the
+    /// signed-in player. Neither depends on the game's weak service reference.
     private var userStoneColor: StoneColor? {
-        guard let user = ogs.user else {
+        guard let playerID = perspectivePlayerID ?? ogs.user?.id else {
             return nil
         }
-        return game.stoneColor(of: user)
+        return game.stoneColor(ofPlayerWithId: playerID)
     }
 
     /// The colour the opponent played. `nil` for a game the user did not take
@@ -89,14 +91,17 @@ struct HistoryGameCell: View {
     }
 
     private var userResult: UserResult? {
+        if game.historyAnnulled ?? (game.ogsRawData?["annulled"] as? Bool) ?? false {
+            return .annulled
+        }
+        guard let userStoneColor else { return nil }
         guard game.gameData?.outcome != nil, let winnerID = game.gameData?.winner else {
             return nil
         }
         guard winnerID != 0 else {
             return .draw
         }
-        guard let userStoneColor,
-              let winnerStoneColor = game.stoneColor(ofPlayerWithId: winnerID) else {
+        guard let winnerStoneColor = game.stoneColor(ofPlayerWithId: winnerID) else {
             return nil
         }
         return winnerStoneColor == userStoneColor ? .win : .loss
@@ -110,6 +115,8 @@ struct HistoryGameCell: View {
             return String(localized: "Loss", comment: "HistoryGameCell result for the logged-in player")
         case .draw:
             return String(localized: "Draw", comment: "HistoryGameCell result for the logged-in player")
+        case .annulled:
+            return String(localized: "Annulled")
         case .none:
             return nil
         }
@@ -121,7 +128,7 @@ struct HistoryGameCell: View {
             return .green
         case .loss:
             return .red
-        case .draw:
+        case .draw, .annulled:
             return .secondary
         case .none:
             return nil
@@ -159,7 +166,7 @@ struct HistoryGameCell: View {
                     localized: "-\(pointDifference, specifier: "%.1f") points",
                     comment: "HistoryGameCell point difference when the logged-in player lost"
                 )
-            case .draw, .none:
+            case .draw, .annulled, .none:
                 return String(
                     localized: "\(pointDifference, specifier: "%.1f") points",
                     comment: "HistoryGameCell point difference without a win or loss perspective"
@@ -189,89 +196,175 @@ struct HistoryGameCell: View {
         }
     }
 
-    var body: some View {
-        Button(action: action) {
-            GeometryReader { geometry in
-                HStack(alignment: .top) {
-                    BoardView(boardPosition: game.currentPosition)
-                        .saturation(0.8)
-                        .opacity(0.85)
-                        .frame(width: geometry.size.height, height: geometry.size.height, alignment: .center)
-                    VStack(alignment: .leading, spacing: 4) {
-                        if userResultText != nil || outcomeText != nil {
-                            HStack(spacing: 4) {
-                                if let userResultText, let userResultColor {
-                                    Text(userResultText)
-                                        .bold()
-                                        .foregroundStyle(userResultColor)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                }
-                                if let outcomeText {
-                                    Text(verbatim: userResultText == nil ? outcomeText : "(\(outcomeText))")
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                }
-                            }
-                            .font(.subheadline)
-                        }
-                        if let opponentStoneColor, let opponent {
-                            HStack(spacing: 6) {
-                                Text("vs.", comment: "HistoryGameCell result versus opponent")
-                                    .fixedSize(horizontal: true, vertical: false)
-                                Stone(color: opponentStoneColor, shadowRadius: 1)
-                                    .frame(width: 15, height: 15)
-                                HStack(spacing: 2) {
-                                    Text(verbatim: opponent.usernameAndRank)
-                                        .bold()
-                                        .lineLimit(1)
-                                        .foregroundColor(opponent.uiColor)
-                                    if let opponentRengoTeamSize, opponentRengoTeamSize > 1 {
-                                        Text(verbatim: " + \(opponentRengoTeamSize - 1)×")
-                                        Image(systemName: "person.fill")
-                                    }
-                                }
-                            }
-                            .font(.subheadline)
-                            .lineLimit(1)
-                        }
-                        if handicapStones > 0 {
-                            Text("\(handicapStones) handicap stones", comment: "HistoryGameCell - vary for plural")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        if let nonstandardKomi {
-                            Text("Komi: \(nonstandardKomi, specifier: "%.1f")", comment: "HistoryGameCell nonstandard komi")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        if let rengoTeamSizes {
-                            Label {
-                                Text(
-                                    "Rengo (\(rengoTeamSizes.black) vs. \(rengoTeamSizes.white))",
-                                    comment: "HistoryGameCell Rengo team sizes, black versus white"
-                                )
-                            } icon: {
-                                Image(systemName: "person.2.fill")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        }
-                        if let displayGameName {
-                            Text(verbatim: displayGameName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(gameNameLineLimit)
-                                .truncationMode(.tail)
+    @ViewBuilder
+    private func opponentLabel(_ opponent: OGSUser) -> some View {
+        if opponent.id == ogs.user?.id {
+            Text("You")
+                .bold()
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 3)
+                .background(Color(UIColor.systemTeal), in: RoundedRectangle(cornerRadius: 5))
+                .offset(x: -3)
+        } else {
+            Text(verbatim: opponent.usernameAndRank)
+                .bold()
+                .foregroundStyle(opponent.uiColor)
+        }
+    }
+
+    /// Accessibility text needs the full row width and its natural height.
+    /// Keep the board small so it does not compete with the result or names.
+    private var accessibilityLayout: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            BoardView(boardPosition: game.currentPosition)
+                .saturation(0.8)
+                .opacity(0.85)
+                .frame(width: 120, height: 120)
+            VStack(alignment: .leading, spacing: 8) {
+                if let userResultText, let userResultColor {
+                    Text(userResultText)
+                        .bold()
+                        .foregroundStyle(userResultColor)
+                }
+                if let outcomeText {
+                    Text(verbatim: outcomeText)
+                }
+                if let opponentStoneColor, let opponent {
+                    HStack(spacing: 6) {
+                        Text("vs.", comment: "HistoryGameCell result versus opponent")
+                        Stone(color: opponentStoneColor, shadowRadius: 1)
+                            .frame(width: 15, height: 15)
+                    }
+                    opponentLabel(opponent)
+                    if let opponentRengoTeamSize, opponentRengoTeamSize > 1 {
+                        HStack(spacing: 2) {
+                            Text(verbatim: "+ \(opponentRengoTeamSize - 1)×")
+                            Image(systemName: "person.fill")
                         }
                     }
-                    .padding(.top, 2)
-                    Spacer(minLength: 0)
                 }
             }
-            .frame(minHeight: 120)
-            .contentShape(Rectangle())
+            .font(.subheadline)
+            if handicapStones > 0 {
+                Text("\(handicapStones) handicap stones", comment: "HistoryGameCell - vary for plural")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let nonstandardKomi {
+                Text("Komi: \(nonstandardKomi, specifier: "%.1f")", comment: "HistoryGameCell nonstandard komi")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let rengoTeamSizes {
+                Label {
+                    Text(
+                        "Rengo (\(rengoTeamSizes.black) vs. \(rengoTeamSizes.white))",
+                        comment: "HistoryGameCell Rengo team sizes, black versus white"
+                    )
+                } icon: {
+                    Image(systemName: "person.2.fill")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            if let displayGameName {
+                Text(verbatim: displayGameName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .lineLimit(nil)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    var body: some View {
+        Button(action: action) {
+            if dynamicTypeSize.isAccessibilitySize {
+                accessibilityLayout
+            } else {
+                GeometryReader { geometry in
+                    HStack(alignment: .top) {
+                        BoardView(boardPosition: game.currentPosition)
+                            .saturation(0.8)
+                            .opacity(0.85)
+                            .frame(width: geometry.size.height, height: geometry.size.height, alignment: .center)
+                        VStack(alignment: .leading, spacing: 4) {
+                            if userResultText != nil || outcomeText != nil {
+                                HStack(spacing: 4) {
+                                    if let userResultText, let userResultColor {
+                                        Text(userResultText)
+                                            .bold()
+                                            .foregroundStyle(userResultColor)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                    }
+                                    if let outcomeText {
+                                        Text(verbatim: userResultText == nil ? outcomeText : "(\(outcomeText))")
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                    }
+                                }
+                                .font(.subheadline)
+                            }
+                            if let opponentStoneColor, let opponent {
+                                HStack(spacing: 6) {
+                                    Text("vs.", comment: "HistoryGameCell result versus opponent")
+                                        .fixedSize(horizontal: true, vertical: false)
+                                    Stone(color: opponentStoneColor, shadowRadius: 1)
+                                        .frame(width: 15, height: 15)
+                                    HStack(spacing: 2) {
+                                        opponentLabel(opponent)
+                                            .lineLimit(1)
+                                        if let opponentRengoTeamSize, opponentRengoTeamSize > 1 {
+                                            Text(verbatim: " + \(opponentRengoTeamSize - 1)×")
+                                            Image(systemName: "person.fill")
+                                        }
+                                    }
+                                }
+                                .font(.subheadline)
+                                .lineLimit(1)
+                            }
+                            if handicapStones > 0 {
+                                Text("\(handicapStones) handicap stones", comment: "HistoryGameCell - vary for plural")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            if let nonstandardKomi {
+                                Text("Komi: \(nonstandardKomi, specifier: "%.1f")", comment: "HistoryGameCell nonstandard komi")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            if let rengoTeamSizes {
+                                Label {
+                                    Text(
+                                        "Rengo (\(rengoTeamSizes.black) vs. \(rengoTeamSizes.white))",
+                                        comment: "HistoryGameCell Rengo team sizes, black versus white"
+                                    )
+                                } icon: {
+                                    Image(systemName: "person.2.fill")
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            }
+                            if let displayGameName {
+                                Text(verbatim: displayGameName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(gameNameLineLimit)
+                                    .truncationMode(.tail)
+                            }
+                        }
+                        .padding(.top, 2)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .frame(minHeight: 120)
+                .contentShape(Rectangle())
+            }
         }
         .buttonStyle(.plain)
         .modifier(GamePlayerProfileMenu(game: game))

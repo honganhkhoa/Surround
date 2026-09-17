@@ -10,6 +10,53 @@ final class StackRouterTests: XCTestCase {
     private var firstPlayer: User { User(username: "First player", id: 101) }
     private var secondPlayer: User { User(username: "Second player", id: 102) }
 
+    func testProfileGameReturnsToExistingGameAndPreservesItsModel() throws {
+        let router = Router()
+        let nav = NavigationService()
+        let game = Game(width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(123))
+        nav.home.activeGame = game
+        router.present(.homeGame)
+        router.openProfile(firstPlayer)
+        router.openHistory(for: firstPlayer)
+        router.openGame(game, using: nav)
+        XCTAssertEqual(router.path, [.homeGame])
+        XCTAssertTrue(nav.home.activeGame === game)
+        XCTAssertTrue(router.games.isEmpty)
+        XCTAssertTrue(router.users.isEmpty)
+    }
+
+    func testNestedProfileGameRoutesReuseAndReleaseTheirState() {
+        let router = Router()
+        let nav = NavigationService()
+        let game = Game(width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(123))
+        router.openProfile(firstPlayer)
+        router.openGame(game, using: nav)
+        router.openProfile(secondPlayer)
+        router.openHistory(for: secondPlayer, opponentID: firstPlayer.id)
+        router.openGame(game, using: nav)
+        XCTAssertEqual(router.path, [.profile(playerID: firstPlayer.id, selectionID: nil), .game(123)])
+        XCTAssertTrue(router.games[123] === game)
+        XCTAssertNil(router.users[secondPlayer.id])
+        router.path.removeLast()
+        XCTAssertTrue(router.games.isEmpty)
+    }
+
+    func testProfileListsRetainOnlyTheirOwnPayloads() throws {
+        let router = Router()
+        let service = OGSService.previewInstance(user: firstPlayer)
+        let games = try XCTUnwrap(service.profileActiveGames(from: .init(user: firstPlayer, activeGames: [])))
+        router.openActiveGames(games, for: firstPlayer)
+        router.openHistory(for: firstPlayer, opponentID: secondPlayer.id)
+        router.openHistory(for: firstPlayer, opponentID: secondPlayer.id)
+        XCTAssertEqual(router.path, [.playerActiveGames(firstPlayer.id),
+                                    .playerHistory(playerID: firstPlayer.id, opponentID: secondPlayer.id)])
+        XCTAssertTrue(router.activeGamesByPlayer[firstPlayer.id] === games)
+        router.path.removeAll()
+        XCTAssertTrue(router.users.isEmpty)
+        XCTAssertTrue(router.games.isEmpty)
+        XCTAssertTrue(router.activeGamesByPlayer.isEmpty)
+    }
+
     func testMessageFromConversationProfileReturnsToExistingConversation() {
         let router = Router()
         router.openConversation(firstPlayer)

@@ -8,6 +8,9 @@ enum StackRoute: Hashable {
     case historyGame
     case publicGame
     case waitingGames
+    case game(Int)
+    case playerHistory(playerID: Int, opponentID: Int?)
+    case playerActiveGames(Int)
     case profile(playerID: Int, selectionID: UUID?)
     case challenge(UUID)
     case opponentPicker(UUID)
@@ -50,6 +53,8 @@ final class StackRouter: ObservableObject {
         didSet { discardInactiveState() }
     }
     private(set) var users: [Int: OGSUser] = [:]
+    @Published private(set) var games: [Int: Game] = [:]
+    private(set) var activeGamesByPlayer: [Int: ProfileActiveGames] = [:]
     private(set) var drafts: [UUID: ChallengeDraft] = [:]
     private(set) var selections: [UUID: OpponentSelection] = [:]
     @Published private(set) var isActive = false
@@ -100,6 +105,51 @@ final class StackRouter: ObservableObject {
         guard user.id > 0 else { return }
         users[user.id] = user
         let route = StackRoute.conversation(user.id)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
+    }
+
+    /// Opening a game already below the profile returns to that same screen,
+    /// retaining its analysis, chat draft and connection owner.
+    func openGame(_ game: Game, using navigation: NavigationService) {
+        guard let gameID = game.ogsID, gameID > 0 else { return }
+        let existingGames: [(StackRoute, Game?)] = [
+            (.homeGame, navigation.home.activeGame),
+            (.historyGame, navigation.gameHistory.activeGame),
+            (.publicGame, navigation.publicGames.activeGame),
+        ]
+        if let route = existingGames.first(where: { path.contains($0.0) && $0.1?.ogsID == gameID })?.0 {
+            returnTo(route)
+            return
+        }
+        let route = StackRoute.game(gameID)
+        if path.contains(route) {
+            returnTo(route)
+        } else {
+            games[gameID] = game
+            present(route)
+        }
+    }
+
+    func updateGame(_ game: Game?, for gameID: Int) {
+        guard path.contains(.game(gameID)), let game, game.ogsID == gameID else { return }
+        guard games[gameID] !== game else { return }
+        games[gameID] = game
+    }
+
+    func openHistory(for user: OGSUser, opponentID: Int? = nil) {
+        guard user.id > 0, opponentID.map({ $0 > 0 && $0 != user.id }) ?? true else { return }
+        users[user.id] = user
+        let route = StackRoute.playerHistory(playerID: user.id, opponentID: opponentID)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
+    }
+
+    func openActiveGames(_ games: ProfileActiveGames, for user: OGSUser) {
+        guard user.id > 0 else { return }
+        users[user.id] = user
+        activeGamesByPlayer[user.id] = games
+        let route = StackRoute.playerActiveGames(user.id)
         if path.contains(route) { returnTo(route) }
         else { present(route) }
     }
@@ -205,11 +255,20 @@ final class StackRouter: ObservableObject {
     private func discardInactiveState() {
         let playerIDs = Set(path.compactMap { route -> Int? in
             switch route {
-            case .profile(let id, _), .conversation(let id): return id
+            case .profile(let id, _), .conversation(let id),
+                 .playerHistory(let id, _), .playerActiveGames(let id): return id
             default: return nil
             }
         })
         users = users.filter { playerIDs.contains($0.key) }
+        let gameIDs = Set(path.compactMap { route -> Int? in
+            if case .game(let id) = route { return id }; return nil
+        })
+        games = games.filter { gameIDs.contains($0.key) }
+        let activeListIDs = Set(path.compactMap { route -> Int? in
+            if case .playerActiveGames(let id) = route { return id }; return nil
+        })
+        activeGamesByPlayer = activeGamesByPlayer.filter { activeListIDs.contains($0.key) }
         let pickerIDs = Set(path.compactMap { route -> UUID? in
             if case .opponentPicker(let id) = route { return id }; return nil
         })
@@ -297,6 +356,21 @@ struct AppNavigationStack<Content: View>: View {
             GameDetailView(currentGame: $nav.publicGames.activeGame)
         case .waitingGames:
             WaitingGamesView()
+        case .game(let gameID):
+            GameDetailView(currentGame: Binding(
+                get: { navigation.games[gameID] },
+                set: { navigation.updateGame($0, for: gameID) }
+            ), allowsActiveGamesCarousel: false)
+        case .playerHistory(let playerID, let opponentID):
+            if let player = navigation.users[playerID] {
+                GameHistoryView(player: player, opponentID: opponentID,
+                                perspectivePlayerID: opponentID ?? playerID)
+            }
+        case .playerActiveGames(let playerID):
+            if let player = navigation.users[playerID],
+               let games = navigation.activeGamesByPlayer[playerID] {
+                PlayerActiveGamesView(player: player, games: games)
+            }
         case .profile(let playerID, let selectionID):
             if let user = navigation.users[playerID] {
                 PlayerProfileView(user: user, selectionID: selectionID)

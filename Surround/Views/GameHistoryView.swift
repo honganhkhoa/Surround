@@ -2,9 +2,8 @@
 //  GameHistoryView.swift
 //  Surround
 //
-//  Paginated list of the logged-in user's finished games. Reached from the
-//  "Recent finished games" section on the home screen. Tapping a game opens
-//  GameDetailView without the active-games carousel.
+//  Paginated finished games, from Home or a player profile. An optional
+//  opponent restricts the list to games between those two players.
 //
 
 import SwiftUI
@@ -83,26 +82,81 @@ struct GameHistoryView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @EnvironmentObject private var navigation: StackRouter
 
     private static let pageSize = 10
 
+    let player: OGSUser?
+    let opponentID: Int?
+    let perspectivePlayerID: Int?
+
+    private struct QueryIdentity: Equatable {
+        let playerID: Int?
+        let opponentID: Int?
+        let viewerID: Int?
+        let botGames: Bool
+    }
+
     @State private var pagination = GameHistoryPaginationState()
     @State private var fetchCancellable: AnyCancellable?
+    @State private var activeIdentity: QueryIdentity?
 
-    init(pagination: GameHistoryPaginationState = GameHistoryPaginationState()) {
+    init(
+        player: OGSUser? = nil,
+        opponentID: Int? = nil,
+        perspectivePlayerID: Int? = nil,
+        pagination: GameHistoryPaginationState = GameHistoryPaginationState()
+    ) {
+        self.player = player
+        self.opponentID = opponentID
+        self.perspectivePlayerID = perspectivePlayerID
         _pagination = State(initialValue: pagination)
     }
 
+    private var queryIdentity: QueryIdentity {
+        QueryIdentity(
+            playerID: player?.id ?? ogs.user?.id,
+            opponentID: opponentID,
+            viewerID: ogs.user?.id,
+            botGames: player?.isBot == true
+        )
+    }
+
+    @ViewBuilder
     var body: some View {
+        if player == nil {
+            historyContent
+                .stackDestination(isPresented: Binding(
+                    get: { nav.gameHistory.activeGame != nil },
+                    set: { if !$0 { nav.gameHistory.activeGame = nil } }
+                ), route: .historyGame)
+        } else {
+            historyContent
+        }
+    }
+
+    private var historyContent: some View {
         ScrollView {
+            if let player {
+                Text(verbatim: player.username)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
                 ForEach(pagination.games) { game in
-                    HistoryGameCell(game: game) {
-                        nav.gameHistory.activeGame = game
+                    HistoryGameCell(game: game, perspectivePlayerID: perspectivePlayerID ?? player?.id) {
+                        if player != nil {
+                            navigation.openGame(game, using: nav)
+                        } else {
+                            nav.gameHistory.activeGame = game
+                        }
                     }
                     .accessibilityIdentifier(
-                        SurroundUITestContract.AccessibilityID
-                            .homeHistoryGame(game)
+                        player == nil
+                            ? SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
+                            : game.ogsID.map(SurroundUITestContract.AccessibilityID.profileHistoryGame)
+                                ?? SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
                     )
                     .padding(.horizontal)
                     .onAppear {
@@ -131,19 +185,22 @@ struct GameHistoryView: View {
             .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
         }
         .accessibilityIdentifier(
-            SurroundUITestContract.AccessibilityID.screenGameHistory
+            player == nil
+                ? SurroundUITestContract.AccessibilityID.screenGameHistory
+                : SurroundUITestContract.AccessibilityID.screenProfileGameHistory
         )
-        .stackDestination(isPresented: Binding(
-            get: { nav.gameHistory.activeGame != nil },
-            set: { if !$0 { nav.gameHistory.activeGame = nil } }
-        ), route: .historyGame)
         .onAppear {
+            if let activeIdentity, activeIdentity != queryIdentity {
+                resetPages(for: queryIdentity)
+                return
+            }
+            activeIdentity = queryIdentity
             if !pagination.loadedOnce {
                 loadNextPage()
             }
         }
-        .onChange(of: ogs.user?.id) { _, newPlayerID in
-            resetPages(playerID: newPlayerID)
+        .onChange(of: queryIdentity) { _, identity in
+            resetPages(for: identity)
         }
         .navigationTitle(Text("Game history"))
     }
@@ -162,13 +219,18 @@ struct GameHistoryView: View {
     }
 
     private func loadNextPage() {
-        guard let request = pagination.beginRequest(playerID: ogs.user?.id) else {
+        let identity = queryIdentity
+        if activeIdentity == nil { activeIdentity = identity }
+        guard activeIdentity == identity,
+              let request = pagination.beginRequest(playerID: identity.playerID) else {
             return
         }
         fetchCancellable = ogs.fetchHydratedFinishedGames(
             playerId: request.playerID,
             page: request.page,
             pageSize: Self.pageSize,
+            opponentId: identity.opponentID,
+            botGames: identity.botGames,
             reusing: pagination.reusableGames
         )
             .map { page in
@@ -182,10 +244,11 @@ struct GameHistoryView: View {
             }
             .receive(on: RunLoop.main)
             .sink { result in
+                guard activeIdentity == identity, ogs.user?.id == identity.viewerID else { return }
                 let action = pagination.finish(
                     result,
                     for: request,
-                    currentPlayerID: ogs.user?.id
+                    currentPlayerID: queryIdentity.playerID
                 )
                 guard action != .ignored else {
                     return
@@ -197,17 +260,20 @@ struct GameHistoryView: View {
                     // Advance again rather than waiting for a new last row
                     // whose `onAppear` can never fire.
                     DispatchQueue.main.async {
+                        guard activeIdentity == identity else { return }
                         loadNextPage()
                     }
                 }
             }
     }
 
-    /// Discards pages belonging to the previous account and starts over.
-    private func resetPages(playerID: Int?) {
+    /// Invalidate both pagination tokens and the broader query when its player,
+    /// opponent, or viewing account changes.
+    private func resetPages(for identity: QueryIdentity) {
         fetchCancellable?.cancel()
         fetchCancellable = nil
-        pagination.reset(playerID: playerID)
+        activeIdentity = identity
+        pagination.reset(playerID: identity.playerID)
         loadNextPage()
     }
 }

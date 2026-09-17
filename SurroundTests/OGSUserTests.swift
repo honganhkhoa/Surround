@@ -3,6 +3,7 @@
 //  SurroundTests
 //
 
+import SwiftUI
 import XCTest
 
 final class OGSUserTests: XCTestCase {
@@ -76,6 +77,64 @@ final class OGSUserTests: XCTestCase {
         XCTAssertEqual(multiCategory.formattedRank(), kyu(6))
         XCTAssertEqual(multiCategory.formattedRank(category: .overall_9x9), dan(9))
         XCTAssertEqual(multiCategory.formattedRank(longFormat: true), "6 Kyu")
+    }
+
+    func testRoleColorsSupportExplicitFlagsAndLegacyUIClasses() throws {
+        let examples: [(String, String, Color)] = [
+            ("supporter", "supporter", .orange),
+            ("professional", "professional", .green),
+            ("is_moderator", "moderator", .purple),
+            ("is_superuser", "admin", .purple),
+            ("is_bot", "bot", .gray),
+        ]
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        for (flag, uiClass, color) in examples {
+            let explicit = try decoder.decode(OGSUser.self, from: Data("""
+                {"id":42,"username":"player","\(flag)":true}
+                """.utf8))
+            let legacy = OGSUser(username: "player", id: 42, uiClass: uiClass)
+            XCTAssertEqual(explicit.uiColor, color, flag)
+            XCTAssertEqual(legacy.uiColor, color, uiClass)
+        }
+        XCTAssertEqual(OGSUser(username: "player", id: 42).uiColor, .blue)
+    }
+
+    func testSupporterColorDoesNotOverrideProfessionalModeratorOrAdmin() {
+        var player = OGSUser(username: "player", id: 42, supporter: true)
+        XCTAssertEqual(player.uiColor, .orange)
+        player.professional = true
+        XCTAssertTrue(player.isOGSProfessional)
+        XCTAssertEqual(player.uiColor, .green)
+        player.isModerator = true
+        XCTAssertEqual(player.uiColor, .purple)
+        player.isModerator = false
+        player.professional = false
+        player.isSuperuser = true
+        XCTAssertEqual(player.uiColor, .purple)
+
+        let legacy = OGSUser(username: "player", id: 42,
+                             uiClass: "supporter professional moderator")
+        XCTAssertEqual(legacy.uiColor, .purple)
+    }
+
+    func testMergingCachedUserFillsMissingRoleFlagsWithoutReplacingExplicitFlags() {
+        let cached = OGSUser(username: "player", id: 42, professional: true,
+                             supporter: true, isBot: true, isModerator: true,
+                             isSuperuser: true)
+        let merged = OGSUser.mergeUserInfoFromCache(
+            user: OGSUser(username: "player", id: 42), cachedUser: cached
+        )
+        XCTAssertTrue(merged.isOGSSupporter)
+        XCTAssertTrue(merged.isOGSProfessional)
+        XCTAssertTrue(merged.isOGSModerator)
+        XCTAssertTrue(merged.isOGSAdmin)
+        XCTAssertEqual(merged.isBot, true)
+
+        let explicit = OGSUser(username: "player", id: 42, professional: false,
+                               supporter: false, isBot: false, isModerator: false,
+                               isSuperuser: false)
+        XCTAssertEqual(OGSUser.mergeUserInfoFromCache(user: explicit, cachedUser: cached), explicit)
     }
 
     private func kyu(_ rank: Int) -> String {

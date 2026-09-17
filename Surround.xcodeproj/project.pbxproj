@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700042026091700000004 /* ProfileRatingTests.swift */; };
+		AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700032026091700000003 /* PlayerProfileGames.swift */; };
+		AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700022026091700000002 /* PlayerProfileRatings.swift */; };
+		AA1700212026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
+		AA1700112026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
 		AA1600222026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
 		AA1600212026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
 		AA1600132026091600000003 /* StackRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600032026091600000003 /* StackRouterTests.swift */; };
@@ -416,6 +421,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AA1700042026091700000004 /* ProfileRatingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRatingTests.swift; sourceTree = "<group>"; };
+		AA1700032026091700000003 /* PlayerProfileGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileGames.swift; sourceTree = "<group>"; };
+		AA1700022026091700000002 /* PlayerProfileRatings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileRatings.swift; sourceTree = "<group>"; };
+		AA1700012026091700000001 /* ProfileRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRating.swift; sourceTree = "<group>"; };
 		AA1600032026091600000003 /* StackRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouterTests.swift; sourceTree = "<group>"; };
 		AA1600022026091600000002 /* StackRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouter.swift; sourceTree = "<group>"; };
 		AA1600012026091600000001 /* ChallengeDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeDraft.swift; sourceTree = "<group>"; };
@@ -787,6 +796,7 @@
 				AE10000B39A000000000000B /* TimeUtilitiesTests.swift */,
 				AE10000C39A000000000000C /* OGSUserTests.swift */,
 				AA1500032026091500000003 /* OGSPlayerProfileTests.swift */,
+				AA1700042026091700000004 /* ProfileRatingTests.swift */,
 				AA1600032026091600000003 /* StackRouterTests.swift */,
 			);
 			path = SurroundTests;
@@ -817,6 +827,7 @@
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
 				AA1500022026091500000002 /* PlayerProfileView.swift */,
+				AA1700032026091700000003 /* PlayerProfileGames.swift */,
 				BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */,
 				BCE913D025B9398D00065061 /* NewGameView.swift */,
 				D10000022026083100000002 /* QuickMatchView.swift */,
@@ -847,6 +858,7 @@
 			isa = PBXGroup;
 			children = (
 				AA1600012026091600000001 /* ChallengeDraft.swift */,
+				AA1700012026091700000001 /* ProfileRating.swift */,
 				BC042B3324AB2DD00050B2D1 /* OGS */,
 				BC042B3824AB2DD00050B2D1 /* Core */,
 				BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */,
@@ -892,6 +904,7 @@
 		BC042B3E24AB2DD10050B2D1 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AA1700022026091700000002 /* PlayerProfileRatings.swift */,
 				AF3000023F00000000000002 /* ConditionalMovesPopover.swift */,
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
@@ -1423,7 +1436,10 @@
 				BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
 				AA1500202026091500000001 /* PlayerProfileView.swift in Sources */,
+				AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */,
+				AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */,
 				AA1600112026091600000001 /* ChallengeDraft.swift in Sources */,
+				AA1700112026091700000001 /* ProfileRating.swift in Sources */,
 				AA1600122026091600000002 /* StackRouter.swift in Sources */,
 				BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
@@ -1481,9 +1497,11 @@
 				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
 				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
 				AA1500202026091500000002 /* OGSPlayerProfileTests.swift in Sources */,
+				AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */,
 				AA1600132026091600000003 /* StackRouterTests.swift in Sources */,
 				AA1600222026091600000002 /* StackRouter.swift in Sources */,
 				AA1600212026091600000001 /* ChallengeDraft.swift in Sources */,
+				AA1700212026091700000001 /* ProfileRating.swift in Sources */,
 				AE3100093A00000000000009 /* OGSService+Fixtures.swift in Sources */,
 				D90700032026090700000003 /* AppReviewPolicy.swift in Sources */,
 				D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */,
