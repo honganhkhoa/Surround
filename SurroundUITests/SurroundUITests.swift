@@ -4425,6 +4425,8 @@ final class SurroundUITests: SurroundUITestCase {
                 + SurroundUITestContract.structuredChatAnalysisText
         )
         XCTAssertTrue(analysisLine.label.contains("CopperKoi"))
+        XCTAssertEqual(analysisLine.elementType, .button,
+                       "A variation must remain selectable independently of its sender's profile.")
         assertChatLine(
             SurroundUITestContract.structuredChatThirdPersonLineID,
             contains: SurroundUITestContract.structuredChatThirdPersonText
@@ -4435,6 +4437,7 @@ final class SurroundUITests: SurroundUITestCase {
         )
         XCTAssertTrue(hiddenLine.label.contains("JuniperStone"))
         XCTAssertTrue(hiddenLine.label.contains("Moderator-only"))
+        XCTAssertEqual(hiddenLine.elementType, .button)
         XCTAssertTrue(
             String(describing: hiddenLine.value)
                 .contains("Visible only to moderators"),

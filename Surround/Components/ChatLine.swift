@@ -279,7 +279,10 @@ struct ChatLine: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture(perform: select)
-                    .accessibilityElement(children: .combine)
+                    // The bubble supplies its own label and action. Combining
+                    // a single Link inherits button traits on iOS 18 and 26.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityRemoveTraits(reviewURL == nil ? [] : .isButton)
                     .accessibilityAddTraits(
                         reviewURL == nil ? .isButton : .isLink
                     )

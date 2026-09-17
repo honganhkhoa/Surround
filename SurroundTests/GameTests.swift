@@ -7,6 +7,7 @@
 
 import XCTest
 import DictionaryCoding
+import Combine
 
 class GameTests: XCTestCase {
 
@@ -149,6 +150,78 @@ class GameTests: XCTestCase {
         XCTAssertFalse(game.requiresUserAction(forPlayerWithId: whiteId))
     }
     
+    func testMarkAllChatAsReadPublishesOnlyWhenUnreadCountChanges() throws {
+        let suite = "GameTests.chat-read.\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let game = Game(width: 5, height: 5, blackName: "black", whiteName: "white", gameId: .OGS(42))
+        game.preferences = preferences
+        game.addChatLine(try chatLine(id: "first", timestamp: 1))
+        XCTAssertEqual(game.chatUnreadCount, 1)
+
+        var changes = 0
+        let observation = game.objectWillChange.sink { changes += 1 }
+        defer { observation.cancel() }
+
+        game.markAllChatAsRead()
+        XCTAssertEqual(game.chatUnreadCount, 0)
+        XCTAssertEqual(changes, 1)
+        XCTAssertEqual(preferences[.lastSeenChatIdByOGSGameId]?[42], "first")
+
+        game.markAllChatAsRead()
+        game.markAllChatAsRead()
+        XCTAssertEqual(changes, 1, "Repeated appearance callbacks must not invalidate the game again.")
+
+        game.addChatLine(try chatLine(id: "second", timestamp: 2))
+        XCTAssertEqual(game.chatUnreadCount, 1)
+        let changesBeforeReading = changes
+        game.markAllChatAsRead()
+        XCTAssertEqual(game.chatUnreadCount, 0)
+        XCTAssertEqual(changes, changesBeforeReading + 1)
+        XCTAssertEqual(preferences[.lastSeenChatIdByOGSGameId]?[42], "second")
+        game.markAllChatAsRead()
+        XCTAssertEqual(changes, changesBeforeReading + 1)
+    }
+
+    func testMarkAllChatAsReadUpdatesReadPositionWhenCountIsAlreadyZero() throws {
+        let suite = "GameTests.chat-read-position.\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let game = Game(width: 5, height: 5, blackName: "black", whiteName: "white", gameId: .OGS(43))
+        game.preferences = preferences
+        game.chatLog = [
+            try chatLine(id: "first", timestamp: 1),
+            try chatLine(id: "second", timestamp: 2),
+        ]
+        XCTAssertEqual(game.chatUnreadCount, 0)
+
+        var changes = 0
+        let observation = game.objectWillChange.sink { changes += 1 }
+        defer { observation.cancel() }
+        game.markAllChatAsRead()
+        XCTAssertEqual(changes, 0)
+        XCTAssertEqual(preferences[.lastSeenChatIdByOGSGameId]?[43], "second")
+
+        // The read index still has to advance, even without a count change.
+        game.addChatLine(try chatLine(id: "third", timestamp: 3))
+        XCTAssertEqual(game.chatUnreadCount, 1)
+        game.markAllChatAsRead()
+        XCTAssertEqual(game.chatUnreadCount, 0)
+        XCTAssertEqual(preferences[.lastSeenChatIdByOGSGameId]?[43], "third")
+    }
+
+    private func chatLine(id: String, timestamp: Double) throws -> OGSChatLine {
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(OGSChatLine.self, from: [
+            "channel": "main",
+            "line": [
+                "chat_id": id, "date": timestamp, "player_id": 1,
+                "username": "player", "body": "Hello",
+            ],
+        ])
+    }
+
     static func sampleGame(ogsId: Int) -> Game {
         let fileURL = Bundle(for: GameTests.self).url(forResource: "game-\(ogsId)", withExtension: "json")!
         let decoder = JSONDecoder()

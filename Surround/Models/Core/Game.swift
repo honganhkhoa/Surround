@@ -1220,7 +1220,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             return
         }
         
-        chatUnreadCount = 0
+        // A covered chat can receive another appearance callback. Publishing
+        // the same count would invalidate its layout again on iOS 18.
+        if chatUnreadCount != 0 {
+            chatUnreadCount = 0
+        }
         lastSeenChatIndex = chatLog.count - 1
         if lastSeenChatId != lastChat.id {
             var lastSeenChatIdByOGSGameId = preferences[.lastSeenChatIdByOGSGameId] ?? [Int: String]()
