@@ -43,10 +43,10 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     private func openProfileContentFromHome(in app: XCUIApplication) {
         let gameID = SurroundUITestContract.screenshotPrimaryGameID
         let row = elementAfterScrolling(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
-        openProfileContextMenu(for: row, in: app)
-        tap(requiredMenuButton(
-            SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, SurroundUITestContract.profileFixtureOpponentID),
-            title: "View Profile", in: app
+        tap(openProfileContextMenu(
+            for: row,
+            expecting: SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, SurroundUITestContract.profileFixtureOpponentID),
+            in: app
         ), description: "Open CopperKoi's profile", in: app)
         assertLoadedProfile(named: "CopperKoi", in: app)
     }
@@ -753,10 +753,10 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         ]
         for (gameID, rowID, playerID, username) in games {
             let row = elementAfterScrolling(rowID, in: app)
-            openProfileContextMenu(for: row, in: app)
-            let profileAction = requiredMenuButton(
-                SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, playerID),
-                title: "View Profile", in: app
+            let profileAction = openProfileContextMenu(
+                for: row,
+                expecting: SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, playerID),
+                in: app
             )
             XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
                 SurroundUITestContract.AccessibilityID.profileGameMenuEntry(
@@ -782,10 +782,10 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         ])
         let gameID = SurroundUITestContract.screenshotHistoryGameIDs[0]
         let row = element(SurroundUITestContract.AccessibilityID.homeHistoryGame(gameID), in: app)
-        openProfileContextMenu(for: row, in: app)
-        tap(requiredMenuButton(
-            SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 851_001),
-            title: "View Profile", in: app
+        tap(openProfileContextMenu(
+            for: row,
+            expecting: SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 851_001),
+            in: app
         ), description: "View the historical opponent's profile", in: app)
         assertLoadedProfile(named: "CedarWave", in: app)
         navigateBackFromPlayerProfile(in: app)
@@ -805,7 +805,11 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let gameID = SurroundUITestContract.screenshotPublicGameID
         let row = element(SurroundUITestContract.AccessibilityID.publicGame(gameID), in: app)
         for (playerID, username) in [(901_001, "MapleLeaf"), (901_002, "SilverPine")] {
-            openProfileContextMenu(for: row, in: app)
+            openProfileContextMenu(
+                for: row,
+                expecting: SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 901_001),
+                in: app
+            )
             // The shared title is intentionally identical. Resolve by player
             // ID so this proves that each item selects its own participant.
             let black = element(SurroundUITestContract.AccessibilityID.profileGameMenuEntry(gameID, 901_001), in: app)

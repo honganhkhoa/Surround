@@ -56,7 +56,7 @@ jobs:
 
   ipad-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 105
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
 
       - name: Run main iPad UI tests
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main \
@@ -116,7 +116,7 @@ jobs:
 
   ipad-profile-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 65
+    timeout-minutes: 80
 
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +143,7 @@ jobs:
 
       - name: Run iPad profile UI tests
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh profile \
@@ -162,7 +162,7 @@ jobs:
   # half of the UI suite. The unit step also warms the UI build's derived data.
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 75
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -219,7 +219,7 @@ jobs:
 
       - name: Run iPad profile UI tests on iPadOS 18
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh profile \
@@ -236,7 +236,7 @@ jobs:
 
   minimum-ios-18-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 105
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -277,7 +277,7 @@ jobs:
 
       - name: Run main iPad UI tests on iPadOS 18
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main \

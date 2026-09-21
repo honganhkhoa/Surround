@@ -777,22 +777,53 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             // content, rather than the title, must leave the visible stack.
             object: profileScreen
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: stateSettleTimeout), .completed,
                        "Back must pop the profile and reveal its originating page.",
                        file: file, line: line)
     }
 
+    // A slow hosted runner occasionally delivers the long press as a tap,
+    // which opens the row's destination instead of its context menu. Return
+    // to the row and press once more before reporting the missing menu item.
+    @discardableResult
     func openProfileContextMenu(
         for row: XCUIElement,
-        in app: XCUIApplication
-    ) {
-        scrollIntoTappableArea(row, in: app)
-        XCTAssertTrue(row.isHittable, "The row must be visible before opening its context menu.")
-        #if targetEnvironment(macCatalyst)
-        row.rightClick()
-        #else
-        row.press(forDuration: 1)
-        #endif
+        expecting accessibilityIdentifier: String,
+        title: String = "View Profile",
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let menuItem = menuButton(accessibilityIdentifier, title: title, in: app)
+        for attempt in 1...2 {
+            scrollIntoTappableArea(row, in: app)
+            XCTAssertTrue(row.isHittable, "The row must be visible before opening its context menu.",
+                          file: file, line: line)
+            #if targetEnvironment(macCatalyst)
+            row.rightClick()
+            #else
+            row.press(forDuration: 1)
+            #endif
+            if attempt == 2 || menuItem.waitForExistence(timeout: 10) { break }
+            if !(row.exists && row.isHittable), let back = backButtonOfPushedScreen(in: app) {
+                tap(back, description: "Return from the row's destination", in: app, file: file, line: line)
+                XCTAssertTrue(waitUntilHittable(row, timeout: stateSettleTimeout),
+                              "The row must reappear after leaving its destination.", file: file, line: line)
+            }
+        }
+        return requiredMenuButton(accessibilityIdentifier, title: title, in: app, file: file, line: line)
+    }
+
+    // UIKit identifies the back control on recent systems. Older releases
+    // leave it as the unidentified first button of the titled bar.
+    private func backButtonOfPushedScreen(in app: XCUIApplication) -> XCUIElement? {
+        let identifiedBack = app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+        if identifiedBack.exists {
+            return identifiedBack
+        }
+        return app.navigationBars.allElementsBoundByIndex
+            .last { !$0.identifier.isEmpty }?
+            .buttons.firstMatch
     }
 
     func assertLoadedProfile(

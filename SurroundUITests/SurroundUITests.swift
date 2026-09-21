@@ -941,10 +941,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let rowID = SurroundUITestContract.AccessibilityID.privateMessageRow(peerID)
         let toolbarID = SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(peerID)
         let row = element(rowID, in: app)
-        openProfileContextMenu(for: row, in: app)
-        tap(requiredMenuButton(
-            SurroundUITestContract.AccessibilityID.profileMessageMenuEntry(peerID),
-            title: "View Profile", in: app
+        tap(openProfileContextMenu(
+            for: row,
+            expecting: SurroundUITestContract.AccessibilityID.profileMessageMenuEntry(peerID),
+            in: app
         ), description: "View the message-list peer's profile", in: app)
         assertLoadedProfile(named: "hakhoa", in: app)
 
