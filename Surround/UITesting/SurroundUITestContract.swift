@@ -36,6 +36,9 @@ enum SurroundUITestContract {
         "--surround-profile-sections-unavailable"
     static let profileContentLaunchArgument = "--surround-profile-content"
     static let profileShortHistoryLaunchArgument = "--surround-profile-short-history"
+    static let friendshipLaunchArgument = "--surround-friendship"
+    static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
+    static let friendshipSlowResponseLaunchArgument = "--surround-friendship-slow-response"
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
@@ -63,6 +66,8 @@ enum SurroundUITestContract {
     static let profileFixtureOwnerID = 314_459
     static let profileFixtureOpponentID = 429_553
     static let profileFixturePickerFriendID = 801_001
+    static let friendshipFixtureRequestPlayerIDs = [912_001, 912_002, 912_003]
+    static let friendshipFixtureRequestUsernames = ["RiverWillow", "SilverHeron", "CloudPebble"]
     static let profileFixtureActiveGameIDs = [91_001_001, 91_001_002, 91_001_003, 91_001_004]
     // Both the complete feed (12) and the pairwise feed (11) exceed a
     // ten-game page; the sixth game alone has a different opponent.
@@ -220,6 +225,18 @@ enum SurroundUITestContract {
 
     static var usesShortProfileHistory: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(profileShortHistoryLaunchArgument)
+    }
+
+    static var includesFriendshipRequests: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(friendshipLaunchArgument)
+    }
+
+    static var simulatesFriendshipFailureOnce: Bool {
+        includesFriendshipRequests && ProcessInfo.processInfo.arguments.contains(friendshipFailsOnceLaunchArgument)
+    }
+
+    static var simulatesSlowFriendshipResponse: Bool {
+        includesFriendshipRequests && ProcessInfo.processInfo.arguments.contains(friendshipSlowResponseLaunchArgument)
     }
 
     static var appearanceOverride: Appearance? {
@@ -431,6 +448,9 @@ enum SurroundUITestContract {
     static let simulatesUnavailableProfileSections = false
     static let includesProfileContent = false
     static let usesShortProfileHistory = false
+    static let includesFriendshipRequests = false
+    static let simulatesFriendshipFailureOnce = false
+    static let simulatesSlowFriendshipResponse = false
     static let appearanceOverride: Appearance? = nil
     static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
@@ -468,6 +488,40 @@ enum SurroundUITestContract {
         static let profileRetry = "profile.retry"
         static let profileChallenge = "profile.challenge"
         static let profileMessage = "profile.message"
+        static let profileFriendshipAction = "profile.friendship.action"
+        static let profileFriendshipError = "profile.friendship.error"
+        static let profileFriendshipRetry = "profile.friendship.retry"
+        static let profileFriendshipLoading = "profile.friendship.loading"
+        static let profileFriendRequest = "profile.friend-request"
+        static let profileRemoveFriend = "profile.friendship.remove"
+        static let friendshipRemoveConfirm = "friendship.remove.confirm"
+        static let friendshipRejectNotify = "friendship.reject.notify"
+        static let friendshipRejectQuietly = "friendship.reject.quietly"
+        static let homeFriendRequests = "home.friend-requests"
+
+        static func friendRequestProfile(_ playerID: Int) -> String {
+            "friend-request.profile.\(playerID)"
+        }
+
+        static func friendRequestAccept(_ playerID: Int) -> String {
+            "friend-request.accept.\(playerID)"
+        }
+
+        static func friendRequestReject(_ playerID: Int) -> String {
+            "friend-request.reject.\(playerID)"
+        }
+
+        static func friendRequestBusy(_ playerID: Int) -> String {
+            "friend-request.busy.\(playerID)"
+        }
+
+        static func friendRequestError(_ playerID: Int) -> String {
+            "friend-request.error.\(playerID)"
+        }
+
+        static func friendRequestRetry(_ playerID: Int) -> String {
+            "friend-request.retry.\(playerID)"
+        }
         static let profileSettingsEntry = "profile.entry.settings"
         static let profileEdit = "profile.edit"
         static let profileShare = "profile.share"

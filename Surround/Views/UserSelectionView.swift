@@ -143,6 +143,21 @@ struct UserSelectionView: View {
                 }
                 .background(Color(.systemGray3))
                 Divider()
+                if ogs.friendsError != nil || ogs.friendsLoading {
+                    VStack(spacing: 8) {
+                        if ogs.friendsError != nil {
+                            Text("Couldn’t load friends")
+                                .foregroundStyle(.secondary)
+                        }
+                        if ogs.friendsLoading {
+                            ProgressView()
+                        } else {
+                            Button("Try Again") { ogs.fetchFriends() }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
                 LazyVStack(spacing: 0) {
                     ForEach(ogs.friends, id: \.id) { friend in
                         userRow(friend)
@@ -180,7 +195,7 @@ struct UserSelectionView: View {
             SearchBar(text: $searchText, placeholder: String(localized: "Search by user name"))
             
             if searchText.count == 0 {
-                if ogs.friends.count > 0 {
+                if !ogs.friends.isEmpty || ogs.friendsLoading || ogs.friendsError != nil {
                     friendList
                 }
             } else {

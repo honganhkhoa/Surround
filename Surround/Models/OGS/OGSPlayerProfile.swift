@@ -13,6 +13,7 @@ struct OGSPlayerProfile: Decodable, Identifiable {
     /// Missing or malformed sections stay unavailable instead of appearing empty.
     let activeGames: [OGSProfileActiveGame]?
     let versus: OGSProfileVersus?
+    let friendship: OGSProfileFriendship?
 
     var id: Int { user.id }
 
@@ -21,17 +22,19 @@ struct OGSPlayerProfile: Decodable, Identifiable {
         about: String? = nil,
         registrationDate: Date? = nil,
         activeGames: [OGSProfileActiveGame]? = nil,
-        versus: OGSProfileVersus? = nil
+        versus: OGSProfileVersus? = nil,
+        friendship: OGSProfileFriendship? = nil
     ) {
         self.user = user
         self.about = about
         self.registrationDate = registrationDate
         self.activeGames = activeGames
         self.versus = versus
+        self.friendship = friendship
     }
 
     private enum CodingKeys: String, CodingKey {
-        case user, activeGames, vs
+        case user, activeGames, vs, isFriend, friendRequestSent, friendRequestReceived
     }
 
     private enum UserDetailsKeys: String, CodingKey {
@@ -59,6 +62,23 @@ struct OGSPlayerProfile: Decodable, Identifiable {
             .flatMap(Self.date(from:))
         activeGames = try? container.decodeIfPresent([OGSProfileActiveGame].self, forKey: .activeGames)
         versus = try? container.decodeIfPresent(OGSProfileVersus.self, forKey: .vs)
+        friendship = OGSProfileFriendship(
+            isFriend: try? container.decode(Bool.self, forKey: .isFriend),
+            requestSent: Self.requestIsPending(in: container, forKey: .friendRequestSent),
+            requestReceived: Self.requestIsPending(in: container, forKey: .friendRequestReceived)
+        )
+    }
+
+    /// Pending request fields can contain a request ID instead of a Boolean.
+    /// Missing or malformed values do not establish whether a request exists.
+    private static func requestIsPending(
+        in container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys
+    ) -> Bool? {
+        if let flag = try? container.decode(Bool.self, forKey: key) { return flag }
+        if let requestID = try? container.decode(Int.self, forKey: key), requestID > 0 {
+            return true
+        }
+        return nil
     }
 
     fileprivate static func date(from string: String) -> Date? {

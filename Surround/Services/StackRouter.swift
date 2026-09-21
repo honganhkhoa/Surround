@@ -308,6 +308,9 @@ struct AppNavigationStack<Content: View>: View {
                         .environment(\.owningStackRoute, route)
                 }
         }
+        .overlay(alignment: .bottom) {
+            if navigation.isActive { FriendshipNoticeBanner() }
+        }
         .environmentObject(navigation)
         .environment(\.openPlayerProfile) { navigation.openProfile($0) }
         .environment(\.openPlayerConversation) { navigation.openConversation($0) }

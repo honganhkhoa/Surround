@@ -765,6 +765,10 @@ class OGSService: ObservableObject {
         var publicGames = [Int: Game]()
         var sortedPublicGames = [Game]()
         var friends = [OGSUser]()
+        var friendshipByPlayerID = [Int: OGSProfileFriendship]()
+        var friendInvitations = [OGSFriendInvitation]()
+        var friendshipActionDelay: TimeInterval = 0
+        var friendshipActionFailuresByPlayerID = [Int: [String]]()
         var eligibleOpenChallengeById = [Int: OGSSeekgraphChallenge]()
         var openChallengeSentById = [Int: OGSSeekgraphChallenge]()
         var challengesReceived = [OGSDirectChallenge]()
@@ -1030,6 +1034,51 @@ class OGSService: ObservableObject {
     private var cachedUsersFetchingCancellable: AnyCancellable?
     
     @Published private(set) public var friends = [OGSUser]()
+    @Published private(set) var friendsLoading = false
+    @Published private(set) var friendsError: String?
+    @Published private(set) var friendshipByPlayerID = [Int: OGSProfileFriendship]()
+    @Published private(set) var friendInvitations = [OGSFriendInvitation]()
+    @Published private(set) var friendshipActionPlayerIDs = Set<Int>()
+    @Published private(set) var friendInvitationsLoading = false
+    @Published private(set) var friendInvitationsError: String?
+    @Published private(set) var friendshipNotice: OGSFriendshipNotice?
+    @Published private(set) var friendshipFailuresByPlayerID = [Int: OGSFriendshipFailure]()
+    @Published private(set) var friendshipRefreshRevision: UInt = 0
+
+    // Mutations invalidate earlier reads; read ordering is separate so an
+    // earlier list response cannot invalidate a later profile request.
+    private var friendshipRevisions = [Int: UInt]()
+    private var friendshipReadOrder: UInt = 0
+    private var friendshipAppliedReadOrders = [Int: UInt]()
+    private var friendshipOutgoingReadOrders = [Int: UInt]()
+    private var friendshipAbsentFriendsReadOrders = [Int: UInt]()
+    private var friendshipAbsentInvitationsReadOrders = [Int: UInt]()
+    private var friendshipProfileRequestIDs = [Int: UUID]()
+    // Automatic reentry/foreground reads briefly reuse authoritative profile
+    // flags. The monotonic clock is replaceable for deterministic expiry tests.
+    var friendshipRefreshTime: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    private var friendshipLastRefresh = [Int: TimeInterval]()
+    private var friendshipRefreshGeneration: UInt = 0
+    private struct FriendshipRefresh {
+        let id: UUID
+        let authentication: UInt
+        let revision: UInt
+        let publisher: AnyPublisher<OGSProfileFriendship, Error>
+    }
+    private var friendshipRefreshes = [Int: FriendshipRefresh]()
+    private var friendshipListRevision: UInt = 0
+    private var friendshipListRequestID: UUID?
+    private var friendshipListCancellable: AnyCancellable?
+    private var friendshipInvalidationWork: DispatchWorkItem?
+    private var friendshipActionDelay: TimeInterval = 0
+    private var friendshipActionFailuresByPlayerID = [Int: [String]]()
+    private var friendshipNotificationIDs = Set<String>()
+    private struct PendingFriendshipAction {
+        let id: UUID
+        let promise: (Result<Void, Error>) -> Void
+        var request: DataRequest?
+    }
+    private var pendingFriendshipActions = [Int: PendingFriendshipAction]()
     
     @Published private(set) public var privateMessagesByPeerId = [Int: [OGSPrivateMessage]]()
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
@@ -1101,6 +1150,16 @@ class OGSService: ObservableObject {
         publicGames = state.publicGames
         sortedPublicGames = state.sortedPublicGames
         friends = state.friends
+        friendshipByPlayerID = state.friendshipByPlayerID
+        friendInvitations = state.friendInvitations.filter { !$0.accepted }
+        friendshipActionDelay = state.friendshipActionDelay
+        friendshipActionFailuresByPlayerID = state.friendshipActionFailuresByPlayerID
+        for friend in friends {
+            friendshipByPlayerID[friend.id] = .friends
+        }
+        for invitation in friendInvitations where friendshipByPlayerID[invitation.id] != .friends {
+            friendshipByPlayerID[invitation.id] = .requestReceived
+        }
         eligibleOpenChallengeById = state.eligibleOpenChallengeById
         openChallengeSentById = state.openChallengeSentById
         challengesReceived = state.challengesReceived
@@ -1371,6 +1430,7 @@ class OGSService: ObservableObject {
             )
             reconcileAutomatchAvailabilitySubscription()
             reconcileSeekGraphSubscription()
+            invalidateFriendshipSnapshots()
             if enablesAppSideEffects {
                 self.syncRemoteStorage()
             }
@@ -1415,12 +1475,15 @@ class OGSService: ObservableObject {
         case "notification":
             if let notification = data as? [String: Any] {
                 handleAutomatchGameLifecycleNotification(notification)
+                handleFriendshipNotification(notification)
             }
         case "ui-push":
             if let data = data as? [String: Any] {
                 if let event = data["event"] as? String {
                     if event == "challenge-list-updated" {
                         self.loadOverview()
+                    } else if event == "update-friend-list" {
+                        invalidateFriendshipSnapshots()
                     }
                 }
             }
@@ -1764,6 +1827,7 @@ class OGSService: ObservableObject {
             let accountIdentityChanged = newValue?.user.id != previousConfig?.user.id
             if accountIdentityChanged {
                 advanceAuthenticationGeneration()
+                resetFriendships()
                 automatchAvailabilitySubscribed = false
                 automatchAvailableEntryByID.removeAll()
                 quickMatchPopularityGeneration = UUID()
@@ -1992,12 +2056,25 @@ class OGSService: ObservableObject {
                     return Fail<OGSPlayerProfile, Error>(error: OGSServiceError.invalidJSON)
                         .eraseToAnyPublisher()
                 }
+                if self.friendshipByPlayerID[playerId] == nil,
+                   let friendship = profile.friendship {
+                    self.applyFriendship(friendship, user: profile.user)
+                }
+                if self.friendship(for: playerId) != nil {
+                    self.friendshipLastRefresh[playerId] = self.friendshipRefreshTime()
+                }
                 return Just(profile)
                     .setFailureType(to: Error.self)
                     .eraseToAnyPublisher()
             }
 
             let requestAuthenticationGeneration = self.authenticationGeneration
+            let friendshipRevision = self.friendshipRevisions[playerId, default: 0]
+            let refreshGeneration = self.friendshipRefreshGeneration
+            self.friendshipLastRefresh.removeValue(forKey: playerId)
+            let friendshipReadOrder = self.nextFriendshipReadOrder()
+            let friendshipRequestID = UUID()
+            self.friendshipProfileRequestIDs[playerId] = friendshipRequestID
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
 
@@ -2014,6 +2091,36 @@ class OGSService: ObservableObject {
                     guard let profile = try? decoder.decode(OGSPlayerProfile.self, from: data),
                           profile.id == playerId else {
                         throw OGSServiceError.invalidJSON
+                    }
+                    // Empty friend/invitation lists cannot resolve an outgoing
+                    // request. A full response can fill that missing fact while
+                    // preserving the newer lists' negative membership result.
+                    let resolvesOutgoingState =
+                        (profile.friendship == OGSProfileFriendship.none || profile.friendship == .requestSent)
+                        && (self.friendship(for: playerId) == OGSProfileFriendship.none
+                            || self.friendship(for: playerId) == .requestSent)
+                        && self.friendshipOutgoingReadOrders[playerId, default: 0] <= friendshipReadOrder
+                    let newerListExcludesRelationship =
+                        (profile.friendship == .friends
+                            && self.friendshipAbsentFriendsReadOrders[playerId, default: 0] > friendshipReadOrder)
+                        || (profile.friendship == .requestReceived
+                            && self.friendshipAbsentInvitationsReadOrders[playerId, default: 0] > friendshipReadOrder)
+                    if self.isLoggedIn, profile.id != self.user?.id,
+                       !newerListExcludesRelationship,
+                       self.friendshipRevisions[playerId, default: 0] == friendshipRevision,
+                       (self.friendshipAppliedReadOrders[playerId, default: 0] <= friendshipReadOrder
+                            || resolvesOutgoingState),
+                       self.friendshipProfileRequestIDs[playerId] == friendshipRequestID,
+                       !self.friendshipActionPlayerIDs.contains(playerId),
+                       let friendship = profile.friendship {
+                        self.applyFriendship(friendship, user: profile.user)
+                        self.friendshipAppliedReadOrders[playerId] = max(
+                            self.friendshipAppliedReadOrders[playerId, default: 0], friendshipReadOrder
+                        )
+                        self.friendshipOutgoingReadOrders[playerId] = friendshipReadOrder
+                        if self.friendshipRefreshGeneration == refreshGeneration {
+                            self.friendshipLastRefresh[playerId] = self.friendshipRefreshTime()
+                        }
                     }
                     return profile
                 }
@@ -4334,21 +4441,467 @@ class OGSService: ObservableObject {
     }
     
     func fetchFriends() {
-        httpClient.session.request("\(self.ogsRoot)/api/v1/ui/friends").validate().responseJSON { response in
-            if case .success(let data) = response.result {
-                if let friends = (data as? [String: Any] ?? [:])["friends"] as? [[String: Any]] {
-                    let decoder = DictionaryDecoder()
-                    decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    var result = [OGSUser]()
-                    for friend in friends {
-                        if let user = try? decoder.decode(OGSUser.self, from: friend) {
-                            result.append(user)
+        guard isLoggedIn else { return }
+        friendshipListCancellable = refreshFriendships().sink(
+            receiveCompletion: { _ in }, receiveValue: { _ in }
+        )
+    }
+
+    func friendship(for playerID: Int) -> OGSProfileFriendship? {
+        friendshipByPlayerID[playerID]
+    }
+
+    func dismissFriendshipNotice(id: UUID) {
+        if friendshipNotice?.id == id { friendshipNotice = nil }
+    }
+
+    func dismissFriendshipFailure(playerID: Int, failureID: UUID) {
+        if friendshipFailuresByPlayerID[playerID]?.id == failureID {
+            friendshipFailuresByPlayerID.removeValue(forKey: playerID)
+        }
+    }
+
+    /// Automatic reads reuse recent authoritative flags; explicit retries bypass
+    /// freshness. Concurrent callers share only this relationship read, leaving
+    /// visible profile loads independently cancellable.
+    func refreshFriendship(playerID: Int, force: Bool = true) -> AnyPublisher<OGSProfileFriendship, Error> {
+        Deferred { [self] () -> AnyPublisher<OGSProfileFriendship, Error> in
+            guard self.isLoggedIn, playerID != self.user?.id else {
+                return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
+            }
+            let authentication = self.authenticationGeneration
+            let revision = self.friendshipRevisions[playerID, default: 0]
+            if let refresh = self.friendshipRefreshes[playerID],
+               refresh.authentication == authentication, refresh.revision == revision {
+                return refresh.publisher
+            }
+            if !force, let refreshedAt = self.friendshipLastRefresh[playerID],
+               self.friendshipRefreshTime() - refreshedAt < 5,
+               let friendship = self.friendship(for: playerID) {
+                return Just(friendship).setFailureType(to: Error.self).eraseToAnyPublisher()
+            }
+            let requestID = UUID()
+            let clearRefresh = { [weak self] in
+                guard let self, self.friendshipRefreshes[playerID]?.id == requestID else { return }
+                self.friendshipRefreshes.removeValue(forKey: playerID)
+            }
+            let publisher = self.fetchPlayerProfile(playerId: playerID)
+                .tryMap { profile in
+                    guard self.playerProfilesById != nil || profile.friendship != nil else {
+                        throw OGSServiceError.invalidJSON
+                    }
+                    guard let friendship = self.friendship(for: playerID) else {
+                        throw OGSServiceError.invalidJSON
+                    }
+                    return friendship
+                }
+                .handleEvents(receiveCompletion: { _ in clearRefresh() }, receiveCancel: clearRefresh)
+                .share()
+                .eraseToAnyPublisher()
+            self.friendshipRefreshes[playerID] = FriendshipRefresh(
+                id: requestID, authentication: authentication, revision: revision, publisher: publisher
+            )
+            return publisher
+        }.eraseToAnyPublisher()
+    }
+
+    /// Each list updates independently; an unavailable or incomplete list cannot
+    /// erase its previously known members or prevent the other list from loading.
+    func refreshFriendships() -> AnyPublisher<Void, Error> {
+        Deferred { () -> AnyPublisher<Void, Error> in
+            guard self.isLoggedIn else {
+                return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
+            }
+            if self.playerProfilesById != nil {
+                return Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+            }
+            let authentication = self.authenticationGeneration
+            let revision = self.friendshipListRevision
+            let playerRevisions = self.friendshipRevisions
+            let readOrder = self.nextFriendshipReadOrder()
+            let requestID = UUID()
+            self.friendshipListRequestID = requestID
+            self.friendsLoading = true
+            self.friendsError = nil
+            self.friendInvitationsLoading = true
+            self.friendInvitationsError = nil
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            struct FriendsResponse: Decodable { let friends: OGSFriendshipList<OGSUser> }
+            let friendsRequest = self.httpClient.session.request(
+                "\(self.ogsRoot)/api/v1/ui/friends"
+            ).validate().publishData().tryMap { response in
+                try decoder.decode(FriendsResponse.self, from: response.result.get()).friends
+                    .validating { $0.id > 0 }
+            }
+                .map { Result<OGSFriendshipList<OGSUser>, Error>.success($0) }
+                .catch { Just(Result<OGSFriendshipList<OGSUser>, Error>.failure($0)) }
+                .handleEvents(receiveOutput: { result in
+                    guard self.authenticationGeneration == authentication,
+                          self.friendshipListRequestID == requestID else { return }
+                    if self.friendshipListRevision == revision {
+                        switch result {
+                        case .success(let friends):
+                            self.applyFriendshipLists(
+                                friends: friends, invitations: nil,
+                                startingRevisions: playerRevisions, readOrder: readOrder
+                            )
+                            self.friendsError = friends.isComplete ? nil : OGSServiceError.invalidJSON.localizedDescription
+                        case .failure(let error): self.friendsError = error.localizedDescription
                         }
                     }
-                    self.friends = result
+                    self.friendsLoading = false
+                })
+            let invitationsRequest = self.httpClient.session.request(
+                "\(self.ogsRoot)/api/v1/me/friends/invitations/"
+            ).validate().publishData().tryMap { response in
+                try decoder.decode(OGSFriendshipList<OGSFriendInvitation>.self, from: response.result.get())
+            }
+                .map { Result<OGSFriendshipList<OGSFriendInvitation>, Error>.success($0) }
+                .catch { Just(Result<OGSFriendshipList<OGSFriendInvitation>, Error>.failure($0)) }
+                .handleEvents(receiveOutput: { result in
+                    guard self.authenticationGeneration == authentication,
+                          self.friendshipListRequestID == requestID else { return }
+                    if self.friendshipListRevision == revision {
+                        switch result {
+                        case .success(let invitations):
+                            self.applyFriendshipLists(
+                                friends: nil, invitations: invitations,
+                                startingRevisions: playerRevisions, readOrder: readOrder
+                            )
+                            self.friendInvitationsError = invitations.isComplete ? nil : OGSServiceError.invalidJSON.localizedDescription
+                        case .failure(let error): self.friendInvitationsError = error.localizedDescription
+                        }
+                    }
+                    self.friendInvitationsLoading = false
+                })
+            return friendsRequest.zip(invitationsRequest)
+                .tryMap { friends, invitations in
+                    guard self.authenticationGeneration == authentication else {
+                        throw OGSServiceError.staleAuthenticationContext
+                    }
+                    guard self.friendshipListRequestID == requestID,
+                          self.friendshipListRevision == revision else { return }
+                    let friendList = try friends.get()
+                    let invitationList = try invitations.get()
+                    // Reconcile the two completed reads together too: confirmed
+                    // absence from both supersedes older profile membership data.
+                    self.applyFriendshipLists(
+                        friends: friendList, invitations: invitationList,
+                        startingRevisions: playerRevisions, readOrder: readOrder
+                    )
+                    guard friendList.isComplete, invitationList.isComplete else {
+                        throw OGSServiceError.invalidJSON
+                    }
                 }
+                .handleEvents(receiveCancel: {
+                    guard self.friendshipListRequestID == requestID,
+                          self.authenticationGeneration == authentication else { return }
+                    self.friendsLoading = false
+                    self.friendInvitationsLoading = false
+                })
+                .eraseToAnyPublisher()
+        }.eraseToAnyPublisher()
+    }
+
+    /// The service retains each operation after the initiating view disappears.
+    /// Only a successful server response changes the shared relationship state.
+    func performFriendshipAction(
+        _ action: OGSFriendshipAction, user player: OGSUser
+    ) -> AnyPublisher<Void, Error> {
+        Deferred {
+            Future<Void, Error> { promise in
+                guard self.isLoggedIn, let viewer = self.user, viewer.id > 0,
+                      viewer.anonymous != true,
+                      player.id > 0, player.id != viewer.id else {
+                    promise(.failure(OGSServiceError.notLoggedIn))
+                    return
+                }
+                guard self.pendingFriendshipActions[player.id] == nil,
+                      action.isAvailable(for: self.friendship(for: player.id)) else {
+                    promise(.failure(OGSServiceError.invalidJSON))
+                    return
+                }
+                let isFixture = self.playerProfilesById != nil
+                let csrfToken = self.preferences[.ogsCsrfCookie] ?? self.ogsUIConfig?.csrfToken
+                guard isFixture || csrfToken != nil else {
+                    promise(.failure(OGSServiceError.notLoggedIn))
+                    return
+                }
+                let authentication = self.authenticationGeneration
+                let operationID = UUID()
+                self.pendingFriendshipActions[player.id] = PendingFriendshipAction(
+                    id: operationID, promise: promise
+                )
+                self.friendshipActionPlayerIDs.insert(player.id)
+                self.friendshipFailuresByPlayerID.removeValue(forKey: player.id)
+                self.advanceFriendshipRevision(player.id)
+
+                let finish: (Result<Void, Error>) -> Void = { result in
+                    guard self.pendingFriendshipActions[player.id]?.id == operationID else { return }
+                    self.pendingFriendshipActions.removeValue(forKey: player.id)
+                    self.friendshipActionPlayerIDs.remove(player.id)
+                    self.advanceFriendshipRevision(player.id)
+                    guard self.authenticationGeneration == authentication else {
+                        promise(.failure(OGSServiceError.staleAuthenticationContext))
+                        return
+                    }
+                    if case .success = result {
+                        let relationship: OGSProfileFriendship
+                        switch action {
+                        case .send: relationship = .requestSent
+                        case .accept: relationship = .friends
+                        case .reject, .remove: relationship = .none
+                        }
+                        self.applyFriendship(relationship, user: player)
+                        self.friendshipFailuresByPlayerID.removeValue(forKey: player.id)
+                        self.friendshipNotice = OGSFriendshipNotice(action: action)
+                    } else if case .failure(let error) = result {
+                        self.friendshipFailuresByPlayerID[player.id] = OGSFriendshipFailure(
+                            action: action, user: player,
+                            message: (error as? OGSFriendshipError)?.message
+                                ?? String(localized: "Check your connection and try again.")
+                        )
+                    }
+                    promise(result)
+                    if !isFixture, case .success = result {
+                        self.fetchFriends()
+                        self.friendshipRefreshRevision &+= 1
+                    }
+                }
+
+                if isFixture {
+                    var failures = self.friendshipActionFailuresByPlayerID[player.id] ?? []
+                    let error = failures.isEmpty ? nil : failures.removeFirst()
+                    self.friendshipActionFailuresByPlayerID[player.id] = failures
+                    DispatchQueue.main.asyncAfter(deadline: .now() + self.friendshipActionDelay) {
+                        finish(error.map { .failure(OGSFriendshipError(message: $0)) } ?? .success(()))
+                    }
+                    return
+                }
+
+                let path: String
+                let parameters: [String: Any]
+                switch action {
+                case .send:
+                    path = "me/friends"
+                    parameters = ["player_id": player.id]
+                case .remove:
+                    path = "me/friends"
+                    parameters = ["player_id": player.id, "delete": true]
+                case .accept:
+                    path = "me/friends/invitations/"
+                    parameters = ["from_user": player.id]
+                case .reject(let notifyRequestor):
+                    path = "me/friends/invitations/"
+                    parameters = [
+                        "from_user": player.id, "delete": true,
+                        "notify_requestor": notifyRequestor
+                    ]
+                }
+                let request = self.httpClient.session.request(
+                    "\(self.ogsRoot)/api/v1/\(path)", method: .post,
+                    parameters: parameters, encoding: JSONEncoding.default,
+                    headers: ["X-CSRFToken": csrfToken!, "Referer": "\(self.ogsRoot)/player/\(player.id)"]
+                ).validate().response { response in
+                    switch response.result {
+                    case .success:
+                        finish(.success(()))
+                    case .failure(let error):
+                        let body = response.data.flatMap {
+                            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+                        }
+                        let message = ["error", "detail", "message"].compactMap {
+                            body?[$0] as? String
+                        }.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                        if let message {
+                            finish(.failure(OGSFriendshipError(message: message)))
+                        } else {
+                            finish(.failure(error))
+                        }
+                    }
+                }
+                self.pendingFriendshipActions[player.id]?.request = request
+            }
+        }.eraseToAnyPublisher()
+    }
+
+    private func advanceFriendshipRevision(_ playerID: Int) {
+        friendshipLastRefresh.removeValue(forKey: playerID)
+        friendshipRefreshes.removeValue(forKey: playerID)
+        friendshipRevisions[playerID, default: 0] &+= 1
+        friendshipListRevision &+= 1
+    }
+
+    private func nextFriendshipReadOrder() -> UInt {
+        friendshipReadOrder &+= 1
+        return friendshipReadOrder
+    }
+
+    private func applyFriendship(_ relationship: OGSProfileFriendship, user player: OGSUser) {
+        friendshipByPlayerID[player.id] = relationship
+        if let failure = friendshipFailuresByPlayerID[player.id],
+           !failure.action.isAvailable(for: relationship) {
+            friendshipFailuresByPlayerID.removeValue(forKey: player.id)
+        }
+        if relationship == .friends {
+            if !friends.contains(where: { $0.id == player.id }) { friends.append(player) }
+        } else {
+            friends.removeAll { $0.id == player.id }
+        }
+        if relationship == .requestReceived {
+            if !friendInvitations.contains(where: { $0.id == player.id }) {
+                friendInvitations.append(OGSFriendInvitation(fromUser: player))
+            }
+        } else {
+            friendInvitations.removeAll { $0.id == player.id }
+        }
+    }
+
+    private func applyFriendshipLists(
+        friends friendList: OGSFriendshipList<OGSUser>?,
+        invitations invitationList: OGSFriendshipList<OGSFriendInvitation>?,
+        startingRevisions: [Int: UInt], readOrder: UInt
+    ) {
+        let removesMissingFriends = friendList?.isComplete == true
+        let removesMissingInvitations = invitationList?.isComplete == true
+        let receivedFriends = Dictionary((friendList?.elements ?? []).filter { $0.id != user?.id }.map {
+            ($0.id, $0)
+        }, uniquingKeysWith: { first, _ in first })
+        let receivedInvitations = Dictionary((invitationList?.elements ?? []).filter { $0.id != user?.id }.map {
+            ($0.id, $0)
+        }, uniquingKeysWith: { first, _ in first })
+        var friendsByID = receivedFriends
+        if !removesMissingFriends {
+            for friend in friends where friendsByID[friend.id] == nil {
+                friendsByID[friend.id] = friend
             }
         }
+        var invitationsByID = receivedInvitations.filter { !$0.value.accepted }
+        if !removesMissingInvitations {
+            for invitation in friendInvitations where receivedInvitations[invitation.id] == nil {
+                invitationsByID[invitation.id] = invitation
+            }
+        }
+        invitationsByID = invitationsByID.filter { friendsByID[$0.key] == nil }
+        let oldIDs = Set(friends.map(\.id) + friendInvitations.map(\.id))
+        let allIDs = oldIDs.union(friendshipByPlayerID.keys)
+            .union(friendshipProfileRequestIDs.keys)
+            .union(friendsByID.keys).union(invitationsByID.keys)
+        let protectedIDs = friendshipActionPlayerIDs.union(allIDs.filter {
+            friendshipRevisions[$0, default: 0] != startingRevisions[$0, default: 0]
+                || friendshipAppliedReadOrders[$0, default: 0] > readOrder
+        })
+        for id in allIDs where !protectedIDs.contains(id) {
+            // Absence only says something about the list that actually loaded.
+            // Incomplete lists preserve missing members and carry no negatives.
+            if removesMissingFriends, receivedFriends[id] == nil {
+                friendshipAbsentFriendsReadOrders[id] = readOrder
+            }
+            if (removesMissingInvitations && receivedInvitations[id] == nil)
+                || receivedInvitations[id]?.accepted == true {
+                friendshipAbsentInvitationsReadOrders[id] = readOrder
+            }
+            var establishedRelationship = false
+            if let friend = receivedFriends[id] {
+                applyFriendship(.friends, user: friend)
+                friendshipOutgoingReadOrders[id] = readOrder
+                establishedRelationship = true
+            } else if let invitation = receivedInvitations[id], !invitation.accepted,
+                      friendsByID[id] == nil {
+                applyFriendship(.requestReceived, user: invitation.fromUser)
+                friendshipOutgoingReadOrders[id] = readOrder
+                establishedRelationship = true
+            } else if (friendshipByPlayerID[id] == .friends && removesMissingFriends && friendsByID[id] == nil)
+                || (friendshipByPlayerID[id] == .requestReceived && invitationsByID[id] == nil
+                    && (removesMissingInvitations || receivedInvitations[id]?.accepted == true)) {
+                if let friend = friendsByID[id] {
+                    applyFriendship(.friends, user: friend)
+                } else if let invitation = invitationsByID[id] {
+                    applyFriendship(.requestReceived, user: invitation.fromUser)
+                } else {
+                    friendshipByPlayerID[id] = OGSProfileFriendship.none
+                    friendshipFailuresByPlayerID.removeValue(forKey: id)
+                }
+            }
+            if establishedRelationship || (removesMissingFriends && removesMissingInvitations) {
+                // Neither list can disprove an outgoing request.
+                friendshipAppliedReadOrders[id] = readOrder
+            }
+        }
+        friends = friendsByID.values.filter { !protectedIDs.contains($0.id) }
+            + friends.filter { protectedIDs.contains($0.id) }
+        friends.sort { $0.username.localizedStandardCompare($1.username) == .orderedAscending }
+        friendInvitations = invitationsByID.values.filter { !protectedIDs.contains($0.id) }
+            + friendInvitations.filter { protectedIDs.contains($0.id) }
+        friendInvitations.sort { $0.fromUser.username.localizedStandardCompare($1.fromUser.username) == .orderedAscending }
+    }
+
+    private func invalidateFriendshipSnapshots() {
+        guard isLoggedIn else { return }
+        clearFriendshipRefreshes()
+        guard friendshipInvalidationWork == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.friendshipInvalidationWork = nil
+            guard self.isLoggedIn else { return }
+            self.friendshipRefreshRevision &+= 1
+            self.fetchFriends()
+        }
+        friendshipInvalidationWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+    }
+
+    private func handleFriendshipNotification(_ notification: [String: Any]) {
+        guard isLoggedIn, let type = notification["type"] as? String else { return }
+        let id = (notification["id"] as? String)
+            ?? (notification["id"] as? NSNumber)?.stringValue
+        if ["friendRequest", "friendAccepted", "friendDeclined"].contains(type) {
+            if let id, !friendshipNotificationIDs.insert(id).inserted { return }
+            invalidateFriendshipSnapshots()
+        } else if type == "delete", let id, friendshipNotificationIDs.remove(id) != nil {
+            invalidateFriendshipSnapshots()
+        }
+    }
+
+    private func resetFriendships() {
+        clearFriendshipRefreshes()
+        friendshipInvalidationWork?.cancel()
+        friendshipInvalidationWork = nil
+        friendshipListRequestID = nil
+        friendshipListCancellable?.cancel()
+        friendshipListCancellable = nil
+        let pending = pendingFriendshipActions.values
+        pendingFriendshipActions.removeAll()
+        for operation in pending {
+            operation.request?.cancel()
+            operation.promise(.failure(OGSServiceError.staleAuthenticationContext))
+        }
+        friendshipActionPlayerIDs.removeAll()
+        friends.removeAll()
+        friendInvitations.removeAll()
+        friendshipByPlayerID.removeAll()
+        friendshipRevisions.removeAll()
+        friendshipAppliedReadOrders.removeAll()
+        friendshipOutgoingReadOrders.removeAll()
+        friendshipAbsentFriendsReadOrders.removeAll()
+        friendshipAbsentInvitationsReadOrders.removeAll()
+        friendshipProfileRequestIDs.removeAll()
+        friendshipListRevision &+= 1
+        friendshipNotificationIDs.removeAll()
+        friendsLoading = false
+        friendsError = nil
+        friendInvitationsLoading = false
+        friendInvitationsError = nil
+        friendshipNotice = nil
+        friendshipFailuresByPlayerID.removeAll()
+        friendshipRefreshRevision &+= 1
+    }
+
+    private func clearFriendshipRefreshes() {
+        friendshipLastRefresh.removeAll()
+        friendshipRefreshes.removeAll()
+        friendshipRefreshGeneration &+= 1
     }
     
     func searchByUsername(keyword: String) -> AnyPublisher<[OGSUser], Error> {

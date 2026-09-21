@@ -1067,6 +1067,29 @@ extension OGSService {
     static func offlineUITestInstance() -> OGSService {
         func makeService(from bootstrapState: BootstrapState) -> OGSService {
             var state = bootstrapState
+            if SurroundUITestContract.includesFriendshipRequests {
+                state.friendInvitations = zip(
+                    SurroundUITestContract.friendshipFixtureRequestPlayerIDs,
+                    SurroundUITestContract.friendshipFixtureRequestUsernames
+                ).enumerated().map { index, identity in
+                    let user = OGSUser(username: identity.1, id: identity.0, ranking: Double(24 + index))
+                    state.cachedUsersById[user.id] = user
+                    return OGSFriendInvitation(
+                        fromUser: user,
+                        created: Date(timeIntervalSince1970: 1_789_603_200 - Double(index * 86_400))
+                    )
+                }
+                state.friendshipActionDelay = SurroundUITestContract.simulatesSlowFriendshipResponse ? 12 : 0.35
+                if SurroundUITestContract.simulatesFriendshipFailureOnce {
+                    let playerIDs = SurroundUITestContract.friendshipFixtureRequestPlayerIDs + [
+                        SurroundUITestContract.profileFixtureOpponentID,
+                        SurroundUITestContract.profileFixturePickerFriendID,
+                    ]
+                    state.friendshipActionFailuresByPlayerID = Dictionary(
+                        uniqueKeysWithValues: playerIDs.map { ($0, ["The connection was interrupted. Please try again."]) }
+                    )
+                }
+            }
             // Full profiles use the same generated identities as their entry
             // points. A snapshot also keeps profile and picker searches on
             // the offline side of the service's rejecting HTTP boundary.
@@ -1091,6 +1114,15 @@ extension OGSService {
                     where profileUsers[participant.id] == nil {
                     profileUsers[participant.id] = participant
                 }
+            }
+            // Keep every offline profile's friendship state known, including
+            // the older journeys that do not opt into incoming invitations.
+            state.friendshipByPlayerID = profileUsers.mapValues { _ in OGSProfileFriendship.none }
+            for friend in state.friends {
+                state.friendshipByPlayerID[friend.id] = .friends
+            }
+            for invitation in state.friendInvitations {
+                state.friendshipByPlayerID[invitation.fromUser.id] = .requestReceived
             }
             state.playerProfilesById = SurroundUITestContract.simulatesUnavailableProfile
                 ? [:]
@@ -1117,7 +1149,8 @@ extension OGSService {
                         registrationDate: Date(timeIntervalSince1970: 1_443_657_600),
                         activeGames: SurroundUITestContract.simulatesUnavailableProfileSections ? nil : [],
                         versus: SurroundUITestContract.simulatesUnavailableProfileSections
-                            ? nil : OGSProfileVersus(wins: 0, losses: 0, draws: 0)
+                            ? nil : OGSProfileVersus(wins: 0, losses: 0, draws: 0),
+                        friendship: state.friendshipByPlayerID[user.id]
                     )
                 }
             if SurroundUITestContract.includesProfileContent,
@@ -1168,7 +1201,8 @@ extension OGSService {
                     user: profile.user,
                     registrationDate: profile.registrationDate,
                     activeGames: activeGames,
-                    versus: OGSProfileVersus(wins: 14, losses: 9, draws: 1, history: recent)
+                    versus: OGSProfileVersus(wins: 14, losses: 9, draws: 1, history: recent),
+                    friendship: profile.friendship
                 )
                 state.finishedGamesByPlayerId = [
                     profile.id: historyGames,

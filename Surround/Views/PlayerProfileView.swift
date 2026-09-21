@@ -34,6 +34,7 @@ struct PlayerProfileView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let user: OGSUser
     var selectionID: UUID? = nil
@@ -55,6 +56,7 @@ struct PlayerProfileView: View {
     @State private var loadedFor: LoadIdentity?
     @State private var refreshAfterEditing = false
     @State private var activeGames: ProfileActiveGames?
+    @State private var isVisible = false
 
     private var loadIdentity: LoadIdentity {
         LoadIdentity(playerID: user.id, viewerID: ogs.user?.id, attempt: attempt)
@@ -69,6 +71,11 @@ struct PlayerProfileView: View {
     private var loadedProfile: OGSPlayerProfile? {
         guard case .loaded(let profile) = state else { return nil }
         return profile
+    }
+
+    private var isLoadingProfile: Bool {
+        if case .loading = state { return true }
+        return false
     }
 
     private var title: Text {
@@ -152,13 +159,31 @@ struct PlayerProfileView: View {
         .toolbar(.visible, for: .navigationBar)
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenPlayerProfile)
         .task(id: loadIdentity) {
+            isVisible = true
+            let revisiting = loadedFor == loadIdentity
             await loadProfile(for: loadIdentity)
+            if revisiting { await refreshFriendship() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, refreshAfterEditing {
                 refreshAfterEditing = false
                 attempt += 1
             }
+            if phase == .active { Task { await refreshFriendship() } }
+        }
+        .onChange(of: ogs.friendshipRefreshRevision) { _, _ in
+            Task { await refreshFriendship(force: true) }
+        }
+        .onDisappear { isVisible = false }
+    }
+
+    private func refreshFriendship(force: Bool = false) async {
+        guard isVisible, !isLoadingProfile, ogs.isLoggedIn, user.id != ogs.user?.id else { return }
+        do {
+            for try await _ in ogs.refreshFriendship(playerID: user.id, force: force).values {}
+        } catch {
+            // Keep the last known relationship on a background refresh failure.
+            // The friendship control exposes an explicit retry if it is unknown.
         }
     }
 
@@ -184,6 +209,17 @@ struct PlayerProfileView: View {
             }
         } else if ogs.isLoggedIn {
             VStack(spacing: 8) {
+                if ogs.friendship(for: player.id) == .requestReceived {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Friend request from \(player.username)", systemImage: "person.badge.plus")
+                            .font(.subheadline.bold())
+                        FriendshipControls(user: player, presentation: .requestBanner)
+                    }
+                    .padding(12)
+                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileFriendRequest)
+                }
                 if let selectionID, let selection = navigation.selections[selectionID] {
                     Button {
                         navigation.selectOpponent(player, selectionID: selectionID, viewerID: ogs.user?.id)
@@ -210,14 +246,22 @@ struct PlayerProfileView: View {
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileChallenge)
                 }
-                Button {
-                    navigation.openConversation(player)
-                } label: {
-                    Label("Message", systemImage: "bubble.left.and.bubble.right")
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(spacing: 8))
+                    : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+                layout {
+                    Button {
+                        navigation.openConversation(player)
+                    } label: {
+                        Label("Message", systemImage: "bubble.left.and.bubble.right")
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessage)
+                    if ogs.friendship(for: player.id) != .requestReceived {
+                        FriendshipControls(user: player)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileMessage)
             }
         }
     }

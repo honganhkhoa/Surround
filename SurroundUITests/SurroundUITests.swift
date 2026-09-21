@@ -1849,6 +1849,372 @@ final class SurroundUITests: SurroundUITestCase {
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
     }
 
+    private func launchFriendship(
+        scene: SurroundUITestContract.CompatibilityScene = .home,
+        failsOnce: Bool = false,
+        additionalLaunchArguments: [String] = []
+    ) -> XCUIApplication {
+        var arguments = [SurroundUITestContract.friendshipLaunchArgument]
+        if failsOnce {
+            arguments.append(SurroundUITestContract.friendshipFailsOnceLaunchArgument)
+        }
+        return launchProfileContent(scene: scene, additionalLaunchArguments: arguments + additionalLaunchArguments)
+    }
+
+    @discardableResult
+    private func assertFriendshipState(_ state: String, in app: XCUIApplication) -> XCUIElement {
+        let action = revealProfileControl(SurroundUITestContract.AccessibilityID.profileFriendshipAction, in: app)
+        let labels = ["none": "Add friend", "requestSent": "Request sent", "friends": "Friends"]
+        let changed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", labels[state] ?? state), object: action
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed,
+                      "Expected the profile's friendship state to become \(state).")
+        return action
+    }
+
+    private func tapFriendshipDialogAction(_ identifier: String, title: String, in app: XCUIApplication) {
+        let action = requiredMenuButton(identifier, title: title, in: app)
+        if !action.isHittable {
+            // At accessibility text sizes UIKit gives a confirmation sheet's
+            // actions their own scroll view, separate from the title/message.
+            // Reveal the action inside that native sheet, never in the profile
+            // scroll view underneath its popover.
+            let actionsScroll = app.sheets.scrollViews.containing(NSPredicate(
+                format: "elementType == %lu AND (identifier == %@ OR label == %@)",
+                XCUIElement.ElementType.button.rawValue, identifier, title
+            )).firstMatch
+            for _ in 0..<4 where !action.isHittable {
+                guard actionsScroll.exists else { break }
+                actionsScroll.swipeUp()
+            }
+            if action.isHittable {
+                keepScreenshot("Friendship confirmation – revealed \(title)", in: app)
+            }
+        }
+        tap(action, description: title, in: app)
+    }
+
+    private func openRemoveFriendConfirmation(in app: XCUIApplication) {
+        tap(assertFriendshipState("friends", in: app), description: "Open friendship actions", in: app)
+        tapFriendshipDialogAction(SurroundUITestContract.AccessibilityID.profileRemoveFriend,
+                                  title: "Remove friend", in: app)
+        requiredMenuButton(SurroundUITestContract.AccessibilityID.friendshipRemoveConfirm,
+                           title: "Remove friend", in: app)
+    }
+
+    private func cancelFriendshipConfirmation(
+        in app: XCUIApplication,
+        at dismissalPoint: XCUICoordinate,
+        containing confirmation: XCUIElement,
+        restoring identifier: String
+    ) {
+        let popover = app.popovers.firstMatch
+        if popover.exists {
+            // iOS 27 can use a popover on iPhone as well as iPad. Its frame
+            // may cover the previously visible navigation title, so choose
+            // an observed point outside the actual presented popover.
+            let bounds = app.frame.insetBy(dx: 20, dy: 20)
+            let presentedFrame = popover.frame
+            let candidates = [
+                CGPoint(x: bounds.midX, y: presentedFrame.maxY + 20),
+                CGPoint(x: presentedFrame.maxX + 20, y: bounds.midY),
+                CGPoint(x: presentedFrame.minX - 20, y: bounds.midY),
+                CGPoint(x: bounds.midX, y: presentedFrame.minY - 20),
+            ]
+            guard let outside = candidates.first(where: { bounds.contains($0) && !presentedFrame.contains($0) }) else {
+                XCTFail("Expected space outside the confirmation popover to cancel it.")
+                return
+            }
+            let point = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                dx: outside.x - app.frame.minX, dy: outside.y - app.frame.minY
+            ))
+            dismissPopover(in: app, at: point, containing: confirmation, restoring: [identifier])
+            return
+        }
+        #if !targetEnvironment(macCatalyst)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let cancel = app.buttons.matching(NSPredicate(format: "label == %@", "Cancel"))
+                .allElementsBoundByIndex.first(where: \.isHittable)
+            XCTAssertNotNil(cancel, "The phone confirmation sheet must offer Cancel.")
+            guard let cancel else { return }
+            tap(cancel, description: "Cancel the friendship confirmation", in: app)
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: confirmation
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+            element(identifier, in: app)
+            return
+        }
+        #endif
+        // Regular-width confirmation dialogs omit Cancel. Dismiss their
+        // popover outside its bounds, without activating a control beneath it.
+        dismissPopover(in: app, at: dismissalPoint, containing: confirmation, restoring: [identifier])
+    }
+
+    private func assertFriendRequestRemoved(_ playerID: Int, in app: XCUIApplication, timeout: TimeInterval = 10) {
+        let request = app.buttons[SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID)].firstMatch
+        let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: request)
+        XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: timeout), .completed,
+                       "A completed request must leave the Home request list.")
+    }
+
+    private func retryFriendshipError(in app: XCUIApplication) {
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "A failed friendship action must explain the error.")
+        tap(alert.buttons["Retry"].firstMatch, description: "Retry the failed friendship action", in: app)
+    }
+
+    private func revealHomeFriendRequest(_ playerID: Int, in app: XCUIApplication) -> XCUIElement {
+        let control = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID),
+                                            in: app, matching: .button)
+        let scroll = element(SurroundUITestContract.AccessibilityID.screenHome, in: app, matching: .scrollView)
+        let header = app.staticTexts[SurroundUITestContract.AccessibilityID.homeFriendRequests].firstMatch
+        let navigationBar = app.navigationBars["Active games"].firstMatch
+        let tabBar = app.tabBars.firstMatch
+        for _ in 0..<10 {
+            let viewport = scroll.frame.intersection(app.frame)
+            var top = navigationBar.exists ? max(viewport.minY, navigationBar.frame.maxY) : viewport.minY
+            if header.exists, header.frame.intersects(viewport) { top = max(top, header.frame.maxY) }
+            let bottom = tabBar.exists ? min(viewport.maxY, tabBar.frame.minY) : viewport.maxY
+            let safeFrame = CGRect(x: viewport.minX, y: top + 8, width: viewport.width,
+                                   height: max(0, bottom - top - 16))
+            if control.isHittable, safeFrame.contains(control.frame) { return control }
+            if safeFrame.isEmpty {
+                scroll.swipeUp()
+            } else if !dragScrollView(scroll, axis: .vertical, targetFrame: control.frame,
+                                      containerFrame: safeFrame, interactionPoint: CGVector(dx: 0.5, dy: 0.5)) {
+                break
+            }
+        }
+        keepInteractionHierarchy(control, container: scroll, in: app,
+                                 reason: "unable to reveal friendship identity below pinned Home header")
+        XCTFail("The friendship identity must fit below Home's pinned section header before tapping.")
+        return control
+    }
+
+    func testFriendRequestAcceptSynchronizesProfileHomeAndOpponentPicker() {
+        let app = launchFriendship()
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
+        let profileEntry = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID),
+                                                in: app, matching: .button)
+        scrollIntoTappableArea(profileEntry, in: app)
+        keepScreenshot("Friendship – incoming requests on Home", in: app)
+        tap(profileEntry, description: "View the incoming friend's profile", in: app)
+        assertLoadedProfile(named: username, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileFriendRequest, in: app)
+        tap(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app, matching: .button)
+        assertFriendshipState("friends", in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
+        keepScreenshot("Friendship – accepted from profile", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        assertFriendRequestRemoved(playerID, in: app)
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(
+            SurroundUITestContract.friendshipFixtureRequestPlayerIDs[1]), in: app, matching: .button)
+
+        // The picker consumes the shared friends list. Enter from a different
+        // profile so the new friend cannot appear just as a selected opponent.
+        openProfileContentFromHome(in: app)
+        tap(SurroundUITestContract.AccessibilityID.profileChallenge, in: app, matching: .button)
+        let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent,
+                                              in: app, matching: .button)
+        tap(opponent, description: "Choose a challenge opponent", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        let newFriend = elementAfterScrolling(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID),
+                                             in: app, matching: .button)
+        scrollIntoTappableArea(newFriend, in: app)
+        tap(newFriend, description: "Open the accepted friend from the picker", in: app)
+        assertLoadedProfile(named: username, in: app)
+        assertFriendshipState("friends", in: app)
+    }
+
+    func testFriendRequestRejectionCanCancelNotifyOrStayQuiet() {
+        let app = launchFriendship()
+        let playerIDs = SurroundUITestContract.friendshipFixtureRequestPlayerIDs
+        for (index, playerID) in playerIDs.prefix(2).enumerated() {
+            let reject = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestReject(playerID),
+                                               in: app, matching: .button)
+            scrollIntoTappableArea(reject, in: app)
+            let dismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "Active games")
+            tap(reject, description: "Review rejection choices", in: app)
+            let confirmation = requiredMenuButton(SurroundUITestContract.AccessibilityID.friendshipRejectNotify,
+                                                  title: "Reject and Let Them Know", in: app)
+            requiredMenuButton(SurroundUITestContract.AccessibilityID.friendshipRejectQuietly,
+                               title: "Reject Quietly", in: app)
+            if index == 0 {
+                cancelFriendshipConfirmation(in: app, at: dismissalPoint, containing: confirmation,
+                                             restoring: SurroundUITestContract.AccessibilityID.screenHome)
+                XCTAssertTrue(reject.exists, "Cancelling must leave the request available.")
+                tap(reject, description: "Reopen rejection choices", in: app)
+            }
+            tapFriendshipDialogAction(index == 0
+                ? SurroundUITestContract.AccessibilityID.friendshipRejectQuietly
+                : SurroundUITestContract.AccessibilityID.friendshipRejectNotify,
+                title: index == 0 ? "Reject Quietly" : "Reject and Let Them Know", in: app)
+            assertFriendRequestRemoved(playerID, in: app)
+        }
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerIDs[2]),
+                              in: app, matching: .button)
+        keepScreenshot("Friendship – only the unanswered request remains", in: app)
+    }
+
+    func testRemovingFriendUpdatesPickerAndSendingRequestPersistsAcrossNavigation() {
+        let app = launchFriendship(scene: .opponentPicker)
+        let playerID = SurroundUITestContract.profileFixturePickerFriendID
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        assertLoadedProfile(named: "BambooPath", in: app)
+        let dismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "BambooPath")
+        openRemoveFriendConfirmation(in: app)
+        let confirmation = requiredMenuButton(SurroundUITestContract.AccessibilityID.friendshipRemoveConfirm,
+                                              title: "Remove friend", in: app)
+        cancelFriendshipConfirmation(in: app, at: dismissalPoint, containing: confirmation,
+                                     restoring: SurroundUITestContract.AccessibilityID.screenPlayerProfile)
+        assertFriendshipState("friends", in: app)
+        openRemoveFriendConfirmation(in: app)
+        tapFriendshipDialogAction(SurroundUITestContract.AccessibilityID.friendshipRemoveConfirm,
+                                  title: "Remove friend", in: app)
+        assertFriendshipState("none", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID)].exists,
+                       "The removed friend must disappear from the picker's friends list.")
+
+        let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+        tap(search, description: "Find the former friend", in: app)
+        search.typeText("Bamboo\n")
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        assertLoadedProfile(named: "BambooPath", in: app)
+        tap(assertFriendshipState("none", in: app), description: "Send a friend request", in: app)
+        XCTAssertFalse(assertFriendshipState("requestSent", in: app).isEnabled,
+                       "A sent request must not allow duplicate submissions.")
+        navigateBackFromPlayerProfile(in: app)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        XCTAssertFalse(assertFriendshipState("requestSent", in: app).isEnabled,
+                       "Returning to the profile must retain the pending request.")
+        keepScreenshot("Friendship – request sent", in: app)
+    }
+
+    func testFriendshipAcceptAndSendFailuresCanRetryWithoutLosingState() {
+        let app = launchFriendship(failsOnce: true)
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let accept = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
+                                           in: app, matching: .button)
+        scrollIntoTappableArea(accept, in: app)
+        tap(accept, description: "Accept with a simulated connection failure", in: app)
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        tap(alert.buttons["Cancel"].firstMatch, description: "Dismiss the failed acceptance", in: app)
+        XCTAssertTrue(accept.exists, "A failed acceptance must preserve its request.")
+        XCTAssertTrue(accept.isEnabled, "A failed action must unlock its controls.")
+        tap(accept, description: "Accept the retained request", in: app)
+        assertFriendRequestRemoved(playerID, in: app)
+
+        openProfileContentFromHome(in: app)
+        tap(assertFriendshipState("none", in: app), description: "Send with a simulated connection failure", in: app)
+        retryFriendshipError(in: app)
+        XCTAssertFalse(assertFriendshipState("requestSent", in: app).isEnabled)
+    }
+
+    func testRemovingFriendFailureCanRetry() {
+        let app = launchFriendship(scene: .opponentPicker, failsOnce: true)
+        let playerID = SurroundUITestContract.profileFixturePickerFriendID
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        openRemoveFriendConfirmation(in: app)
+        tapFriendshipDialogAction(SurroundUITestContract.AccessibilityID.friendshipRemoveConfirm,
+                                  title: "Remove friend", in: app)
+        retryFriendshipError(in: app)
+        assertFriendshipState("none", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID)].exists)
+    }
+
+    func testFriendshipFailureArrivingAfterOpeningProfileCanRetryWithoutReentry() {
+        let app = launchFriendship(failsOnce: true, additionalLaunchArguments: [
+            SurroundUITestContract.friendshipSlowResponseLaunchArgument,
+        ])
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
+        let entry = revealHomeFriendRequest(playerID, in: app)
+        let accept = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
+                                           in: app, matching: .button)
+        scrollIntoTappableArea(accept, in: app)
+        tap(accept, description: "Start accepting the request on Home", in: app)
+        tap(entry, description: "Open the sender's profile while acceptance is pending", in: app)
+        assertLoadedProfile(named: username, in: app)
+        element(SurroundUITestContract.AccessibilityID.friendRequestBusy(playerID), in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists,
+                       "The profile must share Home's pending action and prevent another submission.")
+
+        let failure = app.alerts.firstMatch
+        XCTAssertTrue(failure.waitForExistence(timeout: 20),
+                      "The failure must appear on the already-open profile without leaving and reentering it.")
+        tap(failure.buttons["Retry"].firstMatch, description: "Retry Home's failed acceptance from the profile", in: app)
+        let friendship = app.buttons[SurroundUITestContract.AccessibilityID.profileFriendshipAction].firstMatch
+        XCTAssertTrue(friendship.waitForExistence(timeout: 20))
+        assertLoadedProfile(named: username, in: app)
+        assertFriendshipState("friends", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        assertFriendRequestRemoved(playerID, in: app)
+    }
+
+    func testFriendshipFailureArrivingAfterReturningHomeCanRetryWithoutReentry() {
+        let app = launchFriendship(failsOnce: true, additionalLaunchArguments: [
+            SurroundUITestContract.friendshipSlowResponseLaunchArgument,
+        ])
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let entry = revealHomeFriendRequest(playerID, in: app)
+        tap(entry, description: "Open the incoming friend's profile", in: app)
+        assertLoadedProfile(named: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
+        tap(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app, matching: .button)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.friendRequestBusy(playerID), in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists,
+                       "Home must share the profile's pending acceptance.")
+
+        let failure = app.alerts.firstMatch
+        XCTAssertTrue(failure.waitForExistence(timeout: 20),
+                      "A failure after leaving the profile must appear on Home without reopening the profile.")
+        tap(failure.buttons["Retry"].firstMatch, description: "Retry the profile's failed acceptance from Home", in: app)
+        assertFriendRequestRemoved(playerID, in: app, timeout: 20)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+    }
+
+    func testFriendRequestRemainsUsableInDarkModeAtLargestDynamicType() {
+        let app = launchFriendship(additionalLaunchArguments: [
+            SurroundUITestContract.appearanceLaunchArgument, "dark",
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ])
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let entry = revealHomeFriendRequest(playerID, in: app)
+        tap(entry, description: "Open an incoming request at the largest text size", in: app)
+        assertLoadedProfile(named: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
+        let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        XCTAssertTrue(waitForValue("dark", in: identity, timeout: 10))
+        for identifier in [
+            SurroundUITestContract.AccessibilityID.friendRequestReject(playerID),
+            SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
+            SurroundUITestContract.AccessibilityID.profileChallenge,
+            SurroundUITestContract.AccessibilityID.profileMessage,
+        ] {
+            XCTAssertTrue(revealProfileControl(identifier, in: app).isHittable,
+                          "Each incoming-request and profile action must remain reachable at the largest text size.")
+        }
+        keepScreenshot("Friendship – incoming request in dark and largest Dynamic Type", in: app)
+        let reject = revealProfileControl(SurroundUITestContract.AccessibilityID.friendRequestReject(playerID), in: app)
+        tap(reject, description: "Reject an incoming request at the largest text size", in: app)
+        tapFriendshipDialogAction(SurroundUITestContract.AccessibilityID.friendshipRejectQuietly,
+                                  title: "Reject Quietly", in: app)
+        XCTAssertTrue(assertFriendshipState("none", in: app).isHittable)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
+        keepScreenshot("Friendship – Add friend after rejection at the largest text size", in: app)
+    }
+
     func testProfileHistoryAndHeadToHeadUseCorrectPerspective() {
         let app = launchProfileContent()
         openProfileContentFromHome(in: app)

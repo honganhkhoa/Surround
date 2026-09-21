@@ -7,12 +7,42 @@
 
 import SwiftUI
 
+private func friendshipMessage(for action: OGSFriendshipAction) -> String {
+    switch action {
+    case .send: return String(localized: "Sent friend request")
+    case .accept: return String(localized: "Friend request accepted")
+    case .reject: return String(localized: "Friend request rejected")
+    case .remove: return String(localized: "Removed friend")
+    }
+}
+
+/// Each navigation stack draws the shared notice above its own content,
+/// including stacks presented in sheets. The root popup owns its expiry.
+struct FriendshipNoticeBanner: View {
+    @EnvironmentObject private var ogs: OGSService
+
+    var body: some View {
+        if let notice = ogs.friendshipNotice {
+            Text(verbatim: friendshipMessage(for: notice.action))
+                .bold()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color(.systemIndigo), in: RoundedRectangle(cornerRadius: 10))
+                .padding(16)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
     
     @State var showingPrivateChatView = false
+    @State private var friendshipNotice: OGSFriendshipNotice?
+
     
     var connectionPopup: some View {
         ZStack {
@@ -206,6 +236,18 @@ struct NotificationPopup: View {
                     self.showingPrivateChatView = true
                 }
             }
+        }
+        .onReceive(ogs.$friendshipNotice) { notice in
+            friendshipNotice = notice
+            if let notice {
+                AccessibilityNotification.Announcement(friendshipMessage(for: notice.action)).post()
+            }
+        }
+        .task(id: friendshipNotice?.id) {
+            guard let noticeID = friendshipNotice?.id else { return }
+            do { try await Task.sleep(for: .seconds(3)) }
+            catch { return }
+            ogs.dismissFriendshipNotice(id: noticeID)
         }
         .appReviewPresentationBlocked(showingPrivateChatView)
     }

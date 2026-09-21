@@ -219,6 +219,7 @@ struct HomeView: View {
     var activeGamesView: some View {
         let noItem = 
             ogs.challengesReceived.count +
+            ogs.friendInvitations.count +
             ogs.liveGames.count +
             ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
             ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0
@@ -305,6 +306,30 @@ struct HomeView: View {
                                         .background(Color(UIColor.systemBackground).shadow(radius: 2))
                                         .padding(.vertical, 5)
                                         .padding(.horizontal)
+                                }
+                            }
+                        }
+                        if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsError != nil {
+                            Section(header: sectionHeader(title: String(localized: "Friend requests"))
+                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeFriendRequests)) {
+                                ForEach(ogs.friendInvitations) { invitation in
+                                    FriendRequestCard(invitation: invitation)
+                                        .padding()
+                                        .background(Color(.systemBackground).shadow(radius: 2))
+                                        .padding(.vertical, 5)
+                                        .padding(.horizontal)
+                                }
+                                if ogs.friendInvitationsError != nil {
+                                    VStack(spacing: 8) {
+                                        Text("Couldn’t load friend requests")
+                                            .foregroundStyle(.secondary)
+                                        if ogs.friendInvitationsLoading {
+                                            ProgressView()
+                                        } else {
+                                            Button("Try Again") { ogs.fetchFriends() }
+                                        }
+                                    }
+                                    .padding()
                                 }
                             }
                         }

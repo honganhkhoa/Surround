@@ -18,12 +18,18 @@
 		AA1600122026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
 		AA1600112026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
 		AA1500102026091500000000 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500102026091500000001 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		4A70F0CEAA1A421A91A36B87 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500102026091500000002 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		7531C54A7F254432BCAE7BBA /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500102026091500000003 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500102026091500000004 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		F25D04D509B847029CD1EB05 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500202026091500000001 /* PlayerProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500022026091500000002 /* PlayerProfileView.swift */; };
 		AA1500202026091500000002 /* OGSPlayerProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500032026091500000003 /* OGSPlayerProfileTests.swift */; };
+		DC54F11B65C8433CAF5354CD /* OGSFriendshipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */; };
 		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
 		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
@@ -310,6 +316,7 @@
 		BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
+		1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */; };
 		BCD0849C2B6B96E4000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849D2B6B96E5000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849E2B6B96E6000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
@@ -429,8 +436,10 @@
 		AA1600022026091600000002 /* StackRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouter.swift; sourceTree = "<group>"; };
 		AA1600012026091600000001 /* ChallengeDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeDraft.swift; sourceTree = "<group>"; };
 		AA1500012026091500000001 /* OGSPlayerProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerProfile.swift; sourceTree = "<group>"; };
+		D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendship.swift; sourceTree = "<group>"; };
 		AA1500022026091500000002 /* PlayerProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileView.swift; sourceTree = "<group>"; };
 		AA1500032026091500000003 /* OGSPlayerProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerProfileTests.swift; sourceTree = "<group>"; };
+		37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendshipTests.swift; sourceTree = "<group>"; };
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
@@ -584,6 +593,7 @@
 		BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatMessage.swift; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
 		BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPopup.swift; sourceTree = "<group>"; };
+		06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendshipControls.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -796,6 +806,7 @@
 				AE10000B39A000000000000B /* TimeUtilitiesTests.swift */,
 				AE10000C39A000000000000C /* OGSUserTests.swift */,
 				AA1500032026091500000003 /* OGSPlayerProfileTests.swift */,
+				37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */,
 				AA1700042026091700000004 /* ProfileRatingTests.swift */,
 				AA1600032026091600000003 /* StackRouterTests.swift */,
 			);
@@ -875,6 +886,7 @@
 				BC042B3624AB2DD00050B2D1 /* OGSGame.swift */,
 				BC042B3724AB2DD00050B2D1 /* OGSUser.swift */,
 				AA1500012026091500000001 /* OGSPlayerProfile.swift */,
+				D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */,
 				BC042B3924AB2DD00050B2D1 /* OGSClock.swift */,
 				BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */,
 				BC361AB5256246B4000C47F4 /* OGSChatLine.swift */,
@@ -917,6 +929,7 @@
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
 				BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */,
+				06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */,
 				BC3CD7DD25EF56AD00C931EB /* PrivateMessageLog.swift */,
 				BCA0C72125F0DF5C0077DD28 /* PrivateMessageNotificationView.swift */,
 				BC6B05F525FA0DF8004E1D66 /* BoardDemoView.swift */,
@@ -1444,6 +1457,7 @@
 				BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
 				AA1500102026091500000000 /* OGSPlayerProfile.swift in Sources */,
+				4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */,
 				BC92008225CE5BF600C14433 /* UserSelectionView.swift in Sources */,
 				BC042B5124AB2DD10050B2D1 /* OGSClock.swift in Sources */,
 				BC042B5324AB2DD10050B2D1 /* TimeControl.swift in Sources */,
@@ -1463,6 +1477,7 @@
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
+				1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */,
 				BC3ECFC72B9EAE5500F4E546 /* PreferredSettingsView.swift in Sources */,
 				BC042B4624AB2DD10050B2D1 /* GameCell.swift in Sources */,
 				AF3000013F00000000000001 /* ConditionalMovesPopover.swift in Sources */,
@@ -1497,6 +1512,7 @@
 				AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */,
 				AE20000C39A000000000000C /* OGSUserTests.swift in Sources */,
 				AA1500202026091500000002 /* OGSPlayerProfileTests.swift in Sources */,
+				DC54F11B65C8433CAF5354CD /* OGSFriendshipTests.swift in Sources */,
 				AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */,
 				AA1600132026091600000003 /* StackRouterTests.swift in Sources */,
 				AA1600222026091600000002 /* StackRouter.swift in Sources */,
@@ -1521,6 +1537,7 @@
 				BC3037F62692D03300181570 /* MoveTree.swift in Sources */,
 				BC8CE88D2657B33200E4BE1A /* OGSService.swift in Sources */,
 				AA1500102026091500000003 /* OGSPlayerProfile.swift in Sources */,
+				F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */,
 				BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */,
 				BC463AF9265CB08300D40D3A /* BoardPositionTests.swift in Sources */,
 				BC463AF7265B710E00D40D3A /* Goban.cc in Sources */,
@@ -1581,6 +1598,7 @@
 				BC463B072662515800D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC285B852557FD57005378F9 /* OGSService.swift in Sources */,
 				AA1500102026091500000001 /* OGSPlayerProfile.swift in Sources */,
+				4A70F0CEAA1A421A91A36B87 /* OGSFriendship.swift in Sources */,
 				BC285B6B2557FCBA005378F9 /* UserDefaults+SurroundModels.swift in Sources */,
 				BC463B082662515800D40D3A /* OGSPuzzle.swift in Sources */,
 				BCB98CC1256D144000B1F8FD /* TestData.swift in Sources */,
@@ -1617,6 +1635,7 @@
 				BC5EEC2A259D851B00675761 /* Variation.swift in Sources */,
 				BC6493AC25380DE9002B2200 /* OGSService.swift in Sources */,
 				AA1500102026091500000002 /* OGSPlayerProfile.swift in Sources */,
+				7531C54A7F254432BCAE7BBA /* OGSFriendship.swift in Sources */,
 				BCC3276127BB69B1005EB2E3 /* OGSChatMessage.swift in Sources */,
 				BC6493D325381089002B2200 /* TimeUtilities.swift in Sources */,
 				BC64939B25380DC3002B2200 /* BoardPosition.swift in Sources */,
@@ -1648,6 +1667,7 @@
 				AF2000053E00000000000005 /* OGSConditionalMoves.swift in Sources */,
 				BCD214FE255A94A400F78E2A /* OGSService.swift in Sources */,
 				AA1500102026091500000004 /* OGSPlayerProfile.swift in Sources */,
+				F25D04D509B847029CD1EB05 /* OGSFriendship.swift in Sources */,
 				BCD214EE255A948E00F78E2A /* BoardPosition.swift in Sources */,
 				AA9000064000000000000006 /* BoardMarkup.swift in Sources */,
 				BCD214F2255A948E00F78E2A /* OGSPauseControl.swift in Sources */,
