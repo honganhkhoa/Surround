@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|composer> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|profile|composer> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|composer)
+  build|preflight|main|profile|composer)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, or composer; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, profile, or composer; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -60,6 +60,9 @@ readonly test_target="SurroundUITests"
 readonly test_class="SurroundUITests"
 readonly test_source="SurroundUITests/${test_class}.swift"
 readonly test_case="${test_target}/${test_class}"
+readonly profile_test_class="ProfileUITests"
+readonly profile_test_source="SurroundUITests/${profile_test_class}.swift"
+readonly profile_test_case="${test_target}/${profile_test_class}"
 readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInput"
 
 # These tests intentionally focus a chat composer or exercise layout while that
@@ -80,19 +83,24 @@ readonly composer_test_names=(
   testPrivateMessageProfileEntriesPreserveConversationDraft
 )
 
-# xcodebuild accepts an unknown -only-testing selector and exits successfully
-# after running zero tests. Keep the isolation manifest tied to its Swift
-# declarations so a rename cannot silently move a composer test into main.
-test_class_count="$(
-  grep -Ec \
-    "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundUITestCase[[:space:]]*\\{" \
-    "$test_source" \
-    || true
-)"
-if [[ "$test_class_count" != "1" ]]; then
-  echo "Expected exactly one ${test_class} declaration in ${test_source}. Update the isolated UI-test manifest when renaming or moving it." >&2
-  exit 1
-fi
+# xcodebuild accepts an unknown -only-testing or -skip-testing selector and
+# exits successfully after running zero tests. Keep the isolation manifest tied
+# to its Swift declarations so a rename cannot silently move a composer test
+# into main, or leave the profile phase empty while main runs its tests.
+for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}"; do
+  class_name="${class_and_source%%:*}"
+  class_source="${class_and_source#*:}"
+  test_class_count="$(
+    grep -Ec \
+      "^[[:space:]]*final[[:space:]]+class[[:space:]]+${class_name}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\\{" \
+      "$class_source" \
+      || true
+  )"
+  if [[ "$test_class_count" != "1" ]]; then
+    echo "Expected exactly one ${class_name} declaration in ${class_source}. Update the isolated UI-test manifest when renaming or moving it." >&2
+    exit 1
+  fi
+done
 
 for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   declaration_count="$(
@@ -142,12 +150,13 @@ case "$phase" in
     selection_arguments=(
       "-only-testing:${test_target}"
       "-skip-testing:${test_case}/${keyboard_preflight_test_name}"
+      "-skip-testing:${profile_test_case}"
     )
     for test_name in "${composer_test_names[@]}"; do
       selection_arguments+=("-skip-testing:${test_case}/${test_name}")
     done
 
-    echo "Running the main iPad UI suite without composer-sensitive tests."
+    echo "Running the main iPad UI suite without profile or composer-sensitive tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
@@ -156,6 +165,19 @@ case "$phase" in
       -maximum-test-execution-time-allowance 900 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Main.xcresult"
+    ;;
+
+  profile)
+    mkdir -p TestResults
+    echo "Running the profile and friendship iPad UI journeys."
+    xcodebuild test-without-building \
+      "${common_arguments[@]}" \
+      "-only-testing:${profile_test_case}" \
+      -test-timeouts-enabled YES \
+      -default-test-execution-time-allowance 900 \
+      -maximum-test-execution-time-allowance 900 \
+      -resultBundlePath \
+      "TestResults/SurroundUITests-${result_label}-Profile.xcresult"
     ;;
 
   composer)

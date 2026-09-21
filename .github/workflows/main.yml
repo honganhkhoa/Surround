@@ -114,9 +114,55 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  ipad-profile-ui-tests:
+    runs-on: macos-26
+    timeout-minutes: 65
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select an iPadOS 26 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 26 hardware keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}"
+
+      - name: Build iPad UI tests
+        id: ipad_ui_build
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad profile UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Upload iPad profile UI test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ipad-profile-ui-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The iOS 18 unit tests share this job with the profile UI phase, the shorter
+  # half of the UI suite. The unit step also warms the UI build's derived data.
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v4
@@ -171,6 +217,56 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
+      - name: Run iPad profile UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Upload iOS 18 test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ios-18-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
+  minimum-ios-18-ui-tests:
+    runs-on: macos-15
+    timeout-minutes: 105
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        shell: bash
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iPadOS 18 simulator
+        id: ipad_simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 18 hardware keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.ipad_simulator.outputs.id }}"
+
+      - name: Build iPad UI tests on iPadOS 18
+        id: ipad_ui_build
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
       - name: Verify iPadOS 18 composer input
         id: ipad_keyboard_preflight
         timeout-minutes: 5
@@ -195,11 +291,11 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh composer \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Upload iOS 18 test results
+      - name: Upload iPadOS 18 UI test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: surround-ios-18-test-results
+          name: surround-ios-18-ui-test-results
           path: TestResults
           if-no-files-found: warn
           retention-days: 14
