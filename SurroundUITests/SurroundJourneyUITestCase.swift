@@ -782,9 +782,11 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                        file: file, line: line)
     }
 
-    // A slow hosted runner occasionally delivers the long press as a tap,
-    // which opens the row's destination instead of its context menu. Return
-    // to the row and press once more before reporting the missing menu item.
+    // Home pins its section headers over the grid, so a row that scrolling
+    // left near the top can sit almost entirely under a header. A long press
+    // then reaches the row's thin visible edge and opens the game instead of
+    // the context menu. Center the row before pressing, and if the press
+    // still opens its destination, return and press again, holding longer.
     @discardableResult
     func openProfileContextMenu(
         for row: XCUIElement,
@@ -795,23 +797,55 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let menuItem = menuButton(accessibilityIdentifier, title: title, in: app)
-        for attempt in 1...2 {
+        let pressDurations: [TimeInterval] = [1, 2.5, 2.5]
+        for (attempt, pressDuration) in pressDurations.enumerated() {
             scrollIntoTappableArea(row, in: app)
             XCTAssertTrue(row.isHittable, "The row must be visible before opening its context menu.",
                           file: file, line: line)
             #if targetEnvironment(macCatalyst)
             row.rightClick()
             #else
-            row.press(forDuration: 1)
+            centerInScrollContainer(row, in: app)
+            row.press(forDuration: pressDuration)
             #endif
-            if attempt == 2 || menuItem.waitForExistence(timeout: 10) { break }
-            if !(row.exists && row.isHittable), let back = backButtonOfPushedScreen(in: app) {
+            if attempt == pressDurations.count - 1 || menuItem.waitForExistence(timeout: 10) { break }
+            guard !(row.exists && row.isHittable) else { continue }
+            // A Back tap can be ignored while the pushed screen settles.
+            for _ in 0..<2 {
+                guard let back = backButtonOfPushedScreen(in: app) else { break }
                 tap(back, description: "Return from the row's destination", in: app, file: file, line: line)
-                XCTAssertTrue(waitUntilHittable(row, timeout: stateSettleTimeout),
-                              "The row must reappear after leaving its destination.", file: file, line: line)
+                if row.waitForExistence(timeout: 10) { break }
             }
+            XCTAssertTrue(row.exists, "The row must reappear after leaving its destination.", file: file, line: line)
         }
         return requiredMenuButton(accessibilityIdentifier, title: title, in: app, file: file, line: line)
+    }
+
+    // Moves the row into the middle of the innermost scroll view, list, or
+    // table that contains it, clear of pinned headers and bottom bars. Rows
+    // at either end of their content stay where scrolling leaves them.
+    private func centerInScrollContainer(_ row: XCUIElement, in app: XCUIApplication) {
+        let containsRow = NSPredicate(format: "identifier == %@", row.identifier)
+        let containers = [app.scrollViews, app.collectionViews, app.tables]
+            .flatMap { $0.containing(containsRow).allElementsBoundByIndex }
+            .filter { !$0.frame.isEmpty }
+        guard let container = containers.min(by: {
+            $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height
+        }) else { return }
+        let center = CGVector(dx: 0.5, dy: 0.5)
+        for _ in 0..<4 {
+            let viewport = container.frame.intersection(app.frame)
+            let rowFrame = row.frame
+            let middle = viewport.insetBy(dx: 0, dy: viewport.height * 0.3)
+            if middle.contains(CGPoint(x: middle.midX, y: rowFrame.midY)) { return }
+            guard dragScrollView(
+                container,
+                axis: .vertical,
+                targetFrame: validInteractionFrame(rowFrame, interactionPoint: center),
+                containerFrame: viewport,
+                interactionPoint: center
+            ), row.frame != rowFrame else { return }
+        }
     }
 
     // UIKit identifies the back control on recent systems. Older releases

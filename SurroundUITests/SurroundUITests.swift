@@ -3465,7 +3465,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: selectedNode
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [restoredConditionalState], timeout: 10),
+            XCTWaiter.wait(for: [restoredConditionalState], timeout: stateSettleTimeout),
             .completed,
             "Expected the server echo to restore the selected conditional variation."
         )

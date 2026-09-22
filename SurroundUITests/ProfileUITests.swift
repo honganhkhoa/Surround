@@ -18,11 +18,20 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let control = element(identifier, in: app, matching: type)
         let scroll = app.scrollViews.containing(.textField, identifier: SurroundUITestContract.AccessibilityID.customGameName).firstMatch
         XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        let center = CGVector(dx: 0.5, dy: 0.5)
         for _ in 0..<12 {
             let safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
             if control.isHittable && safeFrame.contains(control.frame) { return control }
-            if control.frame.minY < safeFrame.minY { scroll.swipeDown() }
-            else { scroll.swipeUp() }
+            // A full swipe on an 11-inch iPad overshoots the control and is
+            // still scrolling when the next frame is read, so the search can
+            // swing past it until it runs out. Move toward it in bounded steps.
+            guard dragScrollView(
+                scroll,
+                axis: .vertical,
+                targetFrame: validInteractionFrame(control.frame, interactionPoint: center),
+                containerFrame: safeFrame,
+                interactionPoint: center
+            ) else { break }
         }
         XCTAssertTrue(control.isHittable, "Expected form control \(identifier) to be visible.")
         return control
