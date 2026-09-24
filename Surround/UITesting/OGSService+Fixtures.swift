@@ -1306,6 +1306,15 @@ extension OGSService {
                 }
                 historyData.gameId = SurroundUITestContract.liveBannerHistoryGameID
                 historyData.phase = .finished
+                // Like OGS's game_history endpoint, the fixture feed lists only
+                // games the requested player took part in.
+                if var playerPool = historyData.playerPool {
+                    playerPool[historyData.players.white.id] = nil
+                    playerPool[fixtureUser.id] = fixtureUser
+                    historyData.playerPool = playerPool
+                }
+                historyData.players.white = fixtureUser
+                historyData.whitePlayerId = fixtureUser.id
                 let historyGame = Game(ogsGame: historyData)
                 historyGame.ogsRawData = [:]
                 state.finishedGamesSnapshot = [historyGame]
