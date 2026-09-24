@@ -239,6 +239,35 @@ final class OGSClockTests: XCTestCase {
         XCTAssertEqual(explicitFalse.blackTime.thinkingTimeLeft, 570)
     }
 
+    func testUnknownSystemClearsDerivedClockValuesInPlayAndStartMode() throws {
+        for started in [true, false] {
+            var clock = try makeClock(
+                blackTime: byoYomiTime(thinkingTime: 600, periods: 5, periodTime: 30),
+                extraFields: #""start_mode": \#(!started), "expiration": \#(lastMove + 300_000),"#
+            )
+            clock.autoResignTime[.black] = lastMove + 60_000
+            clock.calculateTimeLeft(
+                with: .Unknown("future-system"), pauseControl: nil, now: lastMove + 30_000
+            )
+
+            XCTAssertNil(clock.blackTime.timeLeft)
+            XCTAssertNil(clock.whiteTime.timeLeft)
+            XCTAssertNil(clock.blackTime.periodsLeft)
+            XCTAssertNil(clock.whiteTime.periodsLeft)
+            XCTAssertNil(clock.timeUntilExpiration)
+            XCTAssertNil(clock.blackTimeUntilAutoResign)
+            XCTAssertEqual(clock.blackTime.thinkingTime, 600)
+            XCTAssertEqual(clock.whiteTime.thinkingTime, 600)
+            XCTAssertEqual(clock.blackTime.periods, 5)
+            XCTAssertEqual(clock.blackTime.periodTime, 30)
+            XCTAssertEqual(clock.expiration, lastMove + 300_000)
+            XCTAssertEqual(clock.autoResignTime[.black], lastMove + 60_000)
+            XCTAssertEqual(clock.currentPlayerId, 1)
+            XCTAssertEqual(clock.blackPlayerId, 1)
+            XCTAssertEqual(clock.whitePlayerId, 2)
+        }
+    }
+
     private func makeFischerClock(now: Double) throws -> OGSClock {
         var clock = try makeClock(
             blackTime: #"{"thinking_time": 300}"#,

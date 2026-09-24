@@ -79,6 +79,37 @@ class GameTests: XCTestCase {
         }
     }
 
+    func testPlayerCacheRefreshPublishesOneRosterAndSkipsUnchangedValues() {
+        let game = Game(width: 5, height: 5, blackName: "Black", whiteName: "White", gameId: .OGS(1))
+        game.blackPlayer = OGSUser(username: "Black", id: -101)
+        game.whitePlayer = OGSUser(username: "White", id: -102)
+        var black = game.blackPlayer!
+        var white = game.whitePlayer!
+        black.icon = "https://example.invalid/black.png"
+        white.icon = "https://example.invalid/white.png"
+        var rosters = [[Int: OGSUser]]()
+        var changes = 0
+        let rosterObservation = game.$playerByOGSId.dropFirst().sink { rosters.append($0) }
+        let gameObservation = game.objectWillChange.sink { changes += 1 }
+        defer {
+            rosterObservation.cancel()
+            gameObservation.cancel()
+        }
+
+        game.mergeCachedPlayers([black.id: black, white.id: white])
+
+        XCTAssertEqual(rosters.count, 1)
+        XCTAssertEqual(rosters.first?[black.id]?.icon, black.icon)
+        XCTAssertEqual(rosters.first?[white.id]?.icon, white.icon)
+        XCTAssertEqual(game.blackPlayer?.icon, black.icon)
+        XCTAssertEqual(game.whitePlayer?.icon, white.icon)
+
+        changes = 0
+        game.mergeCachedPlayers([black.id: black, white.id: white])
+        XCTAssertEqual(rosters.count, 1)
+        XCTAssertEqual(changes, 0)
+    }
+
     func testAnalysisAvailabilityRespectsDisabledSettingUntilGameFinishes() throws {
         let game = GameTests.sampleGame(ogsId: 26_268_396)
         game.gameData?.disableAnalysis = true
@@ -208,6 +239,82 @@ class GameTests: XCTestCase {
         game.markAllChatAsRead()
         XCTAssertEqual(game.chatUnreadCount, 0)
         XCTAssertEqual(preferences[.lastSeenChatIdByOGSGameId]?[43], "third")
+    }
+
+    func testRengoUpdateWaitsForMissingPlayersWithoutChangingOrder() {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.rengo = true
+        let black = OGSUser(username: "Black", id: -101)
+        let white = OGSUser(username: "White", id: -102)
+        let missing = OGSUser(username: "Arriving player", id: -103)
+        game.playerByOGSId = [black.id: black, white.id: white]
+        game.latestPlayerUpdate = OGSPlayerUpdate(
+            rengoTeams: .init(black: [missing.id, black.id], white: [white.id])
+        )
+
+        XCTAssertTrue(game.hasUnresolvedRengoPlayers)
+        XCTAssertNil(game.orderedRengoTeam[.black])
+        XCTAssertNil(game.currentPlayer(with: .black))
+        XCTAssertEqual(game.currentPlayer(with: .white)?.id, white.id)
+
+        // A move without another team update must not forget the pending order.
+        game.latestPlayerUpdate = nil
+        game.mergeCachedPlayers([missing.id: missing])
+
+        XCTAssertFalse(game.hasUnresolvedRengoPlayers)
+        XCTAssertEqual(game.orderedRengoTeam[.black]?.map(\.id), [missing.id, black.id])
+        XCTAssertEqual(game.currentPlayer(with: .black)?.id, missing.id)
+        XCTAssertEqual(game.orderedRengoTeam[.white]?.map(\.id), [white.id])
+    }
+
+    func testRengoNewOrderReplacesPendingOrderAndRefreshesPlayerDetails() {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.rengo = true
+        let first = OGSUser(username: "First", id: -111)
+        var second = OGSUser(username: "Second", id: -112)
+        game.playerByOGSId = [first.id: first, second.id: second]
+        game.latestPlayerUpdate = OGSPlayerUpdate(
+            rengoTeams: .init(black: [-113, first.id], white: [second.id])
+        )
+        game.latestPlayerUpdate = OGSPlayerUpdate(
+            rengoTeams: .init(black: [second.id, first.id], white: [])
+        )
+        game.playerByOGSId[-113] = OGSUser(username: "Obsolete member", id: -113)
+        second.icon = "https://example.invalid/avatar.png"
+        game.playerByOGSId[second.id] = second
+
+        XCTAssertFalse(game.hasUnresolvedRengoPlayers)
+        XCTAssertEqual(game.orderedRengoTeam[.black]?.map(\.id), [second.id, first.id])
+        XCTAssertEqual(game.orderedRengoTeam[.black]?.first?.icon, second.icon)
+        XCTAssertEqual(game.currentPlayer(with: .black)?.id, second.id)
+        XCTAssertEqual(game.orderedRengoTeam[.white], [])
+        XCTAssertNil(game.currentPlayer(with: .white))
+    }
+
+    func testIncompleteRengoRosterPublishesActivePlayerChanges() {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.rengo = true
+        let first = OGSUser(username: "First", id: -121)
+        let next = OGSUser(username: "Next", id: -122)
+        game.playerByOGSId = [first.id: first]
+        game.latestPlayerUpdate = OGSPlayerUpdate(
+            rengoTeams: .init(black: [first.id, -123], white: [])
+        )
+        var publications = 0
+        let observation = game.objectWillChange.sink { publications += 1 }
+        defer { observation.cancel() }
+
+        game.latestPlayerUpdate = OGSPlayerUpdate(
+            rengoTeams: .init(black: [next.id, -123], white: [])
+        )
+        XCTAssertGreaterThan(publications, 0)
+        XCTAssertNil(game.currentPlayer(with: .black))
+        publications = 0
+        game.playerByOGSId[next.id] = next
+
+        XCTAssertGreaterThan(publications, 0)
+        XCTAssertEqual(game.currentPlayer(with: .black)?.id, next.id)
+        XCTAssertNil(game.orderedRengoTeam[.black])
     }
 
     private func chatLine(id: String, timestamp: Double) throws -> OGSChatLine {

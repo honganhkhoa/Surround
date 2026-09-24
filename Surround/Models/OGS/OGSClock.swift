@@ -162,6 +162,23 @@ extension OGSClock: Decodable {
             whiteTimeUntilAutoResign = nil
         }
         
+        guard system.supportsClock else {
+            // The game and its moves remain usable when OGS adds a clock
+            // system. Its timer values cannot be interpreted by this client.
+            blackTime.thinkingTimeLeft = nil
+            blackTime.periodsLeft = nil
+            blackTime.periodTimeLeft = nil
+            blackTime.blockTimeLeft = nil
+            whiteTime.thinkingTimeLeft = nil
+            whiteTime.periodsLeft = nil
+            whiteTime.periodTimeLeft = nil
+            whiteTime.blockTimeLeft = nil
+            timeUntilExpiration = nil
+            blackTimeUntilAutoResign = nil
+            whiteTimeUntilAutoResign = nil
+            return
+        }
+
         // Expiration can be for stone removal or waiting to start (start mode)
         if let expiration = expiration {
             timeUntilExpiration = (expiration + serverTimeOffset - now) / 1000

@@ -162,7 +162,7 @@ struct TimeControlAdjustmentSteppers: View {
             return simpleRanges
         case .Absolute:
             return absoluteRanges
-        case .None:
+        case .None, .Unknown:
             return [:]
         }
     }
@@ -225,7 +225,7 @@ struct TimeControlAdjustmentSteppers: View {
                 timeStepper(keyPath: \.perMove, label: String(localized: "Time per move"))
             case .Absolute:
                 timeStepper(keyPath: \.totalTime, label: String(localized: "Total time"))
-            case .None:
+            case .None, .Unknown:
                 EmptyView()
             }
         }

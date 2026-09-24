@@ -15,6 +15,7 @@ import Combine
 private struct HomeGameRow: Identifiable {
     enum Context: Hashable {
         case live
+        case unclassified
         case userTurn
         case opponentTurn
         case history
@@ -221,6 +222,7 @@ struct HomeView: View {
             ogs.challengesReceived.count +
             ogs.friendInvitations.count +
             ogs.liveGames.count +
+            ogs.unclassifiedActiveGames.count +
             ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
             ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0
         let isLoading = noItem && ogs.isLoadingOverview
@@ -337,6 +339,29 @@ struct HomeView: View {
                             Section(header: sectionHeader(title: String(localized: "Live games", comment: "Homeview"))) {
                                 ForEach(
                                     ogs.liveGames.map { HomeGameRow(game: $0, context: .live) }
+                                ) { row in
+                                    GameCell(
+                                        game: row.game,
+                                        displayMode: displayMode,
+                                        opensGame: {
+                                            showGameDetail(game: row.game)
+                                        },
+                                        showsConditionalMoves: true,
+                                        navigationAccessibilityIdentifier:
+                                            SurroundUITestContract
+                                                .AccessibilityID.homeGame(row.game)
+                                    )
+                                    .padding(.vertical, displayMode == .full ? nil : 0)
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
+                        if !ogs.unclassifiedActiveGames.isEmpty {
+                            Section(header: sectionHeader(title: String(localized: "Active games"))) {
+                                ForEach(
+                                    ogs.unclassifiedActiveGames.map {
+                                        HomeGameRow(game: $0, context: .unclassified)
+                                    }
                                 ) { row in
                                     GameCell(
                                         game: row.game,

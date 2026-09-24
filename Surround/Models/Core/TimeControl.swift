@@ -66,13 +66,14 @@ func durationString(seconds: Int, longFormat: Bool = false) -> String {
     return  String(localized: "\(weeksString) \(daysString) \(hoursString) \(minutesString) \(secondsString)", comment: "Duration string [weeks days hours minutes seconds]").trimmingCharacters(in: .whitespaces)
 }
 
-enum TimeControlSystem: Equatable {
+enum TimeControlSystem: Hashable {
     case Fischer(initialTime: Int, timeIncrement: Int, maxTime: Int)
     case ByoYomi(mainTime: Int, periods: Int, periodTime: Int)
     case Simple(perMove: Int)
     case Canadian(mainTime: Int, periodTime: Int, stonesPerPeriod: Int)
     case Absolute(totalTime: Int)
     case None
+    case Unknown(String)
     
     var name: String {
         switch self {
@@ -88,6 +89,8 @@ enum TimeControlSystem: Equatable {
             return String(localized: "Simple", comment: "TimeControl system name")
         case .None:
             return String(localized: "No time control", comment: "TimeControl system name")
+        case .Unknown(let system):
+            return system
         }
     }
     
@@ -105,6 +108,8 @@ enum TimeControlSystem: Equatable {
             return String(localized: "Simple", comment: "TimeControl system name - shorter")
         case .None:
             return String(localized: "No control", comment: "TimeControl system name - shorter")
+        case .Unknown(let system):
+            return system
         }
     }
     
@@ -122,6 +127,8 @@ enum TimeControlSystem: Equatable {
             return durationString(seconds: totalTime)
         case .None:
             return String(localized: "No time limits", comment: "TimeControl - short description for no system")
+        case .Unknown:
+            return ""
         }
     }
     
@@ -145,10 +152,19 @@ enum TimeControlSystem: Equatable {
             return Text(.init(localized: "**\(durationString(seconds: totalTime, longFormat: true))** of total play time for each player.", comment: "TimeControl - long description for absolute system"))
         case .None:
             return Text("No time limits.", comment: "TimeControl - long description for no system")
+        case .Unknown:
+            return Text(verbatim: "")
         }
     }
     
-    var averageSecondsPerMove: Double {
+    /// Unsupported clocks must not be presented as an unlimited game or used
+    /// to infer a speed from parameters whose meaning the client does not know.
+    var supportsClock: Bool {
+        if case .Unknown = self { return false }
+        return true
+    }
+
+    var averageSecondsPerMove: Double? {
         switch self {
         case .Fischer(let initialTime, let timeIncrement, _):
             return Double(initialTime) / 90.0 + Double(timeIncrement)
@@ -162,11 +178,13 @@ enum TimeControlSystem: Equatable {
             return Double(totalTime) / 90.0
         case .None:
             return 0
+        case .Unknown:
+            return nil
         }
     }
 
-    var speed: TimeControlSpeed {
-        let secondsPerMove = self.averageSecondsPerMove
+    var speed: TimeControlSpeed? {
+        guard let secondsPerMove = averageSecondsPerMove else { return nil }
         if secondsPerMove == 0 || secondsPerMove > 3600 {
             return .correspondence
         } else if secondsPerMove < 10 {
@@ -177,33 +195,7 @@ enum TimeControlSystem: Equatable {
     }
 
     var timeControlObject: TimeControl {
-        switch self {
-        case .Fischer(let initialTime, let timeIncrement, let maxTime):
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "fischer",
-                initialTime: initialTime, timeIncrement: timeIncrement, maxTime: maxTime, speed: speed
-            ))
-        case .Simple(let perMove):
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "simple", perMove: perMove, speed: speed
-            ))
-        case .ByoYomi(let mainTime, let periods, let periodTime):
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "byoyomi", mainTime: mainTime, periods: periods, periodTime: periodTime, speed: speed
-            ))
-        case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "canadian", mainTime: mainTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod, speed: speed
-            ))
-        case .Absolute(let totalTime):
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "absolute", totalTime: totalTime, speed: speed
-            ))
-        case .None:
-            return TimeControl(codingData: TimeControl.TimeControlCodingData(
-                timeControl: "none"
-            ))
-        }
+        TimeControl(system: self)
     }
 
     static let QuestionableSecondsPerMove = 4
@@ -221,7 +213,7 @@ enum TimeControlSystem: Equatable {
             return !(mainTime > TimeControlSystem.QuestionableAbsoluteTime || periodTime / stonesPerPeriod > TimeControlSystem.QuestionableSecondsPerMove)
         case .Absolute(let totalTime):
             return totalTime <= TimeControlSystem.QuestionableAbsoluteTime
-        case .None:
+        case .None, .Unknown:
             return false
         }
     }
@@ -311,17 +303,110 @@ struct TimeControl: Codable, Equatable, Hashable {
         /// decodable without requiring a hand-written codec for every field.
         var speed: String?
         var pauseOnWeekends: Bool?
+
+        fileprivate func validatedSystem(codingPath: [CodingKey] = []) throws -> TimeControlSystem {
+            let systemName = system ?? timeControl
+            func required(_ value: Int?, _ field: String, strictlyPositive: Bool = false) throws -> Int {
+                guard let value, !strictlyPositive || value > 0 else {
+                    throw DecodingError.dataCorrupted(.init(
+                        codingPath: codingPath,
+                        debugDescription: "Invalid or missing \(field) for \(systemName) time control"
+                    ))
+                }
+                return value
+            }
+
+            // These fields are required by Goban's JGOFTimeControl variants.
+            // Zero main time is valid for overtime-only games. Only the two
+            // values used as divisors must be positive to avoid arithmetic traps.
+            switch systemName {
+            case "fischer":
+                return .Fischer(
+                    initialTime: try required(initialTime, "initial_time"),
+                    timeIncrement: try required(timeIncrement, "time_increment"),
+                    maxTime: try required(maxTime, "max_time")
+                )
+            case "byoyomi":
+                return .ByoYomi(
+                    mainTime: try required(mainTime, "main_time"),
+                    periods: try required(periods, "periods"),
+                    periodTime: try required(periodTime, "period_time", strictlyPositive: true)
+                )
+            case "simple":
+                return .Simple(perMove: try required(perMove, "per_move"))
+            case "canadian":
+                return .Canadian(
+                    mainTime: try required(mainTime, "main_time"),
+                    periodTime: try required(periodTime, "period_time"),
+                    stonesPerPeriod: try required(stonesPerPeriod, "stones_per_period", strictlyPositive: true)
+                )
+            case "absolute":
+                return .Absolute(totalTime: try required(totalTime, "total_time"))
+            case "none":
+                return .None
+            default:
+                return .Unknown(systemName)
+            }
+        }
     }
     
-    var codingData: TimeControlCodingData
-    
-    init(from decoder:Decoder) throws {
+    var codingData: TimeControlCodingData {
+        didSet {
+            // Form bindings edit individual wire fields. Keep the last valid
+            // control if an edit removes a required field or changes to an
+            // incomplete system, just as decoding rejects malformed snapshots.
+            guard let updatedSystem = try? codingData.validatedSystem() else {
+                codingData = oldValue
+                return
+            }
+            system = updatedSystem
+        }
+    }
+    private(set) var system: TimeControlSystem
+
+    init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        codingData = try container.decode(TimeControlCodingData.self)
-    }
-    
-    init(codingData: TimeControlCodingData) {
+        let codingData = try container.decode(TimeControlCodingData.self)
+        system = try codingData.validatedSystem(codingPath: decoder.codingPath)
         self.codingData = codingData
+    }
+
+    init(codingData: TimeControlCodingData) throws {
+        system = try codingData.validatedSystem()
+        self.codingData = codingData
+    }
+
+    fileprivate init(system: TimeControlSystem) {
+        self.system = system
+        switch system {
+        case .Fischer(let initialTime, let timeIncrement, let maxTime):
+            codingData = TimeControlCodingData(
+                timeControl: "fischer",
+                initialTime: initialTime, timeIncrement: timeIncrement, maxTime: maxTime, speed: system.speed
+            )
+        case .Simple(let perMove):
+            codingData = TimeControlCodingData(
+                timeControl: "simple", perMove: perMove, speed: system.speed
+            )
+        case .ByoYomi(let mainTime, let periods, let periodTime):
+            codingData = TimeControlCodingData(
+                timeControl: "byoyomi", mainTime: mainTime, periods: periods, periodTime: periodTime, speed: system.speed
+            )
+        case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
+            codingData = TimeControlCodingData(
+                timeControl: "canadian", mainTime: mainTime, periodTime: periodTime, stonesPerPeriod: stonesPerPeriod, speed: system.speed
+            )
+        case .Absolute(let totalTime):
+            codingData = TimeControlCodingData(
+                timeControl: "absolute", totalTime: totalTime, speed: system.speed
+            )
+        case .None:
+            codingData = TimeControlCodingData(
+                timeControl: "none"
+            )
+        case .Unknown(let name):
+            codingData = TimeControlCodingData(timeControl: name)
+        }
     }
 
     /// OGS's speed tag is presentation metadata. If the server introduces a
@@ -356,23 +441,6 @@ struct TimeControl: Codable, Equatable, Hashable {
             return self.codingData[keyPath: keyPath]
         }
         set { self.codingData[keyPath: keyPath] = newValue }
-    }
-    
-    var system: TimeControlSystem {
-        switch self.timeControl {
-        case "fischer":
-            return .Fischer(initialTime: self.initialTime!, timeIncrement: self.timeIncrement!, maxTime: self.maxTime!)
-        case "byoyomi":
-            return .ByoYomi(mainTime: self.mainTime!, periods: self.periods!, periodTime: self.periodTime!)
-        case "simple":
-            return .Simple(perMove: self.perMove!)
-        case "canadian":
-            return .Canadian(mainTime: self.mainTime!, periodTime: self.periodTime!, stonesPerPeriod: self.stonesPerPeriod!)
-        case "absolute":
-            return .Absolute(totalTime: self.totalTime!)
-        default:
-            return .None
-        }
     }
     
     var shortDescription: String {

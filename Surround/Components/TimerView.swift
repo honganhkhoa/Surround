@@ -91,7 +91,7 @@ struct TimerView: View {
     var subFont = Font.caption
     
     var body: some View {
-        if let clock = clock, let timeControl = timeControl {
+        if let clock = clock, let timeControl = timeControl, timeControl.system.supportsClock {
             if !clock.started {
                 if let timeLeft = clock.timeUntilExpiration {
                     if clock.currentPlayerColor == player {
@@ -128,14 +128,9 @@ struct TimerView: View {
 
 #if DEBUG
 private func byoYomiTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "byoyomi",
-            mainTime: 300,
-            periods: 5,
-            periodTime: 30
-        )
-    )
+    let timeControl = TimeControlSystem.ByoYomi(
+        mainTime: 300, periods: 5, periodTime: 30
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(
             thinkingTime: 200,
@@ -161,14 +156,9 @@ private func byoYomiTimerPreviewData() -> (timeControl: TimeControl, clock: OGSC
 }
 
 private func fischerTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "fischer",
-            initialTime: 600,
-            timeIncrement: 30,
-            maxTime: 600
-        )
-    )
+    let timeControl = TimeControlSystem.Fischer(
+        initialTime: 600, timeIncrement: 30, maxTime: 600
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
         whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
@@ -182,14 +172,9 @@ private func fischerTimerPreviewData() -> (timeControl: TimeControl, clock: OGSC
 }
 
 private func canadianTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "canadian",
-            mainTime: 600,
-            periodTime: 180,
-            stonesPerPeriod: 10
-        )
-    )
+    let timeControl = TimeControlSystem.Canadian(
+        mainTime: 600, periodTime: 180, stonesPerPeriod: 10
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(
             thinkingTime: 300,
@@ -215,12 +200,7 @@ private func canadianTimerPreviewData() -> (timeControl: TimeControl, clock: OGS
 }
 
 private func simpleTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "simple",
-            perMove: 60
-        )
-    )
+    let timeControl = TimeControlSystem.Simple(perMove: 60).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 42),
         whiteTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 60),

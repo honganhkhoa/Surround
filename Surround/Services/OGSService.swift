@@ -899,6 +899,7 @@ class OGSService: ObservableObject {
 
     private var gameResynchronizationStates = [Int: GameResynchronizationState]()
     private var gameResynchronizationTimeouts = [Int: DispatchWorkItem]()
+    private var unresolvedRengoPlayersAfterSnapshot = [Int: Set<Int>]()
     private var publicGameConnectionIDs = Set<Int>()
     private let authenticationGenerationLock = NSLock()
     private var authenticationGenerationStorage: UInt = 0
@@ -923,6 +924,7 @@ class OGSService: ObservableObject {
     @Published private(set) public var sortedActiveCorrespondenceGamesNotOnUserTurn: [Game] = []
     @Published private(set) public var sortedActiveCorrespondenceGames: [Game] = []
     @Published private(set) public var liveGames: [Game] = []
+    @Published private(set) var unclassifiedActiveGames: [Game] = []
     @Published private(set) public var publicGames: [Int: Game] = [:]
     @Published private(set) public var sortedPublicGames: [Game] = []
     private var finishedGamesSnapshot: [Game]?
@@ -1103,6 +1105,7 @@ class OGSService: ObservableObject {
         var gamesOnUserTurn: [Game] = []
         var gamesOnOpponentTurn: [Game] = []
         var liveGames: [Game] = []
+        var unclassifiedGames: [Game] = []
         for game in activeGames {
             if game.gameData?.timeControl.speed == .correspondence {
                 if isOnUserTurn(game: game) {
@@ -1112,6 +1115,8 @@ class OGSService: ObservableObject {
                 }
             } else if game.gameData?.timeControl.speed?.isRealtime == true {
                 liveGames.append(game)
+            } else if game.gameData != nil, game.gameData?.timeControl.speed == nil {
+                unclassifiedGames.append(game)
             }
         }
         let thinkingTimeLeft: (Game) -> Double = { game in
@@ -1133,6 +1138,9 @@ class OGSService: ObservableObject {
         self.sortedActiveCorrespondenceGamesNotOnUserTurn = gamesOnOpponentTurn.sorted(by: thinkingTimeLeftIncreasing)
         self.sortedActiveCorrespondenceGames = self.sortedActiveCorrespondenceGamesOnUserTurn + self.sortedActiveCorrespondenceGamesNotOnUserTurn
         self.liveGames = liveGames
+        self.unclassifiedActiveGames = unclassifiedGames.sorted {
+            ($0.ogsID ?? .max) < ($1.ogsID ?? .max)
+        }
         
         #if MAIN_APP
         if enablesAppSideEffects {
@@ -1631,6 +1639,12 @@ class OGSService: ObservableObject {
             do {
                 let ogsGame = try dictionaryDecoder.decode(OGSGame.self, from: gameData)
                 connectedGame.gameData = ogsGame
+                let missingPlayers = connectedGame.unresolvedRengoPlayerIDs
+                unresolvedRengoPlayersAfterSnapshot[ogsGameId] = missingPlayers.isEmpty
+                    ? nil : missingPlayers
+                // The board is authoritative even when optional roster metadata
+                // is incomplete. Finish transport recovery so later move gaps
+                // can recover independently of these missing player records.
                 finishGameResynchronization(gameID: ogsGameId)
                 if self.activeGames[ogsGameId] != nil {
                     preferences[.latestOGSOverviewOutdated] = true
@@ -1682,6 +1696,8 @@ class OGSService: ObservableObject {
             } else {
                 connectedGame.latestPlayerUpdate = nil
             }
+
+            resynchronizeRengoPlayersIfNeeded(gameID: ogsGameId, game: connectedGame)
 
             if let _ = self.activeGames[ogsGameId] {
                 preferences[.latestOGSOverviewOutdated] = true
@@ -1811,6 +1827,7 @@ class OGSService: ObservableObject {
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
                     connectedGame.latestPlayerUpdate = playerUpdate
+                    resynchronizeRengoPlayersIfNeeded(gameID: ogsGameId, game: connectedGame)
                 }
             }
         default:
@@ -3351,6 +3368,7 @@ class OGSService: ObservableObject {
 
         desiredGameConnections.removeAll()
         locallyReservedVariationNumbersByGameID.removeAll()
+        unresolvedRengoPlayersAfterSnapshot.removeAll()
         cancelAllGameResynchronizations()
         publicGameConnectionIDs.removeAll()
 
@@ -3384,6 +3402,7 @@ class OGSService: ObservableObject {
         // callback that follows will then see the remaining owners, if any.
         if desired.chatByOwner.isEmpty {
             desiredGameConnections[gameID] = nil
+            unresolvedRengoPlayersAfterSnapshot[gameID] = nil
             finishGameResynchronization(gameID: gameID)
             gameDetailCancellable.removeValue(forKey: gameID)?.cancel()
             disconnectActualGame(gameID: gameID)
@@ -3393,6 +3412,26 @@ class OGSService: ObservableObject {
             // leaves while a board-only owner remains.
             connectIfReady(gameID: gameID)
         }
+    }
+
+    private func resynchronizeRengoPlayersIfNeeded(gameID: Int, game: Game) {
+        let missingPlayers = game.unresolvedRengoPlayerIDs
+        guard !missingPlayers.isEmpty else {
+            unresolvedRengoPlayersAfterSnapshot[gameID] = nil
+            return
+        }
+        // Reconnecting cannot supply metadata that the latest authoritative
+        // snapshot itself omitted. Retry only for newly missing players, while
+        // keeping this suppression separate from board/transport recovery.
+        guard !missingPlayers.isSubset(
+            of: unresolvedRengoPlayersAfterSnapshot[gameID] ?? []
+        ) else {
+            return
+        }
+        requestGameResynchronization(
+            gameID: gameID,
+            reason: "Rengo player update references missing players"
+        )
     }
 
     /// Requests a fresh authoritative snapshot for one game without disturbing

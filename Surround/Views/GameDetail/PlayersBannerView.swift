@@ -332,6 +332,9 @@ struct PlayersBannerView: View {
         let pauseReason = game.pauseControl?.pauseReason(playerId: playerId)
         let timeUntilAutoResign = color == .black ? game.clock?.blackTimeUntilAutoResign : game.clock?.whiteTimeUntilAutoResign
         let clockStatus = { () -> AnyView in
+            guard game.gameData?.timeControl.system.supportsClock != false else {
+                return AnyView(EmptyView())
+            }
             if pauseReason?.count ?? 0 > 0 {
                 return AnyView(
                     erasing: Text(pauseReason ?? "").font(Font.footnote.bold())

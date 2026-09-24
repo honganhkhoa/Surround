@@ -156,11 +156,19 @@ struct GameControlRow: View {
     func estimateTerritory() {
         pendingMove.wrappedValue = nil
         pendingPosition.wrappedValue = nil
-        self.ogsRequestCancellable = game.currentPosition.estimateTerritory(on: game.computeQueue)
+        let position = game.currentPosition
+        let revision = position.scoringRevision
+        let phase = game.gamePhase
+        self.ogsRequestCancellable = position.estimateTerritory(on: game.computeQueue)
             .receive(on: DispatchQueue.main)
             .sink { estimatedTerritory in
-                game.currentPosition.estimatedScores = estimatedTerritory
                 self.ogsRequestCancellable = nil
+                guard game.currentPosition === position,
+                      position.scoringRevision == revision,
+                      game.gamePhase == phase else {
+                    return
+                }
+                position.estimatedScores = estimatedTerritory
             }
     }
     

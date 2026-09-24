@@ -185,15 +185,53 @@ class TerritoryGroup: Equatable, Hashable {
 }
 
 class BoardPosition: ObservableObject {
-    var width: Int
-    var height: Int
-    var board: [[PointState]]
-    var nextToMove: StoneColor
+    var width: Int {
+        didSet { scoringRevision &+= 1 }
+    }
+    var height: Int {
+        didSet { scoringRevision &+= 1 }
+    }
+    var board: [[PointState]] {
+        didSet { scoringRevision &+= 1 }
+    }
+    var nextToMove: StoneColor {
+        didSet { scoringRevision &+= 1 }
+    }
     var previousPosition: BoardPosition?
     var lastMove: Move?
     var lastMoveColor: StoneColor?
-    var captures: [StoneColor: Int] = [.black: 0, .white: 0]
-    @Published var removedStones: Set<[Int]>?
+    var captures: [StoneColor: Int] = [.black: 0, .white: 0] {
+        didSet { scoringRevision &+= 1 }
+    }
+    @Published var removedStones: Set<[Int]>? {
+        didSet { scoringRevision &+= 1 }
+    }
+    private(set) var scoringRevision: UInt64 = 0
+
+    /// Value-only inputs; a scoring worker must never retain the live board.
+    struct ScoringSnapshot: Equatable {
+        let width: Int
+        let height: Int
+        let board: [[PointState]]
+        let captures: [StoneColor: Int]
+        let removedStones: Set<[Int]>?
+
+        func makePosition() -> BoardPosition {
+            let position = BoardPosition(width: width, height: height)
+            position.board = board
+            position.captures = captures
+            position.removedStones = removedStones
+            return position
+        }
+    }
+
+    func scoringSnapshot() -> ScoringSnapshot {
+        precondition(Thread.isMainThread)
+        return ScoringSnapshot(
+            width: width, height: height, board: board,
+            captures: captures, removedStones: removedStones
+        )
+    }
     @Published var gameScores: GameScores?
     @Published var estimatedScores: [[PointState]]?
     var lastMoveNumber = 0
@@ -428,10 +466,17 @@ class BoardPosition: ObservableObject {
         return result
     }
     
+    /// Call on the main thread to capture live state before dispatching work.
     func estimateTerritory(on queue: DispatchQueue?) -> AnyPublisher<[[PointState]], Never> {
-        return Future<[[PointState]], Never> { [self] promise in
+        precondition(Thread.isMainThread)
+        let snapshot = scoringSnapshot()
+        let width = snapshot.width
+        let height = snapshot.height
+        let board = snapshot.board
+        let nextToMove = self.nextToMove
+        return Future<[[PointState]], Never> { promise in
             let queue = queue ?? DispatchQueue.global()
-            queue.async { [self] in
+            queue.async {
                 var data = board.joined().map({ state -> CInt in
                     switch state {
                     case .empty:

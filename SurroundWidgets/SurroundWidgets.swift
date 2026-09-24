@@ -467,7 +467,8 @@ struct CorrespondenceGamesWidgetView: View {
     }
     
     private func timer(game: Game) -> some View {
-        if let clock = game.clock, let timeControlSystem = game.gameData?.timeControl.system {
+        if let clock = game.clock, let timeControlSystem = game.gameData?.timeControl.system,
+           timeControlSystem.supportsClock {
             let thinkingTime = clock.blackPlayerId == userId ? clock.blackTime : clock.whiteTime
             var timeLeft = thinkingTime.thinkingTimeLeft
             var auxiliaryLabel = ""

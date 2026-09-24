@@ -20,6 +20,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     
     @Published var gameData: OGSGame? {
         didSet {
+            scoringRevision &+= 1
             if let data = gameData {
                 self.gameName = data.gameName
                 self.blackPlayer = OGSUser.mergeUserInfoFromCache(user: self.blackPlayer, cachedUser: data.players.black)
@@ -114,7 +115,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         didSet {
             self.blackId = blackPlayer?.id
             if let player = blackPlayer {
-                playerByOGSId[player.id] = player
+                if playerByOGSId[player.id] != player {
+                    playerByOGSId[player.id] = player
+                }
                 blackName = player.username
             }
         }
@@ -123,7 +126,9 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         didSet {
             self.whiteId = whitePlayer?.id
             if let player = whitePlayer {
-                playerByOGSId[player.id] = player
+                if playerByOGSId[player.id] != player {
+                    playerByOGSId[player.id] = player
+                }
                 whiteName = player.username
             }
         }
@@ -135,6 +140,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     @Published var gameName: String?
     @Published var currentPosition: BoardPosition {
         didSet {
+            scoringRevision &+= 1
             self.positionByLastMoveNumber[currentPosition.lastMoveNumber] = currentPosition
             refreshConditionalMoveBranches()
         }
@@ -216,16 +222,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         return
                     }
                     if let cachedPlayersById = values.last {
-                        for (playerId, player) in self.playerByOGSId {
-                            if let cachedPlayer = cachedPlayersById[playerId] {
-                                self.playerByOGSId[playerId] = OGSUser.mergeUserInfoFromCache(user: player, cachedUser: cachedPlayer)
-                                if playerId == self.blackPlayer?.id {
-                                    self.blackPlayer = self.playerByOGSId[playerId]
-                                } else if playerId == self.whitePlayer?.id {
-                                    self.whitePlayer = self.playerByOGSId[playerId]
-                                }
-                            }
-                        }
+                        self.mergeCachedPlayers(cachedPlayersById)
                     }
                 })
             } else {
@@ -234,12 +231,37 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
         }
     }
+
+    func mergeCachedPlayers(_ cachedPlayersById: [Int: OGSUser]) {
+        var players = playerByOGSId
+        for playerID in Set(players.keys).union(unresolvedRengoPlayerIDs) {
+            if let cachedPlayer = cachedPlayersById[playerID] {
+                players[playerID] = OGSUser.mergeUserInfoFromCache(
+                    user: players[playerID], cachedUser: cachedPlayer
+                )
+            }
+        }
+        // Publish the complete refresh once. The player setters below avoid
+        // writing these same values back into the dictionary a second time.
+        if players != playerByOGSId {
+            playerByOGSId = players
+        }
+        if let id = blackPlayer?.id, let player = players[id], player != blackPlayer {
+            blackPlayer = player
+        }
+        if let id = whitePlayer?.id, let player = players[id], player != whitePlayer {
+            whitePlayer = player
+        }
+    }
     
     var autoScoringDone: Bool?
     var autoScoringCancellable: AnyCancellable?
     var toggleRemovedStoneCancellable: AnyCancellable?
     @Published var gamePhase: OGSGamePhase? {
         didSet {
+            scoringRevision &+= 1
+            autoScoringCancellable?.cancel()
+            autoScoringCancellable = nil
             if gamePhase == .play {
                 refreshConditionalMoveBranches()
             } else {
@@ -247,15 +269,24 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
             if gamePhase == .stoneRemoval {
                 if !(autoScoringDone ?? false) && isUserPlaying {
-                    // Doing score estimating
-                    self.autoScoringCancellable = currentPosition.estimateTerritory(on: computeQueue)
+                    let position = currentPosition
+                    let revision = scoringRevision
+                    let positionRevision = position.scoringRevision
+                    self.autoScoringCancellable = position.estimateTerritory(on: computeQueue)
                         .receive(on: DispatchQueue.main)
-                        .sink(receiveValue: { territory in
+                        .sink(receiveValue: { [weak self, weak position] territory in
+                            guard let self, let position,
+                                  self.gamePhase == .stoneRemoval,
+                                  self.currentPosition === position,
+                                  self.scoringRevision == revision,
+                                  position.scoringRevision == positionRevision else {
+                                return
+                            }
                             var estimatedRemovedStones = Set<[Int]>()
-                            for row in 0..<self.currentPosition.height {
-                                for column in 0..<self.currentPosition.width {
-                                    let isCaptured = self.currentPosition[row, column] != .empty && self.currentPosition[row, column] != territory[row][column]
-                                    let isDame = territory[row][column] == .empty && self.currentPosition[row, column] == .empty
+                            for row in 0..<position.height {
+                                for column in 0..<position.width {
+                                    let isCaptured = position[row, column] != .empty && position[row, column] != territory[row][column]
+                                    let isDame = territory[row][column] == .empty && position[row, column] == .empty
                                     if isCaptured || isDame {
                                         estimatedRemovedStones.insert([row, column])
                                     }
@@ -268,16 +299,27 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     computeScoresAndUpdate()
                 }
             } else if gamePhase == .play {
-                DispatchQueue.main.async {
-                    self.autoScoringDone = nil
-                    self.currentPosition.gameScores = nil
-                    self.currentPosition.removedStones = nil
+                // This flag belongs to the phase, not the current position. A
+                // move can replace the position before deferred board cleanup.
+                autoScoringDone = nil
+                let position = currentPosition
+                let revision = scoringRevision
+                DispatchQueue.main.async { [weak self, weak position] in
+                    guard let self, let position,
+                          self.gamePhase == .play,
+                          self.currentPosition === position,
+                          self.scoringRevision == revision else {
+                        return
+                    }
+                    position.gameScores = nil
+                    position.removedStones = nil
                 }
             }
         }
     }
     @Published var removedStonesAccepted = [StoneColor: Set<[Int]>]()
     lazy var computeQueue = DispatchQueue(label: "com.honganhkhoa.Surround.computeQueue", qos: .default)
+    private var scoringRevision: UInt64 = 0
     
     @Published var chatLog = [OGSChatLine]()
     var positionByLastMoveNumber = [Int: BoardPosition]()
@@ -286,18 +328,49 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var latestPlayerUpdate: OGSPlayerUpdate? {
         didSet {
             if let update = latestPlayerUpdate {
-                for color in [StoneColor.black, StoneColor.white] {
-                    orderedRengoTeam[color] = update.rengoTeams[color].map { playerByOGSId[$0]! }
-                }
+                rengoTeamOrder = update.rengoTeams
+                refreshOrderedRengoTeams()
             }
         }
     }
     
-    var playerByOGSId: [Int: OGSUser] = [:]
+    @Published private var rengoTeamOrder: OGSPlayerUpdate.RengoTeams?
+    @Published var playerByOGSId: [Int: OGSUser] = [:] {
+        didSet { refreshOrderedRengoTeams() }
+    }
+
+    var hasUnresolvedRengoPlayers: Bool {
+        !unresolvedRengoPlayerIDs.isEmpty
+    }
+
+    var unresolvedRengoPlayerIDs: Set<Int> {
+        guard let order = rengoTeamOrder else { return [] }
+        return Set((order.black + order.white).filter { playerByOGSId[$0] == nil })
+    }
+
+    private func refreshOrderedRengoTeams() {
+        guard let order = rengoTeamOrder else { return }
+        var teams = [StoneColor: [OGSUser]]()
+        for color in [StoneColor.black, StoneColor.white] {
+            let ids = order[color]
+            let players = ids.compactMap { playerByOGSId[$0] }
+            // An incomplete roster must not promote the next known teammate
+            // to the active player's slot. Retain its IDs until data arrives.
+            if players.count == ids.count {
+                teams[color] = players
+            }
+        }
+        if orderedRengoTeam != teams {
+            orderedRengoTeam = teams
+        }
+    }
     
     @Published var orderedRengoTeam: [StoneColor: [OGSUser]] = [:]
     func currentPlayer(with color: StoneColor) -> OGSUser? {
         if rengo {
+            if let order = rengoTeamOrder {
+                return order[color].first.flatMap { playerByOGSId[$0] }
+            }
             return orderedRengoTeam[color]?.first
         } else {
             switch color {
@@ -755,10 +828,42 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
     }
     
+    private struct ScoringInput {
+        let position: BoardPosition.ScoringSnapshot
+        let handicap: Int
+        let komi: Double
+        let agaHandicapScoring: Bool
+        let scoreTerritory: Bool
+        let scoreStones: Bool
+        let scorePrisoners: Bool
+        let scoreHandicap: Bool
+    }
+
+    private func scoringInput() -> ScoringInput? {
+        precondition(Thread.isMainThread)
+        guard let gameData else { return nil }
+        return ScoringInput(
+            position: currentPosition.scoringSnapshot(),
+            handicap: gameData.handicap,
+            komi: gameData.komi,
+            agaHandicapScoring: gameData.agaHandicapScoring,
+            scoreTerritory: gameData.scoreTerritory,
+            scoreStones: gameData.scoreStones,
+            scorePrisoners: gameData.scorePrisoners,
+            scoreHandicap: gameData.scoreHandicap
+        )
+    }
+
+    /// Capture live state on the main thread; background work uses ScoringInput.
     func computeScore() -> GameScores? {
-        guard let gameData = gameData else {
-            return nil
-        }
+        precondition(Thread.isMainThread)
+        return scoringInput().map(Self.computeScore(from:))
+    }
+
+    private static func computeScore(from input: ScoringInput) -> GameScores {
+        // Territory construction mutates scratch state. This position and all
+        // of its published storage belong exclusively to this computation.
+        let position = input.position.makePosition()
         var score = GameScores(
             black: PlayerScore(
                 handicap: 0,
@@ -770,8 +875,8 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 total: 0
             ),
             white: PlayerScore(
-                handicap: gameData.handicap,
-                komi: gameData.komi,
+                handicap: input.handicap,
+                komi: input.komi,
                 scoringPositions: Set<[Int]>(),
                 stones: 0,
                 territory: 0,
@@ -779,13 +884,13 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 total: 0
             )
         )
-        let territoryGroups = self.currentPosition.constructTerritoryGroups()
+        let territoryGroups = position.constructTerritoryGroups()
         
-        if gameData.agaHandicapScoring && score.white.handicap > 0 {
+        if input.agaHandicapScoring && score.white.handicap > 0 {
             score.white.handicap -= 1
         }
         
-        if gameData.scoreTerritory {
+        if input.scoreTerritory {
             for group in territoryGroups {
                 group.computeTerritory()
                 if group.isTerritory {
@@ -804,11 +909,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
         }
         
-        for row in 0..<height {
-            for column in 0..<width {
-                if case .hasStone(let color) = currentPosition[row, column] {
-                    let isRemoved = currentPosition.removedStones?.contains([row, column]) ?? false
-                    if !isRemoved && gameData.scoreStones {
+        for row in 0..<position.height {
+            for column in 0..<position.width {
+                if case .hasStone(let color) = position[row, column] {
+                    let isRemoved = position.removedStones?.contains([row, column]) ?? false
+                    if !isRemoved && input.scoreStones {
                         if color == .black {
                             score.black.stones += 1
                             score.black.scoringPositions.insert([row, column])
@@ -817,7 +922,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                             score.white.scoringPositions.insert([row, column])
                         }
                     }
-                    if isRemoved && gameData.scorePrisoners {
+                    if isRemoved && input.scorePrisoners {
                         if color == .black {
                             score.white.prisoners += 1
                         } else {
@@ -828,32 +933,48 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
             }
         }
         
-        if gameData.scorePrisoners {
-            score.white.prisoners += currentPosition.captures[.white] ?? 0
-            score.black.prisoners += currentPosition.captures[.black] ?? 0
+        if input.scorePrisoners {
+            score.white.prisoners += position.captures[.white] ?? 0
+            score.black.prisoners += position.captures[.black] ?? 0
         }
         
         score.black.total = Double(score.black.stones + score.black.territory + score.black.prisoners) + score.black.komi
         score.white.total = Double(score.white.stones + score.white.territory + score.white.prisoners) + score.white.komi
-        if gameData.scoreHandicap {
+        if input.scoreHandicap {
             score.black.total += Double(score.black.handicap)
             score.white.total += Double(score.white.handicap)
         }
         
         return score
     }
-    
+
     func computeScoresAndUpdate() {
-        computeQueue.async {
-            if let score = self.computeScore() {
-                DispatchQueue.main.async {
-                    self.objectWillChange.send()
-                    self.currentPosition.gameScores = score
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.computeScoresAndUpdate()
+            }
+            return
+        }
+        scoringRevision &+= 1
+        guard let input = scoringInput() else { return }
+        let position = currentPosition
+        let revision = scoringRevision
+        let positionRevision = position.scoringRevision
+        computeQueue.async { [weak self, weak position] in
+            let score = Self.computeScore(from: input)
+            DispatchQueue.main.async {
+                guard let self, let position,
+                      self.currentPosition === position,
+                      self.scoringRevision == revision,
+                      position.scoringRevision == positionRevision else {
+                    return
                 }
+                self.objectWillChange.send()
+                position.gameScores = score
             }
         }
     }
-    
+
     func setRemovedStones(removedString: String) {
         self.currentPosition.removedStones = BoardPosition.points(fromPositionString: removedString)
         if self.gamePhase == .stoneRemoval {

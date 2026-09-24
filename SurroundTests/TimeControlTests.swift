@@ -3,6 +3,7 @@
 //  SurroundTests
 //
 
+import DictionaryCoding
 import XCTest
 
 final class TimeControlTests: XCTestCase {
@@ -118,7 +119,7 @@ final class TimeControlTests: XCTestCase {
     }
 
     func testRapidSpeedRoundTripsThroughOGSWireFormat() throws {
-        let control = TimeControl(
+        let control = try TimeControl(
             codingData: .init(
                 timeControl: "byoyomi",
                 mainTime: 300,
@@ -151,6 +152,144 @@ final class TimeControlTests: XCTestCase {
 
             XCTAssertEqual(decoded.system, system)
         }
+    }
+
+    func testMissingAndNullRequiredFieldsAreRejectedByBothDecoders() throws {
+        let fixtures: [(String, [String: Int])] = [
+            ("fischer", ["initial_time": 120, "time_increment": 30, "max_time": 300]),
+            ("byoyomi", ["main_time": 600, "periods": 5, "period_time": 30]),
+            ("simple", ["per_move": 60]),
+            ("canadian", ["main_time": 600, "period_time": 180, "stones_per_period": 10]),
+            ("absolute", ["total_time": 900]),
+        ]
+        let dictionaryDecoder = DictionaryDecoder()
+        dictionaryDecoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        for (system, fields) in fixtures {
+            var validPayload: [String: Any] = fields
+            validPayload["time_control"] = system
+            validPayload["system"] = system
+            for field in fields.keys {
+                for value in [nil, NSNull()] as [Any?] {
+                    var payload = validPayload
+                    payload[field] = value
+                    let data = try JSONSerialization.data(withJSONObject: payload)
+                    let context = "\(system).\(field) = \(String(describing: value))"
+
+                    XCTAssertThrowsError(
+                        try decoder.decode(TimeControl.self, from: data), context
+                    )
+                    XCTAssertThrowsError(
+                        try dictionaryDecoder.decode(TimeControl.self, from: payload), context
+                    )
+                }
+            }
+        }
+    }
+
+    func testOvertimeOnlyControlsKeepZeroMainTime() throws {
+        let payloads = [
+            #"{"time_control":"byoyomi","main_time":0,"periods":5,"period_time":30}"#,
+            #"{"time_control":"canadian","main_time":0,"period_time":180,"stones_per_period":10}"#,
+        ]
+        let dictionaryDecoder = DictionaryDecoder()
+        dictionaryDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        for payload in payloads {
+            let data = Data(payload.utf8)
+            let control = try decoder.decode(TimeControl.self, from: data)
+            let dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let dictionaryControl = try dictionaryDecoder.decode(TimeControl.self, from: dictionary)
+
+            XCTAssertEqual(control.mainTime, 0)
+            XCTAssertNotEqual(control.system, .None)
+            XCTAssertEqual(dictionaryControl, control)
+            XCTAssertEqual(try decoder.decode(TimeControl.self, from: encoder.encode(control)), control)
+        }
+    }
+
+    func testZeroTimeValuesRemainDecodableWhereTheyAreNotDivisors() throws {
+        let fixtures: [(String, TimeControlSystem)] = [
+            (#"{"time_control":"simple","per_move":0}"#, .Simple(perMove: 0)),
+            (#"{"time_control":"absolute","total_time":0}"#, .Absolute(totalTime: 0)),
+            (#"{"time_control":"fischer","initial_time":0,"time_increment":0,"max_time":0}"#,
+             .Fischer(initialTime: 0, timeIncrement: 0, maxTime: 0)),
+        ]
+        for (payload, system) in fixtures {
+            XCTAssertEqual(try decoder.decode(TimeControl.self, from: Data(payload.utf8)).system, system)
+        }
+    }
+
+    func testMalformedAuthoritativeSystemDoesNotFallBackToLegacyControl() throws {
+        let payload = #"{"time_control":"simple","system":"byoyomi","per_move":60,"main_time":0,"periods":5}"#
+        XCTAssertThrowsError(try decoder.decode(TimeControl.self, from: Data(payload.utf8)))
+    }
+
+    func testUnknownSystemRemainsDecodableWithoutInventingClockValues() throws {
+        let payload = #"{"time_control":"simple","system":"future-system","speed":"live"}"#
+        let data = Data(payload.utf8)
+        let control = try decoder.decode(TimeControl.self, from: data)
+        let dictionaryDecoder = DictionaryDecoder()
+        dictionaryDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        let dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(control.system, .Unknown("future-system"))
+        XCTAssertEqual(control.timeControl, "future-system")
+        XCTAssertEqual(control.codingData.timeControl, "simple")
+        XCTAssertEqual(control.codingData.system, "future-system")
+        XCTAssertFalse(control.system.supportsClock)
+        XCTAssertNotEqual(control.system, .None)
+        XCTAssertEqual(control.shortDescription, "")
+        XCTAssertNil(control.system.averageSecondsPerMove)
+        XCTAssertNil(control.system.speed)
+        XCTAssertEqual(control.speed, .live)
+        XCTAssertEqual(try dictionaryDecoder.decode(TimeControl.self, from: dictionary), control)
+        XCTAssertEqual(try decoder.decode(TimeControl.self, from: encoder.encode(control)), control)
+    }
+
+    func testUnknownSystemDoesNotInferSpeedFromMissingOrUnknownMetadata() throws {
+        for payload in [
+            #"{"time_control":"future-system"}"#,
+            #"{"time_control":"future-system","speed":"future-speed"}"#,
+        ] {
+            let control = try decoder.decode(TimeControl.self, from: Data(payload.utf8))
+            XCTAssertEqual(control.system, .Unknown("future-system"))
+            XCTAssertNil(control.speed)
+        }
+    }
+
+    func testUnknownTypedSystemPreservesItsWireName() throws {
+        let control = TimeControlSystem.Unknown("future-system").timeControlObject
+        XCTAssertEqual(control.codingData.system, "future-system")
+        XCTAssertEqual(try decoder.decode(TimeControl.self, from: encoder.encode(control)), control)
+    }
+
+    func testInvalidRawConstructionThrows() {
+        XCTAssertThrowsError(try TimeControl(codingData: .init(timeControl: "byoyomi")))
+        XCTAssertThrowsError(try TimeControl(codingData: .init(
+            timeControl: "canadian", mainTime: 0, periodTime: 30, stonesPerPeriod: 0
+        )))
+    }
+
+    func testInvalidEditsPreserveTheLastValidControl() throws {
+        var control = TimeControlSystem.ByoYomi(mainTime: 600, periods: 5, periodTime: 30).timeControlObject
+        let original = control
+
+        control.mainTime = nil
+        XCTAssertEqual(control, original)
+        control.codingData.periods = nil
+        XCTAssertEqual(control, original)
+        control.codingData.periodTime = 0
+        XCTAssertEqual(control, original)
+        control.codingData = .init(timeControl: "canadian", mainTime: 0)
+        XCTAssertEqual(control, original)
+
+        control.mainTime = 0
+        control.codingData.periods = 3
+        XCTAssertEqual(control.system, .ByoYomi(mainTime: 0, periods: 3, periodTime: 30))
+        XCTAssertEqual(try decoder.decode(TimeControl.self, from: encoder.encode(control)), control)
+
+        control.codingData = .init(timeControl: "simple", perMove: 60)
+        XCTAssertEqual(control.system, .Simple(perMove: 60))
     }
 
     func testSpeedClassificationBoundaries() {

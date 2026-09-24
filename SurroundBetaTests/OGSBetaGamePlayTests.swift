@@ -162,7 +162,7 @@ final class OGSBetaGamePlayTests: XCTestCase {
             disableAnalysis: false,
             name: runTag,
             rules: .japanese,
-            timeControl: TimeControl(codingData: .init(
+            timeControl: try TimeControl(codingData: .init(
                 timeControl: "fischer",
                 initialTime: 120,
                 timeIncrement: 30,

@@ -97,7 +97,7 @@ struct InlineTimerView: View {
     var showsPauseReason = true
 
     var body: some View {
-        guard let clock = clock, let timeControl = timeControl else {
+        guard let clock = clock, let timeControl = timeControl, timeControl.system.supportsClock else {
             return AnyView(EmptyView())
         }
         
@@ -156,14 +156,9 @@ struct InlineTimerView: View {
 
 #if DEBUG
 private func inlineByoYomiTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "byoyomi",
-            mainTime: 300,
-            periods: 5,
-            periodTime: 30
-        )
-    )
+    let timeControl = TimeControlSystem.ByoYomi(
+        mainTime: 300, periods: 5, periodTime: 30
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(
             thinkingTime: 200,
@@ -189,14 +184,9 @@ private func inlineByoYomiTimerPreviewData() -> (timeControl: TimeControl, clock
 }
 
 private func inlineFischerTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "fischer",
-            initialTime: 600,
-            timeIncrement: 30,
-            maxTime: 600
-        )
-    )
+    let timeControl = TimeControlSystem.Fischer(
+        initialTime: 600, timeIncrement: 30, maxTime: 600
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(thinkingTime: 200, thinkingTimeLeft: 185),
         whiteTime: ThinkingTime(thinkingTime: 300, thinkingTimeLeft: 300),
@@ -210,14 +200,9 @@ private func inlineFischerTimerPreviewData() -> (timeControl: TimeControl, clock
 }
 
 private func inlineCanadianTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "canadian",
-            mainTime: 600,
-            periodTime: 180,
-            stonesPerPeriod: 10
-        )
-    )
+    let timeControl = TimeControlSystem.Canadian(
+        mainTime: 600, periodTime: 180, stonesPerPeriod: 10
+    ).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(
             thinkingTime: 300,
@@ -243,12 +228,7 @@ private func inlineCanadianTimerPreviewData() -> (timeControl: TimeControl, cloc
 }
 
 private func inlineSimpleTimerPreviewData() -> (timeControl: TimeControl, clock: OGSClock) {
-    let timeControl = TimeControl(
-        codingData: TimeControl.TimeControlCodingData(
-            timeControl: "simple",
-            perMove: 60
-        )
-    )
+    let timeControl = TimeControlSystem.Simple(perMove: 60).timeControlObject
     let clock = OGSClock(
         blackTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 42),
         whiteTime: ThinkingTime(thinkingTime: 60, thinkingTimeLeft: 60),

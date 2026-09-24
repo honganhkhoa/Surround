@@ -114,6 +114,38 @@ struct OGSChatAnalysisBody: Codable, Equatable {
 
 typealias OGSChatLineVariation = OGSChatAnalysisBody
 
+struct ChatLogRow {
+    let chatLine: OGSChatLine
+    let moveDividerNumber: Int?
+    let shouldMerge: Bool
+
+    static func snapshot(of chatLog: [OGSChatLine]) -> [Self] {
+        var previousLine: OGSChatLine?
+        var lastMoveNumber: Int?
+        return chatLog.map { line in
+            let shouldMerge = previousLine.map {
+                $0.moveNumber == line.moveNumber
+                    && $0.user.id == line.user.id
+                    && $0.channel == line.channel
+            } ?? false
+            let moveDividerNumber: Int?
+            if let moveNumber = line.moveNumber,
+               moveNumber != lastMoveNumber {
+                moveDividerNumber = moveNumber
+                lastMoveNumber = moveNumber
+            } else {
+                moveDividerNumber = nil
+            }
+            previousLine = line
+            return Self(
+                chatLine: line,
+                moveDividerNumber: moveDividerNumber,
+                shouldMerge: shouldMerge
+            )
+        }
+    }
+}
+
 struct OGSChatLine: Decodable, Identifiable, Hashable {
     var id: String
     var channel: OGSChatChannel

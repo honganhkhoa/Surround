@@ -731,6 +731,201 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 2)
     }
 
+    func testMissingRengoPlayersRequestOneSnapshotAndRecoverInServerOrder() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 425)
+        data.rengo = true
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let blackID = data.players.black.id
+        let whiteID = data.players.white.id
+        let missingID = 999_999
+        let update: [String: Any] = [
+            "players": ["black": missingID, "white": whiteID],
+            "rengo_teams": ["black": [missingID, blackID], "white": [whiteID]],
+        ]
+
+        socket.deliver(name: "game/425/player_update", data: update)
+        socket.deliver(name: "game/425/player_update", data: update)
+
+        XCTAssertNil(game.currentPlayer(with: .black))
+        XCTAssertNil(game.orderedRengoTeam[.black])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        var replacement = try makeEmptyGameDataPayload(id: 425)
+        let missing: [String: Any] = ["username": "New teammate", "id": missingID]
+        let players = try XCTUnwrap(replacement["players"] as? [String: Any])
+        replacement["rengo"] = true
+        replacement["rengo_teams"] = [
+            "black": [missing, try XCTUnwrap(players["black"])],
+            "white": [try XCTUnwrap(players["white"])],
+        ]
+        replacement["player_pool"] = [String(missingID): missing]
+        socket.deliver(name: "game/425/gamedata", data: replacement)
+
+        XCTAssertFalse(game.hasUnresolvedRengoPlayers)
+        XCTAssertEqual(game.currentPlayer(with: .black)?.id, missingID)
+        XCTAssertEqual(game.orderedRengoTeam[.black]?.map(\.id), [missingID, blackID])
+        XCTAssertEqual(game.orderedRengoTeam[.white]?.map(\.id), [whiteID])
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/425/player_update", data: update)
+        XCTAssertTrue(socket.emissions.isEmpty)
+    }
+
+    func testIncompleteRengoSnapshotFinishesRecoveryWithoutRepeatingRosterRequests() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, gameResynchronizationTimeout: 0)
+        var data = try makeEmptyGameData(id: 427)
+        data.rengo = true
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        defer { service.releaseConnection(gameID: 427, owner: owner) }
+        socket.emissions.removeAll()
+        let update: [String: Any] = [
+            "rengo_teams": [
+                "black": [999_997, data.players.black.id],
+                "white": [data.players.white.id],
+            ],
+        ]
+        socket.deliver(name: "game/427/player_update", data: update)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        var incomplete = try makeEmptyGameDataPayload(id: 427)
+        incomplete["rengo"] = true
+        incomplete["moves"] = [[0, 0, 0, false, ["player_update": update]] as [Any]]
+        socket.deliver(name: "game/427/gamedata", data: incomplete)
+        XCTAssertTrue(game.hasUnresolvedRengoPlayers)
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/427/player_update", data: update)
+        socket.deliver(name: "game/427/move", data: [
+            "move_number": 2, "move": [1, 0, 0],
+        ])
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        let unexpectedFallback = expectation(description: "Accepted snapshot cancels transport fallback")
+        unexpectedFallback.isInverted = true
+        socket.onCloseThenReconnect = { unexpectedFallback.fulfill() }
+        wait(for: [unexpectedFallback], timeout: 0.05)
+        XCTAssertEqual(socket.closeThenReconnectCount, 0)
+
+        // Missing player metadata must not block repair of a later board gap.
+        socket.deliver(name: "game/427/move", data: [
+            "move_number": 4, "move": [2, 0, 0],
+        ])
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+    }
+
+    func testRengoUpdateDuringRecoveryDoesNotSuppressUnrequestedPlayers() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 428)
+        data.rengo = true
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let firstUpdate: [String: Any] = [
+            "rengo_teams": [
+                "black": [999_991, data.players.black.id],
+                "white": [data.players.white.id],
+            ],
+        ]
+        let secondUpdate: [String: Any] = [
+            "rengo_teams": [
+                "black": [999_992, data.players.black.id],
+                "white": [data.players.white.id],
+            ],
+        ]
+        socket.deliver(name: "game/428/player_update", data: firstUpdate)
+        socket.deliver(name: "game/428/player_update", data: secondUpdate)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        var snapshot = try makeEmptyGameDataPayload(id: 428)
+        snapshot["rengo"] = true
+        snapshot["moves"] = [[0, 0, 0, false, ["player_update": firstUpdate]] as [Any]]
+        socket.deliver(name: "game/428/gamedata", data: snapshot)
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/428/player_update", data: firstUpdate)
+        XCTAssertTrue(socket.emissions.isEmpty)
+        socket.deliver(name: "game/428/player_update", data: secondUpdate)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+    }
+
+    func testRengoRosterResolutionAndConnectionReleaseAllowNewRecoveryEpisodes() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 429)
+        data.rengo = true
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        let missingUpdate: [String: Any] = [
+            "rengo_teams": [
+                "black": [999_993, data.players.black.id],
+                "white": [data.players.white.id],
+            ],
+        ]
+        var snapshot = try makeEmptyGameDataPayload(id: 429)
+        snapshot["rengo"] = true
+        snapshot["moves"] = [[0, 0, 0, false, ["player_update": missingUpdate]] as [Any]]
+        socket.deliver(name: "game/429/gamedata", data: snapshot)
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/429/player_update", data: missingUpdate)
+        XCTAssertTrue(socket.emissions.isEmpty)
+
+        socket.deliver(name: "game/429/player_update", data: [
+            "rengo_teams": [
+                "black": [data.players.black.id], "white": [data.players.white.id],
+            ],
+        ])
+        XCTAssertFalse(game.hasUnresolvedRengoPlayers)
+        socket.deliver(name: "game/429/player_update", data: missingUpdate)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        socket.deliver(name: "game/429/gamedata", data: snapshot)
+        service.releaseConnection(gameID: 429, owner: owner)
+        service.connect(to: game, owner: owner)
+        socket.emissions.removeAll()
+        socket.deliver(name: "game/429/player_update", data: missingUpdate)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+    }
+
+    func testMoveWithUnresolvedRengoPlayerRequestsFreshGameData() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 426)
+        data.rengo = true
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let update: [String: Any] = [
+            "players": ["black": 999_998, "white": data.players.white.id],
+            "rengo_teams": [
+                "black": [999_998, data.players.black.id],
+                "white": [data.players.white.id],
+            ],
+        ]
+        socket.deliver(name: "game/426/move", data: [
+            "move_number": 1,
+            "move": [0, 0, 125, false, ["player_update": update]] as [Any],
+        ])
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertTrue(game.hasUnresolvedRengoPlayers)
+        XCTAssertNil(game.currentPlayer(with: .black))
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+    }
+
     func testConditionalMovesEventRoutesRuntimePayloadAndSurvivesReconnectAndGameData() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
@@ -1626,6 +1821,97 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(game.currentPosition[1, 0], .hasStone(.black))
     }
 
+    func testUnknownTimeControlPreservesAuthoritativeBoardWithoutInventingClockValues() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 269))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        var payload = try makeEmptyGameDataPayload(id: 269)
+        payload["time_control"] = [
+            "system": "future-clock", "time_control": "byoyomi", "speed": "live",
+        ]
+        payload["moves"] = [[0, 0, 0], [1, 0, 0]]
+        let clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+
+        socket.deliver(name: "game/269/gamedata", data: payload)
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+        XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
+        XCTAssertEqual(game.currentPosition[0, 1], .hasStone(.white))
+        XCTAssertEqual(game.gameData?.timeControl.system, .Unknown("future-clock"))
+        XCTAssertEqual(game.gameData?.timeControl.codingData.system, "future-clock")
+        XCTAssertEqual(game.gameData?.timeControl.timeControl, "future-clock")
+
+        socket.deliver(name: "game/269/clock", data: clock)
+
+        XCTAssertNotNil(game.clock)
+        XCTAssertNil(game.clock?.blackTime.timeLeft)
+        XCTAssertNil(game.clock?.whiteTime.timeLeft)
+        XCTAssertNil(game.clock?.timeUntilExpiration)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
+    }
+
+    func testMalformedTimeControlCannotHydrateGameAndLaterValidDataRecovers() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, cachedUsers: try makePublicGameUsers())
+        socket.gamelistResults = [makeShortGameData(id: 267, phase: "play")]
+        service.fetchPublicGames()
+        let game = try XCTUnwrap(service.publicGames[267])
+        var payload = try makeEmptyGameDataPayload(id: 267)
+        payload["time_control"] = [
+            "time_control": "byoyomi", "main_time": 0, "periods": 5,
+        ]
+        let clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+
+        socket.deliver(name: "game/267/gamedata", data: payload)
+        socket.deliver(name: "game/267/clock", data: clock)
+
+        XCTAssertNil(game.gameData)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+
+        payload["time_control"] = [
+            "time_control": "byoyomi", "main_time": 0, "periods": 5, "period_time": 30,
+        ]
+        socket.deliver(name: "game/267/gamedata", data: payload)
+        socket.deliver(name: "game/267/clock", data: clock)
+
+        XCTAssertEqual(game.gameData?.timeControl.system, .ByoYomi(mainTime: 0, periods: 5, periodTime: 30))
+    }
+
+    func testMalformedTimeControlSnapshotRetainsGameAndAcceptsSubsequentClocks() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 268))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        let originalTimeControl = try XCTUnwrap(game.gameData?.timeControl)
+        var replacement = try makeEmptyGameDataPayload(id: 268)
+        replacement["moves"] = [[0, 0, 0]]
+        var clock = try XCTUnwrap(replacement["clock"] as? [String: Any])
+        clock["black_time"] = ["thinking_time": 120]
+        clock["white_time"] = ["thinking_time": 60]
+        clock["last_move"] = Date().timeIntervalSince1970 * 1000 - 5_000
+
+        for field in ["main_time", "periods", "period_time"] {
+            for value in [nil, NSNull()] as [Any?] {
+                var control: [String: Any] = [
+                    "time_control": "byoyomi", "main_time": 0, "periods": 5, "period_time": 30,
+                ]
+                control[field] = value
+                replacement["time_control"] = control
+
+                socket.deliver(name: "game/268/gamedata", data: replacement)
+                socket.deliver(name: "game/268/clock", data: clock)
+
+                XCTAssertEqual(game.gameData?.timeControl, originalTimeControl)
+                XCTAssertEqual(game.currentPosition.lastMoveNumber, 0)
+                XCTAssertEqual(game.clock?.blackTime.thinkingTime, 120)
+                XCTAssertEqual(game.clock?.blackTime.thinkingTimeLeft, 10)
+            }
+        }
+    }
+
     func testMoveEventsRequireHydrationAndSequentialMoveNumbers() throws {
         let socket = FakeWebsocket()
         let service = makeService(
@@ -2382,6 +2668,61 @@ final class OGSServiceEventTests: XCTestCase {
             )
             XCTAssertFalse(service.liveGames.contains { $0.ogsID == gameID })
         }
+    }
+
+    func testUnknownClockGamesRemainVisibleWithoutInventingSpeed() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        let fixture = try makeEmptyGameData(id: 100)
+        service.user = fixture.players.black
+
+        func overviewGame(id: Int, speed: String?) throws -> [String: Any] {
+            var entry = try makeOverviewGameData(
+                id: id, speed: "live", currentPlayerID: fixture.players.black.id
+            )
+            var gameData = try XCTUnwrap(entry["json"] as? [String: Any])
+            var timeControl: [String: Any] = [
+                "system": "future-clock", "time_control": "future-clock",
+            ]
+            timeControl["speed"] = speed
+            gameData["time_control"] = timeControl
+            entry["json"] = gameData
+            return entry
+        }
+
+        service.processOverview(overview: [
+            "active_games": [
+                try overviewGame(id: 312, speed: "future-speed"),
+                try overviewGame(id: 311, speed: nil),
+                try overviewGame(id: 313, speed: "live"),
+                try overviewGame(id: 314, speed: "correspondence"),
+                makeShortGameData(id: 315, phase: "play"),
+            ],
+        ])
+
+        XCTAssertEqual(service.unclassifiedActiveGames.compactMap(\.ogsID), [311, 312])
+        XCTAssertEqual(service.liveGames.compactMap(\.ogsID), [313])
+        XCTAssertEqual(service.sortedActiveCorrespondenceGames.compactMap(\.ogsID), [314])
+        XCTAssertNil(service.activeGames[315]?.gameData)
+
+        socket.deliver(name: "active_game", data: makeShortGameData(id: 312, phase: "finished"))
+        XCTAssertEqual(service.unclassifiedActiveGames.compactMap(\.ogsID), [311])
+
+        service.processOverview(overview: [
+            "active_games": [
+                try overviewGame(id: 311, speed: "live"),
+                try overviewGame(id: 313, speed: "live"),
+                try overviewGame(id: 314, speed: "correspondence"),
+            ],
+        ])
+        XCTAssertTrue(service.unclassifiedActiveGames.isEmpty)
+        XCTAssertEqual(Set(service.liveGames.compactMap(\.ogsID)), [311, 313])
+        XCTAssertEqual(service.sortedActiveCorrespondenceGames.compactMap(\.ogsID), [314])
+
+        service.processOverview(overview: ["active_games": [[String: Any]]()])
+        XCTAssertTrue(service.unclassifiedActiveGames.isEmpty)
+        XCTAssertTrue(service.liveGames.isEmpty)
+        XCTAssertTrue(service.sortedActiveCorrespondenceGames.isEmpty)
     }
 
     func testOverviewSortsTiedCorrespondenceGamesByGameID() throws {

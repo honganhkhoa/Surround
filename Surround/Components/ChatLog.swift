@@ -70,14 +70,6 @@ struct ChatLog: View {
     @State var shouldScrollToEndAfterKeyboardChange = false
     @State private var inputDismissalRequest = 0
 
-    func shouldMergeChat(at index: Int) -> Bool {
-        return index > 0
-            && game.chatLog[index].moveNumber
-                == game.chatLog[index - 1].moveNumber
-            && game.chatLog[index].user.id == game.chatLog[index - 1].user.id
-            && game.chatLog[index].channel == game.chatLog[index - 1].channel
-    }
-
     private func clearSelection() {
         selection.wrappedValue = nil
     }
@@ -120,29 +112,13 @@ struct ChatLog: View {
         )
     }
 
-    static func moveDividerNumbers(for moveNumbers: [Int?]) -> [Int?] {
-        var lastMoveNumber: Int?
-        return moveNumbers.map { moveNumber -> Int? in
-            guard let moveNumber else {
-                return nil
-            }
-            guard moveNumber != lastMoveNumber else {
-                return nil
-            }
-            lastMoveNumber = moveNumber
-            return moveNumber
-        }
-    }
-
     var chatLines: some View {
-        let moveDividerNumbers = Self.moveDividerNumbers(
-            for: game.chatLog.map(\.moveNumber)
-        )
-        return ForEach(
-            Array(game.chatLog.enumerated()),
-            id: \.1
-        ) { index, chatLine in
-            if let moveNumber = moveDividerNumbers[index] {
+        // Lazy rows can outlive this version of game.chatLog. Capture each
+        // line and its neighboring-row metadata together before rendering.
+        let rows = ChatLogRow.snapshot(of: game.chatLog)
+        return ForEach(rows, id: \.chatLine) { row in
+            let chatLine = row.chatLine
+            if let moveNumber = row.moveDividerNumber {
                 let moveTarget = ChatLogSelection.Target.move(
                     moveNumber
                 )
@@ -198,7 +174,7 @@ struct ChatLog: View {
             let lineTarget = ChatLogSelection.Target.chatLine(chatLine.id)
             ChatLine(
                 chatLine: chatLine,
-                showUsername: !shouldMergeChat(at: index),
+                showUsername: !row.shouldMerge,
                 horizontalAlignment: ogs.user?.id == chatLine.user.id
                     ? .trailing
                     : .leading,

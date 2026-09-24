@@ -1948,9 +1948,8 @@ extension OGSService {
                         $0.moveNumber == nil
                     }
                     && fixtureGame.chatLog.last?.moveNumber == 91
-                    && ChatLog.moveDividerNumbers(
-                        for: fixtureGame.chatLog.map(\.moveNumber)
-                    ).filter { $0 == 91 }.count == 1,
+                    && ChatLogRow.snapshot(of: fixtureGame.chatLog)
+                        .filter { $0.moveDividerNumber == 91 }.count == 1,
                 "The structured-chat fixture must preserve move-less formats and avoid repeating its move-91 divider."
             )
         }
