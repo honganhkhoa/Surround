@@ -1,0 +1,453 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "extended-srgb:0.70196,0.58039,0.39608,1.00000",
+      "extended-srgb:0.43137,0.31765,0.18824,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.15,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.85,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "name": "Go Stones",
+      "layers": [
+        {
+          "name": "Black Top",
+          "image-name": "Black Top.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.33333,0.36863,0.41176,1.00000",
+                  "extended-srgb:0.06667,0.08627,0.11765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.45098,0.49804,0.54510,1.00000",
+                  "extended-srgb:0.13333,0.17255,0.21961,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.81176,0.81176,0.81176,1.00000",
+                  "extended-srgb:0.52157,0.52157,0.52157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "Black Center",
+          "image-name": "Black Center.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.33333,0.36863,0.41176,1.00000",
+                  "extended-srgb:0.06667,0.08627,0.11765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.45098,0.49804,0.54510,1.00000",
+                  "extended-srgb:0.13333,0.17255,0.21961,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.81176,0.81176,0.81176,1.00000",
+                  "extended-srgb:0.52157,0.52157,0.52157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "Black Bottom",
+          "image-name": "Black Bottom.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.33333,0.36863,0.41176,1.00000",
+                  "extended-srgb:0.06667,0.08627,0.11765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.45098,0.49804,0.54510,1.00000",
+                  "extended-srgb:0.13333,0.17255,0.21961,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.81176,0.81176,0.81176,1.00000",
+                  "extended-srgb:0.52157,0.52157,0.52157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "White Upper Right",
+          "image-name": "White Upper Right.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,0.98824,1.00000",
+                  "extended-srgb:0.68235,0.72549,0.78039,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.94510,1.00000",
+                  "extended-srgb:0.70196,0.74510,0.78431,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.76471,0.76471,0.76471,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "White Lower Left",
+          "image-name": "White Lower Left.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,0.98824,1.00000",
+                  "extended-srgb:0.68235,0.72549,0.78039,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.94510,1.00000",
+                  "extended-srgb:0.70196,0.74510,0.78431,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.76471,0.76471,0.76471,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.78
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "Board.svg",
+          "name": "Board",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:0.65490,0.54118,0.35686,1.00000"
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "solid": "extended-srgb:0.40000,0.40000,0.40000,1.00000"
+              },
+              "appearance": "tinted"
+            }
+          ]
+        }
+      ],
+      "name": "Board Grid",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.3
+      }
+    },
+    {
+      "name": "Board Surface",
+      "layers": [
+        {
+          "name": "Raised Gold Board",
+          "image-name": "Board Surface.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.96078,0.81569,0.54118,1.00000",
+                  "extended-srgb:0.80000,0.57255,0.23529,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.36863,0.29020,0.19608,1.00000",
+                  "extended-srgb:0.18824,0.16078,0.12157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.63922,0.63922,0.63922,1.00000",
+                  "extended-srgb:0.42745,0.42745,0.42745,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.65
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		496E83BB7FBC43CCBA7CBF4C /* SurroundIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2178C188085D4FE181437D90 /* SurroundIcon.icon */; };
 		AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700042026091700000004 /* ProfileRatingTests.swift */; };
 		AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700032026091700000003 /* PlayerProfileGames.swift */; };
 		AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700022026091700000002 /* PlayerProfileRatings.swift */; };
@@ -430,6 +431,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2178C188085D4FE181437D90 /* SurroundIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.icon; path = SurroundIcon.icon; sourceTree = "<group>"; };
 		AA1700042026091700000004 /* ProfileRatingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRatingTests.swift; sourceTree = "<group>"; };
 		AA1700032026091700000003 /* PlayerProfileGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileGames.swift; sourceTree = "<group>"; };
 		AA1700022026091700000002 /* PlayerProfileRatings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileRatings.swift; sourceTree = "<group>"; };
@@ -755,6 +757,7 @@
 				BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */,
 				BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */,
 				BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */,
+				2178C188085D4FE181437D90 /* SurroundIcon.icon */,
 				BC042AFB24AB2CFA0050B2D1 /* Info.plist */,
 				BC042AF824AB2CFA0050B2D1 /* Preview Content */,
 				AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */,
@@ -1293,6 +1296,7 @@
 				BC042AFA24AB2CFA0050B2D1 /* Preview Assets.xcassets in Resources */,
 				AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */,
 				BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */,
+				496E83BB7FBC43CCBA7CBF4C /* SurroundIcon.icon in Resources */,
 				BCB98CFC256D16B800B1F8FD /* game-26269354.json in Resources */,
 				BC28A918277ACDDD007A417E /* game-beta-11359.json in Resources */,
 			);
@@ -1764,6 +1768,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconBeta;
+				EXCLUDED_SOURCE_FILE_NAMES = ("$(inherited)", SurroundIcon.icon,);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -1922,6 +1927,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconBeta;
+				EXCLUDED_SOURCE_FILE_NAMES = ("$(inherited)", SurroundIcon.icon,);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -2285,7 +2291,7 @@
 		BC042B1524AB2CFA0050B2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = SurroundIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -2317,7 +2323,7 @@
 		BC042B1624AB2CFA0050B2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = SurroundIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;

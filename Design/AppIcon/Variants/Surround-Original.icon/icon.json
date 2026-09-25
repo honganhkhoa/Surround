@@ -1,0 +1,85 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.86667,0.63529,0.27059,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.25098,0.27843,0.30980,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-srgb:0.70000,0.70000,0.70000,1.00000"
+              }
+            }
+          ],
+          "image-name": "Black Stones.svg",
+          "name": "Black Stones"
+        },
+        {
+          "image-name": "White Stones.svg",
+          "name": "White Stones",
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.94510,0.93333,0.90588,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Go Stones",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.4
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.08
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "Board.svg",
+          "name": "Board",
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.71373,0.52941,0.27451,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-srgb:0.48000,0.48000,0.48000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Go Board",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.3
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

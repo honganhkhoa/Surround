@@ -1,0 +1,844 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "extended-srgb:0.74118,0.61569,0.40392,1.00000",
+      "extended-srgb:0.57255,0.43922,0.24706,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.15,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.85,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "name": "Stone Faces",
+      "layers": [
+        {
+          "name": "Black Top Face",
+          "image-name": "Black Top Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        },
+        {
+          "name": "Black Center Face",
+          "image-name": "Black Center Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        },
+        {
+          "name": "Black Bottom Face",
+          "image-name": "Black Bottom Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        },
+        {
+          "name": "White Upper Right Face",
+          "image-name": "White Upper Right Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.95294,1.00000",
+                  "extended-srgb:0.78431,0.76078,0.70980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.98824,0.93333,1.00000",
+                  "extended-srgb:0.80000,0.77255,0.71765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.90980,0.90980,0.90980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        },
+        {
+          "name": "White Lower Left Face",
+          "image-name": "White Lower Left Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.95294,1.00000",
+                  "extended-srgb:0.78431,0.76078,0.70980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.98824,0.93333,1.00000",
+                  "extended-srgb:0.80000,0.77255,0.71765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.90980,0.90980,0.90980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "name": "Go Stones",
+      "layers": [
+        {
+          "name": "Black Top",
+          "image-name": "Black Top.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "Black Center",
+          "image-name": "Black Center.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "Black Bottom",
+          "image-name": "Black Bottom.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.30980,0.34510,0.38431,1.00000",
+                  "extended-srgb:0.08235,0.10196,0.12941,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.47059,0.50588,0.54510,1.00000",
+                  "extended-srgb:0.18824,0.22745,0.27451,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.65098,0.65098,0.65098,1.00000",
+                  "extended-srgb:0.43137,0.43137,0.43137,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "White Upper Right",
+          "image-name": "White Upper Right.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.95294,1.00000",
+                  "extended-srgb:0.78431,0.76078,0.70980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.98824,0.93333,1.00000",
+                  "extended-srgb:0.80000,0.77255,0.71765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.90980,0.90980,0.90980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "White Lower Left",
+          "image-name": "White Lower Left.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.99216,0.95294,1.00000",
+                  "extended-srgb:0.78431,0.76078,0.70980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.98824,0.93333,1.00000",
+                  "extended-srgb:0.80000,0.77255,0.71765,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:1.00000,1.00000,1.00000,1.00000",
+                  "extended-srgb:0.90980,0.90980,0.90980,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.6
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "Board.svg",
+          "name": "Board",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:0.55686,0.47451,0.35294,1.00000"
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "solid": "extended-srgb:0.37647,0.37647,0.37647,1.00000"
+              },
+              "appearance": "tinted"
+            }
+          ]
+        },
+        {
+          "name": "Board Face",
+          "image-name": "Board Face.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.94118,0.81176,0.53725,1.00000",
+                  "extended-srgb:0.81569,0.60784,0.28235,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.36863,0.29020,0.19608,1.00000",
+                  "extended-srgb:0.18824,0.16078,0.12157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.21961,0.21961,0.21961,1.00000",
+                  "extended-srgb:0.13333,0.13333,0.13333,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ],
+          "glass": false
+        }
+      ],
+      "name": "Board Face and Grid",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.3
+      }
+    },
+    {
+      "name": "Board Surface",
+      "layers": [
+        {
+          "name": "Raised Gold Board",
+          "image-name": "Board Surface.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.94118,0.81176,0.53725,1.00000",
+                  "extended-srgb:0.81569,0.60784,0.28235,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              }
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.36863,0.29020,0.19608,1.00000",
+                  "extended-srgb:0.18824,0.16078,0.12157,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "dark"
+            },
+            {
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.21961,0.21961,0.21961,1.00000",
+                  "extended-srgb:0.13333,0.13333,0.13333,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.15,
+                    "y": 0
+                  },
+                  "stop": {
+                    "x": 0.85,
+                    "y": 1
+                  }
+                }
+              },
+              "appearance": "tinted"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.25
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

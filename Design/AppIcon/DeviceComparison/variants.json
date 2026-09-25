@@ -1,0 +1,70 @@
+[
+  {
+    "id": "current",
+    "target": "Go0Current",
+    "label": "Go 0 Current",
+    "title": "0 · Current",
+    "description": "The pre-change Surround icon, retained as a legacy reference.",
+    "asset": "../../../Surround/Assets.xcassets/AppIcon.appiconset",
+    "preview": "../../../Surround/Assets.xcassets/AppIcon.appiconset/surround-1024.png"
+  },
+  {
+    "id": "original",
+    "target": "Go1Original",
+    "label": "Go 1 Original",
+    "title": "1 · Original glass",
+    "description": "The first layered glass design, with grouped stones and a flat board grid.",
+    "icon": "../Variants/Surround-Original.icon"
+  },
+  {
+    "id": "depth",
+    "target": "Go2Depth",
+    "label": "Go 2 Depth",
+    "title": "2 · Added depth",
+    "description": "A raised gold board and individually shaded stones, with stronger glass rims and shadows.",
+    "icon": "../Variants/Surround-Depth.icon"
+  },
+  {
+    "id": "refined",
+    "target": "Go3Refined",
+    "label": "Go 3 Refined",
+    "title": "3 · Refined board",
+    "description": "Quieter board and stone rims, warmer white stones, and a lighter grid.",
+    "icon": "../Surround.icon"
+  },
+  {
+    "id": "roomier",
+    "target": "Go4Roomier",
+    "label": "Go 4 Roomier",
+    "title": "4 · Roomier board",
+    "description": "A smaller rounded board with more breathing room and an open grid.",
+    "icon": "../Variants/Surround-Roomier-Board.icon"
+  },
+  {
+    "id": "borderless",
+    "target": "Go5Borderless",
+    "label": "Go 5 Borderless",
+    "title": "5 · Borderless",
+    "description": "A deeper amber board with grid lines that fade near the edges and softer 50% stone shadows.",
+    "icon": "../Variants/Surround-Edge-to-Edge.icon",
+    "build": "2"
+  },
+  {
+    "id": "brown",
+    "target": "Go6Brown",
+    "label": "Go 6 Brown",
+    "title": "6 · Brown",
+    "description": "A warmer brown board with deeper brown grid lines, soft edge fades, and shaded stones. Compare with Go 5 Borderless.",
+    "icon": "../Variants/Surround-Brown.icon",
+    "build": "2"
+  },
+  {
+    "id": "amber",
+    "target": "Go7Amber",
+    "label": "Go 7 Amber",
+    "title": "7 · Amber",
+    "description": "A balanced amber board and brown grid, halfway between Go 5 Borderless and Go 6 Brown.",
+    "icon": "../Variants/Surround-Amber.icon",
+    "build": "1"
+  }
+]
