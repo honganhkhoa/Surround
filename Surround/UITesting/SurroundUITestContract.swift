@@ -39,6 +39,10 @@ enum SurroundUITestContract {
     static let friendshipLaunchArgument = "--surround-friendship"
     static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
     static let friendshipSlowResponseLaunchArgument = "--surround-friendship-slow-response"
+    // Journeys must move between Home and a profile before a slow action
+    // finishes. Hosted runners have taken up to 18 seconds for that, plus
+    // occasional 9-second accessibility-query hangs.
+    static let friendshipSlowResponseDelay: TimeInterval = 30
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"

@@ -150,6 +150,12 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         return launchProfileContent(scene: scene, additionalLaunchArguments: arguments + additionalLaunchArguments)
     }
 
+    // Waits for a slow action's failure or retried result. Each returns as
+    // soon as its condition holds.
+    private var slowFriendshipResponseTimeout: TimeInterval {
+        SurroundUITestContract.friendshipSlowResponseDelay + stateSettleTimeout
+    }
+
     @discardableResult
     private func assertFriendshipState(_ state: String, in app: XCUIApplication) -> XCUIElement {
         let action = revealProfileControl(SurroundUITestContract.AccessibilityID.profileFriendshipAction, in: app)
@@ -438,11 +444,11 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                        "The profile must share Home's pending action and prevent another submission.")
 
         let failure = app.alerts.firstMatch
-        XCTAssertTrue(failure.waitForExistence(timeout: 20),
+        XCTAssertTrue(failure.waitForExistence(timeout: slowFriendshipResponseTimeout),
                       "The failure must appear on the already-open profile without leaving and reentering it.")
         tap(failure.buttons["Retry"].firstMatch, description: "Retry Home's failed acceptance from the profile", in: app)
         let friendship = app.buttons[SurroundUITestContract.AccessibilityID.profileFriendshipAction].firstMatch
-        XCTAssertTrue(friendship.waitForExistence(timeout: 20))
+        XCTAssertTrue(friendship.waitForExistence(timeout: slowFriendshipResponseTimeout))
         assertLoadedProfile(named: username, in: app)
         assertFriendshipState("friends", in: app)
         navigateBackFromPlayerProfile(in: app)
@@ -466,10 +472,10 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                        "Home must share the profile's pending acceptance.")
 
         let failure = app.alerts.firstMatch
-        XCTAssertTrue(failure.waitForExistence(timeout: 20),
+        XCTAssertTrue(failure.waitForExistence(timeout: slowFriendshipResponseTimeout),
                       "A failure after leaving the profile must appear on Home without reopening the profile.")
         tap(failure.buttons["Retry"].firstMatch, description: "Retry the profile's failed acceptance from Home", in: app)
-        assertFriendRequestRemoved(playerID, in: app, timeout: 20)
+        assertFriendRequestRemoved(playerID, in: app, timeout: slowFriendshipResponseTimeout)
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
     }
 

@@ -1079,7 +1079,8 @@ extension OGSService {
                         created: Date(timeIntervalSince1970: 1_789_603_200 - Double(index * 86_400))
                     )
                 }
-                state.friendshipActionDelay = SurroundUITestContract.simulatesSlowFriendshipResponse ? 12 : 0.35
+                state.friendshipActionDelay = SurroundUITestContract.simulatesSlowFriendshipResponse
+                    ? SurroundUITestContract.friendshipSlowResponseDelay : 0.35
                 if SurroundUITestContract.simulatesFriendshipFailureOnce {
                     let playerIDs = SurroundUITestContract.friendshipFixtureRequestPlayerIDs + [
                         SurroundUITestContract.profileFixtureOpponentID,
