@@ -553,7 +553,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: selectedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [selected], timeout: 10),
+            XCTWaiter.wait(for: [selected], timeout: stateSettleTimeout),
             .completed,
             "Expected element with identifier \(identifier) to be selected",
             file: file,
