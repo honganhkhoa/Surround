@@ -1014,12 +1014,16 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         }
     }
 
-    func testProfileActionsPreserveGameAnalysisAndMarkers() {
+    func testProfileActionsPreserveGameAnalysisAndMarkers() throws {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
             SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
         ])
+        try XCTSkipIf(
+            app.segmentedControls[SurroundUITestContract.AccessibilityID.gameDisplayModePicker].exists,
+            "Compact Analyze has no player banner; the standard navigation title is not a profile action."
+        )
         let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
         let initialBoardValue = board.value as? String
         tap(SurroundUITestContract.AccessibilityID.gameAnalyzeNext, in: app)
@@ -1048,16 +1052,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(markedBoardValue?.contains("|marks:A=") == true)
 
         let opponentID = SurroundUITestContract.profileFixtureOpponentID
-        #if targetEnvironment(macCatalyst)
         let profileEntryID = SurroundUITestContract.AccessibilityID
             .profileBannerAvatarEntry(opponentID)
-        #else
-        // Compact analysis replaces the banner with the move tree; its
-        // opponent title opens the same profile without leaving analysis.
-        let profileEntryID = UIDevice.current.userInterfaceIdiom == .phone
-            ? SurroundUITestContract.AccessibilityID.profileGameTitleEntry(opponentID)
-            : SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(opponentID)
-        #endif
         tap(
             profileEntryID,
             in: app,

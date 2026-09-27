@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|profile|composer> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|profile|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|profile|composer)
+  build|preflight|main|profile|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, profile, or composer; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, profile, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -63,11 +63,15 @@ readonly test_case="${test_target}/${test_class}"
 readonly profile_test_class="ProfileUITests"
 readonly profile_test_source="SurroundUITests/${profile_test_class}.swift"
 readonly profile_test_case="${test_target}/${profile_test_class}"
+readonly continuity_test_class="GameContinuityUITests"
+readonly continuity_test_source="SurroundUITests/${continuity_test_class}.swift"
+readonly continuity_test_case="${test_target}/${continuity_test_class}"
 readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInput"
 
 # These tests intentionally focus a chat composer or exercise layout while that
-# composer owns keyboard focus. Run them after the rest of the suite so an
-# XCTest keyboard-animation quiescence failure cannot slow unrelated journeys.
+# composer owns keyboard focus. Isolate them from the main suite so an XCTest
+# keyboard-animation quiescence failure cannot slow unrelated journeys. The
+# continuity class has its own phase and time budget.
 readonly composer_test_names=(
   testCompactChatAutomaticallyFocusesComposer
   testCompactChatCanHideAndShowMainBoard
@@ -86,8 +90,8 @@ readonly composer_test_names=(
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
-# into main, or leave the profile phase empty while main runs its tests.
-for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}"; do
+# into main, or leave the profile or continuity phase empty.
+for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}" "${continuity_test_class}:${continuity_test_source}"; do
   class_name="${class_and_source%%:*}"
   class_source="${class_and_source#*:}"
   test_class_count="$(
@@ -151,12 +155,13 @@ case "$phase" in
       "-only-testing:${test_target}"
       "-skip-testing:${test_case}/${keyboard_preflight_test_name}"
       "-skip-testing:${profile_test_case}"
+      "-skip-testing:${continuity_test_case}"
     )
     for test_name in "${composer_test_names[@]}"; do
       selection_arguments+=("-skip-testing:${test_case}/${test_name}")
     done
 
-    echo "Running the main iPad UI suite without profile or composer-sensitive tests."
+    echo "Running the main iPad UI suite without profile, composer, or continuity tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
@@ -196,5 +201,18 @@ case "$phase" in
       -maximum-test-execution-time-allowance 900 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Composer.xcresult"
+    ;;
+
+  continuity)
+    mkdir -p TestResults
+    echo "Running the iPad game layout and interaction continuity UI tests."
+    xcodebuild test-without-building \
+      "${common_arguments[@]}" \
+      "-only-testing:${continuity_test_case}" \
+      -test-timeouts-enabled YES \
+      -default-test-execution-time-allowance 900 \
+      -maximum-test-execution-time-allowance 900 \
+      -resultBundlePath \
+      "TestResults/SurroundUITests-${result_label}-Continuity.xcresult"
     ;;
 esac

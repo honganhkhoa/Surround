@@ -144,11 +144,21 @@ struct PlayersBannerView: View {
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
     @Setting(.voiceCountdown) var voiceCountdown: Bool
-    @State var showsRengoTeamDetail = false
+    @State private var localShowsRengoTeamDetail = false
+    var rengoTeamDetail: Binding<Bool>?
+    private var showsRengoTeamDetail: Bool {
+        get { rengoTeamDetail?.wrappedValue ?? localShowsRengoTeamDetail }
+        nonmutating set {
+            if let rengoTeamDetail {
+                rengoTeamDetail.wrappedValue = newValue
+            } else {
+                localShowsRengoTeamDetail = newValue
+            }
+        }
+    }
     
     @Namespace var avatars
     
-    var showCompactModeSwitcher: Binding<Bool> = .constant(true)
     
     var shouldShowNamesOutOfColumn: Bool {
         return playerIconsOffset + playerIconSize >= 30 && playerIconSize < 80
@@ -252,7 +262,6 @@ struct PlayersBannerView: View {
             }
             .onTapGesture {
                 self.showsRengoTeamDetail = true
-                self.showCompactModeSwitcher.wrappedValue = false
             }
         } else {
             EmptyView()
@@ -595,7 +604,6 @@ struct PlayersBannerView: View {
                 }
             }
             .onTapGesture {
-                self.showCompactModeSwitcher.wrappedValue = true
                 self.showsRengoTeamDetail = false
             }
         } else {
@@ -759,7 +767,7 @@ private extension OGSGame {
         activeGames: [game]
     )
 
-    PlayersBannerView(game: game, showsRengoTeamDetail: false)
+    PlayersBannerView(game: game)
         .environmentObject(ogs)
 }
 

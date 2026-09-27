@@ -1067,6 +1067,26 @@ extension OGSService {
     static func offlineUITestInstance() -> OGSService {
         func makeService(from bootstrapState: BootstrapState) -> OGSService {
             var state = bootstrapState
+            // Opt-in team fixture for adaptive game-layout journeys. Normal
+            // compatibility and App Store captures keep their existing data.
+            if ProcessInfo.processInfo.arguments.contains("--surround-rengo-game"),
+               let game = state.activeGames[SurroundUITestContract.screenshotPrimaryGameID],
+               var data = game.gameData {
+                let blackPartner = OGSUser(username: "CedarPartner", id: 913001, ranking: 25)
+                let whitePartner = OGSUser(username: "WillowPartner", id: 913002, ranking: 25)
+                data.rengo = true
+                data.rengoTeams = OGSGame.RengoTeams(
+                    black: [data.players.black, blackPartner],
+                    white: [data.players.white, whitePartner]
+                )
+                data.playerPool = Dictionary(uniqueKeysWithValues:
+                    [data.players.black, blackPartner, data.players.white, whitePartner]
+                        .map { ($0.id, $0) }
+                )
+                game.gameData = data
+                state.cachedUsersById[blackPartner.id] = blackPartner
+                state.cachedUsersById[whitePartner.id] = whitePartner
+            }
             if SurroundUITestContract.includesFriendshipRequests {
                 state.friendInvitations = zip(
                     SurroundUITestContract.friendshipFixtureRequestPlayerIDs,

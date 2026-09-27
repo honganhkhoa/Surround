@@ -56,6 +56,7 @@ struct ChatLogSelectionPreview {
 
 struct ChatLog: View {
     @ObservedObject var game: Game
+    @ObservedObject var session: ChatSessionState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
@@ -63,12 +64,12 @@ struct ChatLog: View {
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var focusInputOnAppear = false
+    var onInteraction: () -> Void = {}
     var onVariationShared: () -> Void = {}
     var onCancelVariationSharing: () -> Void = {}
     
-    @State var atEndOfChat = false
-    @State var shouldScrollToEndAfterKeyboardChange = false
-    @State private var inputDismissalRequest = 0
+    @State private var isVisible = false
+    @State private var visibleScrollAnchor: String?
 
     private func clearSelection() {
         selection.wrappedValue = nil
@@ -76,7 +77,7 @@ struct ChatLog: View {
 
     private func clearSelectionAndDismissInput() {
         clearSelection()
-        inputDismissalRequest += 1
+        session.dismissInput()
     }
 
     private func toggleMoveSelection(_ moveNumber: Int) {
@@ -117,78 +118,81 @@ struct ChatLog: View {
         // line and its neighboring-row metadata together before rendering.
         let rows = ChatLogRow.snapshot(of: game.chatLog)
         return ForEach(rows, id: \.chatLine) { row in
-            let chatLine = row.chatLine
-            if let moveNumber = row.moveDividerNumber {
-                let moveTarget = ChatLogSelection.Target.move(
-                    moveNumber
-                )
-                Button {
-                    toggleMoveSelection(moveNumber)
-                } label: {
-                    ZStack {
-                        Divider()
-                            .allowsHitTesting(false)
-                        HStack {
-                            Spacer()
-                            Text("Move \(moveNumber)")
-                                .font(.caption2)
-                                .padding(.leading, 5)
-                                .background {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(
-                                            Color(
-                                                colorScheme == .dark
-                                                    ? UIColor.systemBackground
-                                                    : UIColor.systemGray6
-                                            )
-                                        )
-                                }
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(
-                                            selection.wrappedValue?.target
-                                                == moveTarget
-                                                ? Color.accentColor
-                                                : .clear,
-                                            lineWidth: 2
-                                        )
-                                }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(
-                    selection.wrappedValue?.target == moveTarget
-                        ? .isSelected
-                        : []
-                )
-                .accessibilityIdentifier(
-                    SurroundUITestContract.AccessibilityID.gameChatMove(
+            VStack(spacing: 0) {
+                let chatLine = row.chatLine
+                if let moveNumber = row.moveDividerNumber {
+                    let moveTarget = ChatLogSelection.Target.move(
                         moveNumber
                     )
+                    Button {
+                        toggleMoveSelection(moveNumber)
+                    } label: {
+                        ZStack {
+                            Divider()
+                                .allowsHitTesting(false)
+                            HStack {
+                                Spacer()
+                                Text("Move \(moveNumber)")
+                                    .font(.caption2)
+                                    .padding(.leading, 5)
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                Color(
+                                                    colorScheme == .dark
+                                                        ? UIColor.systemBackground
+                                                        : UIColor.systemGray6
+                                                )
+                                            )
+                                    }
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(
+                                                selection.wrappedValue?.target
+                                                    == moveTarget
+                                                    ? Color.accentColor
+                                                    : .clear,
+                                                lineWidth: 2
+                                            )
+                                    }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        selection.wrappedValue?.target == moveTarget
+                            ? .isSelected
+                            : []
+                    )
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.gameChatMove(
+                            moveNumber
+                        )
+                    )
+                    Spacer().frame(height: 2)
+                }
+                let lineTarget = ChatLogSelection.Target.chatLine(chatLine.id)
+                ChatLine(
+                    chatLine: chatLine,
+                    showUsername: !row.shouldMerge,
+                    horizontalAlignment: ogs.user?.id == chatLine.user.id
+                        ? .trailing
+                        : .leading,
+                    isSelected: selection.wrappedValue?.target == lineTarget,
+                    accessibilityIdentifier: SurroundUITestContract
+                        .AccessibilityID.gameChatLine(chatLine.id),
+                    select: {
+                        toggleChatLineSelection(chatLine)
+                    },
+                    openProfile: openPlayerProfile.map { action in
+                        { action(chatLine.user) }
+                    }
                 )
                 Spacer().frame(height: 2)
             }
-            let lineTarget = ChatLogSelection.Target.chatLine(chatLine.id)
-            ChatLine(
-                chatLine: chatLine,
-                showUsername: !row.shouldMerge,
-                horizontalAlignment: ogs.user?.id == chatLine.user.id
-                    ? .trailing
-                    : .leading,
-                isSelected: selection.wrappedValue?.target == lineTarget,
-                accessibilityIdentifier: SurroundUITestContract
-                    .AccessibilityID.gameChatLine(chatLine.id),
-                select: {
-                    toggleChatLineSelection(chatLine)
-                },
-                openProfile: openPlayerProfile.map { action in
-                    { action(chatLine.user) }
-                }
-            )
-            Spacer().frame(height: 2)
+            .id(row.chatLine.id)
         }
     }
 
@@ -220,15 +224,17 @@ struct ChatLog: View {
                                 .frame(width: 10, height: 1)
                                 .id("scrollViewBottom")
                                 .onScrollVisibilityChange { isVisible in
-                                    guard atEndOfChat != isVisible else {
+                                    guard self.isVisible,
+                                          session.isAtEndOfChat != isVisible else {
                                         return
                                     }
-                                    atEndOfChat = isVisible
+                                    session.isAtEndOfChat = isVisible
                                     if isVisible {
                                         game.markAllChatAsRead()
                                     }
                                 }
                         }
+                        .scrollTargetLayout()
                         .padding(.horizontal, 10)
                         .padding(.top, 10)
                         .padding(.bottom, 0)
@@ -246,13 +252,26 @@ struct ChatLog: View {
                                 .accessibilityHidden(true)
                         }
                         .onAppear {
+                            isVisible = true
+                            if let anchor = session.scrollAnchor,
+                               !session.isAtEndOfChat {
+                                // Restore after lazy rows have joined the layout.
+                                DispatchQueue.main.async {
+                                    guard isVisible else { return }
+                                    scrollView.scrollTo(anchor, anchor: .top)
+                                }
+                            }
                             game.markAllChatAsRead()
+                        }
+                        .onDisappear { isVisible = false }
+                        .onChange(of: game.ID) { _, _ in
+                            scrollView.scrollTo("scrollViewBottom")
                         }
                         .onReceive(game.$chatLog) { newChatLog in
                             if !selectionStillExists(in: newChatLog) {
                                 clearSelection()
                             }
-                            if atEndOfChat {
+                            if session.isAtEndOfChat {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")
                                     game.markAllChatAsRead()
@@ -260,17 +279,26 @@ struct ChatLog: View {
                             }
                         }
                         .onReceive(SystemPlatformServices.shared.keyboardWillChangeFramePublisher) { _ in
-                            self.shouldScrollToEndAfterKeyboardChange = self.atEndOfChat
+                            session.shouldScrollToEndAfterKeyboardChange =
+                                session.isAtEndOfChat
                         }
                         .onReceive(SystemPlatformServices.shared.keyboardDidChangeFramePublisher) { _ in
-                            if self.shouldScrollToEndAfterKeyboardChange {
+                            if session.shouldScrollToEndAfterKeyboardChange {
                                 DispatchQueue.main.async {
                                     scrollView.scrollTo("scrollViewBottom")
-                                    self.shouldScrollToEndAfterKeyboardChange = false
+                                    session.shouldScrollToEndAfterKeyboardChange = false
                                 }
                             }
                         }
                     }
+                }
+                .scrollPosition(id: $visibleScrollAnchor, anchor: .top)
+                .onChange(of: visibleScrollAnchor) { _, anchor in
+                    // Persist the last visible row without publishing scroll
+                    // layout changes back through the entire game hierarchy.
+                    // A departing view must not erase the replacement's anchor.
+                    guard isVisible, let anchor else { return }
+                    session.scrollAnchor = anchor
                 }
                 .defaultScrollAnchor(.bottom, for: .initialOffset)
                 .coordinateSpace(name: "scrollView")
@@ -282,14 +310,15 @@ struct ChatLog: View {
             if ogs.user != nil {
                 NewChatInput(
                     game: game,
+                    session: session,
                     selectedChannel: selectedChannel,
                     variationShareDraft: variationShareDraft,
                     focusInputOnAppear: focusInputOnAppear,
-                    inputDismissalRequest: inputDismissalRequest,
+                    onInteraction: onInteraction,
                     onVariationShared: onVariationShared,
                     onCancelVariationSharing: onCancelVariationSharing
                 )
-                    .id(game.ID)
+                    .id(session.composerPresentationID)
             }
         }
         .background(
@@ -383,51 +412,26 @@ private struct VariationSharePreviewRow: View {
 }
 
 struct NewChatInput: View {
-    private enum VariationShareFailure: Hashable, Identifiable {
-        case invalidVariation
-        case unavailable
-        case retryable
-
-        var id: Self { self }
-
-        var message: LocalizedStringResource {
-            switch self {
-            case .invalidVariation:
-                return LocalizedStringResource(
-                    "This variation is no longer available.",
-                    comment: "Message shown when an analyzed variation can no longer be shared because its branch has changed or been removed."
-                )
-            case .unavailable:
-                return LocalizedStringResource(
-                    "This variation cannot be shared right now.",
-                    comment: "Message shown after a temporary connection or account-state problem prevents an analyzed variation from being shared."
-                )
-            case .retryable:
-                return LocalizedStringResource("Please try again.")
-            }
-        }
-    }
-
     var game: Game
-    @State private var newChat = ""
+    @ObservedObject var session: ChatSessionState
     @EnvironmentObject var ogs: OGSService
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var focusInputOnAppear = false
-    var inputDismissalRequest = 0
+    var onInteraction: () -> Void = {}
     var onVariationShared: () -> Void = {}
     var onCancelVariationSharing: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
     
-    @State private var chatSendingCancellable: AnyCancellable?
-    @State private var variationShareFailure: VariationShareFailure?
     @FocusState private var isInputFocused: Bool
-    @State private var hasAppeared = false
+    @State private var composerID = UUID()
+    @State private var isRestoringFocus = false
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()
     #endif
 
     private func focusInput() {
+        let requestedRevision = session.focusRevision
         #if DEBUG && MAIN_APP
         let requestedFocusID = variationShareDraft.wrappedValue?.focusRequestID
         SurroundAnimationDiagnostics.record(
@@ -437,6 +441,9 @@ struct NewChatInput: View {
         )
         #endif
         DispatchQueue.main.async {
+            guard session.shouldRestoreInputFocus(
+                composerID: composerID, revision: requestedRevision
+            ), !isInputFocused else { return }
             #if DEBUG && MAIN_APP
             SurroundAnimationDiagnostics.record(
                 "composer.focusExecuting", ownerID: animationObservationID,
@@ -448,6 +455,7 @@ struct NewChatInput: View {
                 ]
             )
             #endif
+            isRestoringFocus = true
             isInputFocused = true
         }
     }
@@ -507,6 +515,7 @@ struct NewChatInput: View {
         subtitle: LocalizedStringResource
     ) -> some View {
         Button {
+            onInteraction()
             selectedChannel.wrappedValue = channel
         } label: {
             Label {
@@ -560,18 +569,28 @@ struct NewChatInput: View {
                     }
                     draft.name = name
                     variationShareDraft.wrappedValue = draft
+                    onInteraction()
                 }
             )
         }
-        return $newChat
+        return Binding(
+            get: { session.message },
+            set: { message in
+                session.message = message
+                onInteraction()
+            }
+        )
     }
 
     private var canSend: Bool {
-        variationShareDraft.wrappedValue != nil || !newChat.isEmpty
+        variationShareDraft.wrappedValue != nil
+            || (!session.message.isEmpty && !session.isSending)
     }
 
     private func send() {
+        onInteraction()
         if let draft = variationShareDraft.wrappedValue {
+            session.failure = nil
             do {
                 try ogs.shareVariation(
                     draft.variation,
@@ -583,38 +602,28 @@ struct NewChatInput: View {
             } catch let error as OGSServiceError {
                 switch error {
                 case .invalidVariation:
-                    variationShareFailure = .invalidVariation
+                    session.failure = .invalidVariation
                     onVariationShared()
                 case .variationSharingUnavailable:
-                    variationShareFailure = .unavailable
+                    session.failure = .variationUnavailable
                 default:
-                    variationShareFailure = .retryable
+                    session.failure = .variationRetryable
                 }
             } catch {
-                variationShareFailure = .retryable
+                session.failure = .variationRetryable
             }
             return
         }
 
-        guard self.chatSendingCancellable == nil && newChat.count > 0 else {
-            return
-        }
-        
         let channel = selectedChannel.wrappedValue.resolved(
             isUserPlaying: game.isUserPlaying
         )
-        self.chatSendingCancellable = ogs.sendChat(in: game, channel: channel, body: newChat)
-            .zip(game.$chatLog.setFailureType(to: Error.self))
-            .sink(receiveCompletion: { _ in
-                DispatchQueue.main.async {
-                    self.chatSendingCancellable = nil
-                    self.newChat = ""
-                }
-            }, receiveValue: { _ in
-                DispatchQueue.main.async {
-                    self.chatSendingCancellable?.cancel()
-                }
-            })
+        session.sendMessage { message in
+            ogs.sendChat(in: game, channel: channel, body: message)
+                .zip(game.$chatLog.setFailureType(to: Error.self))
+                .map { _ in () }
+                .eraseToAnyPublisher()
+        }
     }
     
     var body: some View {
@@ -707,7 +716,7 @@ struct NewChatInput: View {
                     self.send()
                 }
                 if variationShareDraft.wrappedValue != nil
-                    || self.chatSendingCancellable == nil {
+                    || !session.isSending {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
                     }
@@ -724,11 +733,22 @@ struct NewChatInput: View {
         }
         .background(backgroundColor)
         .onAppear {
-            guard !hasAppeared else { return }
-            hasAppeared = true
-            if focusInputOnAppear || variationShareDraft.wrappedValue != nil {
+            session.composerAppeared(
+                id: composerID,
+                automaticallyFocus: focusInputOnAppear,
+                shareFocusRequestID: variationShareDraft.wrappedValue?.focusRequestID
+            )
+            if session.wantsInputFocus {
                 focusInput()
+            } else {
+                // A retained navigation destination may still hold its old
+                // FocusState even though the game owner suspended input.
+                isRestoringFocus = false
+                isInputFocused = false
             }
+        }
+        .onDisappear {
+            session.composerDisappeared(id: composerID)
         }
         .onChange(of: variationShareDraft.wrappedValue?.focusRequestID) {
             _, focusRequestID in
@@ -738,19 +758,37 @@ struct NewChatInput: View {
                 focusRequestID: focusRequestID
             )
             #endif
-            if focusRequestID != nil {
+            session.requestShareFocus(focusRequestID)
+            if session.wantsInputFocus {
                 focusInput()
             }
         }
-        .onChange(of: inputDismissalRequest) {
-            #if DEBUG && MAIN_APP
-            SurroundAnimationDiagnostics.record(
-                "composer.dismissalCallback", ownerID: animationObservationID,
-                focusRequestID: variationShareDraft.wrappedValue?.focusRequestID,
-                fields: ["request": String(inputDismissalRequest)]
-            )
-            #endif
-            isInputFocused = false
+        .onChange(of: session.wantsInputFocus) { _, wantsFocus in
+            if wantsFocus {
+                focusInput()
+            } else {
+                isInputFocused = false
+            }
+        }
+        .onChange(of: isInputFocused) { _, focused in
+            if focused {
+                guard session.isActiveComposer(composerID) else { return }
+                session.recordInputFocus(true, composerID: composerID)
+                if !isRestoringFocus {
+                    onInteraction()
+                }
+                isRestoringFocus = false
+            } else {
+                // Focus can fall before onDisappear during layout replacement.
+                // Record a user dismissal only if this composer remains active.
+                let revision = session.focusRevision
+                DispatchQueue.main.async {
+                    session.recordInputFocus(
+                        false, composerID: composerID,
+                        expectedRevision: revision
+                    )
+                }
+            }
         }
         #if DEBUG && MAIN_APP
         .surroundAnimationObservation(
@@ -764,20 +802,20 @@ struct NewChatInput: View {
         )
         #endif
         .alert(
-            String(
-                localized: "Couldn’t share variation",
-                comment: "Alert title shown when sending an analyzed variation to game chat fails."
-            ),
+            Text(session.failure?.title ?? LocalizedStringResource("Couldn’t send message")),
             isPresented: Binding(
-                get: { variationShareFailure != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        variationShareFailure = nil
-                    }
-                }
+                get: { session.failure != nil },
+                // Adaptive replacement can dismiss the old alert presenter.
+                // Only acknowledging the error discards the retained failure.
+                set: { _ in }
             ),
-            presenting: variationShareFailure
-        ) { _ in
+            presenting: session.failure
+        ) { failure in
+            Button("OK") {
+                if session.failure == failure {
+                    session.failure = nil
+                }
+            }
         } message: {
             Text($0.message)
         }
@@ -786,51 +824,56 @@ struct NewChatInput: View {
 
 #if DEBUG
 #Preview("New message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.main
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: $selectedChannel)
+    return NewChatInput(game: game, session: session, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New Malkovich message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.malkovich
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: $selectedChannel)
+    return NewChatInput(game: game, session: session, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New personal message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.personal
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: $selectedChannel)
+    return NewChatInput(game: game, session: session, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("New personal message input — Accessibility", traits: .fixedLayout(width: 350, height: 140)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.personal
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: $selectedChannel)
+    return NewChatInput(game: game, session: session, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
         .environment(\.dynamicTypeSize, .accessibility3)
 }
 
 #Preview("Variation name input", traits: .fixedLayout(width: 350, height: 180)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.main
     @Previewable @State var variationShareDraft: VariationShareDraft? = {
         let game = TestData.EuropeanChampionshipWithChat
@@ -849,6 +892,7 @@ struct NewChatInput: View {
     game.ogs = ogs
     return NewChatInput(
         game: game,
+        session: session,
         selectedChannel: $selectedChannel,
         variationShareDraft: $variationShareDraft,
         onCancelVariationSharing: {
@@ -859,6 +903,7 @@ struct NewChatInput: View {
 }
 
 #Preview("Variation name input — Accessibility", traits: .fixedLayout(width: 350, height: 240)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.malkovich
     @Previewable @State var variationShareDraft: VariationShareDraft? = {
         let game = TestData.EuropeanChampionshipWithChat
@@ -877,6 +922,7 @@ struct NewChatInput: View {
     game.ogs = ogs
     return NewChatInput(
         game: game,
+        session: session,
         selectedChannel: $selectedChannel,
         variationShareDraft: $variationShareDraft,
         onCancelVariationSharing: {
@@ -888,32 +934,35 @@ struct NewChatInput: View {
 }
 
 #Preview("New spectator message input", traits: .fixedLayout(width: 350, height: 100)) {
+    @Previewable @StateObject var session = ChatSessionState()
     @Previewable @State var selectedChannel = OGSChatSendChannel.main
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "spectator", id: -1)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return NewChatInput(game: game, selectedChannel: $selectedChannel)
+    return NewChatInput(game: game, session: session, selectedChannel: $selectedChannel)
         .environmentObject(ogs)
 }
 
 #Preview("Game chat", traits: .fixedLayout(width: 350, height: 400)) {
+    @Previewable @StateObject var session = ChatSessionState()
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = ogs
-    return ChatLog(game: game)
+    return ChatLog(game: game, session: session)
         .environmentObject(ogs)
 }
 
 #Preview("Game chat — Signed out", traits: .fixedLayout(width: 350, height: 400)) {
+    @Previewable @StateObject var session = ChatSessionState()
     let game = TestData.EuropeanChampionshipWithChat
     game.ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950)
     )
-    return ChatLog(game: game)
+    return ChatLog(game: game, session: session)
         .environmentObject(OGSService.previewInstance())
 }
 #endif

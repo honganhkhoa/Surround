@@ -859,6 +859,8 @@ class OGSService: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
     @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected
+    private let authoritativeGameSnapshots = PassthroughSubject<Game, Never>()
+    private let authoritativeGamePhases = PassthroughSubject<(game: Game, phase: OGSGamePhase), Never>()
 
     /// The independent app features that may need the same game subscription.
     ///
@@ -1653,6 +1655,7 @@ class OGSService: ObservableObject {
                     gameID: ogsGameId,
                     game: connectedGame
                 )
+                authoritativeGameSnapshots.send(connectedGame)
             } catch {
                 print("Error decoding gamedata for game \(ogsGameId): \(error)")
             }
@@ -1771,6 +1774,7 @@ class OGSService: ObservableObject {
                 if let _ = self.activeGames[ogsGameId] {
                     preferences[.latestOGSOverviewOutdated] = true
                 }
+                authoritativeGamePhases.send((game: connectedGame, phase: phase))
             }
         case "conditional_moves":
             guard let currentUserID = user?.id,
@@ -3432,6 +3436,37 @@ class OGSService: ObservableObject {
             gameID: gameID,
             reason: "Rengo player update references missing players"
         )
+    }
+
+    /// Recovery for an unconfirmed scoring action must observe fresh gamedata,
+    /// not retry a toggle against a potentially stale removed-stone set. The
+    /// caller subscribes to the next snapshot before requesting this refresh.
+    func refreshScoringState(game: Game) {
+        guard let gameID = game.ogsID,
+              desiredGameConnections[gameID]?.game === game else { return }
+        // An explicit retry starts a new bounded recovery episode even when a
+        // previous socket fallback never produced usable gamedata. Automatic
+        // recovery keeps its coalescing limit until a valid snapshot arrives.
+        finishGameResynchronization(gameID: gameID)
+        requestGameResynchronization(
+            gameID: gameID, reason: "scoring action needs an authoritative snapshot"
+        )
+    }
+
+    /// Cached overviews and REST enrichment can also assign gameData. Only a
+    /// decoded realtime gamedata snapshot settles explicit scoring recovery.
+    func scoringSnapshots(game: Game) -> AnyPublisher<Void, Error> {
+        authoritativeGameSnapshots.filter { $0 === game }
+            .map { _ in () }.setFailureType(to: Error.self)
+            .eraseToAnyPublisher()
+    }
+
+    /// Overview enrichment also assigns gamePhase. Only a decoded realtime
+    /// phase event can settle scoring without a replacement gamedata snapshot.
+    func scoringPhaseExits(game: Game) -> AnyPublisher<Void, Never> {
+        authoritativeGamePhases
+            .filter { $0.game === game && $0.phase != .stoneRemoval }
+            .map { _ in () }.eraseToAnyPublisher()
     }
 
     /// Requests a fresh authoritative snapshot for one game without disturbing

@@ -222,14 +222,19 @@ struct AnalyzeTreeView: View {
                                 }
                             }
                             .onAppear {
-                                if let lastMoveNumber = self.selectedPosition?.lastMoveNumber {
-                                    if lastMoveNumber == self.game.moveTree.largestLastMoveNumber {
-                                        horizontalScrollView.scrollTo("endOfAnalyzeTree")
+                                // A fold can insert this lazy tree at a retained
+                                // node. Scroll after insertion has finished;
+                                // synchronous scrolling re-enters its layout.
+                                DispatchQueue.main.async {
+                                    if let lastMoveNumber = self.selectedPosition?.lastMoveNumber {
+                                        if lastMoveNumber == self.game.moveTree.largestLastMoveNumber {
+                                            horizontalScrollView.scrollTo("endOfAnalyzeTree")
+                                        } else {
+                                            horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
+                                        }
                                     } else {
-                                        horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
+                                        horizontalScrollView.scrollTo("endOfAnalyzeTree")
                                     }
-                                } else {
-                                    horizontalScrollView.scrollTo("endOfAnalyzeTree")
                                 }
                             }
                         }

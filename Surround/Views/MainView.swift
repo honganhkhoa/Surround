@@ -33,6 +33,26 @@ extension EnvironmentValues {
     }
 }
 
+private struct MainTabPlacement: ViewModifier {
+    let horizontalSizeClass: UserInterfaceSizeClass?
+
+    func body(content: Content) -> some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        if #available(iOS 27.0, *) {
+            content.defaultTabBarPlacement(
+                UIDevice.current.userInterfaceIdiom == .phone
+                    && horizontalSizeClass == .regular
+                    ? .sidebar : .automatic
+            )
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
 struct MainView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
@@ -150,6 +170,9 @@ struct MainView: View {
                         SurroundUITestContract.AccessibilityID.navigationMessages
                     )
                 }
+                // Compact iPhone tab bars ignore sidebar-only placement.
+                // Retain the selected secondary tab and its stack through a
+                // fold; hide it only after another destination is selected.
                 TabSection("Surround") {
                     Tab(value: RootView.settings) {
                         RootView.settings.navigationView
@@ -157,15 +180,23 @@ struct MainView: View {
                         RootView.settings.label
                     }
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationSettings)
+                    .tabPlacement(.sidebarOnly)
+                    .hidden(
+                        horizontalSizeClass == .compact
+                            && nav.main.rootView != .settings
+                    )
                     Tab(value: RootView.about) {
                         RootView.about.navigationView
                     } label: {
                         RootView.about.label
                     }
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationAbout)
+                    .tabPlacement(.sidebarOnly)
+                    .hidden(
+                        horizontalSizeClass == .compact
+                            && nav.main.rootView != .about
+                    )
                 }
-                .hidden(horizontalSizeClass == .compact)
-                .defaultVisibility(.hidden, for: .tabBar)
                 TabSection("OGS") {
                     Tab(value: RootView.browser) {
                         RootView.browser.navigationView
@@ -176,6 +207,7 @@ struct MainView: View {
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
+            .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
             .sheet(isPresented: $nav.main.showWaitingGames) {
                 AppNavigationStack {
                     WaitingGamesView()

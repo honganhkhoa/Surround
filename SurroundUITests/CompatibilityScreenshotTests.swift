@@ -126,6 +126,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         #else
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let nativeScenes = SurroundUITestContract.CompatibilityScene.allCases
+            .filter { $0 != .initialGameAnalysis }
             .filter { isPhone || $0 != .gameChat }
 
         XCTAssertEqual(
@@ -762,7 +763,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
             )
         case .unsupportedGoogle:
             labeledElement("Open OGS Account Settings", in: app)
-        case .activeGameBoard, .gameAnalysis, .zenMode, .gameOptions,
+        case .activeGameBoard, .gameAnalysis, .initialGameAnalysis, .zenMode, .gameOptions,
              .finishedGamePlayback, .publicGameSpectator, .gameChat:
             waitForGameSceneContent(scene, in: app)
         case .quickMatch:

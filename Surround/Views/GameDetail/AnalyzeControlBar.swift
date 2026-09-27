@@ -13,6 +13,7 @@ struct AnalyzeControlBar: View {
 
     @ObservedObject var moveTree: MoveTree
     @Binding var selectedPosition: BoardPosition?
+    @Binding var preferredNextPositionByPosition: [ObjectIdentifier: BoardPosition]
     @Binding var boardTool: AnalyzeBoardTool
     var markups: BoardMarkups
     var analysisAvailable: Bool
@@ -28,8 +29,6 @@ struct AnalyzeControlBar: View {
     var removeFromConditionalMoves: () -> Void
     var deleteBranch: (BoardPosition) -> Void
 
-    @State private var preferredNextPositionByPosition =
-        [ObjectIdentifier: BoardPosition]()
     @State private var showingDeleteConfirmation = false
     #if DEBUG && MAIN_APP
     @State private var animationObservationID = UUID()

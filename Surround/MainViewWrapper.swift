@@ -280,11 +280,11 @@ private struct CompatibilityScreenshotRootView: View {
             AppNavigationStack {
                 GameDetailView(currentGame: .constant(primaryGame))
             }
-        case .gameAnalysis:
+        case .gameAnalysis, .initialGameAnalysis:
             AppNavigationStack {
                 GameDetailView(
                     currentGame: .constant(primaryGame),
-                    analyzeMode: true
+                    interaction: GameDetailInteraction(panel: .analyze)
                 )
             }
         case .zenMode:
@@ -306,7 +306,7 @@ private struct CompatibilityScreenshotRootView: View {
                 GameDetailView(
                     currentGame: .constant(finishedGame),
                     allowsActiveGamesCarousel: false,
-                    analyzeMode: true
+                    interaction: GameDetailInteraction(panel: .analyze)
                 )
             }
         case .publicGameSpectator:
@@ -383,6 +383,7 @@ private struct CompatibilityScreenshotRootView: View {
 
     var body: some View {
         sceneView
+            .modifier(GameLayoutTransitionUITestModifier())
             .modifier(
                 CompatibilityScreenshotReadinessModifier(scene: scene)
             )

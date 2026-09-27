@@ -20,6 +20,11 @@ struct SingleGameView: View {
     var exitZenMode: (() -> ())?
     
     @EnvironmentObject var ogs: OGSService
+    @EnvironmentObject private var stackRouter: StackRouter
+    @EnvironmentObject private var navigation: NavigationService
+    @Environment(\.owningStackRoute) private var owningStackRoute
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
+    @State private var owningRootView: RootView?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
@@ -36,13 +41,27 @@ struct SingleGameView: View {
     @State var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var attachedKeyboardVisible = false
     
-    @Binding var compactDisplayMode: DisplayMode
+    @Binding var interaction: GameDetailInteraction
+    private var compactDisplayMode: GameDetailPanel {
+        get { interaction.panel }
+        nonmutating set { interaction.selectPanel(newValue) }
+    }
+    private var panelSelection: Binding<GameDetailPanel> {
+        Binding(get: { interaction.panel },
+                set: { interaction.selectPanel($0) })
+    }
+    @StateObject private var chatSession = ChatSessionState()
+    @StateObject private var gameControlState = GameControlState()
+    @State private var showsRengoTeamDetail = false
+    @State private var preferredNextPositionByPosition =
+        [ObjectIdentifier: BoardPosition]()
     var showsCompactChatBoard: Binding<Bool> = .constant(true)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var selectedChatChannel: Binding<OGSChatSendChannel> = .constant(.main)
-    @State var showCompactModeSwitcher = true
-    var analyzeMode: Binding<Bool> = .constant(false)
-    var shouldHideActiveGamesCarousel: Binding<Bool> = .constant(false)
+    private var analyzeMode: Binding<Bool> {
+        Binding(get: { interaction.isAnalyzing },
+                set: { interaction.setAnalyzing($0) })
+    }
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
 
@@ -57,18 +76,14 @@ struct SingleGameView: View {
         [ObjectIdentifier: BoardMarkups]()
     
     @State var stonePlacingPlayer: AVAudioPlayer? = nil
-    @State private var conditionalMoveSubmissionCancellable: AnyCancellable?
+    @StateObject private var conditionalMoveRequest = GameControlState()
     @State private var showingConditionalMoveSubmissionError = false
     @State private var hasUsedAddToConditionalMoves =
         userDefaults[.hasUsedAddToConditionalMoves] ?? false
     
     @Namespace var animation
     
-    enum DisplayMode {
-        case playerInfo
-        case chat
-        case analyze
-    }
+    typealias DisplayMode = GameDetailPanel
 
     private struct AnalyzeControlBarConditionalState {
         var canAdd = false
@@ -96,13 +111,36 @@ struct SingleGameView: View {
         )
     }
 
+    private var isChatRouteActive: Bool {
+        (owningRootView == nil || navigation.main.rootView == owningRootView)
+            && stackRouter.path.last == owningStackRoute
+    }
+
     private var chatSelection: Binding<ChatLogSelection?> {
         Binding(
             get: { selectedChatItem },
             set: { newSelection in
                 selectedChatItem = newSelection
                 if newSelection != nil {
-                    analyzeMode.wrappedValue = false
+                    interaction.beginChatPreview()
+                    if newSelection?.preview.position != nil {
+                        showsCompactChatBoard.wrappedValue = true
+                    }
+                }
+            }
+        )
+    }
+
+    private var stoneRemovalSelection: Binding<Set<[Int]>> {
+        Binding(
+            get: { stoneRemovalSelectedPoints },
+            set: { points in
+                guard !gameControlState.blocksGameActions else { return }
+                stoneRemovalSelectedPoints = points
+                // A board commit is an action even when the same group remains
+                // selected after an unconfirmed request and explicit refresh.
+                gameControlState.toggleRemovedStones(points, game: game, using: ogs) {
+                    stoneRemovalSelectedPoints.removeAll()
                 }
             }
         )
@@ -126,6 +164,21 @@ struct SingleGameView: View {
         )
     }
 
+    private var analysisPositionSelection: Binding<BoardPosition?> {
+        Binding(get: { analyticsPosition }, set: { position in
+            interaction.setAnalyzing(true)
+            selectedChatItem = nil
+            analyticsPosition = position
+        })
+    }
+
+    private var analysisToolSelection: Binding<AnalyzeBoardTool> {
+        Binding(get: { analyzeBoardTool }, set: { tool in
+            interaction.setAnalyzing(true)
+            analyzeBoardTool = tool
+        })
+    }
+
     private func analyzeMarkups(for position: BoardPosition) -> BoardMarkups {
         analyzeMarkupsByPosition[ObjectIdentifier(position)] ?? [:]
     }
@@ -137,6 +190,7 @@ struct SingleGameView: View {
         return Binding(
             get: { analyzeMarkupsByPosition[identifier] ?? [:] },
             set: { markups in
+                interaction.setAnalyzing(true)
                 if markups.isEmpty {
                     analyzeMarkupsByPosition[identifier] = nil
                 } else {
@@ -207,26 +261,63 @@ struct SingleGameView: View {
         observedReviewGameID = nil
     }
     
+    private var showsAnalysisBoard: Bool {
+        interaction.isAnalyzing && (!compact || compactDisplayMode == .analyze)
+    }
+
+    private var showsChatPreview: Bool {
+        selectedChatItem?.preview.position != nil
+    }
+
+    private var chatPreviewTitle: Text {
+        if case let .move(number) = selectedChatItem?.target {
+            Text("Move \(number)")
+        } else {
+            Text("Chat variation")
+        }
+    }
+
+    private var chatPreviewBar: some View {
+        HStack(spacing: 12) {
+            chatPreviewTitle
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Button {
+                selectedChatItem = nil
+            } label: {
+                Label("Return to game", systemImage: "arrow.uturn.backward")
+                    .fontWeight(.semibold)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.purple)
+            .accessibilityIdentifier("game.chat.preview.return")
+        }
+        .font(.callout)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     var controlRow: some View {
         GameControlRow(
             game: game,
+            state: gameControlState,
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption,
-            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
+            stoneRemovalOption: $stoneRemovalOption
         )
     }
     
     var verticalControlRow: some View {
         GameControlRow(
             game: game,
+            state: gameControlState,
             horizontal: false,
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition,
             goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption,
-            stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints
+            stoneRemovalOption: $stoneRemovalOption
         )
     }
     
@@ -243,7 +334,7 @@ struct SingleGameView: View {
                         selectedChatPreview?.variation?.markups ?? [:]
                     )
                 )
-            } else if let analyticsPosition = analyticsPosition, (compactDisplayMode == .analyze || analyzeMode.wrappedValue) {
+            } else if let analyticsPosition = analyticsPosition, showsAnalysisBoard {
                 BoardView(
                     boardPosition: analyticsPosition,
                     variation: game.moveTree.variation(to: analyticsPosition),
@@ -252,11 +343,12 @@ struct SingleGameView: View {
                     newMove: $analyticsPendingMove,
                     newPosition: $analyticsPendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
-                    boardTool: $analyzeBoardTool,
+                    boardTool: analysisToolSelection,
                     markups: analyzeMarkupsBinding(for: analyticsPosition)
                 )
                 .onChange(of: analyticsPendingMove) { _, newMove in
                     if let newMove = newMove {
+                        interaction.setAnalyzing(true)
                         if let newPosition = try? game.makeMove(move: newMove, fromAnalyticsPosition: analyticsPosition) {
                             self.analyticsPosition = newPosition
                             analyticsPendingMove = nil
@@ -268,13 +360,13 @@ struct SingleGameView: View {
                 BoardView(
                     boardPosition: game.currentPosition,
                     showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
-                    playable: game.isUserTurn,
-                    stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval,
+                    playable: game.isUserTurn && !gameControlState.blocksGameActions,
+                    stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval && !gameControlState.blocksGameActions,
                     stoneRemovalOption: stoneRemovalOption,
                     newMove: $pendingMove,
                     newPosition: $pendingPosition,
                     allowsSelfCapture: game.gameData?.allowSelfCapture ?? false,
-                    stoneRemovalSelectedPoints: $stoneRemovalSelectedPoints,
+                    stoneRemovalSelectedPoints: stoneRemovalSelection,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     undoRequestCoordinates: game.undoRequestCoordinates
                 )
@@ -286,10 +378,11 @@ struct SingleGameView: View {
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {
                 // Canvas does not otherwise expose a stable element to XCTest.
-                Text(verbatim: "Go board")
-                    .foregroundStyle(.clear)
+                Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: "Go board"))
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameBoard)
                     .accessibilityValue(
                         Text(verbatim: boardUITestAccessibilityValue)
@@ -310,7 +403,7 @@ struct SingleGameView: View {
             )
         }
         if let analyticsPosition,
-           compactDisplayMode == .analyze || analyzeMode.wrappedValue {
+           showsAnalysisBoard {
             return boardUITestAccessibilityValue(
                 position: analyticsPosition,
                 variation: game.moveTree.variation(to: analyticsPosition),
@@ -433,11 +526,8 @@ struct SingleGameView: View {
         )
         #endif
         withAnimation {
-            if compact {
-                showsCompactChatBoard.wrappedValue = false
-                compactDisplayMode = .chat
-                analyzeMode.wrappedValue = false
-            }
+            showsCompactChatBoard.wrappedValue = false
+            interaction.beginChatInteraction()
         }
     }
 
@@ -471,7 +561,7 @@ struct SingleGameView: View {
 
     var compactDisplayModePicker: some View {
         ZStack(alignment: .topTrailing) {
-            Picker(selection: $compactDisplayMode.animation(), label: Text("Display mode")) {
+            Picker(selection: panelSelection.animation(), label: Text("Display mode")) {
                 if game.analysisAvailable {
                     Label("Analyze mode", systemImage: "arrow.triangle.branch")
                         .labelStyle(IconOnlyLabelStyle())
@@ -519,9 +609,9 @@ struct SingleGameView: View {
                 reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
                 showsPlayersName: !game.isUserPlaying,
                 onSelectConditionalVariation: showConditionalVariation,
-                showCompactModeSwitcher: $showCompactModeSwitcher
+                rengoTeamDetail: $showsRengoTeamDetail
             )
-            if showCompactModeSwitcher {
+            if !showsRengoTeamDetail {
                 compactDisplayModePicker
             }
         }
@@ -554,10 +644,12 @@ struct SingleGameView: View {
             compactClockHeader
             ChatLog(
                 game: game,
+                session: chatSession,
                 selection: chatSelection,
                 selectedChannel: selectedChatChannel,
                 variationShareDraft: currentGameVariationShareDraft,
                 focusInputOnAppear: true,
+                onInteraction: { interaction.beginChatInteraction() },
                 onVariationShared: finishVariationSharing,
                 onCancelVariationSharing:
                     cancelVariationSharing
@@ -569,7 +661,7 @@ struct SingleGameView: View {
     var analyzeTree: some View {
         VStack(spacing: 0) {
             compactClockHeader
-            AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
+            AnalyzeTreeView(game: game, selectedPosition: analysisPositionSelection)
         }
     }
 
@@ -577,8 +669,9 @@ struct SingleGameView: View {
         let state = analyzeControlBarConditionalState
         return AnalyzeControlBar(
             moveTree: game.moveTree,
-            selectedPosition: $analyticsPosition,
-            boardTool: $analyzeBoardTool,
+            selectedPosition: analysisPositionSelection,
+            preferredNextPositionByPosition: $preferredNextPositionByPosition,
+            boardTool: analysisToolSelection,
             markups: analyticsPosition.map {
                 analyzeMarkups(for: $0)
             } ?? [:],
@@ -752,16 +845,13 @@ struct SingleGameView: View {
         _ plan: ConditionalMovePlan,
         onSuccess: (() -> Void)? = nil
     ) {
-        conditionalMoveSubmissionCancellable = ogs
-            .submitConditionalMovePlan(plan, for: game)
-            .sink { completion in
-                if case .failure = completion {
-                    showingConditionalMoveSubmissionError = true
-                }
-                conditionalMoveSubmissionCancellable = nil
-            } receiveValue: {
-                onSuccess?()
-            }
+        conditionalMoveRequest.performRequest(
+            gameID: game.ID,
+            accountID: ogs.user?.id,
+            publisher: { ogs.submitConditionalMovePlan(plan, for: game) },
+            receiveValue: { onSuccess?() },
+            receiveFailure: { _ in showingConditionalMoveSubmissionError = true }
+        )
     }
     
     var compactBody: some View {
@@ -777,11 +867,14 @@ struct SingleGameView: View {
             if compactDisplayMode == .analyze && !attachedKeyboardVisible {
                 analyzeControlBar
             }
-            if showsCompactHorizontalControlRow {
+            if showsCompactHorizontalControlRow && !showsChatPreview {
                 Spacer(minLength: 10).frame(maxHeight: 15)
                 controlRow
                     .padding(.horizontal)
                 Spacer(minLength: 10)
+            }
+            if showsChatPreview {
+                chatPreviewBar.padding(.horizontal, 10).padding(.vertical, 5)
             }
             if compactDisplayMode != .chat
                 || showsCompactChatBoard.wrappedValue {
@@ -810,7 +903,9 @@ struct SingleGameView: View {
                                         .frame(width: 20, height: 20)
                                 }
                                 Spacer().frame(height: 15)
-                                verticalControlRow
+                                if !showsChatPreview {
+                                    verticalControlRow
+                                }
                             }
                             .frame(maxWidth: .infinity)
                             .padding([.leading, .trailing])
@@ -823,35 +918,39 @@ struct SingleGameView: View {
             }
             Spacer(minLength: 0)
         }
-        .onChange(of: compactDisplayMode) { oldValue, newValue in
-            if oldValue == .chat && newValue != .chat {
-                selectedChatItem = nil
+    }
+    /// SwiftUI measures the scalable preview first. The board then fits the
+    /// remaining space instead of assuming the preview is one fixed-height row.
+    private var regularBoardWithPreview: some View {
+        VStack(spacing: showsChatPreview ? 5 : 0) {
+            if showsChatPreview {
+                chatPreviewBar
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            withAnimation {
-                shouldHideActiveGamesCarousel.wrappedValue = newValue != .playerInfo
-                if newValue == .analyze, analyticsPosition == nil {
-                    analyticsPosition = game.currentPosition
-                } else if newValue != .analyze {
-                    analyticsPosition = nil
-                }
+            GeometryReader { geometry in
+                let size = max(0, min(geometry.size.width, geometry.size.height))
+                boardView
+                    .frame(width: size, height: size)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            analyzeMode.wrappedValue = newValue == .analyze
         }
     }
-    
+
     var regularVerticalBody: some View {
         GeometryReader { geometry -> AnyView in
             let width = geometry.size.width
             let height = geometry.size.height
             let chatHeight: CGFloat = 270
-            let boardSize = min(width - 15 * 2, height - chatHeight - 15 * 3)
+            let boardSize = max(0, min(width - 15 * 2, height - chatHeight - 15 * 3))
             return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
                 HStack(alignment: .top, spacing: 0) {
                     ChatLog(
                         game: game,
+                        session: chatSession,
                         selection: chatSelection,
                         selectedChannel: selectedChatChannel,
                         variationShareDraft: currentGameVariationShareDraft,
+                        onInteraction: { interaction.beginChatInteraction() },
                         onVariationShared: finishVariationSharing,
                         onCancelVariationSharing:
                             cancelVariationSharing
@@ -866,16 +965,21 @@ struct SingleGameView: View {
                             playerIconsOffset: 25,
                             showsPlayersName: true,
                             onSelectConditionalVariation:
-                                showConditionalVariation
+                                showConditionalVariation,
+                            rengoTeamDetail: $showsRengoTeamDetail
                         )
-                        if !analyzeMode.wrappedValue {
+                        if !analyzeMode.wrappedValue && !showsChatPreview {
                             Spacer(minLength: 15).frame(maxHeight: 15)
                             controlRow
                         }
                     }.frame(width: 350)
                 }
                 Spacer(minLength: 15)
-                boardView.frame(width: boardSize, height: boardSize)
+                if showsChatPreview {
+                    regularBoardWithPreview.frame(width: boardSize, height: boardSize)
+                } else {
+                    boardView.frame(width: boardSize, height: boardSize)
+                }
                 Spacer(minLength: 0)
             }
             .padding())
@@ -918,7 +1022,8 @@ struct SingleGameView: View {
                             playerIconsOffset: playerIconsOffset,
                             showsPlayersName: true,
                             onSelectConditionalVariation:
-                                showConditionalVariation
+                                showConditionalVariation,
+                            rengoTeamDetail: $showsRengoTeamDetail
                         )
                     }
                     HStack(alignment: .top, spacing: 15) {
@@ -931,10 +1036,11 @@ struct SingleGameView: View {
                                     playerIconsOffset: playerIconsOffset,
                                     showsPlayersName: true,
                                     onSelectConditionalVariation:
-                                        showConditionalVariation
+                                        showConditionalVariation,
+                                    rengoTeamDetail: $showsRengoTeamDetail
                                 ).frame(minWidth: minimumPlayerInfoWidth)
                             }
-                            if !analyzeMode.wrappedValue {
+                            if !analyzeMode.wrappedValue && !showsChatPreview {
                                 if horizontalPlayerInfoWidth < 350 {
                                     verticalControlRow
                                         .padding(.bottom, -15)
@@ -944,16 +1050,22 @@ struct SingleGameView: View {
                             }
                             ChatLog(
                                 game: game,
+                                session: chatSession,
                                 selection: chatSelection,
                                 selectedChannel: selectedChatChannel,
                                 variationShareDraft:
                                     currentGameVariationShareDraft,
+                                onInteraction: { interaction.beginChatInteraction() },
                                 onVariationShared: finishVariationSharing,
                                 onCancelVariationSharing:
                                     cancelVariationSharing
                             )
                         }
-                        boardView.frame(width: boardSize, height: boardSize)
+                        if showsChatPreview {
+                            regularBoardWithPreview.frame(width: boardSize)
+                        } else {
+                            boardView.frame(width: boardSize, height: boardSize)
+                        }
                     }.frame(height: boardSize)
                 }.padding(15)
             }.frame(width: width, height: height))
@@ -1107,13 +1219,28 @@ struct SingleGameView: View {
                                 )
                                 #endif
                             if !attachedKeyboardVisible {
-                                AnalyzeTreeView(game: game, selectedPosition: $analyticsPosition)
+                                AnalyzeTreeView(game: game, selectedPosition: analysisPositionSelection)
                                     .frame(maxHeight: 240)
                             }
                         }
                     }
                 }
             }
+        }
+        .modifier(GameControlPresentation(
+            state: gameControlState,
+            game: game,
+            pendingMove: $pendingMove,
+            pendingPosition: $pendingPosition
+        ))
+        .environment(\.openPlayerProfile, openPlayerProfile.map { openProfile in
+            { player in
+                chatSession.gamePresentationDisappeared()
+                openProfile(player)
+            }
+        })
+        .onChange(of: isChatRouteActive) { _, active in
+            chatSession.setGamePresentationActive(active && !zenMode)
         }
         #if DEBUG && MAIN_APP
         .surroundAnimationObservation(
@@ -1130,7 +1257,9 @@ struct SingleGameView: View {
         .onReceive(game.$currentPosition) { [game] newPosition in
             self.pendingMove = nil
             self.pendingPosition = nil
-            self.stoneRemovalSelectedPoints.removeAll()
+            if !gameControlState.requiresScoringRefresh {
+                self.stoneRemovalSelectedPoints.removeAll()
+            }
             
             if game.currentPosition === analyticsPosition {
                 analyticsPosition = newPosition
@@ -1150,6 +1279,8 @@ struct SingleGameView: View {
             }
         }
         .onAppear {
+            if owningRootView == nil { owningRootView = navigation.main.rootView }
+            chatSession.setGamePresentationActive(isChatRouteActive && !zenMode)
             isVisibleForAppReview = true
             if self.soundOnStonePlacement {
                 if let audioData = NSDataAsset(name: "stonePlacing")?.data {
@@ -1189,6 +1320,9 @@ struct SingleGameView: View {
             isVisibleForAppReview = false
             stopReviewGameObservation()
             self.stonePlacingPlayer = nil
+            // This owner survives adaptive layout changes. Leaving its route
+            // suspends keyboard focus without discarding the chat draft.
+            chatSession.gamePresentationDisappeared()
             // Preserve analysis, markups, and chat selection across both pushed
             // destinations and tab switches. Game/mode changes below reset
             // them; removing this game route destroys the retained view state.
@@ -1198,16 +1332,27 @@ struct SingleGameView: View {
                 pruneAnalyzeMarkups()
             }
         }
-        .onChange(of: analyzeMode.wrappedValue) { _, newValue in
-            if newValue {
+        .onChange(of: compactDisplayMode) { oldValue, newValue in
+            if oldValue == .chat && newValue != .chat {
+                selectedChatItem = nil
+            }
+        }
+        .onChange(of: interaction.isAnalyzing, initial: true) { _, analyzing in
+            analyticsPendingMove = nil
+            analyticsPendingPosition = nil
+            if analyzing {
                 selectedChatItem = nil
                 if analyticsPosition == nil {
                     analyticsPosition = game.currentPosition
                 }
-            } else if !newValue {
-                analyticsPosition = nil
-                resetAnalyzeBoardTool()
             }
+        }
+        .onChange(of: interaction.analysisResetRevision) { _, _ in
+            // Only explicit mode exits reset the session. Folding, sharing,
+            // and selecting a read-only chat preview can resume its position.
+            analyticsPosition = interaction.isAnalyzing ? game.currentPosition : nil
+            preferredNextPositionByPosition.removeAll()
+            resetAnalyzeBoardTool()
         }
         .onChange(of: analyzeBoardTool) { _, newValue in
             if newValue != .moves {
@@ -1216,13 +1361,26 @@ struct SingleGameView: View {
             }
         }
         .onChange(of: zenMode) { _, newValue in
+            chatSession.setGamePresentationActive(!newValue && isChatRouteActive)
             if newValue {
                 selectedChatItem = nil
                 resetAnalyzeBoardTool()
+            } else if currentGameVariationShareDraft.wrappedValue != nil {
+                // Leaving Zen explicitly resumes the suspended sharing flow.
+                // A size-class change alone keeps any keyboard dismissal.
+                chatSession.requestInputFocus()
             }
         }
         .onChange(of: game.ID) { _, _ in
             updateReviewGameObservation()
+            chatSession.reset()
+            conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
+            showingConditionalMoveSubmissionError = false
+            preferredNextPositionByPosition.removeAll()
+            showsRengoTeamDetail = false
+            pendingMove = nil
+            pendingPosition = nil
+            stoneRemovalSelectedPoints.removeAll()
             selectedChatItem = nil
             analyzeMarkupsByPosition.removeAll()
             resetAnalyzeBoardTool()
@@ -1242,6 +1400,12 @@ struct SingleGameView: View {
             updateReviewGameObservation()
         }
         .onChange(of: ogs.user?.id) { _, _ in
+            chatSession.reset()
+            conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
+            showingConditionalMoveSubmissionError = false
+            selectedChatItem = nil
+            pendingMove = nil
+            pendingPosition = nil
             stopReviewGameObservation()
             updateReviewGameObservation()
         }
@@ -1272,8 +1436,7 @@ struct SingleGameView: View {
 #if DEBUG
 #Preview("Play — Player info", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    @Previewable @State var compactDisplayMode =
-        SingleGameView.DisplayMode.playerInfo
+    @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.Ongoing19x19wBot3
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "kata-bot", id: 592684),
@@ -1286,17 +1449,18 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: $compactDisplayMode
+            interaction: $interaction
         )
         .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(ogs)
+    .environmentObject(StackRouter())
+    .environmentObject(NavigationService())
 }
 
 #Preview("Play — Analysis", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    @Previewable @State var compactDisplayMode =
-        SingleGameView.DisplayMode.analyze
+    @Previewable @State var interaction = GameDetailInteraction(panel: .analyze)
     let game = TestData.Ongoing19x19wBot3
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "kata-bot", id: 592684),
@@ -1309,17 +1473,18 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: $compactDisplayMode
+            interaction: $interaction
         )
         .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(ogs)
+    .environmentObject(StackRouter())
+    .environmentObject(NavigationService())
 }
 
 #Preview("Finished game — Chat", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    @Previewable @State var compactDisplayMode =
-        SingleGameView.DisplayMode.chat
+    @Previewable @State var interaction = GameDetailInteraction(panel: .chat)
     let game = TestData.EuropeanChampionshipWithChat
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "artem92", id: 655950),
@@ -1332,17 +1497,18 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: $compactDisplayMode
+            interaction: $interaction
         )
         .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(ogs)
+    .environmentObject(StackRouter())
+    .environmentObject(NavigationService())
 }
 
 #Preview("Stone removal", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    @Previewable @State var compactDisplayMode =
-        SingleGameView.DisplayMode.playerInfo
+    @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.StoneRemoval9x9
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "HongAnhKhoa", id: 314459),
@@ -1355,17 +1521,18 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: $compactDisplayMode
+            interaction: $interaction
         )
         .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(ogs)
+    .environmentObject(StackRouter())
+    .environmentObject(NavigationService())
 }
 
 #Preview("Finished game — Score and playback", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
-    @Previewable @State var compactDisplayMode =
-        SingleGameView.DisplayMode.playerInfo
+    @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.Scored19x19Korean
     let ogs = OGSService.previewInstance(
         user: OGSUser(username: "HongAnhKhoa", id: 314459),
@@ -1378,10 +1545,12 @@ struct SingleGameView: View {
             compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            compactDisplayMode: $compactDisplayMode
+            interaction: $interaction
         )
         .navigationBarTitleDisplayMode(.inline)
     }
     .environmentObject(ogs)
+    .environmentObject(StackRouter())
+    .environmentObject(NavigationService())
 }
 #endif

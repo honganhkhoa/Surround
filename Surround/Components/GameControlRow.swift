@@ -6,14 +6,6 @@
 //
 
 import SwiftUI
-import Combine
-
-private struct RematchPresentation: Identifiable {
-    let gameID: GameID
-    let challenge: OGSChallengeTemplate
-
-    var id: GameID { gameID }
-}
 
 private struct RematchChallengeSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -43,142 +35,46 @@ struct GameControlRow: View {
     @EnvironmentObject var ogs: OGSService
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
     @ObservedObject var game: Game
+    @ObservedObject var state: GameControlState
     var horizontal = true
     var pendingMove: Binding<Move?> = .constant(nil)
     var pendingPosition: Binding<BoardPosition?> = .constant(nil)
     var goToNextGame: (() -> ())?
-    @State var ogsRequestCancellable: AnyCancellable?
     var stoneRemovalOption: Binding<StoneRemovalOption> = .constant(.toggleGroup)
-    var stoneRemovalSelectedPoints: Binding<Set<[Int]>> = .constant(Set<[Int]>())
 
-    @State var showingPassAlert = false
-    @State var showingResumeFromStoneRemovalAlert = false
-    @State var showingResignAlert = false
-    @State var showingCancelAlert = false
-    @State private var rematchPresentation: RematchPresentation?
-    
     @Setting(.autoSubmitForLiveGames) var autoSubmitForLiveGames: Bool
     @Setting(.autoSubmitForCorrespondenceGames) var autoSubmitForCorrespondenceGames: Bool
 
     func submitMove(move: Move) {
-        let submittedGame = game
-        let submittedGameID = game.ogsID
-        let submittedUserID = ogs.user?.id
-        let submittedPosition = game.currentPosition
-        let expectedMoveNumber = submittedPosition.lastMoveNumber + 1
-        let reviewCoordinator = appReviewCoordinator
-        let reviewSubmission: AppReviewSubmission?
-        if let submittedGameID,
-           submittedGameID > 0,
-           submittedUserID != nil,
-           game.gameData?.gameId == submittedGameID,
-           game.isUserPlaying,
-           game.isUserTurn {
-            reviewSubmission = reviewCoordinator?.beginMove(
-                gameID: submittedGameID,
-                correspondence: game.gameData?.timeControl.speed == .correspondence
-            )
-        } else {
-            reviewSubmission = nil
+        let pendingMove = pendingMove
+        let pendingPosition = pendingPosition
+        state.submitMove(
+            move, game: game, using: ogs,
+            reviewCoordinator: appReviewCoordinator
+        ) {
+            pendingMove.wrappedValue = nil
+            pendingPosition.wrappedValue = nil
         }
-
-        self.ogsRequestCancellable = ogs.submitMove(move: move, forGame: game)
-            .zip(game.$currentPosition.filter({ $0.lastMoveNumber != game.currentPosition.lastMoveNumber }).setFailureType(to: Error.self))
-            .handleEvents(receiveCancel: {
-                DispatchQueue.main.async {
-                    if let reviewSubmission {
-                        reviewCoordinator?.finishMove(reviewSubmission, succeeded: false)
-                    }
-                }
-            })
-            .sink(receiveCompletion: { completion in
-                DispatchQueue.main.async {
-                    switch completion {
-                    case .failure:
-                        if let reviewSubmission {
-                            reviewCoordinator?.finishMove(reviewSubmission, succeeded: false)
-                        }
-                    case .finished:
-                        break
-                    }
-                    self.ogsRequestCancellable = nil
-                }
-            }, receiveValue: { _, confirmedPosition in
-                DispatchQueue.main.async {
-                    if let reviewSubmission {
-                        let confirmed = ogs.user?.id == submittedUserID
-                            && submittedGame.ogsID == submittedGameID
-                            && submittedGame.isUserPlaying
-                            && AppReviewGameActivity.confirmsSubmittedMove(
-                                move,
-                                moveNumber: expectedMoveNumber,
-                                from: submittedPosition,
-                                in: confirmedPosition
-                            )
-                        reviewCoordinator?.finishMove(reviewSubmission, succeeded: confirmed)
-                    }
-                    self.pendingMove.wrappedValue = nil
-                    self.pendingPosition.wrappedValue = nil
-                    self.ogsRequestCancellable = nil
-                }
-            })
-    }
-
-    func toggleRemovedStones(stones: Set<[Int]>) {
-        self.ogsRequestCancellable = ogs.toggleRemovedStones(stones: stones, forGame: game)
-            .zip(game.currentPosition.$removedStones.setFailureType(to: Error.self))
-            .sink(receiveCompletion: { _ in
-                DispatchQueue.main.async {
-                    self.ogsRequestCancellable = nil
-                }
-            }, receiveValue: { _ in
-                DispatchQueue.main.async {
-                    self.stoneRemovalSelectedPoints.wrappedValue.removeAll()
-                    self.ogsRequestCancellable = nil
-                }
-            })
     }
 
     func acceptRemovedStones() {
-        ogs.acceptRemovedStone(game: game)
-        self.ogsRequestCancellable = game.$removedStonesAccepted.sink(receiveValue: { _ in
-            self.ogsRequestCancellable = nil
-        })
+        state.acceptRemovedStones(game: game, using: ogs)
     }
-    
-    func resumeGameFromStoneRemoval() {
-        ogs.resumeGameFromStoneRemoval(game: game)
-        self.ogsRequestCancellable = game.$gamePhase.sink(receiveValue: { _ in
-            self.ogsRequestCancellable = nil
-        })
-    }
-    
+
     func estimateTerritory() {
+        guard !state.blocksGameActions else { return }
         pendingMove.wrappedValue = nil
         pendingPosition.wrappedValue = nil
-        let position = game.currentPosition
-        let revision = position.scoringRevision
-        let phase = game.gamePhase
-        self.ogsRequestCancellable = position.estimateTerritory(on: game.computeQueue)
-            .receive(on: DispatchQueue.main)
-            .sink { estimatedTerritory in
-                self.ogsRequestCancellable = nil
-                guard game.currentPosition === position,
-                      position.scoringRevision == revision,
-                      game.gamePhase == phase else {
-                    return
-                }
-                position.estimatedScores = estimatedTerritory
-            }
+        state.estimateTerritory(game: game, using: ogs)
     }
-    
+
     func clearEstimatedTerritory() {
         game.currentPosition.estimatedScores = nil
         game.objectWillChange.send()
     }
 
     private var rematchChallenge: OGSChallengeTemplate? {
-        guard ogsRequestCancellable == nil,
+        guard !state.isBusy,
               game.currentPosition.estimatedScores == nil,
               game.userStoneColor != nil else {
             return nil
@@ -234,6 +130,7 @@ struct GameControlRow: View {
                         .allowsTightening(true)
                         .minimumScaleFactor(0.7)
                 }
+                .disabled(state.blocksGameActions)
             } else {
                 Text(game.status).font(Font.title2.bold())
                     .lineLimit(1)
@@ -246,7 +143,7 @@ struct GameControlRow: View {
     var actionsMenu: some View {
         Menu {
             Section {
-                if rematchChallenge != nil,
+                if game.gamePhase == .finished,
                    let goToNextGame,
                    let gamesWaiting = nextGameCount {
                     Button(action: goToNextGame) {
@@ -263,36 +160,40 @@ struct GameControlRow: View {
                 if game.gamePhase == .play {
                     Button(action: { self.estimateTerritory() }) {
                         Label("Estimate score", systemImage: "dot.squareshape.split.2x2")
-                    }.disabled(
+                    }.disabled(state.blocksGameActions || (
                         game.isUserPlaying
                         && (game.gameData?.disableAnalysis ?? false)
-                    )
+                    ))
                 }
                 if game.isUserPlaying {
                     if game.gamePhase == .play {
                         if !game.rengo && game.undoRequest == nil {
                             Button(action: { ogs.requestUndo(game: game) }) {
                                 Label("Request undo", systemImage: "arrow.uturn.left")
-                            }.disabled(!game.undoable || pendingMove.wrappedValue != nil)
+                            }.disabled(state.blocksGameActions || !game.undoable || pendingMove.wrappedValue != nil)
                         }
                         if game.pauseControl?.userPauseDetail == nil {
                             Button(action: { ogs.pause(game: game) }) {
                                 Label("Pause game", systemImage: "pause")
                             }
+                            .disabled(state.blocksGameActions)
                         } else {
                             Button(action: { ogs.resume(game: game) }) {
                                 Label("Resume game", systemImage: "play")
                             }
+                            .disabled(state.blocksGameActions)
                         }
                     } else if game.gamePhase == .stoneRemoval {
                         Picker(selection: stoneRemovalOption, label: Text("Stone removal option")) {
                             Text("Toggle group").tag(StoneRemovalOption.toggleGroup)
                             Text("Toggle single point").tag(StoneRemovalOption.toggleSinglePoint)
                         }
-                        Button(action: { self.showingResumeFromStoneRemovalAlert = true }) {
+                        .disabled(state.blocksGameActions)
+                        Button(action: { state.confirm(.resume, gameID: game.ID, accountID: ogs.user?.id) }) {
                             Label("Resume game", systemImage: "play")
                                 .foregroundColor(.red)
                         }
+                        .disabled(state.blocksGameActions)
                     }
                 }
             }
@@ -304,16 +205,18 @@ struct GameControlRow: View {
             if game.isUserPlaying && game.gamePhase != .finished {
                 Section {
                     if game.canBeCancelled {
-                        Button(action: { self.showingCancelAlert = true }) {
+                        Button(action: { state.confirm(.cancel, gameID: game.ID, accountID: ogs.user?.id) }) {
                             Label("Cancel game", systemImage: "xmark").foregroundColor(.red)
                         }
+                        .disabled(state.blocksGameActions)
                     } else {
-                        Button(role: .destructive, action: { self.showingResignAlert = true }) {
+                        Button(role: .destructive, action: { state.confirm(.resign, gameID: game.ID, accountID: ogs.user?.id) }) {
                             Label("Resign", systemImage: "flag")
                         }
                         .accessibilityIdentifier(
                             SurroundUITestContract.AccessibilityID.gameResign
                         )
+                        .disabled(state.blocksGameActions)
                     }
                 }
             }
@@ -331,7 +234,11 @@ struct GameControlRow: View {
     
     var mainActionButton: some View {
         Group {
-            if ogsRequestCancellable == nil {
+            if state.requiresScoringRefresh && !state.isBusy {
+                // The persistent recovery banner owns Refresh; normal scoring
+                // actions stay unavailable until a fresh snapshot arrives.
+                EmptyView()
+            } else if !state.isBusy {
                 if let userColor = game.userStoneColor {
                     let isUserTurnToPlay = game.gamePhase == .play && game.isUserTurn
                     let userNeedsToAcceptStoneRemoval =
@@ -347,9 +254,9 @@ struct GameControlRow: View {
                             }
                         } else if let rematch = rematchChallenge {
                             Button("Rematch") {
-                                rematchPresentation = RematchPresentation(
-                                    gameID: game.ID,
-                                    challenge: rematch
+                                state.presentRematch(
+                                    rematch, gameID: game.ID,
+                                    accountID: ogs.user?.id
                                 )
                             }
                             .accessibilityIdentifier(
@@ -363,7 +270,7 @@ struct GameControlRow: View {
                                     }
                                 }
                             } else if !isHandicapPlacement {
-                                Button(action: { self.showingPassAlert = true }) {
+                                Button(action: { state.confirm(.pass, gameID: game.ID, accountID: ogs.user?.id) }) {
                                     Text("Pass")
                                 }
                             }
@@ -400,73 +307,13 @@ struct GameControlRow: View {
         }
     }
     
-    var droppingFromCasualRengo: Bool {
-        guard game.rengo, let casual = game.gameData?.rengoCasualMode, casual else {
-            return false
-        }
-        
-        guard let userStoneColor = game.userStoneColor, let userTeam = game.orderedRengoTeam[userStoneColor] else {
-            return false
-        }
-        
-        return userTeam.count > 1
-    }
-    
     var actionButtons: some View {
         HStack(spacing: 0) {
             mainActionButton
-            
             actionsMenu
-            
-            // Putting these inside conditional views above does not seem to work well
-            Rectangle().frame(width: 0, height: 0)
-                .alert(isPresented: $showingResumeFromStoneRemovalAlert) {
-                    Alert(
-                        title: Text("Are you sure you want to resume the game?"),
-                        message: nil,
-                        primaryButton: .destructive(Text("Resume")) {
-                            self.resumeGameFromStoneRemoval()
-                        },
-                        secondaryButton: .cancel(Text("Dismiss"))
-                    )
-                }
-            Rectangle().frame(width: 0, height: 0)
-                .alert(isPresented: $showingPassAlert) {
-                    Alert(
-                        title: Text("Are you sure you want to pass?"),
-                        message: nil,
-                        primaryButton: .destructive(Text("Pass")) {
-                            self.submitMove(move: .pass)
-                        },
-                        secondaryButton: .cancel(Text("Dismiss"))
-                    )
-                }
-            Rectangle().frame(width: 0, height: 0)
-                .alert(isPresented: $showingResignAlert) {
-                    Alert(
-                        title: Text(droppingFromCasualRengo ? "Are you sure you want to abandon your team?" : "Are you sure you want to resign this game?"),
-                        message: nil,
-                        primaryButton: .destructive(Text("Resign")) {
-                            ogs.resign(game: game)
-                        },
-                        secondaryButton: .cancel(Text("Dismiss"))
-                    )
-                }
-            Rectangle().frame(width: 0, height: 0)
-                .alert(isPresented: $showingCancelAlert) {
-                    Alert(
-                        title: Text("Are you sure you want to cancel this game?"),
-                        message: nil,
-                        primaryButton: .destructive(Text("Cancel game")) {
-                            ogs.cancel(game: game)
-                        },
-                        secondaryButton: .cancel(Text("Dismiss"))
-                    )
-                }
-
         }
     }
-    
+
     var rowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: CGSize(width: 1024, height: 768), attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
 
     var body: some View {
@@ -488,9 +335,6 @@ struct GameControlRow: View {
                 }
             }
         }
-        .onChange(of: stoneRemovalSelectedPoints.wrappedValue) { _, selectedPoints in
-            self.toggleRemovedStones(stones: selectedPoints)
-        }
         .onChange(of: pendingMove.wrappedValue) { _, newPendingMove in
             if let newPendingMove = newPendingMove {
                 if let timeControl = game.gameData?.timeControl {
@@ -503,8 +347,130 @@ struct GameControlRow: View {
                 }
             }
         }
-        .sheet(item: $rematchPresentation) { presentation in
-            RematchChallengeSheet(challenge: presentation.challenge)
+    }
+}
+
+/// Attach once outside the adaptive game layouts so folding keeps both the
+/// presented form's edits and any confirmation attached to the same host.
+struct GameControlPresentation: ViewModifier {
+    @ObservedObject var state: GameControlState
+    @ObservedObject var game: Game
+    var pendingMove: Binding<Move?>
+    var pendingPosition: Binding<BoardPosition?>
+    @EnvironmentObject private var ogs: OGSService
+    @Environment(\.appReviewCoordinator) private var appReviewCoordinator
+
+    private var droppingFromCasualRengo: Bool {
+        guard game.rengo,
+              game.gameData?.rengoCasualMode == true,
+              let color = game.userStoneColor,
+              let team = game.orderedRengoTeam[color] else { return false }
+        return team.count > 1
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let notice = state.scoringNotice {
+                    scoringRecoveryBanner(notice)
+                }
+            }
+            .sheet(item: $state.rematchPresentation) { presentation in
+                RematchChallengeSheet(challenge: presentation.challenge)
+            }
+            .alert(item: $state.confirmation, content: confirmationAlert)
+            .onChange(of: game.ID, initial: true) { _, _ in
+                updateContext()
+            }
+            .onChange(of: ogs.user?.id) { _, _ in
+                updateContext()
+            }
+    }
+
+    private func updateContext() {
+        state.updateContext(gameID: game.ID, accountID: ogs.user?.id)
+    }
+
+    private func scoringRecoveryBanner(
+        _ notice: GameControlState.ScoringNotice
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch notice {
+            case .unconfirmed:
+                Text("Scoring update unconfirmed").font(.headline)
+                Text("The server may have applied this change. Refresh the game before trying again.")
+                    .font(.subheadline)
+                Button("Refresh game", action: state.refreshScoringState)
+                    .accessibilityIdentifier("game.scoring.refresh")
+            case .refreshing:
+                ProgressView("Refreshing game…")
+            case .refreshed:
+                Text("Game refreshed. Check the board before making another change.")
+                    .font(.subheadline)
+                Button("Dismiss", action: state.dismissScoringNotice)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.regularMaterial)
+    }
+
+    private func confirmationAlert(
+        _ confirmation: GameControlConfirmation
+    ) -> Alert {
+        let title: LocalizedStringKey
+        let actionTitle: LocalizedStringKey
+        switch confirmation.kind {
+        case .pass:
+            title = "Are you sure you want to pass?"
+            actionTitle = "Pass"
+        case .resume:
+            title = "Are you sure you want to resume the game?"
+            actionTitle = "Resume"
+        case .resign:
+            title = droppingFromCasualRengo
+                ? "Are you sure you want to abandon your team?"
+                : "Are you sure you want to resign this game?"
+            actionTitle = "Resign"
+        case .cancel:
+            title = "Are you sure you want to cancel this game?"
+            actionTitle = "Cancel game"
+        }
+        return Alert(
+            title: Text(title),
+            primaryButton: .destructive(Text(actionTitle)) {
+                performConfirmedAction(confirmation)
+            },
+            secondaryButton: .cancel(Text("Dismiss"))
+        )
+    }
+
+    private func performConfirmedAction(
+        _ confirmation: GameControlConfirmation
+    ) {
+        guard confirmation.gameID == game.ID,
+              confirmation.accountID == ogs.user?.id,
+              state.matches(
+                gameID: confirmation.gameID,
+                accountID: confirmation.accountID
+              ), !state.blocksGameActions else { return }
+        switch confirmation.kind {
+        case .pass:
+            let pendingMove = pendingMove
+            let pendingPosition = pendingPosition
+            state.submitMove(
+                .pass, game: game, using: ogs,
+                reviewCoordinator: appReviewCoordinator
+            ) {
+                pendingMove.wrappedValue = nil
+                pendingPosition.wrappedValue = nil
+            }
+        case .resume:
+            state.resumeGameFromStoneRemoval(game: game, using: ogs)
+        case .resign:
+            ogs.resign(game: game)
+        case .cancel:
+            ogs.cancel(game: game)
         }
     }
 }
@@ -527,17 +493,19 @@ private func gameControlRowPreviewData() -> (games: [Game], ogs: OGSService) {
 }
 
 #Preview("Horizontal controls", traits: .fixedLayout(width: 320, height: 60)) {
+    @Previewable @StateObject var state = GameControlState()
     let previewData = gameControlRowPreviewData()
-    GameControlRow(game: previewData.games[2])
+    GameControlRow(game: previewData.games[2], state: state)
         .environmentObject(previewData.ogs)
         .environmentObject(NavigationService())
 }
 
 #Preview("Vertical controls", traits: .fixedLayout(width: 320, height: 120)) {
+    @Previewable @StateObject var state = GameControlState()
     let previewData = gameControlRowPreviewData()
     HStack {
         Spacer()
-        GameControlRow(game: previewData.games[2], horizontal: false)
+        GameControlRow(game: previewData.games[2], state: state, horizontal: false)
     }
     .environmentObject(previewData.ogs)
     .environmentObject(NavigationService())

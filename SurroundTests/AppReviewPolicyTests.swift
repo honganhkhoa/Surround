@@ -201,6 +201,37 @@ final class AppReviewPolicyTests: XCTestCase {
         XCTAssertNil(coordinator.requestID)
     }
 
+    func testAbandoningObservationReleasesPendingMoveWithoutSuppressingEarlierSuccess() {
+        let clock = Clock()
+        let coordinator = AppReviewCoordinator(history: matureHistory(clock), now: { clock.date }, delay: {})
+        coordinator.updateContext(context())
+        let confirmed = coordinator.beginMove(gameID: 100, correspondence: true)!
+        coordinator.finishMove(confirmed, succeeded: true)
+        let unobserved = coordinator.beginMove(gameID: 101, correspondence: true)!
+        coordinator.updateContext(context(home: true))
+        XCTAssertNil(coordinator.requestID)
+
+        coordinator.abandonMove(unobserved)
+        XCTAssertNotNil(coordinator.requestID)
+        // A queued callback from the departed screen must not change the result.
+        coordinator.finishMove(unobserved, succeeded: false)
+        XCTAssertNotNil(coordinator.requestID)
+    }
+
+    func testAbandonedMoveDoesNotCountAsSuccessOrPoisonLaterSuccess() {
+        let clock = Clock()
+        let coordinator = AppReviewCoordinator(history: matureHistory(clock), now: { clock.date }, delay: {})
+        coordinator.updateContext(context())
+        let unobserved = coordinator.beginMove(gameID: 100, correspondence: true)!
+        coordinator.abandonMove(unobserved)
+        coordinator.finishMove(unobserved, succeeded: true)
+        coordinator.updateContext(context(home: true))
+        XCTAssertNil(coordinator.requestID)
+
+        completeCorrespondenceMove(coordinator)
+        XCTAssertNotNil(coordinator.requestID)
+    }
+
     func testLiveMoveWithoutFinishedGameDoesNotQualify() {
         let clock = Clock()
         let coordinator = AppReviewCoordinator(history: matureHistory(clock), now: { clock.date }, delay: {})

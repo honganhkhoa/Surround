@@ -168,6 +168,8 @@ enum SurroundUITestContract {
         case unsupportedGoogle = "unsupported-google"
         case activeGameBoard = "active-game-board"
         case gameAnalysis = "game-analysis"
+        // Regression-only scene: start Analyze without a screenshot position.
+        case initialGameAnalysis = "initial-game-analysis"
         case zenMode = "zen-mode"
         case gameOptions = "game-options"
         case finishedGamePlayback = "finished-game-playback"
@@ -612,10 +614,6 @@ enum SurroundUITestContract {
 
         static func profileBannerNameEntry(_ id: Int) -> String {
             "profile.entry.banner.name.\(id)"
-        }
-
-        static func profileGameTitleEntry(_ id: Int) -> String {
-            "profile.entry.game-title.\(id)"
         }
 
         static func profileChatEntry(_ id: String) -> String {

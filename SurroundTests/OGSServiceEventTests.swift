@@ -2067,6 +2067,60 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.closeThenReconnectCount, 2)
     }
 
+    func testScoringRefreshStartsNewRecoveryEpisodeAfterFailedSocketFallback() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(
+            socket: socket,
+            gameResynchronizationTimeout: 0
+        )
+        let game = Game(ogsGame: try makeEmptyGameData(id: 266))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        socket.emissions.removeAll()
+        let firstFallback = expectation(description: "Initial scoring refresh falls back once")
+        socket.onCloseThenReconnect = { firstFallback.fulfill() }
+
+        service.refreshScoringState(game: game)
+        wait(for: [firstFallback], timeout: 1)
+        XCTAssertEqual(socket.closeThenReconnectCount, 1)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+
+        socket.openSocket()
+        socket.deliver(name: "game/266/gamedata", data: ["game_id": 266])
+        socket.emissions.removeAll()
+        socket.deliver(
+            name: "game/266/move",
+            data: ["move_number": 2, "move": [0, 0, 0]]
+        )
+        XCTAssertTrue(socket.emissions.isEmpty, "Automatic recovery remains coalesced after fallback.")
+
+        let retryFallback = expectation(description: "Explicit retry gets one new bounded fallback")
+        socket.onCloseThenReconnect = { retryFallback.fulfill() }
+        service.refreshScoringState(game: game)
+        XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
+        socket.deliver(
+            name: "game/266/move",
+            data: ["move_number": 2, "move": [1, 0, 0]]
+        )
+        XCTAssertEqual(socket.emissions.count, 2, "Automatic gaps do not duplicate the explicit refresh.")
+        wait(for: [retryFallback], timeout: 1)
+        XCTAssertEqual(socket.closeThenReconnectCount, 2)
+
+        socket.openSocket()
+        socket.deliver(name: "game/266/gamedata", data: ["game_id": 266])
+        socket.emissions.removeAll()
+        let repeatedFallback = expectation(description: "Retry does not enable an automatic reconnect loop")
+        repeatedFallback.isInverted = true
+        socket.onCloseThenReconnect = { repeatedFallback.fulfill() }
+        socket.deliver(
+            name: "game/266/move",
+            data: ["move_number": 2, "move": [2, 0, 0]]
+        )
+        wait(for: [repeatedFallback], timeout: 0.05)
+        XCTAssertEqual(socket.closeThenReconnectCount, 2)
+        XCTAssertTrue(socket.emissions.isEmpty)
+    }
+
     func testReplacementGameDataInvalidatesActiveGameOverviewCache() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)

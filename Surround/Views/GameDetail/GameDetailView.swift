@@ -26,11 +26,8 @@ struct GameDetailView: View {
     
     @State var showSettings = false
     @State var attachedKeyboardVisible = false
-    @State var needsToHideActiveGameCarousel = false
     @State var zenMode = false
-    @State var analyzeMode = false
-    @State private var compactDisplayMode =
-        SingleGameView.DisplayMode.playerInfo
+    @State var interaction = GameDetailInteraction()
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
@@ -42,6 +39,18 @@ struct GameDetailView: View {
     @ObservedObject var settings = userDefaults
     
     var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
+
+    private var compactDisplayMode: GameDetailPanel {
+        get { interaction.panel }
+        nonmutating set { interaction.selectPanel(newValue) }
+    }
+
+    private var analyzeMode: Bool { interaction.isAnalyzing }
+
+    private var analyzeModeBinding: Binding<Bool> {
+        Binding(get: { interaction.isAnalyzing },
+                set: { interaction.setAnalyzing($0) })
+    }
 
     private var effectiveAttachedKeyboardVisible: Bool {
         #if DEBUG && MAIN_APP
@@ -147,79 +156,69 @@ struct GameDetailView: View {
         }
     }
     
-    var compactBody: some View {
-        GeometryReader { geometry -> AnyView in
-//            print("Geometry \(geometry.size)")
-            
-            let boardSize: CGFloat = min(geometry.size.width, geometry.size.height)
-            let controlRowHeight: CGFloat = NSString(string: "Ilp").boundingRect(with: geometry.size, attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)], context: nil).size.height
-            let usableHeight: CGFloat = geometry.size.height
+    private func gameBody(compact: Bool) -> some View {
+        GeometryReader { geometry in
+            let boardSize = min(geometry.size.width, geometry.size.height)
+            let controlRowHeight = NSString(string: "Ilp").boundingRect(
+                with: geometry.size,
+                attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)],
+                context: nil
+            ).size.height
             let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
-            let spacing: CGFloat = 10.0
-            let remainingHeight: CGFloat = usableHeight - boardSize - controlRowHeight - playerInfoHeight - (spacing * 2)
-            let enoughRoomForCarousel = remainingHeight >= 140 || (remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 134)
-            let canShowActiveGamesCarousel = !self.needsToHideActiveGameCarousel && shouldShowActiveGamesCarousel && enoughRoomForCarousel
-            let reducedPlayerInfoVerticalPadding = (canShowActiveGamesCarousel && remainingHeight <= 150) || remainingHeight < 0
+            let remainingHeight = geometry.size.height - boardSize
+                - controlRowHeight - playerInfoHeight - 20
+            let enoughRoomForCarousel = remainingHeight >= 140
+                || remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 134
+            let showsCompactCarousel = compact
+                && compactDisplayMode == .playerInfo
+                && shouldShowActiveGamesCarousel && enoughRoomForCarousel
+            let reducesPlayerPadding =
+                (showsCompactCarousel && remainingHeight <= 150)
+                    || remainingHeight < 0
+            let horizontal = geometry.size.width
+                + geometry.safeAreaInsets.leading
+                + geometry.safeAreaInsets.trailing + 100
+                > geometry.size.height + geometry.safeAreaInsets.top
+                    + geometry.safeAreaInsets.bottom
 
-            return AnyView(erasing: VStack(alignment: .leading) {
-                if let currentGame = currentGame {
-                    SingleGameView(
-                        compact: true,
-                        compactBoardSize: boardSize,
-                        game: currentGame,
-                        reducedPlayerInfoVerticalPadding: reducedPlayerInfoVerticalPadding,
-                        goToNextGame: goToNextGame,
-                        zenMode: $zenMode,
-                        exitZenMode: self.exitZenMode,
-                        attachedKeyboardVisible:
-                            self.effectiveAttachedKeyboardVisible,
-                        compactDisplayMode: $compactDisplayMode,
-                        showsCompactChatBoard: $showsCompactChatBoard,
-                        variationShareDraft: $variationShareDraft,
-                        selectedChatChannel: $selectedChatChannel,
-                        analyzeMode: self.$analyzeMode,
-                        shouldHideActiveGamesCarousel: self.$needsToHideActiveGameCarousel
+            VStack(alignment: .leading, spacing: compact ? nil : 0) {
+                if !compact && !effectiveAttachedKeyboardVisible
+                    && shouldShowActiveGamesCarousel && !analyzeMode {
+                    ActiveGamesCarousel(
+                        currentGame: $currentGame, activeGames: activeGames
                     )
                 }
-                if canShowActiveGamesCarousel {
-                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames, showsToggleButton: true)
-                }
-            })
-        }
-    }
-    
-    var regularBody: some View {
-        GeometryReader { geometry -> AnyView in
-            let showsActiveGamesCarousel =
-                !effectiveAttachedKeyboardVisible
-                    && shouldShowActiveGamesCarousel
-            let horizontal = geometry.size.width + geometry.safeAreaInsets.leading + geometry.safeAreaInsets.trailing + 100 > geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
-            print("Geometry \(horizontal) \(geometry.size) \(geometry.safeAreaInsets)")
-            return AnyView(erasing: VStack(spacing: 0) {
-                if showsActiveGamesCarousel && !analyzeMode {
-                    ActiveGamesCarousel(currentGame: $currentGame, activeGames: activeGames)
-                }
-                if let currentGame = currentGame {
+                // Keep this view in one structural slot as the size class
+                // changes, so folding preserves analysis and pending board moves.
+                if let currentGame {
                     SingleGameView(
-                        compact: false,
+                        compact: compact,
+                        compactBoardSize: boardSize,
                         game: currentGame,
+                        reducedPlayerInfoVerticalPadding: reducesPlayerPadding,
                         goToNextGame: goToNextGame,
                         horizontal: horizontal,
                         zenMode: $zenMode,
-                        exitZenMode: self.exitZenMode,
+                        exitZenMode: exitZenMode,
                         attachedKeyboardVisible:
-                            self.effectiveAttachedKeyboardVisible,
-                        compactDisplayMode: $compactDisplayMode,
+                            effectiveAttachedKeyboardVisible,
+                        interaction: $interaction,
                         showsCompactChatBoard: $showsCompactChatBoard,
                         variationShareDraft: $variationShareDraft,
-                        selectedChatChannel: $selectedChatChannel,
-                        analyzeMode: self.$analyzeMode
+                        selectedChatChannel: $selectedChatChannel
                     )
                 }
-            })
+                if showsCompactCarousel {
+                    ActiveGamesCarousel(
+                        currentGame: $currentGame,
+                        activeGames: activeGames,
+                        showsToggleButton: true
+                    )
+                }
+            }
         }
     }
-    
+
     var body: some View {
         guard let currentGame = self.currentGame else {
             return AnyView(EmptyView())
@@ -261,13 +260,7 @@ struct GameDetailView: View {
         let navigationTitle = navigationBarHidden ? "" : (title ?? "")
         #endif
         
-        let result = Group {
-            if compactLayout {
-                compactBody
-            } else {
-                regularBody
-            }
-        }
+        let result = gameBody(compact: compactLayout)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
@@ -318,7 +311,6 @@ struct GameDetailView: View {
                     to: newGame.gameData?.timeControl.speed
                 ) {
                     zenMode = false
-                    analyzeMode = false
                     compactDisplayMode = .playerInfo
                     showsCompactChatBoard = true
                 }
@@ -368,76 +360,49 @@ struct GameDetailView: View {
         )
         #endif
         
-        if compactLayout {
-            return AnyView(
-                result.toolbar {
-                    if !navigationBarHidden,
-                       currentGame.isUserPlaying,
-                       !currentGame.rengo,
-                       let userColor = currentGame.userStoneColor,
-                       let opponent = currentGame.currentPlayer(with: userColor.opponentColor()),
-                       opponent.id > 0 {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                stackRouter.openProfile(opponent)
-                            } label: {
-                                Text(verbatim: navigationTitle)
-                                    .font(.headline)
-                                    .lineLimit(1)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                Text(
-                                    "View \(opponent.username)’s profile",
-                                    comment: "Accessibility label for a button that opens a player's profile"
-                                )
-                            )
-                            .accessibilityValue(Text(verbatim: opponent.usernameAndRank))
-                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileGameTitleEntry(opponent.id))
-                        }
-                    }
+        return AnyView(
+            result.toolbar {
+                if compactLayout {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
-                            HStack {
-                                if compactDisplayMode == .chat {
-                                    Button {
-                                        withAnimation {
-                                            showsCompactChatBoard.toggle()
-                                        }
-                                    } label: {
-                                        if showsCompactChatBoard {
-                                            Label(
-                                                "Hide main board",
-                                                image: "custom.squareshape.split.3x3.slash"
-                                            )
-                                        } else {
-                                            Label(
-                                                "Show main board",
-                                                image: "custom.squareshape.split.3x3.badge.eye"
-                                            )
-                                        }
+                            if compactDisplayMode == .chat {
+                                Button {
+                                    withAnimation {
+                                        showsCompactChatBoard.toggle()
                                     }
-                                    .accessibilityIdentifier(
-                                        showsCompactChatBoard
-                                            ? SurroundUITestContract
-                                                .AccessibilityID
-                                                .gameChatBoardHide
-                                            : SurroundUITestContract
-                                                .AccessibilityID
-                                                .gameChatBoardShow
-                                    )
-                                } else if !analyzeMode {
-                                    Button(action: enterZenMode) {
-                                        Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
+                                } label: {
+                                    if showsCompactChatBoard {
+                                        Label(
+                                            "Hide main board",
+                                            image: "custom.squareshape.split.3x3.slash"
+                                        )
+                                    } else {
+                                        Label(
+                                            "Show main board",
+                                            image: "custom.squareshape.split.3x3.badge.eye"
+                                        )
                                     }
-                                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenEnter)
-                                    .surroundUITestZenShortcut()
                                 }
-                                Button(action: { self.showSettings = true }) {
-                                    Label("Options", systemImage: "gearshape.2")
+                                .accessibilityIdentifier(
+                                    showsCompactChatBoard
+                                        ? SurroundUITestContract
+                                            .AccessibilityID
+                                            .gameChatBoardHide
+                                        : SurroundUITestContract
+                                            .AccessibilityID
+                                            .gameChatBoardShow
+                                )
+                            } else if !analyzeMode {
+                                Button(action: enterZenMode) {
+                                    Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                                 }
-                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
+                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenEnter)
+                                .surroundUITestZenShortcut()
                             }
+                            Button(action: { self.showSettings = true }) {
+                                Label("Options", systemImage: "gearshape.2")
+                            }
+                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                         } else if zenMode {
                             Button(action: exitZenMode) {
                                 Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
@@ -446,15 +411,9 @@ struct GameDetailView: View {
                             .surroundUITestZenShortcut()
                         }
                     }
-                }
-                .toolbar(.hidden, for: .tabBar)
-                .ignoresSafeArea(edges: navigationBarHidden ? [.top] : [])
-            )
-        } else {
-            return AnyView(
-                result.toolbar {
+                } else {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Toggle(isOn: $analyzeMode.animation()) {
+                        Toggle(isOn: analyzeModeBinding.animation()) {
                             if currentGame.analysisAvailable {
                                 Label("Toggle analyze mode", systemImage: "arrow.triangle.branch")
                                     .labelStyle(IconOnlyLabelStyle())
@@ -473,7 +432,7 @@ struct GameDetailView: View {
                             set: { newValue in
                                 withAnimation {
                                     if newValue && analyzeMode {
-                                        analyzeMode.toggle()
+                                        interaction.setAnalyzing(false)
                                     }
                                     showsActiveGamesCarouselSetting.wrappedValue = newValue
                                 }
@@ -498,11 +457,13 @@ struct GameDetailView: View {
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                     }
                 }
-                .toolbar(zenMode ? .hidden : .automatic, for: .tabBar)
-            )
-        }
+            }
+            .toolbar(compactLayout || zenMode ? .hidden : .automatic, for: .tabBar)
+            .ignoresSafeArea(edges: compactLayout && navigationBarHidden ? [.top] : [])
+        )
     }
 }
+
 
 extension View {
     @ViewBuilder

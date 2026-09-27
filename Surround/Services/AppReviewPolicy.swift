@@ -212,6 +212,15 @@ final class AppReviewCoordinator {
         refreshRequest()
     }
 
+    /// Navigation can stop observing a move that OGS has already accepted.
+    /// Release its token without inventing a result or suppressing prior success.
+    func abandonMove(_ submission: AppReviewSubmission) {
+        guard submission.sessionID == sessionID,
+              submission.userID == context.userID,
+              pendingMoves.remove(submission) != nil else { return }
+        refreshRequest()
+    }
+
     /// Called only for the scene's displayed realtime game. Initial finished
     /// history and spectator updates have no preceding participant phase. Each
     /// view owns its baseline so an outgoing layout cannot clear its replacement.
