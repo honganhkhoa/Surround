@@ -1189,7 +1189,9 @@ struct SingleGameView: View {
         }
     }
     
-    var body: some View {
+    // Bound each type-checking expression while retaining one state owner and
+    // the same unconditional modifier chain across adaptive layouts.
+    private var gameContent: some View {
         Group {
             if zenMode {
                 zenModeBody
@@ -1227,6 +1229,10 @@ struct SingleGameView: View {
                 }
             }
         }
+    }
+
+    private var presentedGameContent: some View {
+        gameContent
         .modifier(GameControlPresentation(
             state: gameControlState,
             game: game,
@@ -1254,6 +1260,10 @@ struct SingleGameView: View {
             focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
         )
         #endif
+    }
+
+    private var observedGameContent: some View {
+        presentedGameContent
         .onReceive(game.$currentPosition) { [game] newPosition in
             self.pendingMove = nil
             self.pendingPosition = nil
@@ -1332,6 +1342,10 @@ struct SingleGameView: View {
                 pruneAnalyzeMarkups()
             }
         }
+    }
+
+    private var interactiveGameContent: some View {
+        observedGameContent
         .onChange(of: compactDisplayMode) { oldValue, newValue in
             if oldValue == .chat && newValue != .chat {
                 selectedChatItem = nil
@@ -1371,6 +1385,10 @@ struct SingleGameView: View {
                 chatSession.requestInputFocus()
             }
         }
+    }
+
+    var body: some View {
+        interactiveGameContent
         .onChange(of: game.ID) { _, _ in
             updateReviewGameObservation()
             chatSession.reset()
