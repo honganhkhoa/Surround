@@ -1056,7 +1056,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         case .publicGames:
             expectedTitle = "Public live games"
         case .messagesInbox:
-            expectedTitle = "Private messages"
+            expectedTitle = "Messages"
         case .settings:
             expectedTitle = "Settings"
         case .about:
@@ -1064,7 +1064,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         case .browser:
             expectedTitle = "Web version"
         case .activeGameBoard, .zenMode:
-            expectedTitle = "vs CopperKoi [4k]"
+            expectedTitle = "Tournament Game: Through the Years: Long Correspondence (59567) R:2 (CopperKoi vs JuniperStone)"
         default:
             XCTFail(
                 "No desktop window-title contract exists for \(scene.rawValue).",

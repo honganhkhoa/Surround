@@ -101,7 +101,7 @@ struct PrivateMessagesView: View {
             }
             .buttonStyle(.plain)
         } else {
-            NavigationLink {
+            AppNavigationLink {
                 PrivateMessageLog(
                     peer: peer,
                     messages: privateMessagesOverride == nil ? nil : privateMessagesByPeerId[peer.id],
@@ -160,7 +160,7 @@ struct PrivateMessagesView: View {
                 }
             }
         }
-        .navigationBarTitle("Private messages")
+        .navigationBarTitle("Messages")
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.screenMessages
         )

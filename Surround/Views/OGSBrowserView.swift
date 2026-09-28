@@ -56,7 +56,7 @@ struct OGSBrowserView: View {
                     Image(systemName: "arrow.clockwise")
                 }))
         .navigationTitle(resolvedTitle)
-        .navigationDestination(isPresented: $showsUnsupportedGoogleLogin) {
+        .appNavigationDestination(isPresented: $showsUnsupportedGoogleLogin) {
             UnsupportedGoogleLoginView()
         }
         .onChange(of: url, initial: true) { _, newURL in

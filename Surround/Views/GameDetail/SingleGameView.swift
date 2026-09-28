@@ -23,6 +23,7 @@ struct SingleGameView: View {
     @EnvironmentObject private var stackRouter: StackRouter
     @EnvironmentObject private var navigation: NavigationService
     @Environment(\.owningStackRoute) private var owningStackRoute
+    @Environment(\.compactGameModesInToolbar) private var compactGameModesInToolbar
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @State private var owningRootView: RootView?
     @Environment(\.colorScheme) private var colorScheme
@@ -607,11 +608,12 @@ struct SingleGameView: View {
                 game: game,
                 topLeftPlayerColor: topLeftPlayerColor,
                 reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
-                showsPlayersName: !game.isUserPlaying,
+                showsPlayersName: true,
+                extendsBackgroundIntoTopSafeArea: compact,
                 onSelectConditionalVariation: showConditionalVariation,
                 rengoTeamDetail: $showsRengoTeamDetail
             )
-            if !showsRengoTeamDetail {
+            if !showsRengoTeamDetail && !compactGameModesInToolbar {
                 compactDisplayModePicker
             }
         }
@@ -635,8 +637,11 @@ struct SingleGameView: View {
                 }
             }
             Spacer(minLength: 10)
-            compactDisplayModePicker
+            if !compactGameModesInToolbar {
+                compactDisplayModePicker
+            }
         }
+        .frame(minHeight: compactGameModesInToolbar ? 30 : nil)
     }
     
     var chatLog: some View {
@@ -649,7 +654,8 @@ struct SingleGameView: View {
                 selectedChannel: selectedChatChannel,
                 variationShareDraft: currentGameVariationShareDraft,
                 focusInputOnAppear: true,
-                onInteraction: { interaction.beginChatInteraction() },
+                // This panel is already Chat. An outgoing composer's late
+                // callback must not undo an explicit switch to another mode.
                 onVariationShared: finishVariationSharing,
                 onCancelVariationSharing:
                     cancelVariationSharing

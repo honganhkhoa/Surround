@@ -3,16 +3,18 @@
 Surround's automated tests are split into three groups:
 
 - `SurroundTests` contains deterministic unit and service tests. These run for every push and pull request and must not contact OGS.
-- `SurroundUITests` contains deterministic, offline journeys shared by iPadOS and Mac Catalyst. Each test launches independently with bundled fixtures and the Debug-only `--surround-ui-testing` argument.
+- `SurroundUITests` contains deterministic, offline journeys for iPhone, iPadOS, and Mac Catalyst. Each test launches independently with bundled fixtures and the Debug-only `--surround-ui-testing` argument.
 - `SurroundBetaTests` contains live integration scenarios against the isolated OGS beta service. Its separate shared scheme keeps it out of normal test runs; run it only by explicitly selecting that scheme locally or manually dispatching the **OGS beta integration tests** workflow.
 
 The offline UI-test runtime uses a dedicated preferences suite, rejecting HTTP transport, and a no-op WebSocket. It does not use the production or Beta account data and cannot contact OGS.
 
 Profile journeys opt into `--surround-profile-content` for populated ratings, active games, and paginated history without changing the screenshot scenes. They cover profile-owner history results, viewer-relative head-to-head results, game/profile route reuse, missing and provisional rating categories, persisted Rank/Rating display, hidden ratings, and dark appearance at the largest text size. `--surround-profile-sections-unavailable` exercises independent section retries while keeping the profile identity, selected rating, and actions available. `--surround-profile-short-history` verifies that a complete history preview does not offer a redundant “See all games” action.
 
-Friendship journeys opt into `--surround-friendship` for three incoming requests and a short action delay. They cover acceptance from a profile, Home and opponent-picker synchronization, both rejection choices and cancellation, removing a friend with confirmation, a sent request surviving profile navigation without enabling duplicate submissions, and incoming-request controls in dark appearance at the largest text size. `--surround-friendship-fails-once` makes the first action for each fixture player fail, exercising retained state and Retry without contacting OGS. Combined with `--surround-friendship-slow-response`, actions take twelve seconds so journeys can navigate between Home and the sender’s profile while an acceptance is pending, then verify that the active screen presents its failure and allows Retry without reentry in both directions. Existing profile and screenshot fixtures keep their original friends and have no incoming requests unless the friendship flag is present.
+Friendship journeys opt into `--surround-friendship` for three incoming requests and a short action delay. Home's avatar menu and the signed-in user's Profile do not list incoming requests, and Messages does not badge them while it has no request list. Compact navigation pushes Profile from the avatar menu and returns to Home with Back; sidebar navigation retains a Profile tab. The journeys open request senders through opponent search to cover acceptance, opponent-picker synchronization, both rejection choices and cancellation, removing a friend with confirmation, a sent request surviving profile navigation without enabling duplicate submissions, and incoming-request controls in dark appearance at the largest text size. `--surround-friendship-fails-once` makes the first action for each fixture player fail, exercising retained state and Retry without contacting OGS. Combined with `--surround-friendship-gated-response`, the first response waits for an explicit test-only release. The two failure journeys verify that delivery occurs while the sender profile is closed or after it has reopened with the action still pending, then verify the retained failure and Retry. Existing profile and screenshot fixtures keep their original friends and have no incoming requests unless the friendship flag is present. `--surround-empty-messages` clears the fixture conversations to verify that signed-in users can still open Messages without any threads. The signed-out `welcome` scene verifies that Messages is absent.
 
 `OGSFriendshipTests` uses stubbed HTTP responses to cover independent friend/invitation loading, malformed entries, partial failures, cached membership preservation, and stale responses arriving across mutations or account changes. An injected monotonic clock verifies the five-second automatic refresh window without sleeping; explicit retries, overlapping subscribers, cancellation, and notification invalidation have separate coverage.
+
+Navigation content layout is centralized in `AppNavigationStack`, `AppNavigationLink` for direct-view pushes, and `appNavigationDestination` for Boolean pushes. Use these shared entry points instead of applying layout modifiers in individual screens; value links using `StackRoute` are already covered by the stack’s destination builder. The content hosts publish `isVerticalToolbar` synchronously for game controls and backgrounds. Keep SDK-specific toolbar presentation in the shared navigation helpers; `AppNavigationLayout.reclaimsEmptyVerticalBarTopInset` remains the single switch for the optional top-inset reclamation. The Preferred Settings editor journey exercises Boolean editor presentation, a nested rules link, retained edits after Back, and the Create route.
 
 ## Deterministic unit tests
 
@@ -31,9 +33,34 @@ The simulator helper accepts an iOS major version and an optional exact family o
 
 App Store review tests use isolated preferences, an injected clock and delay, and a fake presenter. `AppReviewPolicyTests` covers eligibility, session lifecycle, cancellation, and requests from multiple windows; `AppReviewGameActivityTests` covers authoritative move and game-finish evidence. Automatic review requests are disabled in OGS Beta, previews, offline UI tests, and screenshot captures. The offline navigation journey verifies the About review link using the root's discarded URL action, without opening the App Store.
 
+## Offline iPhone UI tests
+
+The `iphone-navigation-ui-tests` CI matrix runs three targeted journeys on iOS 26 and the minimum supported iOS 18. The compact account journey checks the avatar menu’s Profile push and Back navigation without an extra tab, removal of Friend requests from the menu and own Profile, Settings, and logout. It intentionally skips iPad and Mac Catalyst, where account navigation uses the sidebar. The other two journeys check that Messages stays available with an empty inbox and disappears when signed out. Each test selects portrait orientation on iPhone.
+
+```sh
+simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPhone)"
+result_label="Local-$(date +%Y%m%d-%H%M%S)"
+mkdir -p TestResults
+xcodebuild test \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=${simulator_id}" \
+  -parallel-testing-enabled NO \
+  -only-testing:SurroundUITests/ProfileUITests/testCompactAccountMenuPushesOwnProfileAndOpensSettings \
+  -only-testing:SurroundUITests/SurroundUITests/testMessagesNavigationIsHiddenWhenSignedOut \
+  -only-testing:SurroundUITests/SurroundUITests/testMessagesNavigationRemainsAvailableWithoutThreads \
+  -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 300 \
+  -maximum-test-execution-time-allowance 300 \
+  -resultBundlePath "TestResults/SurroundUITests-iPhone-${result_label}-Navigation.xcresult"
+```
+
+Substitute `18` in the simulator selection to reproduce the minimum-OS selection. CI uses `macos-26` for iOS 26 and `macos-15` with Xcode 26.2 for iOS 18. Each job builds once, validates the three selected test declarations, and runs without retries or parallel test workers. The limits are five minutes per test, twenty minutes for the test step, fifteen minutes for the build step, and forty minutes for the job. Result bundles are retained for fourteen days in `surround-iphone-26-navigation-test-results` and `surround-iphone-18-navigation-test-results`. This targeted lane does not run the full iPad journey suite or test Duo device poses.
+
 ## Offline iPad UI tests
 
-The shared journeys cover top-level navigation, opening the bundled fixture game, and entering and leaving Zen mode. The suite selects landscape orientation itself:
+The shared iPadOS and Mac Catalyst journeys cover top-level sidebar navigation including the own Profile entry, an empty Messages inbox, signed-out navigation without Messages, opening the bundled fixture game, switching active games through the bottom-bar popover, and entering and leaving Zen mode. `--surround-empty-messages` clears only offline private-message threads for the empty-inbox regression. The suite selects landscape orientation itself:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
@@ -51,7 +78,7 @@ The keyboard helper stops the Simulator.app host, shuts down only the selected s
 
 The runner builds once per job, then separates the main journeys from the tests that intentionally focus a composer or exercise layout while it owns keyboard focus. The profile and friendship journeys live in the `ProfileUITests` class, which the `profile` phase runs and the `main` phase skips; add new profile journeys there. `GameContinuityUITests` has its own `continuity` phase. All three journey classes inherit their shared launch, element-resolution, and navigation helpers from `SurroundJourneyUITestCase`. Each test phase writes its own `.xcresult` bundle under `TestResults`. CI runs the main, profile, composer, and continuity phases whenever their job's shared build succeeds and the job is not cancelled, even when the preflight or preceding UI phase fails, preserving complete app-test diagnostics while reporting each failure directly. The runner does not retry failed tests or disable XCTest quiescence. Isolation prevents a lost XCTest keyboard-animation completion notification from slowing unrelated main/profile journeys. The preflight allows three minutes per test; other UI phases allow fifteen.
 
-In CI, each OS runs the UI suite in three parallel jobs: main, profile, and composer/continuity. Main and profile retain 60-minute step limits. Composer and continuity each get an independent 45-minute step limit; adding continuity tests does not consume the existing composer's budget. The composer/continuity job runs its five-minute keyboard preflight first and has a 120-minute outer limit, leaving 25 minutes beyond the combined UI step limits for setup, build, and upload. Both main jobs and the iPadOS 26 profile job have 80-minute outer limits. The `minimum-ios-18` job pairs the iOS 18 unit tests with profile UI tests, reuses the UI derived-data directory for that sequential unit step, and retains its 90-minute outer limit. Each job builds its own test products; the extra job per OS trades another build for independent execution and budget. Matrix fail-fast is disabled so a failure on one OS cannot cancel the other OS's composer/continuity coverage.
+In CI, each iPadOS version runs the UI suite in three parallel jobs: main, profile, and composer/continuity. Main and profile retain 60-minute step limits. Composer and continuity each get an independent 45-minute step limit; adding continuity tests does not consume the existing composer's budget. The composer/continuity job runs its five-minute keyboard preflight first and has a 120-minute outer limit, leaving 25 minutes beyond the combined UI step limits for setup, build, and upload. Both main jobs and the iPadOS 26 profile job have 80-minute outer limits. The `minimum-ios-18` job pairs the iOS 18 unit tests with profile UI tests, reuses the UI derived-data directory for that sequential unit step, and retains its 90-minute outer limit. Each job builds its own test products; the extra job per OS trades another build for independent execution and budget. Matrix fail-fast is disabled so a failure on one OS cannot cancel the other OS's composer/continuity coverage.
 
 The split follows a review of six September 21–25, 2026 CI runs: iPadOS 26 composer reached its old 30-minute step cap twice, before the twelve continuity tests were added. Completed main phases took about 18–37 minutes and profile phases 30–48 minutes, leaving headroom under their existing limits. Composer logs also showed repeated XCTest animation-completion waits, including one passing test lasting over fourteen minutes. The larger budget preserves coverage during those stalls; it does not resolve the underlying stall or assertion failures. Reassess the new continuity phase using hosted-run timings once available.
 

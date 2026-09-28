@@ -122,7 +122,7 @@ struct AnalyzeControlBar: View {
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 52)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.secondarySystemBackground), ignoresSafeAreaEdges: [])
         .overlay(alignment: .top) {
             Divider()
         }

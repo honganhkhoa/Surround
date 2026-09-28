@@ -11,6 +11,7 @@ import Combine
 struct GameDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
     @Environment(\.owningStackRoute) private var owningStackRoute
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
@@ -20,11 +21,12 @@ struct GameDetailView: View {
     @State var activeGameByOGSID: [Int: Game] = [:]
     @State private var detailConnection = GameDetailConnectionCoordinator()
 
-    /// When false (e.g. opening a finished game from Game History), the
-    /// active-games carousel is never shown regardless of the active game list.
+    /// Finished-game history routes do not offer the active-game picker.
     var allowsActiveGamesCarousel = true
     
     @State var showSettings = false
+    @State private var showsActiveGames = false
+    @State private var compactBottomBarWasVisible = false
     @State var attachedKeyboardVisible = false
     @State var zenMode = false
     @State var interaction = GameDetailInteraction()
@@ -38,14 +40,53 @@ struct GameDetailView: View {
 
     @ObservedObject var settings = userDefaults
     
-    var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
-
     private var compactDisplayMode: GameDetailPanel {
         get { interaction.panel }
         nonmutating set { interaction.selectPanel(newValue) }
     }
 
     private var analyzeMode: Bool { interaction.isAnalyzing }
+
+    private var onTurnActiveGameCount: Int {
+        activeGames.filter(ogs.isOnUserTurn).count
+    }
+
+    private var activeGamesButton: some View {
+        Button {
+            showsActiveGames = true
+        } label: {
+            Label("Active games", systemImage: "square.grid.2x2")
+        }
+        .accessibilityValue(Text(verbatim: String(onTurnActiveGameCount)))
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameActiveGamesButton
+        )
+        .popover(isPresented: $showsActiveGames) {
+            VStack(alignment: .leading, spacing: 12) {
+                Group {
+                    if currentGame?.gameData?.timeControl.speed?.isRealtime == true {
+                        Text("Live games")
+                    } else {
+                        Text("Correspondence games")
+                    }
+                }
+                .font(.headline)
+                .padding(.horizontal)
+                ActiveGamesCarousel(
+                    currentGame: $currentGame,
+                    activeGames: activeGames,
+                    onSelectGame: { showsActiveGames = false }
+                )
+            }
+            .padding(.vertical)
+            .frame(idealWidth: 420)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.gameActiveGamesPopover
+            )
+            .presentationCompactAdaptation(.popover)
+        }
+    }
 
     private var analyzeModeBinding: Binding<Bool> {
         Binding(get: { interaction.isAnalyzing },
@@ -62,7 +103,7 @@ struct GameDetailView: View {
         #endif
     }
 
-    var shouldShowActiveGamesCarousel: Bool {
+    var canShowActiveGames: Bool {
         guard allowsActiveGamesCarousel else {
             return false
         }
@@ -70,7 +111,7 @@ struct GameDetailView: View {
             return false
         }
         if let currentGame = currentGame {
-            return currentGame.isUserPlaying && activeGames.count > 1
+            return currentGame.isUserPlaying && !activeGames.isEmpty
         } else {
             return false
         }
@@ -145,6 +186,7 @@ struct GameDetailView: View {
     }
     
     func enterZenMode() {
+        showsActiveGames = false
         withAnimation {
             zenMode = true
         }
@@ -156,74 +198,39 @@ struct GameDetailView: View {
         }
     }
     
-    private func gameBody(compact: Bool) -> some View {
-        GeometryReader { geometry in
-            let boardSize = min(geometry.size.width, geometry.size.height)
-            let controlRowHeight = NSString(string: "Ilp").boundingRect(
-                with: geometry.size,
-                attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)],
-                context: nil
-            ).size.height
-            let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
-            let remainingHeight = geometry.size.height - boardSize
-                - controlRowHeight - playerInfoHeight - 20
-            let enoughRoomForCarousel = remainingHeight >= 140
-                || remainingHeight + geometry.safeAreaInsets.bottom * 2 / 3 >= 134
-            let showsCompactCarousel = compact
-                && compactDisplayMode == .playerInfo
-                && shouldShowActiveGamesCarousel && enoughRoomForCarousel
-            let reducesPlayerPadding =
-                (showsCompactCarousel && remainingHeight <= 150)
-                    || remainingHeight < 0
-            let horizontal = geometry.size.width
-                + geometry.safeAreaInsets.leading
-                + geometry.safeAreaInsets.trailing + 100
-                > geometry.size.height + geometry.safeAreaInsets.top
-                    + geometry.safeAreaInsets.bottom
+    private func gameBody(
+        compact: Bool, geometry: GeometryProxy, remainingHeight: CGFloat
+    ) -> some View {
+        let horizontal = geometry.size.width
+            + geometry.safeAreaInsets.leading
+            + geometry.safeAreaInsets.trailing + 100
+            > geometry.size.height + geometry.safeAreaInsets.top
+                + geometry.safeAreaInsets.bottom
 
-            VStack(alignment: .leading, spacing: compact ? nil : 0) {
-                if !compact && !effectiveAttachedKeyboardVisible
-                    && shouldShowActiveGamesCarousel && !analyzeMode {
-                    ActiveGamesCarousel(
-                        currentGame: $currentGame, activeGames: activeGames
-                    )
-                }
-                // Keep this view in one structural slot as the size class
-                // changes, so folding preserves analysis and pending board moves.
-                if let currentGame {
-                    SingleGameView(
-                        compact: compact,
-                        compactBoardSize: boardSize,
-                        game: currentGame,
-                        reducedPlayerInfoVerticalPadding: reducesPlayerPadding,
-                        goToNextGame: goToNextGame,
-                        horizontal: horizontal,
-                        zenMode: $zenMode,
-                        exitZenMode: exitZenMode,
-                        attachedKeyboardVisible:
-                            effectiveAttachedKeyboardVisible,
-                        interaction: $interaction,
-                        showsCompactChatBoard: $showsCompactChatBoard,
-                        variationShareDraft: $variationShareDraft,
-                        selectedChatChannel: $selectedChatChannel
-                    )
-                }
-                if showsCompactCarousel {
-                    ActiveGamesCarousel(
-                        currentGame: $currentGame,
-                        activeGames: activeGames,
-                        showsToggleButton: true
-                    )
-                }
+        return VStack(alignment: .leading, spacing: compact ? nil : 0) {
+            // Keep this view in one structural slot as the size class changes,
+            // so folding preserves analysis and pending board moves.
+            if let currentGame {
+                SingleGameView(
+                    compact: compact,
+                    compactBoardSize: min(geometry.size.width, geometry.size.height),
+                    game: currentGame,
+                    reducedPlayerInfoVerticalPadding: remainingHeight < 0,
+                    goToNextGame: goToNextGame,
+                    horizontal: horizontal,
+                    zenMode: $zenMode,
+                    exitZenMode: exitZenMode,
+                    attachedKeyboardVisible: effectiveAttachedKeyboardVisible,
+                    interaction: $interaction,
+                    showsCompactChatBoard: $showsCompactChatBoard,
+                    variationShareDraft: $variationShareDraft,
+                    selectedChatChannel: $selectedChatChannel
+                )
             }
         }
     }
 
-    var body: some View {
-        guard let currentGame = self.currentGame else {
-            return AnyView(EmptyView())
-        }
-
+    private var compactLayout: Bool {
         var compactLayout = true
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
@@ -233,34 +240,81 @@ struct GameDetailView: View {
             compactLayout = true
         }
         #endif
-        let navigationBarHidden =
-            (effectiveAttachedKeyboardVisible && !compactLayout) || zenMode
-        var title = currentGame.gameName
-        if currentGame.isUserPlaying, let userColor = currentGame.userStoneColor, let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
+        return compactLayout
+    }
+
+    private var navigationBarHidden: Bool {
+        (effectiveAttachedKeyboardVisible && !compactLayout) || zenMode
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            content(geometry: geometry)
+        }
+        .ignoresSafeArea(edges: compactLayout && navigationBarHidden ? [.top] : [])
+    }
+
+    private func content(geometry: GeometryProxy) -> some View {
+        guard let currentGame = self.currentGame else {
+            return AnyView(EmptyView())
+        }
+
+        let controlRowHeight = NSString(string: "Ilp").boundingRect(
+            with: geometry.size,
+            attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)],
+            context: nil
+        ).size.height
+        let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
+            + PlayersBannerView.additionalPhoneVerticalPadding * 2
+        let remainingHeight = geometry.size.height
+            - min(geometry.size.width, geometry.size.height)
+            - controlRowHeight - playerInfoHeight - 20
+        // Decide during layout, including the first pass. Remember only whether
+        // the previous pass already reserved the horizontal bar's height;
+        // this hysteresis avoids toggling as the bar consumes/releases space.
+        let hasRoomForActiveGamesButton = remainingHeight
+            >= (compactBottomBarWasVisible ? 0 : 70)
+        let showsActiveGamesButton = canShowActiveGames
+            && (!compactLayout || isVerticalToolbar || hasRoomForActiveGamesButton)
+        let showsCompactBottomBar = compactLayout && !isVerticalToolbar
+            && showsActiveGamesButton
+        var title = currentGame.gameName?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) ?? ""
+        if title.isEmpty, currentGame.isUserPlaying,
+           let userColor = currentGame.userStoneColor,
+           let opponent = currentGame.currentPlayer(with: userColor.opponentColor()) {
             title = "vs \(opponent.usernameAndRank)"
             if currentGame.rengo {
                 if let opponentTeam = currentGame.gameData?.rengoTeams?[userColor.opponentColor()] {
                     if opponentTeam.count > 1 {
-                        title = title! + " +\(opponentTeam.count - 1)"
+                        title += " +\(opponentTeam.count - 1)"
                     }
                 }
             }
         }
         #if targetEnvironment(macCatalyst)
-        let trimmedTitle = title?.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ) ?? ""
-        let navigationTitle = trimmedTitle.isEmpty
+        let navigationTitle = title.isEmpty
             ? String(
                 localized: "Game",
                 comment: "Fallback game window title"
             )
-            : trimmedTitle
+            : title
         #else
-        let navigationTitle = navigationBarHidden ? "" : (title ?? "")
+        let navigationTitle = navigationBarHidden ? "" : title
         #endif
         
-        let result = gameBody(compact: compactLayout)
+        let result = gameBody(
+            compact: compactLayout, geometry: geometry,
+            remainingHeight: remainingHeight
+        )
+        .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+        .onChange(of: showsCompactBottomBar, initial: true) { _, isVisible in
+            compactBottomBarWasVisible = isVisible
+        }
+        .onChange(of: showsActiveGamesButton) { _, isVisible in
+            if !isVisible { showsActiveGames = false }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
@@ -306,6 +360,7 @@ struct GameDetailView: View {
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
                 showSettings = false
+                showsActiveGames = false
                 if GameDetailDisplayReset.restoresDisplayDefaults(
                     from: oldGame.gameData?.timeControl.speed,
                     to: newGame.gameData?.timeControl.speed
@@ -321,6 +376,7 @@ struct GameDetailView: View {
             }
         }
         .onChange(of: ogs.user?.id) { _, _ in
+            showsActiveGames = false
             variationShareDraft = nil
             selectedChatChannel = .main
         }
@@ -427,22 +483,6 @@ struct GameDetailView: View {
                         )
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Toggle(isOn: Binding<Bool>(
-                            get: { showsActiveGamesCarouselSetting.wrappedValue },
-                            set: { newValue in
-                                withAnimation {
-                                    if newValue && analyzeMode {
-                                        interaction.setAnalyzing(false)
-                                    }
-                                    showsActiveGamesCarouselSetting.wrappedValue = newValue
-                                }
-                            })) {
-                            Label("Toggle thumbnails", systemImage: "rectangle.topthird.inset")
-                                .labelStyle(IconOnlyLabelStyle())
-                        }
-                        .disabled(!shouldShowActiveGamesCarousel)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         Button(action: enterZenMode) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                         }
@@ -457,13 +497,115 @@ struct GameDetailView: View {
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                     }
                 }
+                if showsActiveGamesButton {
+                    ToolbarItem(placement: .bottomBar) { activeGamesButton }
+                    #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+                    if #available(iOS 26.0, *) {
+                        ToolbarSpacer(.flexible, placement: .bottomBar)
+                    } else {
+                        ToolbarItem(placement: .bottomBar) { Spacer() }
+                    }
+                    #else
+                    ToolbarItem(placement: .bottomBar) { Spacer() }
+                    #endif
+                }
             }
+            // Keep the bottom mode group above the Active Games item.
+            .modifier(GameToolbarLayout(
+                game: currentGame,
+                interaction: $interaction,
+                compact: compactLayout,
+                navigationBarHidden: navigationBarHidden,
+                showsActiveGamesButton: showsActiveGamesButton
+            ))
             .toolbar(compactLayout || zenMode ? .hidden : .automatic, for: .tabBar)
-            .ignoresSafeArea(edges: compactLayout && navigationBarHidden ? [.top] : [])
         )
     }
 }
 
+private struct CompactGameModesInToolbarKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var compactGameModesInToolbar: Bool {
+        get { self[CompactGameModesInToolbarKey.self] }
+        set { self[CompactGameModesInToolbarKey.self] = newValue }
+    }
+}
+
+/// Keep title metadata and native navigation/actions. Vertical bars also host
+/// the compact mode controls, leaving the content header for the game clock.
+private struct GameToolbarLayout: ViewModifier {
+    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    @ObservedObject var game: Game
+    @Binding var interaction: GameDetailInteraction
+    let compact: Bool
+    let navigationBarHidden: Bool
+    let showsActiveGamesButton: Bool
+
+    private func panelSelection(_ panel: GameDetailPanel) -> Binding<Bool> {
+        Binding(
+            get: { interaction.panel == panel },
+            set: { selected in
+                guard selected, interaction.panel != panel else { return }
+                withAnimation { interaction.selectPanel(panel) }
+            }
+        )
+    }
+
+    private func panelButton(
+        _ panel: GameDetailPanel,
+        title: LocalizedStringKey,
+        symbol: String,
+        identifier: String
+    ) -> some View {
+        Toggle(isOn: panelSelection(panel)) {
+            Label(title, systemImage: symbol)
+        }
+        .toggleStyle(.button)
+        .accessibilityIdentifier(
+            SurroundUITestContract.AccessibilityID.gameDisplayModePicker
+                + "." + identifier
+        )
+    }
+
+    func body(content: Content) -> some View {
+        let showsModeButtons = compact && !navigationBarHidden
+            && isVerticalToolbar
+
+        content
+            .toolbar(removing: isVerticalToolbar ? .title : nil)
+            .environment(\.compactGameModesInToolbar, showsModeButtons)
+            .toolbar {
+                if showsModeButtons {
+                    AppVerticalToolbarGroup(separatesNextGroup: showsActiveGamesButton) {
+                        panelButton(
+                            .analyze,
+                            title: game.analysisAvailable
+                                ? "Analyze mode" : "Playback mode",
+                            symbol: game.analysisAvailable
+                                ? "arrow.triangle.branch" : "arrow.left.and.right",
+                            identifier: "analyze"
+                        )
+                        panelButton(
+                            .playerInfo,
+                            title: "Player info",
+                            symbol: "person.crop.square.fill.and.at.rectangle",
+                            identifier: "playerInfo"
+                        )
+                        panelButton(
+                            .chat,
+                            title: "Chat",
+                            symbol: "message",
+                            identifier: "chat"
+                        )
+                        .badge(game.chatUnreadCount)
+                    }
+                }
+            }
+    }
+}
 
 extension View {
     @ViewBuilder

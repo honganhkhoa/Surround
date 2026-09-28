@@ -130,6 +130,10 @@ struct AppStoreScreenshotAvatar: View {
 #endif
 
 struct PlayersBannerView: View {
+    static var additionalPhoneVerticalPadding: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .phone ? 10 : 0
+    }
+
     @EnvironmentObject var ogs: OGSService
     @ObservedObject var game: Game
     @Environment(\.colorScheme) private var colorScheme
@@ -139,6 +143,7 @@ struct PlayersBannerView: View {
     var playerIconSize: CGFloat = 64
     var playerIconsOffset: CGFloat = -10
     var showsPlayersName = false
+    var extendsBackgroundIntoTopSafeArea = false
     var onSelectConditionalVariation: ((ConditionalMoveBranch) -> Void)?
     @State var speechSynthesizer: AVSpeechSynthesizer?
     @State var lastUtterance: String?
@@ -204,7 +209,9 @@ struct PlayersBannerView: View {
                     }
                     #endif
                 }
-                .background(Color.gray)
+                // The avatar fill stays inside its square; only the banner
+                // background should extend into the top safe area.
+                .background(Color.gray, ignoresSafeAreaEdges: [])
                 .frame(width: playerIconSize, height: playerIconSize)
                 .border(player?.uiColor ?? .black, width: 1)
                 .shadow(radius: 2)
@@ -677,7 +684,11 @@ struct PlayersBannerView: View {
         }
         .animation(.linear, value: game.orderedRengoTeam)
         .animation(.linear, value: showsRengoTeamDetail)
-        .padding(.vertical, showsRengoTeamDetail ? 0 : verticalPadding)
+        .padding(
+            .vertical,
+            (showsRengoTeamDetail ? 0 : verticalPadding)
+                + Self.additionalPhoneVerticalPadding
+        )
         .padding(.horizontal)
         .background(
             LinearGradient(
@@ -689,6 +700,9 @@ struct PlayersBannerView: View {
                 startPoint: topLeftPlayerColor == .black ? .topLeading : .bottomTrailing,
                 endPoint: topLeftPlayerColor == .black ? .bottomTrailing : .topLeading)
                 .shadow(radius: 2)
+                .modifier(BannerBackgroundSafeArea(
+                    extendTop: extendsBackgroundIntoTopSafeArea
+                ))
         )
         .onAppear {
             initializeSpeechSynthesizerIfNecessary()
@@ -729,6 +743,17 @@ struct PlayersBannerView: View {
             })
         }
     }}
+
+private struct BannerBackgroundSafeArea: ViewModifier {
+    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    let extendTop: Bool
+
+    func body(content: Content) -> some View {
+        content.ignoresSafeArea(
+            .container, edges: extendTop && isVerticalToolbar ? .top : []
+        )
+    }
+}
 
 #if DEBUG
 private extension OGSGame {

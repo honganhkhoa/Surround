@@ -139,7 +139,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     }
 
     private func launchFriendship(
-        scene: SurroundUITestContract.CompatibilityScene = .home,
+        scene: SurroundUITestContract.CompatibilityScene = .opponentPicker,
         failsOnce: Bool = false,
         additionalLaunchArguments: [String] = []
     ) -> XCUIApplication {
@@ -148,6 +148,33 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             arguments.append(SurroundUITestContract.friendshipFailsOnceLaunchArgument)
         }
         return launchProfileContent(scene: scene, additionalLaunchArguments: arguments + additionalLaunchArguments)
+    }
+
+    private func setFriendshipPickerSearch(_ query: String, in app: XCUIApplication) {
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+        tap(search, description: "Search friendship profiles", in: app)
+        let oldValue = search.value as? String ?? ""
+        let oldText = oldValue == search.placeholderValue ? "" : oldValue
+        let end = search.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        #if targetEnvironment(macCatalyst)
+        end.click()
+        #else
+        end.tap()
+        #endif
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldText.count) + query + "\n")
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let value = search.value as? String ?? ""
+            return value == query || (query.isEmpty && value == search.placeholderValue)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed,
+                       "The picker should retain the requested search text.")
+    }
+
+    private func openFriendshipProfileFromPicker(_ playerID: Int, username: String, in app: XCUIApplication) {
+        setFriendshipPickerSearch(username, in: app)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        assertLoadedProfile(named: username, in: app)
     }
 
     @discardableResult
@@ -242,10 +269,13 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     }
 
     private func assertFriendRequestRemoved(_ playerID: Int, in app: XCUIApplication, timeout: TimeInterval = 10) {
-        let request = app.buttons[SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID)].firstMatch
+        let request = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.profileFriendRequest).firstMatch
         let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: request)
         XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: timeout), .completed,
-                       "A completed request must leave the Home request list.")
+                       "A completed request must leave the sender profile's incoming-request banner.")
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestReject(playerID)].exists)
     }
 
     private func retryFriendshipError(in app: XCUIApplication) {
@@ -254,79 +284,98 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(alert.buttons["Retry"].firstMatch, description: "Retry the failed friendship action", in: app)
     }
 
-    private func revealHomeFriendRequest(_ playerID: Int, in app: XCUIApplication) -> XCUIElement {
-        let control = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID),
-                                            in: app, matching: .button)
-        let scroll = element(SurroundUITestContract.AccessibilityID.screenHome, in: app, matching: .scrollView)
-        let header = app.staticTexts[SurroundUITestContract.AccessibilityID.homeFriendRequests].firstMatch
-        let navigationBar = app.navigationBars["Active games"].firstMatch
-        let tabBar = app.tabBars.firstMatch
-        for _ in 0..<10 {
-            let viewport = scroll.frame.intersection(app.frame)
-            var top = navigationBar.exists ? max(viewport.minY, navigationBar.frame.maxY) : viewport.minY
-            if header.exists, header.frame.intersects(viewport) { top = max(top, header.frame.maxY) }
-            let bottom = tabBar.exists ? min(viewport.maxY, tabBar.frame.minY) : viewport.maxY
-            let safeFrame = CGRect(x: viewport.minX, y: top + 8, width: viewport.width,
-                                   height: max(0, bottom - top - 16))
-            if control.isHittable, safeFrame.contains(control.frame) { return control }
-            if safeFrame.isEmpty {
-                scroll.swipeUp()
-            } else if !dragScrollView(scroll, axis: .vertical, targetFrame: control.frame,
-                                      containerFrame: safeFrame, interactionPoint: CGVector(dx: 0.5, dy: 0.5)) {
-                break
-            }
-        }
-        keepInteractionHierarchy(control, container: scroll, in: app,
-                                 reason: "unable to reveal friendship identity below pinned Home header")
-        XCTFail("The friendship identity must fit below Home's pinned section header before tapping.")
-        return control
+
+
+    func testCompactAccountMenuPushesOwnProfileAndOpensSettings() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone,
+                      "The avatar account menu uses the compact iPhone layout.")
+        let app = launchProfileContent(additionalLaunchArguments: [
+            SurroundUITestContract.friendshipLaunchArgument,
+        ])
+        let account = element(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
+        let originalTabCount = app.tabBars.buttons.count
+        XCTAssertTrue((account.value as? String ?? "").contains("JuniperStone"),
+                      "The avatar menu must announce the current user.")
+        tap(account, description: "Open account menu", in: app)
+        XCTAssertFalse(menuButton("account.friend-requests", title: "Friend requests", in: app).exists,
+                       "The account menu must not offer the removed Friend requests shortcut.")
+        requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuSettings,
+                           title: "Settings", in: app)
+        requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuLogout,
+                           title: "Log out", in: app)
+        tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuProfile,
+                               title: "Profile", in: app), description: "Open own Profile", in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        XCTAssertFalse(app.tabBars.buttons["Profile"].exists,
+                       "Opening the own profile must not add a temporary Profile tab.")
+        XCTAssertFalse(app.tabBars.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationProfile).firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "profile.friend-requests").firstMatch.exists,
+                       "The own profile must not contain the removed incoming-request list.")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "friend-request.profile.")).firstMatch.exists)
+        keepScreenshot("Own profile – pushed from the account menu", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        XCTAssertEqual(app.tabBars.buttons.count, originalTabCount,
+                       "Returning from Profile must preserve the original main navigation tabs.")
+        tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
+        tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuSettings,
+                               title: "Settings", in: app), description: "Open Settings", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+        let settingsBar = app.navigationBars["Settings"].firstMatch
+        let settingsDone = settingsBar.buttons["Done"].firstMatch
+        XCTAssertTrue(settingsDone.waitForExistence(timeout: 10))
+        tap(settingsDone, description: "Dismiss Settings to return to Home", in: app)
+        let settingsDismissed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.screenSettings).firstMatch.exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settingsDismissed], timeout: 10), .completed)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
+        tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuLogout,
+                               title: "Log out", in: app), description: "Log out from the account menu", in: app)
+        let signIn = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Sign in to your OGS account")).firstMatch
+        XCTAssertTrue(signIn.waitForExistence(timeout: 10), "Logging out should show the Welcome sign-in action.")
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationMessages).firstMatch.exists,
+            "Messages navigation must disappear after logging out.")
+        XCTAssertFalse(app.tabBars.buttons["Messages"].exists)
     }
 
-    func testFriendRequestAcceptSynchronizesProfileHomeAndOpponentPicker() {
+    func testFriendRequestAcceptSynchronizesProfileAndOpponentPicker() {
         let app = launchFriendship()
         let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
         let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
-        let profileEntry = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerID),
-                                                in: app, matching: .button)
-        scrollIntoTappableArea(profileEntry, in: app)
-        keepScreenshot("Friendship – incoming requests on Home", in: app)
-        tap(profileEntry, description: "View the incoming friend's profile", in: app)
-        assertLoadedProfile(named: username, in: app)
+        openFriendshipProfileFromPicker(playerID, username: username, in: app)
         element(SurroundUITestContract.AccessibilityID.profileFriendRequest, in: app)
         tap(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app, matching: .button)
         assertFriendshipState("friends", in: app)
-        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
-        keepScreenshot("Friendship – accepted from profile", in: app)
-        navigateBackFromPlayerProfile(in: app)
-        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         assertFriendRequestRemoved(playerID, in: app)
-        elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(
-            SurroundUITestContract.friendshipFixtureRequestPlayerIDs[1]), in: app, matching: .button)
+        keepScreenshot("Friendship – accepted from the sender profile", in: app)
+        navigateBackFromPlayerProfile(in: app)
 
-        // The picker consumes the shared friends list. Enter from a different
-        // profile so the new friend cannot appear just as a selected opponent.
-        openProfileContentFromHome(in: app)
-        tap(SurroundUITestContract.AccessibilityID.profileChallenge, in: app, matching: .button)
-        let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent,
-                                              in: app, matching: .button)
-        tap(opponent, description: "Choose a challenge opponent", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        // Clear the search to prove membership in the picker's friends list,
+        // rather than merely finding the same user in cached search results.
+        setFriendshipPickerSearch("", in: app)
         let newFriend = elementAfterScrolling(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID),
                                              in: app, matching: .button)
         scrollIntoTappableArea(newFriend, in: app)
-        tap(newFriend, description: "Open the accepted friend from the picker", in: app)
+        tap(newFriend, description: "Open the accepted friend from the friends list", in: app)
         assertLoadedProfile(named: username, in: app)
         assertFriendshipState("friends", in: app)
+        assertFriendRequestRemoved(playerID, in: app)
     }
 
     func testFriendRequestRejectionCanCancelNotifyOrStayQuiet() {
         let app = launchFriendship()
         let playerIDs = SurroundUITestContract.friendshipFixtureRequestPlayerIDs
+        let usernames = SurroundUITestContract.friendshipFixtureRequestUsernames
         for (index, playerID) in playerIDs.prefix(2).enumerated() {
-            let reject = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestReject(playerID),
-                                               in: app, matching: .button)
-            scrollIntoTappableArea(reject, in: app)
-            let dismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "Active games")
+            openFriendshipProfileFromPicker(playerID, username: usernames[index], in: app)
+            let reject = revealProfileControl(SurroundUITestContract.AccessibilityID.friendRequestReject(playerID), in: app)
+            let dismissalPoint = popoverDismissalPoint(in: app, navigationTitle: usernames[index])
             tap(reject, description: "Review rejection choices", in: app)
             let confirmation = requiredMenuButton(SurroundUITestContract.AccessibilityID.friendshipRejectNotify,
                                                   title: "Reject and Let Them Know", in: app)
@@ -334,7 +383,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                                title: "Reject Quietly", in: app)
             if index == 0 {
                 cancelFriendshipConfirmation(in: app, at: dismissalPoint, containing: confirmation,
-                                             restoring: SurroundUITestContract.AccessibilityID.screenHome)
+                                             restoring: SurroundUITestContract.AccessibilityID.screenPlayerProfile)
                 XCTAssertTrue(reject.exists, "Cancelling must leave the request available.")
                 tap(reject, description: "Reopen rejection choices", in: app)
             }
@@ -342,11 +391,14 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 ? SurroundUITestContract.AccessibilityID.friendshipRejectQuietly
                 : SurroundUITestContract.AccessibilityID.friendshipRejectNotify,
                 title: index == 0 ? "Reject Quietly" : "Reject and Let Them Know", in: app)
+            assertFriendshipState("none", in: app)
             assertFriendRequestRemoved(playerID, in: app)
+            navigateBackFromPlayerProfile(in: app)
         }
-        elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestProfile(playerIDs[2]),
-                              in: app, matching: .button)
-        keepScreenshot("Friendship – only the unanswered request remains", in: app)
+        openFriendshipProfileFromPicker(playerIDs[2], username: usernames[2], in: app)
+        element(SurroundUITestContract.AccessibilityID.profileFriendRequest, in: app)
+        element(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerIDs[2]), in: app)
+        keepScreenshot("Friendship – the unanswered sender still offers its request", in: app)
     }
 
     func testRemovingFriendUpdatesPickerAndSendingRequestPersistsAcrossNavigation() {
@@ -389,9 +441,9 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     func testFriendshipAcceptAndSendFailuresCanRetryWithoutLosingState() {
         let app = launchFriendship(failsOnce: true)
         let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
-        let accept = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
-                                           in: app, matching: .button)
-        scrollIntoTappableArea(accept, in: app)
+        openFriendshipProfileFromPicker(playerID,
+                                       username: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
+        let accept = revealProfileControl(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app)
         tap(accept, description: "Accept with a simulated connection failure", in: app)
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 10))
@@ -399,9 +451,12 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(accept.exists, "A failed acceptance must preserve its request.")
         XCTAssertTrue(accept.isEnabled, "A failed action must unlock its controls.")
         tap(accept, description: "Accept the retained request", in: app)
+        assertFriendshipState("friends", in: app)
         assertFriendRequestRemoved(playerID, in: app)
+        navigateBackFromPlayerProfile(in: app)
 
-        openProfileContentFromHome(in: app)
+        openFriendshipProfileFromPicker(SurroundUITestContract.profileFixtureOpponentID,
+                                       username: "CopperKoi", in: app)
         tap(assertFriendshipState("none", in: app), description: "Send with a simulated connection failure", in: app)
         retryFriendshipError(in: app)
         XCTAssertFalse(assertFriendshipState("requestSent", in: app).isEnabled)
@@ -420,57 +475,76 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID)].exists)
     }
 
-    func testFriendshipFailureArrivingAfterOpeningProfileCanRetryWithoutReentry() {
+    private func launchPendingFriendshipAcceptance() -> XCUIApplication {
         let app = launchFriendship(failsOnce: true, additionalLaunchArguments: [
-            SurroundUITestContract.friendshipSlowResponseLaunchArgument,
+            SurroundUITestContract.friendshipGatedResponseLaunchArgument,
         ])
         let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
         let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
-        let entry = revealHomeFriendRequest(playerID, in: app)
-        let accept = elementAfterScrolling(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
-                                           in: app, matching: .button)
-        scrollIntoTappableArea(accept, in: app)
-        tap(accept, description: "Start accepting the request on Home", in: app)
-        tap(entry, description: "Open the sender's profile while acceptance is pending", in: app)
-        assertLoadedProfile(named: username, in: app)
+        openFriendshipProfileFromPicker(playerID, username: username, in: app)
+        tap(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app, matching: .button)
         element(SurroundUITestContract.AccessibilityID.friendRequestBusy(playerID), in: app)
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists,
-                       "The profile must share Home's pending action and prevent another submission.")
+                       "Pending acceptance must prevent another submission.")
+        let release = element(SurroundUITestContract.AccessibilityID.friendshipReleaseResponse,
+                              in: app, matching: .button)
+        XCTAssertTrue(waitForValue("held", in: release, timeout: 10),
+                      "The fixture must hold the response before navigating away.")
+        XCTAssertTrue(release.isEnabled)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        return app
+    }
 
-        let failure = app.alerts.firstMatch
-        XCTAssertTrue(failure.waitForExistence(timeout: 20),
-                      "The failure must appear on the already-open profile without leaving and reentering it.")
-        tap(failure.buttons["Retry"].firstMatch, description: "Retry Home's failed acceptance from the profile", in: app)
-        let friendship = app.buttons[SurroundUITestContract.AccessibilityID.profileFriendshipAction].firstMatch
-        XCTAssertTrue(friendship.waitForExistence(timeout: 20))
+    private func releaseHeldFriendshipResponse(in app: XCUIApplication) -> XCUIElement {
+        let release = element(SurroundUITestContract.AccessibilityID.friendshipReleaseResponse,
+                              in: app, matching: .button)
+        XCTAssertTrue(waitForValue("held", in: release, timeout: 10),
+                      "The response must remain pending until the destination is visible.")
+        tap(release, description: "Deliver the held friendship failure", in: app)
+        return release
+    }
+
+    func testFriendshipFailureArrivingOnPickerSurvivesProfileReentry() {
+        let app = launchPendingFriendshipAcceptance()
+        let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
+        let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
+        navigateBackFromPlayerProfile(in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        let release = releaseHeldFriendshipResponse(in: app)
+        XCTAssertTrue(waitForValue("delivered", in: release, timeout: 10),
+                      "The failure must finish on the picker before reopening the sender profile.")
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists,
+                       "The closed sender profile must not present an alert over the picker.")
+        keepScreenshot("Friendship – failure delivered while the sender profile is closed", in: app)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        retryFriendshipError(in: app)
         assertLoadedProfile(named: username, in: app)
         assertFriendshipState("friends", in: app)
-        navigateBackFromPlayerProfile(in: app)
-        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         assertFriendRequestRemoved(playerID, in: app)
     }
 
-    func testFriendshipFailureArrivingAfterReturningHomeCanRetryWithoutReentry() {
-        let app = launchFriendship(failsOnce: true, additionalLaunchArguments: [
-            SurroundUITestContract.friendshipSlowResponseLaunchArgument,
-        ])
+    func testFriendshipFailureArrivingOnReopenedProfileCanRetry() {
+        let app = launchPendingFriendshipAcceptance()
         let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
-        let entry = revealHomeFriendRequest(playerID, in: app)
-        tap(entry, description: "Open the incoming friend's profile", in: app)
-        assertLoadedProfile(named: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
-        tap(SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID), in: app, matching: .button)
+        let username = SurroundUITestContract.friendshipFixtureRequestUsernames[0]
         navigateBackFromPlayerProfile(in: app)
-        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        assertLoadedProfile(named: username, in: app)
         element(SurroundUITestContract.AccessibilityID.friendRequestBusy(playerID), in: app)
-        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists,
-                       "Home must share the profile's pending acceptance.")
-
-        let failure = app.alerts.firstMatch
-        XCTAssertTrue(failure.waitForExistence(timeout: 20),
-                      "A failure after leaving the profile must appear on Home without reopening the profile.")
-        tap(failure.buttons["Retry"].firstMatch, description: "Retry the profile's failed acceptance from Home", in: app)
-        assertFriendRequestRemoved(playerID, in: app, timeout: 20)
-        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists,
+                       "The reopened profile must be visible before the held failure arrives.")
+        keepScreenshot("Friendship – reopened sender profile before response delivery", in: app)
+        _ = releaseHeldFriendshipResponse(in: app)
+        retryFriendshipError(in: app)
+        assertFriendshipState("friends", in: app)
+        assertFriendRequestRemoved(playerID, in: app)
     }
 
     func testFriendRequestRemainsUsableInDarkModeAtLargestDynamicType() {
@@ -480,15 +554,14 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
         ])
         let playerID = SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]
-        let entry = revealHomeFriendRequest(playerID, in: app)
-        tap(entry, description: "Open an incoming request at the largest text size", in: app)
-        assertLoadedProfile(named: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
+        openFriendshipProfileFromPicker(playerID,
+                                       username: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
         let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         XCTAssertTrue(waitForValue("dark", in: identity, timeout: 10))
         for identifier in [
             SurroundUITestContract.AccessibilityID.friendRequestReject(playerID),
             SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
-            SurroundUITestContract.AccessibilityID.profileChallenge,
+            SurroundUITestContract.AccessibilityID.profileSelectOpponent,
             SurroundUITestContract.AccessibilityID.profileMessage,
         ] {
             XCTAssertTrue(revealProfileControl(identifier, in: app).isHittable,
@@ -931,21 +1004,18 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.appearanceLaunchArgument,
             appearance.rawValue,
         ])
-        let homeSettings = app.navigationBars.buttons["Settings"].firstMatch
-        if homeSettings.waitForExistence(timeout: 2) {
-            tap(homeSettings, description: "Home Settings", in: app)
-        } else {
-            // An expanded navigation sidebar replaces the Home toolbar button.
-            tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
-        }
-        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
-        tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
+        let usesAccountMenu = app.buttons[SurroundUITestContract.AccessibilityID.accountMenu].waitForExistence(timeout: 2)
+        openOwnProfileFromMainNavigation(in: app)
         let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: 10),
                       "The profile must resolve the requested appearance, independent of the test host.")
         keepScreenshot("Own profile – \(appearance.rawValue) appearance", in: app)
-        navigateBackFromPlayerProfile(in: app)
-        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+        if usesAccountMenu {
+            navigateBackFromPlayerProfile(in: app)
+        } else {
+            selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationHome, in: app)
+        }
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
     }
 
     func testGameAnalysisSurvivesTabSwitchesWithAndWithoutProfile() throws {

@@ -346,7 +346,7 @@ struct RengoActions: View {
                                 messageOrganizerLabel
                             }
                         } else {
-                            NavigationLink(
+                            AppNavigationLink(
                                 destination: PrivateMessageLog(peer: host)
                                     .navigationBarTitle(host.username)
                                     .navigationBarTitleDisplayMode(.inline)

@@ -383,14 +383,15 @@ struct CustomGameForm: View {
                 }
             }
             Spacer().frame(height: 10)
-            NavigationLink(
+            AppNavigationLink(
                 destination: TimeSystemPickerView(
                     blitzTimeControl: $draft.blitzTimeControl,
                     liveTimeControl: $draft.liveTimeControl,
                     correspondenceTimeControl: $draft.correspondenceTimeControl,
                     timeControlSpeed: $draft.timeControlSpeed,
                     isBlitz: $draft.isBlitz,
-                    pauseOnWeekend: $draft.pauseOnWeekend)
+                    pauseOnWeekend: $draft.pauseOnWeekend
+                )
             ) {
                 HStack(spacing: 4) {
                     Text("Advanced time settings")
@@ -413,7 +414,13 @@ struct CustomGameForm: View {
                         Text("Chinese").tag(OGSRule.chinese)
                     }.pickerStyle(SegmentedPickerStyle())
                 } else {
-                    NavigationLink(destination: RulesPickerView(rulesSet: $draft.rulesSet, komi: $draft.komi, isRanked: draft.isRanked)) {
+                    AppNavigationLink(
+                        destination: RulesPickerView(
+                            rulesSet: $draft.rulesSet,
+                            komi: $draft.komi,
+                            isRanked: draft.isRanked
+                        )
+                    ) {
                         HStack(spacing: 4) {
                             Text(verbatim: "\(draft.rulesSet.fullName) ").bold()
                             Image(systemName: "chevron.forward")
@@ -433,7 +440,13 @@ struct CustomGameForm: View {
                     .leadingAlignedInScrollView()
             }
             Spacer().frame(height: 10)
-            NavigationLink(destination: RulesPickerView(rulesSet: $draft.rulesSet, komi: $draft.komi, isRanked: draft.isRanked)) {
+            AppNavigationLink(
+                destination: RulesPickerView(
+                    rulesSet: $draft.rulesSet,
+                    komi: $draft.komi,
+                    isRanked: draft.isRanked
+                )
+            ) {
                 HStack(spacing: 4) {
                     Text("Advanced rules settings")
                     Image(systemName: "chevron.forward")
@@ -657,7 +670,7 @@ struct CustomGameForm: View {
             }
             // Workaround for an issue on iOS 14.5 where the NavigationLink pops out by itself.
             // https://developer.apple.com/forums/thread/677333#672042022
-            NavigationLink(destination: EmptyView()) {
+            AppNavigationLink(destination: EmptyView()) {
                 EmptyView()
             }
         }

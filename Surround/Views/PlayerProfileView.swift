@@ -78,6 +78,8 @@ struct PlayerProfileView: View {
         return false
     }
 
+    private var isOwnProfile: Bool { user.id == ogs.user?.id }
+
     private var title: Text {
         let player = loadedProfile?.user ?? user
         return player.id == ogs.user?.id ? Text("Profile") : Text(verbatim: player.username)
@@ -178,7 +180,7 @@ struct PlayerProfileView: View {
     }
 
     private func refreshFriendship(force: Bool = false) async {
-        guard isVisible, !isLoadingProfile, ogs.isLoggedIn, user.id != ogs.user?.id else { return }
+        guard isVisible, !isLoadingProfile, ogs.isLoggedIn, !isOwnProfile else { return }
         do {
             for try await _ in ogs.refreshFriendship(playerID: user.id, force: force).values {}
         } catch {
@@ -263,6 +265,25 @@ struct PlayerProfileView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct AccountProfileView: View {
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var navigation: StackRouter
+
+    var body: some View {
+        Group {
+            if let user = ogs.user, ogs.isLoggedIn {
+                PlayerProfileView(user: user)
+                    .id(user.id)
+            } else {
+                WelcomeView()
+            }
+        }
+        .onChange(of: ogs.user?.id) { _, _ in
+            navigation.reset(preserving: nil)
         }
     }
 }

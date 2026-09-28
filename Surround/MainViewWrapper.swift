@@ -116,6 +116,7 @@ private struct OfflineUITestRootView: View {
                 MainView(allowsRemoteActivity: false)
             }
         }
+            .friendshipResponseUITestHarness()
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)

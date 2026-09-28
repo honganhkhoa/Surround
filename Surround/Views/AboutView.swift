@@ -90,7 +90,9 @@ struct AboutView: View {
                     Group {
                         Divider()
                         if AppStore.canMakePayments {
-                            NavigationLink(destination: SupporterView()) {
+                            AppNavigationLink(
+                                destination: SupporterView()
+                            ) {
                                 HStack {
                                     Text("Support Surround").bold()
                                     Spacer()
@@ -99,7 +101,9 @@ struct AboutView: View {
                             }
                             Divider()
                         }
-                        NavigationLink(destination: ThanksView()) {
+                        AppNavigationLink(
+                            destination: ThanksView()
+                        ) {
                             HStack {
                                 Text("Thanks to").bold()
                                 Spacer()
@@ -107,7 +111,12 @@ struct AboutView: View {
                             }
                         }
                         Divider()
-                        NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "https://files.honganhkhoa.com/SurroundTerms.html")!).navigationBarTitleDisplayMode(.inline)) {
+                        AppNavigationLink(
+                            destination: OGSBrowserView(
+                                initialURL: URL(string: "https://files.honganhkhoa.com/SurroundTerms.html")!
+                            )
+                            .navigationBarTitleDisplayMode(.inline)
+                        ) {
                             HStack {
                                 Text("Terms of Use").bold()
                                 Spacer()
@@ -115,7 +124,12 @@ struct AboutView: View {
                             }
                         }
                         Divider()
-                        NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "https://files.honganhkhoa.com/SurroundPrivacyPolicy.html")!).navigationBarTitleDisplayMode(.inline)) {
+                        AppNavigationLink(
+                            destination: OGSBrowserView(
+                                initialURL: URL(string: "https://files.honganhkhoa.com/SurroundPrivacyPolicy.html")!
+                            )
+                            .navigationBarTitleDisplayMode(.inline)
+                        ) {
                             HStack {
                                 Text("Privacy Policy").bold()
                                 Spacer()

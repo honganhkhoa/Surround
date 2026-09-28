@@ -706,6 +706,66 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         #endif
     }
 
+    func selectMainNavigation(_ identifier: String, in app: XCUIApplication) {
+        let entries = app.descendants(matching: .any).matching(identifier: identifier)
+        let tabTitles = [
+            SurroundUITestContract.AccessibilityID.navigationHome: "Home",
+            SurroundUITestContract.AccessibilityID.navigationPublicGames: "Public games",
+            SurroundUITestContract.AccessibilityID.navigationMessages: "Messages",
+            SurroundUITestContract.AccessibilityID.navigationProfile: "Profile",
+            SurroundUITestContract.AccessibilityID.navigationSettings: "Settings",
+            SurroundUITestContract.AccessibilityID.navigationAbout: "About",
+            SurroundUITestContract.AccessibilityID.navigationBrowser: "Web version",
+        ]
+        var entry: XCUIElement?
+        func visibleEntry() -> Bool {
+            entry = entries.allElementsBoundByIndex.first(where: { $0.isHittable })
+            // At launch UIKit can expose the compact tabs by title before
+            // SwiftUI forwards their identifiers. Restrict title resolution
+            // to actual tab-bar buttons so page content cannot match.
+            if entry == nil, let title = tabTitles[identifier] {
+                entry = app.tabBars.buttons.matching(NSPredicate(format: "label == %@", title))
+                    .allElementsBoundByIndex.first(where: { $0.isHittable })
+            }
+            return entry != nil
+        }
+        func waitForEntry() -> Bool {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in visibleEntry() }, object: nil)
+            return XCTWaiter.wait(for: [ready], timeout: 10) == .completed
+        }
+        if !waitForEntry() {
+            let sidebar = app.buttons["Toggle sidebar"].firstMatch
+            if sidebar.exists && sidebar.isHittable {
+                tap(sidebar, description: "Show navigation sidebar", in: app)
+                _ = waitForEntry()
+            }
+        }
+        XCTAssertNotNil(entry, "Expected a visible main navigation entry: \(identifier)")
+        guard let entry else { return }
+        tap(entry, description: identifier, in: app)
+    }
+
+    func openOwnProfileFromMainNavigation(in app: XCUIApplication) {
+        let account = app.buttons[SurroundUITestContract.AccessibilityID.accountMenu].firstMatch
+        let profile = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationProfile).firstMatch
+        let navigationReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            account.exists || profile.exists || app.tabBars.buttons["Profile"].exists
+                || app.buttons["Toggle sidebar"].exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [navigationReady], timeout: 10), .completed,
+                       "Expected the account menu or Profile navigation to appear.")
+        if account.exists {
+            tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
+            tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuProfile,
+                                   title: "Profile", in: app), description: "Open own Profile", in: app)
+        } else {
+            selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationProfile, in: app)
+        }
+        element(SurroundUITestContract.AccessibilityID.screenPlayerProfile, in: app)
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+    }
+
     func dismissPopover(
         in app: XCUIApplication,
         at point: XCUICoordinate,

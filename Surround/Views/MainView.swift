@@ -86,6 +86,13 @@ struct MainView: View {
         SystemPlatformServices.shared.endBackgroundTask(backgroundTask)
         backgroundTask = nil
     }
+
+    private func redirectSignedOutAccountDestination() {
+        guard !ogs.isLoggedIn else { return }
+        if nav.main.rootView == .profile || nav.main.rootView == .privateMessages {
+            nav.main.rootView = .home
+        }
+    }
     
     func onAppActive(newLaunch: Bool) {
         guard allowsRemoteActivity else { return }
@@ -152,24 +159,27 @@ struct MainView: View {
                     RootView.publicGames.label
                 }
                 .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
-                if ogs.privateMessagesActivePeerIds.count > 0 {
+                if ogs.isLoggedIn {
                     Tab(value: RootView.privateMessages) {
                         RootView.privateMessages.navigationView
                     } label: {
-                        if horizontalSizeClass == .compact {
-                            Label(
-                                "Messages",
-                                systemImage:
-                                    RootView.privateMessages.systemImage
-                            )
-                        } else {
-                            RootView.privateMessages.label
-                        }
+                        RootView.privateMessages.label
                     }
                     .accessibilityIdentifier(
                         SurroundUITestContract.AccessibilityID.navigationMessages
                     )
                 }
+                Tab(value: RootView.profile) {
+                    RootView.profile.navigationView
+                } label: {
+                    RootView.profile.label
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationProfile)
+                .tabPlacement(.sidebarOnly)
+                .hidden(
+                    nav.main.rootView != .profile
+                        && (!ogs.isLoggedIn || horizontalSizeClass == .compact)
+                )
                 // Compact iPhone tab bars ignore sidebar-only placement.
                 // Retain the selected secondary tab and its stack through a
                 // fold; hide it only after another destination is selected.
@@ -225,6 +235,12 @@ struct MainView: View {
             if ogs.isLoggedIn {
                 NotificationPopup()
             }
+        }
+        .onChange(of: ogs.isLoggedIn, initial: true) { _, _ in
+            redirectSignedOutAccountDestination()
+        }
+        .onChange(of: nav.main.rootView) { _, _ in
+            redirectSignedOutAccountDestination()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard allowsRemoteActivity else { return }

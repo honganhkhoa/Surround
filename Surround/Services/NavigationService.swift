@@ -300,6 +300,7 @@ enum RootView: String, CaseIterable, Identifiable {
     case home
     case publicGames
     case privateMessages
+    case profile
     case settings
     case about
     case browser
@@ -313,6 +314,8 @@ enum RootView: String, CaseIterable, Identifiable {
             return "person.2"
         case .privateMessages:
             return "message"
+        case .profile:
+            return "person.crop.circle"
         case .settings:
             return "gearshape.2"
         case .about:
@@ -331,7 +334,9 @@ enum RootView: String, CaseIterable, Identifiable {
         case .publicGames:
             return String(localized: "Public games", comment: "in navigation menu")
         case .privateMessages:
-            return String(localized: "Private messages", comment: "in navigation menu")
+            return String(localized: "Messages", comment: "in navigation menu")
+        case .profile:
+            return String(localized: "Profile", comment: "in navigation menu")
         case .settings:
             return String(localized: "Settings", comment: "in navigation menu")
         case .about:
@@ -376,6 +381,8 @@ enum RootView: String, CaseIterable, Identifiable {
             PublicGamesList()
         case .privateMessages:
             PrivateMessagesView()
+        case .profile:
+            AccountProfileView()
         case .settings:
             SettingsView()
         case .about:
@@ -443,6 +450,7 @@ struct RootViewSwitchingMenu: ViewModifier {
     #endif
     @EnvironmentObject var nav: NavigationService
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
 
     func body(content: Content) -> some View {
         var compactSizeClass = false
@@ -456,8 +464,13 @@ struct RootViewSwitchingMenu: ViewModifier {
                     Section {
                         RootView.home.menuButton(currentView: $nav.main.rootView)
                         RootView.publicGames.menuButton(currentView: $nav.main.rootView)
-                        if ogs.privateMessagesActivePeerIds.count > 0 {
+                        if ogs.isLoggedIn {
                             RootView.privateMessages.menuButton(currentView: $nav.main.rootView)
+                            Button {
+                                if let user = ogs.user { openPlayerProfile?(user) }
+                            } label: {
+                                RootView.profile.label
+                            }
                         }
                     }
                     Section {

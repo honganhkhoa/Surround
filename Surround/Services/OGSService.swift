@@ -4748,9 +4748,13 @@ class OGSService: ObservableObject {
                     var failures = self.friendshipActionFailuresByPlayerID[player.id] ?? []
                     let error = failures.isEmpty ? nil : failures.removeFirst()
                     self.friendshipActionFailuresByPlayerID[player.id] = failures
-                    DispatchQueue.main.asyncAfter(deadline: .now() + self.friendshipActionDelay) {
+                    let respond = {
                         finish(error.map { .failure(OGSFriendshipError(message: $0)) } ?? .success(()))
                     }
+                    #if DEBUG && MAIN_APP
+                    if FriendshipResponseUITestGate.shared.holdIfNeeded(respond) { return }
+                    #endif
+                    DispatchQueue.main.asyncAfter(deadline: .now() + self.friendshipActionDelay, execute: respond)
                     return
                 }
 

@@ -61,7 +61,13 @@ struct SettingsView: View {
                 .padding(.horizontal)
             } else {
                 GroupBox(label: Text("Online-go.com Account")) {
-                    NavigationLink(destination: OGSBrowserView(initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!, showsURLBar: true).navigationBarTitleDisplayMode(.inline)) {
+                    AppNavigationLink(
+                        destination: OGSBrowserView(
+                            initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!,
+                            showsURLBar: true
+                        )
+                        .navigationBarTitleDisplayMode(.inline)
+                    ) {
                         Text("Sign in to your Account")
                             .leadingAlignedInScrollView()
                             .padding(.vertical, 8)
@@ -150,7 +156,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showSupporterView) {
-            NavigationStack {
+            AppNavigationStack {
                 SupporterView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -170,7 +176,9 @@ struct SettingsView: View {
             VStack {
                 accountSettings
                 GroupBox {
-                    NavigationLink(destination: AboutView()) {
+                    AppNavigationLink(
+                        destination: AboutView()
+                    ) {
                         HStack {
                             Text("About & Support")
                                 .bold()

@@ -246,6 +246,10 @@ struct AnalyzeTreeView: View {
                 }.frame(minHeight: geometry.size.height)
             }.frame(height: geometry.size.height)
         }
+        // Slices overlap to connect branches; clip only the complete viewport
+        // so scrolling cannot draw or receive taps beneath a side toolbar.
+        .clipped()
+        .contentShape(Rectangle())
         .background(Color(colorScheme == .dark ? .systemGray4 : .systemGray6).shadow(radius: 2))
     }
 }

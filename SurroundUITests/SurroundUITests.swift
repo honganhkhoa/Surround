@@ -983,6 +983,110 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         element(rowID, in: app)
     }
 
+    func testMessagesNavigationIsHiddenWhenSignedOut() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.welcome.rawValue,
+        ], orientation: UIDevice.current.userInterfaceIdiom == .phone ? .portrait : .landscapeLeft)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        let signIn = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Sign in to your OGS account")).firstMatch
+        XCTAssertTrue(signIn.waitForExistence(timeout: 10))
+
+        // Exercise the main navigation so a collapsed sidebar cannot hide an
+        // incorrectly exposed account destination from this assertion.
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationPublicGames, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+        let sidebar = app.buttons["Toggle sidebar"].firstMatch
+        let home = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationHome).firstMatch
+        if !home.isHittable && sidebar.exists && sidebar.isHittable {
+            tap(sidebar, description: "Show signed-out navigation", in: app)
+        }
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationMessages).firstMatch.exists)
+        XCTAssertFalse(app.tabBars.buttons["Messages"].exists)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+    }
+
+    func testPreferredSettingEditorRetainsRulesAcrossNavigation() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.preferredSettings.rawValue,
+        ], orientation: .portrait)
+        element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
+        let edit = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ AND label == %@",
+            SurroundUITestContract.AccessibilityID.preferredSetting(0), "Edit"
+        )).firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        scrollIntoTappableArea(edit, in: app)
+        tap(edit, description: "Edit the first preferred setting", in: app)
+        XCTAssertTrue(app.navigationBars["Edit preferred setting"].waitForExistence(timeout: 10))
+        let editor = element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app, matching: .scrollView)
+
+        let advancedRules = app.buttons["Advanced rules settings"].firstMatch
+        XCTAssertTrue(advancedRules.waitForExistence(timeout: 10))
+        scrollIntoTappableArea(advancedRules, in: app)
+        tap(advancedRules, description: "Open advanced rules from the setting editor", in: app)
+        XCTAssertTrue(app.navigationBars["Advanced rules settings"].waitForExistence(timeout: 10))
+        // The preferred-setting fixture starts with Japanese rules. AGA also
+        // changes the editor from its two-option picker to the rule-name link.
+        tap(app.buttons["AGA"].firstMatch, description: "Choose AGA rules", in: app)
+
+        func navigateBack(from title: String) {
+            let bar = app.navigationBars[title].firstMatch
+            XCTAssertTrue(bar.waitForExistence(timeout: 10))
+            let identifiedBack = bar.buttons.matching(identifier: "BackButton").firstMatch
+            tap(identifiedBack.exists ? identifiedBack : bar.buttons.firstMatch,
+                description: "Back from \(title)", in: app)
+        }
+
+        navigateBack(from: "Advanced rules settings")
+        XCTAssertTrue(app.navigationBars["Edit preferred setting"].waitForExistence(timeout: 10))
+        let retainedRule = editor.buttons.matching(NSPredicate(
+            format: "label == %@ OR label BEGINSWITH %@", "AGA", "AGA "
+        )).firstMatch
+        XCTAssertTrue(retainedRule.waitForExistence(timeout: 10),
+                      "Returning from Advanced rules must preserve the existing editor draft's rule.")
+        keepScreenshot("Preferred setting – edited rule retained after Back", in: app)
+
+        navigateBack(from: "Edit preferred setting")
+        element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        let add = app.navigationBars.buttons.matching(NSPredicate(
+            format: "label == %@ OR label == %@ OR identifier == %@", "Add", "plus", "plus"
+        )).firstMatch
+        tap(add, description: "Add a new preferred setting", in: app)
+        XCTAssertTrue(app.navigationBars["New preferred setting"].waitForExistence(timeout: 10))
+        element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
+        navigateBack(from: "New preferred setting")
+        element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
+        XCTAssertTrue(edit.waitForExistence(timeout: 10),
+                      "Cancelling creation must return to the original preferred-settings list.")
+    }
+
+    func testMessagesNavigationRemainsAvailableWithoutThreads() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+            SurroundUITestContract.emptyMessagesLaunchArgument,
+        ], orientation: UIDevice.current.userInterfaceIdiom == .phone ? .portrait : .landscapeLeft)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationMessages, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", "messages.row."
+        )).firstMatch.exists, "This regression must exercise an inbox with no message threads.")
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationMessages, in: app)
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,
@@ -1002,6 +1106,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
 
         tap(SurroundUITestContract.AccessibilityID.navigationMessages, in: app)
         element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.navigationProfile, in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
         element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
@@ -1711,6 +1818,58 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testActiveGamesPopoverSwitchesGameAndDismisses() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        let gameIDs = SurroundUITestContract.liveBannerCorrespondenceGameIDs
+        let firstGame = elementAfterScrolling(SurroundUITestContract.AccessibilityID.homeGame(gameIDs[0]), in: app)
+        scrollIntoTappableArea(firstGame, in: app)
+        tap(firstGame, description: "Open the first correspondence game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameIDs[0]), in: app)
+        let carousel = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
+        XCTAssertFalse(carousel.exists, "Game thumbnails must not occupy the game screen by default.")
+        let activeGamesButton = element(
+            SurroundUITestContract.AccessibilityID.gameActiveGamesButton,
+            in: app,
+            matching: .button
+        )
+        // iOS 27 reports this visible bottom-bar item as not hittable while
+        // the hidden tab bar retains an accessibility frame over it.
+        activeGamesButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let popover = element(SurroundUITestContract.AccessibilityID.gameActiveGamesPopover, in: app)
+        element(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel, in: app)
+        for gameID in gameIDs {
+            let entries = popover.descendants(matching: .button)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameID))
+            XCTAssertTrue(entries.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertEqual(entries.count, 1, "Each popover game must have a unique entry identifier.")
+            XCTAssertTrue(entries.firstMatch.label.contains("Friendly Match"))
+            XCTAssertTrue(
+                entries.firstMatch.label.contains("OrbitFox"),
+                "The opponent must be announced even when the games share the same name."
+            )
+            XCTAssertTrue(
+                entries.firstMatch.label.contains("Your move"),
+                "Turn status must be announced without relying on the thumbnail color."
+            )
+            XCTAssertEqual(entries.firstMatch.isSelected, gameID == gameIDs[0])
+            XCTAssertFalse(popover.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.homeGame(gameID)).firstMatch.exists,
+                "Popover entries must not reuse Home's game identifiers.")
+        }
+        let nextGame = popover.descendants(matching: .button)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameIDs[1])).firstMatch
+        XCTAssertTrue(nextGame.waitForExistence(timeout: 10))
+        tap(nextGame, description: "Switch to the second correspondence game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameIDs[1]), in: app)
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: popover)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+        XCTAssertFalse(carousel.exists, "Selecting a game must return to its unobstructed board.")
+        element(SurroundUITestContract.AccessibilityID.gameActiveGamesButton, in: app)
+    }
+
     func testLiveGameBannerUsesHomeNavigationStack() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
@@ -1723,7 +1882,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         scrollIntoTappableArea(correspondence, in: app)
         tap(correspondence, description: "Open correspondence game", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(correspondenceID), in: app)
-        let carousel = element(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel, in: app)
+        let carousel = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
+        XCTAssertFalse(carousel.exists, "Active games must stay hidden until requested.")
         let banner = element(SurroundUITestContract.AccessibilityID.liveGameBanner, in: app, matching: .button)
 
         func openLiveGameFromBanner() {
@@ -3347,7 +3508,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             )
         tapAnalysisPosition(conflictingNodeIdentifier, in: app)
         assertSelected(conflictingNodeIdentifier, in: app)
-        let detailDismissalPoint = popoverDismissalPoint(in: app, navigationTitle: "vs ")
+        let detailDismissalPoint = popoverDismissalPoint(
+            in: app,
+            navigationTitle: "Tournament Game: Correspondence"
+        )
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app

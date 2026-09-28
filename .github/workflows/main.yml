@@ -54,6 +54,96 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  iphone-navigation-ui-tests:
+    name: iOS ${{ matrix.ios }} iPhone navigation
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ios: '26'
+            runner: macos-26
+          - ios: '18'
+            runner: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2 for iOS 18
+        if: ${{ matrix.ios == '18' }}
+        shell: bash
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iOS ${{ matrix.ios }} iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh '${{ matrix.ios }}' iPhone)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Build iPhone navigation UI tests
+        id: iphone_ui_build
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          xcodebuild build-for-testing \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
+            -parallel-testing-enabled NO \
+            -only-testing:SurroundUITests
+
+      - name: Run compact account and Messages navigation tests
+        if: ${{ !cancelled() && steps.iphone_ui_build.outcome == 'success' }}
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          test_cases=(
+            ProfileUITests/testCompactAccountMenuPushesOwnProfileAndOpensSettings
+            SurroundUITests/testMessagesNavigationIsHiddenWhenSignedOut
+            SurroundUITests/testMessagesNavigationRemainsAvailableWithoutThreads
+          )
+          selection_arguments=()
+          for test_case in "${test_cases[@]}"; do
+            test_class="${test_case%%/*}"
+            test_name="${test_case#*/}"
+            test_source="SurroundUITests/${test_class}.swift"
+            class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
+            declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+${test_name}[[:space:]]*\([[:space:]]*\)" "$test_source" || true)"
+            if [[ "$class_count" != "1" || "$declaration_count" != "1" ]]; then
+              echo "Expected exactly one ${test_class} class and ${test_name} declaration in ${test_source}. Update the iPhone navigation selection when renaming or moving it." >&2
+              exit 1
+            fi
+            selection_arguments+=("-only-testing:SurroundUITests/${test_case}")
+          done
+          mkdir -p TestResults
+          xcodebuild test-without-building \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
+            -parallel-testing-enabled NO \
+            "${selection_arguments[@]}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-Navigation.xcresult"
+
+      - name: Upload iPhone navigation UI test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-iphone-${{ matrix.ios }}-navigation-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
   ipad-ui-tests:
     runs-on: macos-26
     timeout-minutes: 80

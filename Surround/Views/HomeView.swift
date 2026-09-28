@@ -48,6 +48,7 @@ struct HomeView: View {
     @Environment(\.tabBarPlacement) private var tabBarPlacement
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
+    @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     
@@ -220,7 +221,6 @@ struct HomeView: View {
     var activeGamesView: some View {
         let noItem = 
             ogs.challengesReceived.count +
-            ogs.friendInvitations.count +
             ogs.liveGames.count +
             ogs.unclassifiedActiveGames.count +
             ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
@@ -308,30 +308,6 @@ struct HomeView: View {
                                         .background(Color(UIColor.systemBackground).shadow(radius: 2))
                                         .padding(.vertical, 5)
                                         .padding(.horizontal)
-                                }
-                            }
-                        }
-                        if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsError != nil {
-                            Section(header: sectionHeader(title: String(localized: "Friend requests"))
-                                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeFriendRequests)) {
-                                ForEach(ogs.friendInvitations) { invitation in
-                                    FriendRequestCard(invitation: invitation)
-                                        .padding()
-                                        .background(Color(.systemBackground).shadow(radius: 2))
-                                        .padding(.vertical, 5)
-                                        .padding(.horizontal)
-                                }
-                                if ogs.friendInvitationsError != nil {
-                                    VStack(spacing: 8) {
-                                        Text("Couldn’t load friend requests")
-                                            .foregroundStyle(.secondary)
-                                        if ogs.friendInvitationsLoading {
-                                            ProgressView()
-                                        } else {
-                                            Button("Try Again") { ogs.fetchFriends() }
-                                        }
-                                    }
-                                    .padding()
                                 }
                             }
                         }
@@ -627,6 +603,49 @@ struct HomeView: View {
         }
     }
 
+    private var accountMenu: some View {
+        Menu {
+            if let user = ogs.user {
+                Text(verbatim: user.usernameAndRank)
+            }
+            Divider()
+            Button("Profile", systemImage: "person.crop.circle") {
+                if let user = ogs.user { openPlayerProfile?(user) }
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenuProfile)
+            Button("Settings", systemImage: "gearshape") {
+                nav.home.showingSettings = true
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenuSettings)
+            Divider()
+            Button("Log out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                ogs.logout()
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenuLogout)
+        } label: {
+            AsyncImage(url: allowsRemoteActivity ? ogs.user?.iconURL(ofSize: 128) : nil) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 40, height: 40)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+        }
+        .accessibilityLabel("Account")
+        .accessibilityValue(Text(verbatim: ogs.user?.usernameAndRank ?? ""))
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenu)
+    }
+
+    private var accountMenuToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            accountMenu
+        }
+    }
+
     var body: some View {
         return VStack {
             if ogs.isLoggedIn {
@@ -637,11 +656,11 @@ struct HomeView: View {
         }
         .toolbar {
             if (ogs.isLoggedIn) {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    if shouldShowSettingsButton {
-                        Button(action: { nav.home.showingSettings = true }) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
+                if shouldShowSettingsButton {
+                    if #available(iOS 26.0, *) {
+                        accountMenuToolbarItem.sharedBackgroundVisibility(.hidden)
+                    } else {
+                        accountMenuToolbarItem
                     }
                 }
                 if #available(iOS 26.0, *) {

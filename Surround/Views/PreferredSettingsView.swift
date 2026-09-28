@@ -205,12 +205,12 @@ struct PreferredSettingsView: View {
             .onDisappear {
                 ogs.unsubscribeFromSeekGraphWhenDone()
             }
-            .navigationDestination(isPresented: $creatingNewPreferredSetting) {
+            .appNavigationDestination(isPresented: $creatingNewPreferredSetting) {
                 CustomGameForm(mode: .createPreferredSetting)
                     .navigationTitle("New preferred setting")
                     .navigationBarTitleDisplayMode(.inline)
             }
-            .navigationDestination(isPresented: Binding(
+            .appNavigationDestination(isPresented: Binding(
                 get: { settingBeingEdited != nil },
                 set: { isActive in
                     if !isActive {

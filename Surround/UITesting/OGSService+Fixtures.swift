@@ -8,7 +8,60 @@
 import Foundation
 
 #if DEBUG && MAIN_APP
+import SwiftUI
 import WidgetKit
+
+/// Holds the first offline friendship response until a UI journey has verified
+/// its navigation destination. Later responses, including Retry, run normally.
+final class FriendshipResponseUITestGate: ObservableObject {
+    static let shared = FriendshipResponseUITestGate()
+
+    @Published private(set) var state = "idle"
+    private var response: (() -> Void)?
+
+    func holdIfNeeded(_ response: @escaping () -> Void) -> Bool {
+        guard SurroundUITestContract.gatesFriendshipResponse, state == "idle" else { return false }
+        self.response = response
+        state = "held"
+        return true
+    }
+
+    func release() {
+        guard let response else { return }
+        self.response = nil
+        response()
+        state = "delivered"
+    }
+}
+
+private struct FriendshipResponseUITestModifier: ViewModifier {
+    @ObservedObject private var gate = FriendshipResponseUITestGate.shared
+
+    func body(content: Content) -> some View {
+        if SurroundUITestContract.gatesFriendshipResponse {
+            content.safeAreaInset(edge: .bottom, spacing: 0) {
+                Button(action: gate.release) {
+                    Text(verbatim: "Release friendship response")
+                }
+                    .buttonStyle(.bordered)
+                    .disabled(gate.state != "held")
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendshipReleaseResponse)
+                    .accessibilityValue(Text(verbatim: gate.state))
+                    .padding(6)
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func friendshipResponseUITestHarness() -> some View {
+        modifier(FriendshipResponseUITestModifier())
+    }
+}
 
 private struct AppStoreScreenshotPublicClockFixture {
     let timeControl: TimeControlSystem
@@ -1067,6 +1120,9 @@ extension OGSService {
     static func offlineUITestInstance() -> OGSService {
         func makeService(from bootstrapState: BootstrapState) -> OGSService {
             var state = bootstrapState
+            if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.emptyMessagesLaunchArgument) {
+                state.privateMessages = []
+            }
             // Opt-in team fixture for adaptive game-layout journeys. Normal
             // compatibility and App Store captures keep their existing data.
             if ProcessInfo.processInfo.arguments.contains("--surround-rengo-game"),
@@ -1099,7 +1155,7 @@ extension OGSService {
                         created: Date(timeIntervalSince1970: 1_789_603_200 - Double(index * 86_400))
                     )
                 }
-                state.friendshipActionDelay = SurroundUITestContract.simulatesSlowFriendshipResponse ? 12 : 0.35
+                state.friendshipActionDelay = 0.35
                 if SurroundUITestContract.simulatesFriendshipFailureOnce {
                     let playerIDs = SurroundUITestContract.friendshipFixtureRequestPlayerIDs + [
                         SurroundUITestContract.profileFixtureOpponentID,

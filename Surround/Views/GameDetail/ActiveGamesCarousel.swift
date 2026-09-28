@@ -9,8 +9,6 @@ import SwiftUI
 import Combine
 
 struct ActiveGamesCarousel: View {
-    @EnvironmentObject var ogs: OGSService
-    @Environment(\.colorScheme) private var colorScheme
     var currentGame: Binding<Game?>
     @Namespace var selectingGame
     var activeGames: [Game]
@@ -21,78 +19,35 @@ struct ActiveGamesCarousel: View {
     var cellSize: CGFloat = 120.0
     var selectionRingPadding: CGFloat = 5.0
     var padding: CGFloat = 5.0
-    var showsToggleButton = false
-
-    var showsActiveGamesCarouselSetting = Setting(.showsActiveGamesCarousel).binding
+    var onSelectGame: (() -> Void)?
 
     func gameCell(game: Game) -> some View {
-        Button(action: {
+        ActiveGamePopoverEntry(
+            game: game,
+            isSelected: game.ID == currentGame.wrappedValue?.ID,
+            cellSize: cellSize,
+            selectionRingPadding: selectionRingPadding,
+            selectionNamespace: selectingGame
+        ) {
             withAnimation {
                 discardNextScrollTarget = true
                 currentGame.wrappedValue = game
                 scrollTarget = currentGame.wrappedValue?.ID
             }
-        }) {
-            VStack(alignment: .trailing) {
-                ZStack(alignment: .center) {
-                    if game.gamePhase == .stoneRemoval {
-                        Color(UIColor.systemOrange).cornerRadius(3)
-                    } else if game.clock?.currentPlayerId == ogs.user?.id {
-                        Color(UIColor.systemTeal).cornerRadius(3)
-                    } else {
-                        if colorScheme == .dark {
-                            Color(UIColor.systemGray5)
-                        } else {
-                            Color(UIColor.systemBackground)
-                        }
-                    }
-                    BoardView(boardPosition: game.currentPosition)
-                        .frame(width: cellSize, height: cellSize)
-                        .padding(.horizontal, 5)
-                    if game.ID == currentGame.wrappedValue?.ID {
-                        RoundedRectangle(cornerRadius: 3)
-                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                            .padding(1)
-                            .foregroundColor(Color(UIColor.label))
-                            .matchedGeometryEffect(id: "selectionIndicator", in: selectingGame)
-                    }
-                }
-                .frame(width: cellSize + selectionRingPadding * 2, height: cellSize + selectionRingPadding * 2)
-            }
-            .padding(.horizontal, selectionRingPadding / 2)
+            onSelectGame?()
         }
-        .buttonStyle(.plain)
         .id(game.ID)
         .onChange(of: currentGame.wrappedValue) { _, _ in
             self.renderedCurrentGame.send(game == currentGame.wrappedValue)
         }
-        .contentShape(Rectangle())
-        .hoverEffect(.lift)
     }
     
     var body: some View {
         ScrollView(.horizontal) {
             ScrollViewReader { scrollView in
                 LazyHStack(alignment: .bottom, spacing: 0) {
-                    if showsToggleButton {
-                        Button(action: { withAnimation { showsActiveGamesCarouselSetting.wrappedValue.toggle() }}) {
-                            Label("Toggle thumbnails", systemImage: "squares.below.rectangle")
-                                .labelStyle(IconOnlyLabelStyle())
-                        }
-                        .foregroundColor(showsActiveGamesCarouselSetting.wrappedValue ? Color.white : Color.accentColor)
-                        .padding(5)
-                        .background(
-                            Group {
-                                if showsActiveGamesCarouselSetting.wrappedValue { Color.accentColor } else { Color.clear }
-                            }
-                            .cornerRadius(5)
-                        )
-                        .padding(.trailing, 5)
-                    }
-                    if showsActiveGamesCarouselSetting.wrappedValue {
-                        ForEach(activeGames) { game in
-                            gameCell(game: game)
-                        }
+                    ForEach(activeGames) { game in
+                        gameCell(game: game)
                     }
                 }
                 .padding(.horizontal, 5)
@@ -111,7 +66,7 @@ struct ActiveGamesCarousel: View {
                 }
             }
         }
-        .frame(height: showsActiveGamesCarouselSetting.wrappedValue ? cellSize + selectionRingPadding * 2 + padding * 2 : showsToggleButton ? 44 : 0)
+        .frame(height: cellSize + selectionRingPadding * 2 + padding * 2)
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel)
         .onReceive(renderedCurrentGameCollected) { rendered in
             if rendered.allSatisfy({ !$0 }) {
@@ -124,6 +79,86 @@ struct ActiveGamesCarousel: View {
             scrollTarget = currentGame.wrappedValue?.ID
             self.renderedCurrentGameCollected = self.renderedCurrentGame.collect(.byTime(DispatchQueue.main, 1.0)).eraseToAnyPublisher()
         }
+    }
+}
+
+private struct ActiveGamePopoverEntry: View {
+    @EnvironmentObject private var ogs: OGSService
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var preferences = userDefaults
+    @ObservedObject var game: Game
+    let isSelected: Bool
+    let cellSize: CGFloat
+    let selectionRingPadding: CGFloat
+    let selectionNamespace: Namespace.ID
+    let onSelect: () -> Void
+
+    private func playerLabel(_ player: OGSUser) -> String {
+        player.usernameAndRank(hidesRank: preferences[.hidesRank] ?? false)
+    }
+
+    private var matchupLabel: String? {
+        let versus = String(localized: "vs.")
+        if let user = ogs.user, let color = game.stoneColor(of: user) {
+            let opponentColor = color.opponentColor()
+            let opponents = (game.rengo ? game.orderedRengoTeam[opponentColor] : nil)
+                ?? game.currentPlayer(with: opponentColor).map { [$0] }
+                ?? []
+            if !opponents.isEmpty {
+                return "\(versus) " + opponents.map(playerLabel).joined(separator: ", ")
+            }
+        }
+        if let black = game.blackPlayer, let white = game.whitePlayer {
+            return "\(playerLabel(black)) \(versus) \(playerLabel(white))"
+        }
+        return nil
+    }
+
+    private var accessibilityLabel: String {
+        let gameName = game.gameName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var parts = [gameName, matchupLabel ?? ""].filter { !$0.isEmpty }
+        if parts.isEmpty { parts.append(String(localized: "Game")) }
+        let status = game.status
+        if !status.isEmpty { parts.append(status) }
+        return parts.joined(separator: ", ")
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .trailing) {
+                ZStack(alignment: .center) {
+                    if game.gamePhase == .stoneRemoval {
+                        Color(UIColor.systemOrange).cornerRadius(3)
+                    } else if game.clock?.currentPlayerId == ogs.user?.id {
+                        Color(UIColor.systemTeal).cornerRadius(3)
+                    } else {
+                        if colorScheme == .dark {
+                            Color(UIColor.systemGray5)
+                        } else {
+                            Color(UIColor.systemBackground)
+                        }
+                    }
+                    BoardView(boardPosition: game.currentPosition)
+                        .frame(width: cellSize, height: cellSize)
+                        .padding(.horizontal, 5)
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                            .padding(1)
+                            .foregroundColor(Color(UIColor.label))
+                            .matchedGeometryEffect(id: "selectionIndicator", in: selectionNamespace)
+                    }
+                }
+                .frame(width: cellSize + selectionRingPadding * 2, height: cellSize + selectionRingPadding * 2)
+            }
+            .padding(.horizontal, selectionRingPadding / 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: accessibilityLabel))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(game))
+        .contentShape(Rectangle())
+        .hoverEffect(.lift)
     }
 }
 
@@ -152,8 +187,7 @@ private struct ActiveGamesCarouselPreviewState {
 
     ActiveGamesCarousel(
         currentGame: $preview.currentGame,
-        activeGames: preview.games,
-        showsToggleButton: true
+        activeGames: preview.games
     )
     .environmentObject(ogs)
 }

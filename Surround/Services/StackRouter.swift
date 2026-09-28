@@ -281,6 +281,153 @@ final class StackRouter: ObservableObject {
 }
 
 #if MAIN_APP
+/// Central switch for reclaiming Duo's empty navigation inset in compact layouts.
+enum AppNavigationLayout {
+    // The top band still handles system scroll-to-top taps. Compact game modes
+    // live in the toolbar; the remaining avatar/team-icon edge overlap is accepted.
+    // Intentional kill switch: keep reclamation independently reversible.
+    static let reclaimsEmptyVerticalBarTopInset = true
+    static let maximumEmptyVerticalBarTopInset: CGFloat = 24
+}
+
+private struct IsVerticalToolbarKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Synchronous toolbar orientation supplied by the navigation content host.
+    var isVerticalToolbar: Bool {
+        get { self[IsVerticalToolbarKey.self] }
+        set { self[IsVerticalToolbarKey.self] = newValue }
+    }
+}
+
+/// Apply inside NavigationStack: its UIKit content host supplies its own safe
+/// area, so ignoring the safe area on the outside of the stack has no effect.
+/// Keep this private so navigation entry points own the policy, not screens.
+private struct AppNavigationContentLayout: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) {
+            content.modifier(VerticalNavigationContentLayout())
+        } else {
+            content.environment(\.isVerticalToolbar, false)
+        }
+        #else
+        content.environment(\.isVerticalToolbar, false)
+        #endif
+    }
+}
+
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+@available(iOS 27.1, *)
+private struct VerticalNavigationContentLayout: ViewModifier {
+    @Environment(\.toolbarVerticalEdge) private var toolbarVerticalEdge
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var hasEmptyTopBand = false
+
+    func body(content: Content) -> some View {
+        let reclaimsTop = AppNavigationLayout.reclaimsEmptyVerticalBarTopInset
+            // Regular game layouts can put the playable board at the top.
+            // Preserve their inset so top-row touches remain available.
+            && horizontalSizeClass == .compact
+            && toolbarVerticalEdge != nil && hasEmptyTopBand
+
+        content
+            .environment(\.isVerticalToolbar, toolbarVerticalEdge != nil)
+            .ignoresSafeArea(.container, edges: reclaimsTop ? .top : [])
+            // Observe outside ignoresSafeArea to retain the original inset,
+            // without a GeometryReader changing the content's ideal size.
+            .onGeometryChange(for: Bool.self) { geometry in
+                // iOS 27.1 leaves an empty navigation bar at y=24 even when
+                // its height and the window's top inset are zero. Keep larger
+                // insets for titles/search. The bound is observed behavior,
+                // not an Apple contract or a fixed offset to subtract.
+                let topInset = geometry.safeAreaInsets.top
+                guard topInset > 0,
+                      topInset <= AppNavigationLayout.maximumEmptyVerticalBarTopInset
+                else { return false }
+                let topBand = CGRect(x: 0, y: -topInset,
+                                     width: geometry.size.width, height: topInset)
+                return !geometry.reservedRegions(kind: .occlusion).contains { region in
+                    let frame = region.frame
+                    let margins = region.margins
+                    let reservedFrame = CGRect(
+                        x: frame.minX - margins.leading,
+                        y: frame.minY - margins.top,
+                        width: frame.width + margins.leading + margins.trailing,
+                        height: frame.height + margins.top + margins.bottom
+                    )
+                    return reservedFrame.intersects(topBand)
+                }
+            } action: { hasEmptyTopBand = $0 }
+    }
+}
+#endif
+
+/// Keep SDK-specific toolbar presentation alongside the navigation policy.
+/// Callers use `isVerticalToolbar` and need no availability branches.
+struct AppVerticalToolbarGroup<Content: View>: ToolbarContent {
+    var separatesNextGroup: Bool = false
+    @ViewBuilder var content: () -> Content
+
+    var body: some ToolbarContent {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) {
+            ToolbarItemGroup(placement: .bottomBar, content: content)
+                .axisBehavior(.verticalPreferred)
+                .visibilityPriority(.high)
+            if separatesNextGroup {
+                ToolbarSpacer(.fixed, placement: .bottomBar)
+            }
+        }
+        #else
+        ToolbarItem(placement: .bottomBar) { EmptyView() }
+        #endif
+    }
+}
+
+/// Direct-view pushes need the same content layout as the stack's routed pushes.
+/// Use a value-based NavigationLink for StackRoute, or this wrapper for views.
+struct AppNavigationLink<Label: View, Destination: View>: View {
+    private let destination: () -> Destination
+    private let label: Label
+
+    init(destination: Destination, @ViewBuilder label: () -> Label) {
+        self.destination = { destination }
+        self.label = label()
+    }
+
+    init(@ViewBuilder destination: @escaping () -> Destination,
+         @ViewBuilder label: () -> Label) {
+        self.destination = destination
+        self.label = label()
+    }
+
+    var body: some View {
+        NavigationLink {
+            destination()
+                .modifier(AppNavigationContentLayout())
+        } label: {
+            label
+        }
+    }
+}
+
+extension View {
+    /// Boolean destinations have their own navigation content host, independent
+    /// of the root and StackRoute destination builder in AppNavigationStack.
+    func appNavigationDestination<Destination: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        navigationDestination(isPresented: isPresented) {
+            destination()
+                .modifier(AppNavigationContentLayout())
+        }
+    }
+}
+
 private struct OwningStackRouteKey: EnvironmentKey {
     static let defaultValue: StackRoute? = nil
 }
@@ -292,6 +439,8 @@ extension EnvironmentValues {
     }
 }
 
+/// Owns the root and StackRoute destination layout. Direct-view and Boolean
+/// pushes use AppNavigationLink/appNavigationDestination for the same policy.
 struct AppNavigationStack<Content: View>: View {
     @EnvironmentObject private var nav: NavigationService
     @StateObject private var navigation = StackRouter()
@@ -302,9 +451,11 @@ struct AppNavigationStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
+                .modifier(AppNavigationContentLayout())
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
+                        .modifier(AppNavigationContentLayout())
                         .environment(\.owningStackRoute, route)
                 }
         }

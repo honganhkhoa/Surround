@@ -38,7 +38,8 @@ enum SurroundUITestContract {
     static let profileShortHistoryLaunchArgument = "--surround-profile-short-history"
     static let friendshipLaunchArgument = "--surround-friendship"
     static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
-    static let friendshipSlowResponseLaunchArgument = "--surround-friendship-slow-response"
+    static let friendshipGatedResponseLaunchArgument = "--surround-friendship-gated-response"
+    static let emptyMessagesLaunchArgument = "--surround-empty-messages"
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
@@ -237,8 +238,8 @@ enum SurroundUITestContract {
         includesFriendshipRequests && ProcessInfo.processInfo.arguments.contains(friendshipFailsOnceLaunchArgument)
     }
 
-    static var simulatesSlowFriendshipResponse: Bool {
-        includesFriendshipRequests && ProcessInfo.processInfo.arguments.contains(friendshipSlowResponseLaunchArgument)
+    static var gatesFriendshipResponse: Bool {
+        includesFriendshipRequests && ProcessInfo.processInfo.arguments.contains(friendshipGatedResponseLaunchArgument)
     }
 
     static var appearanceOverride: Appearance? {
@@ -452,7 +453,7 @@ enum SurroundUITestContract {
     static let usesShortProfileHistory = false
     static let includesFriendshipRequests = false
     static let simulatesFriendshipFailureOnce = false
-    static let simulatesSlowFriendshipResponse = false
+    static let gatesFriendshipResponse = false
     static let appearanceOverride: Appearance? = nil
     static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
@@ -473,6 +474,7 @@ enum SurroundUITestContract {
         static let navigationHome = "navigation.home"
         static let navigationPublicGames = "navigation.publicGames"
         static let navigationMessages = "navigation.messages"
+        static let navigationProfile = "navigation.profile"
         static let navigationSettings = "navigation.settings"
         static let navigationAbout = "navigation.about"
         static let navigationBrowser = "navigation.browser"
@@ -497,9 +499,13 @@ enum SurroundUITestContract {
         static let profileFriendRequest = "profile.friend-request"
         static let profileRemoveFriend = "profile.friendship.remove"
         static let friendshipRemoveConfirm = "friendship.remove.confirm"
+        static let friendshipReleaseResponse = "fixture.friendship.release-response"
         static let friendshipRejectNotify = "friendship.reject.notify"
         static let friendshipRejectQuietly = "friendship.reject.quietly"
-        static let homeFriendRequests = "home.friend-requests"
+        static let accountMenu = "home.account-menu"
+        static let accountMenuProfile = "account.profile"
+        static let accountMenuSettings = "account.settings"
+        static let accountMenuLogout = "account.logout"
 
         static func friendRequestProfile(_ playerID: Int) -> String {
             "friend-request.profile.\(playerID)"
@@ -777,6 +783,16 @@ enum SurroundUITestContract {
         }
         static let gameDisplayModePicker = "game.displayMode"
         static let gameActiveGamesCarousel = "game.activeGamesCarousel"
+        static let gameActiveGamesButton = "game.activeGames.button"
+        static let gameActiveGamesPopover = "game.activeGames.popover"
+        static func gameActiveGamesEntry(_ id: Int) -> String {
+            "game.activeGames.entry.\(id)"
+        }
+        #if MAIN_APP
+        static func gameActiveGamesEntry(_ game: Game) -> String {
+            gameActiveGamesEntry(ogsID(for: game))
+        }
+        #endif
         static let gameAnalyzeToggle = "game.analyze"
         static let gameAnalyzeControlBar = "game.analyze.controls"
         static let gameAnalyzeTreeScroll = "game.analyze.tree.scroll"
