@@ -199,7 +199,8 @@ struct GameDetailView: View {
     }
     
     private func gameBody(
-        compact: Bool, geometry: GeometryProxy, remainingHeight: CGFloat
+        compact: Bool, geometry: GeometryProxy, remainingHeight: CGFloat,
+        reserveCompactBottomBarClearance: Bool
     ) -> some View {
         let horizontal = geometry.size.width
             + geometry.safeAreaInsets.leading
@@ -216,6 +217,7 @@ struct GameDetailView: View {
                     compactBoardSize: min(geometry.size.width, geometry.size.height),
                     game: currentGame,
                     reducedPlayerInfoVerticalPadding: remainingHeight < 0,
+                    reserveCompactBottomBarClearance: reserveCompactBottomBarClearance,
                     goToNextGame: goToNextGame,
                     horizontal: horizontal,
                     zenMode: $zenMode,
@@ -278,6 +280,19 @@ struct GameDetailView: View {
             && (!compactLayout || isVerticalToolbar || hasRoomForActiveGamesButton)
         let showsCompactBottomBar = compactLayout && !isVerticalToolbar
             && showsActiveGamesButton
+        let reserveCompactBottomBarClearance: Bool
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if #available(iOS 26.0, *) {
+            reserveCompactBottomBarClearance = false
+        } else {
+            // In an iOS 18 tabbed route, the bottom toolbar sits higher
+            // than in a standalone stack; keep the full board clear.
+            reserveCompactBottomBarClearance = showsCompactBottomBar
+                && owningStackRoute != nil
+        }
+        #else
+        reserveCompactBottomBarClearance = false
+        #endif
         var title = currentGame.gameName?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ) ?? ""
@@ -306,7 +321,8 @@ struct GameDetailView: View {
         
         let result = gameBody(
             compact: compactLayout, geometry: geometry,
-            remainingHeight: remainingHeight
+            remainingHeight: remainingHeight,
+            reserveCompactBottomBarClearance: reserveCompactBottomBarClearance
         )
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         .onChange(of: showsCompactBottomBar, initial: true) { _, isVisible in

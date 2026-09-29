@@ -14,6 +14,7 @@ struct SingleGameView: View {
     var compactBoardSize: CGFloat = 0
     @ObservedObject var game: Game
     var reducedPlayerInfoVerticalPadding: Bool = false
+    var reserveCompactBottomBarClearance = false
     var goToNextGame: (() -> ())?
     var horizontal = false
     @Binding var zenMode: Bool
@@ -877,7 +878,11 @@ struct SingleGameView: View {
                 Spacer(minLength: 10).frame(maxHeight: 15)
                 controlRow
                     .padding(.horizontal)
-                Spacer(minLength: 10)
+                if reserveCompactBottomBarClearance {
+                    Spacer(minLength: 10).frame(maxHeight: 15)
+                } else {
+                    Spacer(minLength: 10)
+                }
             }
             if showsChatPreview {
                 chatPreviewBar.padding(.horizontal, 10).padding(.vertical, 5)
