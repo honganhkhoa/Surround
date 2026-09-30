@@ -298,7 +298,8 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         for attempt in 0...8 {
             var targetExists = target.exists
             var targetFrame = targetExists ? target.frame : .null
-            var chatLogFrame = chatLog.frame
+            var chatLogFrame = visibleChatLogViewport(chatLog.frame, in: app)
+            print("[ChatReveal] \(identifier) attempt=\(attempt) target=\(targetFrame) viewport=\(chatLogFrame)")
             if hasTappableInteractionPoint(
                 interactionPoint,
                 targetFrame,
@@ -307,7 +308,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.2))
                 targetExists = target.exists
                 targetFrame = targetExists ? target.frame : .null
-                chatLogFrame = chatLog.frame
+                chatLogFrame = visibleChatLogViewport(chatLog.frame, in: app)
                 if hasTappableInteractionPoint(
                     interactionPoint,
                     targetFrame,
@@ -322,16 +323,26 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
             guard attempt < 8 else { break }
 
+            let dragTargetFrame = targetExists
+                ? validInteractionFrame(
+                    targetFrame,
+                    interactionPoint: interactionPoint
+                ) : nil
+            // Materialize older lazy rows first, then control short corrections
+            // in the composer's small viewport without overshooting the target.
             guard dragScrollView(
                 chatLog,
                 axis: .vertical,
-                targetFrame: targetExists
-                    ? validInteractionFrame(
-                        targetFrame,
-                        interactionPoint: interactionPoint
-                    ) : nil,
+                targetFrame: dragTargetFrame,
                 containerFrame: chatLogFrame,
-                interactionPoint: interactionPoint
+                interactionPoint: interactionPoint,
+                dragStartPoint: CGPoint(
+                    x: chatLogFrame.midX,
+                    y: chatLogFrame.midY
+                ),
+                dragVelocity: dragTargetFrame == nil
+                    ? .slow : XCUIGestureVelocity(rawValue: 60),
+                dragHoldDuration: 0.2
             ) else { break }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
@@ -412,7 +423,9 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         targetFrame: CGRect?,
         containerFrame: CGRect,
         interactionPoint: CGVector,
-        dragStartPoint: CGPoint? = nil
+        dragStartPoint: CGPoint? = nil,
+        dragVelocity: XCUIGestureVelocity? = nil,
+        dragHoldDuration: TimeInterval = 0
     ) -> Bool {
         guard !containerFrame.isEmpty else { return false }
 
@@ -484,10 +497,19 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         case .vertical:
             offset = CGVector(dx: 0, dy: dragDelta)
         }
-        start.press(
-            forDuration: 0.05,
-            thenDragTo: start.withOffset(offset)
-        )
+        if let dragVelocity {
+            start.press(
+                forDuration: 0.05,
+                thenDragTo: start.withOffset(offset),
+                withVelocity: dragVelocity,
+                thenHoldForDuration: dragHoldDuration
+            )
+        } else {
+            start.press(
+                forDuration: 0.05,
+                thenDragTo: start.withOffset(offset)
+            )
+        }
         #endif
         return true
     }

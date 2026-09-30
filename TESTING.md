@@ -96,6 +96,25 @@ For keyboard layout failures, match the device model as well as the runtime repo
 
 On iOS 27 a SwiftUI `Menu` item wrapped in a `Section` loses its accessibility identifier and value and keeps only its localized label. Separate the groups of such a menu with `Divider()` wherever a test has to resolve an item without knowing the running language: it draws the same separators in the same places and keeps the identifiers on every runtime. The Analyze actions menu does this because the App Store capture runs in thirteen languages and matches on identifiers alone. `SurroundUITests` pins itself to English and resolves a menu item by identifier or, failing that, by the title of an element that has none, which covers both Mac Catalyst's `NSMenuItem` titles and the still-sectioned game actions menu.
 
+### Focused iPadOS 18 CI verification
+
+The CI workflow's manual dispatch offers a `test_scope` choice. Its default, `all`, retains the complete matrix; pushes and pull requests also retain that coverage. Select `ipad18-focus` to run only one focused job on `macos-15` with Xcode 26.2 and the same iPadOS 18 simulator-selection and hardware-keyboard setup used by the normal lanes:
+
+```sh
+gh workflow run main.yml --ref your-branch -f test_scope=ipad18-focus
+```
+
+The focused selection contains these six offline journeys, and validates each class and method declaration before running them:
+
+- `GameContinuityUITests/testMovePreviewKeepsAnExitAcrossLayouts`
+- `ProfileUITests/testHomeGameMenusOpenOpponentProfilesWithoutOpeningGames`
+- `ProfileUITests/testPickerProfilesSelectDifferentOpponentsWithoutReplacingEditedChallenge`
+- `SurroundUITests/testLiveGameBannerUsesHomeNavigationStack`
+- `SurroundUITests/testRestoredLiveAutomatchLocksQuickMatchForm`
+- `SurroundUITests/testVariationSharingDraftSurvivesChatSelection`
+
+The job builds once, runs the selection without retries or parallel workers, and allows five minutes per test within a 45-minute job limit. Build and test steps have 15- and 35-minute caps; the outer limit bounds their combined duration. The `surround-ipad-18-focused-test-results` artifact retains the result bundle, build log, raw test log, bounded simulator log, and collector status for fourteen days. The external diagnostic wrapper captures an early screenshot and process samples on an animation-completion warning, an event-loop-idle notification warning, or a long app-idle wait after Share. This job uses the normal app environment with app animation tracing disabled; its collector observes the running processes without accessibility queries or focus changes.
+
 ### Opt-in animation-stall diagnostics
 
 For a focused reproduction, the Debug app can log draft creation, focus requests, keyboard notifications, and composer/Analyze-menu appearance and frame changes. Tracing requires both the offline UI-test launch argument and `--surround-animation-diagnostics`; the test runner forwards the latter only when its `SURROUND_UI_ANIMATION_DIAGNOSTICS` environment variable equals `1`. The logs contain event metadata rather than chat contents. Appearance callbacks and observation identifiers describe SwiftUI observations; they do not prove that a UIKit menu presenter was destroyed.
@@ -131,7 +150,7 @@ python3 .github/ci-tools/diagnose-ipad-animation-stalls.py \
   -resultBundlePath "${diagnostic_output}.xcresult"
 ```
 
-The wrapper preserves Xcode's exit status and writes raw console output, a bounded simulator log stream, and collector status into a fresh output directory. The first animation-completion warning in any test, or the first app-idle wait exceeding 15 seconds after a Share action, triggers one early screenshot and stack samples of the selected simulator's app and UI-test runner. Collection errors are retained in the status files. When the command finishes, `status.json` also pairs XCTest's in-app animation-idle requests with their replies from the simulator log, per app process, and lists each unanswered request with the UIKit input transitions just before it and the delay until XCTest's next in-app activity; compare that list with the console's animation-completion warning count. Collection does not query the accessibility hierarchy, dismiss the keyboard, or stop the app or runner. The diagnostic example limits each test to four minutes; normal CI allowances remain unchanged.
+The wrapper preserves Xcode's exit status and writes raw console output, a bounded simulator log stream, and collector status into a fresh output directory. The first animation-completion or event-loop-idle notification warning in any test, or the first app-idle wait exceeding 15 seconds after a Share action, triggers one early screenshot and stack samples of the selected simulator's app and UI-test runner. Collection errors are retained in the status files. When the command finishes, `status.json` also pairs XCTest's in-app animation-idle requests with their replies from the simulator log, per app process, and lists each unanswered request with the UIKit input transitions just before it and the delay until XCTest's next in-app activity; compare that list with the console's animation-completion warning count. Collection does not query the accessibility hierarchy, dismiss the keyboard, or stop the app or runner. The diagnostic example limits each test to four minutes; normal CI allowances remain unchanged.
 
 Use a dedicated simulator when comparing traces, and record its runtime, Xcode version, and keyboard setup. Run at most three isolated attempts initially; if they all pass, run the existing twelve-test composer selection once to check suite-state dependence. Inspect the first captured stall before expanding the run. Passing traces help establish the normal event order but do not demonstrate that an intermittent stall is fixed. Tracing itself can affect timing, so any resulting behavioral fix also needs verification with diagnostics disabled.
 

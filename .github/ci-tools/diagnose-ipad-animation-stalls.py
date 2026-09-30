@@ -26,6 +26,7 @@ APP = "com.honganhkhoa.Surround"
 RUNNER = APP + "UITests.xctrunner"
 ARM_MARKER = "[SurroundAnimationTest] ARM share"
 WARNING = "App animations complete notification not received"
+EVENT_LOOP_WARNING = "App event loop idle notification not received"
 ACTIVITY = re.compile(r"^\s*t\s*=\s*[0-9.]+s\s+(.+)$")
 IDLE = "Wait for " + APP + " to idle"
 LOG_PREDICATE = (
@@ -144,6 +145,8 @@ class StallDetector:
         # cannot spend the run's single capture.
         if WARNING in line:
             return self._fire("missing-animation-completion", now)
+        if EVENT_LOOP_WARNING in line:
+            return self._fire("missing-event-loop-idle", now)
         if not self.arm_source:
             return None
         if description == IDLE:

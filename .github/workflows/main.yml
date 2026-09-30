@@ -8,12 +8,21 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      test_scope:
+        description: Test coverage to run
+        type: choice
+        default: all
+        options:
+          - all
+          - ipad18-focus
 
 permissions:
   contents: read
 
 jobs:
   test:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-26
     timeout-minutes: 30
 
@@ -55,6 +64,7 @@ jobs:
           retention-days: 14
 
   iphone-navigation-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -145,6 +155,7 @@ jobs:
           retention-days: 14
 
   ipad-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -189,6 +200,7 @@ jobs:
           retention-days: 14
 
   ipad-profile-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -235,6 +247,7 @@ jobs:
   # The iOS 18 unit tests share this job with the profile UI phase. The unit
   # step also warms the UI build's derived data.
   minimum-ios-18:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-15
     timeout-minutes: 90
 
@@ -309,6 +322,7 @@ jobs:
           retention-days: 14
 
   minimum-ios-18-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-15
     timeout-minutes: 80
 
@@ -363,6 +377,7 @@ jobs:
   # consume the existing composer's budget. Leave 25 minutes for setup,
   # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -437,7 +452,103 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Explicitly selected followup coverage; normal events retain the full matrix.
+  ipad18-focused-ui-tests:
+    name: iPadOS 18 focused UI verification
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_scope == 'ipad18-focus' }}
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        shell: bash
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iPadOS 18 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 18 hardware keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}"
+
+      - name: Build focused iPad UI tests
+        id: ipad_ui_build
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.simulator.outputs.id }}" iPadOS18-Focused \
+            2>&1 | tee TestResults/iPadOS18-Focused-build.log
+
+      - name: Run six focused iPadOS 18 UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          test_cases=(
+            GameContinuityUITests/testMovePreviewKeepsAnExitAcrossLayouts
+            ProfileUITests/testHomeGameMenusOpenOpponentProfilesWithoutOpeningGames
+            ProfileUITests/testPickerProfilesSelectDifferentOpponentsWithoutReplacingEditedChallenge
+            SurroundUITests/testLiveGameBannerUsesHomeNavigationStack
+            SurroundUITests/testRestoredLiveAutomatchLocksQuickMatchForm
+            SurroundUITests/testVariationSharingDraftSurvivesChatSelection
+          )
+          selection_arguments=()
+          for test_case in "${test_cases[@]}"; do
+            test_class="${test_case%%/*}"
+            test_name="${test_case#*/}"
+            test_source="SurroundUITests/${test_class}.swift"
+            class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
+            declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+${test_name}[[:space:]]*\([[:space:]]*\)" "$test_source" || true)"
+            if [[ "$class_count" != "1" || "$declaration_count" != "1" ]]; then
+              echo "Expected exactly one ${test_class} class and ${test_name} declaration in ${test_source}. Update the focused iPadOS 18 selection when renaming or moving it." >&2
+              exit 1
+            fi
+            selection_arguments+=("-only-testing:SurroundUITests/${test_case}")
+          done
+          derived_data_path="$(
+            .github/ci-tools/run-ipad-ui-tests.sh derived-data-path \
+              "${{ steps.simulator.outputs.id }}"
+          )"
+          python3 .github/ci-tools/diagnose-ipad-animation-stalls.py \
+            --simulator "${{ steps.simulator.outputs.id }}" \
+            --output TestResults/iPadOS18-Focused-Diagnostics -- \
+            xcodebuild test-without-building \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$derived_data_path" \
+            -parallel-testing-enabled NO \
+            "${selection_arguments[@]}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            -resultBundlePath TestResults/SurroundUITests-iPadOS18-Focused.xcresult
+
+      - name: Upload focused iPadOS 18 results and diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ipad-18-focused-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
   catalyst-build:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
     runs-on: macos-26
     timeout-minutes: 20
 

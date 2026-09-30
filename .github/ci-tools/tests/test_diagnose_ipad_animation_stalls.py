@@ -75,6 +75,18 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(trigger["reason"], "missing-animation-completion")
         self.assertIsNone(trigger["armSource"])
 
+    def test_event_loop_warning_captures_unarmed_test_once(self):
+        detector = diagnostics.StallDetector(15)
+        warning = "    t =    82.79s " + diagnostics.EVENT_LOOP_WARNING + ", will attempt to continue."
+        self.assertIsNone(detector.feed(warning, 0))
+        detector.feed(START.replace("testShare", "testMovePreview"), 1)
+        detector.feed(IDLE, 2)
+        self.assertIsNone(detector.check(30))
+        trigger = detector.feed(warning, 83)
+        self.assertEqual(trigger["reason"], "missing-event-loop-idle")
+        self.assertIsNone(trigger["armSource"])
+        self.assertIsNone(detector.feed(warning, 84))
+
     def test_process_selection_uses_exact_jobs_and_rejects_ambiguity(self):
         text = ("11 0 UIKitApplication:com.honganhkhoa.Surround[abc][rb-legacy]\n"
                 "22 0 UIKitApplication:com.honganhkhoa.SurroundUITests.xctrunner[def]\n"

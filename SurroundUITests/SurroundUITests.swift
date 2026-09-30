@@ -42,6 +42,44 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
         app.typeKey("z", modifierFlags: [.control, .option])
         #else
+        let control = app.buttons.matching(identifier: identifier).firstMatch
+        if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
+           !control.exists {
+            // Narrow navigation bars move this action into the native overflow.
+            let navigationBar = app.navigationBars.containing(
+                .button,
+                identifier: SurroundUITestContract.AccessibilityID
+                    .gameAnalyzeToggle
+            ).firstMatch
+            tap(
+                navigationBar.buttons["More"].firstMatch,
+                description: "game toolbar overflow",
+                in: app,
+                file: file,
+                line: line
+            )
+            let menuItem = requiredMenuButton(
+                identifier,
+                title: "Zen mode",
+                in: app,
+                file: file,
+                line: line
+            )
+            XCTAssertTrue(
+                menuItem.isEnabled,
+                "Expected the overflowed Zen action to be enabled",
+                file: file,
+                line: line
+            )
+            tap(
+                menuItem,
+                description: identifier,
+                in: app,
+                file: file,
+                line: line
+            )
+            return
+        }
         tap(
             identifier,
             in: app,
@@ -782,13 +820,97 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let toggle = element(identifier, in: app, file: file, line: line)
+        let toggle: XCUIElement
+        #if targetEnvironment(macCatalyst)
+        toggle = element(identifier, in: app, file: file, line: line)
+        #else
+        if identifier == SurroundUITestContract.AccessibilityID
+            .quickMatchStrictHandicap {
+            guard let revealedSwitch = revealQuickMatchSwitch(
+                identifier,
+                in: app,
+                file: file,
+                line: line
+            ) else { return }
+            toggle = revealedSwitch
+        } else {
+            toggle = element(identifier, in: app, file: file, line: line)
+        }
+        #endif
         XCTAssertTrue(
             waitForValue(isOn ? "1" : "0", in: toggle, timeout: stateSettleTimeout),
             "Expected \(identifier) to be \(isOn ? "on" : "off")",
             file: file,
             line: line
         )
+    }
+
+    private func revealQuickMatchSwitch(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString,
+        line: UInt
+    ) -> XCUIElement? {
+        let target = element(identifier, in: app, file: file, line: line)
+        let scroll = element(
+            SurroundUITestContract.AccessibilityID.quickMatchScroll,
+            in: app,
+            matching: .scrollView,
+            file: file,
+            line: line
+        )
+        let center = CGVector(dx: 0.5, dy: 0.5)
+        for attempt in 0...10 {
+            guard let scrollFrame = validInteractionFrame(
+                scroll.frame,
+                interactionPoint: center
+            ), let appFrame = validInteractionFrame(
+                app.frame,
+                interactionPoint: center
+            ) else { break }
+            guard let viewport = validInteractionFrame(
+                scrollFrame.intersection(appFrame),
+                interactionPoint: center
+            ), viewport.width > 8, viewport.height > 16,
+               target.exists,
+               let targetFrame = validInteractionFrame(
+                target.frame,
+                interactionPoint: center
+               ) else { break }
+            if viewport.insetBy(dx: 0, dy: 8).contains(targetFrame) {
+                // Inspect the native value without requiring a disabled switch
+                // to accept interaction or changing the restored criteria.
+                return element(
+                    identifier,
+                    in: app,
+                    matching: .switch,
+                    file: file,
+                    line: line
+                )
+            }
+            guard attempt < 10 else { break }
+            guard dragScrollView(
+                scroll,
+                axis: .vertical,
+                targetFrame: targetFrame,
+                containerFrame: viewport,
+                interactionPoint: center,
+                dragStartPoint: CGPoint(x: viewport.midX, y: viewport.midY)
+            ) else { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        keepInteractionHierarchy(
+            target,
+            container: scroll,
+            in: app,
+            reason: "unable to reveal Quick Match switch \(identifier)"
+        )
+        XCTFail(
+            "Expected Quick Match switch \(identifier) inside its visible viewport",
+            file: file,
+            line: line
+        )
+        return nil
     }
 
     private func openQuickMatchAdvanced(in app: XCUIApplication) {
