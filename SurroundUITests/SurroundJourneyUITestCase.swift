@@ -411,7 +411,8 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         axis: ScrollRevealAxis,
         targetFrame: CGRect?,
         containerFrame: CGRect,
-        interactionPoint: CGVector
+        interactionPoint: CGVector,
+        dragStartPoint: CGPoint? = nil
     ) -> Bool {
         guard !containerFrame.isEmpty else { return false }
 
@@ -463,9 +464,19 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             scrollView.swipeUp(velocity: .slow)
         }
         #else
-        let start = scrollView.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
-        )
+        let start: XCUICoordinate
+        if let dragStartPoint {
+            let scrollFrame = scrollView.frame
+            start = scrollView.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(
+                    dx: dragStartPoint.x - scrollFrame.minX,
+                    dy: dragStartPoint.y - scrollFrame.minY
+                ))
+        } else {
+            start = scrollView.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            )
+        }
         let offset: CGVector
         switch axis {
         case .horizontal:

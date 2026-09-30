@@ -266,8 +266,11 @@ struct GameDetailView: View {
             attributes: [.font: UIFont.preferredFont(forTextStyle: .title2)],
             context: nil
         ).size.height
-        let playerInfoHeight: CGFloat = 64 + 64 - 10 + 15 * 2
-            + PlayersBannerView.additionalPhoneVerticalPadding * 2
+        let basePlayerInfoHeight: CGFloat = 148
+        let additionalPlayerInfoHeight: CGFloat =
+            PlayersBannerView.additionalPhoneVerticalPadding * 2
+        let playerInfoHeight: CGFloat =
+            basePlayerInfoHeight + additionalPlayerInfoHeight
         let remainingHeight = geometry.size.height
             - min(geometry.size.width, geometry.size.height)
             - controlRowHeight - playerInfoHeight - 20

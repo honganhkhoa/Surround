@@ -321,16 +321,42 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
         tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuSettings,
                                title: "Settings", in: app), description: "Open Settings", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+        let settingsScreen = element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
         let settingsBar = app.navigationBars["Settings"].firstMatch
         let settingsDone = settingsBar.buttons["Done"].firstMatch
         XCTAssertTrue(settingsDone.waitForExistence(timeout: 10))
+        let homeScreen = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.screenHome).firstMatch
+        let doneFrameBeforeTap = settingsDone.frame
+        func recordSettingsDismissalState(_ phase: String) {
+            let state = XCTAttachment(string: """
+                Phase: \(phase)
+                Settings exists: \(settingsScreen.exists)
+                Settings Done exists: \(settingsDone.exists)
+                Home exists: \(homeScreen.exists)
+                Tap target: Settings navigation bar's Done button
+                Done frame before tap: \(doneFrameBeforeTap)
+                Done frame center: \(CGPoint(x: doneFrameBeforeTap.midX, y: doneFrameBeforeTap.midY))
+                """)
+            state.name = "Settings dismissal state – \(phase)"
+            state.lifetime = .keepAlways
+            add(state)
+        }
+        recordSettingsDismissalState("before Done")
         tap(settingsDone, description: "Dismiss Settings to return to Home", in: app)
-        let settingsDismissed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !app.descendants(matching: .any)
-                .matching(identifier: SurroundUITestContract.AccessibilityID.screenSettings).firstMatch.exists
-        }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [settingsDismissed], timeout: 10), .completed)
+        let settingsDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: settingsScreen
+        )
+        let dismissalResult = XCTWaiter.wait(for: [settingsDismissed], timeout: stateSettleTimeout)
+        recordSettingsDismissalState("after Done wait: \(dismissalResult)")
+        if dismissalResult != .completed {
+            keepScreenshot("Settings dismissal failed after Done", in: app)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Accessibility hierarchy – Settings dismissal failed after Done"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertEqual(dismissalResult, .completed, "Done must dismiss Settings and return to Home.")
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
         tap(requiredMenuButton(SurroundUITestContract.AccessibilityID.accountMenuLogout,
