@@ -257,13 +257,45 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
-    @discardableResult
+    private func analysisViewportFrame(
+        _ analysisTree: XCUIElement,
+        in app: XCUIApplication
+    ) -> CGRect? {
+        let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+        let ancestorScrollViews = app.scrollViews.containing(
+            .scrollView,
+            identifier: SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll
+        ).allElementsBoundByIndex
+        let frames = [app.frame, analysisTree.frame]
+            + ancestorScrollViews.map { $0.frame }
+        var viewport = CGRect.infinite
+        for frame in frames {
+            guard let frame = validInteractionFrame(
+                frame,
+                interactionPoint: interactionPoint
+            ) else { return nil }
+            viewport = viewport.intersection(frame)
+        }
+        return validInteractionFrame(viewport, interactionPoint: interactionPoint)
+    }
+
+    private func analysisPositionIsFullyVisible(
+        _ frame: CGRect,
+        in viewport: CGRect?
+    ) -> Bool {
+        guard let frame = validInteractionFrame(
+            frame,
+            interactionPoint: CGVector(dx: 0.5, dy: 0.5)
+        ), let viewport else { return false }
+        return viewport.insetBy(dx: 4, dy: 4).contains(frame)
+    }
+
     private func revealAnalysisPosition(
         _ identifier: String,
         in app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
-    ) -> XCUIElement {
+    ) -> XCUIElement? {
         let target = app.buttons
             .matching(identifier: identifier)
             .firstMatch
@@ -278,26 +310,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         for attempt in 0...10 {
             var targetExists = target.exists
             var targetFrame = targetExists ? target.frame : .null
-            var analysisTreeFrame = analysisTree.frame
-            if hasTappableInteractionPoint(
-                CGVector(dx: 0.5, dy: 0.5),
-                targetFrame,
-                in: analysisTreeFrame
-            ) {
+            var viewport = analysisViewportFrame(analysisTree, in: app)
+            if analysisPositionIsFullyVisible(targetFrame, in: viewport) {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.2))
                 targetExists = target.exists
                 targetFrame = targetExists ? target.frame : .null
-                analysisTreeFrame = analysisTree.frame
-                if hasTappableInteractionPoint(
-                    CGVector(dx: 0.5, dy: 0.5),
-                    targetFrame,
-                    in: analysisTreeFrame
-                ), target.isHittable {
+                viewport = analysisViewportFrame(analysisTree, in: app)
+                if analysisPositionIsFullyVisible(targetFrame, in: viewport) {
                     return target
                 }
             }
 
-            guard attempt < 10 else { break }
+            guard attempt < 10, let viewport else { break }
 
             let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
             guard dragScrollView(
@@ -308,8 +332,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                         targetFrame,
                         interactionPoint: interactionPoint
                     ) : nil,
-                containerFrame: analysisTreeFrame,
-                interactionPoint: interactionPoint
+                containerFrame: viewport,
+                interactionPoint: interactionPoint,
+                dragStartPoint: CGPoint(x: viewport.midX, y: viewport.midY)
             ) else { break }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
@@ -320,12 +345,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             in: app,
             reason: "unable to reveal analysis position \(identifier)"
         )
+        keepScreenshot("Unable to fully reveal analysis position \(identifier)", in: app)
         XCTFail(
-            "Expected analysis position \(identifier) to become visible and hittable",
+            "Expected analysis position \(identifier) to become fully visible",
             file: file,
             line: line
         )
-        return target
+        return nil
     }
 
     private func tapAnalysisPosition(
@@ -336,53 +362,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     ) {
         var lastTarget: XCUIElement?
         for attempt in 0..<2 {
-            // AnalyzeTreeView normally centers the selected position. Use
-            // XCTest's valid hit point in that common case so long journeys do
-            // not repeatedly traverse the complete accessibility hierarchy.
-            // If that interaction does not select the node, the next attempt
-            // falls back to the frame-aware reveal and centered interaction.
-            let visibleTarget = app.buttons
-                .matching(identifier: identifier)
-                .firstMatch
-            let analysisTree = app.scrollViews
-                .matching(
-                    identifier:
-                        SurroundUITestContract.AccessibilityID
-                            .gameAnalyzeTreeScroll
-                )
-                .firstMatch
-            let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
-            if attempt == 0,
-               visibleTarget.exists,
-               hasTappableInteractionPoint(
-                   interactionPoint,
-                   visibleTarget.frame,
-                   in: analysisTree.frame
-               ) {
-                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-                if visibleTarget.exists,
-                   hasTappableInteractionPoint(
-                       interactionPoint,
-                       visibleTarget.frame,
-                       in: analysisTree.frame
-                   ), visibleTarget.isHittable {
-                    lastTarget = visibleTarget
-                    activate(visibleTarget)
-                    if waitForStableSelection(of: visibleTarget, timeout: 5) {
-                        return
-                    }
-                    continue
-                }
-            }
-
-            let target = revealAnalysisPosition(
+            // XCTest can throw while computing a hit point for a node at the
+            // clipped tree edge. Reveal its complete frame and activate its
+            // center, then require the same real, stable selection as before.
+            guard let target = revealAnalysisPosition(
                 identifier,
                 in: app,
                 file: file,
                 line: line
-            )
+            ) else { return }
             lastTarget = target
-            activate(target, at: CGVector(dx: 0.5, dy: 0.5))
+            XCTContext.runActivity(
+                named: "Select fully visible analysis position \(identifier), attempt \(attempt + 1)"
+            ) { _ in
+                activate(target, at: CGVector(dx: 0.5, dy: 0.5))
+            }
             if waitForStableSelection(of: target, timeout: 5) {
                 return
             }
@@ -403,6 +397,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             in: app,
             reason: "analysis selection did not settle for \(identifier)"
         )
+        keepScreenshot("Analysis selection did not settle for \(identifier)", in: app)
         XCTFail(
             "Expected analysis position \(identifier) to remain selected",
             file: file,
