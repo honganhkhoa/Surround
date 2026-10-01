@@ -212,20 +212,21 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             let previewBoard = try boardValue(in: app)
             XCTAssertEqual(previewBoard, "position:91:hg")
             XCTAssertNotEqual(previewBoard, liveBoard)
-            if cycle == 2 {
-                tap(ID.gameChatInput, in: app, matching: .textField)
-                let focused = XCTNSPredicateExpectation(
-                    predicate: NSPredicate { _, _ in self.chatInputHasKeyboardFocus(in: app) },
-                    object: nil
-                )
-                XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 10), .completed)
-            }
+            // Check retained state before resuming composer interaction. The
+            // native app chooser can transfer keyboard ownership between apps.
             assertNativePreview(
                 compact: false, fullScreenFrame: fullScreenFrame,
                 screenSize: screenSize, value: previewBoard,
-                requiresKeyboardFocus: cycle == 2,
+                requiresKeyboardFocus: false,
                 stage: "cycle \(cycle) full-screen preview", in: app
             )
+            if cycle == 2 {
+                assertNativePreviewWithKeyboard(
+                    compact: false, fullScreenFrame: fullScreenFrame,
+                    screenSize: screenSize, value: previewBoard,
+                    stage: "cycle \(cycle) full-screen preview after composer refocus", in: app
+                )
+            }
 
             selectNativeMultitaskingAction("Split View", in: app, springboard: springboard)
             let safariIcon = springboard.icons["Safari"].firstMatch
@@ -233,7 +234,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             assertNativePreview(
                 compact: true, fullScreenFrame: fullScreenFrame,
                 screenSize: screenSize, value: previewBoard,
-                requiresKeyboardFocus: cycle == 2,
+                requiresKeyboardFocus: false,
                 stage: "cycle \(cycle) Safari Split View preview", in: app
             )
             let paired = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -252,6 +253,13 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             add(pairedBounds)
             XCTAssertEqual(pairedResult, .completed,
                            "Safari must occupy an adjacent full-height native Split View window, without Slide Over overlap.")
+            if cycle == 2 {
+                assertNativePreviewWithKeyboard(
+                    compact: true, fullScreenFrame: fullScreenFrame,
+                    screenSize: screenSize, value: previewBoard,
+                    stage: "cycle \(cycle) Safari Split View preview after composer refocus", in: app
+                )
+            }
 
             // Diagnostic markers never wait for collection or alter assertions.
             if cycle == 1 {
@@ -264,17 +272,44 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             assertNativePreview(
                 compact: false, fullScreenFrame: fullScreenFrame,
                 screenSize: screenSize, value: previewBoard,
-                requiresKeyboardFocus: cycle == 2,
+                requiresKeyboardFocus: false,
                 stage: "cycle \(cycle) restored full-screen preview", in: app
             )
             if cycle == 1 {
                 FileHandle.standardError.write(Data("[SurroundNativeResizeCapture] RESTORED cycle=1\n".utf8))
+            }
+            if cycle == 2 {
+                assertNativePreviewWithKeyboard(
+                    compact: false, fullScreenFrame: fullScreenFrame,
+                    screenSize: screenSize, value: previewBoard,
+                    stage: "cycle \(cycle) restored full-screen preview after composer refocus", in: app
+                )
             }
             tap("game.chat.preview.return", in: app, matching: .button)
             assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))
             XCTAssertFalse(app.buttons["game.chat.preview.return"].exists)
             keepScreenshot("Native resize – cycle \(cycle) returned to live game", in: app)
         }
+    }
+
+    private func assertNativePreviewWithKeyboard(
+        compact: Bool, fullScreenFrame: CGRect, screenSize: CGSize,
+        value: String, stage: String, in app: XCUIApplication
+    ) {
+        // Call only after independently checking the post-transition state.
+        // This models the user resuming typing in the existing composer.
+        tap(ID.gameChatInput, in: app, matching: .textField)
+        let focused = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.chatInputHasKeyboardFocus(in: app)
+                && self.softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 10), .completed,
+                       "Expected the existing composer to receive focus and show its software keyboard at \(stage).")
+        assertNativePreview(
+            compact: compact, fullScreenFrame: fullScreenFrame,
+            screenSize: screenSize, value: value, requiresKeyboardFocus: true,
+            stage: stage, in: app
+        )
     }
 
     private func selectNativeMultitaskingAction(
@@ -335,7 +370,8 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
                 && returnButton.exists && returnButton.isHittable
                 && window.insetBy(dx: -1, dy: -1).contains(returnButton.frame)
                 && returnButton.frame.maxY <= board.frame.minY + 1
-                && (!requiresKeyboardFocus || self.chatInputHasKeyboardFocus(in: app))
+                && (!requiresKeyboardFocus || (self.chatInputHasKeyboardFocus(in: app)
+                    && self.softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)))
         }, object: nil)
         let result = XCTWaiter.wait(for: [settled], timeout: 15)
         let screenshot = XCUIScreen.main.screenshot()
@@ -348,6 +384,8 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             nativeCompactControls=\(picker.exists); expectedCompact=\(compact)
             board=\(board.frame); value=\(String(describing: board.value))
             return=\(returnButton.frame); keyboardFocus=\(chatInputHasKeyboardFocus(in: app))
+            requiresKeyboardFocus=\(requiresKeyboardFocus); softwareKeyboardVisible=\(softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app))
+            keyboard=\(app.keyboards.firstMatch.exists ? app.keyboards.firstMatch.frame : .zero)
             \(app.debugDescription)
             """)
         details.name = "Native resize – \(stage) bounds and accessibility"
