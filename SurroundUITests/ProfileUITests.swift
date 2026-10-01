@@ -1266,14 +1266,12 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         ])
         let draftName = "Profile draft retained"
         let name = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
-        tap(name, description: "Challenge game name", in: app)
         let oldName = name.value as? String ?? ""
-        let trailingEdge = name.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
-        #if targetEnvironment(macCatalyst)
-        trailingEdge.click()
-        #else
-        trailingEdge.tap()
-        #endif
+        // Acquire focus and place the caret in one interaction. A second tap
+        // can land on the keyboard while its presentation moves the field.
+        XCTAssertTrue(waitUntilHittable(name, timeout: 10),
+                      "The challenge game name must be hittable before acquiring focus.")
+        activate(name, at: CGVector(dx: 0.95, dy: 0.5))
         name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldName.count) + draftName + "\n")
         XCTAssertTrue(waitForValue(draftName, in: name, timeout: 10))
 
