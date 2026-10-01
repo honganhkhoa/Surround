@@ -524,7 +524,8 @@ jobs:
           )"
           python3 .github/ci-tools/diagnose-ipad-animation-stalls.py \
             --simulator "${{ steps.simulator.outputs.id }}" \
-            --output TestResults/iPadOS18-Focused-Diagnostics -- \
+            --output TestResults/iPadOS18-Focused-Diagnostics \
+            --native-resize-capture -- \
             xcodebuild test-without-building \
             -scheme Surround \
             -project Surround.xcodeproj \

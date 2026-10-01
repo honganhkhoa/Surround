@@ -47,6 +47,45 @@ LOG_LINE = re.compile(
 IDLE_REQUEST = "Received request to notify when animations are idle"
 IDLE_REPLY = "Sending animations idle reply"
 INPUT_TRANSITION = re.compile(r"state transition|Posted notification (?:will|did)(?:Show|Hide)|[Mm]enu")
+NATIVE_BEGIN = "[SurroundNativeResizeCapture] BEGIN cycle=1"
+NATIVE_ACTION = "[SurroundNativeResizeCapture] ACTION cycle=1"
+NATIVE_RESTORED = "[SurroundNativeResizeCapture] RESTORED cycle=1"
+NATIVE_TEST = re.compile(
+    r"Test Case '-\[SurroundUITests\.GameContinuityUITests "
+    r"testMovePreviewKeepsAnExitAcrossLayouts\]' started\."
+)
+
+
+class NativeResizeDetector:
+    """Explicit native-test markers only; never changes the test's scheduling."""
+    def __init__(self):
+        self.active = False
+        self.fired = False
+        self.action = threading.Event()
+        self.restored = threading.Event()
+        self.finished = threading.Event()
+        self.markers = {}
+
+    def feed(self, line, now):
+        if re.search(r"Test Case .+ started\.", line):
+            self.active = bool(NATIVE_TEST.search(line))
+        if not self.active:
+            return None
+        if re.search(r"Test Case .+ (passed|failed|skipped|exceeded execution)", line):
+            self.finished.set()
+            self.active = False
+        elif line.strip() == NATIVE_BEGIN and not self.fired:
+            self.fired = True
+            self.markers["beginReceivedAtUTC"] = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+            return {"reason": "native-full-screen", "phase": "cycle-1",
+                    "capturedAtUTC": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        elif self.fired and line.strip() == NATIVE_ACTION:
+            self.markers["actionReceivedAtUTC"] = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+            self.action.set()
+        elif self.fired and line.strip() == NATIVE_RESTORED:
+            self.markers["restoredReceivedAtUTC"] = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+            self.restored.set()
+        return None
 
 
 def summarize_animation_idle(simulator_log, console_log):
@@ -187,12 +226,13 @@ def stop_owned_process(process):
 
 
 def tool(command, output, timeout, stop=None, limit=2 * 1024 * 1024,
-         on_line=None, env=None):
+         on_line=None, env=None, cleanup=None):
     """Run a bounded, owned collector, keeping output and nonfatal errors."""
     started = time.monotonic()
     result = {"command": command, "output": str(output), "exitCode": None}
     process = None
     pending = b""
+    clean = cleanup or stop_owned_process
     try:
         with open(output, "wb", buffering=0) as stream:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -233,7 +273,9 @@ def tool(command, output, timeout, stop=None, limit=2 * 1024 * 1024,
                         process.wait(timeout=remaining)
                     except subprocess.TimeoutExpired:
                         result["error"] = "collector timeout after output closed"
-            stop_owned_process(process)
+            metadata = clean(process)
+            if metadata:
+                result["cleanup"] = metadata
             result["exitCode"] = process.returncode
             if process.returncode and not result.get("error") and not result.get("stopped"):
                 result["error"] = "collector exited unsuccessfully"
@@ -241,9 +283,55 @@ def tool(command, output, timeout, stop=None, limit=2 * 1024 * 1024,
         result["error"] = str(error)
     finally:
         if process is not None:
-            stop_owned_process(process)
+            metadata = clean(process)
+            if metadata:
+                result["cleanup"] = metadata
             process.stdout.close()
         result["elapsedSeconds"] = round(time.monotonic() - started, 3)
+    return result
+
+
+def stop_native_collector(process, deadline, privileged=False):
+    """Clean only our collector group or sudo wrapper, never the sampled app."""
+    if process.poll() is not None:
+        return {"stopped": True}
+    result = {"pid": process.pid, "stopped": False}
+    available = deadline - time.monotonic()
+    if available <= 0:
+        result["error"] = "Cleanup deadline exhausted; collector exit unconfirmed"
+        return result
+    try:
+        if privileged:
+            # Signal only our unreaped sudo child; sudo relays TERM to its
+            # command even when it created a separate pty/session. KILL would
+            # not be relayed. Wrapper exit alone does not prove sampler exit;
+            # spindump's intrinsic limit remains the primary command bound.
+            result["collectorExitConfirmed"] = False
+            command = ["sudo", "-n", "/bin/kill", "-TERM", str(process.pid)]
+            killed = subprocess.run(command, capture_output=True,
+                                    timeout=min(0.5, available))
+            result["exitCode"] = killed.returncode
+            if killed.returncode:
+                result["error"] = "Noninteractive privileged collector cleanup failed"
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=min(0.2, available))
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+        available = deadline - time.monotonic()
+        if available > 0:
+            process.wait(timeout=min(0.2, available))
+        result["stopped"] = process.poll() is not None
+        if not result["stopped"]:
+            result.setdefault("error", "Collector exit unconfirmed")
+    except ProcessLookupError:
+        result["stopped"] = process.poll() is not None
+    except (OSError, subprocess.SubprocessError) as error:
+        result.setdefault("error", str(error))
+        result["cleanupException"] = str(error)
+    if privileged:
+        result["wrapperStopped"] = result["stopped"]
     return result
 
 
@@ -293,6 +381,153 @@ def capture(args, output, stop):
     return result
 
 
+def capture_native_resize(args, output, stop, detector):
+    """One device recording and raw app sample, outside XCTest/AX, within one budget.
+
+    Stackshots briefly perturb scheduling. This evidence cannot establish that an
+    instrumented pass would also pass without collection. No app or runner is signalled.
+    """
+    started = time.monotonic()
+    deadline = started + args.native_capture_seconds
+    # Reserve time for SIGINT to finalize the MP4 rather than force-cutting it.
+    work_deadline = deadline - min(2, args.native_capture_seconds / 4)
+    directory = output / "native-full-screen"
+    directory.mkdir()
+    result = {"simulator": args.simulator, "tools": {}, "processes": {},
+              "budgetSeconds": args.native_capture_seconds,
+              "startedAtUTC": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+              "instrumentation": "Independent compositor recording and targeted stackshot; may perturb scheduling"}
+    video = None
+    video_log = None
+
+    def remaining():
+        return max(0, work_deadline - time.monotonic())
+
+    def collect(command, name, maximum=None):
+        # Leave owned-process cleanup time inside the same work deadline.
+        budget = max(0, remaining() - 0.5)
+        if maximum is not None:
+            budget = min(budget, maximum)
+        if budget <= 0:
+            return {"error": "shared capture deadline exhausted"}
+        cleanup_result = {}
+
+        def clean(process):
+            if not cleanup_result:
+                cleanup_result.update(stop_native_collector(process, work_deadline))
+            return cleanup_result
+
+        return tool(command, directory / name, budget, stop, cleanup=clean)
+
+    try:
+        video_command = ["xcrun", "simctl", "io", args.simulator, "recordVideo",
+                         "--codec=h264", str(directory / "compositor.mp4")]
+        video_log = open(directory / "video.log", "wb", buffering=0)
+        video = subprocess.Popen(video_command, stdout=video_log, stderr=subprocess.STDOUT,
+                                 start_new_session=True)
+        result["video"] = {"command": video_command, "pid": video.pid,
+                           "output": str(directory / "compositor.mp4")}
+        while not detector.action.is_set() and not detector.finished.is_set() and not stop.is_set():
+            if remaining() <= 0:
+                break
+            detector.action.wait(min(0.1, remaining()))
+        result["actionObserved"] = detector.action.is_set()
+        if not result["actionObserved"]:
+            result["error"] = "Full Screen ACTION marker absent before capture deadline or test end"
+            return result
+
+        result["tools"]["launchctl"] = collect(
+            ["xcrun", "simctl", "spawn", args.simulator, "launchctl", "list"], "launchctl.log", 3)
+        launchctl = result["tools"]["launchctl"]
+        if launchctl.get("exitCode") == 0 and not launchctl.get("error"):
+            try:
+                result["processes"] = simulator_pids((directory / "launchctl.log").read_text())
+            except ValueError as error:
+                result["error"] = str(error)
+        app = result["processes"].get("app")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            futures = {
+                "screenshot": pool.submit(collect,
+                    ["xcrun", "simctl", "io", args.simulator, "screenshot",
+                     str(directory / "post-action.png")], "screenshot.log", 3),
+            }
+            if app:
+                pid = str(app["pid"])
+                futures["process"] = pool.submit(collect,
+                    ["ps", "-p", pid, "-o", "pid=,ppid=,state=,pcpu=,etime=,comm="], "process.log", 2)
+                # Intrinsic root-command limit is shorter than the shared deadline.
+                # No symbolization while sampling; keep UUID/offset binary data.
+                raw_limit = min(12, int(remaining() - 2))
+                if raw_limit >= args.native_stack_seconds + 1:
+                    raw_command = ["sudo", "-n", "/usr/sbin/spindump", pid,
+                                   str(args.native_stack_seconds), "10", "-onlyTarget",
+                                   "-noSymbolicate", "-noText", "-timelimit", str(raw_limit),
+                                   "-o", str(directory / "app.raw.spindump")]
+                    # Allow its intrinsic limit to complete even if XCTest exits;
+                    # a user-owned wrapper cannot assume it can signal a root child.
+                    raw_cleanup = {}
+
+                    def clean_raw(process):
+                        if not raw_cleanup:
+                            raw_cleanup.update(stop_native_collector(process, work_deadline, privileged=True))
+                        return raw_cleanup
+
+                    result["sampleRequestedAtUTC"] = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+                    futures["rawStack"] = pool.submit(tool, raw_command,
+                        directory / "raw-stack.log", raw_limit + 1, None, cleanup=clean_raw)
+                else:
+                    result["tools"]["rawStack"] = {"error": "Insufficient shared budget for raw sampling"}
+            else:
+                result["tools"]["rawStack"] = {"error": "No exact simulator app job; raw sample skipped"}
+            for name, future in futures.items():
+                try:
+                    result["tools"][name] = future.result()
+                except Exception as error:
+                    result["tools"][name] = {"error": str(error)}
+            raw = result["tools"].get("rawStack", {})
+            raw["artifactExists"] = (directory / "app.raw.spindump").is_file()
+            if raw.get("exitCode") == 0 and not raw["artifactExists"]:
+                raw["error"] = "Raw sampler returned success without an artifact"
+        # Continue compositor observation through restoration (or the same
+        # deadline), including when sampling is unavailable. Never delay XCTest.
+        while not detector.restored.is_set() and not detector.finished.is_set() and not stop.is_set():
+            if remaining() <= 0:
+                break
+            detector.restored.wait(min(0.1, remaining()))
+        result["restoredMarkerObserved"] = detector.restored.is_set()
+    except (OSError, subprocess.SubprocessError) as error:
+        result["error"] = str(error)
+    finally:
+        if video is not None:
+            details = result["video"]
+            if video.poll() is None:
+                try:
+                    os.killpg(video.pid, signal.SIGINT)
+                    details["finalizationSignal"] = "owned-recorder-SIGINT"
+                    available = deadline - time.monotonic() - min(0.7, args.native_capture_seconds / 8)
+                    if available > 0:
+                        video.wait(timeout=min(1, available))
+                    if video.poll() is None:
+                        raise subprocess.TimeoutExpired(video.args, 1)
+                except subprocess.TimeoutExpired:
+                    details["error"] = "Recorder did not finalize within shared deadline"
+                    details["cleanup"] = stop_native_collector(video, deadline)
+                except ProcessLookupError:
+                    pass
+                except OSError as error:
+                    details["error"] = str(error)
+            details["exitCode"] = video.poll()
+            details["artifactExists"] = (directory / "compositor.mp4").is_file()
+            if not details["artifactExists"]:
+                details.setdefault("error", "No compositor video artifact")
+        if video_log is not None:
+            video_log.close()
+        result["elapsedSeconds"] = round(time.monotonic() - started, 3)
+        result["markers"] = dict(detector.markers)
+        (directory / "capture.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 def log_stream(args, output, stop):
     # A guest log process can outlive its host simctl. Record an ownership nonce
     # and its exact PID; native --timeout also bounds an unverifiable orphan.
@@ -307,10 +542,19 @@ def log_stream(args, output, stop):
 
     environment = os.environ.copy()
     environment["SIMCTL_CHILD_SURROUND_ANIMATION_LOG_OWNER"] = owner
+    predicate = LOG_PREDICATE
+    if getattr(args, "native_resize_capture", False):
+        predicate = "(" + predicate + ") OR " + (
+            '(process == "Surround" AND '
+            '(eventMessage CONTAINS[c] "main run loop" '
+            'OR eventMessage CONTAINS "XCTPerformOnMainRunLoop")) OR '
+            '(process IN {"runningboardd", "SpringBoard"} '
+            'AND eventMessage CONTAINS "com.honganhkhoa.Surround")'
+        )
     command = ["xcrun", "simctl", "spawn", args.simulator, "/bin/sh", "-c",
                'printf "SurroundAnimationCollectorPID=%s\\n" "$$"; export DYLD_ROOT_PATH="$SIMULATOR_ROOT"; exec "$SIMULATOR_ROOT/usr/bin/log" stream "$@"',
                "surround-animation-log", "--style", "compact", "--level", "debug",
-               "--timeout", str(args.log_seconds), "--predicate", LOG_PREDICATE]
+               "--timeout", str(args.log_seconds), "--predicate", predicate]
     result = tool(command, output / "simulator.log", args.log_seconds + 5, stop,
                   args.log_max_bytes, receive, environment)
     result["guestPID"] = guest_pid
@@ -343,12 +587,15 @@ def run(args):
     output.mkdir(parents=True, exist_ok=False)
     stop = threading.Event()
     status = {"simulator": args.simulator, "command": args.command, "capture": None,
+              "nativeResizeCapture": None,
               "commandExitCode": None, "errors": []}
     detector = StallDetector(args.stall_seconds)
+    native_detector = NativeResizeDetector()
     command = None
     interrupted = None
     interrupt_time = None
     capture_future = None
+    native_future = None
     previous_handlers = {}
 
     def interrupted_by(signum, _frame):
@@ -369,10 +616,20 @@ def run(args):
             print("[SurroundAnimation] Capturing one early idle-wait diagnostic.", file=sys.stderr, flush=True)
             capture_future = pool.submit(capture, args, output, stop)
 
+    def maybe_native_capture(line, pool):
+        nonlocal native_future
+        if not getattr(args, "native_resize_capture", False):
+            return
+        trigger = native_detector.feed(line, time.monotonic())
+        if trigger and native_future is None and not stop.is_set():
+            status["nativeResizeTrigger"] = trigger
+            print("[SurroundNativeResizeCapture] Starting bounded independent capture.", file=sys.stderr, flush=True)
+            native_future = pool.submit(capture_native_resize, args, output, stop, native_detector)
+
     for signum in (signal.SIGINT, signal.SIGTERM):
         previous_handlers[signum] = signal.signal(signum, interrupted_by)
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
             log_future = pool.submit(log_stream, args, output, stop)
             try:
                 with open(output / "console.log", "wb", buffering=0) as console:
@@ -410,7 +667,9 @@ def run(args):
                                 pending += data
                                 while b"\n" in pending:
                                     line, pending = pending.split(b"\n", 1)
-                                    maybe_capture(detector.feed(line.decode("utf-8", errors="replace"), time.monotonic()), pool)
+                                    decoded = line.decode("utf-8", errors="replace")
+                                    maybe_native_capture(decoded, pool)
+                                    maybe_capture(detector.feed(decoded, time.monotonic()), pool)
                                 # An oversized non-line diagnostic must not grow watcher memory forever.
                                 pending = pending[-1024 * 1024:]
                             if command.poll() is None:
@@ -432,6 +691,11 @@ def run(args):
                         status["capture"] = capture_future.result()
                     except Exception as error:
                         status["capture"] = {"error": str(error)}
+                if native_future is not None:
+                    try:
+                        status["nativeResizeCapture"] = native_future.result()
+                    except Exception as error:
+                        status["nativeResizeCapture"] = {"error": str(error)}
     finally:
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
@@ -460,6 +724,11 @@ def main():
     parser.add_argument("--capture-timeout", type=float, default=10)
     parser.add_argument("--log-seconds", type=int, default=1800)
     parser.add_argument("--log-max-bytes", type=int, default=16 * 1024 * 1024)
+    parser.add_argument("--native-resize-capture", action="store_true",
+                        help="Capture only the first explicitly marked native Full Screen restoration")
+    parser.add_argument("--native-capture-seconds", type=float, default=20,
+                        help="Shared native collector budget, including recorder finalization")
+    parser.add_argument("--native-stack-seconds", type=int, default=2)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.simulator):
@@ -470,7 +739,8 @@ def main():
         parser.error("Supply the test command after --")
     if not (0 < args.stall_seconds <= 120 and 1 <= args.sample_seconds <= 5
             and 0 < args.capture_timeout <= 30 and 1 <= args.log_seconds <= 7200
-            and 1024 <= args.log_max_bytes <= 64 * 1024 * 1024):
+            and 1024 <= args.log_max_bytes <= 64 * 1024 * 1024
+            and 1 <= args.native_capture_seconds <= 20 and 1 <= args.native_stack_seconds <= 5):
         parser.error("Diagnostic limits out of bounds")
     try:
         return run(args)

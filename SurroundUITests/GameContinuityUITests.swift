@@ -253,13 +253,23 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             XCTAssertEqual(pairedResult, .completed,
                            "Safari must occupy an adjacent full-height native Split View window, without Slide Over overlap.")
 
+            // Diagnostic markers never wait for collection or alter assertions.
+            if cycle == 1 {
+                FileHandle.standardError.write(Data("[SurroundNativeResizeCapture] BEGIN cycle=1\n".utf8))
+            }
             selectNativeMultitaskingAction("Full Screen", in: app, springboard: springboard)
+            if cycle == 1 {
+                FileHandle.standardError.write(Data("[SurroundNativeResizeCapture] ACTION cycle=1\n".utf8))
+            }
             assertNativePreview(
                 compact: false, fullScreenFrame: fullScreenFrame,
                 screenSize: screenSize, value: previewBoard,
                 requiresKeyboardFocus: cycle == 2,
                 stage: "cycle \(cycle) restored full-screen preview", in: app
             )
+            if cycle == 1 {
+                FileHandle.standardError.write(Data("[SurroundNativeResizeCapture] RESTORED cycle=1\n".utf8))
+            }
             tap("game.chat.preview.return", in: app, matching: .button)
             assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))
             XCTAssertFalse(app.buttons["game.chat.preview.return"].exists)
