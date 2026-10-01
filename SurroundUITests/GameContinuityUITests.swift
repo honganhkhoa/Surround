@@ -148,6 +148,13 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
     }
 
     func testMovePreviewKeepsAnExitAcrossLayouts() throws {
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 18 {
+            try verifyMovePreviewAcrossNativeSplitView()
+            return
+        }
+
+        // Keep the existing iPadOS 26 coverage until its different native
+        // windowing controls have their own verified automation route.
         let app = launchContinuityScene(.activeGameBoard)
         let liveBoard = try boardValue(in: app)
         tapChatItem(ID.gameChatMove(91), in: app, matching: .button)
@@ -163,6 +170,186 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         assertProperty(
             "value", equals: liveBoard, of: element(ID.gameBoard, in: app)
         )
+    }
+
+    private func verifyMovePreviewAcrossNativeSplitView() throws {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.activeGameBoard.rawValue,
+        ], orientation: .portrait)
+        XCTAssertFalse(app.launchArguments.contains(GameLayoutUITestContract.launchArgument))
+        XCTAssertFalse(app.launchArguments.contains(SurroundUITestContract.compactGameLayoutLaunchArgument))
+        let liveBoard = try boardValue(in: app)
+        XCTAssertEqual(liveBoard, "position:101:cq")
+        let fullScreenFrame = app.windows.firstMatch.frame
+        let screen = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
+        let screenSize = CGSize(width: screen.width, height: screen.height)
+        XCTAssertGreaterThan(fullScreenFrame.width, 650)
+        XCTAssertGreaterThan(fullScreenFrame.height, fullScreenFrame.width)
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        // Teardown blocks run in reverse registration order, so restore the
+        // native window before launchApp's existing app-termination block.
+        addTeardownBlock {
+            guard app.state != .notRunning, app.windows.firstMatch.exists else { return }
+            let window = app.windows.firstMatch.frame
+            if window.width > 0 && window.width < fullScreenFrame.width - 100 {
+                self.selectNativeMultitaskingAction("Full Screen", in: app, springboard: springboard)
+                let restored = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    let window = app.windows.firstMatch.frame
+                    return abs(window.width - fullScreenFrame.width) <= 1
+                        && abs(window.height - fullScreenFrame.height) <= 1
+                        && !app.segmentedControls[ID.gameDisplayModePicker].exists
+                }, object: nil)
+                XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 15), .completed,
+                               "Restore native Full Screen before terminating the fixture.")
+            }
+        }
+        for cycle in 1...2 {
+            tapChatItem(ID.gameChatMove(91), in: app, matching: .button)
+            let previewBoard = try boardValue(in: app)
+            XCTAssertEqual(previewBoard, "position:91:hg")
+            XCTAssertNotEqual(previewBoard, liveBoard)
+            if cycle == 2 {
+                tap(ID.gameChatInput, in: app, matching: .textField)
+                let focused = XCTNSPredicateExpectation(
+                    predicate: NSPredicate { _, _ in self.chatInputHasKeyboardFocus(in: app) },
+                    object: nil
+                )
+                XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 10), .completed)
+            }
+            assertNativePreview(
+                compact: false, fullScreenFrame: fullScreenFrame,
+                screenSize: screenSize, value: previewBoard,
+                requiresKeyboardFocus: cycle == 2,
+                stage: "cycle \(cycle) full-screen preview", in: app
+            )
+
+            selectNativeMultitaskingAction("Split View", in: app, springboard: springboard)
+            let safariIcon = springboard.icons["Safari"].firstMatch
+            tap(safariIcon, description: "Safari in the native Split View app chooser", in: springboard)
+            assertNativePreview(
+                compact: true, fullScreenFrame: fullScreenFrame,
+                screenSize: screenSize, value: previewBoard,
+                requiresKeyboardFocus: cycle == 2,
+                stage: "cycle \(cycle) Safari Split View preview", in: app
+            )
+            let paired = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                guard safari.windows.firstMatch.exists else { return false }
+                let companion = safari.windows.firstMatch.frame
+                let surround = app.windows.firstMatch.frame
+                return companion.width > 100
+                    && abs(companion.height - fullScreenFrame.height) <= 1
+                    && companion.insetBy(dx: 1, dy: 1).intersection(surround).isEmpty
+                    && abs(companion.union(surround).width - fullScreenFrame.width) <= 1
+            }, object: nil)
+            let pairedResult = XCTWaiter.wait(for: [paired], timeout: 10)
+            let pairedBounds = XCTAttachment(string: "Surround=\(app.windows.firstMatch.frame); Safari=\(safari.windows.firstMatch.frame)")
+            pairedBounds.name = "Native Split View companion bounds – cycle \(cycle)"
+            pairedBounds.lifetime = .keepAlways
+            add(pairedBounds)
+            XCTAssertEqual(pairedResult, .completed,
+                           "Safari must occupy an adjacent full-height native Split View window, without Slide Over overlap.")
+
+            selectNativeMultitaskingAction("Full Screen", in: app, springboard: springboard)
+            assertNativePreview(
+                compact: false, fullScreenFrame: fullScreenFrame,
+                screenSize: screenSize, value: previewBoard,
+                requiresKeyboardFocus: cycle == 2,
+                stage: "cycle \(cycle) restored full-screen preview", in: app
+            )
+            tap("game.chat.preview.return", in: app, matching: .button)
+            assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))
+            XCTAssertFalse(app.buttons["game.chat.preview.return"].exists)
+            keepScreenshot("Native resize – cycle \(cycle) returned to live game", in: app)
+        }
+    }
+
+    private func selectNativeMultitaskingAction(
+        _ title: String, in app: XCUIApplication, springboard: XCUIApplication
+    ) {
+        // The OS ellipsis is absent from the app's accessibility tree. Its
+        // position is relative to the current native window, including after
+        // Split View; this never changes Simulator scale or app geometry.
+        let label = NSPredicate(format: "label == %@ OR label BEGINSWITH %@", title, title + ", ")
+        let systemAction = springboard.descendants(matching: .any).matching(label).firstMatch
+        let appAction = app.descendants(matching: .any).matching(label).firstMatch
+        let menuAlreadyOpen = (systemAction.exists && systemAction.isHittable)
+            || (appAction.exists && appAction.isHittable)
+        if !menuAlreadyOpen {
+            let window = app.windows.firstMatch.frame
+            let application = app.frame
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                dx: window.midX - application.minX,
+                dy: window.minY + 12 - application.minY
+            )).tap()
+        }
+        let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (systemAction.exists && systemAction.isHittable)
+                || (appAction.exists && appAction.isHittable)
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [appeared], timeout: 10)
+        keepScreenshot("Native multitasking menu – \(title)", in: app)
+        let hierarchy = XCTAttachment(string: springboard.debugDescription + "\n" + app.debugDescription)
+        hierarchy.name = "Native multitasking menu – \(title) accessibility"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        XCTAssertEqual(result, .completed, "Expected the native \(title) multitasking action.")
+        let action = systemAction.exists && systemAction.isHittable ? systemAction : appAction
+        tap(action, description: "native \(title) action", in: springboard)
+    }
+
+    private func assertNativePreview(
+        compact: Bool, fullScreenFrame: CGRect, screenSize: CGSize,
+        value: String, requiresKeyboardFocus: Bool,
+        stage: String, in app: XCUIApplication
+    ) {
+        let picker = app.segmentedControls[ID.gameDisplayModePicker]
+        let board = element(ID.gameBoard, in: app)
+        let returnButton = app.buttons["game.chat.preview.return"]
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let window = app.windows.firstMatch.frame
+            let widthMatches = compact
+                ? window.width < 650 && window.width < fullScreenFrame.width - 100
+                : abs(window.width - fullScreenFrame.width) <= 1
+            // With both override flags absent, this picker exists only in
+            // GameDetailView's native horizontalSizeClass == .compact branch.
+            return widthMatches && abs(window.height - fullScreenFrame.height) <= 1
+                && abs(window.minX - fullScreenFrame.minX) <= 1
+                && abs(window.minY - fullScreenFrame.minY) <= 1
+                && picker.exists == compact && board.value as? String == value
+                && board.frame.width > 100 && abs(board.frame.width - board.frame.height) <= 1
+                && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+                && returnButton.exists && returnButton.isHittable
+                && window.insetBy(dx: -1, dy: -1).contains(returnButton.frame)
+                && returnButton.frame.maxY <= board.frame.minY + 1
+                && (!requiresKeyboardFocus || self.chatInputHasKeyboardFocus(in: app))
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [settled], timeout: 15)
+        let screenshot = XCUIScreen.main.screenshot()
+        let raster = screenshot.image.cgImage
+        let rasterSize = CGSize(width: raster?.width ?? 0, height: raster?.height ?? 0)
+        let details = XCTAttachment(string: """
+            stage=\(stage)
+            window=\(app.windows.firstMatch.frame); fullScreen=\(fullScreenFrame)
+            screenPixels=\(rasterSize); initialScreenPixels=\(screenSize)
+            nativeCompactControls=\(picker.exists); expectedCompact=\(compact)
+            board=\(board.frame); value=\(String(describing: board.value))
+            return=\(returnButton.frame); keyboardFocus=\(chatInputHasKeyboardFocus(in: app))
+            \(app.debugDescription)
+            """)
+        details.name = "Native resize – \(stage) bounds and accessibility"
+        details.lifetime = .keepAlways
+        add(details)
+        let image = XCTAttachment(screenshot: screenshot, quality: .original)
+        image.name = "Native resize – \(stage) rendering"
+        image.lifetime = .keepAlways
+        add(image)
+        XCTAssertEqual(rasterSize, screenSize, "The device raster must not scale during native resizing.")
+        XCTAssertEqual(result, .completed, "Expected native bounds, size-class controls, retained preview, square visible board and usable Return action at \(stage).")
+        assertProperty("value", equals: value, of: board)
     }
 
     func testInitialAnalyzeStateStartsAtCurrentPositionWithoutFixtureReseeding() throws {
