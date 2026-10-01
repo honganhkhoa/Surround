@@ -352,28 +352,51 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         stage: String, in app: XCUIApplication
     ) {
         let picker = app.segmentedControls[ID.gameDisplayModePicker]
+        // Stage markers survive a query abort before the in-memory predicate
+        // trace exists. They wrap the original call without new AX work/waits.
+        let boardResolutionStart = ProcessInfo.processInfo.systemUptime
+        FileHandle.standardError.write(Data("[SurroundNativePreviewPredicate] stage=\(stage) phase=board-resolution-begin epochSeconds=\(Date().timeIntervalSince1970)\n".utf8))
         let board = element(ID.gameBoard, in: app)
+        FileHandle.standardError.write(Data("[SurroundNativePreviewPredicate] stage=\(stage) phase=board-resolution-end elapsedSeconds=\(ProcessInfo.processInfo.systemUptime - boardResolutionStart) epochSeconds=\(Date().timeIntervalSince1970)\n".utf8))
         let returnButton = app.buttons["game.chat.preview.return"]
+        let trace = NativePreviewPredicateTrace()
         let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let window = app.windows.firstMatch.frame
+            let poll = trace.beginPoll()
+            let window = trace.read(.windowFrame, in: poll) { app.windows.firstMatch.frame }
             let widthMatches = compact
                 ? window.width < 650 && window.width < fullScreenFrame.width - 100
                 : abs(window.width - fullScreenFrame.width) <= 1
             // With both override flags absent, this picker exists only in
             // GameDetailView's native horizontalSizeClass == .compact branch.
-            return widthMatches && abs(window.height - fullScreenFrame.height) <= 1
-                && abs(window.minX - fullScreenFrame.minX) <= 1
-                && abs(window.minY - fullScreenFrame.minY) <= 1
-                && picker.exists == compact && board.value as? String == value
-                && board.frame.width > 100 && abs(board.frame.width - board.frame.height) <= 1
-                && window.insetBy(dx: -1, dy: -1).contains(board.frame)
-                && returnButton.exists && returnButton.isHittable
-                && window.insetBy(dx: -1, dy: -1).contains(returnButton.frame)
-                && returnButton.frame.maxY <= board.frame.minY + 1
-                && (!requiresKeyboardFocus || (self.chatInputHasKeyboardFocus(in: app)
-                    && self.softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)))
+            let matches = trace.check(.nativeWidth, in: poll, widthMatches)
+                && trace.check(.fullHeight, in: poll, abs(window.height - fullScreenFrame.height) <= 1)
+                && trace.check(.originX, in: poll, abs(window.minX - fullScreenFrame.minX) <= 1)
+                && trace.check(.originY, in: poll, abs(window.minY - fullScreenFrame.minY) <= 1)
+                && trace.check(.compactControls, in: poll, picker.exists == compact)
+                && trace.check(.previewValue, in: poll, board.value as? String == value)
+                && trace.check(.boardWidth, in: poll, board.frame.width > 100)
+                && trace.check(.boardSquare, in: poll, abs(board.frame.width - board.frame.height) <= 1)
+                && trace.check(.boardInsideWindow, in: poll, window.insetBy(dx: -1, dy: -1).contains(board.frame))
+                && trace.check(.returnExists, in: poll, returnButton.exists)
+                && trace.check(.returnHittable, in: poll, returnButton.isHittable)
+                && trace.check(.returnInsideWindow, in: poll, window.insetBy(dx: -1, dy: -1).contains(returnButton.frame))
+                && trace.check(.returnAboveBoard, in: poll, returnButton.frame.maxY <= board.frame.minY + 1)
+                && trace.check(.requiredKeyboard, in: poll, !requiresKeyboardFocus
+                    || (trace.check(.composerFocus, in: poll, self.chatInputHasKeyboardFocus(in: app))
+                        && trace.check(.softwareKeyboard, in: poll, self.softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app))))
+            trace.finishPoll(poll, result: matches)
+            return matches
         }, object: nil)
+        trace.markWaitStart()
         let result = XCTWaiter.wait(for: [settled], timeout: 15)
+        trace.markWaitEnd()
+        let clauses = XCTAttachment(string: trace.report(waitResult: Int(result.rawValue),
+                                                        requiresKeyboardFocus: requiresKeyboardFocus,
+                                                        waitResultName: result == .completed ? "completed"
+                                                            : result == .timedOut ? "timedOut" : String(describing: result)))
+        clauses.name = "Native resize – \(stage) predicate clauses"
+        clauses.lifetime = .keepAlways
+        add(clauses)
         let screenshot = XCUIScreen.main.screenshot()
         let raster = screenshot.image.cgImage
         let rasterSize = CGSize(width: raster?.width ?? 0, height: raster?.height ?? 0)
@@ -709,5 +732,145 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         assertProperty(
             "value", equals: preferredChild, of: element(ID.gameBoard, in: app)
         )
+    }
+}
+
+// Records only work the existing predicate already performs. No lock is held
+// across an AX query, and no later clause is evaluated after a false result.
+private final class NativePreviewPredicateTrace {
+    enum Clause: String, CaseIterable {
+        case windowFrame, nativeWidth, fullHeight, originX, originY, compactControls
+        case previewValue, boardWidth, boardSquare, boardInsideWindow
+        case returnExists, returnHittable, returnInsideWindow, returnAboveBoard
+        case requiredKeyboard, composerFocus, softwareKeyboard
+    }
+
+    final class Poll {
+        let number: Int
+        let start: TimeInterval
+        var end: TimeInterval?
+        var result: Bool?
+        fileprivate var samples: [Clause: Sample] = [:]
+        init(number: Int, start: TimeInterval) {
+            self.number = number
+            self.start = start
+        }
+    }
+
+    fileprivate final class Sample {
+        let poll: Int
+        let start: TimeInterval
+        var end: TimeInterval?
+        var result: String?
+        init(poll: Int, start: TimeInterval) {
+            self.poll = poll
+            self.start = start
+        }
+    }
+
+    private let origin = ProcessInfo.processInfo.systemUptime
+    private let wallClockAnchor = Date().timeIntervalSince1970
+    private let lock = NSLock()
+    private var polls: [Poll] = []
+    private var pollCount = 0
+    private var firstFalse: [Clause: Sample] = [:]
+    private var waitStart: TimeInterval?
+    private var waitEnd: TimeInterval?
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+
+    func beginPoll() -> Poll {
+        locked {
+            pollCount += 1
+            let poll = Poll(number: pollCount, start: ProcessInfo.processInfo.systemUptime)
+            polls.append(poll)
+            if polls.count > 8 { polls.removeFirst() }
+            return poll
+        }
+    }
+
+    func finishPoll(_ poll: Poll, result: Bool) {
+        locked {
+            poll.end = ProcessInfo.processInfo.systemUptime
+            poll.result = result
+        }
+    }
+
+    private func begin(_ clause: Clause, in poll: Poll) -> Sample {
+        locked {
+            let sample = Sample(poll: poll.number, start: ProcessInfo.processInfo.systemUptime)
+            poll.samples[clause] = sample
+            return sample
+        }
+    }
+
+    private func finish(_ sample: Sample, clause: Clause, result: String) {
+        locked {
+            sample.end = ProcessInfo.processInfo.systemUptime
+            sample.result = result
+            if result == "false", firstFalse[clause] == nil { firstFalse[clause] = sample }
+        }
+    }
+
+    func read<T>(_ clause: Clause, in poll: Poll, _ body: () -> T) -> T {
+        let sample = begin(clause, in: poll)
+        let value = body()
+        finish(sample, clause: clause, result: "returned")
+        return value
+    }
+
+    func check(_ clause: Clause, in poll: Poll, _ condition: @autoclosure () -> Bool) -> Bool {
+        let sample = begin(clause, in: poll)
+        let matches = condition()
+        finish(sample, clause: clause, result: String(matches))
+        return matches
+    }
+
+    func markWaitStart() { locked { waitStart = ProcessInfo.processInfo.systemUptime } }
+    func markWaitEnd() { locked { waitEnd = ProcessInfo.processInfo.systemUptime } }
+
+    func report(waitResult: Int, requiresKeyboardFocus: Bool, waitResultName: String = "unspecified") -> String {
+        locked {
+            func time(_ value: TimeInterval?) -> String {
+                value.map { String(format: "%.6f", $0 - origin) } ?? "inFlight"
+            }
+            func describe(_ sample: Sample) -> String {
+                let duration = sample.end.map { String(format: "%.6f", $0 - sample.start) } ?? "inFlight"
+                return "\(sample.result ?? "inFlight") start=\(time(sample.start)) end=\(time(sample.end)) duration=\(duration)s"
+            }
+            var lines = [
+                "waitLimitSeconds=15; waitResult=\(waitResult); waitResultName=\(waitResultName)",
+                "wallClockEpochAtTraceCreation=\(wallClockAnchor)",
+                "monotonicSecondsSinceTraceCreation: waitStart=\(time(waitStart)); waitEnd=\(time(waitEnd))",
+                "polls=\(pollCount); retainedLastPolls=\(polls.count); requiresKeyboardFocus=\(requiresKeyboardFocus)",
+                "Only original predicate queries are recorded. notReached means not evaluated at report time, after short-circuit or an earlier inFlight query; no fresh AX reads occur here.",
+                "firstFalse is the first false observation per clause. requiredKeyboard includes its nested focus/keyboard durations; do not sum overlapping durations.",
+            ]
+            for clause in Clause.allCases {
+                if let sample = firstFalse[clause] {
+                    lines.append("firstFalse \(clause.rawValue) poll=\(sample.poll): \(describe(sample))")
+                }
+            }
+            for poll in polls {
+                lines.append("poll=\(poll.number) start=\(time(poll.start)) end=\(time(poll.end)) result=\(poll.result.map(String.init) ?? "inFlight")")
+                for clause in Clause.allCases {
+                    let state: String
+                    if let sample = poll.samples[clause] {
+                        state = describe(sample)
+                    } else if !requiresKeyboardFocus, poll.samples[.requiredKeyboard] != nil,
+                              clause == .composerFocus || clause == .softwareKeyboard {
+                        state = "notRequired"
+                    } else {
+                        state = "notReached"
+                    }
+                    lines.append("  \(clause.rawValue): \(state)")
+                }
+            }
+            return lines.joined(separator: "\n")
+        }
     }
 }
