@@ -16,13 +16,14 @@ on:
         options:
           - all
           - ipad18-focus
+          - xcode27-ipad18-native
 
 permissions:
   contents: read
 
 jobs:
   test:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-26
     timeout-minutes: 30
 
@@ -64,7 +65,7 @@ jobs:
           retention-days: 14
 
   iphone-navigation-ui-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -155,7 +156,7 @@ jobs:
           retention-days: 14
 
   ipad-ui-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -200,7 +201,7 @@ jobs:
           retention-days: 14
 
   ipad-profile-ui-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -247,7 +248,7 @@ jobs:
   # The iOS 18 unit tests share this job with the profile UI phase. The unit
   # step also warms the UI build's derived data.
   minimum-ios-18:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-15
     timeout-minutes: 90
 
@@ -322,7 +323,7 @@ jobs:
           retention-days: 14
 
   minimum-ios-18-ui-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-15
     timeout-minutes: 80
 
@@ -377,7 +378,7 @@ jobs:
   # consume the existing composer's budget. Leave 25 minutes for setup,
   # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -548,8 +549,139 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # A toolchain comparison only; an unavailable exact runtime fails this job.
+  xcode27-ipad18-native-ui-test:
+    name: Xcode 27.1 native iPadOS 18.6 comparison
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_scope == 'xcode27-ipad18-native' }}
+    runs-on: xcode-27
+    timeout-minutes: 50
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27.1 on this hosted worker
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p TestResults/Xcode27-iPadOS18.6-Provisioning
+          {
+            sudo -n xcode-select --switch "$DEVELOPER_DIR" || exit 1
+            xcode-select -p
+            xcodebuild -version
+            sw_vers
+            uname -m
+            echo "Source SHA: $GITHUB_SHA"
+          } 2>&1 | tee TestResults/Xcode27-iPadOS18.6-Provisioning/host-toolchain.log
+
+      - name: Provision exact iPadOS 18.6 build 22G86 and 11-inch M4 device
+        id: simulator
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/ci-tools/provision-ipad18-xcode27.py \
+            --output TestResults/Xcode27-iPadOS18.6-Provisioning \
+            --download-dir "$RUNNER_TEMP/Surround-iPadOS18.6-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            2>&1 | tee TestResults/Xcode27-iPadOS18.6-Provisioning/provision.log
+
+      - name: Prefer the same hardware keyboard setup
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}"
+
+      - name: Build native comparison UI tests
+        id: ipad_ui_build
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.simulator.outputs.id }}" Xcode27-iPadOS18.6-Native \
+            2>&1 | tee TestResults/Xcode27-iPadOS18.6-Native-build.log
+
+      - name: Run the unchanged native resize journey once
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          test_class=GameContinuityUITests
+          test_name=testMovePreviewKeepsAnExitAcrossLayouts
+          test_source="SurroundUITests/${test_class}.swift"
+          class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
+          declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+${test_name}[[:space:]]*\([[:space:]]*\)" "$test_source" || true)"
+          if [[ "$class_count" != "1" || "$declaration_count" != "1" ]]; then
+            echo "Expected exactly one native resize class and test declaration in $test_source." >&2
+            exit 1
+          fi
+          derived_data_path="$(
+            .github/ci-tools/run-ipad-ui-tests.sh derived-data-path \
+              "${{ steps.simulator.outputs.id }}"
+          )"
+          python3 .github/ci-tools/diagnose-ipad-animation-stalls.py \
+            --simulator "${{ steps.simulator.outputs.id }}" \
+            --output TestResults/Xcode27-iPadOS18.6-Native-Diagnostics \
+            --native-resize-capture -- \
+            xcodebuild test-without-building \
+            -scheme Surround \
+            -project Surround.xcodeproj \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "$derived_data_path" \
+            -parallel-testing-enabled NO \
+            "-only-testing:SurroundUITests/${test_class}/${test_name}" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            -resultBundlePath TestResults/SurroundUITests-Xcode27-iPadOS18.6-Native.xcresult
+
+      - name: Remove only the comparison device
+        if: ${{ always() }}
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import re
+          import subprocess
+          root = Path("TestResults/Xcode27-iPadOS18.6-Provisioning")
+          metadata = root / "provision.json"
+          if not metadata.is_file():
+              raise SystemExit(0)
+          simulator_id = json.loads(metadata.read_text()).get("createdSimulatorID")
+          if not simulator_id:
+              raise SystemExit(0)
+          if not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", simulator_id):
+              raise SystemExit("Refusing cleanup of an invalid simulator UUID.")
+          results = []
+          with (root / "cleanup.log").open("w") as log:
+              for action in ("shutdown", "delete"):
+                  command = ["xcrun", "simctl", action, simulator_id]
+                  try:
+                      result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+                      results.append({"action": action, "exitCode": result.returncode})
+                  except subprocess.TimeoutExpired:
+                      results.append({"action": action, "timedOut": True})
+          (root / "cleanup.json").write_text(json.dumps(results, indent=2) + "\n")
+          if results[-1].get("exitCode") != 0:
+              raise SystemExit("Comparison device deletion failed; see cleanup logs.")
+          PY
+
+      - name: Upload native comparison results or provisioning failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-xcode27-ipad18-native-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
   catalyst-build:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_scope != 'ipad18-focus' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.test_scope != 'ipad18-focus' && inputs.test_scope != 'xcode27-ipad18-native') }}
     runs-on: macos-26
     timeout-minutes: 20
 
