@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100122026100100000012 /* DuoProfileSidebarUITests.swift */; };
+		D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100042026100100000004 /* SidebarKeyboardUITests.swift */; };
+		D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100022026100100000002 /* AppReviewPresentationUITests.swift */; };
+		D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000042026093000000004 /* DuoSidebarUITests.swift */; };
+		D03000012026093000000001 /* DuoTabContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000022026093000000002 /* DuoTabContainer.swift */; };
 		A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */; };
 		F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
 		2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
@@ -443,6 +448,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D10100122026100100000012 /* DuoProfileSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoProfileSidebarUITests.swift; sourceTree = "<group>"; };
+		D10100042026100100000004 /* SidebarKeyboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarKeyboardUITests.swift; sourceTree = "<group>"; };
+		D10100022026100100000002 /* AppReviewPresentationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentationUITests.swift; sourceTree = "<group>"; };
+		D03000042026093000000004 /* DuoSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoSidebarUITests.swift; sourceTree = "<group>"; };
+		D03000022026093000000002 /* DuoTabContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoTabContainer.swift; sourceTree = "<group>"; };
 		0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContinuityUITests.swift; sourceTree = "<group>"; };
 		7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLayoutUITestHarness.swift; sourceTree = "<group>"; };
 		E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteractionTests.swift; sourceTree = "<group>"; };
@@ -851,6 +861,10 @@
 				AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */,
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
+				D03000042026093000000004 /* DuoSidebarUITests.swift */,
+				D10100122026100100000012 /* DuoProfileSidebarUITests.swift */,
+				D10100042026100100000004 /* SidebarKeyboardUITests.swift */,
+				D10100022026100100000002 /* AppReviewPresentationUITests.swift */,
 				AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */,
 				AE4400023C00000000000002 /* SurroundUITestCase.swift */,
 				BC042B0F24AB2CFA0050B2D1 /* SurroundUITests.swift */,
@@ -865,6 +879,7 @@
 				D90700052026090700000005 /* AppReviewPresentation.swift */,
 				BC463B0B266353B400D40D3A /* GameDetail */,
 				BC042B2D24AB2DD00050B2D1 /* MainView.swift */,
+				D03000022026093000000002 /* DuoTabContainer.swift */,
 				BC042B2F24AB2DD00050B2D1 /* PublicGamesList.swift */,
 				BCFA11510000000000000001 /* GameHistoryView.swift */,
 				AE6000063B00000000000006 /* GameHistoryPaginationState.swift */,
@@ -1467,6 +1482,7 @@
 				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
 				BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */,
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
+				D03000012026093000000001 /* DuoTabContainer.swift in Sources */,
 				BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */,
 				BCA0C72225F0DF5C0077DD28 /* PrivateMessageNotificationView.swift in Sources */,
 				BC6B05F625FA0DF8004E1D66 /* BoardDemoView.swift in Sources */,
@@ -1622,6 +1638,10 @@
 				AE4400013C00000000000001 /* SurroundUITestCase.swift in Sources */,
 				AE4500013C00000000000001 /* SurroundJourneyUITestCase.swift in Sources */,
 				AE4600013C00000000000001 /* ProfileUITests.swift in Sources */,
+				D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */,
+				D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */,
+				D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */,
+				D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */,
 				BC042B1024AB2CFA0050B2D1 /* SurroundUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

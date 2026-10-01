@@ -88,11 +88,46 @@ private struct OfflineUITestRootView: View {
     @StateObject private var ogs: OGSService
     @StateObject private var sgs: SurroundService
     @StateObject private var nav: NavigationService
+    @State private var reviewCoordinator: AppReviewCoordinator?
     private let compatibilityScene:
         SurroundUITestContract.CompatibilityScene?
 
     init() {
-        let ogs = OGSService.offlineUITestInstance()
+        let ogs: OGSService
+        if SurroundUITestContract.testsAppReviewPresentation {
+            guard var gameData = TestData.Ongoing19x19wBot2.gameData else {
+                preconditionFailure("App review presentation needs the bundled game fixture.")
+            }
+            // Keep the review context neutral: the test toggles one local
+            // presentation blocker instead of starting live or network work.
+            gameData.timeControl = TimeControlSystem.Fischer(
+                initialTime: 3 * 86_400,
+                timeIncrement: 86_400,
+                maxTime: 7 * 86_400
+            ).timeControlObject
+            let game = Game(ogsGame: gameData)
+            game.ogsRawData = [:]
+            guard let user = game.whitePlayer else {
+                preconditionFailure("App review presentation needs a signed-in fixture player.")
+            }
+            guard let gameID = game.ogsID else {
+                preconditionFailure("App review presentation needs an identified fixture game.")
+            }
+            var state = OGSService.BootstrapState()
+            state.user = user
+            state.isLoggedIn = true
+            state.socketStatus = .connected
+            // Preview defaults deliberately model an overview still loading.
+            // This fixture is complete and has no transport to finish a load.
+            state.isLoadingOverview = false
+            state.activeGames = [gameID: game]
+            state.publicGames = [gameID: game]
+            state.sortedPublicGames = [game]
+            state.finishedGamesSnapshot = []
+            ogs = OGSService(previewState: state)
+        } else {
+            ogs = OGSService.offlineUITestInstance()
+        }
         let sgs = SurroundService.offlineUITestInstance
         let nav = NavigationService()
         let compatibilityScene = SurroundUITestContract.compatibilityScene
@@ -105,12 +140,23 @@ private struct OfflineUITestRootView: View {
         _ogs = StateObject(wrappedValue: ogs)
         _sgs = StateObject(wrappedValue: sgs)
         _nav = StateObject(wrappedValue: nav)
+        _reviewCoordinator = State(initialValue: SurroundUITestContract.testsAppReviewPresentation
+            ? AppReviewCoordinator(history: AppReviewHistoryStore(
+                preferences: AppReviewUITestPreferences(),
+                // An empty marketing version makes every review attempt
+                // ineligible, even if future test actions create activity.
+                marketingVersion: ""
+            )) : nil)
         self.compatibilityScene = compatibilityScene
     }
 
     var body: some View {
         Group {
-            if let compatibilityScene {
+            if let reviewCoordinator {
+                AppReviewScene(coordinator: reviewCoordinator) {
+                    MainView(allowsRemoteActivity: false)
+                }
+            } else if let compatibilityScene {
                 CompatibilityScreenshotRootView(scene: compatibilityScene)
             } else {
                 MainView(allowsRemoteActivity: false)
@@ -125,6 +171,20 @@ private struct OfflineUITestRootView: View {
             #if targetEnvironment(macCatalyst)
             .background(CatalystUITestWindowPositioner())
             #endif
+    }
+}
+
+/// AppReviewHistoryStore uses only these two methods. Review test history never
+/// reads from or writes to any persistent UserDefaults domain.
+private final class AppReviewUITestPreferences: UserDefaults {
+    private var values = [String: Data]()
+
+    override func data(forKey defaultName: String) -> Data? {
+        values[defaultName]
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        values[defaultName] = value as? Data
     }
 }
 

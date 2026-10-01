@@ -56,6 +56,8 @@ private struct MainTabPlacement: ViewModifier {
 struct MainView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.self) private var environment
+    @EnvironmentObject private var sgs: SurroundService
     @EnvironmentObject var ogs: OGSService
 
     let allowsRemoteActivity: Bool
@@ -128,6 +130,119 @@ struct MainView: View {
         })
     }
     
+    @ViewBuilder
+    private var tabNavigation: some View {
+        let navigationCurrentView = Binding<RootView>(
+            get: { nav.main.rootView },
+            set: { nav.main.rootView = $0 }
+        )
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        if #available(iOS 27.0, *), UIDevice.current.userInterfaceIdiom == .phone {
+            DuoTabContainer(selection: navigationCurrentView, isLoggedIn: ogs.isLoggedIn) { root in
+                AnyView(root.navigationView
+                    .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
+                    .environmentObject(ogs)
+                    .environmentObject(sgs)
+                    .environmentObject(nav)
+                    .environment(\.openURL, environment.openURL)
+                    .environment(\.locale, environment.locale)
+                    .environment(\.layoutDirection, environment.layoutDirection)
+                    .environment(\.colorScheme, environment.colorScheme)
+                    .environment(\.dynamicTypeSize, environment.dynamicTypeSize)
+                    .environment(\.scenePhase, environment.scenePhase)
+                    .environment(\.surroundAllowsLocalPersistence, environment.surroundAllowsLocalPersistence)
+                    .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+                    .modifier(AppReviewHostedPresentation(root: root))
+                    .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
+                    .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
+            }
+            // UIKit owns the full window and its keyboard avoidance. Shrinking
+            // this controller in SwiftUI moves its tab bar above the keyboard
+            // and applies an extra bottom inset to the hosted composer.
+            .ignoresSafeArea()
+        } else {
+            swiftUITabs(selection: navigationCurrentView)
+        }
+        #else
+        swiftUITabs(selection: navigationCurrentView)
+        #endif
+    }
+
+    private func swiftUITabs(selection: Binding<RootView>) -> some View {
+        TabView(selection: selection) {
+            Tab(value: RootView.home) {
+                RootView.home.navigationView
+            } label: {
+                RootView.home.label
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationHome)
+            Tab(value: RootView.publicGames) {
+                RootView.publicGames.navigationView
+            } label: {
+                RootView.publicGames.label
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
+            if ogs.isLoggedIn {
+                Tab(value: RootView.privateMessages) {
+                    RootView.privateMessages.navigationView
+                } label: {
+                    RootView.privateMessages.label
+                }
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.navigationMessages
+                )
+            }
+            Tab(value: RootView.profile) {
+                RootView.profile.navigationView
+            } label: {
+                RootView.profile.label
+            }
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationProfile)
+            .tabPlacement(.sidebarOnly)
+            .hidden(
+                nav.main.rootView != .profile
+                    && (!ogs.isLoggedIn || horizontalSizeClass == .compact)
+            )
+            // Compact iPhone tab bars ignore sidebar-only placement.
+            // Retain the selected secondary tab and its stack through a
+            // fold; hide it only after another destination is selected.
+            TabSection("Surround") {
+                Tab(value: RootView.settings) {
+                    RootView.settings.navigationView
+                } label: {
+                    RootView.settings.label
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationSettings)
+                .tabPlacement(.sidebarOnly)
+                .hidden(
+                    horizontalSizeClass == .compact
+                        && nav.main.rootView != .settings
+                )
+                Tab(value: RootView.about) {
+                    RootView.about.navigationView
+                } label: {
+                    RootView.about.label
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationAbout)
+                .tabPlacement(.sidebarOnly)
+                .hidden(
+                    horizontalSizeClass == .compact
+                        && nav.main.rootView != .about
+                )
+            }
+            TabSection("OGS") {
+                Tab(value: RootView.browser) {
+                    RootView.browser.navigationView
+                } label: {
+                    RootView.browser.label
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationBrowser)
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
+    }
+
     var body: some View {
         if firstLaunch {
             DispatchQueue.main.async {
@@ -140,84 +255,8 @@ struct MainView: View {
             }
         }
 
-        let navigationCurrentView = Binding<RootView>(
-            get: { nav.main.rootView },
-            set: { nav.main.rootView = $0 }
-        )
-
         return ZStack(alignment: .top) {
-            TabView(selection: navigationCurrentView) {
-                Tab(value: RootView.home) {
-                    RootView.home.navigationView
-                } label: {
-                    RootView.home.label
-                }
-                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationHome)
-                Tab(value: RootView.publicGames) {
-                    RootView.publicGames.navigationView
-                } label: {
-                    RootView.publicGames.label
-                }
-                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
-                if ogs.isLoggedIn {
-                    Tab(value: RootView.privateMessages) {
-                        RootView.privateMessages.navigationView
-                    } label: {
-                        RootView.privateMessages.label
-                    }
-                    .accessibilityIdentifier(
-                        SurroundUITestContract.AccessibilityID.navigationMessages
-                    )
-                }
-                Tab(value: RootView.profile) {
-                    RootView.profile.navigationView
-                } label: {
-                    RootView.profile.label
-                }
-                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationProfile)
-                .tabPlacement(.sidebarOnly)
-                .hidden(
-                    nav.main.rootView != .profile
-                        && (!ogs.isLoggedIn || horizontalSizeClass == .compact)
-                )
-                // Compact iPhone tab bars ignore sidebar-only placement.
-                // Retain the selected secondary tab and its stack through a
-                // fold; hide it only after another destination is selected.
-                TabSection("Surround") {
-                    Tab(value: RootView.settings) {
-                        RootView.settings.navigationView
-                    } label: {
-                        RootView.settings.label
-                    }
-                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationSettings)
-                    .tabPlacement(.sidebarOnly)
-                    .hidden(
-                        horizontalSizeClass == .compact
-                            && nav.main.rootView != .settings
-                    )
-                    Tab(value: RootView.about) {
-                        RootView.about.navigationView
-                    } label: {
-                        RootView.about.label
-                    }
-                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationAbout)
-                    .tabPlacement(.sidebarOnly)
-                    .hidden(
-                        horizontalSizeClass == .compact
-                            && nav.main.rootView != .about
-                    )
-                }
-                TabSection("OGS") {
-                    Tab(value: RootView.browser) {
-                        RootView.browser.navigationView
-                    } label: {
-                        RootView.browser.label
-                    }
-                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationBrowser)
-                }
-            }
-            .tabViewStyle(.sidebarAdaptable)
-            .modifier(MainTabPlacement(horizontalSizeClass: horizontalSizeClass))
+            tabNavigation
             .sheet(isPresented: $nav.main.showWaitingGames) {
                 AppNavigationStack {
                     WaitingGamesView()

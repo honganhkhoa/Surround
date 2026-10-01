@@ -46,6 +46,9 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.tabBarPlacement) private var tabBarPlacement
+    #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+    @Environment(\.duoTabContext) private var duoTabContext
+    #endif
     @Environment(\.surroundAllowsRemoteActivity) private var allowsRemoteActivity
     @Environment(\.surroundAllowsLocalPersistence) private var allowsLocalPersistence
     @Environment(\.openPlayerProfile) private var openPlayerProfile
@@ -583,6 +586,11 @@ struct HomeView: View {
 
     var shouldShowSettingsButton: Bool {
         #if os(iOS)
+        #if !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        if #available(iOS 27.0, *), let duoTabContext {
+            return !duoTabContext.sidebarAvailable
+        }
+        #endif
         if let tabBarPlacement {
             return tabBarPlacement != .sidebar
         }

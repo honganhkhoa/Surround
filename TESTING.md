@@ -58,6 +58,31 @@ xcodebuild test \
 
 Substitute `18` in the simulator selection to reproduce the minimum-OS selection. CI uses `macos-26` for iOS 26 and `macos-15` with Xcode 26.2 for iOS 18. Each job builds once, validates the three selected test declarations, and runs without retries or parallel test workers. The limits are five minutes per test, twenty minutes for the test step, fifteen minutes for the build step, and forty minutes for the job. Result bundles are retained for fourteen days in `surround-iphone-26-navigation-test-results` and `surround-iphone-18-navigation-test-results`. This targeted lane does not run the full iPad journey suite or test Duo device poses.
 
+## Offline Duo sidebar test
+
+On iOS 27 phones, the root navigation uses an owned `UITabBarController` so the Duo sidebar can show native Surround/OGS groups and overlap every destination. Hosting controllers remain stable across compact and regular layouts. UIKit receives the full window, including the keyboard region, so its tab bar stays behind a software keyboard. Shared navigation content ignores horizontal container safe areas and restores horizontal padding measured from the enclosing window's safe-area guide. Titles and toolbars retain UIKit's layout; this modifier leaves vertical content insets and keyboard avoidance unchanged. Presented stacks keep their own layout. Padding must not depend on safe-area geometry measured from that same modified content, which can oscillate at pixel boundaries during native sidebar layout. Game screens forward tab-bar visibility through `appTabBarHidden(_:)`.
+
+Start an iPhone Duo simulator in Open pose, then run the focused offline journey with its UUID:
+
+```sh
+TEST_RUNNER_SURROUND_EXPECT_DUO_SIDEBAR=1 xcodebuild test \
+  -scheme Surround \
+  -project Surround.xcodeproj \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=${simulator_id}" \
+  -parallel-testing-enabled NO \
+  -only-testing:SurroundUITests/DuoSidebarUITests \
+  -resultBundlePath "TestResults/SurroundUITests-DuoSidebar.xcresult"
+```
+
+The journey checks both group headings, a stationary Public games card while the sidebar opens, grouped Settings/About/Web destinations, and automatic dismissal after selection. It asserts the owned container exists. Without the expectation flag it skips unsupported devices and a collapsed Duo; an explicitly expected Open run fails when its sidebar toggle is missing. Xcode passes `TEST_RUNNER_SURROUND_EXPECT_DUO_SIDEBAR=1` to the test runner as `SURROUND_EXPECT_DUO_SIDEBAR=1`. Verify that the Open result contains an executed test. It does not change folding poses. Separately verify content space and board-edge taps beside the game's vertical toolbar, and exercise selected destinations and pushed game state through Closed, Book, Open, and rotation without relaunching. Debug launches with `SURROUND_DUO_SIDEBAR_DIAGNOSTICS=1` report hosting bounds, safe areas, the closed baseline, and the measured sidebar delta.
+
+`AppReviewPresentationUITests` launches a production `AppReviewScene` around the offline MainView, with dictionary-backed review history and an empty marketing version that prevents system requests. It checks coordinator forwarding, Home visibility through a game push and Back, local pending presentation blocking, and inactive retained tabs. Run it on an iOS 27 phone to exercise the owned hosting boundary.
+
+`DuoProfileSidebarUITests` exercises Home's sidebar selection of the own Profile tab and Home → game → opponent avatar → pushed Profile. Open runs check repeated native sidebar opening/closing over stationary profile content and a responsive return to Home or the originating game. The pushed route checks repeated entry/Back and retained board state in Closed as well. Add `-only-testing:SurroundUITests/DuoProfileSidebarUITests` to the command above; the same strict Open expectation flag applies. Back resolves the visible control, including the Duo's vertical toolbar.
+
+`SidebarKeyboardUITests` opens a private conversation through the Messages inbox in MainView. It requires an actual docked software keyboard, records composer/container/tab-bar geometry and screenshots, and preserves an unsent draft. It records keyboard dismissal when the conversation gesture or system control supports it; otherwise it records `keyboard-dismissal-unavailable` without claiming dismissal coverage. Use `TEST_RUNNER_SURROUND_EXPECT_OWNED_TABS=1` for the owned shell and additionally `TEST_RUNNER_SURROUND_EXPECT_DUO_SIDEBAR=1` for Duo Open. `TEST_RUNNER_SURROUND_SIDEBAR_KEYBOARD_ORIENTATION=landscape` selects landscape; otherwise it uses portrait. Disable hardware keyboard attachment on the selected simulator before this diagnostic. Compare the same journey against clean HEAD; a standalone message-thread fixture does not exercise the main shell.
+
 ## Offline iPad UI tests
 
 The shared iPadOS and Mac Catalyst journeys cover top-level sidebar navigation including the own Profile entry, an empty Messages inbox, signed-out navigation without Messages, opening the bundled fixture game, switching active games through the bottom-bar popover, and entering and leaving Zen mode. `--surround-empty-messages` clears only offline private-message threads for the empty-inbox regression. The suite selects landscape orientation itself:

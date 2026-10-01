@@ -534,7 +534,7 @@ struct GameDetailView: View {
                 navigationBarHidden: navigationBarHidden,
                 showsActiveGamesButton: showsActiveGamesButton
             ))
-            .toolbar(compactLayout || zenMode ? .hidden : .automatic, for: .tabBar)
+            .appTabBarHidden(compactLayout || zenMode)
         )
     }
 }

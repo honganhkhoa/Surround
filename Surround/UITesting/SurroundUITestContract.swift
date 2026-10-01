@@ -59,6 +59,8 @@ enum SurroundUITestContract {
         "--surround-attached-software-keyboard-visible"
     static let structuredChatFormatsLaunchArgument =
         "--surround-structured-chat-formats"
+    static let appReviewPresentationLaunchArgument =
+        "--surround-app-review-presentation"
     static let preferencesSuite = "com.honganhkhoa.Surround.UITests"
     static let appStoreScreenshotWidgetGameCount = 3
     static let compatibilityWidgetGameCount = 4
@@ -195,6 +197,10 @@ enum SurroundUITestContract {
 
     static var isCapturingAppStoreScreenshots: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(screenshotLaunchArgument)
+    }
+
+    static var testsAppReviewPresentation: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(appReviewPresentationLaunchArgument)
     }
 
     static var isCapturingCompatibilityScreenshots: Bool {
@@ -464,9 +470,15 @@ enum SurroundUITestContract {
     static let compatibilityWidgetProofToken: String? = nil
     static let appStoreScreenshotWidgetProofToken: String? = nil
     static let isClearingAppStoreScreenshotWidgetFixture = false
+    static let testsAppReviewPresentation = false
     #endif
 
     enum AccessibilityID {
+        static let appReviewContext = "fixture.app-review.context"
+        static let appReviewPendingToggle = "fixture.app-review.pending-toggle"
+        static func appReviewHostedCoordinator(_ root: String) -> String {
+            "fixture.app-review.hosted-coordinator.\(root)"
+        }
         static let catalystWindowGeometry = "window.catalyst.geometry"
         static let catalystFreshWindowGeometry =
             "window.catalyst.geometry.fresh-default"

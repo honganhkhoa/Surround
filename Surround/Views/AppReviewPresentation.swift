@@ -1,15 +1,68 @@
 import SwiftUI
 import StoreKit
+import Observation
 
 private struct AppReviewCoordinatorKey: EnvironmentKey {
     static let defaultValue: AppReviewCoordinator? = nil
 }
 
+private struct AppReviewPresentationRelayKey: EnvironmentKey {
+    static let defaultValue: AppReviewPresentationRelay? = nil
+}
+
 extension EnvironmentValues {
-    /// Absent in previews, offline journeys, and the isolated OGS Beta app.
+    /// Absent in previews, ordinary offline journeys, and the isolated OGS Beta app.
     var appReviewCoordinator: AppReviewCoordinator? {
         get { self[AppReviewCoordinatorKey.self] }
         set { self[AppReviewCoordinatorKey.self] = newValue }
+    }
+
+    var appReviewPresentationRelay: AppReviewPresentationRelay? {
+        get { self[AppReviewPresentationRelayKey.self] }
+        set { self[AppReviewPresentationRelayKey.self] = newValue }
+    }
+}
+
+/// Hosted roots retain preferences independently of the outer scene. Each root
+/// owns an entry, and only the scene's selected, visible root contributes to
+/// review eligibility. Scene-level SwiftUI views retain their preferences.
+@MainActor
+@Observable
+final class AppReviewPresentationRelay {
+    struct Presentation: Equatable {
+        var homeVisible = false
+        var blocked = false
+    }
+
+    private struct HostedPresentation: Equatable {
+        let root: RootView
+        let isVisible: Bool
+        let presentation: Presentation
+    }
+
+    private var hostedPresentations = [UUID: HostedPresentation]()
+
+    fileprivate func update(owner: UUID, root: RootView, isVisible: Bool, homeVisible: Bool, blocked: Bool) {
+        let value = HostedPresentation(
+            root: root,
+            isVisible: isVisible,
+            presentation: Presentation(homeVisible: homeVisible, blocked: blocked)
+        )
+        guard hostedPresentations[owner] != value else { return }
+        hostedPresentations[owner] = value
+    }
+
+    fileprivate func remove(owner: UUID) {
+        hostedPresentations.removeValue(forKey: owner)
+    }
+
+    func presentation(for root: RootView) -> Presentation {
+        hostedPresentations.values
+            .filter { $0.root == root && $0.isVisible }
+            .reduce(into: Presentation()) { result, entry in
+                result.homeVisible = result.homeVisible || entry.presentation.homeVisible
+                result.blocked = result.blocked || entry.presentation.blocked
+            }
     }
 }
 
@@ -48,26 +101,34 @@ struct AppReviewScene<Content: View>: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
-    @State private var coordinator = AppReviewCoordinator(
-        history: AppReviewDependencies.history
-    )
+    @State private var coordinator: AppReviewCoordinator
+    @State private var presentationRelay = AppReviewPresentationRelay()
     @State private var presentationBlocked = false
     @State private var homeVisible = false
     @ViewBuilder var content: () -> Content
 
+    init(coordinator: AppReviewCoordinator? = nil, @ViewBuilder content: @escaping () -> Content) {
+        _coordinator = State(initialValue: coordinator ?? AppReviewCoordinator(
+            history: AppReviewDependencies.history
+        ))
+        self.content = content
+    }
+
     private var context: AppReviewContext {
-        appReviewContext(
+        let hosted = presentationRelay.presentation(for: nav.main.rootView)
+        return appReviewContext(
             scenePhase: scenePhase,
             ogs: ogs,
             nav: nav,
-            homeVisible: homeVisible,
-            presentationBlocked: presentationBlocked
+            homeVisible: homeVisible || hosted.homeVisible,
+            presentationBlocked: presentationBlocked || hosted.blocked
         )
     }
 
     var body: some View {
         content()
             .environment(\.appReviewCoordinator, coordinator)
+            .environment(\.appReviewPresentationRelay, presentationRelay)
             .onPreferenceChange(AppReviewPresentationBlockedKey.self) {
                 presentationBlocked = $0
             }
@@ -75,10 +136,102 @@ struct AppReviewScene<Content: View>: View {
                 homeVisible = $0
             }
             .onChange(of: context, initial: true) { _, newContext in
+                #if DEBUG && MAIN_APP
+                if SurroundUITestContract.testsAppReviewPresentation {
+                    let hosted = presentationRelay.presentation(for: nav.main.rootView)
+                    print("APP-REVIEW-CONTEXT root=\(nav.main.rootView.rawValue) home=\(newContext.isHome) blocked=\(newContext.isBlocked) hostedHome=\(hosted.homeVisible) hostedBlocked=\(hosted.blocked) sceneBlocked=\(presentationBlocked) overviewLoading=\(ogs.isLoadingOverview) socket=\(ogs.socketStatus)")
+                }
+                #endif
                 coordinator.updateContext(newContext)
             }
+            #if DEBUG && MAIN_APP
+            .overlay(alignment: .bottomLeading) {
+                if SurroundUITestContract.testsAppReviewPresentation {
+                    Text("App review context")
+                        .font(.caption2)
+                        .padding(4)
+                        .background(.regularMaterial)
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.appReviewContext)
+                        .accessibilityValue(Text(verbatim: "home=\(context.isHome);blocked=\(context.isBlocked)"))
+                }
+            }
+            #endif
     }
 }
+
+/// Applied outside the hosted NavigationStack so its preferences include root
+/// content, pushed destinations, and local presentation blockers.
+struct AppReviewHostedPresentation: ViewModifier {
+    @Environment(\.appReviewPresentationRelay) private var relay
+    @State private var owner = UUID()
+    @State private var isVisible = false
+    @State private var homeVisible = false
+    @State private var blocked = false
+    let root: RootView
+
+    private func publish() {
+        relay?.update(owner: owner, root: root, isVisible: isVisible, homeVisible: homeVisible, blocked: blocked)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            #if DEBUG && MAIN_APP
+            .overlay(alignment: .bottomTrailing) {
+                if SurroundUITestContract.testsAppReviewPresentation {
+                    AppReviewHostedUITestProbe(root: root)
+                }
+            }
+            #endif
+            .onPreferenceChange(AppReviewHomeVisibleKey.self) {
+                homeVisible = $0
+                publish()
+            }
+            .onPreferenceChange(AppReviewPresentationBlockedKey.self) {
+                blocked = $0
+                publish()
+            }
+            .onAppear {
+                isVisible = true
+                publish()
+            }
+            .onDisappear {
+                isVisible = false
+                relay?.remove(owner: owner)
+            }
+            // Some UIKit hosting integrations also forward preferences to the
+            // outer SwiftUI graph. Consume these after the local readers so a
+            // retained, inactive tab cannot block through the scene's reader.
+            .transformPreference(AppReviewHomeVisibleKey.self) { $0 = false }
+            .transformPreference(AppReviewPresentationBlockedKey.self) { $0 = false }
+    }
+}
+
+#if DEBUG && MAIN_APP
+/// A local pending presentation exercises the actual preference modifier inside
+/// the hosting boundary without a network request or a system review prompt.
+private struct AppReviewHostedUITestProbe: View {
+    @Environment(\.appReviewCoordinator) private var coordinator
+    @State private var pending = false
+    let root: RootView
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("Hosted review coordinator")
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.appReviewHostedCoordinator(root.rawValue))
+                .accessibilityValue(coordinator == nil ? "absent" : "present")
+            Button(pending ? "Finish pending UI" : "Start pending UI") {
+                pending.toggle()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.appReviewPendingToggle)
+        }
+        .font(.caption2)
+        .padding(4)
+        .background(.regularMaterial)
+        .appReviewPresentationBlocked(pending)
+    }
+}
+#endif
 
 @MainActor
 private func appReviewContext(
@@ -121,6 +274,7 @@ private func appReviewContext(
 struct AppReviewHomePresentation: ViewModifier {
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appReviewCoordinator) private var coordinator
+    @Environment(\.appReviewPresentationRelay) private var presentationRelay
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
@@ -152,6 +306,7 @@ struct AppReviewHomePresentation: ViewModifier {
                             nav: nav,
                             homeVisible: isVisible,
                             presentationBlocked: isBlocked
+                                || (presentationRelay?.presentation(for: .home).blocked ?? false)
                         )
                         return current.isActive && current.isHome
                             && !current.isBlocked && anchor.canPresent

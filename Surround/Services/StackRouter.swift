@@ -310,11 +310,78 @@ private struct AppNavigationContentLayout: ViewModifier {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             content.modifier(VerticalNavigationContentLayout())
+                .modifier(SidebarNavigationContentLayout())
+        } else if #available(iOS 27.0, *) {
+            content.environment(\.isVerticalToolbar, false)
+                .modifier(SidebarNavigationContentLayout())
         } else {
             content.environment(\.isVerticalToolbar, false)
         }
         #else
         content.environment(\.isVerticalToolbar, false)
+        #endif
+    }
+}
+
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+/// Reclaim only sidebar occlusion inside the navigation content host. UIKit
+/// retains its safe area for the title and toolbars outside this body.
+@available(iOS 27.0, *)
+private struct SidebarNavigationContentLayout: ViewModifier {
+    @Environment(\.duoTabContext) private var tabs
+
+    private var preservedInsets: EdgeInsets {
+        guard let tabs, tabs.sidebarAvailable else { return EdgeInsets() }
+        // Measure outside this content: feeding its own safe-area geometry back
+        // into padding can oscillate at pixel boundaries during native layout.
+        return tabs.physicalHorizontalInsets
+    }
+
+    func body(content: Content) -> some View {
+        let usesOverlap = tabs?.sidebarAvailable == true
+        content
+            .frame(maxWidth: usesOverlap ? .infinity : nil)
+            .padding(.leading, usesOverlap ? preservedInsets.leading : 0)
+            .padding(.trailing, usesOverlap ? preservedInsets.trailing : 0)
+            .ignoresSafeArea(.container, edges: usesOverlap ? .horizontal : [])
+    }
+}
+
+private struct AppTabBarVisibility: ViewModifier {
+    @Environment(\.duoTabContext) private var tabs
+    @State private var owner = UUID()
+    let hidden: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(hidden ? .hidden : .automatic, for: .tabBar)
+            .onAppear {
+                if #available(iOS 27.0, *) {
+                    tabs?.setTabBarHidden(hidden, owner: owner)
+                }
+            }
+            .onChange(of: hidden) { _, value in
+                if #available(iOS 27.0, *) {
+                    tabs?.setTabBarHidden(value, owner: owner)
+                }
+            }
+            .onDisappear {
+                if #available(iOS 27.0, *) {
+                    tabs?.removeTabBarHiddenRequest(owner: owner)
+                }
+            }
+    }
+}
+#endif
+
+extension View {
+    /// SwiftUI shells keep their native preference; the owned Duo container
+    /// receives the same request without inspecting generated controllers.
+    func appTabBarHidden(_ hidden: Bool) -> some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        modifier(AppTabBarVisibility(hidden: hidden))
+        #else
+        toolbar(hidden ? .hidden : .automatic, for: .tabBar)
         #endif
     }
 }
@@ -443,6 +510,9 @@ extension EnvironmentValues {
 /// pushes use AppNavigationLink/appNavigationDestination for the same policy.
 struct AppNavigationStack<Content: View>: View {
     @EnvironmentObject private var nav: NavigationService
+    #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+    @Environment(\.duoTabContext) private var duoTabContext
+    #endif
     @StateObject private var navigation = StackRouter()
     @State private var isVisible = false
     var rootView: RootView? = nil
@@ -463,6 +533,10 @@ struct AppNavigationStack<Content: View>: View {
             if navigation.isActive { FriendshipNoticeBanner() }
         }
         .environmentObject(navigation)
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        // Presented stacks have their own safe area and chrome ownership.
+        .environment(\.duoTabContext, rootView == nil ? nil : duoTabContext)
+        #endif
         .environment(\.openPlayerProfile) { navigation.openProfile($0) }
         .environment(\.openPlayerConversation) { navigation.openConversation($0) }
         .onAppear {
