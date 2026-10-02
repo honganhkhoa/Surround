@@ -89,7 +89,8 @@ def runner_identity(simulator, output, index, test):
     directory = output / ("runner-case-" + str(index))
     directory.mkdir()
     result = {"test": test, "simulator": simulator,
-              "capturedAtUTC": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+              "capturedAtUTC": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              "capturedAtEpoch": time.time()}
     launchctl = collectors.tool(
         ["xcrun", "simctl", "spawn", simulator, "launchctl", "list"],
         directory / "launchctl.log", 10,
@@ -101,16 +102,20 @@ def runner_identity(simulator, output, index, test):
             result["processes"] = processes
             runner = processes.get("runner")
             if runner is not None:
-                identity = subprocess.run(
+                identity = collectors.tool(
                     ["ps", "-p", str(runner["pid"]), "-o", "pid=,lstart=,comm="],
-                    capture_output=True, text=True, timeout=3,
-                )
-                identity.check_returncode()
-                result["runnerProcessIdentity"] = identity.stdout.strip()
+                    directory / "runner-process.log", 10)
+                result["runnerProcessQuery"] = identity
+                if identity.get("exitCode") == 0 and not identity.get("error"):
+                    result["runnerProcessIdentity"] = (directory / "runner-process.log").read_text().strip()
+                else:
+                    result["error"] = "Runner process identity query failed; see retained output/status"
             else:
                 result["error"] = "No exact simulator runner job"
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             result["error"] = str(error)
+    result["completedAtEpoch"] = time.time()
+    result["completedAtUTC"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     (directory / "identity.json").write_text(json.dumps(result, indent=2) + "\n")
 
 
@@ -372,7 +377,7 @@ def main():
             code = collectors.run(args) if not video_status["errors"] else 1
         finally:
             for thread in runner_threads:
-                thread.join(timeout=15)
+                thread.join(timeout=30)
             if video is not None:
                 ended = finish_video(video, video_path)
                 ended["errors"] = video_status["errors"] + ended["errors"]
