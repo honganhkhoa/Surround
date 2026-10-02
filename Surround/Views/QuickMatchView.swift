@@ -7,6 +7,200 @@
 
 import SwiftUI
 
+#if DEBUG && MAIN_APP
+import OSLog
+import UIKit
+import UIKit.UIGestureRecognizerSubclass
+
+// Temporary, offline-only observations. The touch layer is a separate opt-in
+// because adding any recognizer can perturb event delivery or timing.
+enum SurroundQuickMatchDiagnostics {
+    static let launchArgument = "--surround-quick-match-diagnostics"
+    static let touchLaunchArgument = "--surround-quick-match-touch-diagnostics"
+    static let isEnabled = SurroundUITestContract.isEnabled
+        && ProcessInfo.processInfo.arguments.contains(launchArgument)
+    static let observesTouches = isEnabled
+        && ProcessInfo.processInfo.arguments.contains(touchLaunchArgument)
+
+    private final class Output: @unchecked Sendable {
+        let lock = NSLock()
+        let logger = Logger(
+            subsystem: "com.honganhkhoa.Surround",
+            category: "UIQuickMatchDiagnostics"
+        )
+        var sequence = 0
+        var reportedLimit = false
+    }
+
+    private static let output = Output()
+
+    static func record(
+        _ event: StaticString,
+        fields: @autoclosure () -> [String: String] = [:]
+    ) {
+        guard isEnabled else { return }
+        let values = fields().sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }.joined(separator: " ")
+        output.lock.lock()
+        defer { output.lock.unlock() }
+        guard output.sequence < 200 else {
+            if !output.reportedLimit {
+                output.reportedLimit = true
+                output.logger.notice("[SurroundQuickMatch] event=trace.limitReached limit=200")
+            }
+            return
+        }
+        output.sequence += 1
+        let line = "[SurroundQuickMatch] seq=\(output.sequence) "
+            + "uptime=\(ProcessInfo.processInfo.systemUptime) "
+            + "pid=\(ProcessInfo.processInfo.processIdentifier) "
+            + "main=\(Thread.isMainThread) event=\(event) \(values)"
+        output.logger.notice("\(line, privacy: .public)")
+    }
+
+    static func frame(_ value: CGRect) -> String {
+        "\(value.minX),\(value.minY),\(value.width),\(value.height)"
+    }
+}
+
+private struct QuickMatchTouchObservation: UIViewRepresentable {
+    final class Observer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+        override func canPrevent(_ other: UIGestureRecognizer) -> Bool { false }
+        override func canBePrevented(by other: UIGestureRecognizer) -> Bool { false }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool { true }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            super.touchesBegan(touches, with: event)
+            record("touch.began", touches: touches)
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+            super.touchesEnded(touches, with: event)
+            record("touch.ended", touches: touches)
+            state = .failed
+        }
+
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+            super.touchesCancelled(touches, with: event)
+            record("touch.cancelled", touches: touches)
+            state = .failed
+        }
+
+        override func reset() {
+            super.reset()
+            SurroundQuickMatchDiagnostics.record("touch.observerReset")
+        }
+
+        private func record(_ phase: StaticString, touches: Set<UITouch>) {
+            for touch in touches {
+                guard let window = touch.window else { continue }
+                let point = touch.location(in: window)
+                SurroundQuickMatchDiagnostics.record(phase, fields: [
+                    "touch": String(describing: ObjectIdentifier(touch)),
+                    "touchUptime": String(touch.timestamp),
+                    "point": "\(point.x),\(point.y)",
+                    "window": SurroundQuickMatchDiagnostics.frame(window.bounds),
+                    "viewClass": touch.view.map { String(describing: type(of: $0)) } ?? "none",
+                ])
+            }
+        }
+    }
+
+    final class Anchor: UIView {
+        private weak var observedWindow: UIWindow?
+        private var observer: Observer?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window !== observedWindow else { return }
+            stopObserving()
+            guard let window else { return }
+            let observer = Observer(target: nil, action: nil)
+            observer.delegate = observer
+            observer.cancelsTouchesInView = false
+            observer.delaysTouchesBegan = false
+            observer.delaysTouchesEnded = false
+            window.addGestureRecognizer(observer)
+            observedWindow = window
+            self.observer = observer
+            SurroundQuickMatchDiagnostics.record("touch.observerInstalled", fields: [
+                "window": SurroundQuickMatchDiagnostics.frame(window.bounds),
+            ])
+        }
+
+        func stopObserving() {
+            if let observer {
+                observedWindow?.removeGestureRecognizer(observer)
+                SurroundQuickMatchDiagnostics.record("touch.observerRemoved")
+            }
+            observer = nil
+            observedWindow = nil
+        }
+    }
+
+    func makeUIView(context: Context) -> Anchor { Anchor(frame: .zero) }
+    func updateUIView(_ uiView: Anchor, context: Context) {}
+    static func dismantleUIView(_ uiView: Anchor, coordinator: ()) {
+        uiView.stopObserving()
+    }
+}
+#endif
+
+extension View {
+    @ViewBuilder
+    func quickMatchDiagnosticObservation(
+        _ name: String, state: @autoclosure () -> String
+    ) -> some View {
+        #if DEBUG && MAIN_APP
+        if SurroundQuickMatchDiagnostics.isEnabled {
+            let value = state()
+            self.onAppear {
+                SurroundQuickMatchDiagnostics.record("view.appear", fields: ["name": name, "state": value])
+            }
+            .onDisappear {
+                SurroundQuickMatchDiagnostics.record("view.disappear", fields: ["name": name])
+            }
+            .onChange(of: value) { oldValue, newValue in
+                SurroundQuickMatchDiagnostics.record("view.state", fields: [
+                    "name": name, "old": oldValue, "new": newValue,
+                ])
+            }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                SurroundQuickMatchDiagnostics.record("view.frame", fields: [
+                    "name": name, "frame": SurroundQuickMatchDiagnostics.frame(frame),
+                ])
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func quickMatchDiagnosticTouches() -> some View {
+        #if DEBUG && MAIN_APP
+        if SurroundQuickMatchDiagnostics.observesTouches {
+            self.background {
+                QuickMatchTouchObservation()
+                    .frame(width: 0, height: 0)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 private struct QuickMatchCard<Content: View>: View {
     let title: String
     let subtitle: String?
@@ -102,7 +296,17 @@ private struct QuickMatchActionArea: View {
                         )
 
                     if !isCancelling {
-                        Button("Withdraw", role: .destructive, action: onCancel)
+                        Button("Withdraw", role: .destructive) {
+                            #if DEBUG && MAIN_APP
+                            SurroundQuickMatchDiagnostics.record("button.cancel", fields: [
+                                "searching": String(isSearching), "cancelling": String(isCancelling),
+                                "canCancel": String(canCancel),
+                                "keyboardFocus": String(describing: keyboardFocus),
+                                "accessibilityFocus": String(cancelIsFocused),
+                            ])
+                            #endif
+                            onCancel()
+                        }
                             .fontWeight(.bold)
                             .disabled(!canCancel)
                             .frame(minWidth: 44, minHeight: 44)
@@ -112,6 +316,7 @@ private struct QuickMatchActionArea: View {
                             .accessibilityIdentifier(
                                 SurroundUITestContract.AccessibilityID.quickMatchCancel
                             )
+                            .quickMatchDiagnosticObservation("cancel", state: String(canCancel))
                     }
                 }
                 .padding(.horizontal, 14)
@@ -125,7 +330,12 @@ private struct QuickMatchActionArea: View {
                 .focusable(isCancelling)
                 .focused($keyboardFocus, equals: .status)
             } else {
-                Button(action: onFind) {
+                Button(action: {
+                    #if DEBUG && MAIN_APP
+                    SurroundQuickMatchDiagnostics.record("button.find")
+                    #endif
+                    onFind()
+                }) {
                     HStack(spacing: 8) {
                         if isSubmitting {
                             if reduceMotion {
@@ -158,6 +368,7 @@ private struct QuickMatchActionArea: View {
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.quickMatchFind
                 )
+                .quickMatchDiagnosticObservation("find", state: String(canFind))
             }
 
             if let disabledReason {
@@ -173,6 +384,11 @@ private struct QuickMatchActionArea: View {
         .padding(.bottom, 12)
         .background(Color(uiColor: .systemGray6))
         .overlay(alignment: .bottom) { Divider() }
+        .quickMatchDiagnosticTouches()
+        .quickMatchDiagnosticObservation(
+            "actionArea",
+            state: "searching=\(isSearching),cancelling=\(isCancelling),keyboard=\(String(describing: keyboardFocus)),axCancel=\(cancelIsFocused),axFind=\(findIsFocused),axStatus=\(statusIsFocused)"
+        )
         .onAppear {
             if isSearching {
                 moveFocusToCurrentAction()
@@ -201,7 +417,18 @@ private struct QuickMatchActionArea: View {
     }
 
     private func moveFocusToCurrentAction() {
+        #if DEBUG && MAIN_APP
+        SurroundQuickMatchDiagnostics.record("focus.scheduled", fields: [
+            "searching": String(isSearching), "cancelling": String(isCancelling),
+        ])
+        #endif
         Task { @MainActor in
+            #if DEBUG && MAIN_APP
+            SurroundQuickMatchDiagnostics.record("focus.began", fields: [
+                "searching": String(isSearching), "cancelling": String(isCancelling),
+                "keyboard": String(describing: keyboardFocus),
+            ])
+            #endif
             if isCancelling {
                 statusIsFocused = true
                 keyboardFocus = .status
@@ -212,6 +439,13 @@ private struct QuickMatchActionArea: View {
                 findIsFocused = true
                 keyboardFocus = .find
             }
+            #if DEBUG && MAIN_APP
+            SurroundQuickMatchDiagnostics.record("focus.finished", fields: [
+                "keyboard": String(describing: keyboardFocus),
+                "axCancel": String(cancelIsFocused), "axFind": String(findIsFocused),
+                "axStatus": String(statusIsFocused),
+            ])
+            #endif
         }
     }
 }
@@ -528,6 +762,12 @@ struct QuickMatchForm: View {
                     : findDisabledReason,
                 onFind: onFind,
                 onCancel: {
+                    #if DEBUG && MAIN_APP
+                    SurroundQuickMatchDiagnostics.record("form.cancel", fields: [
+                        "capturedEntry": activeLiveEntry?.uuid ?? "none",
+                        "cancellingID": cancellingEntryID ?? "none",
+                    ])
+                    #endif
                     if let activeLiveEntry {
                         onCancel(activeLiveEntry)
                     }

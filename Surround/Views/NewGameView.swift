@@ -423,6 +423,10 @@ struct NewGameView: View {
             }
             #endif
         }
+        .quickMatchDiagnosticObservation(
+            "newGame",
+            state: "optimistic=\(optimisticLiveEntry?.uuid ?? "none"),server=\(serverLiveEntry?.uuid ?? "none"),active=\(activeLiveEntry?.uuid ?? "none"),cancelling=\(cancellingEntryID ?? "none")"
+        )
         .onAppear {
             loadQuickMatchDraftIfNecessary()
             if allowsRemoteActivity {
@@ -543,6 +547,9 @@ struct NewGameView: View {
                 optimisticCorrespondenceEntries[entry.uuid] = entry
             } else {
                 optimisticLiveEntry = entry
+                #if DEBUG && MAIN_APP
+                recordQuickMatchState("submit.liveEntrySet", entryID: entry.uuid)
+                #endif
             }
             submittedEntries.append(entry)
             if !allowsRemoteActivity && !SurroundUITestContract.holdsQuickMatchAcknowledgements {
@@ -613,8 +620,19 @@ struct NewGameView: View {
     }
 
     private func cancelQuickMatch(_ entry: OGSAutomatchEntry) {
-        guard cancellingEntryID == nil else { return }
+        #if DEBUG && MAIN_APP
+        recordQuickMatchState("cancel.enter", entryID: entry.uuid)
+        #endif
+        guard cancellingEntryID == nil else {
+            #if DEBUG && MAIN_APP
+            recordQuickMatchState("cancel.alreadyCancelling", entryID: entry.uuid)
+            #endif
+            return
+        }
         if allowsRemoteActivity && !ogs.cancelAutomatch(entry: entry) {
+            #if DEBUG && MAIN_APP
+            recordQuickMatchState("cancel.remoteRejected", entryID: entry.uuid)
+            #endif
             quickMatchRequestFailure = QuickMatchRequestFailure(
                 operation: .cancel,
                 entry: entry
@@ -623,6 +641,9 @@ struct NewGameView: View {
         }
 
         cancellingEntryID = entry.uuid
+        #if DEBUG && MAIN_APP
+        recordQuickMatchState("cancel.idSet", entryID: entry.uuid)
+        #endif
         if !allowsRemoteActivity {
             finishCancellation(uuid: entry.uuid)
             return
@@ -640,6 +661,9 @@ struct NewGameView: View {
     }
 
     private func finishCancellation(uuid: String) {
+        #if DEBUG && MAIN_APP
+        recordQuickMatchState("cancel.finishBefore", entryID: uuid)
+        #endif
         if optimisticLiveEntry?.uuid == uuid {
             optimisticLiveEntry = nil
         }
@@ -649,7 +673,23 @@ struct NewGameView: View {
         }
         quickMatchRequestFailure = quickMatchRequestFailure?
             .retainedAfterCancellationTerminal(uuid: uuid)
+        #if DEBUG && MAIN_APP
+        recordQuickMatchState("cancel.finishAfter", entryID: uuid)
+        #endif
     }
+
+    #if DEBUG && MAIN_APP
+    private func recordQuickMatchState(_ event: StaticString, entryID: String) {
+        SurroundQuickMatchDiagnostics.record(event, fields: [
+            "entry": entryID,
+            "optimistic": optimisticLiveEntry?.uuid ?? "none",
+            "server": serverLiveEntry?.uuid ?? "none",
+            "active": activeLiveEntry?.uuid ?? "none",
+            "cancelling": cancellingEntryID ?? "none",
+            "remote": String(allowsRemoteActivity),
+        ])
+    }
+    #endif
 
     private func retryCancellation(_ failure: QuickMatchRequestFailure) {
         var activeEntryIDs = Set(ogs.autoMatchEntryById.keys)

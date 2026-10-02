@@ -1252,7 +1252,25 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     }
 
     func testQuickMatchLiveSearchLocksTheFormAndCanBeCancelled() {
-        let app = launchApp()
+        let diagnosticsEnabled = ProcessInfo.processInfo.environment[
+            "SURROUND_UI_QUICKMATCH_DIAGNOSTICS"
+        ] == "1"
+        var diagnosticArguments = [String]()
+        if diagnosticsEnabled {
+            diagnosticArguments.append("--surround-quick-match-diagnostics")
+            if ProcessInfo.processInfo.environment[
+                "SURROUND_UI_QUICKMATCH_TOUCH_DIAGNOSTICS"
+            ] == "1" {
+                diagnosticArguments.append("--surround-quick-match-touch-diagnostics")
+            }
+        }
+        func trace(_ event: String) {
+            guard diagnosticsEnabled else { return }
+            let line = "[SurroundQuickMatchTest] event=\(event) "
+                + "uptime=\(ProcessInfo.processInfo.systemUptime)\n"
+            FileHandle.standardOutput.write(Data(line.utf8))
+        }
+        let app = launchApp(additionalLaunchArguments: diagnosticArguments)
 
         tap(
             SurroundUITestContract.AccessibilityID.homeNewGame,
@@ -1273,11 +1291,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
         keepScreenshot("Quick Match – default selections", in: app)
 
+        trace("find.tapBegin")
         tap(
             SurroundUITestContract.AccessibilityID.quickMatchFind,
             in: app,
             matching: .button
         )
+        trace("find.tapEnd")
         let searchingStatus = element(
             SurroundUITestContract.AccessibilityID.quickMatchSearching,
             in: app
@@ -1298,19 +1318,24 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             matching: .segmentedControl
         ).isEnabled)
 
+        trace("cancel.tapBegin")
         tap(
             SurroundUITestContract.AccessibilityID.quickMatchCancel,
             in: app,
             matching: .button
         )
+        trace("cancel.tapEnd")
+        trace("findAgain.queryBegin")
         let findAgain = element(
             SurroundUITestContract.AccessibilityID.quickMatchFind,
             in: app,
             matching: .button
         )
+        trace("findAgain.queryEnd")
         XCTAssertTrue(waitUntilHittable(findAgain, timeout: 5))
         XCTAssertTrue(boardSize.isEnabled)
         XCTAssertTrue(rapid.isEnabled)
+        trace("assertions.complete")
     }
 
     func testQuickMatchMultiselectionAndAdvancedPreferences() {

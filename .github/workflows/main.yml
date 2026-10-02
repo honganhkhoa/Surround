@@ -8,12 +8,19 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      quick_match_diagnostics:
+        description: Run only the pinned QuickMatch Cancel diagnostic
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
   test:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-26
     timeout-minutes: 30
 
@@ -55,6 +62,7 @@ jobs:
           retention-days: 14
 
   iphone-navigation-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -145,6 +153,7 @@ jobs:
           retention-days: 14
 
   ipad-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -189,6 +198,7 @@ jobs:
           retention-days: 14
 
   ipad-profile-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -235,6 +245,7 @@ jobs:
   # The iOS 18 unit tests share this job with the profile UI phase. The unit
   # step also warms the UI build's derived data.
   minimum-ios-18:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-15
     timeout-minutes: 90
 
@@ -309,6 +320,7 @@ jobs:
           retention-days: 14
 
   minimum-ios-18-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-15
     timeout-minutes: 80
 
@@ -363,6 +375,7 @@ jobs:
   # consume the existing composer's budget. Leave 25 minutes for setup,
   # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -438,6 +451,7 @@ jobs:
           retention-days: 14
 
   catalyst-build:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics) }}
     runs-on: macos-26
     timeout-minutes: 20
 
@@ -453,3 +467,116 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=macOS,variant=Mac Catalyst' \
             CODE_SIGNING_ALLOWED=NO
+
+  quick-match-diagnostics:
+    name: QuickMatch Cancel · Xcode 26.6 · iPadOS 26.5
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics }}
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact source and Xcode
+        shell: bash
+        run: |
+          mkdir -p TestResults
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor deb7950e2c532c92cceb55c1e87830b8e1356245 HEAD
+          sudo xcode-select --switch "$DEVELOPER_DIR"
+          xcodebuild -version | tee TestResults/xcode-version.txt
+          test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+          git rev-parse HEAD > TestResults/source-sha.txt
+          sw_vers > TestResults/host-version.txt
+
+      - name: Select exact iPadOS 26.5 M5 iPad
+        id: simulator
+        shell: bash
+        run: |
+          xcrun simctl list runtimes --json > TestResults/runtimes.json
+          xcrun simctl list devices available --json > TestResults/devices.json
+          python3 - <<'PYSETUP'
+          import json, os, subprocess
+          from pathlib import Path
+          runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-26-5'
+          runtimes = json.loads(Path('TestResults/runtimes.json').read_text())['runtimes']
+          matched = [r for r in runtimes if r.get('identifier') == runtime and r.get('version') == '26.5' and r.get('buildversion') == '23F77' and r.get('isAvailable')]
+          assert len(matched) == 1, 'Exact iOS26.5/23F77 runtime unavailable; no fallback'
+          kind = 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB'
+          devices = json.loads(Path('TestResults/devices.json').read_text())['devices'].get(runtime, [])
+          matched = [d for d in devices if d.get('deviceTypeIdentifier') == kind and d.get('isAvailable')]
+          if matched:
+              simulator = matched[0]['udid']
+          else:
+              simulator = subprocess.check_output(['xcrun', 'simctl', 'create', 'QuickMatch CI M5 iPad', kind, runtime], text=True).strip()
+          Path('TestResults/simulator.json').write_text(json.dumps({'udid': simulator, 'deviceType': kind, 'runtime': runtime, 'runtimeBuild': '23F77'}, indent=2) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('id=' + simulator + '\n')
+          PYSETUP
+
+      - name: Match the original hardware keyboard setup
+        shell: bash
+        run: .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh "${{ steps.simulator.outputs.id }}" | tee TestResults/keyboard-setup.log
+
+      - name: Build the original iPad UI products
+        id: diagnostic_build
+        timeout-minutes: 15
+        shell: bash
+        run: .github/ci-tools/run-ipad-ui-tests.sh build "${{ steps.simulator.outputs.id }}" QuickMatch | tee TestResults/build.log
+
+      - name: Capture the single QuickMatch Cancel case
+        if: ${{ !cancelled() && steps.diagnostic_build.outcome == 'success' }}
+        timeout-minutes: 20
+        shell: bash
+        env:
+          TEST_RUNNER_SURROUND_UI_QUICKMATCH_DIAGNOSTICS: '1'
+          TEST_RUNNER_SURROUND_UI_QUICKMATCH_TOUCH_DIAGNOSTICS: '1'
+        run: |
+          simulator_id="${{ steps.simulator.outputs.id }}"
+          derived_data_path="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "$simulator_id")"
+          python3 .github/ci-tools/diagnose-quick-match-cancel.py \
+            --simulator "$simulator_id" --output TestResults/QuickMatchCapture -- \
+            xcodebuild test-without-building \
+            -scheme Surround -project Surround.xcodeproj -configuration Debug \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            -derivedDataPath "$derived_data_path" -parallel-testing-enabled NO \
+            -only-testing:SurroundUITests/SurroundUITests/testQuickMatchLiveSearchLocksTheFormAndCanBeCancelled \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 900 \
+            -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath TestResults/QuickMatch-Cancel.xcresult
+
+      - name: Retain the app trace and result summary
+        if: ${{ always() && steps.diagnostic_build.outcome == 'success' }}
+        shell: bash
+        run: |
+          xcrun simctl spawn "${{ steps.simulator.outputs.id }}" log show \
+            --style compact --last 20m \
+            --predicate 'subsystem == "com.honganhkhoa.Surround" AND category == "UIQuickMatchDiagnostics"' \
+            > TestResults/QuickMatch-app-history.log 2> TestResults/QuickMatch-app-history-errors.log || true
+          if [[ -d TestResults/QuickMatch-Cancel.xcresult ]]; then
+            xcrun xcresulttool get test-results summary --path TestResults/QuickMatch-Cancel.xcresult \
+              > TestResults/result-summary.json
+            python3 - <<'PYCHECK'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('TestResults/result-summary.json').read_text())
+          assert result['totalTestCount'] == 1, result
+          device = result['devicesAndConfigurations'][0]['device']
+          assert device['osVersion'] == '26.5' and device['osBuildNumber'] == '23F77', device
+          assert device['modelName'] == 'iPad Pro 13-inch (M5)', device
+          PYCHECK
+          fi
+
+      - name: Upload focused diagnostic evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quick-match-cancel-${{ github.sha }}
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
