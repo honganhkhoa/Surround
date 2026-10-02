@@ -469,10 +469,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
   quick-match-diagnostics:
-    name: QuickMatch Cancel · Xcode 26.6 · iPadOS 26.5
+    name: QuickMatch Correspondence then Cancel · Xcode 26.6 · iPadOS 26.5
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics }}
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 65
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
@@ -522,15 +522,49 @@ jobs:
         shell: bash
         run: .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh "${{ steps.simulator.outputs.id }}" | tee TestResults/keyboard-setup.log
 
+      - name: Validate native video and live log commands
+        id: capture_preflight
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          python3 .github/ci-tools/diagnose-quick-match-cancel.py \
+            --simulator "${{ steps.simulator.outputs.id }}" \
+            --output TestResults/CollectorPreflight --validate-collectors
+
       - name: Build the original iPad UI products
         id: diagnostic_build
         timeout-minutes: 15
         shell: bash
         run: .github/ci-tools/run-ipad-ui-tests.sh build "${{ steps.simulator.outputs.id }}" QuickMatch | tee TestResults/build.log
 
-      - name: Capture the single QuickMatch Cancel case
+      - name: Verify documented alphabetical execution configuration
+        id: execution_order
         if: ${{ !cancelled() && steps.diagnostic_build.outcome == 'success' }}
-        timeout-minutes: 20
+        shell: bash
+        run: |
+          derived_data_path="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "${{ steps.simulator.outputs.id }}")"
+          python3 - "$derived_data_path" <<'PYORDER'
+          import json, plistlib, sys
+          from pathlib import Path
+          paths = list((Path(sys.argv[1]) / 'Build/Products').glob('*.xctestrun'))
+          assert len(paths) == 1, paths
+          value = plistlib.loads(paths[0].read_bytes())
+          targets = []
+          def visit(node):
+              if isinstance(node, dict):
+                  if node.get('BlueprintName') == 'SurroundUITests':
+                      targets.append({'target': node['BlueprintName'], 'ordering': node.get('TestExecutionOrdering'), 'orderingKeyPresent': 'TestExecutionOrdering' in node})
+                  for child in node.values(): visit(child)
+              elif isinstance(node, list):
+                  for child in node: visit(child)
+          visit(value)
+          Path('TestResults/execution-order-configuration.json').write_text(json.dumps(targets, indent=2) + '\n')
+          assert targets and all(not target['orderingKeyPresent'] for target in targets), targets
+          PYORDER
+
+      - name: Capture Correspondence then QuickMatch Cancel
+        if: ${{ !cancelled() && steps.diagnostic_build.outcome == 'success' && steps.capture_preflight.outcome == 'success' && steps.execution_order.outcome == 'success' }}
+        timeout-minutes: 35
         shell: bash
         env:
           TEST_RUNNER_SURROUND_UI_QUICKMATCH_DIAGNOSTICS: '1'
@@ -544,6 +578,7 @@ jobs:
             -scheme Surround -project Surround.xcodeproj -configuration Debug \
             -destination "platform=iOS Simulator,id=$simulator_id" \
             -derivedDataPath "$derived_data_path" -parallel-testing-enabled NO \
+            -only-testing:SurroundUITests/SurroundUITests/testQuickMatchCorrespondenceAllowsAnotherSearch \
             -only-testing:SurroundUITests/SurroundUITests/testQuickMatchLiveSearchLocksTheFormAndCanBeCancelled \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 900 \
@@ -555,20 +590,31 @@ jobs:
         shell: bash
         run: |
           xcrun simctl spawn "${{ steps.simulator.outputs.id }}" log show \
-            --style compact --last 20m \
+            --style compact --last 40m \
             --predicate 'subsystem == "com.honganhkhoa.Surround" AND category == "UIQuickMatchDiagnostics"' \
             > TestResults/QuickMatch-app-history.log 2> TestResults/QuickMatch-app-history-errors.log || true
           if [[ -d TestResults/QuickMatch-Cancel.xcresult ]]; then
             xcrun xcresulttool get test-results summary --path TestResults/QuickMatch-Cancel.xcresult \
               > TestResults/result-summary.json
             python3 - <<'PYCHECK'
-          import json
+          import json, re
           from pathlib import Path
           result = json.loads(Path('TestResults/result-summary.json').read_text())
-          assert result['totalTestCount'] == 1, result
+          assert result['totalTestCount'] == 2, result
+          assert result['skippedTests'] == 0 and result['passedTests'] + result['failedTests'] == 2, result
           device = result['devicesAndConfigurations'][0]['device']
           assert device['osVersion'] == '26.5' and device['osBuildNumber'] == '23F77', device
           assert device['modelName'] == 'iPad Pro 13-inch (M5)', device
+          starts = json.loads(Path('TestResults/QuickMatchCapture/test-starts.json').read_text())
+          observed = [item['test'].split('SurroundUITests.SurroundUITests ')[1].split("'")[0].rstrip(']') for item in starts]
+          expected = ['testQuickMatchCorrespondenceAllowsAnotherSearch', 'testQuickMatchLiveSearchLocksTheFormAndCanBeCancelled']
+          console = Path('TestResults/QuickMatchCapture/console.log').read_text(errors='replace')
+          boundaries = re.findall(r"Test Case '-\[SurroundUITests\.SurroundUITests (testQuickMatch(?:CorrespondenceAllowsAnotherSearch|LiveSearchLocksTheFormAndCanBeCancelled))\]' (started|passed|failed|skipped)", console)
+          Path('TestResults/execution-order-observed.json').write_text(json.dumps({'expected': expected, 'observed': observed, 'nativeBoundaries': boundaries}, indent=2) + '\n')
+          assert observed == expected, observed
+          assert [item[0] for item in boundaries] == [expected[0], expected[0], expected[1], expected[1]], boundaries
+          assert boundaries[0][1] == boundaries[2][1] == 'started', boundaries
+          assert all(boundaries[index][1] in {'passed', 'failed'} for index in [1, 3]), boundaries
           PYCHECK
           fi
 
