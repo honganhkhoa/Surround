@@ -14,6 +14,11 @@ on:
         required: false
         default: false
         type: boolean
+      quick_match_collectors_only:
+        description: Validate only native collectors; skip app build and tests
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -469,7 +474,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
   quick-match-diagnostics:
-    name: QuickMatch Correspondence then Cancel · Xcode 26.6 · iPadOS 26.5
+    name: QuickMatch ${{ inputs.quick_match_collectors_only && 'collector validation' || 'Correspondence then Cancel' }} · Xcode 26.6 · iPadOS 26.5
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.quick_match_diagnostics }}
     runs-on: macos-26
     timeout-minutes: 65
@@ -524,7 +529,7 @@ jobs:
 
       - name: Validate native video and live log commands
         id: capture_preflight
-        timeout-minutes: 2
+        timeout-minutes: 7
         shell: bash
         run: |
           python3 .github/ci-tools/diagnose-quick-match-cancel.py \
@@ -533,6 +538,7 @@ jobs:
 
       - name: Build the original iPad UI products
         id: diagnostic_build
+        if: ${{ !cancelled() && !inputs.quick_match_collectors_only && steps.capture_preflight.outcome == 'success' }}
         timeout-minutes: 15
         shell: bash
         run: .github/ci-tools/run-ipad-ui-tests.sh build "${{ steps.simulator.outputs.id }}" QuickMatch | tee TestResults/build.log

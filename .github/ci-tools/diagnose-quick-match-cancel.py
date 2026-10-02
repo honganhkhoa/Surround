@@ -129,7 +129,7 @@ def quick_match_log_stream(args, output, stop):
 
     def discover():
         nonlocal guest_pid
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + min(60, args.log_seconds)
         while not stop.is_set() and time.monotonic() < deadline:
             try:
                 guest_pid = owned_log_pid(args.simulator, owner)
@@ -195,12 +195,14 @@ def await_video(process, log):
     raise RuntimeError("Recorder did not report a first frame within 15 seconds")
 
 
-def finish_video(video, path):
+def finish_video(video, path, flush_seconds=10):
     status = {"path": str(path), "errors": []}
     if video.poll() is None:
         try:
+            status["stopSignal"] = "SIGINT"
+            status["stopRequestedAtEpoch"] = time.time()
             video.send_signal(signal.SIGINT)
-            video.wait(timeout=10)
+            video.wait(timeout=flush_seconds)
         except subprocess.TimeoutExpired:
             status["errors"].append("Video flush timeout")
             collectors.stop_owned_process(video)
@@ -218,33 +220,70 @@ def finish_video(video, path):
 def validate_collectors(args):
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
-    args.log_seconds = 30
+    args.log_seconds = 90
     stop = threading.Event()
     video_path = output / "native-validation.mp4"
-    video_log = output / "video.log"
     video = None
-    result = {}
-    try:
-        with open(video_log, "wb", buffering=0) as stream:
-            video = start_video(args.simulator, video_path, stream)
-            await_video(video, video_log)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(quick_match_log_stream, args, output, stop)
-                try:
-                    # Let the logger establish ownership and write its native header.
-                    stop.wait(3)
-                finally:
-                    stop.set()
-                    result["simulatorLog"] = future.result()
-    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
-        result["error"] = str(error)
-    finally:
-        stop.set()
-        if video is not None:
-            result["video"] = finish_video(video, video_path)
-        (output / "validation-status.json").write_text(json.dumps(result, indent=2) + "\n")
+    result = {"simulator": args.simulator, "recordingWindowSeconds": 60,
+              "startedAtEpoch": time.time(), "testCommandExecuted": False}
+    # These read-only observations do not drive the app or change simulator settings.
+    commands = {
+        "nativeHelp": (["xcrun", "simctl", "io", args.simulator, "recordVideo", "--help"], 15),
+        "devices": (["xcrun", "simctl", "list", "devices", "--json"], 15),
+        "bootStatus": (["xcrun", "simctl", "bootstatus", args.simulator], 30),
+        "screenshot": (["xcrun", "simctl", "io", args.simulator, "screenshot", str(output / "simulator-ready.png")], 30),
+    }
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        pending = {name: pool.submit(collectors.tool, command, output / (name + ".log"), timeout)
+                   for name, (command, timeout) in commands.items()}
+        result["readiness"] = {name: future.result() for name, future in pending.items()}
+    # The logger runs independently: a recorder error must not hide its result.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        logger_started = time.monotonic()
+        future = pool.submit(quick_match_log_stream, args, output, stop)
+        command = ["xcrun", "simctl", "io", args.simulator, "recordVideo", "--codec=h264", str(video_path)]
+        result["videoCommand"] = command
+        result["videoObservations"] = []
+        try:
+            with open(output / "video.stdout.log", "wb", buffering=0) as stdout, open(output / "video.stderr.log", "wb", buffering=0) as stderr:
+                video = subprocess.Popen(command, stdout=stdout, stderr=stderr, start_new_session=True)
+                result["videoPID"] = video.pid
+                result["videoStartedAtEpoch"] = time.time()
+                started = time.monotonic()
+                for index in range(4):
+                    if index:
+                        stop.wait(max(0, started + index * 20 - time.monotonic()))
+                    snapshot = collectors.tool(["ps", "-p", str(video.pid), "-o", "pid=,ppid=,etime=,state=,comm="],
+                                               output / ("video-process-" + str(index) + ".log"), 3)
+                    result["videoObservations"].append({"atEpoch": time.time(), "poll": video.poll(),
+                        "bytes": video_path.stat().st_size if video_path.exists() else 0,
+                        "stdoutBytes": (output / "video.stdout.log").stat().st_size,
+                        "stderrBytes": (output / "video.stderr.log").stat().st_size,
+                        "process": snapshot})
+                    if video.poll() is not None:
+                        break
+        except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+            result["videoError"] = str(error)
+        finally:
+            if video is not None:
+                result["video"] = finish_video(video, video_path, flush_seconds=20)
+            # Preserve the independent logger window even if the recorder fails early.
+            stop.wait(max(0, logger_started + 60 - time.monotonic()))
+            stop.set()
+            result["simulatorLog"] = future.result()
+    result["readinessMarkerPresent"] = any("Recording started" in path.read_text(errors="replace")
+        for path in [output / "video.stdout.log", output / "video.stderr.log"] if path.exists())
+    # Decode actual beginning/middle/end frames from the cleanly stopped movie.
+    if video_path.exists() and video_path.stat().st_size:
+        result["videoDecode"] = collectors.tool(
+            ["xcrun", "swift", str(Path(__file__).with_name("verify-quick-match-video.swift")),
+             str(video_path), str(output / "decoded-video")], output / "video-decode.log", 90)
+    result["finishedAtEpoch"] = time.time()
+    (output / "validation-status.json").write_text(json.dumps(result, indent=2) + "\n")
     logger = result.get("simulatorLog", {})
-    valid = (not result.get("error") and not result.get("video", {}).get("errors")
+    valid = (not result.get("videoError") and not result.get("video", {}).get("errors")
+             and result.get("videoDecode", {}).get("exitCode") == 0
+             and not result.get("videoDecode", {}).get("error")
              and logger.get("guestPID") is not None and not logger.get("error")
              and not logger.get("guestCleanupError") and not logger.get("ownershipDiscoveryErrors")
              and (output / "simulator.log").exists()
