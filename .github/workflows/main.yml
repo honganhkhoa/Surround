@@ -8,12 +8,24 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      diagnose_chat_variation_layout:
+        description: Run only the pinned chat variation layout observation capture
+        required: false
+        default: false
+        type: boolean
+      chat_variation_collectors_only:
+        description: Validate only native collectors; skip app build and tests
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
   test:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-26
     timeout-minutes: 30
 
@@ -55,6 +67,7 @@ jobs:
           retention-days: 14
 
   iphone-navigation-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     name: iOS ${{ matrix.ios }} iPhone navigation
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -145,6 +158,7 @@ jobs:
           retention-days: 14
 
   ipad-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -189,6 +203,7 @@ jobs:
           retention-days: 14
 
   ipad-profile-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-26
     timeout-minutes: 80
 
@@ -235,6 +250,7 @@ jobs:
   # The iOS 18 unit tests share this job with the profile UI phase. The unit
   # step also warms the UI build's derived data.
   minimum-ios-18:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-15
     timeout-minutes: 90
 
@@ -309,6 +325,7 @@ jobs:
           retention-days: 14
 
   minimum-ios-18-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-15
     timeout-minutes: 80
 
@@ -363,6 +380,7 @@ jobs:
   # consume the existing composer's budget. Leave 25 minutes for setup,
   # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
   ipad-composer-ui-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     name: iPadOS ${{ matrix.ios }} composer and continuity
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -438,6 +456,7 @@ jobs:
           retention-days: 14
 
   catalyst-build:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only)) }}
     runs-on: macos-26
     timeout-minutes: 20
 
@@ -453,3 +472,201 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=macOS,variant=Mac Catalyst' \
             CODE_SIGNING_ALLOWED=NO
+
+  chat-variation-layout-diagnostics:
+    name: Chat variation ${{ inputs.chat_variation_collectors_only && 'collector validation' || 'layout observation' }} · Xcode 26.6 · iPadOS 26.5
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnose_chat_variation_layout || inputs.chat_variation_collectors_only) }}
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify original source outside the three diagnostic files
+        shell: bash
+        env:
+          COLLECTORS_ONLY: ${{ inputs.chat_variation_collectors_only }}
+        run: |
+          python3 - <<'PYSOURCE'
+          import hashlib, json, os, re, subprocess
+          from pathlib import Path
+          baseline = 'deb7950e2c532c92cceb55c1e87830b8e1356245'
+          allowed = {
+              '.github/workflows/main.yml',
+              '.github/ci-tools/diagnose-chat-variation-layout.py',
+              '.github/ci-tools/verify-diagnostic-video.swift',
+          }
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          head = git('rev-parse', 'HEAD').decode().strip()
+          assert head == os.environ['GITHUB_SHA'], (head, os.environ['GITHUB_SHA'])
+          subprocess.run(['git', 'merge-base', '--is-ancestor', baseline, head], check=True)
+          subprocess.run(['git', 'diff', '--exit-code', 'HEAD'], check=True)
+          untracked = git('ls-files', '--others', '--exclude-standard', '-z')
+          assert not untracked, 'Checkout contains untracked files before diagnostics'
+          changed = {p.decode() for p in git('diff', '--no-renames', '--name-only', '-z', baseline, head).split(b'\0') if p}
+          assert changed == allowed, {'changed': sorted(changed), 'allowed': sorted(allowed)}
+          anchors = [
+              'SurroundUITests/GameContinuityUITests.swift',
+              'SurroundUITests/SurroundJourneyUITestCase.swift',
+              'SurroundUITests/SurroundUITestCase.swift',
+              'Surround/UITesting/GameLayoutUITestHarness.swift',
+              'Surround/UITesting/SurroundUITestContract.swift',
+              'Surround/UITesting/OGSService+Fixtures.swift',
+              'Surround/MainViewWrapper.swift',
+              'Surround/Views/GameDetail/GameDetailView.swift',
+              'Surround/Views/GameDetail/SingleGameView.swift',
+              '.github/ci-tools/run-ipad-ui-tests.sh',
+          ]
+          identities = []
+          for path in anchors:
+              original = git('show', baseline + ':' + path)
+              actual = Path(path).read_bytes()
+              assert original == actual, path
+              identities.append({'path': path, 'baselineBlob': git('rev-parse', baseline + ':' + path).decode().strip(), 'headBlob': git('rev-parse', head + ':' + path).decode().strip(), 'sha256': hashlib.sha256(actual).hexdigest()})
+          test_source = Path('SurroundUITests/GameContinuityUITests.swift').read_text()
+          assert len(re.findall(r'^\s*func\s+testChatVariationPreviewKeepsAnExitAcrossLayouts\s*\(\s*\)', test_source, re.M)) == 1
+          continuity = Path('.github/ci-tools/run-ipad-ui-tests.sh').read_text().split('  continuity)\n', 1)[1]
+          for flag in ['-default-test-execution-time-allowance', '-maximum-test-execution-time-allowance']:
+              assert re.search(re.escape(flag) + r'\s+900(?:\s|$)', continuity), flag
+          Path('TestResults').mkdir()
+          manifest = {'sourceSHA': head, 'baselineSHA': baseline, 'changedPaths': sorted(changed), 'allOtherTrackedPathsUnchanged': True, 'sourceAnchors': identities, 'selector': 'SurroundUITests/GameContinuityUITests/testChatVariationPreviewKeepsAnExitAcrossLayouts', 'defaultTestExecutionAllowance': 900, 'maximumTestExecutionAllowance': 900, 'collectorsOnly': os.environ['COLLECTORS_ONLY'].lower() == 'true'}
+          Path('TestResults/source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          Path('TestResults/source-sha.txt').write_text(head + '\n')
+          PYSOURCE
+
+      - name: Verify exact Xcode and simulator SDK
+        shell: bash
+        run: |
+          xcodebuild -version | tee TestResults/xcode-version.txt
+          test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+          xcrun --sdk iphonesimulator --show-sdk-version > TestResults/sdk-version.txt
+          xcrun --sdk iphonesimulator --show-sdk-build-version > TestResults/sdk-build.txt
+          test "$(cat TestResults/sdk-version.txt)" = '26.5'
+          test "$(cat TestResults/sdk-build.txt)" = '23F81a'
+          sw_vers > TestResults/host-version.txt
+
+      - name: Create a fresh exact iPadOS 26.5 M5 destination
+        id: simulator
+        shell: bash
+        run: |
+          xcrun simctl list runtimes --json > TestResults/runtimes.json
+          xcrun simctl list devicetypes --json > TestResults/device-types.json
+          xcrun simctl list devices available --json > TestResults/devices-before.json
+          python3 - <<'PYSETUP'
+          import json, os, subprocess
+          from pathlib import Path
+          runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-26-5'
+          runtimes = json.loads(Path('TestResults/runtimes.json').read_text())['runtimes']
+          matched = [r for r in runtimes if r.get('identifier') == runtime and r.get('version') == '26.5' and r.get('buildversion') == '23F77' and r.get('isAvailable')]
+          assert len(matched) == 1, 'Exact iPadOS26.5/23F77 runtime unavailable; no fallback'
+          kind = 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB'
+          types = json.loads(Path('TestResults/device-types.json').read_text())['devicetypes']
+          matched_types = [d for d in types if d.get('identifier') == kind and d.get('name') == 'iPad Pro 13-inch (M5)']
+          assert len(matched_types) == 1, 'Exact standard 12GB M5 iPad model unavailable; no fallback'
+          name = 'Chat Variation Layout CI ' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
+          simulator = subprocess.check_output(['xcrun', 'simctl', 'create', name, kind, runtime], text=True).strip()
+          derived = str(Path(os.environ['RUNNER_TEMP']) / ('Surround-ChatVariationLayout-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']))
+          assert not Path(derived).exists(), 'Diagnostic derived data must be fresh'
+          manifest = {'udid': simulator, 'name': name, 'deviceType': kind, 'model': 'iPad Pro 13-inch (M5)', 'runtime': runtime, 'runtimeVersion': '26.5', 'runtimeBuild': '23F77', 'freshlyCreated': True, 'derivedDataPath': derived}
+          Path('TestResults/simulator.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('id=' + simulator + '\n')
+              out.write('derived_data_path=' + derived + '\n')
+          PYSETUP
+
+      - name: Match the original hardware keyboard setup
+        shell: bash
+        run: |
+          set -o pipefail
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}" | tee TestResults/keyboard-setup.log
+          xcrun simctl list devices available --json > TestResults/devices-ready.json
+
+      - name: Validate native video and live log collectors
+        id: capture_preflight
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          python3 .github/ci-tools/diagnose-chat-variation-layout.py \
+            --simulator "${{ steps.simulator.outputs.id }}" \
+            --output TestResults/CollectorPreflight --validate-collectors
+
+      - name: Build the original iPad UI products
+        id: diagnostic_build
+        if: ${{ !cancelled() && !inputs.chat_variation_collectors_only && steps.capture_preflight.outcome == 'success' }}
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -scheme Surround -project Surround.xcodeproj -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "${{ steps.simulator.outputs.derived_data_path }}" \
+            -parallel-testing-enabled NO -only-testing:SurroundUITests \
+            | tee TestResults/build.log
+
+      - name: Capture the unchanged chat variation layout case
+        id: diagnostic_test
+        if: ${{ !cancelled() && !inputs.chat_variation_collectors_only && steps.diagnostic_build.outcome == 'success' && steps.capture_preflight.outcome == 'success' }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          python3 .github/ci-tools/diagnose-chat-variation-layout.py \
+            --simulator "${{ steps.simulator.outputs.id }}" \
+            --output TestResults/ChatVariationLayoutCapture -- \
+            xcodebuild test-without-building \
+            -scheme Surround -project Surround.xcodeproj -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath "${{ steps.simulator.outputs.derived_data_path }}" \
+            -parallel-testing-enabled NO \
+            -only-testing:SurroundUITests/GameContinuityUITests/testChatVariationPreviewKeepsAnExitAcrossLayouts \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 900 \
+            -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath TestResults/ChatVariationLayout.xcresult
+
+      - name: Retain and verify the one-case result
+        if: ${{ always() && !inputs.chat_variation_collectors_only && steps.diagnostic_build.outcome == 'success' }}
+        shell: bash
+        run: |
+          if [[ ! -d TestResults/ChatVariationLayout.xcresult ]]; then
+            echo 'No result bundle was produced; retain collector evidence and report the gap.' >&2
+            exit 1
+          fi
+          xcrun xcresulttool get test-results summary --path TestResults/ChatVariationLayout.xcresult \
+            > TestResults/result-summary.json
+          xcrun xcresulttool get test-results tests --path TestResults/ChatVariationLayout.xcresult \
+            > TestResults/result-tests.json
+          python3 - <<'PYCHECK'
+          import json, re
+          from pathlib import Path
+          result = json.loads(Path('TestResults/result-summary.json').read_text())
+          assert result['totalTestCount'] == 1, result
+          assert result['skippedTests'] == 0 and result['passedTests'] + result['failedTests'] == 1, result
+          configurations = result['devicesAndConfigurations']
+          assert len(configurations) == 1, configurations
+          device = configurations[0]['device']
+          assert device['osVersion'] == '26.5' and device['osBuildNumber'] == '23F77', device
+          assert device['modelName'] == 'iPad Pro 13-inch (M5)', device
+          console = Path('TestResults/ChatVariationLayoutCapture/console.log').read_text(errors='replace')
+          all_boundaries = re.findall(r"Test Case '-\[([^ ]+) ([^]]+)\]' (started|passed|failed|skipped)", console)
+          case = ('SurroundUITests.GameContinuityUITests', 'testChatVariationPreviewKeepsAnExitAcrossLayouts')
+          Path('TestResults/execution-observed.json').write_text(json.dumps({'expected': case, 'nativeBoundaries': all_boundaries, 'resultCount': result['totalTestCount']}, indent=2) + '\n')
+          assert len(all_boundaries) == 2, all_boundaries
+          assert all(tuple(item[:2]) == case for item in all_boundaries), all_boundaries
+          assert all_boundaries[0][2] == 'started' and all_boundaries[1][2] in {'passed', 'failed'}, all_boundaries
+          PYCHECK
+
+      - name: Upload the complete focused diagnostic evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-variation-layout-${{ github.sha }}
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
