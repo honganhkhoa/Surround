@@ -62,20 +62,23 @@ class QuickMatchStallDetector(collectors.StallDetector):
         return self.check(now)
 
 
-def owned_log_pid(simulator, owner):
+def owned_log_pid(simulator, owner, deadline):
     """Find only our native simulator logger; never retain ps environments."""
     inventory = subprocess.run(
-        ["ps", "-axo", "pid=,comm="], capture_output=True, text=True, timeout=3
+        ["ps", "-axo", "pid=,comm="], capture_output=True, text=True,
+        timeout=max(0.1, min(10, deadline - time.monotonic()))
     )
     inventory.check_returncode()
     found = []
     for line in inventory.stdout.splitlines():
+        if time.monotonic() >= deadline:
+            return None
         fields = line.strip().split(None, 1)
         if (len(fields) != 2 or not fields[0].isdigit()
                 or not (fields[1] == "log" or fields[1].endswith("/usr/bin/log"))):
             continue
         pid = int(fields[0])
-        if verifies_log_owner(pid, simulator, owner):
+        if verifies_log_owner(pid, simulator, owner, timeout=max(0.1, min(10, deadline - time.monotonic()))):
             found.append(pid)
     if len(found) > 1:
         raise RuntimeError("Multiple owned log processes; refusing to choose")
@@ -111,10 +114,10 @@ def runner_identity(simulator, output, index, test):
     (directory / "identity.json").write_text(json.dumps(result, indent=2) + "\n")
 
 
-def verifies_log_owner(pid, simulator, owner):
+def verifies_log_owner(pid, simulator, owner, timeout=10):
     check = subprocess.run(
         ["ps", "eww", "-p", str(pid), "-o", "command="],
-        capture_output=True, text=True, timeout=3,
+        capture_output=True, text=True, timeout=timeout,
     )
     return check.returncode == 0 and re.search(r"^(?:.*?/)?log stream(?:\s|$)", check.stdout.strip()) and all(
         re.search(r"(?:^|\s)" + name + "=" + re.escape(value) + r"(?:\s|$)", check.stdout, re.I)
@@ -126,19 +129,24 @@ def quick_match_log_stream(args, output, stop):
     owner = uuid.uuid4().hex
     guest_pid = None
     discovery_errors = []
+    discovery_timeouts = []
 
     def discover():
         nonlocal guest_pid
         deadline = time.monotonic() + min(60, args.log_seconds)
         while not stop.is_set() and time.monotonic() < deadline:
             try:
-                guest_pid = owned_log_pid(args.simulator, owner)
+                guest_pid = owned_log_pid(args.simulator, owner, deadline)
                 if guest_pid is not None:
                     return
+            except subprocess.TimeoutExpired:
+                # A finite ps timeout under host load is inconclusive. Retry only
+                # within the same ownership deadline; never guess a guest PID.
+                discovery_timeouts.append({"observedAtEpoch": time.time(), "reason": "bounded ps timeout"})
             except (OSError, subprocess.SubprocessError, RuntimeError) as error:
                 discovery_errors.append(str(error))
                 return
-            stop.wait(0.2)
+            stop.wait(0.5)
 
     environment = os.environ.copy()
     environment["SIMCTL_CHILD_SURROUND_QUICKMATCH_LOG_OWNER"] = owner
@@ -156,6 +164,7 @@ def quick_match_log_stream(args, output, stop):
         watcher.join(timeout=12)
     result["guestPID"] = guest_pid
     result["ownershipDiscoveryErrors"] = discovery_errors
+    result["ownershipDiscoveryTimeouts"] = discovery_timeouts
     if guest_pid is not None:
         try:
             if verifies_log_owner(guest_pid, args.simulator, owner):
@@ -185,14 +194,18 @@ def start_video(simulator, path, stream):
 
 
 def await_video(process, log):
-    deadline = time.monotonic() + 15
+    # Hosted preflight now proves a stopped, playable movie. Native help promises
+    # this first-frame marker but no 15-second deadline; retain a finite 60s bound.
+    started = time.monotonic()
+    deadline = started + 60
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError("Recorder exited before readiness: " + str(process.returncode))
         if "Recording started" in log.read_text(errors="replace"):
-            return {"recordingReadyAtEpoch": time.time(), "recordingReadyUptime": time.monotonic()}
+            return {"recordingReadyAtEpoch": time.time(), "recordingReadyUptime": time.monotonic(),
+                    "recordingStartupSeconds": time.monotonic() - started}
         time.sleep(0.1)
-    raise RuntimeError("Recorder did not report a first frame within 15 seconds")
+    raise RuntimeError("Recorder did not report a first frame within 60 seconds")
 
 
 def finish_video(video, path, flush_seconds=10):
@@ -363,7 +376,7 @@ def main():
             if video is not None:
                 ended = finish_video(video, video_path)
                 ended["errors"] = video_status["errors"] + ended["errors"]
-                ended.update({key: value for key, value in video_status.items() if key.startswith("recordingReady")})
+                ended.update({key: value for key, value in video_status.items() if key.startswith("recording")})
                 video_status = ended
             output.mkdir(parents=True, exist_ok=True)
             (output / "test-starts.json").write_text(json.dumps(test_starts, indent=2) + "\n")
