@@ -318,7 +318,9 @@ struct MainView: View {
             preferring: scenePhase == .active
                 ? handledExternalEventRoots
                 : [],
-            allowing: handledExternalEventRoots
+            // Every main window can handle general activation, including a
+            // Home Screen return. AppRoute still validates incoming URLs.
+            allowing: ["*"]
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
     }

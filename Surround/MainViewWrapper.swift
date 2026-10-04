@@ -168,9 +168,60 @@ private struct OfflineUITestRootView: View {
             .environmentObject(nav)
             .environment(\.openURL, OpenURLAction { _ in .discarded })
             .environment(\.surroundAllowsRemoteActivity, false)
+            .overlay(alignment: .topLeading) {
+                if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.sceneActivationLaunchArgument) {
+                    SceneActivationUITestProbe()
+                        .frame(width: 8, height: 8).allowsHitTesting(false)
+                }
+            }
             #if targetEnvironment(macCatalyst)
             .background(CatalystUITestWindowPositioner())
             #endif
+    }
+}
+
+/// Reports UIKit session identities, rather than counting accessibility windows.
+/// This probe exists only in the opt-in offline root.
+private struct SceneActivationUITestProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView { ProbeView() }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    private final class ProbeView: UIView {
+        init() {
+            super.init(frame: .zero)
+            isAccessibilityElement = true
+            accessibilityIdentifier = "test.sceneActivation"
+            accessibilityLabel = "Offline scene activation"
+            for name in [UIScene.didActivateNotification, UIScene.didEnterBackgroundNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(scenePhaseChanged), name: name, object: nil)
+            }
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.updateSnapshot() }
+        }
+
+        @objc private func scenePhaseChanged(_ notification: Notification) {
+            guard notification.object as? UIScene === window?.windowScene else { return }
+            DispatchQueue.main.async { [weak self] in self?.updateSnapshot() }
+        }
+
+        private func updateSnapshot() {
+            guard let scene = window?.windowScene else { return }
+            let value: [String: Any] = [
+                "sessionID": scene.session.persistentIdentifier,
+                "sessionIDs": UIApplication.shared.openSessions
+                    .filter { $0.role == .windowApplication }.map(\.persistentIdentifier).sorted(),
+                "isActive": scene.activationState == .foregroundActive,
+                "supportsMultipleScenes": UIApplication.shared.supportsMultipleScenes,
+            ]
+            guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return }
+            accessibilityValue = String(data: data, encoding: .utf8)
+        }
     }
 }
 
