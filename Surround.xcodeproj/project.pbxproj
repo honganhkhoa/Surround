@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06A00023D00000000000002 /* LocalizationUITests.swift */; };
 		0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */; };
 		274ACDD01C764687872BE0D2 /* MessagesLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */; };
 		C44DED6BB70146278FF1AB21 /* PrivateMessageSendSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */; };
@@ -456,6 +457,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 		655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesNavigationUITests.swift; sourceTree = "<group>"; };
 		B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesLayoutTests.swift; sourceTree = "<group>"; };
 		9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSessionTests.swift; sourceTree = "<group>"; };
@@ -879,6 +881,7 @@
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
 				D03000042026093000000004 /* DuoSidebarUITests.swift */,
 				655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */,
+				F06A00023D00000000000002 /* LocalizationUITests.swift */,
 				D10100122026100100000012 /* DuoProfileSidebarUITests.swift */,
 				D10100042026100100000004 /* SidebarKeyboardUITests.swift */,
 				D10100022026100100000002 /* AppReviewPresentationUITests.swift */,
@@ -1310,6 +1313,8 @@
 				es,
 				"pt-BR",
 				"pt-PT",
+				ms,
+				id,
 			);
 			mainGroup = BC042AE624AB2CF40050B2D1;
 			packageReferences = (
@@ -1657,6 +1662,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */,
+				F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */,
 				A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */,
 				F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */,
 				C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */,

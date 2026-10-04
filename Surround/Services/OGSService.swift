@@ -308,23 +308,23 @@ extension OGSServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidJSON:
-            return "Cannot decode server's response"
+            return String(localized: "Cannot decode server's response")
         case .notLoggedIn:
-            return "Login required"
+            return String(localized: "Login required")
         case .loginError(let error):
             return error
         case .staleAuthenticationContext:
-            return "Discarded a response from a previous account"
+            return String(localized: "Discarded a response from a previous account")
         case .variationSharingUnavailable:
-            return "This variation cannot be shared right now"
+            return String(localized: "This variation cannot be shared right now")
         case .invalidVariation:
-            return "This variation is no longer available"
+            return String(localized: "This variation is no longer available")
         case .conditionalMovesUpdateUnavailable:
-            return "Conditional moves cannot be updated right now"
+            return String(localized: "Conditional moves cannot be updated right now")
         case .conditionalMovesUpdateTimedOut:
-            return "Updating conditional moves timed out"
+            return String(localized: "Updating conditional moves timed out")
         case .conditionalMovesUpdateInterrupted:
-            return "Updating conditional moves was interrupted"
+            return String(localized: "Updating conditional moves was interrupted")
         }
     }
 }
