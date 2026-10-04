@@ -148,6 +148,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         enterDraft(rootDraft, in: assertConversation("hakhoa", peerID: firstPeerID,
                                                     presentation: .wideRoot, in: app), app: app)
         setSearch("Copper", in: app)
+        assertSearch("Copper", playerID: searchPlayerID, in: app)
+        let searchBounds = element("messages.playerSearchField", in: app, matching: .textField).frame
+        let detailBounds = element("messages.detailPane", in: app).frame
         tap("messages.search.profile.\(searchPlayerID)", in: app, matching: .button)
         assertLoadedProfile(named: "CopperKoi", in: app)
         tap(SurroundUITestContract.AccessibilityID.profileMessage, in: app, matching: .button)
@@ -159,7 +162,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertLoadedProfile(named: "CopperKoi", in: app)
         assertFullWidthDestination(SurroundUITestContract.AccessibilityID.screenPlayerProfile, over: bounds, in: app)
         back(from: "CopperKoi", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
-        assertWideRoot(in: app, expectedBounds: bounds)
+        assertWideSearchRoot(in: app, searchBounds: searchBounds, detailBounds: detailBounds)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         XCTAssertTrue(waitForValue(rootDraft, in: assertConversation("hakhoa", peerID: firstPeerID,
                                                                    presentation: .wideRoot, in: app), timeout: 10),

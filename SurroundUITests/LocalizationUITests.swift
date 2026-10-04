@@ -46,9 +46,8 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             "Messages": "Mesej",
             "Friends": "Rakan",
             "Search players": "Cari pemain",
-            "Search friends": "Cari rakan",
-            "See all": "Lihat semua",
-            "%lld friends": "%lld rakan",
+            "Collapsed": "Diringkaskan",
+            "Expanded": "Dikembangkan",
             "Message %@": "Hantar mesej kepada %@",
             "Challenge %@": "Cabar %@",
             "View %@’s profile": "Lihat profil %@",
@@ -78,9 +77,8 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             "Messages": "Pesan",
             "Friends": "Teman",
             "Search players": "Cari pemain",
-            "Search friends": "Cari teman",
-            "See all": "Lihat semua",
-            "%lld friends": "%lld teman",
+            "Collapsed": "Diciutkan",
+            "Expanded": "Diperluas",
             "Message %@": "Kirim pesan ke %@",
             "Challenge %@": "Tantang %@",
             "View %@’s profile": "Lihat profil %@",
@@ -353,53 +351,67 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         assertVisible(search, in: app)
         // The second fixture remains unread even if the wide layout selected
         // and marked the first conversation as read on appearance.
-        let unread = elementAfterScrolling(
+        let unread = messagesInboxElement(
             SurroundUITestContract.AccessibilityID.privateMessageRow(955_348),
-            in: app, matching: .button)
+            in: app)
         XCTAssertEqual(unread.value as? String, language.text("Unread conversation"))
         capture("messages-inbox", language: language, in: app)
 
-        let seeAll = element("messages.seeAllFriends", in: app, matching: .button)
-        XCTAssertEqual(seeAll.label, language.text("See all"))
-        scrollIntoTappableArea(seeAll, in: app)
-        tap(seeAll, description: "Open offline Friends", in: app)
-        element("messages.friends", in: app)
-        localizedLabel(language.text("Friends"), in: app)
-        let count = language.text("%lld friends").replacingOccurrences(of: "%lld", with: "6")
-        assertVisible(localizedLabel(count, in: app), in: app)
-        let filter = element("messages.friends.filter", in: app, matching: .textField)
-        XCTAssertEqual(filter.placeholderValue, language.text("Search friends"))
-        assertVisible(filter, in: app)
-
         let friendID = SurroundUITestContract.profileFixturePickerFriendID
         let username = "BambooPath"
-        let profile = element("messages.friend.profile.\(friendID)", in: app, matching: .button)
-        let message = element("messages.friend.message.\(friendID)", in: app, matching: .button)
-        let challenge = element("messages.friend.challenge.\(friendID)", in: app, matching: .button)
-        XCTAssertEqual(profile.label, language.text("View %@’s profile", username: username))
+        let friendButtons = NSPredicate(format: "identifier BEGINSWITH %@", "messages.friend.message.")
+        let strip = element("messages.friends.strip", in: app)
+        XCTAssertEqual(strip.buttons.matching(friendButtons).count, 6,
+                       "The inline Friends strip must contain the six existing fixture friends.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "messages.friends").firstMatch.exists,
+                       "Friends must remain inline rather than create a separate destination.")
+        let toggle = app.buttons.matching(identifier: "messages.friends.toggle").firstMatch
+        let expanded = toggle.exists
+        if expanded {
+            let visibleToggle = messagesInboxElement("messages.friends.toggle", in: app)
+            XCTAssertEqual(visibleToggle.label, language.text("Friends"))
+            XCTAssertEqual(visibleToggle.value as? String, language.text("Collapsed"))
+            assertVisible(visibleToggle, in: app)
+            tap(visibleToggle, description: "Expand localized inline Friends", in: app)
+            let grid = element("messages.friends.grid", in: app)
+            XCTAssertEqual(grid.buttons.matching(friendButtons).count, 6)
+            XCTAssertEqual(toggle.value as? String, language.text("Expanded"))
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "messages.friends.strip").firstMatch.exists)
+        } else {
+            // As in MessagesNavigationUITests, an absent toggle is valid only
+            // when the measured horizontal strip can display every friend.
+            messagesInboxElement("messages.friend.message.\(friendID)", in: app)
+            XCTAssertTrue((801_001...801_006).allSatisfy { id in
+                let friend = strip.buttons["messages.friend.message.\(id)"].firstMatch
+                return friend.exists && friend.isHittable
+                    && friend.frame.minX >= strip.frame.minX - 1
+                    && friend.frame.maxX <= strip.frame.maxX + 1
+            })
+            assertVisible(localizedLabel(language.text("Friends"), in: app), in: app)
+        }
+        let message = messagesInboxElement("messages.friend.message.\(friendID)", in: app)
         XCTAssertEqual(message.label, language.text("Message %@", username: username))
-        XCTAssertEqual(challenge.label, language.text("Challenge %@", username: username))
-        assertVisible(profile, in: app)
         assertVisible(message, in: app)
-        assertVisible(challenge, in: app)
         capture("friends", language: language, in: app)
 
-        // Exercise the localized filter after preserving the full six-friend
-        // screen. This also gives native Friends navigation a real focus and
-        // layout transition before the profile interaction.
-        tap(filter, description: "Focus the localized offline Friends filter", in: app)
-        filter.typeText("Bamboo")
-        XCTAssertTrue(waitForValue("Bamboo", in: filter, timeout: 10))
-        let filteredProfiles = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "messages.friend.profile."))
-        let onlyFixture = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            filteredProfiles.count == 1 && profile.exists
-        }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [onlyFixture], timeout: 10), .completed,
-                       "The Friends filter must retain only the BambooPath fixture profile.")
-        XCTAssertEqual(filteredProfiles.firstMatch.identifier,
-                       "messages.friend.profile.\(friendID)")
-        tap(profile, description: "Open the offline friend's profile", in: app)
+        if expanded {
+            tap(messagesInboxElement("messages.friends.toggle", in: app),
+                description: "Collapse localized inline Friends", in: app)
+            element("messages.friends.strip", in: app)
+            XCTAssertEqual(toggle.value as? String, language.text("Collapsed"))
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "messages.friends.grid").firstMatch.exists)
+        }
+        tap(messagesInboxElement("messages.friend.message.\(friendID)", in: app),
+            description: "Select the offline inline friend", in: app)
+        let profile = element(SurroundUITestContract.AccessibilityID.profileMessageToolbarEntry(friendID),
+                              in: app, matching: .button)
+        let challenge = element("messages.challenge.\(friendID)", in: app, matching: .button)
+        verifyComposer(for: username, language: language, in: app)
+        XCTAssertEqual(profile.label, language.text("View %@’s profile", username: username))
+        XCTAssertEqual(challenge.label, language.text("Challenge %@", username: username))
+        assertVisible(profile, in: app)
+        assertVisible(challenge, in: app)
+        tap(profile, description: "Open the inline friend's conversation profile", in: app)
         assertLoadedProfile(named: username, in: app)
         let profileMessage = element(SurroundUITestContract.AccessibilityID.profileMessage,
                                      in: app, matching: .button)
@@ -420,6 +432,12 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(opponent.label.contains(username))
         assertVisible(opponent, in: app)
         capture("challenge-form", language: language, in: app)
+    }
+
+    @discardableResult
+    private func messagesInboxElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
+        return elementAfterScrolling(identifier, in: app, within: scroll, matching: .button)
     }
 
     private func positionConditionalButtonInVisibleContent(
