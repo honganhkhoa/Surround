@@ -500,7 +500,7 @@ struct MessagesConversationView: View {
 
     private var challengeButton: some View {
         Button { navigation.openChallenge(for: peer) } label: {
-            Image(systemName: "circle.lefthalf.filled")
+            Image("custom.squareshape.split.3x3.bubble.right")
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }

@@ -1274,8 +1274,40 @@ extension OGSService {
                             .correspondence_overall: OGSCategoryRating(rating: 1950, deviation: 75, volatility: 0.06),
                         ])
                     }
+                    let biographyBrowserLink = ProcessInfo.processInfo.environment["SURROUND_UI_BIOGRAPHY_BROWSER_URL"]
+                        .map { "[Open local biography page](\($0))\n" } ?? ""
                     return OGSPlayerProfile(
                         user: user,
+                        about: SurroundUITestContract.includesProfileBiography ? """
+                        Weekend player from **Hà Nội**. Mostly correspondence — happy to play a teaching game.
+
+                        ## About my Go
+                        I enjoy *thoughtful games* and [JuniperStone](/player/314459).
+                        [View a game](/game/68301595) · [OGS page](https://online-go.com/player/314459/?tab=games)
+                        [Unavailable game](/game/999999999)
+                        [Jump to escaped heading](#study%20%26%20review)
+                        [Jump to text anchor](#text-anchor)
+                        [Jump to empty anchor](#empty-anchor)
+
+                        <div style="color:white;background:black;font-size:1px" onclick="alert('unsafe')">Readable biography</div>
+                        <script>document.body.innerHTML = 'Unsafe script ran';</script>
+                        <img src="https://example.invalid/biography.png" alt="Go board photograph">
+                        <img src="https://example.invalid/biography2.png" alt="Second Go photograph">
+                        <img src="javascript:alert('unsafe-image')" alt="Sanitizer-rejected Go photograph">
+                        <audio src="https://example.invalid/audio.mp3"></audio>
+                        <video src="https://example.invalid/video.mp4"></video>
+                        [date=2026-10-04 time=09:30:00 timezone=Asia/Ho_Chi_Minh format=YYYY/MM/DD]
+                        [date=2026-10-04 time=09:30:00 timezone=Asia/Ho_Chi_Minh format=unsupported]
+
+                        <h2 id="study &amp; review">Escaped fragment destination</h2>
+                        <p><a id="text-anchor">Text anchor destination</a></p>
+                        <a id="empty-anchor"></a><p>Empty anchor destination</p>
+
+                        ## Study notes
+                        \(String(repeating: "I review my correspondence games slowly, compare ideas, and enjoy learning from other players.\n\n", count: 16))
+                        \(biographyBrowserLink)
+                        [More about JuniperStone](/player/314459)
+                        """ : nil,
                         registrationDate: Date(timeIntervalSince1970: 1_443_657_600),
                         activeGames: SurroundUITestContract.simulatesUnavailableProfileSections ? nil : [],
                         versus: SurroundUITestContract.simulatesUnavailableProfileSections
@@ -1329,6 +1361,7 @@ extension OGSService {
                 // the profile must display the server record, not recount it.
                 state.playerProfilesById?[profile.id] = OGSPlayerProfile(
                     user: profile.user,
+                    about: profile.about,
                     registrationDate: profile.registrationDate,
                     activeGames: activeGames,
                     versus: OGSProfileVersus(wins: 14, losses: 9, draws: 1, history: recent),

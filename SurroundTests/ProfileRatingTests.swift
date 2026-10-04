@@ -4,6 +4,7 @@
 //
 
 import XCTest
+import UIKit
 
 final class ProfileRatingTests: XCTestCase {
     func testProfileCategoriesIncludeAllSevenAggregatesInDisplayOrder() {
@@ -26,7 +27,7 @@ final class ProfileRatingTests: XCTestCase {
         XCTAssertNil(missing.likelyRankRange)
     }
 
-    func testProvisionalStateUsesSelectedCategoryInsteadOfOverall() {
+    func testProvisionalStateUsesEachCategoryInsteadOfOverall() {
         let user = user(ratings: [
             .overall: rating(1800, deviation: 60),
             .blitz_overall: rating(1500, deviation: 200),
@@ -95,6 +96,24 @@ final class ProfileRatingTests: XCTestCase {
         for invalid in [rating(.nan, deviation: 60), rating(1500, deviation: .infinity), rating(1500, deviation: -1)] {
             XCTAssertFalse(ProfileRating(user: user(ratings: [.overall: invalid]), category: .overall).hasData)
         }
+    }
+
+    @MainActor
+    func testChallengeCustomSymbolLoadsFromAssetsAndRenders() throws {
+        let symbol = try XCTUnwrap(UIImage(
+            named: "custom.squareshape.split.3x3.bubble.right",
+            in: Bundle(for: ProfileRatingTests.self),
+            compatibleWith: nil
+        ))
+        XCTAssertTrue(symbol.isSymbolImage, "Challenge uses the supplied asset-catalog symbol.")
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64))
+        let rendered = renderer.image { _ in
+            symbol.withTintColor(.black, renderingMode: .alwaysOriginal)
+                .draw(in: CGRect(x: 8, y: 8, width: 48, height: 48))
+        }
+        let blank = renderer.image { _ in }
+        XCTAssertNotEqual(try XCTUnwrap(rendered.pngData()), try XCTUnwrap(blank.pngData()),
+                          "The custom Challenge symbol must draw visible pixels.")
     }
 
     private func user(ratings: [OGSRatingCategory: OGSCategoryRating]) -> OGSUser {

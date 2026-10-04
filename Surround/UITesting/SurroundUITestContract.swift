@@ -36,6 +36,7 @@ enum SurroundUITestContract {
     static let profileSectionsUnavailableLaunchArgument =
         "--surround-profile-sections-unavailable"
     static let profileContentLaunchArgument = "--surround-profile-content"
+    static let profileBiographyLaunchArgument = "--surround-profile-biography"
     static let profileShortHistoryLaunchArgument = "--surround-profile-short-history"
     static let friendshipLaunchArgument = "--surround-friendship"
     static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
@@ -252,6 +253,10 @@ enum SurroundUITestContract {
 
     static var includesProfileContent: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(profileContentLaunchArgument)
+    }
+
+    static var includesProfileBiography: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(profileBiographyLaunchArgument)
     }
 
     static var usesShortProfileHistory: Bool {
@@ -529,6 +534,11 @@ enum SurroundUITestContract {
         static let screenSettings = "screen.settings"
         static let screenPlayerProfile = "screen.player-profile"
         static let profileLoaded = "profile.loaded"
+        static let profileBiographySummary = "profile.biography.summary"
+        static let profileAbout = "profile.about"
+        static let screenPlayerAbout = "screen.player-about"
+        static let profileBiographyContent = "profile.biography.content"
+        static let profileRatingKey = "profile.rating-key"
         static let profileIdentity = "profile.identity"
         static let profileLoading = "profile.loading"
         static let profileError = "profile.error"
@@ -597,7 +607,6 @@ enum SurroundUITestContract {
         static let screenProfileGameHistory = "screen.profile-game-history"
         static let profileRatings = "profile.ratings"
         static let profileRatingMode = "profile.rating-mode"
-        static let profileRatingHeadline = "profile.rating-headline"
 
         static func profileActiveGame(_ gameID: Int) -> String {
             "profile.active-game.\(gameID)"

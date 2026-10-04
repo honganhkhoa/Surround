@@ -67,7 +67,17 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(scroll.waitForExistence(timeout: 10))
         let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
         for _ in 0..<14 {
-            let safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
+            var safeFrame = scroll.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
+            // The scroll view extends behind system chrome. A large history
+            // card can exceed the visible reading area even when it is shorter
+            // than the full-screen accessibility frame.
+            let bars = app.navigationBars.allElementsBoundByIndex.map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(safeFrame) }
+            if let top = bars.map(\.maxY).max(), top > safeFrame.minY {
+                safeFrame = CGRect(x: safeFrame.minX, y: top + 12,
+                                   width: safeFrame.width,
+                                   height: max(0, safeFrame.maxY - top - 12))
+            }
             guard control.exists else {
                 // A lazy grid does not expose the target's position until
                 // its row approaches the viewport.
@@ -86,7 +96,9 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 axis: .vertical,
                 targetFrame: validInteractionFrame(targetFrame, interactionPoint: interactionPoint),
                 containerFrame: safeFrame,
-                interactionPoint: interactionPoint
+                interactionPoint: interactionPoint,
+                dragVelocity: XCUIGestureVelocity(rawValue: 60),
+                dragHoldDuration: 0.2
             ) else { break }
         }
         keepInteractionHierarchy(control, container: scroll, in: app,
@@ -670,33 +682,42 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let app = launchProfileContent()
         openProfileContentFromHome(in: app)
         for category in ["overall", "19x19", "13x13", "9x9", "blitz", "live", "correspondence"] {
-            element(SurroundUITestContract.AccessibilityID.profileRatingCategory(category), in: app)
+            let identifier = SurroundUITestContract.AccessibilityID.profileRatingCategory(category)
+            element(identifier, in: app)
+            XCTAssertFalse(app.buttons[identifier].exists, "Rating categories are display-only cells.")
         }
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "profile.rating-headline").firstMatch.exists,
+                       "The category table must not repeat a large selected-category headline.")
         let nine = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
         XCTAssertTrue((nine.value as? String ?? "").contains("Provisional"), "A category at deviation 160 is provisional even with a stable overall rating.")
+        XCTAssertTrue((nine.value as? String ?? "").contains("Likely range"))
+        XCTAssertFalse((nine.value as? String ?? "").contains("±"))
         let overall = element(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app)
         XCTAssertFalse((overall.value as? String ?? "").contains("Provisional"))
-        tap(nine, description: "Select provisional 9×9 rating", in: app)
-        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertTrue(headline.label.contains("Provisional"))
-        XCTAssertFalse(headline.label.contains("±"), "A provisional Rank headline uses its likely range instead of a deviation subtitle.")
-        keepScreenshot("Profile ratings – category-specific provisional rank", in: app)
+        let key = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingKey, in: app)
+        XCTAssertTrue(key.label.contains("? means provisional"))
+        keepScreenshot("Profile ratings – seven display-only rank categories", in: app)
+
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.profileRatingMode, app: app)
-        XCTAssertTrue(headline.label.contains("1650") || headline.label.contains("1,650"))
-        XCTAssertTrue(headline.label.contains("±"), "Numeric Rating mode keeps the category's deviation, including provisional categories.")
+        XCTAssertTrue((nine.value as? String ?? "").contains("1650"))
+        XCTAssertTrue((nine.value as? String ?? "").contains("±160"))
+        XCTAssertTrue((nine.value as? String ?? "").contains("Provisional"),
+                      "The numeric provisional state must be explicit to VoiceOver independently of gray text.")
+        XCTAssertTrue((overall.value as? String ?? "").contains("1875"), "The switch updates every category.")
+        let correspondence = element(SurroundUITestContract.AccessibilityID.profileRatingCategory("correspondence"), in: app)
+        XCTAssertTrue((correspondence.value as? String ?? "").contains("1950"))
+        XCTAssertTrue(key.label.contains("Gray ratings are provisional"))
+        let thirteen = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
+        XCTAssertEqual(thirteen.value as? String, "No rated games")
+        keepScreenshot("Profile ratings – all numeric categories and missing 13×13", in: app)
+
         navigateBackFromPlayerProfile(in: app)
         openProfileContentFromHome(in: app)
         let mode = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
         XCTAssertTrue(mode.buttons.element(boundBy: 1).isSelected, "The Rank/Rating preference must survive reopening a profile.")
-        let reloadedHeadline = element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertTrue(reloadedHeadline.label.contains("1875") || reloadedHeadline.label.contains("1,875"))
-        let thirteen = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
-        XCTAssertEqual(thirteen.value as? String, "No rated games")
-        tap(thirteen, description: "Select the unrated 13×13 category", in: app)
-        let missingHeadline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertEqual(missingHeadline.label, "No rated games", "A missing category needs only its explanation, without a placeholder or subtitle.")
-        keepScreenshot("Profile ratings – missing 13×13 data", in: app)
+        XCTAssertTrue((element(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app).value as? String ?? "").contains("1875"))
+        XCTAssertTrue((element(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app).value as? String ?? "").contains("1650"))
     }
 
     func testOwnProfileOmitsOpponentSectionsAndHonorsHiddenRatings() {
@@ -743,26 +764,27 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         keepScreenshot("Own profile – supporter identity in dark and largest Dynamic Type", in: app)
         let provisional = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
         XCTAssertTrue((provisional.value as? String ?? "").contains("Provisional"))
-        tap(provisional, description: "Choose provisional category at the largest text size", in: app)
-        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertTrue(headline.label.contains("Provisional"))
-        XCTAssertFalse(headline.label.contains("±"))
-        keepScreenshot("Profile ratings – dark and largest Dynamic Type headline", in: app)
+        XCTAssertTrue((provisional.value as? String ?? "").contains("Likely range"))
+        XCTAssertFalse((provisional.value as? String ?? "").contains("±"))
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9")].exists)
+        let thirteen = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
+        XCTAssertGreaterThan(thirteen.frame.minY, provisional.frame.minY,
+                             "Accessibility sizes show one category per row.")
+        XCTAssertEqual(thirteen.value as? String, "No rated games")
+        keepScreenshot("Profile ratings – dark and largest Dynamic Type rank rows", in: app)
 
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.profileRatingMode, app: app)
-        XCTAssertTrue(headline.label.contains("1650") || headline.label.contains("1,650"))
+        let numericProvisional = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
+        XCTAssertTrue((numericProvisional.value as? String ?? "").contains("1650"))
+        XCTAssertTrue((numericProvisional.value as? String ?? "").contains("Provisional"))
         let missing = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("13x13"), in: app)
         XCTAssertEqual(missing.value as? String, "No rated games")
-        tap(missing, description: "Choose missing category at the largest text size", in: app)
-        XCTAssertEqual(element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app).label, "No rated games")
         let correspondence = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("correspondence"), in: app)
-        XCTAssertTrue((correspondence.value as? String ?? "").contains("1950")
-            || (correspondence.value as? String ?? "").contains("1,950"))
-        keepScreenshot("Profile ratings – dark and largest Dynamic Type rows", in: app)
-        tap(correspondence, description: "Choose the longest category label at the largest text size", in: app)
-        let finalHeadline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertTrue(finalHeadline.label.contains("1950") || finalHeadline.label.contains("1,950"))
+        XCTAssertTrue((correspondence.value as? String ?? "").contains("1950"))
+        XCTAssertEqual(correspondence.label, "Correspondence", "Category names must retain their full label.")
+        _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingKey, in: app)
+        keepScreenshot("Profile ratings – dark and largest Dynamic Type numeric rows", in: app)
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileHistoryGame(
             SurroundUITestContract.screenshotHistoryGameIDs[0]), in: app)
         keepScreenshot("Profile history – dark and largest Dynamic Type", in: app)
@@ -782,9 +804,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let live = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("live"), in: app)
         XCTAssertFalse((live.value as? String ?? "").contains("Provisional"),
                        "A stable category must remain stable when the overall rating is provisional.")
-        tap(live, description: "Select the independently stable live rating", in: app)
-        let headline = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        XCTAssertFalse(headline.label.contains("Provisional"))
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileRatingCategory("live")].exists)
+        XCTAssertTrue((live.value as? String ?? "").contains("±"))
         keepScreenshot("Profile – stable category despite provisional overall", in: app)
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileAllHistory].exists,
                        "An empty preview should not offer a redundant See all games action.")
@@ -812,10 +833,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                           "Missing section data must report its own error: \(message).")
         }
         let nine = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
-        tap(nine, description: "Select 9×9 before retrying independent profile sections", in: app)
-        let headline = element(SurroundUITestContract.AccessibilityID.profileRatingHeadline, in: app)
-        let selectedHeadline = headline.label
-        XCTAssertTrue(selectedHeadline.contains("Provisional"))
+        let categoryValue = nine.value as? String
+        XCTAssertTrue((categoryValue ?? "").contains("Provisional"))
         for retryID in [SurroundUITestContract.AccessibilityID.profileHeadToHeadRetry,
                         SurroundUITestContract.AccessibilityID.profileActiveGamesRetry,
                         SurroundUITestContract.AccessibilityID.gameHistoryRetry] {
@@ -825,8 +844,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
                 SurroundUITestContract.AccessibilityID.profileLoading).firstMatch.exists,
                 "A section retry must retain the loaded profile instead of restarting its page load.")
-            XCTAssertEqual(headline.label, selectedHeadline,
-                           "A section retry must preserve the independently selected 9×9 rating category.")
+            XCTAssertEqual(nine.value as? String, categoryValue,
+                           "A section retry must preserve the category's displayed rating.")
             element(SurroundUITestContract.AccessibilityID.profileChallenge, in: app)
             element(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
         }

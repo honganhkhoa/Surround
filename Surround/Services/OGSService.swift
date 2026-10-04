@@ -2240,7 +2240,7 @@ class OGSService: ObservableObject {
         return ProfileActiveGames(playerID: profile.id, entries: entries, service: self)
     }
 
-    fileprivate func knownProfileGame(gameID: Int) -> Game? {
+    func knownProfileGame(gameID: Int) -> Game? {
         desiredGameConnections[gameID]?.game
             ?? connectedGames[gameID]
             ?? activeGames[gameID]
@@ -2502,51 +2502,43 @@ class OGSService: ObservableObject {
     /// connection state. If that game already has connection intent, enriches
     /// and returns its canonical model so WebSocket events and the caller
     /// continue observing the same object. The caller owns any subsequent
-    /// connection intent.
+    /// connection intent. Each subscriber owns a request, so cancelling a
+    /// destination's task or subscription also stops its HTTP transport.
     func getGameDetail(gameID: Int) -> AnyPublisher<Game, Error> {
         let requestAuthenticationGeneration = authenticationGeneration
-        return Future<Game, Error> { promise in
-            self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseJSON { response in
-                guard self.authenticationGeneration == requestAuthenticationGeneration else {
-                    promise(.failure(OGSServiceError.staleAuthenticationContext))
-                    return
-                }
-                switch response.result {
-                case .success:
-                    guard let data = response.value as? [String: Any],
+        return Deferred {
+            self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)")
+                .validate()
+                .publishResponse(using: JSONResponseSerializer())
+                .tryMap { response -> Game in
+                    guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                        throw OGSServiceError.staleAuthenticationContext
+                    }
+                    guard let data = try response.result.get() as? [String: Any],
                           let gameData = data["gamedata"] as? [String: Any] else {
-                        promise(.failure(OGSServiceError.invalidJSON))
-                        return
+                        throw OGSServiceError.invalidJSON
                     }
                     let decoder = DictionaryDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    do {
-                        let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
-                        guard ogsGame.gameId == gameID else {
-                            promise(.failure(OGSServiceError.invalidJSON))
-                            return
-                        }
-                        let game: Game
-                        if let existingGame = self.desiredGameConnections[gameID]?.game
-                            ?? self.connectedGames[gameID] {
-                            existingGame.ogsRawData = data
-                            if existingGame.gameData == nil {
-                                existingGame.gameData = ogsGame
-                            }
-                            game = existingGame
-                        } else {
-                            game = Game(ogsGame: ogsGame)
-                            game.ogsRawData = data
-                            game.ogs = self
-                        }
-                        promise(.success(game))
-                    } catch {
-                        promise(.failure(error))
+                    let ogsGame = try decoder.decode(OGSGame.self, from: gameData)
+                    guard ogsGame.gameId == gameID else {
+                        throw OGSServiceError.invalidJSON
                     }
-                case .failure(let error):
-                    promise(.failure(error))
+                    let game: Game
+                    if let existingGame = self.desiredGameConnections[gameID]?.game
+                        ?? self.connectedGames[gameID] {
+                        existingGame.ogsRawData = data
+                        if existingGame.gameData == nil {
+                            existingGame.gameData = ogsGame
+                        }
+                        game = existingGame
+                    } else {
+                        game = Game(ogsGame: ogsGame)
+                        game.ogsRawData = data
+                        game.ogs = self
+                    }
+                    return game
                 }
-            }
         }.eraseToAnyPublisher()
     }
 

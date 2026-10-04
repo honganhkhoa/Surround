@@ -57,7 +57,14 @@ final class OGSServiceIsolationTests: XCTestCase {
         static var gameDetailBody: Data?
         static var gameDetailGate: DispatchSemaphore?
         static var gameDetailStarted: (() -> Void)?
+        static var gameDetailStopped: (() -> Void)?
+        static var gameDetailReleased: (() -> Void)?
         static var gameHistoryBody: Data?
+
+        private let deliveryLock = NSRecursiveLock()
+        private var isStopped = false
+        private var hasFinishedLoading = false
+        private var gameDetailStop: (() -> Void)?
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -71,6 +78,9 @@ final class OGSServiceIsolationTests: XCTestCase {
             let body: Data
             var headers = [String: String]()
             var statusCode = 200
+            var responseGate: DispatchSemaphore?
+            var responseStarted: (() -> Void)?
+            var responseReleased: (() -> Void)?
 
             switch path {
             case "/api/v0/login":
@@ -110,11 +120,13 @@ final class OGSServiceIsolationTests: XCTestCase {
             case _ where path.hasPrefix("/api/v1/games/"):
                 Self.lock.lock()
                 body = Self.gameDetailBody ?? Data("{}".utf8)
-                let gate = Self.gameDetailGate
-                let started = Self.gameDetailStarted
+                responseGate = Self.gameDetailGate
+                responseStarted = Self.gameDetailStarted
+                responseReleased = Self.gameDetailReleased
+                deliveryLock.lock()
+                gameDetailStop = Self.gameDetailStopped
+                deliveryLock.unlock()
                 Self.lock.unlock()
-                started?()
-                gate?.wait()
             default:
                 body = Data("{}".utf8)
             }
@@ -125,12 +137,46 @@ final class OGSServiceIsolationTests: XCTestCase {
                 httpVersion: "HTTP/1.1",
                 headerFields: headers
             )!
+            responseStarted?()
+            if let responseGate {
+                // Keep the URL loading thread free to deliver stopLoading().
+                // A bounded wait also prevents a failed test from leaking a worker.
+                let released = responseReleased
+                DispatchQueue.global(qos: .userInitiated).async {
+                    if responseGate.wait(timeout: .now() + 10) == .success {
+                        self.deliver(response: response, body: body)
+                    } else {
+                        self.deliveryLock.lock()
+                        if !self.isStopped {
+                            self.hasFinishedLoading = true
+                            self.client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
+                        }
+                        self.deliveryLock.unlock()
+                    }
+                    released?()
+                }
+            } else {
+                deliver(response: response, body: body)
+            }
+        }
+
+        private func deliver(response: HTTPURLResponse, body: Data) {
+            deliveryLock.lock()
+            defer { deliveryLock.unlock() }
+            guard !isStopped else { return }
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: body)
             client?.urlProtocolDidFinishLoading(self)
+            hasFinishedLoading = true
         }
 
-        override func stopLoading() {}
+        override func stopLoading() {
+            deliveryLock.lock()
+            let stopped = !isStopped && !hasFinishedLoading ? gameDetailStop : nil
+            isStopped = true
+            deliveryLock.unlock()
+            stopped?()
+        }
 
         static func recordedRequests(forPath path: String) -> [URLRequest] {
             lock.lock()
@@ -151,6 +197,8 @@ final class OGSServiceIsolationTests: XCTestCase {
         StubURLProtocol.gameDetailBody = nil
         StubURLProtocol.gameDetailGate = nil
         StubURLProtocol.gameDetailStarted = nil
+        StubURLProtocol.gameDetailStopped = nil
+        StubURLProtocol.gameDetailReleased = nil
         StubURLProtocol.gameHistoryBody = nil
         StubURLProtocol.lock.unlock()
     }
@@ -338,6 +386,135 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertTrue(receivedGame === canonicalGame)
         XCTAssertNotNil(canonicalGame.ogsRawData)
         XCTAssertTrue(socket.emittedCommands.isEmpty)
+    }
+
+    @MainActor
+    func testCancelledGameDetailTaskStopsTransportWithoutLateModelMutation() async throws {
+        let gameID = 845_011
+        let ogsGame = try installGameDetailResponse(gameID: gameID)
+        FinishedGameCache.shared.clear()
+        defer { FinishedGameCache.shared.clear() }
+        let responseGate = DispatchSemaphore(value: 0)
+        defer { responseGate.signal() }
+        let requestStarted = expectation(description: "linked-game transport started")
+        let requestStopped = expectation(description: "Back cancels linked-game transport")
+        let responseReleased = expectation(description: "delayed response released after Back")
+        StubURLProtocol.lock.withLock {
+            StubURLProtocol.gameDetailGate = responseGate
+            StubURLProtocol.gameDetailStarted = { requestStarted.fulfill() }
+            StubURLProtocol.gameDetailStopped = { requestStopped.fulfill() }
+            StubURLProtocol.gameDetailReleased = { responseReleased.fulfill() }
+        }
+
+        let socket = StubWebsocket()
+        socket.opened = true
+        socket.authenticated = true
+        socket.status = .connected
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            socket: socket,
+            label: "cancelled-linked-game"
+        )
+        let canonicalGame = Game(ogsGame: ogsGame)
+        canonicalGame.ogs = service
+        service.connect(to: canonicalGame, owner: .explicit(UUID()))
+        socket.resetEmittedCommands()
+        let lateModelMutation = expectation(description: "cancelled response must not enrich the canonical game")
+        lateModelMutation.isInverted = true
+        canonicalGame.$ogsRawData.dropFirst().sink { _ in lateModelMutation.fulfill() }
+            .store(in: &cancellables)
+
+        let router = StackRouter()
+        router.present(.playerAbout(101))
+        router.present(.game(gameID))
+        let taskFinished = expectation(description: "linked-game task cancelled")
+        let task = Task { @MainActor in
+            defer { taskFinished.fulfill() }
+            do {
+                for try await game in service.getGameDetail(gameID: gameID).values {
+                    try Task.checkCancellation()
+                    router.updateGame(game, for: gameID)
+                    return
+                }
+            } catch {
+                if !Task.isCancelled { XCTFail("Unexpected game-detail error: \(error)") }
+            }
+        }
+        defer { task.cancel() }
+
+        await fulfillment(of: [requestStarted], timeout: 5)
+        router.remove(.game(gameID))
+        task.cancel()
+        await fulfillment(of: [requestStopped, taskFinished], timeout: 5)
+        responseGate.signal()
+        await fulfillment(of: [responseReleased], timeout: 5)
+        await fulfillment(of: [lateModelMutation], timeout: 0.25)
+
+        XCTAssertEqual(router.path, [.playerAbout(101)])
+        XCTAssertTrue(router.games.isEmpty)
+        XCTAssertTrue(service.knownProfileGame(gameID: gameID) === canonicalGame)
+        XCTAssertNil(canonicalGame.ogsRawData)
+        XCTAssertNil(FinishedGameCache.shared.data(forGameID: gameID))
+        XCTAssertTrue(socket.emittedCommands.isEmpty)
+    }
+
+    @MainActor
+    func testCancellingOneGameDetailSubscriberDoesNotCancelAnother() async throws {
+        let gameID = 845_012
+        _ = try installGameDetailResponse(gameID: gameID)
+        let responseGate = DispatchSemaphore(value: 0)
+        defer {
+            responseGate.signal()
+            responseGate.signal()
+        }
+        let requestsStarted = expectation(description: "each subscriber owns its game-detail transport")
+        requestsStarted.expectedFulfillmentCount = 2
+        let firstRequestStopped = expectation(description: "first subscriber cancels only its transport")
+        let responsesReleased = expectation(description: "both delayed workers released")
+        responsesReleased.expectedFulfillmentCount = 2
+        StubURLProtocol.lock.withLock {
+            StubURLProtocol.gameDetailGate = responseGate
+            StubURLProtocol.gameDetailStarted = { requestsStarted.fulfill() }
+            StubURLProtocol.gameDetailStopped = { firstRequestStopped.fulfill() }
+            StubURLProtocol.gameDetailReleased = { responsesReleased.fulfill() }
+        }
+
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "unused"),
+            label: "independent-game-detail-subscribers"
+        )
+        let publisher = service.getGameDetail(gameID: gameID)
+        let cancelledDelivery = expectation(description: "cancelled subscriber has no delivery")
+        cancelledDelivery.isInverted = true
+        let first = publisher.sink(
+            receiveCompletion: { _ in cancelledDelivery.fulfill() },
+            receiveValue: { _ in cancelledDelivery.fulfill() }
+        )
+        defer { first.cancel() }
+        let secondCompleted = expectation(description: "second subscriber completes normally")
+        var receivedGame: Game?
+        var receivedError: Error?
+        publisher.sink(
+            receiveCompletion: {
+                if case .failure(let error) = $0 { receivedError = error }
+                secondCompleted.fulfill()
+            },
+            receiveValue: { receivedGame = $0 }
+        ).store(in: &cancellables)
+
+        await fulfillment(of: [requestsStarted], timeout: 5)
+        first.cancel()
+        await fulfillment(of: [firstRequestStopped], timeout: 5)
+        responseGate.signal()
+        responseGate.signal()
+        await fulfillment(of: [secondCompleted, responsesReleased], timeout: 5)
+        await fulfillment(of: [cancelledDelivery], timeout: 0.25)
+
+        XCTAssertNil(receivedError)
+        XCTAssertEqual(receivedGame?.ogsID, gameID)
+        XCTAssertEqual(StubURLProtocol.recordedRequests(forPath: "/api/v1/games/\(gameID)").count, 2)
     }
 
     func testProfileActiveGamesReuseConnectedModelsWithoutConnectionOwnership() throws {

@@ -35,6 +35,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
     func launchApp(
         additionalLaunchArguments: [String] = [],
+        launchEnvironment: [String: String] = [:],
         orientation: UIDeviceOrientation = .landscapeLeft
     ) -> XCUIApplication {
         #if !targetEnvironment(macCatalyst)
@@ -42,6 +43,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         #endif
 
         let app = XCUIApplication()
+        app.launchEnvironment = launchEnvironment
         app.launchArguments = [
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",

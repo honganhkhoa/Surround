@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AFA610012026100400000001 /* ProfileBiographyBrowserServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */; };
 		D10400012026100400000001 /* SceneActivationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10400022026100400000002 /* SceneActivationUITests.swift */; };
 		F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06A00023D00000000000002 /* LocalizationUITests.swift */; };
 		0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */; };
@@ -394,6 +395,12 @@
 		D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
 		D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
 		D907000B202609070000000B /* AppReviewGameActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D907000C202609070000000C /* AppReviewGameActivityTests.swift */; };
+		AFA600022026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
+		AFA600022026100400000002 /* ProfileBiographyWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000002 /* ProfileBiographyWebView.swift */; };
+		AFA600022026100400000003 /* PlayerAboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000003 /* PlayerAboutView.swift */; };
+		AFA600022026100400000004 /* ProfileBiographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000004 /* ProfileBiographyTests.swift */; };
+		AFA600032026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
+		AFA600022026100400000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -458,6 +465,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyBrowserServer.swift; sourceTree = "<group>"; };
 		D10400022026100400000002 /* SceneActivationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneActivationUITests.swift; sourceTree = "<group>"; };
 		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 		655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesNavigationUITests.swift; sourceTree = "<group>"; };
@@ -668,6 +676,10 @@
 		D90700072026090700000007 /* AppReviewPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicyTests.swift; sourceTree = "<group>"; };
 		D90700092026090700000009 /* AppReviewGameActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivity.swift; sourceTree = "<group>"; };
 		D907000C202609070000000C /* AppReviewGameActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivityTests.swift; sourceTree = "<group>"; };
+		AFA600012026100400000001 /* ProfileBiographyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyDocument.swift; sourceTree = "<group>"; };
+		AFA600012026100400000002 /* ProfileBiographyWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyWebView.swift; sourceTree = "<group>"; };
+		AFA600012026100400000003 /* PlayerAboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAboutView.swift; sourceTree = "<group>"; };
+		AFA600012026100400000004 /* ProfileBiographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -867,6 +879,7 @@
 				AA1500032026091500000003 /* OGSPlayerProfileTests.swift */,
 				37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */,
 				AA1700042026091700000004 /* ProfileRatingTests.swift */,
+				AFA600012026100400000004 /* ProfileBiographyTests.swift */,
 				AA1600032026091600000003 /* StackRouterTests.swift */,
 				B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */,
 				9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */,
@@ -884,6 +897,7 @@
 				D03000042026093000000004 /* DuoSidebarUITests.swift */,
 				D10400022026100400000002 /* SceneActivationUITests.swift */,
 				655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */,
+				AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */,
 				F06A00023D00000000000002 /* LocalizationUITests.swift */,
 				D10100122026100100000012 /* DuoProfileSidebarUITests.swift */,
 				D10100042026100100000004 /* SidebarKeyboardUITests.swift */,
@@ -910,6 +924,7 @@
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
 				AA1500022026091500000002 /* PlayerProfileView.swift */,
+				AFA600012026100400000003 /* PlayerAboutView.swift */,
 				AA1700032026091700000003 /* PlayerProfileGames.swift */,
 				BC4F95F1252ED54900A86A8A /* OGSBrowserView.swift */,
 				BCE913D025B9398D00065061 /* NewGameView.swift */,
@@ -944,6 +959,7 @@
 			children = (
 				AA1600012026091600000001 /* ChallengeDraft.swift */,
 				AA1700012026091700000001 /* ProfileRating.swift */,
+				AFA600012026100400000001 /* ProfileBiographyDocument.swift */,
 				BC042B3324AB2DD00050B2D1 /* OGS */,
 				BC042B3824AB2DD00050B2D1 /* Core */,
 				BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */,
@@ -993,6 +1009,7 @@
 				4FB7716AFD83430980B45D64 /* GameControlState.swift */,
 				EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */,
 				AA1700022026091700000002 /* PlayerProfileRatings.swift */,
+				AFA600012026100400000002 /* ProfileBiographyWebView.swift */,
 				AF3000023F00000000000002 /* ConditionalMovesPopover.swift */,
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
@@ -1377,6 +1394,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AFA600022026100400000005 /* Assets.xcassets in Resources */,
 				BC8CE8972657B35900E4BE1A /* game-23871959.json in Resources */,
 				BC8CE89A2657B35900E4BE1A /* game-26268396.json in Resources */,
 				BC8CE8942657B35900E4BE1A /* chat-27671778.json in Resources */,
@@ -1538,10 +1556,13 @@
 				BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
 				AA1500202026091500000001 /* PlayerProfileView.swift in Sources */,
+				AFA600022026100400000003 /* PlayerAboutView.swift in Sources */,
 				AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */,
 				AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */,
+				AFA600022026100400000002 /* ProfileBiographyWebView.swift in Sources */,
 				AA1600112026091600000001 /* ChallengeDraft.swift in Sources */,
 				AA1700112026091700000001 /* ProfileRating.swift in Sources */,
+				AFA600022026100400000001 /* ProfileBiographyDocument.swift in Sources */,
 				AA1600122026091600000002 /* StackRouter.swift in Sources */,
 				BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
@@ -1613,10 +1634,12 @@
 				AA1500202026091500000002 /* OGSPlayerProfileTests.swift in Sources */,
 				DC54F11B65C8433CAF5354CD /* OGSFriendshipTests.swift in Sources */,
 				AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */,
+				AFA600022026100400000004 /* ProfileBiographyTests.swift in Sources */,
 				AA1600132026091600000003 /* StackRouterTests.swift in Sources */,
 				AA1600222026091600000002 /* StackRouter.swift in Sources */,
 				AA1600212026091600000001 /* ChallengeDraft.swift in Sources */,
 				AA1700212026091700000001 /* ProfileRating.swift in Sources */,
+				AFA600032026100400000001 /* ProfileBiographyDocument.swift in Sources */,
 				AE3100093A00000000000009 /* OGSService+Fixtures.swift in Sources */,
 				D90700032026090700000003 /* AppReviewPolicy.swift in Sources */,
 				D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */,
@@ -1666,6 +1689,7 @@
 			files = (
 				D10400012026100400000001 /* SceneActivationUITests.swift in Sources */,
 				0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */,
+				AFA610012026100400000001 /* ProfileBiographyBrowserServer.swift in Sources */,
 				F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */,
 				A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */,
 				F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */,

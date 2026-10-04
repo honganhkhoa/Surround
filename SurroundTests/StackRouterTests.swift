@@ -10,6 +10,113 @@ final class StackRouterTests: XCTestCase {
     private var firstPlayer: User { User(username: "First player", id: 101) }
     private var secondPlayer: User { User(username: "Second player", id: 102) }
 
+    func testBiographyPlayerLinksLoadByIDAndKeepTheirSourceAboutForBack() {
+        let router = Router()
+        let profile = OGSPlayerProfile(user: firstPlayer, about: "A linked biography")
+        router.openProfile(firstPlayer)
+        router.openAbout(profile)
+        router.openProfile(playerID: secondPlayer.id)
+
+        XCTAssertEqual(router.path, [.profile(playerID: firstPlayer.id, selectionID: nil),
+                                     .playerAbout(firstPlayer.id),
+                                     .profile(playerID: secondPlayer.id, selectionID: nil)])
+        XCTAssertNil(router.users[secondPlayer.id], "An ID-only link must not invent the player's name.")
+        XCTAssertEqual(router.aboutProfilesByPlayer[firstPlayer.id]?.about, profile.about)
+
+        router.path.removeLast()
+        XCTAssertEqual(router.path.last, .playerAbout(firstPlayer.id))
+        XCTAssertEqual(router.aboutProfilesByPlayer[firstPlayer.id]?.about, profile.about)
+        router.path.removeLast()
+        XCTAssertTrue(router.aboutProfilesByPlayer.isEmpty)
+        XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+    }
+
+    func testBiographyRoutesPreserveConversationDraftAndHistoryAcrossColumnsAndBack() {
+        let router = Router()
+        let draft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        draft.wrappedValue = "Unsent before reading About"
+        let bookmark = router.conversationScrollBookmark(for: firstPlayer.id, accountID: viewerID)
+        bookmark.isAtEndOfChat = false
+        bookmark.messageKey = "older-message"
+        router.presentMessagesConversation(firstPlayer)
+        router.openProfile(firstPlayer)
+        router.openAbout(OGSPlayerProfile(user: firstPlayer, about: "Read more"))
+        router.openProfile(playerID: secondPlayer.id)
+
+        router.showMessagesColumns(true, peer: firstPlayer)
+        XCTAssertEqual(router.path, [.profile(playerID: firstPlayer.id, selectionID: nil),
+                                     .playerAbout(firstPlayer.id),
+                                     .profile(playerID: secondPlayer.id, selectionID: nil)])
+        router.showMessagesColumns(false, peer: firstPlayer)
+        XCTAssertEqual(router.path.first, .messagesConversation(firstPlayer.id))
+        router.returnTo(.messagesConversation(firstPlayer.id))
+
+        XCTAssertEqual(draft.wrappedValue, "Unsent before reading About")
+        XCTAssertTrue(router.conversationScrollBookmark(for: firstPlayer.id, accountID: viewerID) === bookmark)
+        XCTAssertEqual(bookmark.messageKey, "older-message")
+        XCTAssertFalse(bookmark.isAtEndOfChat)
+        XCTAssertTrue(router.aboutProfilesByPlayer.isEmpty)
+        XCTAssertNil(router.users[secondPlayer.id])
+    }
+
+    func testBiographyGameIDLinkReusesOriginalGameAncestor() {
+        let router = Router()
+        let nav = NavigationService()
+        let service = OGSService.previewInstance(user: firstPlayer)
+        let game = Game(width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(123))
+        nav.home.activeGame = game
+        router.present(.homeGame)
+        router.openProfile(firstPlayer)
+        router.openAbout(OGSPlayerProfile(user: firstPlayer, about: "Original game"))
+
+        router.openGame(gameID: 123, using: nav, service: service)
+
+        XCTAssertEqual(router.path, [.homeGame])
+        XCTAssertTrue(nav.home.activeGame === game)
+        XCTAssertTrue(router.games.isEmpty)
+        XCTAssertTrue(router.aboutProfilesByPlayer.isEmpty)
+    }
+
+    func testUncachedBiographyGameRetainsAboutAndAcceptsOnlyItsOwnLoadedModel() {
+        let router = Router()
+        let nav = NavigationService()
+        let service = OGSService.previewInstance(user: firstPlayer)
+        let game = Game(width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(123))
+        let wrongGame = Game(width: 9, height: 9, blackName: "Other Black", whiteName: "Other White", gameId: .OGS(124))
+        router.openAbout(OGSPlayerProfile(user: firstPlayer, about: "Game link"))
+        router.openGame(gameID: 123, using: nav, service: service)
+
+        XCTAssertEqual(router.path, [.playerAbout(firstPlayer.id), .game(123)])
+        XCTAssertNil(router.games[123])
+        router.updateGame(wrongGame, for: 123)
+        XCTAssertNil(router.games[123])
+        router.updateGame(game, for: 123)
+        XCTAssertTrue(router.games[123] === game)
+        router.openProfile(secondPlayer)
+        router.openGame(gameID: 123, using: nav, service: service)
+        XCTAssertEqual(router.path, [.playerAbout(firstPlayer.id), .game(123)])
+        router.path.removeLast()
+        router.updateGame(game, for: 123)
+        XCTAssertTrue(router.games.isEmpty, "A late response must not revive a popped game.")
+        XCTAssertNotNil(router.aboutProfilesByPlayer[firstPlayer.id])
+        router.path.removeLast()
+        XCTAssertTrue(router.aboutProfilesByPlayer.isEmpty)
+    }
+
+    func testInvalidBiographyIDsLeaveNavigationUntouched() {
+        let router = Router()
+        let nav = NavigationService()
+        let service = OGSService.previewInstance(user: firstPlayer)
+        router.openAbout(OGSPlayerProfile(user: firstPlayer, about: "Biography"))
+        for invalidID in [0, -1] {
+            router.openProfile(playerID: invalidID)
+            router.openGame(gameID: invalidID, using: nav, service: service)
+        }
+        XCTAssertEqual(router.path, [.playerAbout(firstPlayer.id)])
+        XCTAssertTrue(router.games.isEmpty)
+        XCTAssertEqual(router.aboutProfilesByPlayer[firstPlayer.id]?.about, "Biography")
+    }
+
     func testProfileGameReturnsToExistingGameAndPreservesItsModel() throws {
         let router = Router()
         let nav = NavigationService()

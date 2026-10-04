@@ -11,6 +11,7 @@ enum StackRoute: Hashable {
     case game(Int)
     case playerHistory(playerID: Int, opponentID: Int?)
     case playerActiveGames(Int)
+    case playerAbout(Int)
     case profile(playerID: Int, selectionID: UUID?)
     case challenge(UUID)
     case opponentPicker(UUID)
@@ -122,6 +123,7 @@ final class StackRouter: ObservableObject {
     private(set) var users: [Int: OGSUser] = [:]
     @Published private(set) var games: [Int: Game] = [:]
     private(set) var activeGamesByPlayer: [Int: ProfileActiveGames] = [:]
+    private(set) var aboutProfilesByPlayer: [Int: OGSPlayerProfile] = [:]
     private(set) var drafts: [UUID: ChallengeDraft] = [:]
     private(set) var selections: [UUID: OpponentSelection] = [:]
     @Published private(set) var isActive = false
@@ -168,6 +170,24 @@ final class StackRouter: ObservableObject {
         else { present(route) }
     }
 
+    /// Biography links can identify a player before their name is cached.
+    /// The destination loads the full profile and supplies its real identity.
+    func openProfile(playerID: Int) {
+        guard playerID > 0 else { return }
+        let route = StackRoute.profile(playerID: playerID, selectionID: nil)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
+    }
+
+    func openAbout(_ profile: OGSPlayerProfile) {
+        guard profile.id > 0 else { return }
+        users[profile.id] = profile.user
+        aboutProfilesByPlayer[profile.id] = profile
+        let route = StackRoute.playerAbout(profile.id)
+        if path.contains(route) { returnTo(route) }
+        else { present(route) }
+    }
+
     func openConversation(_ user: OGSUser) {
         guard user.id > 0 else { return }
         users[user.id] = user
@@ -180,6 +200,24 @@ final class StackRouter: ObservableObject {
     /// retaining its analysis, chat draft and connection owner.
     func openGame(_ game: Game, using navigation: NavigationService) {
         guard let gameID = game.ogsID, gameID > 0 else { return }
+        if returnToExistingGame(gameID: gameID, using: navigation) { return }
+        games[gameID] = game
+        present(.game(gameID))
+    }
+
+    /// A biography's game link stays in its originating stack. Cached models
+    /// retain their connection owner; an uncached destination loads REST detail.
+    func openGame(gameID: Int, using navigation: NavigationService, service: OGSService) {
+        guard gameID > 0 else { return }
+        if returnToExistingGame(gameID: gameID, using: navigation) { return }
+        if let game = service.knownProfileGame(gameID: gameID)
+            ?? service.cachedOverviewGame(gameID: gameID) {
+            games[gameID] = game
+        }
+        present(.game(gameID))
+    }
+
+    private func returnToExistingGame(gameID: Int, using navigation: NavigationService) -> Bool {
         let existingGames: [(StackRoute, Game?)] = [
             (.homeGame, navigation.home.activeGame),
             (.historyGame, navigation.gameHistory.activeGame),
@@ -187,15 +225,14 @@ final class StackRouter: ObservableObject {
         ]
         if let route = existingGames.first(where: { path.contains($0.0) && $0.1?.ogsID == gameID })?.0 {
             returnTo(route)
-            return
+            return true
         }
         let route = StackRoute.game(gameID)
         if path.contains(route) {
             returnTo(route)
-        } else {
-            games[gameID] = game
-            present(route)
+            return true
         }
+        return false
     }
 
     func updateGame(_ game: Game?, for gameID: Int) {
@@ -323,7 +360,7 @@ final class StackRouter: ObservableObject {
         let playerIDs = Set(path.compactMap { route -> Int? in
             switch route {
             case .profile(let id, _), .conversation(let id), .messagesConversation(let id),
-                 .playerHistory(let id, _), .playerActiveGames(let id): return id
+                 .playerHistory(let id, _), .playerActiveGames(let id), .playerAbout(let id): return id
             default: return nil
             }
         })
@@ -336,6 +373,10 @@ final class StackRouter: ObservableObject {
             if case .playerActiveGames(let id) = route { return id }; return nil
         })
         activeGamesByPlayer = activeGamesByPlayer.filter { activeListIDs.contains($0.key) }
+        let aboutIDs = Set(path.compactMap { route -> Int? in
+            if case .playerAbout(let id) = route { return id }; return nil
+        })
+        aboutProfilesByPlayer = aboutProfilesByPlayer.filter { aboutIDs.contains($0.key) }
         let pickerIDs = Set(path.compactMap { route -> UUID? in
             if case .opponentPicker(let id) = route { return id }; return nil
         })
@@ -659,10 +700,7 @@ struct AppNavigationStack<Content: View>: View {
         case .waitingGames:
             WaitingGamesView()
         case .game(let gameID):
-            GameDetailView(currentGame: Binding(
-                get: { navigation.games[gameID] },
-                set: { navigation.updateGame($0, for: gameID) }
-            ), allowsActiveGamesCarousel: false)
+            StackGameDestination(gameID: gameID)
         case .playerHistory(let playerID, let opponentID):
             if let player = navigation.users[playerID] {
                 GameHistoryView(player: player, opponentID: opponentID,
@@ -674,8 +712,11 @@ struct AppNavigationStack<Content: View>: View {
                 PlayerActiveGamesView(player: player, games: games)
             }
         case .profile(let playerID, let selectionID):
-            if let user = navigation.users[playerID] {
-                PlayerProfileView(user: user, selectionID: selectionID)
+            PlayerProfileView(playerID: playerID, seedUser: navigation.users[playerID],
+                              selectionID: selectionID)
+        case .playerAbout(let playerID):
+            if let profile = navigation.aboutProfilesByPlayer[playerID] {
+                PlayerAboutView(profile: profile)
             }
         case .messagesConversation(let playerID), .conversation(let playerID):
             if let user = navigation.users[playerID] {
@@ -695,6 +736,72 @@ struct AppNavigationStack<Content: View>: View {
                     .navigationTitle("Select your opponent ")
                     .navigationBarTitleDisplayMode(.inline)
             }
+        }
+    }
+}
+
+/// Keeps a linked game's fetch and retry local to the game destination. The
+/// router owns the loaded model so covering it with Profile retains its state.
+private struct StackGameDestination: View {
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var navigation: StackRouter
+    let gameID: Int
+    @State private var attempt = 0
+    @State private var failed = false
+
+    private struct LoadIdentity: Equatable {
+        let gameID: Int
+        let accountID: Int?
+        let attempt: Int
+    }
+
+    private var loadIdentity: LoadIdentity {
+        LoadIdentity(gameID: gameID, accountID: ogs.user?.id, attempt: attempt)
+    }
+
+    var body: some View {
+        Group {
+            if navigation.games[gameID] != nil {
+                GameDetailView(currentGame: Binding(
+                    get: { navigation.games[gameID] },
+                    set: { navigation.updateGame($0, for: gameID) }
+                ), allowsActiveGamesCarousel: false)
+            } else if failed {
+                ContentUnavailableView {
+                    Label("Unable to load game", systemImage: "squareshape.split.3x3")
+                        .accessibilityIdentifier("profile.linkedGame.error")
+                } description: {
+                    Text("Check your connection and try again. The game may no longer be available.")
+                } actions: {
+                    Button("Try again") { attempt += 1 }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("profile.linkedGame.retry")
+                }
+                .navigationTitle("Game")
+            } else {
+                ProgressView("Loading game…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Game")
+                    .accessibilityIdentifier("profile.linkedGame.loading")
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: loadIdentity) { await loadGame(for: loadIdentity) }
+    }
+
+    private func loadGame(for identity: LoadIdentity) async {
+        guard navigation.games[gameID] == nil else { return }
+        failed = false
+        do {
+            for try await game in ogs.getGameDetail(gameID: gameID).values {
+                try Task.checkCancellation()
+                guard identity == loadIdentity else { return }
+                navigation.updateGame(game, for: gameID)
+                return
+            }
+            if !Task.isCancelled { failed = true }
+        } catch {
+            if !Task.isCancelled { failed = true }
         }
     }
 }

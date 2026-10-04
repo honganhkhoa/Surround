@@ -36,8 +36,21 @@ struct PlayerProfileView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    let user: OGSUser
+    let playerID: Int
+    private let seedUser: OGSUser?
     var selectionID: UUID? = nil
+
+    init(user: OGSUser, selectionID: UUID? = nil) {
+        playerID = user.id
+        seedUser = user
+        self.selectionID = selectionID
+    }
+
+    init(playerID: Int, seedUser: OGSUser? = nil, selectionID: UUID? = nil) {
+        self.playerID = playerID
+        self.seedUser = seedUser
+        self.selectionID = selectionID
+    }
 
     private enum LoadState {
         case loading
@@ -59,13 +72,13 @@ struct PlayerProfileView: View {
     @State private var isVisible = false
 
     private var loadIdentity: LoadIdentity {
-        LoadIdentity(playerID: user.id, viewerID: ogs.user?.id, attempt: attempt)
+        LoadIdentity(playerID: playerID, viewerID: ogs.user?.id, attempt: attempt)
     }
 
     private var profileURL: URL {
         URL(string: OGSService.ogsRoot)!
             .appendingPathComponent("player")
-            .appendingPathComponent(String(user.id))
+            .appendingPathComponent(String(playerID))
     }
 
     private var loadedProfile: OGSPlayerProfile? {
@@ -78,27 +91,28 @@ struct PlayerProfileView: View {
         return false
     }
 
-    private var isOwnProfile: Bool { user.id == ogs.user?.id }
+    private var isOwnProfile: Bool { playerID == ogs.user?.id }
 
     private var title: Text {
-        let player = loadedProfile?.user ?? user
+        guard let player = loadedProfile?.user ?? seedUser else { return Text("Profile") }
         return player.id == ogs.user?.id ? Text("Profile") : Text(verbatim: player.username)
     }
 
+    @ViewBuilder
     private var identityHeader: some View {
-        let profile = loadedProfile
-        let displayedUser = profile?.user ?? user
-        return PlayerProfileIdentity(
-            user: displayedUser,
-            isOwnProfile: displayedUser.id == ogs.user?.id,
-            registrationDate: profile?.registrationDate
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(profile == nil ? SurroundUITestContract.AccessibilityID.profileIdentity : SurroundUITestContract.AccessibilityID.profileLoaded)
-        #if DEBUG && MAIN_APP
-        .accessibilityValue(Text(verbatim: SurroundUITestContract.isEnabled
-            ? (colorScheme == .dark ? "dark" : "light") : ""))
-        #endif
+        if let displayedUser = loadedProfile?.user ?? seedUser {
+            PlayerProfileIdentity(
+                user: displayedUser,
+                isOwnProfile: displayedUser.id == ogs.user?.id,
+                registrationDate: loadedProfile?.registrationDate
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(loadedProfile == nil ? SurroundUITestContract.AccessibilityID.profileIdentity : SurroundUITestContract.AccessibilityID.profileLoaded)
+            #if DEBUG && MAIN_APP
+            .accessibilityValue(Text(verbatim: SurroundUITestContract.isEnabled
+                ? (colorScheme == .dark ? "dark" : "light") : ""))
+            #endif
+        }
     }
 
     private func loadProfile(for identity: LoadIdentity) async {
@@ -132,6 +146,7 @@ struct PlayerProfileView: View {
                         .padding(.vertical, 32)
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileLoading)
                 case .loaded(let profile):
+                    PlayerBiographySummary(profile: profile)
                     actions(for: profile.user)
                         .profileContentMargins()
                         .padding(.bottom, 16)
@@ -182,7 +197,7 @@ struct PlayerProfileView: View {
     private func refreshFriendship(force: Bool = false) async {
         guard isVisible, !isLoadingProfile, ogs.isLoggedIn, !isOwnProfile else { return }
         do {
-            for try await _ in ogs.refreshFriendship(playerID: user.id, force: force).values {}
+            for try await _ in ogs.refreshFriendship(playerID: playerID, force: force).values {}
         } catch {
             // Keep the last known relationship on a background refresh failure.
             // The friendship control exposes an explicit retry if it is unknown.
@@ -231,7 +246,11 @@ struct PlayerProfileView: View {
                             Label("Select opponent", systemImage: "person.crop.circle.badge.checkmark")
                                 .frame(maxWidth: .infinity, minHeight: 32)
                         case .challengeWithSettings:
-                            Label("Challenge with these settings", systemImage: "plus.circle")
+                            Label {
+                                Text("Challenge with these settings")
+                            } icon: {
+                                Image("custom.squareshape.split.3x3.bubble.right")
+                            }
                                 .frame(maxWidth: .infinity, minHeight: 32)
                         }
                     }
@@ -242,7 +261,11 @@ struct PlayerProfileView: View {
                     Button {
                         navigation.openChallenge(for: player)
                     } label: {
-                        Label("Challenge", systemImage: "plus.circle")
+                        Label {
+                            Text("Challenge")
+                        } icon: {
+                            Image("custom.squareshape.split.3x3.bubble.right")
+                        }
                             .frame(maxWidth: .infinity, minHeight: 32)
                     }
                     .buttonStyle(.borderedProminent)

@@ -10,12 +10,13 @@ struct PlayerProfileRatings: View {
     @Setting(.hidesRank) private var hidesRank: Bool
     @Setting(.profileShowsRatings) private var showsRatings: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var selectedCategory: ProfileRatingCategory = .overall
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
 
     let user: OGSUser
 
-    private var selectedRating: ProfileRating {
-        ProfileRating(user: user, category: selectedCategory)
+    private var ratings: [ProfileRating] {
+        ProfileRatingCategory.allCases.map { ProfileRating(user: user, category: $0) }
     }
 
     var body: some View {
@@ -23,24 +24,34 @@ struct PlayerProfileRatings: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .zIndex(1)
-                headline
-                    .profileContentMargins()
-                    .padding(.vertical, 12)
-                VStack(spacing: 0) {
-                    ForEach(ProfileRatingCategory.allCases) { category in
-                        if category != .overall { Divider() }
-                        ratingRow(ProfileRating(user: user, category: category))
+                VStack(alignment: .leading, spacing: 8) {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        accessibleRatings
+                    } else if horizontalSizeClass == .regular {
+                        regularRatings
+                    } else {
+                        compactRatings
+                    }
+                    if ratings.contains(where: \.isProvisional) {
+                        Group {
+                            if showsRatings {
+                                Text("Gray ratings are provisional.")
+                            } else {
+                                Text("? means provisional — the range is where their rank likely is.")
+                            }
+                        }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRatingKey)
                     }
                 }
-                .padding(.horizontal, 8)
-                .frame(maxWidth: 1_100)
-                .frame(maxWidth: .infinity)
+                .profileContentMargins()
+                .padding(.vertical, 12)
             }
             .background(Color(.systemBackground))
-            .padding(.bottom, 12)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRatings)
-            .onChange(of: user.id) { _, _ in selectedCategory = .overall }
         }
     }
 
@@ -66,136 +77,142 @@ struct PlayerProfileRatings: View {
         .background(Color(.systemGray3).shadow(radius: 2))
     }
 
-    private var headline: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !selectedRating.hasData {
-                Text("No rated games")
-                    .font(.title2.weight(.semibold))
-            } else {
-                if selectedRating.isProvisional && !showsRatings {
-                    Text("Provisional rank")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.indigo)
-                    if let range = selectedRating.likelyRankRange {
-                        Text("Likely range: \(range)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text(verbatim: showsRatings ? selectedRating.ratingText : selectedRating.rankText(longFormat: true))
-                        .font(.largeTitle.weight(.semibold))
-                        .foregroundStyle(.indigo)
-                }
-                if showsRatings || !selectedRating.isProvisional,
-                   let deviation = showsRatings ? selectedRating.ratingDeviationText : selectedRating.rankDeviationText {
-                    Group {
-                        if showsRatings {
-                            Text("\(selectedCategory.title) · ±\(deviation) rating points")
-                        } else {
-                            Text("\(selectedCategory.title) · ±\(deviation) ranks")
-                        }
-                    }
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                if selectedRating.isProvisional && showsRatings {
-                    Text("Provisional")
-                        .font(.subheadline.weight(.medium))
-                }
+    private var compactRatings: some View {
+        VStack(spacing: 6) {
+            horizontalRating(ProfileRating(user: user, category: .overall))
+            VStack(spacing: 0) {
+                compactRow([.nineByNine, .thirteenByThirteen, .nineteenByNineteen])
+                Divider()
+                compactRow([.blitz, .live, .correspondence])
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRatingHeadline)
     }
 
-    private func ratingRow(_ rating: ProfileRating) -> some View {
-        let selected = selectedCategory == rating.category
-        let usesVerticalLayout = dynamicTypeSize.isAccessibilitySize
-        let layout = usesVerticalLayout
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
-        return Button {
-            selectedCategory = rating.category
-        } label: {
-            layout {
-                Text(verbatim: rating.category.title)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !usesVerticalLayout { Spacer(minLength: 8) }
-                rowValue(rating, usesVerticalLayout: usesVerticalLayout)
+    private func compactRow(_ categories: [ProfileRatingCategory]) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(categories) { category in
+                if category != categories.first { Divider() }
+                ratingCell(ProfileRating(user: user, category: category), centered: false)
             }
-            .font(.subheadline)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(selected ? Color.indigo.opacity(0.08) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var regularRatings: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(ratings, id: \.category) { rating in
+                if rating.category == .nineByNine || rating.category == .blitz { Divider() }
+                ratingCell(rating, centered: true)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var accessibleRatings: some View {
+        VStack(spacing: 0) {
+            ForEach(ratings, id: \.category) { rating in
+                if rating.category != .overall { Divider() }
+                horizontalRating(rating)
+            }
+        }
+    }
+
+    private func horizontalRating(_ rating: ProfileRating) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        return layout {
+            Text(verbatim: rating.category.title)
+                .font(.subheadline.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
+            VStack(alignment: .leading, spacing: 4) {
+                inlineValue(rating)
+                provisionalMarker(rating)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rating.category == .overall ? Color.indigo.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: rating.category.title))
         .accessibilityValue(accessibilityValue(for: rating))
-        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRatingCategory(rating.category.rawValue))
     }
 
-    private func rowValue(_ rating: ProfileRating, usesVerticalLayout: Bool) -> some View {
-        VStack(alignment: usesVerticalLayout ? .leading : .trailing, spacing: 4) {
-            if rating.hasData {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        ratingValueParts(rating)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        ratingValueParts(rating)
-                    }
-                }
-                .monospacedDigit()
-                if rating.isProvisional && showsRatings {
-                    Text("Provisional")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+    private func ratingCell(_ rating: ProfileRating, centered: Bool) -> some View {
+        VStack(alignment: centered ? .center : .leading, spacing: 4) {
+            Text(verbatim: rating.category.title)
+                .font(.caption.weight(rating.category == .overall ? .semibold : .regular))
+                .foregroundStyle(rating.category == .overall ? .primary : .secondary)
+                .multilineTextAlignment(centered ? .center : .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if centered {
+                primaryValue(rating)
+                supplementaryValue(rating)
             } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        missingRatingValue
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
-                    VStack(alignment: usesVerticalLayout ? .leading : .trailing, spacing: 4) {
-                        missingRatingValue
-                    }
-                }
+                inlineValue(rating)
+            }
+            provisionalMarker(rating)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
+        .background(rating.category == .overall ? Color.indigo.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: rating.category.title))
+        .accessibilityValue(accessibilityValue(for: rating))
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileRatingCategory(rating.category.rawValue))
+    }
+
+    private func inlineValue(_ rating: ProfileRating) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                primaryValue(rating)
+                supplementaryValue(rating)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            VStack(alignment: .leading, spacing: 4) {
+                primaryValue(rating)
+                supplementaryValue(rating)
             }
         }
-        .multilineTextAlignment(usesVerticalLayout ? .leading : .trailing)
+        .monospacedDigit()
     }
 
-    @ViewBuilder
-    private var missingRatingValue: some View {
-        Text("—").foregroundStyle(.secondary)
-        Text("No rated games")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    @ViewBuilder
-    private func ratingValueParts(_ rating: ProfileRating) -> some View {
+    private func primaryValue(_ rating: ProfileRating) -> some View {
         Text(verbatim: showsRatings ? rating.ratingText : rating.rankText())
-            .fontWeight(.semibold)
-            .foregroundStyle(.primary)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(!rating.hasData || (showsRatings && rating.isProvisional) ? .secondary : .primary)
+            .monospacedDigit()
             .fixedSize(horizontal: true, vertical: false)
+    }
+
+    @ViewBuilder
+    private func supplementaryValue(_ rating: ProfileRating) -> some View {
         if rating.isProvisional && !showsRatings, let range = rating.likelyRankRange {
             Text(verbatim: range)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
+                .fixedSize(horizontal: false, vertical: true)
         } else if let deviation = showsRatings ? rating.ratingDeviationText : rating.rankDeviationText {
             Text("±\(deviation)")
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
+                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func provisionalMarker(_ rating: ProfileRating) -> some View {
+        if differentiateWithoutColor && showsRatings && rating.isProvisional {
+            Text("Provisional")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
