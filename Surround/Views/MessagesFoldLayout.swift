@@ -10,10 +10,11 @@ struct MessagesColumnLayout: Equatable {
 
     init(size: CGSize, divisions: [CGRect] = [], usesColumns: Bool? = nil) {
         let bounds = CGRect(origin: .zero, size: size)
-        let verticalDivision = divisions.map { $0.intersection(bounds) }.first {
-            !$0.isNull && $0.height >= size.height * 0.5
-                && $0.width < size.width * 0.2
-                && $0.midX >= 280 && size.width - $0.midX >= 280
+        let clippedDivisions: [CGRect] = divisions.map { $0.intersection(bounds) }
+        let verticalDivision: CGRect? = clippedDivisions.first { division in
+            !division.isNull && division.height >= size.height * 0.5
+                && division.width < size.width * 0.2
+                && division.midX >= 280 && size.width - division.midX >= 280
         }
         self.usesColumns = usesColumns ?? (size.width >= Self.minimumWideWidth || verticalDivision != nil)
         if self.usesColumns, let verticalDivision {
