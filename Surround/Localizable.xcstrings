@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     " — players may drop mid-game" : {
       "localizations" : {
         "de" : {
@@ -332,6 +335,18 @@
       "shouldTranslate" : false
     },
     "—" : {
+
+    },
+    "·" : {
+
+    },
+    "· Friend" : {
+
+    },
+    "· Request sent" : {
+
+    },
+    "· Wants to be friends" : {
 
     },
     "[**Alexandru Cristescu**](https://github.com/acristescu), for creating the [**Sente**](https://github.com/acristescu/OnlineGo) Android app for OGS and making it open source. The process of creating this Android app, along with the project itself have been great reference materials for me during development." : {
@@ -14163,6 +14178,9 @@
         }
       }
     },
+    "Challenge %@" : {
+
+    },
     "Challenge received!" : {
       "localizations" : {
         "de" : {
@@ -14869,6 +14887,9 @@
         }
       }
     },
+    "Choose a conversation or a friend to start messaging." : {
+
+    },
     "Circle" : {
       "comment" : "Circular analyze-board marker.",
       "localizations" : {
@@ -15009,6 +15030,9 @@
           }
         }
       }
+    },
+    "Clear search" : {
+
     },
     "Clock starts with **%@** and increases by **%@** per move, up to a maximum of **%@**." : {
       "comment" : "TimeControl - long description for fischer system",
@@ -15597,6 +15621,9 @@
         }
       }
     },
+    "Collapsed" : {
+
+    },
     "Compact" : {
       "localizations" : {
         "de" : {
@@ -16162,6 +16189,9 @@
           }
         }
       }
+    },
+    "Conversations" : {
+
     },
     "correspondence" : {
       "comment" : "TimeControlSpeed enum localization",
@@ -16796,6 +16826,9 @@
         }
       }
     },
+    "Couldn’t confirm delivery. Check the conversation before retrying." : {
+
+    },
     "Couldn’t load active games" : {
       "localizations" : {
         "de" : {
@@ -16867,7 +16900,6 @@
       }
     },
     "Couldn’t load friend requests" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17357,6 +17389,9 @@
           }
         }
       }
+    },
+    "Couldn’t search players" : {
+
     },
     "Couldn’t send friend request" : {
       "localizations" : {
@@ -19908,6 +19943,9 @@
         }
       }
     },
+    "Expanded" : {
+
+    },
     "Failed to load your correspondence games." : {
       "comment" : "Correspondence Games Widget error",
       "localizations" : {
@@ -20259,6 +20297,12 @@
           }
         }
       }
+    },
+    "Find players" : {
+
+    },
+    "Find players on OGS" : {
+
     },
     "Fischer" : {
       "comment" : "TimeControl system name",
@@ -20685,7 +20729,6 @@
       }
     },
     "Friend requests" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -24858,6 +24901,12 @@
         }
       }
     },
+    "Loading friend requests…" : {
+
+    },
+    "Loading friends…" : {
+
+    },
     "Loading friendship status…" : {
       "localizations" : {
         "de" : {
@@ -25705,6 +25754,9 @@
         }
       }
     },
+    "Message %@" : {
+
+    },
     "Message organizer" : {
       "localizations" : {
         "de" : {
@@ -25774,6 +25826,9 @@
           }
         }
       }
+    },
+    "Message wasn’t sent. Try again." : {
+
     },
     "Messages" : {
       "comment" : "in navigation menu",
@@ -27544,6 +27599,9 @@
         }
       }
     },
+    "No conversations yet" : {
+
+    },
     "No correspondence games on your opponents' turn" : {
       "localizations" : {
         "de" : {
@@ -27830,6 +27888,9 @@
           }
         }
       }
+    },
+    "No friends yet" : {
+
     },
     "No games together yet" : {
       "localizations" : {
@@ -30912,6 +30973,9 @@
           }
         }
       }
+    },
+    "Players on OGS" : {
+
     },
     "Players waiting" : {
       "comment" : "Quick Match option currently requested by compatible players",
@@ -36293,6 +36357,9 @@
         }
       }
     },
+    "Search by username to view a profile or start a conversation." : {
+
+    },
     "Search cancelled" : {
       "comment" : "Accessibility announcement after cancelling a Quick Match search",
       "localizations" : {
@@ -36363,6 +36430,12 @@
           }
         }
       }
+    },
+    "Search for a player by username to message them, challenge them, or add them as a friend. Friend requests you receive show up here too." : {
+
+    },
+    "Search players" : {
+
     },
     "Searching for %lld correspondence games" : {
       "comment" : "Accessibility announcement after starting multiple correspondence Quick Match searches",
@@ -36790,6 +36863,9 @@
         }
       }
     },
+    "Searching…" : {
+
+    },
     "See all %lld games" : {
       "comment" : "Opens the complete active-games list or head-to-head history, with its total game count.",
       "localizations" : {
@@ -37008,6 +37084,9 @@
           }
         }
       }
+    },
+    "Select a conversation" : {
+
     },
     "Select any sizes you would play." : {
       "localizations" : {
@@ -37569,6 +37648,9 @@
           }
         }
       }
+    },
+    "Send message" : {
+
     },
     "Sent friend request" : {
       "localizations" : {
@@ -40194,6 +40276,9 @@
           }
         }
       }
+    },
+    "Tap a friend to send a message or a challenge, or search for any player on OGS." : {
+
     },
     "Tap and drag to place a stone. Drag outside of the board to cancel." : {
       "localizations" : {
@@ -43074,6 +43159,9 @@
         }
       }
     },
+    "Today" : {
+
+    },
     "Toggle analyze mode" : {
       "localizations" : {
         "de" : {
@@ -44202,6 +44290,12 @@
           }
         }
       }
+    },
+    "Unread" : {
+
+    },
+    "Unread conversation" : {
+
     },
     "Unusual board size: %lld×%lld" : {
       "localizations" : {
@@ -47776,6 +47870,9 @@
         }
       }
     },
+    "Yesterday" : {
+
+    },
     "You" : {
       "localizations" : {
         "de" : {
@@ -48415,6 +48512,9 @@
           }
         }
       }
+    },
+    "Your friends" : {
+
     },
     "Your game with %@ has ended." : {
       "comment" : "Notification body",

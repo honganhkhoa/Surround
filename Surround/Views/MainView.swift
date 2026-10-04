@@ -72,6 +72,8 @@ struct MainView: View {
         self.allowsRemoteActivity = allowsRemoteActivity
     }
 
+    private var messagesBadgeCount: Int { ogs.friendInvitations.count + ogs.privateMessagesUnreadCount }
+
     private var handledExternalEventRoots: Set<String> {
         Set(RootView.allCases.map(\.rawValue))
     }
@@ -138,7 +140,7 @@ struct MainView: View {
         )
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
         if #available(iOS 27.0, *), UIDevice.current.userInterfaceIdiom == .phone {
-            DuoTabContainer(selection: navigationCurrentView, isLoggedIn: ogs.isLoggedIn) { root in
+            DuoTabContainer(selection: navigationCurrentView, isLoggedIn: ogs.isLoggedIn, messagesBadgeCount: messagesBadgeCount) { root in
                 AnyView(root.navigationView
                     .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
                     .environmentObject(ogs)
@@ -184,10 +186,11 @@ struct MainView: View {
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.navigationPublicGames)
             if ogs.isLoggedIn {
                 Tab(value: RootView.privateMessages) {
-                    RootView.privateMessages.navigationView
+                    RootView.privateMessages.navigationView.id(ogs.user?.id)
                 } label: {
                     RootView.privateMessages.label
                 }
+                .badge(messagesBadgeCount)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.navigationMessages
                 )

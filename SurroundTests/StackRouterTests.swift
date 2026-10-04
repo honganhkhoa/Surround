@@ -80,6 +80,280 @@ final class StackRouterTests: XCTestCase {
         XCTAssertTrue(router.users.isEmpty)
     }
 
+    func testCompactRootAndProfileMessageToSamePeerKeepDistinctBackDestinations() {
+        let router = Router()
+        let messageDraft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        messageDraft.wrappedValue = "Return to this conversation"
+        let rootConversation = StackRoute.messagesConversation(firstPlayer.id)
+        let profile = StackRoute.profile(playerID: firstPlayer.id, selectionID: nil)
+
+        router.presentMessagesConversation(firstPlayer)
+        router.openProfile(firstPlayer)
+        router.openConversation(firstPlayer)
+
+        XCTAssertEqual(router.path, [rootConversation, profile, .conversation(firstPlayer.id)])
+        router.path.removeLast()
+        XCTAssertEqual(router.path, [rootConversation, profile],
+                       "Profile's Message action must return to Profile, even for the root recipient.")
+        XCTAssertEqual(messageDraft.wrappedValue, "Return to this conversation")
+
+        router.path.removeLast()
+        XCTAssertEqual(router.path, [rootConversation])
+        XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+
+        router.path.removeLast()
+        XCTAssertTrue(router.path.isEmpty, "Compact root Back must reveal the inbox.")
+        XCTAssertTrue(router.users.isEmpty)
+        router.presentMessagesConversation(firstPlayer)
+        XCTAssertEqual(router.path, [rootConversation])
+        XCTAssertEqual(
+            router.conversationDraft(for: firstPlayer.id, accountID: viewerID).wrappedValue,
+            "Return to this conversation"
+        )
+    }
+
+    func testConversationDraftsStayWithTheirAccountAndPeer() {
+        let router = Router()
+        let first = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        let second = router.conversationDraft(for: secondPlayer.id, accountID: viewerID)
+        let otherAccount = router.conversationDraft(for: firstPlayer.id, accountID: 200)
+        first.wrappedValue = "First account, first peer"
+        second.wrappedValue = "First account, second peer"
+        otherAccount.wrappedValue = "Other account, first peer"
+
+        XCTAssertEqual(
+            router.conversationDraft(for: firstPlayer.id, accountID: viewerID).wrappedValue,
+            "First account, first peer"
+        )
+        XCTAssertEqual(second.wrappedValue, "First account, second peer")
+        XCTAssertEqual(otherAccount.wrappedValue, "Other account, first peer")
+
+        let signedOut = router.conversationDraft(for: firstPlayer.id, accountID: nil)
+        signedOut.wrappedValue = "Signed-out text"
+        XCTAssertEqual(signedOut.wrappedValue, "")
+        XCTAssertEqual(first.wrappedValue, "First account, first peer")
+        first.wrappedValue = ""
+        XCTAssertEqual(second.wrappedValue, "First account, second peer")
+        XCTAssertEqual(otherAccount.wrappedValue, "Other account, first peer")
+    }
+
+    func testConversationHistoryBookmarkStaysWithAccountAndPeerAcrossRouteRolesAndBack() {
+        let router = Router()
+        let accountID = 847
+        let peer = User(username: "Selected peer", id: 765826)
+        let bookmark = router.conversationScrollBookmark(for: peer.id, accountID: accountID)
+        bookmark.messageKey = "older-history-message"
+        bookmark.isAtEndOfChat = false
+
+        router.presentMessagesConversation(peer)
+        router.openProfile(peer)
+        router.openConversation(peer)
+        XCTAssertEqual(router.path, [
+            .messagesConversation(peer.id), .profile(playerID: peer.id, selectionID: nil),
+            .conversation(peer.id),
+        ])
+
+        for _ in 0..<3 {
+            let current = router.conversationScrollBookmark(for: peer.id, accountID: accountID)
+            XCTAssertTrue(current === bookmark)
+            XCTAssertEqual(current.messageKey, "older-history-message")
+            XCTAssertFalse(current.isAtEndOfChat)
+            router.path.removeLast()
+        }
+        XCTAssertTrue(router.path.isEmpty)
+        XCTAssertTrue(router.users.isEmpty)
+        let returned = router.conversationScrollBookmark(for: peer.id, accountID: accountID)
+        XCTAssertTrue(returned === bookmark)
+        XCTAssertEqual(returned.messageKey, "older-history-message")
+        XCTAssertFalse(returned.isAtEndOfChat)
+
+        let otherAccount = router.conversationScrollBookmark(for: peer.id, accountID: accountID + 1)
+        let otherPeer = router.conversationScrollBookmark(for: peer.id + 1, accountID: accountID)
+        for fresh in [otherAccount, otherPeer] {
+            XCTAssertFalse(fresh === bookmark)
+            XCTAssertNil(fresh.messageKey)
+            XCTAssertTrue(fresh.isAtEndOfChat)
+        }
+    }
+
+    func testConversationHistoryBookmarkUsesMiddleVisibleMessageInTranscriptOrder() {
+        let bookmark = PrivateMessageScrollBookmark()
+        bookmark.isAtEndOfChat = false
+        let orderedKeys = (1...50).map { "history-\($0)" }
+
+        bookmark.rememberVisibleMessages(
+            ["history-42", "history-38", "unknown", "history-40", "history-39", "history-41", "history-39"],
+            orderedKeys: orderedKeys
+        )
+
+        XCTAssertEqual(bookmark.messageKey, "history-40")
+        XCTAssertFalse(bookmark.isAtEndOfChat)
+    }
+
+    func testConversationHistoryBookmarkIgnoresMissingTargetsAndLatestMode() {
+        let bookmark = PrivateMessageScrollBookmark()
+        bookmark.isAtEndOfChat = false
+        bookmark.messageKey = "retained-history"
+
+        bookmark.rememberVisibleMessages([], orderedKeys: ["another-message"])
+        bookmark.rememberVisibleMessages(["removed-message"], orderedKeys: ["another-message"])
+        XCTAssertEqual(bookmark.messageKey, "retained-history")
+
+        bookmark.isAtEndOfChat = true
+        bookmark.rememberVisibleMessages(["latest-message"], orderedKeys: ["latest-message"])
+        XCTAssertEqual(bookmark.messageKey, "retained-history")
+        XCTAssertTrue(bookmark.isAtEndOfChat)
+    }
+
+    func testChangingToColumnsKeepsCoveredProfileChallengeAndMessageDraft() throws {
+        let router = Router()
+        router.presentMessagesConversation(firstPlayer)
+        router.openProfile(secondPlayer)
+        router.openChallenge(for: secondPlayer)
+        let challengeDraft = try XCTUnwrap(router.drafts.values.first)
+        edit(challengeDraft)
+        let messageDraft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        messageDraft.wrappedValue = "Keep composing"
+
+        router.showMessagesColumns(true, peer: firstPlayer)
+
+        XCTAssertEqual(router.path, [
+            .profile(playerID: secondPlayer.id, selectionID: nil), .challenge(challengeDraft.id),
+        ])
+        XCTAssertTrue(router.drafts[challengeDraft.id] === challengeDraft)
+        assertEditsRetained(challengeDraft)
+        XCTAssertEqual(router.users[secondPlayer.id]?.id, secondPlayer.id)
+        XCTAssertNil(router.users[firstPlayer.id],
+                     "The wide root owns its selected peer independently of the route cache.")
+        XCTAssertEqual(messageDraft.wrappedValue, "Keep composing")
+    }
+
+    func testReturningToInboxAndSelectingAnotherCompactPeerKeepsBothDrafts() {
+        let router = Router()
+        let first = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        let second = router.conversationDraft(for: secondPlayer.id, accountID: viewerID)
+        first.wrappedValue = "First peer's unfinished message"
+        second.wrappedValue = "Second peer's unfinished message"
+        router.presentMessagesConversation(firstPlayer)
+
+        router.path.removeLast()
+        XCTAssertTrue(router.path.isEmpty)
+        router.presentMessagesConversation(secondPlayer)
+        XCTAssertEqual(router.path, [.messagesConversation(secondPlayer.id)])
+        XCTAssertEqual(first.wrappedValue, "First peer's unfinished message")
+        XCTAssertEqual(second.wrappedValue, "Second peer's unfinished message")
+        router.path.removeLast()
+        XCTAssertTrue(router.users.isEmpty)
+        router.presentMessagesConversation(firstPlayer)
+        XCTAssertEqual(router.path, [.messagesConversation(firstPlayer.id)])
+        XCTAssertEqual(first.wrappedValue, "First peer's unfinished message")
+        XCTAssertEqual(second.wrappedValue, "Second peer's unfinished message")
+    }
+
+    func testMessagesFullHistoryBackPreservesOriginsAndMessageDraft() throws {
+        let router = Router()
+        router.presentMessagesConversation(firstPlayer)
+        router.openProfile(secondPlayer)
+        router.openChallenge(for: secondPlayer)
+        let challengeDraft = try XCTUnwrap(router.drafts.values.first)
+        edit(challengeDraft)
+        let messageDraft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        messageDraft.wrappedValue = "Retain while backing out"
+        let profile = StackRoute.profile(playerID: secondPlayer.id, selectionID: nil)
+
+        XCTAssertEqual(router.path, [
+            .messagesConversation(firstPlayer.id), profile, .challenge(challengeDraft.id),
+        ])
+        assertEditsRetained(challengeDraft)
+
+        router.path.removeLast()
+
+        XCTAssertEqual(router.path, [.messagesConversation(firstPlayer.id), profile])
+        XCTAssertNil(router.drafts[challengeDraft.id])
+        XCTAssertEqual(router.users[secondPlayer.id]?.id, secondPlayer.id)
+        XCTAssertEqual(messageDraft.wrappedValue, "Retain while backing out")
+
+        router.path.removeLast()
+
+        XCTAssertEqual(router.path, [.messagesConversation(firstPlayer.id)])
+        XCTAssertNil(router.users[secondPlayer.id])
+        XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+        XCTAssertEqual(messageDraft.wrappedValue, "Retain while backing out")
+
+        router.path.removeLast()
+
+        XCTAssertTrue(router.path.isEmpty)
+        XCTAssertTrue(router.users.isEmpty)
+        XCTAssertEqual(messageDraft.wrappedValue, "Retain while backing out")
+    }
+
+    func testWideRootProfileChallengeBackReturnsToInboxAndKeepsMessageDraft() throws {
+        let router = Router()
+        let messageDraft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        messageDraft.wrappedValue = "Keep the wide recipient's draft"
+        router.openProfile(firstPlayer)
+        router.openChallenge(for: firstPlayer)
+        let challengeDraft = try XCTUnwrap(router.drafts.values.first)
+        edit(challengeDraft)
+        let profile = StackRoute.profile(playerID: firstPlayer.id, selectionID: nil)
+
+        XCTAssertEqual(router.path, [profile, .challenge(challengeDraft.id)])
+        assertEditsRetained(challengeDraft)
+
+        router.path.removeLast()
+
+        XCTAssertEqual(router.path, [profile])
+        XCTAssertNil(router.drafts[challengeDraft.id])
+        XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+
+        router.path.removeLast()
+
+        XCTAssertTrue(router.path.isEmpty)
+        XCTAssertTrue(router.users.isEmpty)
+        XCTAssertEqual(messageDraft.wrappedValue, "Keep the wide recipient's draft")
+    }
+
+    func testRepeatedPoseChangesPreserveSamePeerProfileMessageAndChallengeSuffix() throws {
+        let router = Router()
+        router.presentMessagesConversation(firstPlayer)
+        router.openProfile(firstPlayer)
+        router.openConversation(firstPlayer)
+        router.openChallenge(for: firstPlayer)
+        let challengeDraft = try XCTUnwrap(router.drafts.values.first)
+        edit(challengeDraft)
+        let messageDraft = router.conversationDraft(for: firstPlayer.id, accountID: viewerID)
+        messageDraft.wrappedValue = "Keep across pose changes"
+        let coveredRoutes: [StackRoute] = [
+            .profile(playerID: firstPlayer.id, selectionID: nil),
+            .conversation(firstPlayer.id), .challenge(challengeDraft.id),
+        ]
+
+        for usesColumns in [true, false, true, false] {
+            router.showMessagesColumns(usesColumns, peer: firstPlayer)
+
+            let compactRoot: [StackRoute] = usesColumns ? [] : [.messagesConversation(firstPlayer.id)]
+            XCTAssertEqual(router.path, compactRoot + coveredRoutes,
+                           "Only the compact root route may change while destinations cover Messages.")
+            XCTAssertTrue(router.drafts[challengeDraft.id] === challengeDraft)
+            assertEditsRetained(challengeDraft)
+            XCTAssertEqual(messageDraft.wrappedValue, "Keep across pose changes")
+            XCTAssertEqual(router.users[firstPlayer.id]?.id, firstPlayer.id)
+        }
+    }
+
+    func testPoseNormalizationWithoutRootPeerKeepsProfileMessageHistory() {
+        let router = Router()
+        router.openProfile(firstPlayer)
+        router.openConversation(secondPlayer)
+        let history = router.path
+
+        router.showMessagesColumns(false, peer: nil)
+        XCTAssertEqual(router.path, history)
+        router.showMessagesColumns(true, peer: nil)
+        XCTAssertEqual(router.path, history)
+        XCTAssertEqual(Set(router.users.keys), [firstPlayer.id, secondPlayer.id])
+    }
+
     private func pickerID(in router: Router) throws -> UUID {
         let id: UUID?
         if case .opponentPicker(let pickerID) = router.path.last { id = pickerID }

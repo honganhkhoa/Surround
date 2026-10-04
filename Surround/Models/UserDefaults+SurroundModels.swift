@@ -295,6 +295,18 @@ extension SettingKey {
     static var lastSeenPrivateMessageByOGSUserId: SettingKey<[Int: Double]> {
         return .init(name: "lastSeenPrivateMessageByOGSUserId", encoded: true, defaultValue: [Int: Double]())
     }
+
+    static var lastSeenPrivateMessageByOGSAccountAndPeerID: SettingKey<[Int: [Int: Double]]> {
+        return .init(name: "lastSeenPrivateMessageByOGSAccountAndPeerID", encoded: true, defaultValue: [Int: [Int: Double]]())
+    }
+
+    static var recentPrivateMessagePeerIDsByOGSAccountID: SettingKey<[Int: [Int]]> {
+        return .init(name: "recentPrivateMessagePeerIDsByOGSAccountID", encoded: true, defaultValue: [Int: [Int]]())
+    }
+
+    static var latestPrivateMessageTimestampByOGSAccountAndPeerID: SettingKey<[Int: [Int: Double]]> {
+        return .init(name: "latestPrivateMessageTimestampByOGSAccountAndPeerID", encoded: true, defaultValue: [Int: [Int: Double]]())
+    }
     
     static var supporterProductId: SettingKey<String> {
         return .init(name: "supporterProductId")

@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */; };
+		274ACDD01C764687872BE0D2 /* MessagesLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */; };
+		C44DED6BB70146278FF1AB21 /* PrivateMessageSendSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */; };
+		4994A315A8D4438AA3A870A1 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
+		38CA9CF98683472A84F0BE22 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
+		DD3754945BD4410D94211589 /* MessagesFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */; };
+		DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
+		E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
 		D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100122026100100000012 /* DuoProfileSidebarUITests.swift */; };
 		D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100042026100100000004 /* SidebarKeyboardUITests.swift */; };
 		D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100022026100100000002 /* AppReviewPresentationUITests.swift */; };
@@ -448,6 +456,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesNavigationUITests.swift; sourceTree = "<group>"; };
+		B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesLayoutTests.swift; sourceTree = "<group>"; };
+		9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSessionTests.swift; sourceTree = "<group>"; };
+		8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSession.swift; sourceTree = "<group>"; };
+		9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesFriendsView.swift; sourceTree = "<group>"; };
+		07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesFoldLayout.swift; sourceTree = "<group>"; };
 		D10100122026100100000012 /* DuoProfileSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoProfileSidebarUITests.swift; sourceTree = "<group>"; };
 		D10100042026100100000004 /* SidebarKeyboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarKeyboardUITests.swift; sourceTree = "<group>"; };
 		D10100022026100100000002 /* AppReviewPresentationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentationUITests.swift; sourceTree = "<group>"; };
@@ -850,6 +864,8 @@
 				37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */,
 				AA1700042026091700000004 /* ProfileRatingTests.swift */,
 				AA1600032026091600000003 /* StackRouterTests.swift */,
+				B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */,
+				9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */,
 			);
 			path = SurroundTests;
 			sourceTree = "<group>";
@@ -862,6 +878,7 @@
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
 				D03000042026093000000004 /* DuoSidebarUITests.swift */,
+				655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */,
 				D10100122026100100000012 /* DuoProfileSidebarUITests.swift */,
 				D10100042026100100000004 /* SidebarKeyboardUITests.swift */,
 				D10100022026100100000002 /* AppReviewPresentationUITests.swift */,
@@ -896,6 +913,8 @@
 				BC4F7D4C25CEA69D0075C080 /* RulesPickerView.swift */,
 				BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */,
 				BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */,
+				9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */,
+				07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */,
 				BC70596125FF00F400AC4DE9 /* AboutView.swift */,
 				BC70596925FF209300AC4DE9 /* SupporterView.swift */,
 				BC6E33F3260C388F008A59F7 /* WelcomeView.swift */,
@@ -992,6 +1011,7 @@
 			isa = PBXGroup;
 			children = (
 				AA1600022026091600000002 /* StackRouter.swift */,
+				8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */,
 				D90700022026090700000002 /* AppReviewPolicy.swift */,
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
@@ -1445,6 +1465,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				38CA9CF98683472A84F0BE22 /* PrivateMessageSendSession.swift in Sources */,
+				DD3754945BD4410D94211589 /* MessagesFriendsView.swift in Sources */,
+				E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */,
 				2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */,
 				3753FB40BEEC4990A677F1F5 /* GameDetailInteraction.swift in Sources */,
 				BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */,
@@ -1551,6 +1574,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				274ACDD01C764687872BE0D2 /* MessagesLayoutTests.swift in Sources */,
+				C44DED6BB70146278FF1AB21 /* PrivateMessageSendSessionTests.swift in Sources */,
+				4994A315A8D4438AA3A870A1 /* PrivateMessageSendSession.swift in Sources */,
+				DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */,
 				D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */,
 				794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */,
 				8B5F21EBE5A5494DBCB11929 /* ChatSessionStateTests.swift in Sources */,
@@ -1629,6 +1656,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */,
 				A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */,
 				F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */,
 				C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */,

@@ -14,6 +14,7 @@ enum StackRoute: Hashable {
     case profile(playerID: Int, selectionID: UUID?)
     case challenge(UUID)
     case opponentPicker(UUID)
+    case messagesConversation(Int)
     case conversation(Int)
 }
 
@@ -47,8 +48,74 @@ final class RootOpponentSelection {
     }
 }
 
+/// Retained by the conversation's account/peer owner, without publishing scroll
+/// updates through the navigation or inbox hierarchy.
+final class PrivateMessageScrollBookmark {
+    var messageKey: String?
+    var isAtEndOfChat = true
+
+    /// Visibility callbacks do not promise transcript order. Retain the middle
+    /// visible message in chronological order, rather than a lazy layout's
+    /// estimated leading target or a content offset tied to one width.
+    func rememberVisibleMessages(_ visibleKeys: [String], orderedKeys: [String]) {
+        guard !isAtEndOfChat else { return }
+        let visible = Set(visibleKeys)
+        let orderedVisible = orderedKeys.filter { visible.contains($0) }
+        guard !orderedVisible.isEmpty else { return }
+        messageKey = orderedVisible[orderedVisible.count / 2]
+    }
+}
+
 /// One instance belongs to one navigation stack, including each presented sheet.
 final class StackRouter: ObservableObject {
+    private struct ConversationDraftKey: Hashable {
+        let accountID: Int
+        let peerID: Int
+    }
+    @Published private var conversationDrafts: [ConversationDraftKey: String] = [:]
+    private var conversationScrollBookmarks: [ConversationDraftKey: PrivateMessageScrollBookmark] = [:]
+
+    /// Draft lifetime is independent of the compact or detail navigation path.
+    func conversationDraft(for peerID: Int, accountID: Int?) -> Binding<String> {
+        guard let accountID else { return .constant("") }
+        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
+        return Binding(
+            get: { self.conversationDrafts[key, default: ""] },
+            set: { self.conversationDrafts[key] = $0 }
+        )
+    }
+
+    /// Scroll bookmarks share the draft's account/peer lifetime, but scrolling
+    /// never publishes a navigation or inbox update.
+    func conversationScrollBookmark(for peerID: Int, accountID: Int?) -> PrivateMessageScrollBookmark {
+        guard let accountID else { return PrivateMessageScrollBookmark() }
+        let key = ConversationDraftKey(accountID: accountID, peerID: peerID)
+        if let bookmark = conversationScrollBookmarks[key] { return bookmark }
+        let bookmark = PrivateMessageScrollBookmark()
+        conversationScrollBookmarks[key] = bookmark
+        return bookmark
+    }
+
+    /// Compact presentation of Messages' selected root peer. Generic Profile
+    /// conversations keep their own route, including when they share this peer.
+    func presentMessagesConversation(_ user: OGSUser) {
+        guard user.id > 0 else { return }
+        users[user.id] = user
+        present(.messagesConversation(user.id))
+    }
+
+    /// Move only the root conversation's compact presentation across a layout
+    /// edge. Covering destinations remain full-width with unchanged history.
+    func showMessagesColumns(_ usesColumns: Bool, peer: OGSUser?) {
+        if usesColumns {
+            if case .messagesConversation = path.first { path.removeFirst() }
+        } else if let peer, peer.id > 0 {
+            users[peer.id] = peer
+            if case .messagesConversation = path.first { return }
+            path.insert(.messagesConversation(peer.id), at: 0)
+        }
+    }
+
     @Published var path: [StackRoute] = [] {
         didSet { discardInactiveState() }
     }
@@ -255,7 +322,7 @@ final class StackRouter: ObservableObject {
     private func discardInactiveState() {
         let playerIDs = Set(path.compactMap { route -> Int? in
             switch route {
-            case .profile(let id, _), .conversation(let id),
+            case .profile(let id, _), .conversation(let id), .messagesConversation(let id),
                  .playerHistory(let id, _), .playerActiveGames(let id): return id
             default: return nil
             }
@@ -305,7 +372,7 @@ extension EnvironmentValues {
 /// Apply inside NavigationStack: its UIKit content host supplies its own safe
 /// area, so ignoring the safe area on the outside of the stack has no effect.
 /// Keep this private so navigation entry points own the policy, not screens.
-private struct AppNavigationContentLayout: ViewModifier {
+struct AppNavigationContentLayout: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
@@ -516,6 +583,13 @@ struct AppNavigationStack<Content: View>: View {
     @StateObject private var navigation = StackRouter()
     @State private var isVisible = false
     var rootView: RootView? = nil
+    init(rootView: RootView? = nil, router: StackRouter? = nil,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.rootView = rootView
+        _navigation = StateObject(wrappedValue: router ?? StackRouter())
+        self.content = content
+    }
+
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -603,11 +677,9 @@ struct AppNavigationStack<Content: View>: View {
             if let user = navigation.users[playerID] {
                 PlayerProfileView(user: user, selectionID: selectionID)
             }
-        case .conversation(let playerID):
+        case .messagesConversation(let playerID), .conversation(let playerID):
             if let user = navigation.users[playerID] {
-                PrivateMessageLog(peer: user)
-                    .navigationTitle(user.username)
-                    .navigationBarTitleDisplayMode(.inline)
+                MessagesConversationView(peer: user)
             }
         case .challenge(let id):
             if let draft = navigation.drafts[id] {

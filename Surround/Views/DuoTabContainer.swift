@@ -87,6 +87,7 @@ private struct DuoHostBaselineKey: Hashable {
 struct DuoTabContainer: UIViewControllerRepresentable {
     @Binding var selection: RootView
     let isLoggedIn: Bool
+    var messagesBadgeCount = 0
     let content: (RootView) -> AnyView
 
     func makeCoordinator() -> Coordinator {
@@ -104,6 +105,7 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         context.coordinator.update(
             selection: $selection,
             isLoggedIn: isLoggedIn,
+            messagesBadgeCount: messagesBadgeCount,
             content: content,
             regularWidth: context.environment.horizontalSizeClass == .regular,
             layoutDirection: context.environment.layoutDirection
@@ -201,6 +203,7 @@ struct DuoTabContainer: UIViewControllerRepresentable {
         func update(
             selection: Binding<RootView>,
             isLoggedIn: Bool,
+            messagesBadgeCount: Int,
             content: @escaping (RootView) -> AnyView,
             regularWidth: Bool,
             layoutDirection: LayoutDirection
@@ -213,6 +216,7 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                 host.rootView = hostedContent(root)
                 tabs[root]?.title = root.title
             }
+            tabs[.privateMessages]?.badgeValue = messagesBadgeCount > 0 ? String(messagesBadgeCount) : nil
             applyTabs(regularWidth: regularWidth)
             measureLayout()
         }

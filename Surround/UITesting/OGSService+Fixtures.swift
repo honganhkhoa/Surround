@@ -1185,6 +1185,60 @@ extension OGSService {
                     profileUsers[line.user.id] = line.user
                 }
             }
+            if SurroundUITestContract.includesMessagesContent, let account = state.user {
+                let peers = [OGSUser(username: "hakhoa", id: 765826), OGSUser(username: "khoahong", id: 955348)]
+                let now = Date().timeIntervalSince1970
+                state.privateMessages = peers.enumerated().map { index, peer in
+                    OGSPrivateMessage(from: peer, to: account, content: OGSPrivateMessageContent(
+                        id: "messages-fixture-\(index)", message: "Offline message from \(peer.username)",
+                        timestamp: now - Double(index * 60)))
+                }
+            }
+            if SurroundUITestContract.includesMessagesOverflow, let account = state.user {
+                // Keep the existing profiles, latest two messages, unread
+                // conversations and ordering intact. Only this opt-in fixture
+                // adds enough content to exercise actual scrolling.
+                precondition(
+                    Set(SurroundUITestContract.messagesOverflowFriendIDs).isDisjoint(with: profileUsers.keys),
+                    "Messages overflow friends must not replace existing fixture profiles."
+                )
+                for (index, id) in SurroundUITestContract.messagesOverflowFriendIDs.enumerated() {
+                    let friend = OGSUser(
+                        username: SurroundUITestContract.messagesOverflowFriendUsername(index: index + 1),
+                        id: id,
+                        ranking: Double(22 + index % 8)
+                    )
+                    state.friends.append(friend)
+                    state.cachedUsersById[id] = friend
+                    profileUsers[id] = friend
+                }
+                let historyCount = SurroundUITestContract.messagesOverflowHistoryCount
+                let olderMessages = state.privateMessages.flatMap { latest in
+                    let peer = latest.from.id == account.id ? latest.to : latest.from
+                    return (1...historyCount).map { index in
+                        let isOutgoing = index.isMultiple(of: 2)
+                        return OGSPrivateMessage(
+                            from: isOutgoing ? account : peer,
+                            to: isOutgoing ? peer : account,
+                            content: OGSPrivateMessageContent(
+                                id: SurroundUITestContract.messagesOverflowHistoryID(peerID: peer.id, index: index),
+                                message: SurroundUITestContract.messagesOverflowHistoryText(username: peer.username, index: index),
+                                timestamp: latest.content.timestamp - Double(historyCount - index + 1) * 3_600
+                            )
+                        )
+                    }
+                }
+                if let friend = state.friends.first(where: { $0.id == SurroundUITestContract.messagesOverflowRecentFriendID }),
+                   let latestTimestamp = state.privateMessages.map(\.content.timestamp).min() {
+                    // The recent friend leads Friends without becoming the
+                    // latest conversation or creating another unread thread.
+                    state.privateMessages.append(OGSPrivateMessage(from: account, to: friend,
+                        content: OGSPrivateMessageContent(id: "messages-fixture-recent-friend",
+                            message: "Offline earlier conversation with \(friend.username)",
+                            timestamp: latestTimestamp - 3_600)))
+                }
+                state.privateMessages = olderMessages + state.privateMessages
+            }
             for message in state.privateMessages {
                 for participant in [message.from, message.to]
                     where profileUsers[participant.id] == nil {

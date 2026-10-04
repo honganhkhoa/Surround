@@ -25,6 +25,28 @@ enum OGSServiceError: Error {
     case conditionalMovesUpdateInterrupted
 }
 
+/// The server rejected a PM or it failed locally before a WebSocket frame was sent.
+/// Connection failures and missing acknowledgements remain delivery-uncertain.
+enum OGSPrivateMessageSendError: Error {
+    case notSent
+}
+
+enum PrivateMessageSendFailure: Equatable {
+    case notSent
+    case deliveryUnconfirmed
+
+    static func classify(_ error: Error) -> Self {
+        if error is OGSPrivateMessageSendError {
+            return .notSent
+        }
+        if let serviceError = error as? OGSServiceError,
+           case .notLoggedIn = serviceError {
+            return .notSent
+        }
+        return .deliveryUnconfirmed
+    }
+}
+
 /// The decoded and sanitized pieces of `/api/v1/games/{id}` needed to turn a
 /// lightweight history-list model into a complete, offline-reusable game.
 struct FinishedGameDetail {
@@ -812,6 +834,16 @@ class OGSService: ObservableObject {
     static let ogsRoot = OGSEnvironment.current.rootURL.absoluteString
     private let environment: OGSEnvironment
     private var ogsRoot: String { environment.rootURL.absoluteString }
+    private let persistsRecentPrivateMessagePeers: Bool
+    private static let privateMessageReadMarkersChanged = Notification.Name(
+        "Surround.privateMessageReadMarkersChanged"
+    )
+    private static let privateMessageAccountChanged = Notification.Name(
+        "Surround.privateMessageAccountChanged"
+    )
+    private let privateMessageInstanceID = UUID()
+    private var privateMessageReadMarkersCancellable: AnyCancellable?
+    private var privateMessageAccountCancellable: AnyCancellable?
 
     private let httpClient: OGSHTTPClient
     private var playerProfilesById: [Int: OGSPlayerProfile]?
@@ -854,6 +886,11 @@ class OGSService: ObservableObject {
     /// Test-visible local authentication readiness, not a server acknowledgement.
     var isWebsocketAuthenticated: Bool {
         return ogsWebsocket.authenticated
+    }
+
+    /// Keeps a composer's fallback later than this service's socket deadline.
+    var privateMessageAcknowledgementTimeout: TimeInterval {
+        ogsWebsocket.callbackTimeout
     }
 
     @Published var isLoggedIn: Bool = false
@@ -1086,6 +1123,7 @@ class OGSService: ObservableObject {
     
     @Published private(set) public var privateMessagesByPeerId = [Int: [OGSPrivateMessage]]()
     @Published private(set) public var privateMessagesUnreadCount: Int = 0
+    @Published private(set) public var privateMessagesUnreadPeerIds = Set<Int>()
     @Published private(set) public var privateMessagesActivePeerIds = Set<Int>()
     @Published private(set) public var superchatPeerIds = Set<Int>()
     
@@ -1304,6 +1342,7 @@ class OGSService: ObservableObject {
         initialState: BootstrapState? = nil
     ) {
         self.environment = environment
+        self.persistsRecentPrivateMessagePeers = initialState == nil
         self.httpClient = httpClient
         self.gameResynchronizationTimeout = gameResynchronizationTimeout
         self.conditionalMoveSubmissionTimeout = conditionalMoveSubmissionTimeout
@@ -1316,6 +1355,34 @@ class OGSService: ObservableObject {
         self.usesSurroundOverviewService = usesSurroundOverviewService
         self.enablesAppSideEffects = enablesAppSideEffects
         self.startsTimers = startsTimers
+
+        if initialState == nil {
+            migrateLegacyPrivateMessageReadMarkers(
+                for: preferences[.ogsUIConfig]?.user.id
+            )
+            privateMessageReadMarkersCancellable = NotificationCenter.default.publisher(
+                for: Self.privateMessageReadMarkersChanged,
+                object: preferences
+            )
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let accountID = notification.userInfo?["accountID"] as? Int,
+                      self.currentPrivateMessageAccountID == accountID else { return }
+                self._calculatePrivateMessageUnreadCount()
+            }
+            privateMessageAccountCancellable = NotificationCenter.default.publisher(
+                for: Self.privateMessageAccountChanged,
+                object: preferences
+            )
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let sourceID = notification.userInfo?["source"] as? UUID,
+                      sourceID != self.privateMessageInstanceID else { return }
+                self.resetPrivateMessageState()
+            }
+        }
 
         ogsWebsocket.authenticationConfigProvider = { [weak self] in self?.ogsUIConfig }
         ogsWebsocket.serverEventCallback = self.onWebsocketServerEvent(name:data:)
@@ -1384,6 +1451,9 @@ class OGSService: ObservableObject {
         })
         
         self.checkLoginStatus()
+        if ogsWebsocket.authenticated {
+            reloadRecentPrivateMessageSessions()
+        }
     }
 
     private func onWebsocketServerEvent(name eventName: String, data: Any?) {
@@ -1426,6 +1496,7 @@ class OGSService: ObservableObject {
             // Player chat waits for authentication so Malkovich lines are not
             // exposed through an anonymous subscription.
             self.reconcileDesiredGameConnections()
+            self.reloadRecentPrivateMessageSessions()
             latestSocketAuthenticationTime = currentTime()
             socketAuthenticationGeneration = UUID()
             handledGameStartedNotificationIDs.removeAll()
@@ -1847,6 +1918,12 @@ class OGSService: ObservableObject {
             let previousConfig = preferences[.ogsUIConfig]
             let accountIdentityChanged = newValue?.user.id != previousConfig?.user.id
             if accountIdentityChanged {
+                migrateLegacyPrivateMessageReadMarkers(for: previousConfig?.user.id)
+                resetPrivateMessageState()
+                if previousConfig == nil, newValue != nil {
+                    // An unowned legacy marker cannot safely be assigned to a new login.
+                    preferences.reset(.lastSeenPrivateMessageByOGSUserId)
+                }
                 advanceAuthenticationGeneration()
                 resetFriendships()
                 automatchAvailabilitySubscribed = false
@@ -1892,6 +1969,13 @@ class OGSService: ObservableObject {
             preferences[.ogsUIConfig] = newValue
             self.updateSessionId()
             checkLoginStatus()
+            if accountIdentityChanged {
+                NotificationCenter.default.post(
+                    name: Self.privateMessageAccountChanged,
+                    object: preferences,
+                    userInfo: ["source": privateMessageInstanceID]
+                )
+            }
             if accountIdentityChanged {
                 // Reconnect after storing the config so the new socket sends
                 // the matching JWT instead of authenticating anonymously or
@@ -5423,10 +5507,105 @@ class OGSService: ObservableObject {
         automatchLifecycleEvents.send(event)
     }
     
+    private static let maximumRecentPrivateMessagePeers = 50
+
+    private var currentPrivateMessageAccountID: Int? {
+        if persistsRecentPrivateMessagePeers {
+            guard let accountID = ogsUIConfig?.user.id,
+                  accountID > 0, user?.id == accountID else { return nil }
+            return accountID
+        }
+        return user?.id
+    }
+
+    private func migrateLegacyPrivateMessageReadMarkers(for accountID: Int?) {
+        guard let accountID, accountID > 0,
+              let legacyMarkers = preferences[.lastSeenPrivateMessageByOGSUserId],
+              !legacyMarkers.isEmpty else { return }
+        var allMarkers = preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID] ?? [:]
+        var accountMarkers = allMarkers[accountID] ?? [:]
+        for (peerID, timestamp) in legacyMarkers {
+            accountMarkers[peerID] = max(accountMarkers[peerID] ?? 0, timestamp)
+        }
+        allMarkers[accountID] = accountMarkers
+        preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID] = allMarkers
+        preferences.reset(.lastSeenPrivateMessageByOGSUserId)
+    }
+
+    private func resetPrivateMessageState() {
+        _receivedMessagesKeysByPeerId.removeAll()
+        _privateMessagesUIDByPeerId.removeAll()
+        privateMessagesByPeerId.removeAll()
+        privateMessagesActivePeerIds.removeAll()
+        privateMessagesUnreadPeerIds.removeAll()
+        privateMessagesUnreadCount = 0
+        superchatPeerIds.removeAll()
+    }
+
+    private func rememberRecentPrivateMessagePeer(_ peerID: Int, timestamp: Double) {
+        guard persistsRecentPrivateMessagePeers,
+              let accountID = currentPrivateMessageAccountID, accountID > 0,
+              peerID > 0 else { return }
+        var allPeers = preferences[.recentPrivateMessagePeerIDsByOGSAccountID] ?? [:]
+        var accountPeers = allPeers[accountID] ?? []
+        var allTimestamps = preferences[.latestPrivateMessageTimestampByOGSAccountAndPeerID] ?? [:]
+        var accountTimestamps = allTimestamps[accountID] ?? [:]
+        let wasKnown = accountPeers.contains(peerID)
+        let previousTimestamp = accountTimestamps[peerID]
+        if wasKnown, let previousTimestamp, timestamp <= previousTimestamp { return }
+
+        if !wasKnown {
+            accountPeers.insert(peerID, at: 0)
+        }
+        accountTimestamps[peerID] = max(previousTimestamp ?? timestamp, timestamp)
+
+        // Older installations have an ordered peer list without timestamps.
+        // Preserve that order until all retained peers have supplied history;
+        // evicting during a partial replay would discard an arbitrary peer.
+        if accountPeers.allSatisfy({ accountTimestamps[$0] != nil }) {
+            let previousRanks = Dictionary(uniqueKeysWithValues: accountPeers.enumerated().map { ($0.element, $0.offset) })
+            accountPeers.sort { lhs, rhs in
+                let lhsTimestamp = accountTimestamps[lhs] ?? 0
+                let rhsTimestamp = accountTimestamps[rhs] ?? 0
+                if lhsTimestamp != rhsTimestamp {
+                    return lhsTimestamp > rhsTimestamp
+                }
+                return (previousRanks[lhs] ?? Int.max) < (previousRanks[rhs] ?? Int.max)
+            }
+        }
+        if accountPeers.count > Self.maximumRecentPrivateMessagePeers {
+            let evictedPeers = accountPeers.suffix(accountPeers.count - Self.maximumRecentPrivateMessagePeers)
+            for evictedPeer in evictedPeers {
+                accountTimestamps.removeValue(forKey: evictedPeer)
+            }
+            accountPeers.removeLast(evictedPeers.count)
+        }
+        allPeers[accountID] = accountPeers
+        allTimestamps[accountID] = accountTimestamps
+        preferences[.recentPrivateMessagePeerIDsByOGSAccountID] = allPeers
+        preferences[.latestPrivateMessageTimestampByOGSAccountAndPeerID] = allTimestamps
+    }
+
+    private func reloadRecentPrivateMessageSessions() {
+        guard persistsRecentPrivateMessagePeers,
+              let accountID = currentPrivateMessageAccountID else { return }
+        let recentPeers = preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[accountID] ?? []
+        let peerIDs = privateMessagesActivePeerIds.union(recentPeers).filter { $0 > 0 }
+        for peerID in peerIDs.sorted() {
+            if _receivedMessagesKeysByPeerId[peerID] == nil {
+                setUpNewPeerIfNecessary(peerId: peerID)
+            } else {
+                ogsWebsocket.emit(command: "chat/pm/load", data: ["player_id": peerID])
+            }
+        }
+    }
+
     private var _receivedMessagesKeysByPeerId = [Int: Set<String>]()
     private var _privateMessagesUIDByPeerId = [Int: [Int]]()
     func handlePrivateMessage(_ message: OGSPrivateMessage) {
-        let otherPlayerId = message.from.id == self.user?.id ? message.to.id : message.from.id
+        guard let accountID = currentPrivateMessageAccountID, accountID > 0,
+              message.from.id == accountID || message.to.id == accountID else { return }
+        let otherPlayerId = message.from.id == accountID ? message.to.id : message.from.id
         
         setUpNewPeerIfNecessary(peerId: otherPlayerId)
                 
@@ -5436,11 +5615,20 @@ class OGSService: ObservableObject {
         
         _receivedMessagesKeysByPeerId[otherPlayerId]?.insert(message.messageKey)
         privateMessagesByPeerId[otherPlayerId]?.append(message)
+        privateMessagesByPeerId[otherPlayerId]?.sort {
+            if $0.content.timestamp == $1.content.timestamp {
+                return $0.messageKey < $1.messageKey
+            }
+            return $0.content.timestamp < $1.content.timestamp
+        }
+        rememberRecentPrivateMessagePeer(otherPlayerId, timestamp: message.content.timestamp)
         
         _calculatePrivateMessageUnreadCount()
     }
     
     func setUpNewPeerIfNecessary(peerId: Int) {
+        guard !persistsRecentPrivateMessagePeers
+            || currentPrivateMessageAccountID != nil else { return }
         if _receivedMessagesKeysByPeerId[peerId] == nil {
             _receivedMessagesKeysByPeerId[peerId] = Set<String>()
             privateMessagesByPeerId[peerId] = [OGSPrivateMessage]()
@@ -5452,6 +5640,7 @@ class OGSService: ObservableObject {
     }
     
     func handleSuperchat(config: [String: Any]) {
+        guard currentPrivateMessageAccountID != nil else { return }
         if let moderatorId = config["moderator_id"] as? Int, let enabled = config["enable"] as? Bool {
             setUpNewPeerIfNecessary(peerId: moderatorId)
             if enabled {
@@ -5463,20 +5652,38 @@ class OGSService: ObservableObject {
     }
 
     private func _calculatePrivateMessageUnreadCount() {
-        privateMessagesUnreadCount = privateMessagesByPeerId.keys.filter { peerId in
-            if let lastSeen = preferences[.lastSeenPrivateMessageByOGSUserId]?[peerId] {
-                if let lastInThread = privateMessagesByPeerId[peerId]?.last {
-                    return lastInThread.content.timestamp > lastSeen
-                } else {
-                    return false
-                }
-            } else {
-                return true
+        guard let accountID = currentPrivateMessageAccountID, accountID > 0 else {
+            if !privateMessagesUnreadPeerIds.isEmpty {
+                privateMessagesUnreadPeerIds.removeAll()
             }
-        }.count
+            if privateMessagesUnreadCount != 0 {
+                privateMessagesUnreadCount = 0
+            }
+            return
+        }
+        let readMarkers = preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[accountID] ?? [:]
+        var unreadPeerIDs = Set<Int>()
+        for (peerID, messages) in privateMessagesByPeerId {
+            let lastSeen = readMarkers[peerID] ?? 0
+            if messages.contains(where: {
+                $0.to.id == accountID && $0.from.id != accountID
+                    && $0.content.timestamp > lastSeen
+            }) {
+                unreadPeerIDs.insert(peerID)
+            }
+        }
+        if privateMessagesUnreadPeerIds != unreadPeerIDs {
+            privateMessagesUnreadPeerIds = unreadPeerIDs
+        }
+        if privateMessagesUnreadCount != unreadPeerIDs.count {
+            privateMessagesUnreadCount = unreadPeerIDs.count
+        }
     }
     
     func sendPrivateMessage(to peer: OGSUser, message: String) -> AnyPublisher<OGSPrivateMessage, Error> {
+        guard let accountID = currentPrivateMessageAccountID else {
+            return Fail(error: OGSServiceError.notLoggedIn).eraseToAnyPublisher()
+        }
         if _privateMessagesUIDByPeerId[peer.id] == nil {
             _privateMessagesUIDByPeerId[peer.id] = [Int.random(in: 0..<100000), 0]
         }
@@ -5490,9 +5697,20 @@ class OGSService: ObservableObject {
                 "username": peer.username,
                 "uid": "\(String(uid[0], radix: 36)).\(uid[1])",
                 "message": message
-            ]) { data, _ in
+            ]) { data, error in
+                if let error {
+                    let wasDefinitelyNotSent = error["not_sent"] != nil
+                        || error["encoding"] != nil
+                        || (error["connection"] == nil && error["timeout"] == nil)
+                    if wasDefinitelyNotSent {
+                        promise(.failure(OGSPrivateMessageSendError.notSent))
+                        return
+                    }
+                }
                 if let messageData = data as? [String: Any] {
-                    if let message = try? self.dictionaryDecoder.decode(OGSPrivateMessage.self, from: messageData) {
+                    if let message = try? self.dictionaryDecoder.decode(OGSPrivateMessage.self, from: messageData),
+                       self.currentPrivateMessageAccountID == accountID,
+                       message.from.id == accountID, message.to.id == peer.id {
                         self.handlePrivateMessage(message)
                         promise(.success(message))
                         return
@@ -5504,13 +5722,25 @@ class OGSService: ObservableObject {
     }
     
     func markPrivateMessageThreadAsRead(peerId: Int) {
-        if let lastMessage = privateMessagesByPeerId[peerId]?.last {
-            if var lastSeen = preferences[.lastSeenPrivateMessageByOGSUserId] {
-                lastSeen[peerId] = lastMessage.content.timestamp
-                preferences[.lastSeenPrivateMessageByOGSUserId] = lastSeen
-                _calculatePrivateMessageUnreadCount()
-            }
+        guard let accountID = currentPrivateMessageAccountID, accountID > 0,
+              let latestIncomingTimestamp = privateMessagesByPeerId[peerId]?
+                .filter({ $0.to.id == accountID && $0.from.id != accountID })
+                .map(\.content.timestamp).max() else { return }
+        var allMarkers = preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID] ?? [:]
+        var accountMarkers = allMarkers[accountID] ?? [:]
+        guard latestIncomingTimestamp > (accountMarkers[peerId] ?? 0) else {
+            _calculatePrivateMessageUnreadCount()
+            return
         }
+        accountMarkers[peerId] = latestIncomingTimestamp
+        allMarkers[accountID] = accountMarkers
+        preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID] = allMarkers
+        _calculatePrivateMessageUnreadCount()
+        NotificationCenter.default.post(
+            name: Self.privateMessageReadMarkersChanged,
+            object: preferences,
+            userInfo: ["accountID": accountID]
+        )
     }
     
     func joinChatChannel(_ channel: String) {

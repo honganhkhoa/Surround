@@ -242,6 +242,37 @@ struct OGSUser : Codable, Equatable, Hashable {
     }
 }
 
+extension OGSUser {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        username = try container.decode(String.self, forKey: .username)
+        id = try container.decode(Int.self, forKey: .id)
+        ranking = try container.decodeIfPresent(Double.self, forKey: .ranking)
+        rank = try container.decodeIfPresent(Double.self, forKey: .rank)
+        uiClass = try container.decodeIfPresent(String.self, forKey: .uiClass)
+        isTournamentModerator = try container.decodeIfPresent(Bool.self, forKey: .isTournamentModerator)
+        canCreateTournaments = try container.decodeIfPresent(Bool.self, forKey: .canCreateTournaments)
+        country = try container.decodeIfPresent(String.self, forKey: .country)
+        // OGS normalizes this status flag by truthiness; the grade is in ranking.
+        if let flag = try? container.decode(Bool.self, forKey: .professional) {
+            professional = flag
+        } else {
+            professional = try container.decodeIfPresent(Double.self, forKey: .professional).map { $0 != 0 }
+        }
+        provisional = try container.decodeIfPresent(Int.self, forKey: .provisional)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        supporter = try container.decodeIfPresent(Bool.self, forKey: .supporter)
+        ratings = try container.decodeIfPresent(OGSRating.self, forKey: .ratings)
+        iconUrl = try container.decodeIfPresent(String.self, forKey: .iconUrl)
+        anonymous = try container.decodeIfPresent(Bool.self, forKey: .anonymous)
+        isBot = try container.decodeIfPresent(Bool.self, forKey: .isBot)
+        isModerator = try container.decodeIfPresent(Bool.self, forKey: .isModerator)
+        isSuperuser = try container.decodeIfPresent(Bool.self, forKey: .isSuperuser)
+        acceptedStones = try container.decodeIfPresent(String.self, forKey: .acceptedStones)
+        acceptedStrictSekiMode = try container.decodeIfPresent(Bool.self, forKey: .acceptedStrictSekiMode)
+    }
+}
+
 struct RankUtils {
     private static let minRank = 5.0
     private static let maxRank = 38.0

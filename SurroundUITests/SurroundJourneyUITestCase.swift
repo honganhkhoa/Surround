@@ -704,6 +704,32 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         )
     }
 
+    /// Reveals a control in one scroll viewport without moving an adjacent pane.
+    func elementAfterScrolling(
+        _ identifier: String,
+        in app: XCUIApplication,
+        within scrollView: XCUIElement,
+        matching elementType: XCUIElement.ElementType = .any,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        let candidate = scrollView.descendants(matching: elementType)
+            .matching(identifier: identifier).firstMatch
+        for _ in 0..<8 {
+            if candidate.exists && candidate.isHittable { return candidate }
+            if candidate.exists && candidate.frame.maxY < scrollView.frame.minY {
+                scrollView.swipeDown()
+            } else {
+                scrollView.swipeUp()
+            }
+        }
+        XCTAssertTrue(candidate.waitForExistence(timeout: 10),
+                      "Expected \(identifier) inside its scroll viewport", file: file, line: line)
+        XCTAssertTrue(waitUntilHittable(candidate, timeout: 10),
+                      "Expected \(identifier) to be usable after bounded scrolling", file: file, line: line)
+        return candidate
+    }
+
     func keepScreenshot(_ name: String, in app: XCUIApplication) {
         let attachment = XCTAttachment(
             screenshot: XCUIScreen.main.screenshot(),

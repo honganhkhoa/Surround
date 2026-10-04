@@ -505,6 +505,89 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertNil(user.ratings?[.blitz_overall])
     }
 
+    func testUserDecodesNullableBooleanAndNumericProfessionalFlags() throws {
+        let cases: [(name: String, json: String?, expected: Bool?)] = [
+            ("missing", nil, nil),
+            ("null", "null", nil),
+            ("false", "false", false),
+            ("true", "true", true),
+            ("zero", "0", false),
+            ("one", "1", true),
+            ("nonzero", "2", true),
+            ("negative", "-1", true),
+            ("fraction", "0.5", true),
+        ]
+        struct EncodedFlag: Decodable { let professional: Bool? }
+
+        for testCase in cases {
+            let flag = testCase.json.map { ",\"professional\":\($0)" } ?? ""
+            let payload = #"{"id":42,"username":"flag-fixture","ranking":39\#(flag)}"#
+            let user = try decoder.decode(OGSUser.self, from: Data(payload.utf8))
+
+            XCTAssertEqual(user.professional, testCase.expected, testCase.name)
+            XCTAssertEqual(user.ranking, 39, testCase.name)
+            if testCase.expected == true {
+                XCTAssertEqual(user.formattedRank, "3p", testCase.name)
+            }
+            let encoded = try JSONEncoder().encode(user)
+            XCTAssertEqual(
+                try JSONDecoder().decode(EncodedFlag.self, from: encoded).professional,
+                testCase.expected,
+                "Persistence must encode a Boolean or omit the flag: \(testCase.name)"
+            )
+            XCTAssertEqual(try decoder.decode(OGSUser.self, from: encoded), user, testCase.name)
+        }
+    }
+
+    func testUserProfessionalCompatibilityKeepsMalformedAndUnrelatedFieldsStrict() {
+        let cases: [(payload: String, path: [String])] = [
+            (#"{"id":42,"username":"fixture","professional":"1"}"#, ["professional"]),
+            (#"{"id":42,"username":"fixture","professional":{}}"#, ["professional"]),
+            (#"{"id":42,"username":"fixture","professional":[]}"#, ["professional"]),
+            (#"{"id":"42","username":"fixture","professional":0}"#, ["id"]),
+            (#"{"username":"fixture","professional":0}"#, ["id"]),
+            (#"{"id":42,"professional":0}"#, ["username"]),
+            (#"{"id":42,"username":42,"professional":0}"#, ["username"]),
+            (#"{"id":42,"username":"fixture","professional":0,"supporter":1}"#, ["supporter"]),
+            (#"{"id":42,"username":"fixture","professional":0,"ranking":"39"}"#, ["ranking"]),
+            (#"{"id":42,"username":"fixture","professional":0,"ratings":{"overall":{"rating":1510,"deviation":120}}}"#, ["ratings", "overall", "volatility"]),
+        ]
+
+        for testCase in cases {
+            XCTAssertThrowsError(try decoder.decode(OGSUser.self, from: Data(testCase.payload.utf8))) { error in
+                let path: [String]
+                switch error {
+                case DecodingError.keyNotFound(let key, let context):
+                    path = context.codingPath.map(\.stringValue) + [key.stringValue]
+                case DecodingError.typeMismatch(_, let context),
+                     DecodingError.valueNotFound(_, let context),
+                     DecodingError.dataCorrupted(let context):
+                    path = context.codingPath.map(\.stringValue)
+                default:
+                    return XCTFail("Expected a decoder failure at \(testCase.path), received \(error)")
+                }
+                XCTAssertEqual(path, testCase.path)
+            }
+        }
+    }
+
+    func testUserMemberwiseInitializationAndEncodingPreserveAllFields() throws {
+        let user = OGSUser(
+            username: "memberwise-fixture", id: 42, ranking: 39, rank: 39,
+            uiClass: "professional", isTournamentModerator: false,
+            canCreateTournaments: true, country: "jp", professional: true,
+            provisional: 0, icon: "https://example.test/icon", supporter: true,
+            ratings: OGSRating(ratingByCategory: [
+                .overall: OGSCategoryRating(rating: 1510, deviation: 120, volatility: 0.06),
+            ]),
+            iconUrl: "https://example.test/icon-url", anonymous: false,
+            isBot: false, isModerator: true, isSuperuser: false,
+            acceptedStones: "aabb", acceptedStrictSekiMode: true
+        )
+
+        XCTAssertEqual(try decoder.decode(OGSUser.self, from: JSONEncoder().encode(user)), user)
+    }
+
     func testConditionalMovesDecodesRuntimeTreeAndProtocolAlias() throws {
         let runtimePayload = #"""
         {

@@ -40,6 +40,8 @@ enum SurroundUITestContract {
     static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
     static let friendshipGatedResponseLaunchArgument = "--surround-friendship-gated-response"
     static let emptyMessagesLaunchArgument = "--surround-empty-messages"
+    static let messagesContentLaunchArgument = "--surround-messages-content"
+    static let messagesOverflowLaunchArgument = "--surround-messages-overflow"
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
@@ -71,6 +73,25 @@ enum SurroundUITestContract {
     static let profileFixturePickerFriendID = 801_001
     static let friendshipFixtureRequestPlayerIDs = [912_001, 912_002, 912_003]
     static let friendshipFixtureRequestUsernames = ["RiverWillow", "SilverHeron", "CloudPebble"]
+    // Opt-in Messages fixtures stay behind the rejecting offline transports.
+    // Sixty-four friends overflow the expanded grid even in a tall iPad inbox.
+    static let messagesOverflowFriendIDs = Array(914_001...914_064)
+    static let messagesOverflowHistoryCount = 50
+    static let messagesOverflowRecentFriendID = 801_006
+
+    static func messagesOverflowFriendUsername(index: Int) -> String {
+        "OverflowFriend\(String(format: "%02d", index))"
+    }
+
+    static func messagesOverflowHistoryID(peerID: Int, index: Int) -> String {
+        "messages-history-\(peerID)-\(index)"
+    }
+
+    static func messagesOverflowHistoryText(username: String, index: Int) -> String {
+        "Offline history \(String(format: "%02d", index)) for \(username)\n"
+            + "This older message remains in its own conversation.\n"
+            + "Return here after changing peers or opening a profile."
+    }
     static let profileFixtureActiveGameIDs = [91_001_001, 91_001_002, 91_001_003, 91_001_004]
     // Both the complete feed (12) and the pairwise feed (11) exceed a
     // ten-game page; the sixth game alone has a different opponent.
@@ -234,6 +255,15 @@ enum SurroundUITestContract {
 
     static var usesShortProfileHistory: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(profileShortHistoryLaunchArgument)
+    }
+
+    static var includesMessagesContent: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(messagesContentLaunchArgument)
+    }
+
+    static var includesMessagesOverflow: Bool {
+        includesMessagesContent
+            && ProcessInfo.processInfo.arguments.contains(messagesOverflowLaunchArgument)
     }
 
     static var includesFriendshipRequests: Bool {

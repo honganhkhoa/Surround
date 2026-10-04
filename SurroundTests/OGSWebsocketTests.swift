@@ -414,6 +414,7 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertEqual(socket.status, .reconnecting)
         XCTAssertFalse(socket.opened)
         XCTAssertNotNil(firstCallbackError?["connection"])
+        XCTAssertNil(firstCallbackError?["not_sent"])
         XCTAssertTrue(scheduler.scheduledDelays.contains(1))
         XCTAssertTrue(scheduler.runNext(after: 1))
         XCTAssertEqual(factory.transports.count, 2)
@@ -430,6 +431,7 @@ final class OGSWebsocketTests: XCTestCase {
         XCTAssertFalse(socket.opened)
         XCTAssertFalse(socket.authenticated)
         XCTAssertNotNil(closeCallbackError?["connection"])
+        XCTAssertNil(closeCallbackError?["not_sent"])
         XCTAssertEqual(scheduler.activeWorkCount, 0)
         XCTAssertGreaterThanOrEqual(secondTransport.disconnectCount, 1)
 
@@ -438,6 +440,39 @@ final class OGSWebsocketTests: XCTestCase {
         socket.closeThenReconnect()
         XCTAssertEqual(factory.transports.count, 2)
         XCTAssertEqual(socket.status, .disconnected)
+    }
+
+    func testEmitMarksOnlyPreSendFailuresAsDefinitelyNotSent() throws {
+        let scheduler = Scheduler()
+        let factory = TransportFactory()
+        let socket = OGSWebsocket(
+            rootURL: URL(string: "https://ogs.test")!,
+            authenticationConfigProvider: { try? self.makeConfig(jwt: "jwt", anonymous: true) },
+            transportFactory: factory.make,
+            scheduler: scheduler,
+            connectTimeout: 15,
+            maxReconnectDelay: 30,
+            callbackTimeout: 5,
+            logger: { _ in }
+        )
+
+        var noTransportError: [String: String]?
+        socket.emit(command: "chat/pm", data: [:]) { _, error in noTransportError = error }
+        XCTAssertNotNil(noTransportError?["not_sent"])
+
+        socket.connect()
+        let transport = try XCTUnwrap(factory.transports.first)
+        transport.open()
+        transport.sendError = TestError.connectionLost
+        var attemptedSendError: [String: String]?
+        socket.emit(command: "chat/pm", data: [:]) { _, error in attemptedSendError = error }
+        XCTAssertNotNil(attemptedSendError?["connection"])
+        XCTAssertNil(attemptedSendError?["not_sent"])
+
+        socket.close()
+        var closedSocketError: [String: String]?
+        socket.emit(command: "chat/pm", data: [:]) { _, error in closedSocketError = error }
+        XCTAssertNotNil(closedSocketError?["not_sent"])
     }
 
     func testNaturalReconnectAuthenticatesWithFreshestProviderToken() throws {

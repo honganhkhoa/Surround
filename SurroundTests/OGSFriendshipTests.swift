@@ -1097,6 +1097,51 @@ final class OGSFriendshipTests: XCTestCase {
         }
     }
 
+    func testNumericProfessionalFriendListClearsDecodeErrorAndReconcilesDifferentCaches() throws {
+        for (flag, expectedProfessional) in [("0", false), ("1", true)] {
+            let services = [
+                try makeService(friendship: .friends),
+                try makeService(friendship: .friends, hasKnownFriendship: false),
+            ]
+            FriendshipURLProtocol.configure { request in
+                if FriendshipURLProtocol.path(for: request.request) == "/api/v1/ui/friends" {
+                    request.respond(#"{"friends":[{"id":51,"username":"authoritative-friend","professional":"invalid"}]}"#)
+                } else {
+                    request.respond("[]")
+                }
+            }
+            for service in services {
+                guard case .failure = waitForResult(service.refreshFriendships()) else {
+                    return XCTFail("A malformed flag must leave the list incomplete")
+                }
+                XCTAssertNotNil(service.friendsError)
+            }
+            XCTAssertEqual(services[0].friends.map(\.id), [42])
+            XCTAssertTrue(services[1].friends.isEmpty)
+
+            FriendshipURLProtocol.configure { request in
+                if FriendshipURLProtocol.path(for: request.request) == "/api/v1/ui/friends" {
+                    request.respond(#"{"friends":[{"id":51,"username":"authoritative-friend","professional":\#(flag),"ranking":25,"ratings":{"overall":{"rating":1510,"deviation":120,"volatility":0.06}}}]}"#)
+                } else {
+                    request.respond("[]")
+                }
+            }
+            for service in services {
+                try waitForResult(service.refreshFriendships()).get()
+                XCTAssertEqual(service.friends.map(\.id), [51])
+                XCTAssertEqual(service.friends.first?.professional, expectedProfessional)
+                XCTAssertEqual(service.friends.first?.ratings?[.overall]?.volatility, 0.06)
+                XCTAssertEqual(service.friendship(for: 51), .friends)
+                XCTAssertNil(service.friendsError)
+                XCTAssertNil(service.friendInvitationsError)
+                XCTAssertFalse(service.friendsLoading)
+                XCTAssertFalse(service.friendInvitationsLoading)
+            }
+            XCTAssertEqual(services[0].friends, services[1].friends)
+            XCTAssertEqual(services[0].friendship(for: 42), OGSProfileFriendship.none)
+        }
+    }
+
     func testPartialListAbsenceOnlySupersedesItsOwnOlderProfileMembership() throws {
         for friendsSucceed in [true, false] {
             for profileIsFriend in [true, false] {

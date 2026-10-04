@@ -20,6 +20,9 @@ final class OGSServiceIsolationTests: XCTestCase {
         var latency = 0.0
         private(set) var reconnectCount = 0
         private(set) var emittedCommands = [String]()
+        var nextCallbackError: [String: String]?
+        var defersPrivateMessageAcknowledgements = false
+        private(set) var privateMessageCallbacks = [OGSWebsocketResultCallback]()
 
         func connect() {}
         func close() {}
@@ -28,11 +31,21 @@ final class OGSServiceIsolationTests: XCTestCase {
 
         func emit(command: String, data: Any?, resultCallback: OGSWebsocketResultCallback?) {
             emittedCommands.append(command)
-            resultCallback?(nil, nil)
+            if command == "chat/pm", defersPrivateMessageAcknowledgements, let resultCallback {
+                privateMessageCallbacks.append(resultCallback)
+                return
+            }
+            resultCallback?(nil, nextCallbackError)
+            nextCallbackError = nil
         }
 
         func resetEmittedCommands() {
             emittedCommands.removeAll()
+        }
+
+        func acknowledgeNextPrivateMessage(with data: [String: Any]) {
+            let callback = privateMessageCallbacks.removeFirst()
+            callback(data, nil)
         }
     }
 
@@ -1154,6 +1167,477 @@ final class OGSServiceIsolationTests: XCTestCase {
         XCTAssertEqual(loginRequests.count, 2)
     }
 
+    func testPrivateMessageUnreadCountTracksIncomingConversations() throws {
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-messages"),
+            label: "private-message-unread"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+
+        service.setUpNewPeerIfNecessary(peerId: 42)
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+        XCTAssertTrue(service.privateMessagesUnreadPeerIds.isEmpty)
+
+        let first = privateMessage(from: 42, to: 101, id: "first", timestamp: 100)
+        service.handlePrivateMessage(first)
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "older-history", timestamp: 99))
+        service.handlePrivateMessage(first)
+        service.handlePrivateMessage(privateMessage(from: 101, to: 42, id: "reply", timestamp: 102))
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "second", timestamp: 101))
+        XCTAssertEqual(service.privateMessagesUnreadCount, 1)
+        XCTAssertEqual(service.privateMessagesUnreadPeerIds, [42])
+        XCTAssertEqual(service.privateMessagesByPeerId[42]?.map(\.content.timestamp), [99, 100, 101, 102])
+
+        service.markPrivateMessageThreadAsRead(peerId: 42)
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+        XCTAssertEqual(
+            service.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[101]?[42],
+            101
+        )
+        service.handlePrivateMessage(privateMessage(from: 101, to: 42, id: "next-reply", timestamp: 104))
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "third", timestamp: 103))
+        XCTAssertEqual(service.privateMessagesUnreadPeerIds, [42])
+        XCTAssertEqual(service.privateMessagesUnreadCount, 1)
+    }
+
+    func testPrivateMessageUnreadPublishesOnlyWhenUnreadStateChanges() throws {
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-unread-publications"),
+            label: "private-message-unread-publications"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+        var peerPublications = [Set<Int>]()
+        var countPublications = [Int]()
+        service.$privateMessagesUnreadPeerIds
+            .dropFirst()
+            .sink { peerPublications.append($0) }
+            .store(in: &cancellables)
+        service.$privateMessagesUnreadCount
+            .dropFirst()
+            .sink { countPublications.append($0) }
+            .store(in: &cancellables)
+
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "first", timestamp: 100))
+        XCTAssertEqual(peerPublications, [Set([42])])
+        XCTAssertEqual(countPublications, [1])
+
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "already-unread", timestamp: 101))
+        XCTAssertEqual(peerPublications, [Set([42])], "Another message in an unread thread must not republish equal unread state.")
+        XCTAssertEqual(countPublications, [1])
+
+        service.markPrivateMessageThreadAsRead(peerId: 42)
+        XCTAssertEqual(peerPublications, [Set([42]), Set<Int>()])
+        XCTAssertEqual(countPublications, [1, 0])
+        XCTAssertEqual(service.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[101]?[42], 101)
+
+        service.markPrivateMessageThreadAsRead(peerId: 42)
+        service.markPrivateMessageThreadAsRead(peerId: 42)
+        XCTAssertEqual(peerPublications, [Set([42]), Set<Int>()], "Repeated visible read checks must not invalidate the unread hierarchy.")
+        XCTAssertEqual(countPublications, [1, 0])
+
+        service.handlePrivateMessage(privateMessage(from: 42, to: 101, id: "new-unread", timestamp: 102))
+        XCTAssertEqual(peerPublications, [Set([42]), Set<Int>(), Set([42])])
+        XCTAssertEqual(countPublications, [1, 0, 1])
+        XCTAssertEqual(service.privateMessagesUnreadPeerIds, [42])
+    }
+
+    func testPrivateMessageReadMarkersAndHistoryPeersStayWithTheirAccount() throws {
+        let socket = StubWebsocket()
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-accounts"),
+            socket: socket,
+            label: "private-message-accounts"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+        let firstAccountMessage = privateMessage(from: 42, to: 101, id: "account-one", timestamp: 100)
+        service.handlePrivateMessage(firstAccountMessage)
+        service.markPrivateMessageThreadAsRead(peerId: 42)
+        XCTAssertEqual(service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101], [42])
+
+        try signInForPrivateMessageTest(service, userID: 202)
+        XCTAssertTrue(service.privateMessagesByPeerId.isEmpty)
+        XCTAssertTrue(service.privateMessagesUnreadPeerIds.isEmpty)
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+        socket.resetEmittedCommands()
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        XCTAssertFalse(socket.emittedCommands.contains("chat/pm/load"))
+
+        service.handlePrivateMessage(firstAccountMessage)
+        XCTAssertTrue(service.privateMessagesByPeerId.isEmpty)
+        let secondAccountMessage = privateMessage(from: 42, to: 202, id: "account-two", timestamp: 100)
+        service.handlePrivateMessage(secondAccountMessage)
+        XCTAssertEqual(service.privateMessagesUnreadPeerIds, [42])
+
+        try signInForPrivateMessageTest(service, userID: 101)
+        XCTAssertTrue(service.privateMessagesByPeerId.isEmpty)
+        socket.resetEmittedCommands()
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        XCTAssertEqual(socket.emittedCommands.filter { $0 == "chat/pm/load" }.count, 1)
+        service.handlePrivateMessage(firstAccountMessage)
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+        XCTAssertEqual(service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[202], [42])
+
+        service.logout()
+        XCTAssertEqual(service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101], [42])
+        XCTAssertEqual(service.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[101]?[42], 100)
+        try signInForPrivateMessageTest(service, userID: 101)
+        socket.resetEmittedCommands()
+        socket.serverEventCallback?("surround/socketAuthenticated", nil)
+        XCTAssertEqual(socket.emittedCommands.filter { $0 == "chat/pm/load" }.count, 1)
+    }
+
+    func testRecentPrivateMessagePeersKeepTimestampOrderAcrossHistoryReplayAndEviction() throws {
+        let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
+        let httpClient = makeHTTPClient(responseUsername: "private-message-recent-peers")
+        let first = makeService(
+            environment: environment,
+            httpClient: httpClient,
+            label: "private-message-recent-peers"
+        )
+        try signInForPrivateMessageTest(first, userID: 101)
+        for peerID in 1...50 {
+            first.handlePrivateMessage(privateMessage(
+                from: peerID, to: 101, id: "original-\(peerID)", timestamp: Double(peerID)
+            ))
+        }
+        XCTAssertEqual(
+            first.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101],
+            Array((1...50).reversed())
+        )
+
+        let secondSocket = StubWebsocket()
+        let second = OGSService(
+            environment: environment,
+            httpClient: httpClient,
+            preferences: first.preferences,
+            ogsWebsocket: secondSocket,
+            connectsAutomatically: false,
+            usesSurroundOverviewService: false,
+            enablesAppSideEffects: false,
+            startsTimers: false,
+            installsObservers: false
+        )
+        try signInForPrivateMessageTest(second, userID: 101)
+        secondSocket.serverEventCallback?("surround/socketAuthenticated", nil)
+        XCTAssertEqual(secondSocket.emittedCommands.filter { $0 == "chat/pm/load" }.count, 50)
+
+        // Socket history arrives in load order, rather than timestamp order.
+        for peerID in 1...50 {
+            second.handlePrivateMessage(privateMessage(
+                from: peerID, to: 101, id: "replayed-\(peerID)", timestamp: Double(peerID)
+            ))
+        }
+        XCTAssertEqual(
+            second.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101],
+            Array((1...50).reversed())
+        )
+
+        second.handlePrivateMessage(privateMessage(
+            from: 51, to: 101, id: "new-peer", timestamp: 51
+        ))
+        XCTAssertEqual(
+            second.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101],
+            [51] + Array((2...50).reversed())
+        )
+        XCTAssertNil(
+            second.preferences[.latestPrivateMessageTimestampByOGSAccountAndPeerID]?[101]?[1]
+        )
+
+        second.handlePrivateMessage(privateMessage(
+            from: 101, to: 2, id: "new-reply", timestamp: 52
+        ))
+        XCTAssertEqual(
+            Array(second.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101]?.prefix(3) ?? []),
+            [2, 51, 50]
+        )
+        second.handlePrivateMessage(privateMessage(
+            from: 3, to: 101, id: "old-late-replay", timestamp: 2
+        ))
+        XCTAssertEqual(
+            Array(second.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101]?.prefix(3) ?? []),
+            [2, 51, 50]
+        )
+    }
+
+    func testRecentPrivateMessagePeerOrderMigratesAfterAllSavedPeersReload() throws {
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-recency-migration"),
+            label: "private-message-recency-migration"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+        service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID] = [101: [2, 3, 1]]
+
+        service.handlePrivateMessage(privateMessage(
+            from: 1, to: 101, id: "oldest", timestamp: 1
+        ))
+        service.handlePrivateMessage(privateMessage(
+            from: 2, to: 101, id: "middle", timestamp: 2
+        ))
+        XCTAssertEqual(
+            service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101],
+            [2, 3, 1]
+        )
+
+        service.handlePrivateMessage(privateMessage(
+            from: 3, to: 101, id: "newest", timestamp: 3
+        ))
+        XCTAssertEqual(
+            service.preferences[.recentPrivateMessagePeerIDsByOGSAccountID]?[101],
+            [3, 2, 1]
+        )
+    }
+
+    func testPrivateMessageSendFailureSeparatesDefiniteRejectionFromMissingAcknowledgement() throws {
+        XCTAssertEqual(
+            PrivateMessageSendFailure.classify(OGSServiceError.notLoggedIn), .notSent
+        )
+        XCTAssertEqual(
+            PrivateMessageSendFailure.classify(URLError(.timedOut)),
+            .deliveryUnconfirmed
+        )
+        XCTAssertEqual(
+            PrivateMessageSendFailure.classify(OGSServiceError.invalidJSON),
+            .deliveryUnconfirmed
+        )
+
+        let socket = StubWebsocket()
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-send-failure"),
+            socket: socket,
+            label: "private-message-send-failure"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+        socket.nextCallbackError = ["error": "message rejected"]
+        let rejected = expectation(description: "server rejected the private message")
+        service.sendPrivateMessage(
+            to: OGSUser(username: "player-42", id: 42), message: "hello"
+        )
+        .sink { completion in
+            if case .failure(let error) = completion {
+                XCTAssertEqual(PrivateMessageSendFailure.classify(error), .notSent)
+                rejected.fulfill()
+            }
+        } receiveValue: { _ in
+            XCTFail("A rejected message must not be acknowledged")
+        }
+        .store(in: &cancellables)
+        wait(for: [rejected], timeout: 1)
+
+        socket.nextCallbackError = [
+            "connection": "not connected",
+            "not_sent": "not connected"
+        ]
+        let preSendFailure = expectation(description: "private message never left the device")
+        service.sendPrivateMessage(
+            to: OGSUser(username: "player-42", id: 42), message: "hello again"
+        )
+        .sink { completion in
+            if case .failure(let error) = completion {
+                XCTAssertEqual(PrivateMessageSendFailure.classify(error), .notSent)
+                preSendFailure.fulfill()
+            }
+        } receiveValue: { _ in
+            XCTFail("An unsent message must not be acknowledged")
+        }
+        .store(in: &cancellables)
+        wait(for: [preSendFailure], timeout: 1)
+
+        socket.nextCallbackError = ["timeout": "no acknowledgement"]
+        let unconfirmed = expectation(description: "private message delivery is unconfirmed")
+        service.sendPrivateMessage(
+            to: OGSUser(username: "player-42", id: 42), message: "third attempt"
+        )
+        .sink { completion in
+            if case .failure(let error) = completion {
+                XCTAssertEqual(
+                    PrivateMessageSendFailure.classify(error), .deliveryUnconfirmed
+                )
+                unconfirmed.fulfill()
+            }
+        } receiveValue: { _ in
+            XCTFail("A timed-out message must not be acknowledged")
+        }
+        .store(in: &cancellables)
+        wait(for: [unconfirmed], timeout: 1)
+    }
+
+    func testLegacyPrivateMessageReadMarkersMigrateOnlyToTheirSavedAccount() throws {
+        let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
+        let httpClient = makeHTTPClient(responseUsername: "private-message-read-migration")
+        let first = makeService(
+            environment: environment,
+            httpClient: httpClient,
+            label: "private-message-read-migration"
+        )
+        try signInForPrivateMessageTest(first, userID: 101)
+        first.preferences[.lastSeenPrivateMessageByOGSUserId] = [42: 100, 43: 90]
+        first.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID] = [101: [42: 150]]
+
+        let restored = OGSService(
+            environment: environment,
+            httpClient: httpClient,
+            preferences: first.preferences,
+            ogsWebsocket: StubWebsocket(),
+            connectsAutomatically: false,
+            usesSurroundOverviewService: false,
+            enablesAppSideEffects: false,
+            startsTimers: false,
+            installsObservers: false
+        )
+        XCTAssertEqual(
+            restored.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[101],
+            [42: 150, 43: 90]
+        )
+        XCTAssertTrue(restored.preferences[.lastSeenPrivateMessageByOGSUserId]?.isEmpty == true)
+        try signInForPrivateMessageTest(restored, userID: 202)
+        restored.handlePrivateMessage(privateMessage(
+            from: 42, to: 202, id: "new-account-unread", timestamp: 100
+        ))
+        XCTAssertEqual(restored.privateMessagesUnreadPeerIds, [42])
+        XCTAssertNil(restored.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?[202])
+    }
+
+    func testUnownedLegacyPrivateMessageReadMarkersDoNotHideNewAccountMessages() throws {
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-unowned-markers"),
+            label: "private-message-unowned-markers"
+        )
+        service.preferences[.lastSeenPrivateMessageByOGSUserId] = [42: 500]
+        try signInForPrivateMessageTest(service, userID: 202)
+        service.handlePrivateMessage(privateMessage(
+            from: 42, to: 202, id: "unread", timestamp: 100
+        ))
+        XCTAssertEqual(service.privateMessagesUnreadPeerIds, [42])
+        XCTAssertTrue(service.preferences[.lastSeenPrivateMessageByOGSUserId]?.isEmpty == true)
+        XCTAssertTrue(service.preferences[.lastSeenPrivateMessageByOGSAccountAndPeerID]?.isEmpty == true)
+    }
+
+    func testPrivateMessageAcknowledgementMustMatchSendingAccountAndPeer() throws {
+        let socket = StubWebsocket()
+        socket.defersPrivateMessageAcknowledgements = true
+        let service = makeService(
+            environment: OGSEnvironment(rootURL: URL(string: "https://ogs.test")!),
+            httpClient: makeHTTPClient(responseUsername: "private-message-acknowledgements"),
+            socket: socket,
+            label: "private-message-acknowledgements"
+        )
+        try signInForPrivateMessageTest(service, userID: 101)
+        let peer = OGSUser(username: "player-42", id: 42)
+        var acknowledgedMessage: OGSPrivateMessage?
+        service.sendPrivateMessage(to: peer, message: "hello")
+            .sink(
+                receiveCompletion: { if case .failure = $0 { XCTFail("Matching acknowledgement must succeed") } },
+                receiveValue: { acknowledgedMessage = $0 }
+            )
+            .store(in: &cancellables)
+        XCTAssertEqual(socket.privateMessageCallbacks.count, 1)
+        XCTAssertNil(acknowledgedMessage)
+        socket.acknowledgeNextPrivateMessage(with: privateMessagePayload(from: 101, to: 42, id: "acknowledged"))
+        XCTAssertEqual(acknowledgedMessage?.content.id, "acknowledged")
+        XCTAssertEqual(service.privateMessagesByPeerId[42]?.count, 1)
+        XCTAssertEqual(service.privateMessagesUnreadCount, 0)
+
+        var wrongPeerFailure: PrivateMessageSendFailure?
+        service.sendPrivateMessage(to: peer, message: "next message")
+            .sink(
+                receiveCompletion: {
+                    if case .failure(let error) = $0 { wrongPeerFailure = .classify(error) }
+                },
+                receiveValue: { _ in XCTFail("Another peer's acknowledgement must not clear a draft") }
+            )
+            .store(in: &cancellables)
+        XCTAssertEqual(socket.privateMessageCallbacks.count, 1)
+        socket.acknowledgeNextPrivateMessage(with: privateMessagePayload(from: 101, to: 43, id: "wrong-peer"))
+        XCTAssertEqual(wrongPeerFailure, .deliveryUnconfirmed)
+        XCTAssertNil(service.privateMessagesByPeerId[43])
+
+        var changedAccountFailure: PrivateMessageSendFailure?
+        service.sendPrivateMessage(to: peer, message: "message before switching account")
+            .sink(
+                receiveCompletion: {
+                    if case .failure(let error) = $0 { changedAccountFailure = .classify(error) }
+                },
+                receiveValue: { _ in XCTFail("An old account's acknowledgement must not clear the active draft") }
+            )
+            .store(in: &cancellables)
+        XCTAssertEqual(socket.privateMessageCallbacks.count, 1)
+        try signInForPrivateMessageTest(service, userID: 202)
+        socket.acknowledgeNextPrivateMessage(with: privateMessagePayload(from: 101, to: 42, id: "stale-account"))
+        XCTAssertEqual(changedAccountFailure, .deliveryUnconfirmed)
+        XCTAssertTrue(service.privateMessagesByPeerId.isEmpty)
+    }
+
+    func testReadingPrivateMessageInOneSceneUpdatesAnotherScene() throws {
+        let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
+        let httpClient = makeHTTPClient(responseUsername: "private-message-scenes")
+        let first = makeService(
+            environment: environment,
+            httpClient: httpClient,
+            label: "private-message-scenes"
+        )
+        try signInForPrivateMessageTest(first, userID: 101)
+        let secondSocket = StubWebsocket()
+        let second = OGSService(
+            environment: environment,
+            httpClient: httpClient,
+            preferences: first.preferences,
+            ogsWebsocket: secondSocket,
+            connectsAutomatically: false,
+            usesSurroundOverviewService: false,
+            enablesAppSideEffects: false,
+            startsTimers: false,
+            installsObservers: false
+        )
+        try signInForPrivateMessageTest(second, userID: 101)
+        let message = privateMessage(from: 42, to: 101, id: "cross-scene", timestamp: 100)
+        first.handlePrivateMessage(message)
+        second.handlePrivateMessage(message)
+        XCTAssertEqual(first.privateMessagesUnreadCount, 1)
+        XCTAssertEqual(second.privateMessagesUnreadCount, 1)
+
+        let secondSceneUpdated = expectation(description: "second scene updates its unread count")
+        second.$privateMessagesUnreadCount
+            .dropFirst()
+            .filter { $0 == 0 }
+            .first()
+            .sink { _ in secondSceneUpdated.fulfill() }
+            .store(in: &cancellables)
+        first.markPrivateMessageThreadAsRead(peerId: 42)
+        wait(for: [secondSceneUpdated], timeout: 2)
+        XCTAssertTrue(second.privateMessagesUnreadPeerIds.isEmpty)
+
+        let secondSceneCleared = expectation(description: "second scene clears old account messages")
+        second.$privateMessagesByPeerId
+            .dropFirst()
+            .filter { $0.isEmpty }
+            .first()
+            .sink { _ in secondSceneCleared.fulfill() }
+            .store(in: &cancellables)
+        try signInForPrivateMessageTest(first, userID: 202)
+        second.handlePrivateMessage(message)
+        second.handlePrivateMessage(privateMessage(from: 42, to: 202, id: "new-account", timestamp: 101))
+        var staleSendFailed = false
+        second.sendPrivateMessage(
+            to: OGSUser(username: "player-42", id: 42), message: "stale"
+        )
+            .sink(
+                receiveCompletion: { if case .failure = $0 { staleSendFailed = true } },
+                receiveValue: { _ in XCTFail("Stale account must not send a private message") }
+            )
+            .store(in: &cancellables)
+        wait(for: [secondSceneCleared], timeout: 2)
+        XCTAssertTrue(second.privateMessagesByPeerId.isEmpty)
+        XCTAssertTrue(staleSendFailed)
+        XCTAssertFalse(secondSocket.emittedCommands.contains("chat/pm"))
+    }
+
     func testSubmitMoveWithoutGameDataFailsInsteadOfHanging() {
         let environment = OGSEnvironment(rootURL: URL(string: "https://ogs.test")!)
         let service = makeService(
@@ -1387,6 +1871,30 @@ final class OGSServiceIsolationTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(OGSUIConfig.self, from: data)
+    }
+
+    private func signInForPrivateMessageTest(_ service: OGSService, userID: Int) throws {
+        service.preferences[.ogsSessionId] = "test-session-\(userID)"
+        service.ogsUIConfig = try makeUIConfig(jwt: "test-jwt-\(userID)", userID: userID)
+        XCTAssertEqual(service.user?.id, userID)
+    }
+
+    private func privateMessage(
+        from senderID: Int, to recipientID: Int, id: String, timestamp: Double
+    ) -> OGSPrivateMessage {
+        OGSPrivateMessage(
+            from: OGSUser(username: "player-\(senderID)", id: senderID),
+            to: OGSUser(username: "player-\(recipientID)", id: recipientID),
+            content: OGSPrivateMessageContent(id: id, message: id, timestamp: timestamp)
+        )
+    }
+
+    private func privateMessagePayload(from senderID: Int, to recipientID: Int, id: String) -> [String: Any] {
+        [
+            "from": ["id": senderID, "username": "player-\(senderID)"],
+            "to": ["id": recipientID, "username": "player-\(recipientID)"],
+            "message": ["i": id, "m": id, "t": 100.0],
+        ]
     }
 
     private func makeService(

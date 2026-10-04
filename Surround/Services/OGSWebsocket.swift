@@ -68,6 +68,9 @@ protocol OGSWebsocketProtocol: AnyObject {
     /// Current connection/reconnection state.
     var status: OGSWebsocketStatus { get }
 
+    /// Time allowed for a correlated command acknowledgment before local failure.
+    var callbackTimeout: TimeInterval { get }
+
     /// Estimated client/server clock difference in milliseconds.
     var drift: Double { get set }
 
@@ -92,6 +95,8 @@ protocol OGSWebsocketProtocol: AnyObject {
 }
 
 extension OGSWebsocketProtocol {
+    var callbackTimeout: TimeInterval { OGSWebsocket.defaultCallbackTimeout }
+
     func emit(command: String) {
         emit(command: command, data: nil, resultCallback: nil)
     }
@@ -472,12 +477,14 @@ typealias OGSAnonymousConfigLoader = (URL, @escaping (Result<OGSUIConfig, Error>
 /// The transport and scheduler abstractions keep those behaviors deterministic
 /// in unit tests, while the default initializer retains production behavior.
 class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegate {
+    static let defaultCallbackTimeout: TimeInterval = 30
+
     private let rootURL: URL
     private let websocketURL: URL
     private let transportFactory: () -> OGSWebsocketTransport
     private let scheduler: OGSWebsocketScheduling
     private let anonymousConfigLoader: OGSAnonymousConfigLoader
-    private let callbackTimeout: TimeInterval
+    let callbackTimeout: TimeInterval
     private let currentTime: () -> TimeInterval
     private let logger: (String) -> Void
 
@@ -552,7 +559,7 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
         anonymousConfigLoader: OGSAnonymousConfigLoader? = nil,
         connectTimeout: TimeInterval = 15,
         maxReconnectDelay: TimeInterval = 30,
-        callbackTimeout: TimeInterval = 30,
+        callbackTimeout: TimeInterval = OGSWebsocket.defaultCallbackTimeout,
         currentTime: @escaping () -> TimeInterval = {
             Date().timeIntervalSince1970
         },
@@ -662,7 +669,10 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
     ) {
         scheduler.async {
             guard !self.isClosed else {
-                resultCallback?(nil, ["connection": "WebSocket was closed"])
+                resultCallback?(nil, [
+                    "connection": "WebSocket was closed",
+                    "not_sent": "WebSocket was closed"
+                ])
                 return
             }
             var callbackID: Int?
@@ -701,7 +711,10 @@ class OGSWebsocket: NSObject, OGSWebsocketProtocol, OGSWebsocketTransportDelegat
                     self.completeCallback(
                         id: callbackID,
                         data: nil,
-                        error: ["connection": OGSWebsocketTransportError.notConnected.localizedDescription]
+                        error: [
+                            "connection": OGSWebsocketTransportError.notConnected.localizedDescription,
+                            "not_sent": OGSWebsocketTransportError.notConnected.localizedDescription
+                        ]
                     )
                 }
                 return

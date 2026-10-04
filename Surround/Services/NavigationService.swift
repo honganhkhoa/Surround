@@ -367,8 +367,10 @@ enum RootView: String, CaseIterable, Identifiable {
     
     @ViewBuilder
     var navigationView : some View {
-        AppNavigationStack(rootView: self) {
-            self.view
+        if self == .privateMessages {
+            PrivateMessagesView()
+        } else {
+            AppNavigationStack(rootView: self) { self.view }
         }
     }
 
@@ -445,6 +447,7 @@ enum RootView: String, CaseIterable, Identifiable {
 
 #if MAIN_APP
 struct RootViewSwitchingMenu: ViewModifier {
+    var isEnabled = true
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -459,38 +462,40 @@ struct RootViewSwitchingMenu: ViewModifier {
         #endif
         
         return content.toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Menu {
-                    Section {
-                        RootView.home.menuButton(currentView: $nav.main.rootView)
-                        RootView.publicGames.menuButton(currentView: $nav.main.rootView)
-                        if ogs.isLoggedIn {
-                            RootView.privateMessages.menuButton(currentView: $nav.main.rootView)
-                            Button {
-                                if let user = ogs.user { openPlayerProfile?(user) }
-                            } label: {
-                                RootView.profile.label
+            if isEnabled {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Section {
+                            RootView.home.menuButton(currentView: $nav.main.rootView)
+                            RootView.publicGames.menuButton(currentView: $nav.main.rootView)
+                            if ogs.isLoggedIn {
+                                RootView.privateMessages.menuButton(currentView: $nav.main.rootView)
+                                Button {
+                                    if let user = ogs.user { openPlayerProfile?(user) }
+                                } label: {
+                                    RootView.profile.label
+                                }
                             }
                         }
+                        Section {
+                            RootView.settings.menuButton(currentView: $nav.main.rootView)
+                            RootView.about.menuButton(currentView: $nav.main.rootView)
+                        }
+                        Section {
+                            RootView.browser.menuButton(currentView:$nav.main.rootView)
+                            RootView.forums.menuButton(currentView: $nav.main.rootView)
+                        }
                     }
-                    Section {
-                        RootView.settings.menuButton(currentView: $nav.main.rootView)
-                        RootView.about.menuButton(currentView: $nav.main.rootView)
+                    label: {
+                        Label("Navigation", systemImage: nav.main.rootView.systemImage)
+                            .font(.title2)
+                            .padding(10)
+                            .offset(x: -8)
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
                     }
-                    Section {
-                        RootView.browser.menuButton(currentView:$nav.main.rootView)
-                        RootView.forums.menuButton(currentView: $nav.main.rootView)
-                    }
+                    .disabled(!compactSizeClass)
+                    .opacity(compactSizeClass ? 1 : 0)
                 }
-                label: {
-                    Label("Navigation", systemImage: nav.main.rootView.systemImage)
-                        .font(.title2)
-                        .padding(10)
-                        .offset(x: -8)
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .disabled(!compactSizeClass)
-                .opacity(compactSizeClass ? 1 : 0)
             }
         }
     }

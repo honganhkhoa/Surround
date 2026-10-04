@@ -4,7 +4,7 @@ import SwiftUI
 /// state, so navigating during a request cannot submit it a second time.
 struct FriendshipControls: View {
     enum Presentation {
-        case profile, requestBanner, requestCard
+        case profile, requestBanner, requestCard, inboxRow
     }
 
     @EnvironmentObject private var ogs: OGSService
@@ -14,7 +14,9 @@ struct FriendshipControls: View {
     let user: OGSUser
     var presentation: Presentation = .profile
 
-    private var isInvitation: Bool { presentation != .profile }
+    private var isInvitation: Bool {
+        presentation != .profile
+    }
 
     @State private var confirmingRejection = false
     @State private var confirmingRemoval = false
@@ -87,6 +89,8 @@ struct FriendshipControls: View {
             if isInvitation {
                 if presentation == .requestBanner {
                     invitationActions.buttonStyle(.bordered)
+                } else if presentation == .inboxRow {
+                    invitationActions.buttonStyle(.plain)
                 } else {
                     invitationActions.buttonStyle(.borderless)
                 }
@@ -174,14 +178,29 @@ struct FriendshipControls: View {
 
     private var invitationActions: some View {
         let stacksActions = dynamicTypeSize.isAccessibilitySize
+        let alignsTrailing = presentation == .requestCard
+            || presentation == .inboxRow
         let layout = stacksActions
-            ? AnyLayout(VStackLayout(alignment: presentation == .requestCard ? .trailing : .center, spacing: 8))
+            ? AnyLayout(VStackLayout(alignment: alignsTrailing ? .trailing : .center, spacing: 8))
             : AnyLayout(HStackLayout(spacing: presentation == .requestCard ? 20 : 8))
         return layout {
             if isBusy {
                 ProgressView()
                     .accessibilityLabel(Text("Updating friendship…"))
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestBusy(user.id))
+            } else if presentation == .inboxRow {
+                Button(role: .destructive) { confirmingRejection = true } label: {
+                    Text("Reject")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 30)
+                        .background(Color(uiColor: .systemGray5), in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestReject(user.id))
+                compactAcceptButton
             } else {
                 Button(role: .destructive) { confirmingRejection = true } label: {
                     Text("Reject")
@@ -199,7 +218,21 @@ struct FriendshipControls: View {
         }
         .font(.body.bold())
         .frame(maxWidth: .infinity, minHeight: 44,
-               alignment: presentation == .requestCard ? .trailing : .leading)
+               alignment: alignsTrailing ? .trailing : .leading)
+    }
+
+    private var compactAcceptButton: some View {
+        Button { perform(.accept) } label: {
+            Text("Accept")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 30)
+                .background(.indigo, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.friendRequestAccept(user.id))
     }
 
     @ViewBuilder
