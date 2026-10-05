@@ -6111,29 +6111,41 @@ class OGSService: ObservableObject {
 /// Each game's raw `/api/v1/games/{id}` response is written to its own
 /// `{id}.json` file under a dedicated folder in the Caches directory (which is
 /// regenerable and excluded from iCloud backup). The whole folder is removed on
-/// sign-out via `OGSService.logout()`.
+/// sign-out via `OGSService.logout()`. Successful writes make a best-effort prune
+/// of older cache files to 50,000,000 logical JSON bytes (decimal 50 MB), excluding
+/// filesystem overhead and unrelated files. Payloads larger than the budget are
+/// not stored and leave existing entries intact. Reads do not refresh dates.
 final class FinishedGameCache {
     static let shared = FinishedGameCache()
 
-    /// Serializes every file operation. `directoryURL` is resolved in `init`
-    /// rather than lazily because a `lazy var` on a shared instance is not
-    /// thread-safe, and rows read the cache concurrently while a list scrolls.
+    /// Serializes payload reads, writes, pruning, and deletion. Generation and
+    /// advisory existence checks do not wait for these potentially long operations.
     private let queue = DispatchQueue(label: "com.honganhkhoa.Surround.FinishedGameCache")
+    private let generationLock = NSLock()
     private let fileManager = FileManager.default
     private let directoryURL: URL?
+    private let maximumBytes: Int
 
     /// Bumped by `clear()`. A response that began before a sign-out carries the
     /// older generation and is dropped rather than recreating the cache.
     private var generation = 0
 
-    private init() {
-        directoryURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("FinishedGames", isDirectory: true)
+    private convenience init() {
+        self.init(directoryURL: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("FinishedGames", isDirectory: true))
+    }
+
+    init(directoryURL: URL?, maximumBytes: Int = 50_000_000) {
+        precondition(maximumBytes > 0)
+        self.directoryURL = directoryURL
+        self.maximumBytes = maximumBytes
     }
 
     /// Capture this when a request starts, and hand it back to `store`.
     var currentGeneration: Int {
-        return queue.sync { generation }
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        return generation
     }
 
     private func fileURL(forGameID gameID: Int) -> URL? {
@@ -6149,35 +6161,82 @@ final class FinishedGameCache {
         }
     }
 
+    /// Advisory only: payload reads validate the entry on the serialized queue.
     func contains(gameID: Int) -> Bool {
-        queue.sync {
-            guard let fileURL = fileURL(forGameID: gameID) else { return false }
-            return fileManager.fileExists(atPath: fileURL.path)
-        }
+        guard let fileURL = fileURL(forGameID: gameID) else { return false }
+        return fileManager.fileExists(atPath: fileURL.path)
     }
 
     func store(_ data: Data, forGameID gameID: Int, ifGeneration expectedGeneration: Int) {
         queue.sync {
-            guard expectedGeneration == generation,
+            guard data.count <= maximumBytes,
+                  expectedGeneration == currentGeneration,
                   let directoryURL,
                   let fileURL = fileURL(forGameID: gameID) else {
                 return
             }
-            if !fileManager.fileExists(atPath: directoryURL.path) {
-                try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            do {
+                if !fileManager.fileExists(atPath: directoryURL.path) {
+                    try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+                }
+                try data.write(to: fileURL, options: .atomic)
+                prune(protecting: fileURL)
+            } catch {
+                return
             }
-            try? data.write(to: fileURL, options: .atomic)
         }
     }
 
-    func clear() {
-        queue.sync {
-            generation += 1
-            guard let directoryURL else {
-                return
-            }
-            try? fileManager.removeItem(at: directoryURL)
+    private func prune(protecting writtenURL: URL) {
+        guard let directoryURL else { return }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: directoryURL, includingPropertiesForKeys: Array(keys)
+        ) else { return }
+        var files: [(url: URL, bytes: UInt64, modified: Date)] = []
+        var totalBytes: UInt64 = 0
+        for url in contents {
+            let stem = url.deletingPathExtension().lastPathComponent
+            guard url.pathExtension == "json", let id = Int(stem), String(id) == stem else { continue }
+            guard let values = try? url.resourceValues(forKeys: keys),
+                  let isRegularFile = values.isRegularFile,
+                  let isSymbolicLink = values.isSymbolicLink else { return }
+            guard isRegularFile, !isSymbolicLink else { continue }
+            guard let size = values.fileSize, size >= 0 else { return }
+            let bytes = UInt64(size)
+            files.append((url, bytes, values.contentModificationDate ?? .distantPast))
+            let sum = totalBytes.addingReportingOverflow(bytes)
+            guard !sum.overflow else { return }
+            totalBytes = sum.partialValue
         }
+        guard totalBytes > UInt64(maximumBytes) else { return }
+        files.sort {
+            if $0.modified != $1.modified { return $0.modified < $1.modified }
+            return $0.url.lastPathComponent < $1.url.lastPathComponent
+        }
+        for file in files where file.url.lastPathComponent != writtenURL.lastPathComponent {
+            guard totalBytes > UInt64(maximumBytes) else { break }
+            do {
+                try fileManager.removeItem(at: file.url)
+                totalBytes -= file.bytes
+            } catch {
+                continue
+            }
+        }
+    }
+
+    /// Invalidates in-flight stores immediately; physical deletion is queued.
+    func clear() {
+        generationLock.lock()
+        generation += 1
+        // Enqueue deletion before exposing the new generation, so subsequent
+        // reads and writes cannot run ahead of this clear on the I/O queue.
+        queue.async {
+            if let directoryURL = self.directoryURL {
+                try? self.fileManager.removeItem(at: directoryURL)
+            }
+        }
+        generationLock.unlock()
     }
 
     /// Strips credential-bearing fields before a payload is persisted.

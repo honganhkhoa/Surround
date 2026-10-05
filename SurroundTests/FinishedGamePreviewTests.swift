@@ -1094,3 +1094,315 @@ final class FinishedGamePreviewTests: XCTestCase {
         }
     }
 }
+
+final class FinishedGameCacheTests: XCTestCase {
+    private let fileManager = FileManager.default
+    private var scratchDirectories: [URL] = []
+
+    override func tearDownWithError() throws {
+        defer { scratchDirectories.removeAll() }
+        for directory in scratchDirectories {
+            if fileManager.fileExists(atPath: directory.path) {
+                try fileManager.removeItem(at: directory)
+            }
+        }
+        try super.tearDownWithError()
+    }
+
+    func testExactByteBudgetAndExactLimitPayloadRemainCacheable() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 10)
+        store(Data(repeating: 1, count: 3), gameID: 1, in: cache)
+        try setModificationDate(100, gameID: 1, in: directory)
+        store(Data(repeating: 2, count: 7), gameID: 2, in: cache)
+
+        XCTAssertEqual(cache.data(forGameID: 1), Data(repeating: 1, count: 3))
+        XCTAssertEqual(cache.data(forGameID: 2), Data(repeating: 2, count: 7))
+        XCTAssertEqual(try totalFileBytes(in: directory), 10)
+
+        store(Data([3]), gameID: 3, in: cache)
+        XCTAssertNil(cache.data(forGameID: 1))
+        XCTAssertEqual(cache.data(forGameID: 2), Data(repeating: 2, count: 7))
+        XCTAssertEqual(cache.data(forGameID: 3), Data([3]))
+        XCTAssertEqual(try totalFileBytes(in: directory), 8)
+
+        let exactLimit = Data(repeating: 4, count: 10)
+        store(exactLimit, gameID: 4, in: cache)
+        XCTAssertEqual(try fileNames(in: directory), ["4.json"])
+        XCTAssertEqual(cache.data(forGameID: 4), exactLimit)
+        XCTAssertEqual(try totalFileBytes(in: directory), 10)
+    }
+
+    func testOverwriteUsesReplacementSizeAndProtectsTheReplacement() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 12)
+        try seed(Data(repeating: 1, count: 4), gameID: 1, modified: 300, in: directory)
+        try seed(Data(repeating: 2, count: 4), gameID: 2, modified: 100, in: directory)
+        try seed(Data(repeating: 3, count: 4), gameID: 3, modified: 200, in: directory)
+
+        let replacement = Data(repeating: 9, count: 6)
+        store(replacement, gameID: 1, in: cache)
+        XCTAssertEqual(try fileNames(in: directory), ["1.json", "3.json"])
+        XCTAssertEqual(cache.data(forGameID: 1), replacement)
+        XCTAssertEqual(cache.data(forGameID: 3), Data(repeating: 3, count: 4))
+        XCTAssertEqual(try totalFileBytes(in: directory), 10)
+
+        store(Data([8, 8]), gameID: 1, in: cache)
+        XCTAssertEqual(try fileNames(in: directory), ["1.json", "3.json"])
+        XCTAssertEqual(cache.data(forGameID: 1), Data([8, 8]))
+        XCTAssertEqual(try totalFileBytes(in: directory), 6)
+    }
+
+    func testOversizedReplacementPreservesExistingEntryWithoutPruning() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 8)
+        let existing = Data(repeating: 1, count: 4)
+        let other = Data(repeating: 2, count: 6)
+        try seed(existing, gameID: 1, modified: 100, in: directory)
+        try seed(other, gameID: 2, modified: 200, in: directory)
+        let originalDate = try modificationDate(gameID: 1, in: directory)
+
+        store(Data(repeating: 9, count: 9), gameID: 1, in: cache)
+        store(Data(repeating: 9, count: 9), gameID: 3, in: cache)
+
+        XCTAssertEqual(try fileNames(in: directory), ["1.json", "2.json"])
+        XCTAssertEqual(cache.data(forGameID: 1), existing)
+        XCTAssertEqual(cache.data(forGameID: 2), other)
+        XCTAssertNil(cache.data(forGameID: 3))
+        XCTAssertEqual(try modificationDate(gameID: 1, in: directory), originalDate)
+        XCTAssertEqual(try totalFileBytes(in: directory), 10)
+    }
+
+    func testOldestContentModificationDateWinsAcrossGameIDs() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 6)
+        // The older file sorts after the newer file by name, so filename-only
+        // eviction cannot satisfy this content-modification-date assertion.
+        try seed(Data(repeating: 1, count: 3), gameID: 2, modified: 100, in: directory)
+        try seed(Data(repeating: 2, count: 3), gameID: 10, modified: 200, in: directory)
+
+        store(Data(repeating: 3, count: 3), gameID: 99, in: cache)
+
+        XCTAssertEqual(try fileNames(in: directory), ["10.json", "99.json"])
+        XCTAssertNil(cache.data(forGameID: 2))
+        XCTAssertEqual(cache.data(forGameID: 10), Data(repeating: 2, count: 3))
+        XCTAssertEqual(cache.data(forGameID: 99), Data(repeating: 3, count: 3))
+        XCTAssertEqual(try totalFileBytes(in: directory), 6)
+        XCTAssertEqual(try modificationDate(gameID: 10, in: directory), Date(timeIntervalSince1970: 200))
+    }
+
+    func testEqualModificationDatesUseDeterministicFilenameOrder() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 6)
+        try seed(Data(repeating: 1, count: 3), gameID: 2, modified: 100, in: directory)
+        try seed(Data(repeating: 2, count: 3), gameID: 10, modified: 100, in: directory)
+
+        store(Data(repeating: 3, count: 3), gameID: 99, in: cache)
+
+        XCTAssertEqual(try fileNames(in: directory), ["2.json", "99.json"])
+        XCTAssertNil(cache.data(forGameID: 10))
+        XCTAssertEqual(cache.data(forGameID: 2), Data(repeating: 1, count: 3))
+        XCTAssertEqual(try totalFileBytes(in: directory), 6)
+    }
+
+    func testSuccessfulWriteIsProtectedEvenWhenExistingFileHasFutureModificationDate() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 6)
+        try seed(Data(repeating: 1, count: 4), gameID: 1,
+                 modified: Date().addingTimeInterval(86_400).timeIntervalSince1970, in: directory)
+        let newlyWritten = Data(repeating: 2, count: 4)
+
+        store(newlyWritten, gameID: 2, in: cache)
+
+        XCTAssertEqual(try fileNames(in: directory), ["2.json"])
+        XCTAssertEqual(cache.data(forGameID: 2), newlyWritten)
+        XCTAssertNil(cache.data(forGameID: 1))
+        XCTAssertEqual(try totalFileBytes(in: directory), 4)
+    }
+
+    func testCorruptRecognizedFileCountsTowardBudgetWithoutDecoding() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 4)
+        try seed(Data("not JSON".utf8), gameID: 1, modified: 100, in: directory)
+        try seed(Data([2, 2]), gameID: 2, modified: 200, in: directory)
+
+        store(Data([3, 3]), gameID: 3, in: cache)
+
+        XCTAssertFalse(fileManager.fileExists(atPath: fileURL(gameID: 1, in: directory).path))
+        XCTAssertEqual(cache.data(forGameID: 2), Data([2, 2]))
+        XCTAssertEqual(cache.data(forGameID: 3), Data([3, 3]))
+        XCTAssertEqual(try totalFileBytes(in: directory), 4)
+    }
+
+    func testUnknownFilesDirectoriesAndSymlinksAreUntouched() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 8)
+        try seed(Data(repeating: 1, count: 4), gameID: 1, modified: 100, in: directory)
+        let unknownData = Data(repeating: 7, count: 128)
+        let unknownNames = ["01.json", "+1.json", "4.JSON", "4.json.tmp", "notes.json", "9223372036854775808.json"]
+        for name in unknownNames {
+            try unknownData.write(to: directory.appendingPathComponent(name))
+        }
+        let nestedDirectory = directory.appendingPathComponent("7.json", isDirectory: true)
+        try fileManager.createDirectory(at: nestedDirectory, withIntermediateDirectories: false)
+        let nestedFile = nestedDirectory.appendingPathComponent("keep")
+        try unknownData.write(to: nestedFile)
+        let externalFile = directory.deletingLastPathComponent().appendingPathComponent("link-target")
+        try unknownData.write(to: externalFile)
+        let link = directory.appendingPathComponent("3.json")
+        try fileManager.createSymbolicLink(at: link, withDestinationURL: externalFile)
+
+        store(Data(repeating: 2, count: 4), gameID: 2, in: cache)
+
+        // Both recognized entries fit exactly. Counting any large unknown item
+        // would incorrectly evict the older recognized entry.
+        XCTAssertEqual(cache.data(forGameID: 1), Data(repeating: 1, count: 4))
+        XCTAssertEqual(cache.data(forGameID: 2), Data(repeating: 2, count: 4))
+        XCTAssertEqual(try modificationDate(gameID: 1, in: directory), Date(timeIntervalSince1970: 100))
+        for name in unknownNames {
+            XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent(name)), unknownData, name)
+        }
+        XCTAssertEqual(try Data(contentsOf: nestedFile), unknownData)
+        XCTAssertEqual(try Data(contentsOf: externalFile), unknownData)
+        XCTAssertEqual(try fileManager.destinationOfSymbolicLink(atPath: link.path), externalFile.path)
+        XCTAssertEqual(try fileManager.attributesOfItem(atPath: link.path)[.type] as? FileAttributeType,
+                       .typeSymbolicLink)
+    }
+
+    func testReadHitHasNoTTLAndDoesNotPruneOrRefreshContentModificationDate() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 3)
+        let oldest = Data([1, 1, 1])
+        let newest = Data([2, 2, 2])
+        try seed(oldest, gameID: 1, modified: 100, in: directory)
+        try seed(newest, gameID: 2, modified: 200, in: directory)
+        let oldDate = try modificationDate(gameID: 1, in: directory)
+        let newDate = try modificationDate(gameID: 2, in: directory)
+
+        XCTAssertTrue(cache.contains(gameID: 1))
+        XCTAssertEqual(cache.data(forGameID: 1), oldest)
+        XCTAssertEqual(cache.data(forGameID: 1), oldest)
+
+        XCTAssertEqual(try fileNames(in: directory), ["1.json", "2.json"])
+        XCTAssertEqual(try totalFileBytes(in: directory), 6)
+        XCTAssertEqual(try modificationDate(gameID: 1, in: directory), oldDate)
+        XCTAssertEqual(try modificationDate(gameID: 2, in: directory), newDate)
+        XCTAssertEqual(cache.data(forGameID: 2), newest)
+    }
+
+    func testFailedAtomicWriteDoesNotPruneAnExistingOverBudgetCache() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 4)
+        let existing = Data(repeating: 1, count: 6)
+        try seed(existing, gameID: 1, modified: 100, in: directory)
+        let blockedDestination = fileURL(gameID: 2, in: directory)
+        try fileManager.createDirectory(at: blockedDestination, withIntermediateDirectories: false)
+        let sentinel = blockedDestination.appendingPathComponent("keep")
+        try Data([9]).write(to: sentinel)
+
+        store(Data([2, 2]), gameID: 2, in: cache)
+
+        XCTAssertEqual(cache.data(forGameID: 1), existing)
+        XCTAssertEqual(try modificationDate(gameID: 1, in: directory), Date(timeIntervalSince1970: 100))
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data([9]))
+        XCTAssertEqual(try fileManager.attributesOfItem(atPath: blockedDestination.path)[.type] as? FileAttributeType,
+                       .typeDirectory)
+    }
+
+    func testConcurrentAtomicWritesKeepCompletePayloadsWithinTheByteBudget() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 160)
+        let writes = (0..<48).map { index in
+            (gameID: index % 8 + 1,
+             data: Data(("revision:\(index):" + String(repeating: String(index % 10), count: 32 + index % 9)).utf8))
+        }
+        let expectedPayloads = Dictionary(grouping: writes, by: { $0.gameID }).mapValues { $0.map { $0.data } }
+        let generation = cache.currentGeneration
+        let observationLock = NSLock()
+        var observations: [(gameID: Int, data: Data)] = []
+
+        DispatchQueue.concurrentPerform(iterations: writes.count) { index in
+            let write = writes[index]
+            cache.store(write.data, forGameID: write.gameID, ifGeneration: generation)
+            if let observed = try? Data(contentsOf: fileURL(gameID: write.gameID, in: directory)) {
+                observationLock.lock()
+                observations.append((write.gameID, observed))
+                observationLock.unlock()
+            }
+        }
+
+        for observation in observations {
+            XCTAssertTrue(expectedPayloads[observation.gameID]?.contains(observation.data) == true)
+        }
+        let files = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        XCTAssertFalse(files.isEmpty)
+        var totalBytes = 0
+        for file in files {
+            let gameID = try XCTUnwrap(Int(file.deletingPathExtension().lastPathComponent))
+            XCTAssertEqual(file.lastPathComponent, "\(gameID).json")
+            let payload = try Data(contentsOf: file)
+            XCTAssertTrue(expectedPayloads[gameID]?.contains(payload) == true)
+            totalBytes += payload.count
+        }
+        XCTAssertLessThanOrEqual(totalBytes, 160)
+    }
+
+    func testClearAdvancesGenerationAndRejectsLateWritesWithoutRecreatingTheDirectory() throws {
+        let (cache, directory) = try makeCache(maximumBytes: 4)
+        let oldGeneration = cache.currentGeneration
+        cache.store(Data([1, 1]), forGameID: 1, ifGeneration: oldGeneration)
+
+        cache.clear()
+
+        XCTAssertEqual(cache.currentGeneration, oldGeneration + 1)
+        XCTAssertNil(cache.data(forGameID: 1)) // Flush the asynchronously queued directory removal.
+        XCTAssertFalse(fileManager.fileExists(atPath: directory.path))
+        cache.store(Data([9, 9]), forGameID: 1, ifGeneration: oldGeneration)
+        XCTAssertNil(cache.data(forGameID: 1))
+        XCTAssertFalse(fileManager.fileExists(atPath: directory.path))
+
+        let newGeneration = cache.currentGeneration
+        cache.store(Data(repeating: 2, count: 4), forGameID: 2, ifGeneration: newGeneration)
+        cache.store(Data([9, 9]), forGameID: 3, ifGeneration: oldGeneration)
+        XCTAssertEqual(try fileNames(in: directory), ["2.json"])
+        XCTAssertEqual(cache.data(forGameID: 2), Data(repeating: 2, count: 4))
+
+        cache.clear()
+        XCTAssertEqual(cache.currentGeneration, newGeneration + 1)
+        XCTAssertNil(cache.data(forGameID: 2))
+        XCTAssertFalse(fileManager.fileExists(atPath: directory.path))
+        store(Data([4]), gameID: 4, in: cache)
+        XCTAssertEqual(try fileNames(in: directory), ["4.json"])
+        XCTAssertEqual(cache.data(forGameID: 4), Data([4]))
+    }
+
+    private func makeCache(maximumBytes: Int) throws -> (FinishedGameCache, URL) {
+        let scratch = fileManager.temporaryDirectory.appendingPathComponent("FinishedGameCacheTests-\(UUID().uuidString)",
+                                                                           isDirectory: true)
+        try fileManager.createDirectory(at: scratch, withIntermediateDirectories: false)
+        scratchDirectories.append(scratch)
+        let directory = scratch.appendingPathComponent("FinishedGames", isDirectory: true)
+        return (FinishedGameCache(directoryURL: directory, maximumBytes: maximumBytes), directory)
+    }
+
+    private func store(_ data: Data, gameID: Int, in cache: FinishedGameCache) {
+        cache.store(data, forGameID: gameID, ifGeneration: cache.currentGeneration)
+    }
+
+    private func seed(_ data: Data, gameID: Int, modified: TimeInterval, in directory: URL) throws {
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try data.write(to: fileURL(gameID: gameID, in: directory), options: .atomic)
+        try setModificationDate(modified, gameID: gameID, in: directory)
+    }
+
+    private func fileURL(gameID: Int, in directory: URL) -> URL {
+        directory.appendingPathComponent("\(gameID).json")
+    }
+
+    private func setModificationDate(_ timestamp: TimeInterval, gameID: Int, in directory: URL) throws {
+        try fileManager.setAttributes([.modificationDate: Date(timeIntervalSince1970: timestamp)],
+                                      ofItemAtPath: fileURL(gameID: gameID, in: directory).path)
+    }
+
+    private func modificationDate(gameID: Int, in directory: URL) throws -> Date {
+        try XCTUnwrap(fileManager.attributesOfItem(atPath: fileURL(gameID: gameID, in: directory).path)[.modificationDate] as? Date)
+    }
+
+    private func fileNames(in directory: URL) throws -> [String] {
+        try fileManager.contentsOfDirectory(atPath: directory.path).sorted()
+    }
+
+    private func totalFileBytes(in directory: URL) throws -> Int {
+        try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .reduce(0) { total, file in total + (try Data(contentsOf: file)).count }
+    }
+}
