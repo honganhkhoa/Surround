@@ -167,10 +167,7 @@ struct MessagesFriendsSection: View {
             if let error = ogs.friendsError {
                 MessagesRetryCard(title: "Couldn’t load friends", message: error, retry: ogs.fetchFriends)
             }
-            if ogs.friendsLoading && ogs.friends.isEmpty {
-                ProgressView("Loading friends…")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if ogs.friends.isEmpty {
+            if ogs.friends.isEmpty {
                 Text("No friends yet")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -261,10 +258,15 @@ struct MessagesFriendsSection: View {
     }
 }
 
+enum MessagesPlayerSearchPhase {
+    case idle, loading, loaded, failed
+}
+
 struct MessagesPlayerSearchResults: View {
     @EnvironmentObject private var ogs: OGSService
 
     @Binding var query: String
+    @Binding var phase: MessagesPlayerSearchPhase
     let onMessage: (OGSUser) -> Void
 
     private struct SearchIdentity: Hashable {
@@ -273,13 +275,8 @@ struct MessagesPlayerSearchResults: View {
         let attempt: Int
     }
 
-    private enum SearchPhase {
-        case idle, loading, loaded, failed
-    }
-
     @State private var attempt = 0
     @State private var results = [OGSUser]()
-    @State private var phase: SearchPhase = .idle
     @State private var searchError = ""
     @State private var loadedIdentity: SearchIdentity?
 
@@ -319,6 +316,10 @@ struct MessagesPlayerSearchResults: View {
         do {
             try await Task.sleep(for: .milliseconds(250))
             try Task.checkCancellation()
+            #if DEBUG && MAIN_APP
+            try await awaitMessagesSearchUITestRelease()
+            try Task.checkCancellation()
+            #endif
             for try await players in ogs.searchByUsername(keyword: keyword).values {
                 try Task.checkCancellation()
                 guard identity == searchIdentity else { return }
@@ -353,11 +354,10 @@ struct MessagesPlayerSearchResults: View {
                         Text("Search by username to view a profile or start a conversation.")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 80)
                 case .loading:
-                    ProgressView("Searching…")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                    if !friendResults.isEmpty {
+                        searchSection("Your friends", users: friendResults)
+                    }
                 case .failed:
                     MessagesRetryCard(title: "Couldn’t search players",
                                       message: searchError, retry: { attempt += 1 })
@@ -379,6 +379,7 @@ struct MessagesPlayerSearchResults: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)

@@ -44,6 +44,19 @@ enum SurroundUITestContract {
     static let emptyMessagesLaunchArgument = "--surround-empty-messages"
     static let messagesContentLaunchArgument = "--surround-messages-content"
     static let messagesOverflowLaunchArgument = "--surround-messages-overflow"
+    static let messagesShortHistoryLaunchArgument = "--surround-messages-short-history"
+    static let messagesDelayedHistoryLaunchArgument = "--surround-messages-delayed-history"
+    static let messagesInitialOpeningLaunchArgument = "--surround-messages-initial-opening"
+    static let messagesIncomingLaunchArgument = "--surround-messages-incoming"
+    static let messagesLoadingLaunchArgument = "--surround-messages-loading"
+
+    enum MessagesLoadingUITestAction {
+        case beginRead, finishFriends, finishRequests, failRead
+    }
+    static let messagesShortHistoryLatestText = "Short conversation reference 2/2. This incoming reply also wraps to several lines. Keep the final line visible above the composer after opening the conversation."
+    static let messagesVideoHistoryLatestText = "[surround way surround-e2e-browser-msg-20261002t123634z-def9830c 2/2] duo reply and same-account iPad test message. echo check."
+    static let messagesIncomingFirstText = "Offline incoming reply 1/2. A new message should follow the latest conversation while keeping the composer usable."
+    static let messagesIncomingLatestText = "Offline incoming reply 2/2. The latest reply stays above the composer; a reader of older history keeps that reading position."
     static let appearanceLaunchArgument = "--surround-ui-appearance"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
@@ -270,6 +283,25 @@ enum SurroundUITestContract {
     static var includesMessagesOverflow: Bool {
         includesMessagesContent
             && ProcessInfo.processInfo.arguments.contains(messagesOverflowLaunchArgument)
+    }
+
+    static var includesMessagesShortHistory: Bool {
+        includesMessagesContent
+            && ProcessInfo.processInfo.arguments.contains(messagesShortHistoryLaunchArgument)
+    }
+
+    static var includesMessagesDelayedHistory: Bool {
+        includesMessagesShortHistory
+            && ProcessInfo.processInfo.arguments.contains(messagesDelayedHistoryLaunchArgument)
+    }
+
+    static var includesMessagesIncoming: Bool {
+        includesMessagesOverflow
+            && ProcessInfo.processInfo.arguments.contains(messagesIncomingLaunchArgument)
+    }
+
+    static var includesMessagesLoading: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(messagesLoadingLaunchArgument)
     }
 
     static var includesFriendshipRequests: Bool {
@@ -553,6 +585,11 @@ enum SurroundUITestContract {
         static let profileRemoveFriend = "profile.friendship.remove"
         static let friendshipRemoveConfirm = "friendship.remove.confirm"
         static let friendshipReleaseResponse = "fixture.friendship.release-response"
+        static let messagesLoadingStartRead = "fixture.messages.start-read"
+        static let messagesLoadingEndFriends = "fixture.messages.end-friends"
+        static let messagesLoadingEndRequests = "fixture.messages.end-requests"
+        static let messagesLoadingFailRead = "fixture.messages.fail-read"
+        static let messagesLoadingReleaseSearch = "fixture.messages.release-search"
         static let friendshipRejectNotify = "friendship.reject.notify"
         static let friendshipRejectQuietly = "friendship.reject.quietly"
         static let accountMenu = "home.account-menu"

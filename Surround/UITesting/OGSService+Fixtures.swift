@@ -10,6 +10,173 @@ import Foundation
 #if DEBUG && MAIN_APP
 import SwiftUI
 import WidgetKit
+import os
+
+private final class MessagesHistoryReplayUITestProgress: ObservableObject {
+    static let shared = MessagesHistoryReplayUITestProgress()
+    @Published var delivered = 0
+    @Published var expected = 0
+}
+
+private struct MessagesHistoryReplayUITestModifier: ViewModifier {
+    @ObservedObject private var progress = MessagesHistoryReplayUITestProgress.shared
+
+    func body(content: Content) -> some View {
+        if SurroundUITestContract.includesMessagesIncoming {
+            content.accessibilityValue(Text(verbatim: "delivered:\(progress.delivered)/\(progress.expected)"))
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func messagesHistoryReplayUITestHarness() -> some View {
+        modifier(MessagesHistoryReplayUITestModifier())
+    }
+}
+
+/// Delivers an opt-in offline history only after its transcript appears.
+private enum MessagesHistoryReplayUITestGate {
+    static var pending = [ObjectIdentifier: [OGSPrivateMessage]]()
+    private static let log = Logger(subsystem: "com.honganhkhoa.Surround.MessagesReplay", category: "offline")
+
+    static func begin(service: OGSService, peerID: Int) {
+        guard peerID == 765826,
+              let messages = pending.removeValue(forKey: ObjectIdentifier(service)) else { return }
+        let progress = MessagesHistoryReplayUITestProgress.shared
+        progress.delivered = 0
+        progress.expected = messages.count
+        log.notice("Offline history replay started; count=\(messages.count)")
+        let environment = ProcessInfo.processInfo.environment
+        let requestedDelay = Double(environment["SURROUND_UI_MESSAGES_REPLAY_DELAY"] ?? "") ?? 2
+        let delay = min(60, max(0, requestedDelay))
+        let requestedInterval = Double(environment["SURROUND_UI_MESSAGES_REPLAY_INTERVAL"] ?? "") ?? 0.35
+        let interval = min(1, max(0, requestedInterval))
+        for (index, message) in messages.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + Double(index) * interval) { [weak service] in
+                guard let service else { return }
+                service.handlePrivateMessage(message)
+                if service.privateMessagesByPeerId[peerID]?.contains(where: { $0.messageKey == message.messageKey }) == true {
+                    progress.delivered += 1
+                }
+                log.notice("Offline history delivered index=\(index), total=\(service.privateMessagesByPeerId[peerID]?.count ?? 0)")
+            }
+        }
+    }
+}
+
+extension OGSService {
+    func beginMessagesHistoryUITestReplay(peerID: Int) {
+        guard SurroundUITestContract.includesMessagesDelayedHistory
+            || SurroundUITestContract.includesMessagesIncoming else { return }
+        MessagesHistoryReplayUITestGate.begin(service: self, peerID: peerID)
+    }
+}
+
+@MainActor
+private final class MessagesLoadingUITestSearchGate: ObservableObject {
+    static let shared = MessagesLoadingUITestSearchGate()
+    @Published private(set) var pendingCount = 0
+    private var pending = [UUID: CheckedContinuation<Void, Error>]()
+    private var hasFailedSearch = false
+
+    func waitForRelease() async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                pending[id] = continuation
+                pendingCount = pending.count
+            }
+            try Task.checkCancellation()
+        } onCancel: {
+            Task { @MainActor in self.cancel(id) }
+        }
+    }
+
+    private func cancel(_ id: UUID) {
+        guard let continuation = pending.removeValue(forKey: id) else { return }
+        pendingCount = pending.count
+        continuation.resume(throwing: CancellationError())
+    }
+
+    func release() {
+        let continuations = Array(pending.values)
+        pending.removeAll()
+        pendingCount = 0
+        let fails = !continuations.isEmpty && !hasFailedSearch
+            && ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_SEARCH_FAIL_ONCE"] == "1"
+        if fails { hasFailedSearch = true }
+        for continuation in continuations {
+            if fails {
+                continuation.resume(throwing: OGSServiceError.invalidJSON)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+}
+
+@MainActor
+func awaitMessagesSearchUITestRelease() async throws {
+    guard SurroundUITestContract.includesMessagesLoading else { return }
+    try await MessagesLoadingUITestSearchGate.shared.waitForRelease()
+}
+
+private struct MessagesLoadingUITestModifier: ViewModifier {
+    @EnvironmentObject private var ogs: OGSService
+    @ObservedObject private var gate = MessagesLoadingUITestSearchGate.shared
+
+    private var state: String {
+        let errorCount = (ogs.friendsError == nil ? 0 : 1) + (ogs.friendInvitationsError == nil ? 0 : 1)
+        return "friends:\(ogs.friendsLoading ? 1 : 0);requests:\(ogs.friendInvitationsLoading ? 1 : 0)"
+            + ";errors:\(errorCount);search:\(gate.pendingCount)"
+    }
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            // Every control keeps the same footprint during all fixture states.
+            HStack(spacing: 4) {
+                control("Read", identifier: SurroundUITestContract.AccessibilityID.messagesLoadingStartRead) {
+                    ogs.applyMessagesLoadingUITestAction(.beginRead)
+                }
+                .accessibilityValue(Text(verbatim: state))
+                control("Friends", identifier: SurroundUITestContract.AccessibilityID.messagesLoadingEndFriends) {
+                    ogs.applyMessagesLoadingUITestAction(.finishFriends)
+                }
+                control("Requests", identifier: SurroundUITestContract.AccessibilityID.messagesLoadingEndRequests) {
+                    ogs.applyMessagesLoadingUITestAction(.finishRequests)
+                }
+                control("Fail", identifier: SurroundUITestContract.AccessibilityID.messagesLoadingFailRead) {
+                    ogs.applyMessagesLoadingUITestAction(.failRead)
+                }
+                control("Search", identifier: SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch) {
+                    gate.release()
+                }
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
+        }
+    }
+
+    private func control(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(verbatim: title)
+                .font(.caption2)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+}
 
 /// Holds the first offline friendship response until a UI journey has verified
 /// its navigation destination. Later responses, including Retry, run normally.
@@ -38,7 +205,9 @@ private struct FriendshipResponseUITestModifier: ViewModifier {
     @ObservedObject private var gate = FriendshipResponseUITestGate.shared
 
     func body(content: Content) -> some View {
-        if SurroundUITestContract.gatesFriendshipResponse {
+        if SurroundUITestContract.includesMessagesLoading {
+            content.modifier(MessagesLoadingUITestModifier())
+        } else if SurroundUITestContract.gatesFriendshipResponse {
             content.safeAreaInset(edge: .bottom, spacing: 0) {
                 Button(action: gate.release) {
                     Text(verbatim: "Release friendship response")
@@ -1194,6 +1363,27 @@ extension OGSService {
                         timestamp: now - Double(index * 60)))
                 }
             }
+            if SurroundUITestContract.includesMessagesShortHistory, let account = state.user,
+               let latest = state.privateMessages.first(where: { $0.from.id == 765826 }) {
+                let peer = latest.from
+                let videoTextShape = ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_VIDEO_TEXT_SHAPE"] == "1"
+                let texts = [
+                    "Hello", "Hi",
+                    videoTextShape
+                        ? "[surround qa surround-e2e-browser-msg-20261002t123634z-def9830c 1/2] phone to duo/ipad delivery check."
+                        : "Short conversation reference 1/2. This longer outgoing message wraps to several lines while the whole history still fits above the composer.",
+                    videoTextShape ? SurroundUITestContract.messagesVideoHistoryLatestText : SurroundUITestContract.messagesShortHistoryLatestText,
+                ]
+                state.privateMessages.removeAll { $0.from.id == peer.id || $0.to.id == peer.id }
+                let requestedCount = Int(ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_SHORT_COUNT"] ?? "") ?? 4
+                state.privateMessages += texts.prefix(min(4, max(1, requestedCount))).enumerated().map { index, text in
+                    let outgoing = index == 1 || index == 2
+                    let age = index < 2 ? 3 * 86_400 : 86_400
+                    return OGSPrivateMessage(from: outgoing ? account : peer, to: outgoing ? peer : account,
+                        content: OGSPrivateMessageContent(id: "messages-short-history-\(index)", message: text,
+                            timestamp: latest.content.timestamp - Double(age) + Double(index * 60)))
+                }
+            }
             if SurroundUITestContract.includesMessagesOverflow, let account = state.user {
                 // Keep the existing profiles, latest two messages, unread
                 // conversations and ordering intact. Only this opt-in fixture
@@ -1383,7 +1573,37 @@ extension OGSService {
                 // window stays open for the whole test.
                 state.isReconcilingAutomatches = true
             }
-            return OGSService(
+            var delayedHistory = SurroundUITestContract.includesMessagesDelayedHistory
+                ? state.privateMessages.filter { $0.from.id == 765826 || $0.to.id == 765826 }
+                : []
+            if !delayedHistory.isEmpty {
+                let mode = ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_REPLAY_MODE"] ?? "backfill"
+                let initial = mode == "empty" ? []
+                    : mode == "append" ? Array(delayedHistory.prefix(2)) : Array(delayedHistory.suffix(1))
+                state.privateMessages.removeAll { $0.from.id == 765826 || $0.to.id == 765826 }
+                state.privateMessages += initial
+                if mode == "empty", let peer = delayedHistory.first?.from {
+                    state.friends.insert(peer, at: 0)
+                    state.friendshipByPlayerID[peer.id] = .friends
+                }
+            }
+            if SurroundUITestContract.includesMessagesIncoming, let account = state.user,
+               let latest = state.privateMessages.last(where: { $0.from.id == 765826 || $0.to.id == 765826 }) {
+                let peer = latest.from.id == account.id ? latest.to : latest.from
+                delayedHistory = [SurroundUITestContract.messagesIncomingFirstText,
+                                  SurroundUITestContract.messagesIncomingLatestText].enumerated().map { index, text in
+                    OGSPrivateMessage(from: peer, to: account, content: OGSPrivateMessageContent(
+                        id: "messages-incoming-\(index)", message: text,
+                        timestamp: latest.content.timestamp + Double(index + 1) * 60))
+                }
+            }
+            if SurroundUITestContract.includesMessagesLoading,
+               ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_LOADING_EMPTY"] == "1" {
+                state.friends = []
+                state.friendInvitations = []
+                state.privateMessages = []
+            }
+            let service = OGSService(
                 environment: .current,
                 httpClient: SurroundUITestRejectingHTTPClient(),
                 preferences: userDefaults,
@@ -1396,6 +1616,14 @@ extension OGSService {
                 remoteSettings: OGSRemoteSetting(preferences: userDefaults),
                 initialState: state
             )
+            if !delayedHistory.isEmpty {
+                MessagesHistoryReplayUITestGate.pending[ObjectIdentifier(service)] = delayedHistory
+            }
+            if SurroundUITestContract.includesMessagesLoading,
+               ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_LOADING_INITIAL"] == "1" {
+                service.applyMessagesLoadingUITestAction(.beginRead)
+            }
+            return service
         }
 
         var state = BootstrapState()

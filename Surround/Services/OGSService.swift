@@ -4592,10 +4592,42 @@ class OGSService: ObservableObject {
     
     func fetchFriends() {
         guard isLoggedIn else { return }
+        #if DEBUG && MAIN_APP
+        if SurroundUITestContract.includesMessagesLoading {
+            applyMessagesLoadingUITestAction(.beginRead)
+            return
+        }
+        #endif
         friendshipListCancellable = refreshFriendships().sink(
             receiveCompletion: { _ in }, receiveValue: { _ in }
         )
     }
+
+    #if DEBUG && MAIN_APP
+    /// Drives existing view state only; deterministic clients keep their
+    /// rejecting transports and unchanged friendship snapshots.
+    func applyMessagesLoadingUITestAction(_ action: SurroundUITestContract.MessagesLoadingUITestAction) {
+        guard SurroundUITestContract.includesMessagesLoading else { return }
+        switch action {
+        case .beginRead:
+            friendsError = nil
+            friendInvitationsError = nil
+            friendsLoading = true
+            friendInvitationsLoading = true
+        case .finishFriends:
+            friendsLoading = false
+            friendsError = nil
+        case .finishRequests:
+            friendInvitationsLoading = false
+            friendInvitationsError = nil
+        case .failRead:
+            friendsLoading = false
+            friendInvitationsLoading = false
+            friendsError = "Offline friends read failed. Please try again."
+            friendInvitationsError = "Offline friend requests read failed. Please try again."
+        }
+    }
+    #endif
 
     func friendship(for playerID: Int) -> OGSProfileFriendship? {
         friendshipByPlayerID[playerID]

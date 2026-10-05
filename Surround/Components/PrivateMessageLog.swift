@@ -274,8 +274,10 @@ private struct PrivateMessageTranscript: View {
 
     private func scrollToLatestMessageIfFollowing() {
         guard isVisible, isPresented, followsLatestMessages,
-              !Self.isUserScrolling(scrollPhase), let key = messages.last?.messageKey else { return }
-        scrollPosition.scrollTo(id: key, anchor: .bottom)
+              !Self.isUserScrolling(scrollPhase), !messages.isEmpty else { return }
+        // A fitting transcript is already bottom-aligned. Target its edge to
+        // avoid applying that alignment again through a message-ID anchor.
+        scrollPosition.scrollTo(edge: .bottom)
     }
 
     private func markThreadAsRead() {
@@ -343,20 +345,26 @@ private struct PrivateMessageTranscript: View {
                 rememberUserPosition(in: context.geometry)
             }
         }
+        #if DEBUG && MAIN_APP
+        .messagesHistoryReplayUITestHarness()
+        #endif
         .onAppear {
             isVisible = true
             publishRetainedPosition()
             scrollToLatestMessageIfFollowing()
             ogs.setUpNewPeerIfNecessary(peerId: peerID)
             markThreadAsRead()
+            #if DEBUG && MAIN_APP
+            ogs.beginMessagesHistoryUITestReplay(peerID: peerID)
+            #endif
         }
         .onDisappear {
             isVisible = false
             if scrollPhase != .idle { scrollPhase = .idle }
         }
         .onChange(of: messages) { _, _ in
-            if isVisible && isPresented && followsLatestMessages, let key = messages.last?.messageKey {
-                scrollPosition.scrollTo(id: key, anchor: .bottom)
+            if isVisible && isPresented && followsLatestMessages, !messages.isEmpty {
+                scrollPosition.scrollTo(edge: .bottom)
                 markThreadAsRead()
             }
         }

@@ -9,6 +9,7 @@ struct PrivateMessagesView: View {
     @StateObject private var navigation = StackRouter()
     @State private var playerSearchQuery = ""
     @State private var isSearchingPlayers = false
+    @State private var playerSearchPhase: MessagesPlayerSearchPhase = .idle
     @FocusState private var searchFocused: Bool
     @State private var selectedPeer: OGSUser?
     @State private var usesColumns: Bool?
@@ -51,6 +52,7 @@ struct PrivateMessagesView: View {
     }
     private func cancelPlayerSearch() {
         setPlayerSearchActive(false)
+        playerSearchPhase = .idle
         searchFocused = false
         playerSearchQuery = ""
     }
@@ -74,7 +76,7 @@ struct PrivateMessagesView: View {
                         if layout.usesColumns {
                             Color.clear
                                 .frame(width: 1)
-                                .background(Color(uiColor: .separator), ignoresSafeAreaEdges: .bottom)
+                                .background(Color(uiColor: .separator), ignoresSafeAreaEdges: .vertical)
                                 .frame(width: layout.gap)
                                 .accessibilityHidden(true)
                             Group {
@@ -90,6 +92,14 @@ struct PrivateMessagesView: View {
                             .accessibilityIdentifier("messages.detailPane")
                         }
                     }
+                    .background(alignment: .leading) {
+                        // Paint up to the separator at the center of the native
+                        // division clearance; keep pane controls out of it.
+                        MessagesStyle.canvas
+                            .frame(width: layout.inboxWidth + layout.gap / 2)
+                            .clipped()
+                            .ignoresSafeArea(.container, edges: .vertical)
+                    }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenMessages)
                     .onChange(of: data.map { $0.peer.id }, initial: true) { _, _ in
@@ -103,9 +113,21 @@ struct PrivateMessagesView: View {
                     }
                     #endif
                 }
-                .background(MessagesStyle.canvas)
+                .background(usesColumns == true ? Color(uiColor: .systemBackground) : MessagesStyle.canvas)
                 .navigationTitle("Messages")
                 .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    if #available(iOS 26.0, *) {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            loadingIndicator
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            loadingIndicator
+                        }
+                    }
+                }
             }
             .onChange(of: mode, initial: true) { _, wide in
                 guard let wide else { return }
@@ -129,6 +151,7 @@ struct PrivateMessagesView: View {
             selectedPeer = nil
             searchFocused = false
             isSearchingPlayers = false
+            playerSearchPhase = .idle
             playerSearchQuery = ""
             friendsExpanded = false
             inboxPosition = ScrollPosition(idType: String.self, edge: .top)
@@ -136,28 +159,64 @@ struct PrivateMessagesView: View {
     }
 
     private func selectInitialPeer(inColumns: Bool) {
+        #if DEBUG && MAIN_APP
+        if SurroundUITestContract.isEnabled,
+           ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.messagesInitialOpeningLaunchArgument) {
+            // Wait for the permanent host's layout before any initial selection.
+            guard let wide = usesColumns, navigation.path.isEmpty, selectedPeer == nil,
+                  let peer = user(id: 765826) else { return }
+            openConversation(with: peer, inColumns: wide)
+            return
+        }
+        #endif
         if inColumns && selectedPeer == nil { selectedPeer = data.first?.peer }
     }
 
     private func inbox(inColumns: Bool, availableHeight: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            searchBar
-            ZStack(alignment: .top) {
-                if isSearchingPlayers {
-                    MessagesPlayerSearchResults(query: $playerSearchQuery) { peer in
-                        openConversation(with: peer, inColumns: inColumns)
-                    }
-                    .transition(.opacity)
-                } else {
-                    inboxSections(expanded: inColumns, availableHeight: availableHeight)
-                        .transition(.opacity)
+        ZStack(alignment: .top) {
+            if isSearchingPlayers {
+                MessagesPlayerSearchResults(query: $playerSearchQuery, phase: $playerSearchPhase) { peer in
+                    openConversation(with: peer, inColumns: inColumns)
                 }
+                .transition(.opacity)
+            } else {
+                inboxSections(expanded: inColumns, availableHeight: availableHeight)
+                    .transition(.opacity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .background {
-            MessagesStyle.canvas.ignoresSafeArea(edges: .bottom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            // Keep the scroll view at the navigation edge so it owns native
+            // large-title collapse, while search stays pinned above its content.
+            searchBar.background(MessagesStyle.canvas, ignoresSafeAreaEdges: [])
         }
+    }
+
+    private var loadingIndicator: some View {
+        let searching = isSearchingPlayers && playerSearchPhase == .loading
+        let loading = searching || ogs.friendsLoading || ogs.friendInvitationsLoading
+        let label: Text = if searching {
+            Text("Searching…")
+        } else if ogs.friendsLoading && ogs.friendInvitationsLoading {
+            Text("Loading friends…") + Text(verbatim: ", ") + Text("Loading friend requests…")
+        } else if ogs.friendInvitationsLoading {
+            Text("Loading friend requests…")
+        } else {
+            Text("Loading friends…")
+        }
+        return ZStack {
+            Color.clear.accessibilityHidden(true)
+            if loading {
+                ProgressView()
+                    .accessibilityLabel(label)
+                    .accessibilityIdentifier("messages.loadingStatus")
+            }
+        }
+        .frame(width: 44, height: 44)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: ""))
+        .accessibilityIdentifier("messages.loadingSlot")
+        .accessibilityHidden(!loading)
     }
 
     private var searchBar: some View {
@@ -194,12 +253,11 @@ struct PrivateMessagesView: View {
     private func inboxSections(expanded: Bool, availableHeight: CGFloat) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsLoading
-                    || ogs.friendInvitationsError != nil {
+                if !ogs.friendInvitations.isEmpty || ogs.friendInvitationsError != nil {
                     requestsSection.id("messages.requests")
                 }
 
-                if !ogs.friends.isEmpty || ogs.friendsLoading || ogs.friendsError != nil {
+                if !ogs.friends.isEmpty || ogs.friendsError != nil {
                     MessagesFriendsSection(isExpanded: $friendsExpanded, selectedPeerID: expanded ? selectedPeerID : nil,
                         recentPeerIDs: data.map { $0.peer.id }) { peer in
                             openConversation(with: peer, inColumns: expanded)
@@ -207,8 +265,7 @@ struct PrivateMessagesView: View {
                         .id("messages.friends")
                 }
 
-                if data.isEmpty && ogs.friends.isEmpty && ogs.friendInvitations.isEmpty
-                    && !ogs.friendsLoading && !ogs.friendInvitationsLoading {
+                if data.isEmpty && ogs.friends.isEmpty && ogs.friendInvitations.isEmpty {
                     discoveryEmptyState(expanded: expanded)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: max(300, availableHeight - 170))
@@ -239,12 +296,6 @@ struct PrivateMessagesView: View {
                         .padding(.vertical, 2)
                         .background(MessagesStyle.paleAccent, in: Capsule())
                 }
-            }
-            if ogs.friendInvitationsLoading && ogs.friendInvitations.isEmpty {
-                ProgressView("Loading friend requests…")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(MessagesStyle.card, in: RoundedRectangle(cornerRadius: 16))
             }
             if let error = ogs.friendInvitationsError {
                 MessagesRetryCard(title: "Couldn’t load friend requests",
@@ -504,7 +555,6 @@ struct MessagesConversationView: View {
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
-        .tint(MessagesStyle.accent)
         .accessibilityLabel(Text("Challenge \(peer.username)"))
         .accessibilityIdentifier("messages.challenge.\(peer.id)")
     }

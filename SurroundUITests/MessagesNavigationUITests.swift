@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import Vision
 
 /// Offline journeys through MainView's real Messages tab. Independent device
 /// launches cover fixed geometry; native Duo transitions remain separate.
@@ -10,6 +11,870 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private let secondPeerID = 955_348
 
     private enum ConversationPresentation { case wideRoot, nativePush }
+
+    func testMessagesReadLoadingStatusKeepsCachedInboxGeometry() {
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesLoadingLaunchArgument,
+            SurroundUITestContract.friendshipLaunchArgument,
+        ])
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        var anchors = messagesLoadingAnchors(in: app)
+        anchors["scroll"] = element("messages.inboxScroll", in: app, matching: .scrollView)
+        anchors["request"] = element(SurroundUITestContract.AccessibilityID.friendRequestProfile(
+            SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]), in: app, matching: .button)
+        anchors["friend"] = element("messages.friend.message.\(friendID)", in: app, matching: .button)
+        let frames = anchors.mapValues(\.frame)
+
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingStartRead, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:1;requests:1;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus("Loading friends…, Loading friend requests…", in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        XCTAssertTrue(anchors["request"]!.isHittable, "A refresh must keep the cached requests usable.")
+        keepScreenshot("Cached inbox during both read activities", in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndFriends, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:1;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus("Loading friend requests…", in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndRequests, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        keepScreenshot("Cached inbox after both read activities", in: app)
+    }
+
+    func testMessagesEmptyReadLoadingErrorAndRetryKeepNavigationStable() {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesLoadingLaunchArgument],
+            launchEnvironment: ["SURROUND_UI_MESSAGES_LOADING_INITIAL": "1",
+                                "SURROUND_UI_MESSAGES_LOADING_EMPTY": "1"])
+        assertMessagesLoadingFixture("friends:1;requests:1;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus("Loading friends…, Loading friend requests…", in: app)
+        let empty = app.staticTexts["No conversations yet"].firstMatch
+        XCTAssertTrue(empty.waitForExistence(timeout: 10) && empty.isHittable,
+                      "Initial reads must retain the readable empty inbox.")
+        var anchors = messagesLoadingAnchors(in: app, includesConversation: false)
+        anchors["scroll"] = element("messages.inboxScroll", in: app, matching: .scrollView)
+        anchors["empty"] = empty
+        let frames = anchors.mapValues(\.frame)
+        keepScreenshot("Initial empty inbox during read activity", in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndFriends, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:1;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus("Loading friend requests…", in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndRequests, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingStartRead, in: app, matching: .button)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingFailRead, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:2;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        XCTAssertTrue(app.staticTexts["Couldn’t load friends"].exists)
+        XCTAssertTrue(app.staticTexts["Couldn’t load friend requests"].exists)
+        keepScreenshot("Empty inbox preserves both read errors and retry", in: app)
+        tap(app.buttons["Try Again"].firstMatch, description: "Retry the failed inbox reads", in: app)
+        assertMessagesLoadingFixture("friends:1;requests:1;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus("Loading friends…, Loading friend requests…", in: app)
+        XCTAssertFalse(app.staticTexts["Couldn’t load friends"].exists)
+        XCTAssertFalse(app.staticTexts["Couldn’t load friend requests"].exists)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndFriends, in: app, matching: .button)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingEndRequests, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        keepScreenshot("Empty inbox after successful retry state", in: app)
+    }
+
+    func testMessagesSearchLoadingCancelAndEmptyResultKeepNavigationStable() {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesLoadingLaunchArgument])
+        let anchors = messagesLoadingAnchors(in: app)
+        let restingFrames = anchors.mapValues(\.frame)
+        setSearch("Copper", in: app)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
+        assertMessagesLoadingStatus("Searching…", in: app)
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        keepScreenshot("Held player search uses the navigation activity slot", in: app)
+        cancelInboxSearch(in: app)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        XCTAssertTrue(waitForCondition { !app.keyboards.firstMatch.exists })
+        assertMessagesLoadingFramesAfterSearchCancel(anchors, equalTo: restingFrames, in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        XCTAssertEqual(anchors["search"]!.value as? String, "")
+        XCTAssertFalse(query("messages.cancelPlayerSearch", in: app).exists,
+                       "Releasing a canceled search must not restore its discovery presentation.")
+
+        let emptyQuery = "NoSuchMessagesLoadingPlayer777"
+        setSearch(emptyQuery, in: app)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
+        assertMessagesLoadingStatus("Searching…", in: app)
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        let keyboardFrames = anchors.mapValues(\.frame)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        let emptyHeading = app.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "No Results for", emptyQuery)).firstMatch
+        let emptyHeadingVisible = emptyHeading.waitForExistence(timeout: 10)
+            && waitUntilHittable(emptyHeading, timeout: 10)
+        if !emptyHeadingVisible {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Loaded empty search – native heading hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            keepScreenshot("Loaded empty search – native heading assertion", in: app)
+        }
+        XCTAssertTrue(emptyHeadingVisible, "The loaded empty result must show the native heading for this exact query.")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.exists)
+        XCTAssertLessThanOrEqual(emptyHeading.frame.maxY, keyboard.frame.minY + 1,
+                                 "The loaded empty heading must be readable above the software keyboard.")
+        assertMessagesLoadingFrames(anchors, equalTo: keyboardFrames, in: app)
+        keepScreenshot("Loaded empty player search keeps keyboard and detail geometry", in: app)
+        cancelInboxSearch(in: app)
+        XCTAssertTrue(waitForCondition { !app.keyboards.firstMatch.exists })
+        assertMessagesLoadingStatus(nil, in: app)
+        assertMessagesLoadingFramesAfterSearchCancel(anchors, equalTo: restingFrames, in: app)
+    }
+
+    func testMessagesSearchLoadingFailureAndRetryKeepNavigationStable() {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesLoadingLaunchArgument],
+            launchEnvironment: ["SURROUND_UI_MESSAGES_SEARCH_FAIL_ONCE": "1"])
+        let anchors = messagesLoadingAnchors(in: app)
+        setSearch("Copper", in: app)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
+        assertMessagesLoadingStatus("Searching…", in: app)
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        let frames = anchors.mapValues(\.frame)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        XCTAssertTrue(app.staticTexts["Couldn’t search players"].waitForExistence(timeout: 10))
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        keepScreenshot("Player search failure clears activity and preserves retry", in: app)
+        tap(app.buttons["Try Again"].firstMatch, description: "Retry the failed player search", in: app)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
+        assertMessagesLoadingStatus("Searching…", in: app)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertSearch("Copper", playerID: searchPlayerID, in: app)
+        XCTAssertFalse(app.staticTexts["Couldn’t search players"].exists)
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        assertMessagesLoadingFrames(anchors, equalTo: frames, in: app)
+        keepScreenshot("Player search retry loads results without moving navigation", in: app)
+    }
+
+    private func assertMessagesLoadingFixture(_ state: String, in app: XCUIApplication) {
+        let probe = element(SurroundUITestContract.AccessibilityID.messagesLoadingStartRead, in: app, matching: .button)
+        XCTAssertTrue(waitForValue(state, in: probe, timeout: 10),
+                      "The opt-in fixture must expose the actual read flags, errors and held search count.")
+    }
+
+    private func assertMessagesLoadingStatus(_ label: String?, in app: XCUIApplication) {
+        let statusID = "messages.loadingStatus"
+        let status = query(statusID, in: app)
+        if let label {
+            // SwiftUI can give the spinner's wrapper the same identifier.
+            // Count the actual activity widget while idle still excludes all IDs.
+            let activeStatus = app.activityIndicators.matching(identifier: statusID).firstMatch
+            let announced = waitForCondition { activeStatus.exists && activeStatus.label == label }
+            if !announced { keepMessagesLoadingAccessibilityFailure("active announcement", in: app) }
+            XCTAssertTrue(announced,
+                          "The fixed navigation slot must announce the active operation.")
+            XCTAssertTrue(app.navigationBars.activityIndicators
+                .matching(identifier: statusID).firstMatch.exists,
+                "Background activity must belong to native navigation instead of a scroll section.")
+            let count = app.activityIndicators.matching(identifier: statusID).count
+            if count != 1 { keepMessagesLoadingAccessibilityFailure("active identifier count \(count)", in: app) }
+            XCTAssertEqual(count, 1)
+        } else {
+            let hidden = waitForCondition { !status.exists }
+            if !hidden { keepMessagesLoadingAccessibilityFailure("inactive identifier remains", in: app) }
+            XCTAssertTrue(hidden, "Inactive activity must be hidden from accessibility.")
+            let slots = app.descendants(matching: .any).matching(identifier: "messages.loadingSlot")
+                .allElementsBoundByIndex
+            if slots.contains(where: { !$0.label.isEmpty }) {
+                keepMessagesLoadingAccessibilityFailure("inactive slot retains a loading label", in: app)
+            }
+            for slot in slots {
+                XCTAssertEqual(slot.label, "", "An enumerated inactive slot must clear its previous activity label.")
+            }
+        }
+    }
+
+    private func keepMessagesLoadingAccessibilityFailure(_ reason: String, in app: XCUIApplication) {
+        let matches = ["messages.loadingStatus", "messages.loadingSlot"].flatMap { identifier in
+            app.descendants(matching: .any).matching(identifier: identifier).allElementsBoundByIndex
+        }
+        let description = matches.enumerated().map { index, status in
+            "match \(index): type=\(status.elementType.rawValue), hittable=\(status.isHittable), frame=\(status.frame)\n"
+                + status.debugDescription
+        }.joined(separator: "\n\n")
+        let status = XCTAttachment(string: description)
+        status.name = "Messages loading status – \(reason)"
+        status.lifetime = .keepAlways
+        add(status)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Messages loading hierarchy – \(reason)"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        keepScreenshot("Messages loading accessibility failure – \(reason)", in: app)
+    }
+
+    private func messagesLoadingAnchors(in app: XCUIApplication,
+                                       includesConversation: Bool = true) -> [String: XCUIElement] {
+        var anchors = ["search": element("messages.playerSearchField", in: app, matching: .textField),
+                       "navigation": app.navigationBars["Messages"].firstMatch]
+        if usesColumns(in: app) {
+            if includesConversation {
+                anchors["composer"] = assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app)
+            }
+            anchors["detail"] = element("messages.detailPane", in: app)
+        }
+        return anchors
+    }
+
+    private func assertMessagesLoadingFramesAfterSearchCancel(_ anchors: [String: XCUIElement],
+                                                              equalTo frames: [String: CGRect], in app: XCUIApplication) {
+        // Retain the full intrinsic-size evidence even when the center check passes.
+        let actualFrames = messagesLoadingFramesWithDiagnostics(anchors, equalTo: frames, in: app)
+        let fixedAnchors = anchors.filter { $0.key != "search" }
+        assertMessagesLoadingFrames(fixedAnchors, equalTo: frames, in: app)
+        let actual = actualFrames["search"]!
+        let expected = frames["search"]!
+        // After first focus, the native text field's accessibility height changes
+        // about its fixed center. Cancellation must preserve that center and width;
+        // activity completion/error/retry still checks every frame component.
+        XCTAssertEqual(actual.midX, expected.midX, accuracy: 1, "Search must retain its horizontal center after cancellation.")
+        XCTAssertEqual(actual.midY, expected.midY, accuracy: 1, "Search must retain its vertical center after cancellation.")
+        XCTAssertEqual(actual.width, expected.width, accuracy: 1, "Search must retain its width after cancellation.")
+    }
+
+    private func assertMessagesLoadingFrames(_ anchors: [String: XCUIElement],
+                                             equalTo frames: [String: CGRect], in app: XCUIApplication) {
+        let actualFrames = messagesLoadingFramesWithDiagnostics(anchors, equalTo: frames, in: app)
+        for name in anchors.keys.sorted() {
+            let actual = actualFrames[name]!
+            let expected = frames[name]!
+            XCTAssertEqual(actual.minX, expected.minX, accuracy: 1, "\(name) must retain its horizontal position.")
+            XCTAssertEqual(actual.minY, expected.minY, accuracy: 1, "\(name) must retain its vertical position.")
+            XCTAssertEqual(actual.width, expected.width, accuracy: 1, "\(name) must retain its width.")
+            XCTAssertEqual(actual.height, expected.height, accuracy: 1, "\(name) must retain its height.")
+        }
+    }
+
+    private func messagesLoadingFramesWithDiagnostics(_ anchors: [String: XCUIElement],
+                                                      equalTo frames: [String: CGRect], in app: XCUIApplication) -> [String: CGRect] {
+        let actualFrames = anchors.mapValues(\.frame)
+        let moved = anchors.keys.contains { name in
+            let actual = actualFrames[name]!
+            let expected = frames[name]!
+            return abs(actual.minX - expected.minX) > 1 || abs(actual.minY - expected.minY) > 1
+                || abs(actual.width - expected.width) > 1 || abs(actual.height - expected.height) > 1
+        }
+        if moved {
+            func describe(_ frame: CGRect) -> [String: Double] {
+                ["x": Double(frame.minX), "y": Double(frame.minY),
+                 "width": Double(frame.width), "height": Double(frame.height),
+                 "centerX": Double(frame.midX), "centerY": Double(frame.midY)]
+            }
+            let snapshot = anchors.keys.reduce(into: [String: [String: [String: Double]]]()) { result, name in
+                result[name] = ["expected": describe(frames[name]!), "actual": describe(actualFrames[name]!)]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: snapshot, options: [.prettyPrinted, .sortedKeys]) {
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                attachment.name = "Messages loading geometry – full anchor frames"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Messages loading geometry – hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            keepScreenshot("Messages loading geometry – before frame assertion", in: app)
+        }
+        return actualFrames
+    }
+
+    func testInitialShortHistoryOpeningStaysAboveComposerWithoutInput() throws {
+        try assertInitialHistoryOpening(mode: nil, delay: "0", interval: "0")
+    }
+
+    func testInitialTwoMessageOpeningStaysAboveComposerWithoutInput() throws {
+        try assertInitialHistoryOpening(mode: nil, delay: "0", interval: "0", messageCount: 2)
+    }
+
+    func testInitialThreeMessageOpeningStaysAboveComposerWithoutInput() throws {
+        try assertInitialHistoryOpening(mode: nil, delay: "0", interval: "0", messageCount: 3)
+    }
+
+    func testInitialEmptyHistoryFastReplayStaysAboveComposerWithoutInput() throws {
+        try assertInitialHistoryOpening(mode: "empty", delay: "0.02", interval: "0.03")
+    }
+
+    func testInitialEmptyHistoryStaggeredReplayStaysAboveComposerWithoutInput() throws {
+        try assertInitialHistoryOpening(mode: "empty", delay: "0.2", interval: "0.35")
+    }
+
+    private func assertInitialHistoryOpening(mode: String?, delay: String, interval: String,
+                                            messageCount: Int = 4) throws {
+        var arguments = [SurroundUITestContract.messagesShortHistoryLaunchArgument,
+                         SurroundUITestContract.messagesInitialOpeningLaunchArgument]
+        if mode != nil { arguments.append(SurroundUITestContract.messagesDelayedHistoryLaunchArgument) }
+        var environment = ["SURROUND_UI_MESSAGES_VIDEO_TEXT_SHAPE": "1",
+                           "SURROUND_UI_MESSAGES_REPLAY_DELAY": delay,
+                           "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": interval,
+                           "SURROUND_UI_MESSAGES_SHORT_COUNT": String(messageCount)]
+        if let mode { environment["SURROUND_UI_MESSAGES_REPLAY_MODE"] = mode }
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.messagesInbox.rawValue,
+            SurroundUITestContract.profileContentLaunchArgument,
+            SurroundUITestContract.messagesContentLaunchArgument,
+        ] + arguments, launchEnvironment: environment, orientation: .portrait)
+        // These portrait fixtures occupy the full window. Decide the expected
+        // presentation independently of retained root elements behind a push.
+        let window = app.windows.firstMatch.frame
+        let expectsColumns = window.width >= 660
+        let activeComposer = assertConversation("hakhoa", peerID: firstPeerID,
+            presentation: expectsColumns ? .wideRoot : .nativePush, in: app)
+        let composer: XCUIElement
+        let transcript: XCUIElement
+        if expectsColumns {
+            let detail = element("messages.detailPane", in: app)
+            composer = detail.textFields.matching(identifier:
+                SurroundUITestContract.AccessibilityID.privateMessageComposer).firstMatch
+            XCTAssertTrue(waitUntilHittable(composer, timeout: 10),
+                          "Initial wide opening must leave the root detail composer usable.")
+            XCTAssertEqual(composer.frame, activeComposer.frame,
+                           "The root detail must own the only active composer.")
+            XCTAssertTrue(detail.frame.contains(composer.frame) && window.contains(composer.frame))
+            transcript = rootTranscript(in: app)
+        } else {
+            composer = activeComposer
+            transcript = nativeTranscript(over: window, in: app)
+            XCTAssertNotNil(visibleBack(from: "hakhoa", in: app),
+                            "Initial compact opening must use the native conversation push.")
+        }
+        let latestText = messageCount == 2 ? "Hi" : messageCount == 3
+            ? "[surround qa surround-e2e-browser-msg-20261002t123634z-def9830c 1/2] phone to duo/ipad delivery check."
+            : SurroundUITestContract.messagesVideoHistoryLatestText
+        let latest = transcript.staticTexts.matching(NSPredicate(format: "label == %@", latestText)).firstMatch
+        XCTAssertTrue(latest.waitForExistence(timeout: 10))
+        if expectsColumns {
+            assertWideRoot(in: app)
+            let inbox = element("messages.inboxPane", in: app)
+            let search = inbox.textFields["messages.playerSearchField"].firstMatch
+            let row = inbox.buttons[SurroundUITestContract.AccessibilityID.privateMessageRow(firstPeerID)].firstMatch
+            XCTAssertTrue(waitUntilHittable(search, timeout: 10) && window.contains(search.frame),
+                          "Initial wide opening must leave the inbox search visible and usable.")
+            XCTAssertTrue(waitUntilHittable(row, timeout: 10) && inbox.frame.contains(row.frame)
+                          && window.contains(row.frame),
+                          "Initial wide opening must leave the selected inbox thread fully readable.")
+            XCTAssertNil(visibleBack(from: "Messages", in: app),
+                         "Initial wide opening must not cover its columns with a compact push.")
+        }
+        for sample in 0..<6 {
+            if sample > 0 { RunLoop.current.run(until: Date().addingTimeInterval(0.6)) }
+            keepScreenshot("Initial \(messageCount)-message history \(mode ?? "static") sample \(sample)", in: app)
+            XCTAssertEqual(app.state, .runningForeground)
+            XCTAssertTrue(latest.isHittable, "No input after launch may be needed to repair the fitting transcript.")
+            XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
+                                     "Initial fitting content must stay above its stationary composer.")
+        }
+    }
+
+    func testLongHistoryIncomingMessagesFollowLatestWithKeyboardAndDraft() throws {
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesOverflowLaunchArgument,
+            SurroundUITestContract.messagesIncomingLaunchArgument,
+        ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_DELAY": "40",
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"])
+        let wide = usesColumns(in: app)
+        if !wide { openInboxConversation(firstPeerID, in: app) }
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        let initialLatest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+        XCTAssertTrue(waitUntilHittable(initialLatest, timeout: 10), "Seed a conversation that follows latest.")
+        let draft = "Unsent draft while new replies arrive"
+        enterDraft(draft, in: composer, app: app)
+        let progress = transcript
+        XCTAssertEqual(progress.value as? String, "delivered:0/2", "The draft and following position must precede the appends.")
+        #if !targetEnvironment(macCatalyst)
+        XCTAssertTrue(app.keyboards.firstMatch.exists, "Incoming replies must exercise the software-keyboard viewport.")
+        #endif
+        XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
+                      "Both fresh incoming replies must be delivered through the offline service.")
+        let latest = transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch
+        XCTAssertTrue(waitUntilHittable(latest, timeout: 10), "Following latest must reveal the new incoming reply.")
+        XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
+                                 "The newest reply must remain above the composer after keyboard avoidance.")
+        XCTAssertTrue(composer.isHittable)
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        keepScreenshot("Long history follows incoming replies with retained draft", in: app)
+    }
+
+    func testLongHistoryIncomingMessagesPreserveOlderReadingPositionAndDraft() throws {
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesOverflowLaunchArgument,
+            SurroundUITestContract.messagesIncomingLaunchArgument,
+        ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_DELAY": "40",
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"])
+        let wide = usesColumns(in: app)
+        if !wide { openInboxConversation(firstPeerID, in: app) }
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let draft = "Unsent draft while reading older replies"
+        enterDraft(draft, in: composer, app: app)
+        let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        let initialLatest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+        for _ in 0..<4 {
+            transcript.swipeDown()
+            if !initialLatest.isHittable { break }
+        }
+        XCTAssertFalse(initialLatest.isHittable, "Seed a reading position that is independent of latest.")
+        func readableViewport() -> CGRect {
+            let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
+            return CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width,
+                          height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
+                .insetBy(dx: 8, dy: 8)
+        }
+        let olderMessages = transcript.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
+        )).allElementsBoundByIndex.filter { readableViewport().contains($0.frame) && $0.isHittable }
+            .sorted { $0.frame.midY < $1.frame.midY }
+        let witnessLabel = try XCTUnwrap(olderMessages.dropFirst(olderMessages.count / 2).first?.label,
+                                        "Seed one fully readable older-message witness.")
+        let witness = transcript.staticTexts.matching(NSPredicate(format: "label == %@", witnessLabel)).firstMatch
+        let progress = transcript
+        XCTAssertEqual(progress.value as? String, "delivered:0/2", "The reading witness must precede the appends.")
+        keepScreenshot("Older witness before incoming replay", in: app)
+        XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
+                      "Both incoming replies must arrive while the older history remains selected.")
+        XCTAssertTrue(witness.isHittable && readableViewport().contains(witness.frame),
+                      "The exact older reading witness must remain fully readable after incoming appends.")
+        XCTAssertFalse(initialLatest.isHittable, "New replies must not switch older reading back to latest.")
+        XCTAssertFalse(transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch.isHittable)
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        keepScreenshot("Older witness and draft retained after incoming replay", in: app)
+    }
+
+    func testCompactMessagesTitleCollapsesOnInboxScrollAndExpandsAtTop() throws {
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.friendshipLaunchArgument,
+            SurroundUITestContract.messagesOverflowLaunchArgument,
+        ])
+        try requireCompact(in: app)
+        let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
+        let navigationBar = app.navigationBars["Messages"].firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        let firstRequest = query(SurroundUITestContract.AccessibilityID.friendRequestProfile(
+            SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]), in: app)
+        for _ in 0..<6 {
+            if navigationBar.frame.height >= 80 && firstRequest.isHittable { break }
+            scroll.swipeDown()
+        }
+        let expandedHeight = navigationBar.frame.height
+        XCTAssertGreaterThanOrEqual(expandedHeight, 80, "The top of the compact inbox must show its large native title.")
+        XCTAssertTrue(firstRequest.isHittable)
+        let requestOrigin = firstRequest.frame.minY
+        let search = element("messages.playerSearchField", in: app, matching: .textField)
+        let searchWidth = search.frame.width
+        keepScreenshot("Compact Messages large title before inbox scroll", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Initial large title")
+        for _ in 0..<3 {
+            scroll.swipeUp()
+            if navigationBar.frame.height < expandedHeight - 30 { break }
+        }
+        XCTAssertTrue(waitForCondition { navigationBar.frame.height < expandedHeight - 30
+            && navigationBar.frame.height <= 60 }, "Scrolling the inbox must collapse Messages into its native inline title.")
+        XCTAssertTrue(!firstRequest.exists || firstRequest.frame.minY < requestOrigin - 30,
+                      "The inbox content must actually scroll before asserting title collapse.")
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame),
+                      "The collapsed search field must remain fully inside the active window.")
+        XCTAssertGreaterThanOrEqual(search.frame.minY, navigationBar.frame.maxY - 1)
+        XCTAssertLessThanOrEqual(search.frame.minY, navigationBar.frame.maxY + 40)
+        XCTAssertEqual(search.frame.width, searchWidth, accuracy: 1)
+        keepScreenshot("Compact Messages inline title with pinned search", in: app)
+        // XCTest reports this safeAreaInset field as not hittable after native
+        // title collapse, although UIKit hit-testing resolves its exact visible
+        // frame center to the enabled text field. Verify the real tap outcome.
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: search.frame.midX - window.frame.minX,
+            dy: search.frame.midY - window.frame.minY)).tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "Collapsed search must remain usable with the native keyboard.")
+        tap("messages.cancelPlayerSearch", in: app, matching: .button)
+        XCTAssertTrue(waitForCondition { !keyboard.exists }, "Cancel must dismiss the search keyboard before restoring the large title.")
+        for _ in 0..<6 {
+            scroll.swipeDown()
+            if firstRequest.isHittable && navigationBar.frame.height >= expandedHeight - 2 { break }
+        }
+        XCTAssertTrue(waitForCondition { firstRequest.isHittable && navigationBar.frame.height >= expandedHeight - 2 })
+        XCTAssertEqual(navigationBar.frame.height, expandedHeight, accuracy: 2,
+                       "Returning to the inbox top must restore the native large title.")
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame),
+                      "The restored search field must remain fully inside the active window.")
+        keepScreenshot("Compact Messages title expands after returning to top", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Restored large title")
+    }
+
+    func testCompactMessagesSearchKeepsExpandedTitleThroughFocusResultsAndCancel() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey requires compact Messages with the iOS software keyboard.")
+        #else
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesLoadingLaunchArgument,
+            SurroundUITestContract.friendshipLaunchArgument,
+            SurroundUITestContract.messagesOverflowLaunchArgument,
+        ])
+        try requireCompact(in: app)
+        let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
+        let navigationBar = app.navigationBars["Messages"].firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 10))
+        let firstRequest = query(SurroundUITestContract.AccessibilityID.friendRequestProfile(
+            SurroundUITestContract.friendshipFixtureRequestPlayerIDs[0]), in: app)
+        for _ in 0..<6 {
+            if navigationBar.frame.height >= 80 && firstRequest.isHittable { break }
+            scroll.swipeDown()
+        }
+        XCTAssertGreaterThanOrEqual(navigationBar.frame.height, 80,
+                                    "Search must begin at the expanded compact inbox top.")
+        XCTAssertTrue(firstRequest.isHittable)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        let anchors = messagesLoadingAnchors(in: app)
+        let restingFrames = anchors.mapValues(\.frame)
+        keepScreenshot("Expanded Messages before custom search", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Expanded inbox before search")
+
+        let search = anchors["search"]!
+        tap(search, description: "Focus empty search from the expanded inbox", in: app)
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "Search must own the software keyboard.")
+        let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
+        XCTAssertTrue(waitUntilHittable(description, timeout: 10))
+        XCTAssertLessThanOrEqual(description.frame.maxY, keyboard.frame.minY + 1,
+                                 "Empty search guidance must remain readable above the keyboard.")
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        let focusedFrames = anchors.mapValues(\.frame)
+        keepScreenshot("Expanded Messages with empty focused search", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Empty focused search")
+
+        search.typeText("Copper")
+        XCTAssertTrue(waitForValue("Copper", in: search, timeout: 10))
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
+        assertMessagesLoadingStatus("Searching…", in: app)
+        XCTAssertTrue(keyboard.exists)
+        XCTAssertTrue(app.buttons["Clear search"].firstMatch.isHittable,
+                      "A typed query must expose the existing Clear button.")
+        // The Clear button changes text-field width when the query becomes nonempty.
+        assertMessagesLoadingFrames(anchors.filter { $0.key != "search" }, equalTo: focusedFrames, in: app)
+        let typedFrames = anchors.mapValues(\.frame)
+        keepScreenshot("Expanded Messages with held Copper search", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Held Copper search")
+
+        tap(SurroundUITestContract.AccessibilityID.messagesLoadingReleaseSearch, in: app, matching: .button)
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertSearch("Copper", playerID: searchPlayerID, in: app)
+        XCTAssertTrue(keyboard.exists, "Loading results must preserve the focused query and keyboard.")
+        assertMessagesLoadingFrames(anchors, equalTo: typedFrames, in: app)
+        keepScreenshot("Expanded Messages with loaded CopperKoi results", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Loaded CopperKoi results")
+
+        cancelInboxSearch(in: app)
+        XCTAssertTrue(waitForCondition { !keyboard.exists }, "Cancel must dismiss the search keyboard.")
+        XCTAssertTrue(waitForValue("", in: search, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(firstRequest, timeout: 10), "Cancel must restore the expanded inbox content.")
+        assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
+        assertMessagesLoadingStatus(nil, in: app)
+        assertMessagesLoadingFramesAfterSearchCancel(anchors, equalTo: restingFrames, in: app)
+        keepScreenshot("Expanded Messages restored after search Cancel", in: app)
+        try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Search Cancel restores inbox")
+        #endif
+    }
+
+    private func assertRenderedMessagesTitle(in app: XCUIApplication, navigationBar: XCUIElement,
+                                             stage: String) throws {
+        let screenshot = app.screenshot()
+        let image = try XCTUnwrap(screenshot.image.cgImage)
+        let window = app.windows.firstMatch.frame
+        let bar = navigationBar.frame.intersection(window)
+        let scaleX = CGFloat(image.width) / window.width
+        let scaleY = CGFloat(image.height) / window.height
+        let pixels = CGRect(x: (bar.minX - window.minX) * scaleX,
+                            y: (bar.minY - window.minY) * scaleY,
+                            width: bar.width * scaleX, height: bar.height * scaleY).integral
+        let titleImage = try XCTUnwrap(image.cropping(to: pixels))
+        let attachment = XCTAttachment(image: UIImage(cgImage: titleImage))
+        attachment.name = "\(stage) – rendered navigation bar"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        request.usesLanguageCorrection = false
+        try VNImageRequestHandler(cgImage: titleImage, options: [:]).perform([request])
+        XCTAssertTrue((request.results ?? []).contains { observation in
+            observation.topCandidates(1).first?.string.caseInsensitiveCompare("Messages") == .orderedSame
+        }, "The expanded navigation bar must visibly paint Messages; bar geometry or the tab label cannot satisfy it.")
+    }
+
+    func testDelayedShortHistoryBackfillStaysAboveComposerWithoutInput() throws {
+        try assertDelayedHistoryWithoutInput(mode: "backfill")
+    }
+
+    func testDelayedShortHistoryAppendStaysAboveComposerWithoutInput() throws {
+        try assertDelayedHistoryWithoutInput(mode: "append")
+    }
+
+    func testEmptyHistoryReplayStaysAboveComposerWithoutInput() throws {
+        try assertDelayedHistoryWithoutInput(mode: "empty", videoTextShape: true)
+    }
+
+    func testVideoShapedShortHistoryWaitStaysAboveComposerWithoutInput() throws {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesShortHistoryLaunchArgument],
+            launchEnvironment: ["SURROUND_UI_MESSAGES_VIDEO_TEXT_SHAPE": "1"])
+        guard !usesColumns(in: app) else { throw XCTSkip("This journey covers the compact supplied-video presentation.") }
+        openInboxConversation(firstPeerID, in: app)
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let latest = app.staticTexts.matching(NSPredicate(format: "label == %@",
+            SurroundUITestContract.messagesVideoHistoryLatestText)).firstMatch
+        for sample in 1...8 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            keepScreenshot("Video-shaped short history waiting sample \(sample)", in: app)
+            XCTAssertTrue(latest.isHittable)
+            XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1)
+        }
+    }
+
+    private func assertDelayedHistoryWithoutInput(mode: String, videoTextShape: Bool = false) throws {
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesShortHistoryLaunchArgument,
+            SurroundUITestContract.messagesDelayedHistoryLaunchArgument,
+        ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_MODE": mode,
+            "SURROUND_UI_MESSAGES_VIDEO_TEXT_SHAPE": videoTextShape ? "1" : "0"])
+        guard !usesColumns(in: app) else { throw XCTSkip("This journey covers the compact supplied-video presentation.") }
+        if mode == "empty" { tapFriend(firstPeerID, in: app) }
+        else { openInboxConversation(firstPeerID, in: app) }
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let latest = app.staticTexts.matching(NSPredicate(format: "label == %@",
+            videoTextShape ? SurroundUITestContract.messagesVideoHistoryLatestText : SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
+        for sample in 1...8 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            keepScreenshot("Delayed \(mode) no-input sample \(sample)", in: app)
+            XCTAssertEqual(app.state, .runningForeground)
+            if latest.exists {
+                XCTAssertTrue(latest.isHittable, "Simply waiting for asynchronous history must keep the latest message readable.")
+                XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
+                    "A delayed history update must not move the transcript underneath its stationary composer.")
+            }
+        }
+        XCTAssertTrue(latest.exists, "The delayed latest message must have arrived.")
+        XCTAssertTrue(app.staticTexts["Hello"].exists, "The older history must have arrived.")
+        XCTAssertTrue(app.staticTexts["Hi"].exists)
+    }
+
+    func testShortConversationOpeningKeepsMessageAboveComposer() throws {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesShortHistoryLaunchArgument])
+        guard !usesColumns(in: app) else {
+            throw XCTSkip("This journey covers the compact push seen in the supplied video.")
+        }
+        for opening in 1...3 {
+            openInboxConversation(firstPeerID, in: app)
+            let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+            let message = app.staticTexts.matching(NSPredicate(format: "label == %@",
+                SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            for sample in 1...3 {
+                RunLoop.current.run(until: Date().addingTimeInterval(1))
+                keepScreenshot("Short conversation opening \(opening) settled sample \(sample)", in: app)
+                XCTAssertTrue(message.isHittable, "The short conversation must remain readable without a repair gesture.")
+                XCTAssertLessThanOrEqual(message.frame.maxY, composer.frame.minY + 1,
+                    "Settling a short conversation must not move its message below the composer.")
+            }
+            back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+        }
+    }
+
+    func testShortConversationScrollGestureKeepsMessageAboveComposer() throws {
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesShortHistoryLaunchArgument])
+        guard !usesColumns(in: app) else { throw XCTSkip("This journey covers compact transcript scrolling.") }
+        openInboxConversation(firstPeerID, in: app)
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let message = app.staticTexts.matching(NSPredicate(format: "label == %@",
+            SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
+        let transcript = nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        keepScreenshot("Short conversation before scroll gesture", in: app)
+        for gesture in 1...3 {
+            if gesture == 2 { transcript.swipeUp() }
+            else { transcript.swipeDown() }
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            keepScreenshot("Short conversation after settled scroll gesture \(gesture)", in: app)
+            XCTAssertEqual(app.state, .runningForeground)
+            XCTAssertTrue(message.isHittable)
+            XCTAssertLessThanOrEqual(message.frame.maxY, composer.frame.minY + 1,
+                "A completed scroll gesture in a fitting short history must not leave messages beneath the composer.")
+        }
+    }
+
+    func testConversationBackgroundReturnPreservesSceneViewportAndDraft() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey exercises iOS background and scene activation.")
+        #else
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesOverflowLaunchArgument,
+            SurroundUITestContract.sceneActivationLaunchArgument,
+        ])
+        let wide = usesColumns(in: app)
+        if !wide { openInboxConversation(firstPeerID, in: app) }
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let draft = "Unsent through repeated background returns"
+        enterDraft(draft, in: composer, app: app)
+        let sceneProbe = app.descendants(matching: .any).matching(identifier: "test.sceneActivation").firstMatch
+        XCTAssertTrue(sceneProbe.waitForExistence(timeout: 10))
+        let original = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
+        let sessionID = try XCTUnwrap(original?["sessionID"] as? String)
+        let sessionIDs = try XCTUnwrap(original?["sessionIDs"] as? [String])
+
+        func assertLatestMessageIsReadable() {
+            let transcript = app.scrollViews.matching(identifier: SurroundUITestContract.AccessibilityID.profileConversation)
+                .allElementsBoundByIndex.first { $0.isHittable } ?? app.scrollViews[SurroundUITestContract.AccessibilityID.profileConversation].firstMatch
+            let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+            XCTAssertTrue(waitUntilHittable(latest, timeout: 10), "The latest message must stay readable without a repair gesture.")
+            XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
+                                     "Message content must remain above the composer after backgrounding.")
+            XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        }
+        assertLatestMessageIsReadable()
+        keepScreenshot("Messages before background return", in: app)
+        for cycle in 1...3 {
+            XCUIDevice.shared.press(.home)
+            if !app.wait(for: .runningBackground, timeout: 3) {
+                XCUIApplication(bundleIdentifier: "com.apple.springboard").activate()
+            }
+            XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+            app.activate()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            XCTAssertTrue(waitForCondition { (sceneProbe.value as? String)?.contains("\"isActive\":true") == true })
+            let returned = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
+            XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
+            XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
+            assertLatestMessageIsReadable()
+            keepScreenshot("Messages after background return \(cycle)", in: app)
+        }
+
+        // Exercise a real older reading position as well as following latest.
+        // Freeze an external label; a different nearby message cannot satisfy it.
+        let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+        for _ in 0..<8 {
+            transcript.swipeDown()
+            if !latest.isHittable { break }
+        }
+        XCTAssertFalse(latest.isHittable, "Seed an actual older reading position before backgrounding.")
+        let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
+        let viewport = CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width,
+                              height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
+            .insetBy(dx: 8, dy: 8)
+        let visibleOlderMessages = transcript.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
+        )).allElementsBoundByIndex.filter { viewport.contains($0.frame) && $0.isHittable }
+            .sorted { $0.frame.midY < $1.frame.midY }
+        XCTAssertFalse(visibleOlderMessages.isEmpty, "Seed a fully readable older-message witness.")
+        let historyLabel = try XCTUnwrap(visibleOlderMessages.dropFirst(visibleOlderMessages.count / 2).first?.label)
+        let history = app.staticTexts.matching(NSPredicate(format: "label == %@", historyLabel)).firstMatch
+        XCTAssertTrue(history.isHittable)
+        keepScreenshot("Older message before background return", in: app)
+        // Two repeats keep this bounded on Duo, where native idle waits after
+        // an interactive keyboard dismissal can each consume a full minute.
+        for cycle in 1...2 {
+            XCUIDevice.shared.press(.home)
+            if !app.wait(for: .runningBackground, timeout: 3) {
+                XCUIApplication(bundleIdentifier: "com.apple.springboard").activate()
+            }
+            XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+            app.activate()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            XCTAssertTrue(waitForCondition { (sceneProbe.value as? String)?.contains("\"isActive\":true") == true })
+            let returned = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
+            XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
+            XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
+            XCTAssertTrue(waitUntilHittable(history, timeout: 10),
+                          "The same older message must remain readable without another scroll gesture.")
+            XCTAssertLessThanOrEqual(history.frame.maxY, composer.frame.minY + 1)
+            XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+            keepScreenshot("Older message after background return \(cycle)", in: app)
+        }
+        #endif
+    }
+
+    func testPlayerSearchEmptyStateStaysAboveSoftwareKeyboard() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey requires the iOS software keyboard.")
+        #else
+        let app = launchMessages()
+        guard !usesColumns(in: app) else {
+            throw XCTSkip("The pixel check covers compact search on the active phone display.")
+        }
+        let search = element("messages.playerSearchField", in: app, matching: .textField)
+        tap(search, description: "Focus empty player search", in: app)
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "A software keyboard is required.")
+        guard keyboard.exists else { return }
+        let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
+        XCTAssertTrue(waitUntilHittable(description, timeout: 10))
+        XCTAssertLessThanOrEqual(description.frame.maxY, keyboard.frame.minY,
+                                 "The complete search description must be readable above the keyboard.")
+        // Keyboard AX bounds can exclude its prediction strip. Check the actual
+        // rendered words as well, so a label hidden behind that strip cannot pass.
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Empty player search above software keyboard"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        request.usesLanguageCorrection = false
+        try VNImageRequestHandler(cgImage: XCTUnwrap(screenshot.image.cgImage), options: [:]).perform([request])
+        let renderedWords = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+            .joined(separator: " ").lowercased().filter(\.isLetter)
+        let expectedWords = "Search by username to view a profile or start a conversation."
+            .lowercased().filter(\.isLetter)
+        XCTAssertTrue(renderedWords.contains(expectedWords),
+                      "The complete description must be present in the visible pixels, including its last line.")
+        #endif
+    }
+
+    func testWidePlayerSearchCancelPreservesSelectedPeerAndDraft() throws {
+        let app = launchMessages()
+        guard usesColumns(in: app) else { throw XCTSkip("This journey covers selection retained in the wide root.") }
+        let bounds = assertWideRoot(in: app)
+        setSearch("Copper", in: app)
+        tap("messages.search.message.\(searchPlayerID)", in: app, matching: .button)
+        let draft = "Unsent selected search recipient"
+        enterDraft(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
+                                                presentation: .wideRoot, in: app), app: app)
+        cancelInboxSearch(in: app)
+        assertWideRoot(in: app, expectedBounds: bounds)
+        XCTAssertTrue(waitForValue(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
+                                                               presentation: .wideRoot, in: app), timeout: 10))
+        XCTAssertNil(visibleBack(from: "Messages", in: app))
+        keepScreenshot("Search Cancel retains selected peer and draft", in: app)
+    }
 
     func testProfileBiographyPlayerAndGameLinksBackPreservesSearchAndDraft() {
         let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.profileBiographyLaunchArgument])
