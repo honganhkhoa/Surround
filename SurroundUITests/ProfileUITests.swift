@@ -662,6 +662,52 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             "The filtered history must exclude CopperKoi's game against a different player.")
     }
 
+    func testHistoryKeepsResultsWhenOneBoardPreviewIsUnavailable() {
+        let app = launchProfileContent(additionalLaunchArguments: [
+            SurroundUITestContract.historyPreviewUnavailableLaunchArgument,
+        ])
+        openProfileContentFromHome(in: app)
+        let ids = SurroundUITestContract.profileFixtureHistoryGameIDs
+        let firstID = SurroundUITestContract.AccessibilityID.profileHistoryGame(ids[0])
+        let secondID = SurroundUITestContract.AccessibilityID.profileHistoryGame(ids[1])
+        let first = revealProfileControl(firstID, in: app)
+        let previewFailed = NSPredicate(format: "label CONTAINS %@", "Board unavailable")
+        expectation(for: previewFailed, evaluatedWith: first)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(first.label.contains("Loss"))
+        XCTAssertTrue(first.label.contains("Resignation"))
+        XCTAssertTrue(first.label.contains("Board unavailable"),
+                      "The row must distinguish a missing replay from an empty final board.")
+        let second = revealProfileControl(secondID, in: app)
+        XCTAssertTrue(second.label.contains("Win"))
+        XCTAssertFalse(second.label.contains("Board unavailable"))
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameHistoryError).firstMatch.exists,
+            "One replay failure must not mark the successful history listing as failed.")
+        keepScreenshot("Profile history – one unavailable board retains valid results", in: app)
+
+        tap(revealProfileControl(SurroundUITestContract.AccessibilityID.profileHeadToHeadHistory, in: app),
+            description: "Open head-to-head history with one unavailable replay", in: app)
+        let filtered = element(firstID, in: app)
+        XCTAssertTrue(filtered.label.contains("Win"), "The listing keeps the viewer's head-to-head perspective.")
+        XCTAssertTrue(filtered.label.contains("CopperKoi"))
+        XCTAssertTrue(filtered.label.contains("Board unavailable"))
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(ids.last!), in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameHistoryError).firstMatch.exists)
+        keepScreenshot("Head-to-head history – remaining pages survive a preview failure", in: app)
+
+        backToProfile(from: "Game history", destinationID: SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
+        tap(revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app),
+            description: "Reopen general history after preview demand was cancelled", in: app)
+        let reopened = element(firstID, in: app)
+        XCTAssertTrue(reopened.label.contains("Loss"))
+        XCTAssertTrue(reopened.label.contains("Board unavailable"))
+        elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(ids.last!), in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameHistoryError).firstMatch.exists)
+    }
+
     func testShortProfileHistoryDoesNotOfferRedundantSeeAll() {
         let app = launchProfileContent(additionalLaunchArguments: [
             SurroundUITestContract.profileShortHistoryLaunchArgument,

@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA09806D16FF4219A1D91BB8 /* OGSPlayerUpdateCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */; };
+		1A57865CFAAC482C8638C865 /* FinishedGamePreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */; };
+		3A28708B37954FC78203C96A /* OGSGameCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */; };
+		868D9BE6401442998F41D69C /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
+		2BD98F4D00EE4081AF3AF851 /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
+		A389720DAEAD420B956A2398 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		AE2CDDECB73441EEB7AEEA57 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		60852AEE87C44A5CBEB515EA /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		CE2BAD00CC394E78B69BF9F7 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		4258474839C94E3A9A020D0B /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
 		AFA610012026100400000001 /* ProfileBiographyBrowserServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */; };
 		D10400012026100400000001 /* SceneActivationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10400022026100400000002 /* SceneActivationUITests.swift */; };
 		F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06A00023D00000000000002 /* LocalizationUITests.swift */; };
@@ -465,6 +475,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerUpdateCompatibilityTests.swift; sourceTree = "<group>"; };
+		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
+		88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSGameCompatibilityTests.swift; sourceTree = "<group>"; };
+		686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewLoader.swift; sourceTree = "<group>"; };
+		30129213567E4FB69263A42F /* FinishedGameSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGameSummary.swift; sourceTree = "<group>"; };
 		AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyBrowserServer.swift; sourceTree = "<group>"; };
 		D10400022026100400000002 /* SceneActivationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneActivationUITests.swift; sourceTree = "<group>"; };
 		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
@@ -866,6 +881,9 @@
 				BC3ECFCD2BA7ECCE00F4E546 /* ChallengeTests.swift */,
 				AE10000139A0000000000001 /* TimeControlTests.swift */,
 				AE10000239A0000000000002 /* OGSModelDecodingTests.swift */,
+				B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */,
+				5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */,
+				88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */,
 				AE10000339A0000000000003 /* ChallengeBehaviorTests.swift */,
 				AE10000439A0000000000004 /* GameReplayTests.swift */,
 				AE10000539A0000000000005 /* OGSServiceIsolationTests.swift */,
@@ -974,6 +992,7 @@
 				BC042B3424AB2DD00050B2D1 /* OGSUIConfig.swift */,
 				BC042B3524AB2DD00050B2D1 /* OGSPauseControl.swift */,
 				BC042B3624AB2DD00050B2D1 /* OGSGame.swift */,
+				30129213567E4FB69263A42F /* FinishedGameSummary.swift */,
 				BC042B3724AB2DD00050B2D1 /* OGSUser.swift */,
 				AA1500012026091500000001 /* OGSPlayerProfile.swift */,
 				D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */,
@@ -1039,6 +1058,7 @@
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
+				686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */,
 				BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
 				BC649413253DA44C002B2200 /* SurroundNotificationService.swift */,
@@ -1511,6 +1531,7 @@
 				D90700042026090700000004 /* AppReviewPresentation.swift in Sources */,
 				AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000033B00000000000003 /* GameHistoryPaginationState.swift in Sources */,
+				868D9BE6401442998F41D69C /* FinishedGamePreviewLoader.swift in Sources */,
 				BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */,
 				BC463B0D266353D700D40D3A /* SingleGameView.swift in Sources */,
 				BC042B4C24AB2DD10050B2D1 /* TestData.swift in Sources */,
@@ -1529,6 +1550,7 @@
 				BC042B5524AB2DD10050B2D1 /* UserDefaults+SurroundModels.swift in Sources */,
 				BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */,
 				BC042B4F24AB2DD10050B2D1 /* OGSGame.swift in Sources */,
+				A389720DAEAD420B956A2398 /* FinishedGameSummary.swift in Sources */,
 				BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */,
 				BC042B4924AB2DD10050B2D1 /* MainView.swift in Sources */,
 				D03000012026093000000001 /* DuoTabContainer.swift in Sources */,
@@ -1621,6 +1643,9 @@
 				AF2000023E00000000000002 /* OGSConditionalMoves.swift in Sources */,
 				AE20000139A0000000000001 /* TimeControlTests.swift in Sources */,
 				AE20000239A0000000000002 /* OGSModelDecodingTests.swift in Sources */,
+				BA09806D16FF4219A1D91BB8 /* OGSPlayerUpdateCompatibilityTests.swift in Sources */,
+				1A57865CFAAC482C8638C865 /* FinishedGamePreviewTests.swift in Sources */,
+				3A28708B37954FC78203C96A /* OGSGameCompatibilityTests.swift in Sources */,
 				AE20000339A0000000000003 /* ChallengeBehaviorTests.swift in Sources */,
 				AE20000439A0000000000004 /* GameReplayTests.swift in Sources */,
 				AE20000539A0000000000005 /* OGSServiceIsolationTests.swift in Sources */,
@@ -1647,12 +1672,14 @@
 				D90700062026090700000006 /* AppReviewPolicyTests.swift in Sources */,
 				AE6000023B00000000000002 /* GameDetailConnectionCoordinator.swift in Sources */,
 				AE6000043B00000000000004 /* GameHistoryPaginationState.swift in Sources */,
+				2BD98F4D00EE4081AF3AF851 /* FinishedGamePreviewLoader.swift in Sources */,
 				BC8CE88E2657B33200E4BE1A /* TimeUtilities.swift in Sources */,
 				BC463B0426624D5D00D40D3A /* PuzzleTests.swift in Sources */,
 				BC8CE8852657B2E100E4BE1A /* OGSPauseControl.swift in Sources */,
 				BC8CE8842657B2E100E4BE1A /* TimeControl.swift in Sources */,
 				BC3ECFCE2BA7ECCE00F4E546 /* ChallengeTests.swift in Sources */,
 				BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */,
+				CE2BAD00CC394E78B69BF9F7 /* FinishedGameSummary.swift in Sources */,
 				BC8CE8832657B2E100E4BE1A /* Variation.swift in Sources */,
 				BC4ED4CF2802EEF1003A85A2 /* OGSChatMessage.swift in Sources */,
 				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
@@ -1743,6 +1770,7 @@
 				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
 				BCD3009D2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
 				BC285B5C2557FCAC005378F9 /* OGSGame.swift in Sources */,
+				AE2CDDECB73441EEB7AEEA57 /* FinishedGameSummary.swift in Sources */,
 				BC285B592557FCAC005378F9 /* OGSPauseControl.swift in Sources */,
 				BC285B5A2557FCAC005378F9 /* OGSClock.swift in Sources */,
 				BC285B4C2557FC78005378F9 /* BoardView.swift in Sources */,
@@ -1777,6 +1805,7 @@
 				BC3037F72692D03300181570 /* MoveTree.swift in Sources */,
 				BC463B052662515800D40D3A /* OGSMoveTreeNode.swift in Sources */,
 				BC6493A425380DCA002B2200 /* OGSGame.swift in Sources */,
+				60852AEE87C44A5CBEB515EA /* FinishedGameSummary.swift in Sources */,
 				BC6493C625381006002B2200 /* Goban.cc in Sources */,
 				BC463B062662515800D40D3A /* OGSPuzzle.swift in Sources */,
 				BCB98CC0256D143F00B1F8FD /* TestData.swift in Sources */,
@@ -1829,6 +1858,7 @@
 				BCD214D9255A946D00F78E2A /* NotificationService.swift in Sources */,
 				BCD214F3255A948E00F78E2A /* Game.swift in Sources */,
 				BCD214F5255A948E00F78E2A /* OGSGame.swift in Sources */,
+				4258474839C94E3A9A020D0B /* FinishedGameSummary.swift in Sources */,
 				BCD21500255A94A400F78E2A /* SurroundNotificationService.swift in Sources */,
 				BCD214F6255A948E00F78E2A /* OGSUser.swift in Sources */,
 			);

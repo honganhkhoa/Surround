@@ -1541,6 +1541,27 @@ extension OGSService {
                 let historyGames = historyIDs.enumerated().map {
                     let game = Game(ogsGame: profileGame(id: $0.element, index: $0.offset, finished: true))
                     game.ogsRawData = [:]
+                    if SurroundUITestContract.simulatesUnavailableHistoryPreview,
+                       $0.offset == 0, let data = game.gameData {
+                        // The rejecting offline transport makes this replay
+                        // fail only when its row actually requests a preview.
+                        // The other rows retain their real boards.
+                        game.historySummary = FinishedGameSummary(
+                            gameID: data.gameId,
+                            blackPlayerID: data.players.black.id,
+                            whitePlayerID: data.players.white.id,
+                            width: data.width, height: data.height,
+                            outcome: data.outcome,
+                            blackLost: data.winner == data.players.white.id,
+                            whiteLost: data.winner == data.players.black.id,
+                            annulled: false, name: data.gameName,
+                            handicap: data.handicap, komi: data.komi,
+                            rules: data.rules, rengo: false, ranked: data.ranked
+                        )
+                        game.gameData = nil
+                        game.ogsRawData = nil
+                        game.historyDetailState = .notRequested
+                    }
                     return game
                 }
                 let recentResults: [OGSProfileVersusGame.Result] = [.win, .loss, .draw, .win, .loss]

@@ -165,6 +165,22 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     /// Fresh history metadata can be newer than the cached finished-game detail.
     @Published var historyAnnulled: Bool?
+    @Published var historySummary: FinishedGameSummary?
+    @Published var historyDetailState: FinishedGameDetailState = .notRequested
+    var historyDetailRequestID: UUID?
+    @Published var historyPreviewPosition: BoardPosition?
+
+    var finishedHistoryPosition: BoardPosition? {
+        if let historyPreviewPosition { return historyPreviewPosition }
+        guard let data = gameData, data.phase == .finished, ogsRawData != nil else { return nil }
+        guard let position = positionByLastMoveNumber[data.moves.count],
+              position.lastMoveNumber == data.moves.count,
+              position.width == width, position.height == height else { return nil }
+        return position
+    }
+
+    var hasCompleteFinishedGameDetail: Bool { finishedHistoryPosition != nil }
+
     @Published var ogsRawData: [String: Any]? {
         didSet {
             if let players = (ogsRawData ?? [:])["players"] as? [String: Any] {
@@ -328,8 +344,14 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     var latestPlayerUpdate: OGSPlayerUpdate? {
         didSet {
             if let update = latestPlayerUpdate {
-                rengoTeamOrder = update.rengoTeams
-                refreshOrderedRengoTeams()
+                if let teams = update.rengoTeams {
+                    rengoTeamOrder = teams
+                    refreshOrderedRengoTeams()
+                }
+                if let players = update.players {
+                    if let black = playerByOGSId[players.black] { blackPlayer = black }
+                    if let white = playerByOGSId[players.white] { whitePlayer = white }
+                }
             }
         }
     }

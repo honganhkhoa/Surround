@@ -65,6 +65,8 @@ struct HomeView: View {
     @State private var recentFinishedLoadState: RecentFinishedGamesLoadState
     @State private var recentFinishedRequestID: UUID?
     @State private var hasSimulatedRecentFinishedGamesFailure = false
+    @StateObject private var historyPreviewLoader = FinishedGamePreviewLoader()
+    @State private var isVisible = false
     
     init(previewGames: [Game] = []) {
         _recentFinishedGames = State(initialValue: previewGames)
@@ -171,7 +173,7 @@ struct HomeView: View {
             recentFinishedGames.compactMap { game in game.ogsID.map { ($0, game) } },
             uniquingKeysWith: { first, _ in first }
         )
-        recentFinishedCancellable = ogs.fetchHydratedFinishedGames(
+        recentFinishedCancellable = ogs.fetchFinishedGames(
             playerId: playerId,
             page: 1,
             pageSize: 10,
@@ -213,6 +215,7 @@ struct HomeView: View {
 
     /// Clears history state that belongs to the previous account and reloads.
     func resetRecentFinishedGames() {
+        historyPreviewLoader.cancel()
         recentFinishedCancellable?.cancel()
         recentFinishedCancellable = nil
         recentFinishedRequestID = nil
@@ -418,13 +421,17 @@ struct HomeView: View {
                                     HomeGameRow(game: $0, context: .history)
                                 }
                             ) { row in
-                                HistoryGameCell(game: row.game) {
+                                HistoryGameCell(game: row.game, retryPreview: {
+                                    historyPreviewLoader.retry(game: row.game, using: ogs)
+                                }) {
                                     showGameDetail(game: row.game, showsCarousel: false)
                                 }
                                 .accessibilityIdentifier(
                                     SurroundUITestContract.AccessibilityID.homeHistoryGame(row.game)
                                 )
                                 .padding(.horizontal)
+                                .historyPreviewDemand(for: row.game, loader: historyPreviewLoader, using: ogs,
+                                                      query: ogs.user?.id, screenIsVisible: isVisible)
                             }
                             if let recentFinishedGamesStatus {
                                 GameHistoryLoadStatusView(
@@ -731,7 +738,12 @@ struct HomeView: View {
             route: .gameHistory
         )
         .onAppear {
+            isVisible = true
             loadRecentFinishedGames()
+        }
+        .onDisappear {
+            isVisible = false
+            historyPreviewLoader.cancel()
         }
         .onChange(of: ogs.user?.id) { _, _ in
             resetRecentFinishedGames()

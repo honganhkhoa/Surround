@@ -100,6 +100,8 @@ struct GameHistoryView: View {
     @State private var pagination = GameHistoryPaginationState()
     @State private var fetchCancellable: AnyCancellable?
     @State private var activeIdentity: QueryIdentity?
+    @StateObject private var previewLoader = FinishedGamePreviewLoader()
+    @State private var isVisible = false
 
     init(
         player: OGSUser? = nil,
@@ -145,7 +147,8 @@ struct GameHistoryView: View {
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
                 ForEach(pagination.games) { game in
-                    HistoryGameCell(game: game, perspectivePlayerID: perspectivePlayerID ?? player?.id) {
+                    HistoryGameCell(game: game, perspectivePlayerID: perspectivePlayerID ?? player?.id,
+                                    retryPreview: { previewLoader.retry(game: game, using: ogs) }) {
                         if player != nil {
                             navigation.openGame(game, using: nav)
                         } else {
@@ -159,6 +162,8 @@ struct GameHistoryView: View {
                                 ?? SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
                     )
                     .padding(.horizontal)
+                    .historyPreviewDemand(for: game, loader: previewLoader, using: ogs,
+                                          query: queryIdentity, screenIsVisible: isVisible)
                     .onAppear {
                         if game.ogsID == pagination.games.last?.ogsID {
                             loadNextPage()
@@ -190,6 +195,7 @@ struct GameHistoryView: View {
                 : SurroundUITestContract.AccessibilityID.screenProfileGameHistory
         )
         .onAppear {
+            isVisible = true
             if let activeIdentity, activeIdentity != queryIdentity {
                 resetPages(for: queryIdentity)
                 return
@@ -198,6 +204,10 @@ struct GameHistoryView: View {
             if !pagination.loadedOnce {
                 loadNextPage()
             }
+        }
+        .onDisappear {
+            isVisible = false
+            previewLoader.cancel()
         }
         .onChange(of: queryIdentity) { _, identity in
             resetPages(for: identity)
@@ -225,7 +235,7 @@ struct GameHistoryView: View {
               let request = pagination.beginRequest(playerID: identity.playerID) else {
             return
         }
-        fetchCancellable = ogs.fetchHydratedFinishedGames(
+        fetchCancellable = ogs.fetchFinishedGames(
             playerId: request.playerID,
             page: request.page,
             pageSize: Self.pageSize,
@@ -270,6 +280,7 @@ struct GameHistoryView: View {
     /// Invalidate both pagination tokens and the broader query when its player,
     /// opponent, or viewing account changes.
     private func resetPages(for identity: QueryIdentity) {
+        previewLoader.cancel()
         fetchCancellable?.cancel()
         fetchCancellable = nil
         activeIdentity = identity

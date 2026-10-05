@@ -80,6 +80,8 @@ struct PlayerProfileGames: View {
     @State private var loadingActiveGames = false
     @State private var completedHeadToHeadRetry: HistoryIdentity?
     @State private var completedActiveGamesRetry: HistoryIdentity?
+    @StateObject private var historyPreviewLoader = FinishedGamePreviewLoader()
+    @State private var isVisible = false
 
     private enum ProfileSection { case headToHead, activeGames }
 
@@ -124,6 +126,13 @@ struct PlayerProfileGames: View {
             historySection
         }
         .onGeometryChange(for: Bool.self) { $0.size.width - 32 >= 650 } action: { isWide = $0 }
+        .onAppear {
+            isVisible = true
+        }
+        .onDisappear {
+            isVisible = false
+            historyPreviewLoader.cancel()
+        }
         .task(id: historyIdentity) { await loadHistory(for: historyIdentity) }
         .task(id: headToHeadIdentity) {
             if headToHeadAttempt > 0 {
@@ -266,10 +275,13 @@ struct PlayerProfileGames: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(Array(history.prefix(previewLimit))) { game in
-                        HistoryGameCell(game: game, perspectivePlayerID: profile.id) {
+                        HistoryGameCell(game: game, perspectivePlayerID: profile.id,
+                                        retryPreview: { historyPreviewLoader.retry(game: game, using: ogs) }) {
                             navigation.openGame(game, using: nav)
                         }
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.profileHistoryGame(game.ogsID ?? 0))
+                        .historyPreviewDemand(for: game, loader: historyPreviewLoader, using: ogs,
+                                              query: historyIdentity, screenIsVisible: isVisible)
                     }
                 }.profileContentMargins()
                 if historyHasNextPage || history.count > previewLimit {
@@ -339,9 +351,10 @@ struct PlayerProfileGames: View {
 
     private func loadHistory(for identity: HistoryIdentity) async {
         guard loadedHistory != identity else { return }
+        historyPreviewLoader.cancel()
         historyStatus = .loading
         do {
-            for try await page in ogs.fetchHydratedFinishedGames(
+            for try await page in ogs.fetchFinishedGames(
                 playerId: identity.playerID, page: 1, pageSize: 4,
                 botGames: profile.user.isBot == true
             ).values {
@@ -353,9 +366,9 @@ struct PlayerProfileGames: View {
                 loadedHistory = identity
                 return
             }
-            if !Task.isCancelled { historyStatus = .failed }
+            if !Task.isCancelled && identity == historyIdentity { historyStatus = .failed }
         } catch {
-            if !Task.isCancelled { historyStatus = .failed }
+            if !Task.isCancelled && identity == historyIdentity { historyStatus = .failed }
         }
     }
 }

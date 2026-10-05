@@ -38,6 +38,7 @@ enum SurroundUITestContract {
     static let profileContentLaunchArgument = "--surround-profile-content"
     static let profileBiographyLaunchArgument = "--surround-profile-biography"
     static let profileShortHistoryLaunchArgument = "--surround-profile-short-history"
+    static let historyPreviewUnavailableLaunchArgument = "--surround-history-preview-unavailable"
     static let friendshipLaunchArgument = "--surround-friendship"
     static let friendshipFailsOnceLaunchArgument = "--surround-friendship-fails-once"
     static let friendshipGatedResponseLaunchArgument = "--surround-friendship-gated-response"
@@ -274,6 +275,11 @@ enum SurroundUITestContract {
 
     static var usesShortProfileHistory: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(profileShortHistoryLaunchArgument)
+    }
+
+    static var simulatesUnavailableHistoryPreview: Bool {
+        includesProfileContent
+            && ProcessInfo.processInfo.arguments.contains(historyPreviewUnavailableLaunchArgument)
     }
 
     static var includesMessagesContent: Bool {
@@ -525,6 +531,7 @@ enum SurroundUITestContract {
     static let simulatesUnavailableProfileSections = false
     static let includesProfileContent = false
     static let usesShortProfileHistory = false
+    static let simulatesUnavailableHistoryPreview = false
     static let includesFriendshipRequests = false
     static let simulatesFriendshipFailureOnce = false
     static let gatesFriendshipResponse = false
@@ -651,6 +658,18 @@ enum SurroundUITestContract {
 
         static func profileHistoryGame(_ gameID: Int) -> String {
             "profile.history-game.\(gameID)"
+        }
+
+        static func gameHistoryBoardLoading(_ gameID: Int) -> String {
+            "gameHistory.board.loading.\(gameID)"
+        }
+
+        static func gameHistoryBoardUnavailable(_ gameID: Int) -> String {
+            "gameHistory.board.unavailable.\(gameID)"
+        }
+
+        static func gameHistoryBoardRetry(_ gameID: Int) -> String {
+            "gameHistory.board.retry.\(gameID)"
         }
 
         static func profileHeadToHeadRecent(_ gameID: Int) -> String {

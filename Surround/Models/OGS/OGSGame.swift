@@ -116,7 +116,44 @@ struct OGSPlayerUpdate: Codable, Equatable {
     }
     
     var players: Players?
-    var rengoTeams: RengoTeams
+    var rengoTeams: RengoTeams?
+}
+
+extension OGSPlayerUpdate {
+    private enum CodingKeys: String, CodingKey {
+        case players, rengoTeams
+    }
+
+    private struct TeamKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        players = try container.decodeIfPresent(Players.self, forKey: .players)
+
+        // Ordinary games can carry player-only updates with no team membership.
+        // A supplied nonempty team object must still contain both typed arrays.
+        if container.contains(.rengoTeams) {
+            let teams = try container.nestedContainer(keyedBy: TeamKey.self, forKey: .rengoTeams)
+            if teams.allKeys.isEmpty {
+                rengoTeams = nil
+            } else {
+                rengoTeams = try container.decode(RengoTeams.self, forKey: .rengoTeams)
+            }
+        } else {
+            rengoTeams = nil
+        }
+    }
 }
 
 struct OGSMoveExtra: Codable {
@@ -375,4 +412,139 @@ struct OGSGame: Decodable {
     var rengo: Bool?
     var rengoTeams: RengoTeams?
     var rengoCasualMode: Bool?
+}
+
+extension OGSGame {
+    private enum CodingKeys: String, CodingKey {
+        case allowKo, allowSelfCapture, allowSuperko, automaticStoneRemoval, whiteMustPassLast
+        case blackPlayerId, whitePlayerId, disableAnalysis, freeHandicapPlacement
+        case width, height, gameId, gameName, handicap, ranked, `private`, rules
+        case initialPlayer, initialState, komi, moves, players, playerPool
+        case timeControl, clock, pauseControl, outcome, winner, removed, score
+        case scoreHandicap, scorePasses, scorePrisoners, scoreStones, scoreTerritory
+        case scoreTerritoryInSeki, strictSekiMode, agaHandicapScoring, autoScoringDone
+        case undoRequested, phase, tournamentId, ladderId, rengo, rengoTeams, rengoCasualMode
+        case ogsImport
+    }
+
+    /// Matches GobanEngine.fillDefaults for the rule flags Surround consumes.
+    /// Archived OGS games can omit these flags; supplied values remain authoritative.
+    private struct RuleDefaults {
+        var allowKo = false
+        var allowSelfCapture = false
+        var allowSuperko = false
+        var automaticStoneRemoval = false
+        var whiteMustPassLast = false
+        var disableAnalysis = false
+        var freeHandicapPlacement = false
+        var scoreHandicap = false
+        var scorePasses = true
+        var scorePrisoners = true
+        var scoreStones = true
+        var scoreTerritory = true
+        var scoreTerritoryInSeki = true
+        var strictSekiMode: Bool
+        var agaHandicapScoring = false
+
+        init(rules: OGSRule, phase: OGSGamePhase, isOGSImport: Bool) {
+            strictSekiMode = phase == .finished
+            switch rules {
+            case .chinese:
+                scorePrisoners = false
+                freeHandicapPlacement = !isOGSImport
+                scoreHandicap = true
+            case .aga:
+                scorePrisoners = false
+                whiteMustPassLast = true
+                agaHandicapScoring = true
+                scoreHandicap = true
+            case .japanese, .korean:
+                allowSuperko = true
+                scoreTerritoryInSeki = false
+                scoreStones = false
+            case .ing:
+                scorePrisoners = false
+                freeHandicapPlacement = true
+                allowSelfCapture = true
+                scoreHandicap = true
+            case .nz:
+                scorePrisoners = false
+                freeHandicapPlacement = true
+                allowSelfCapture = true
+            }
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rules = try container.decode(OGSRule.self, forKey: .rules)
+        phase = try container.decode(OGSGamePhase.self, forKey: .phase)
+        let defaults = RuleDefaults(
+            rules: rules, phase: phase, isOGSImport: container.contains(.ogsImport)
+        )
+
+        // Only absent keys receive defaults. Null and malformed flags still fail
+        // so compatibility cannot conceal a damaged authoritative game snapshot.
+        func flag(_ key: CodingKeys, default defaultValue: Bool) throws -> Bool {
+            if container.contains(key) {
+                return try container.decode(Bool.self, forKey: key)
+            }
+            return defaultValue
+        }
+
+        allowKo = try flag(.allowKo, default: defaults.allowKo)
+        allowSelfCapture = try flag(.allowSelfCapture, default: defaults.allowSelfCapture)
+        allowSuperko = try flag(.allowSuperko, default: defaults.allowSuperko)
+        automaticStoneRemoval = try flag(.automaticStoneRemoval, default: defaults.automaticStoneRemoval)
+        whiteMustPassLast = try flag(.whiteMustPassLast, default: defaults.whiteMustPassLast)
+        disableAnalysis = try flag(.disableAnalysis, default: defaults.disableAnalysis)
+        freeHandicapPlacement = try flag(.freeHandicapPlacement, default: defaults.freeHandicapPlacement)
+        scoreHandicap = try flag(.scoreHandicap, default: defaults.scoreHandicap)
+        scorePasses = try flag(.scorePasses, default: defaults.scorePasses)
+        scorePrisoners = try flag(.scorePrisoners, default: defaults.scorePrisoners)
+        scoreStones = try flag(.scoreStones, default: defaults.scoreStones)
+        scoreTerritory = try flag(.scoreTerritory, default: defaults.scoreTerritory)
+        scoreTerritoryInSeki = try flag(.scoreTerritoryInSeki, default: defaults.scoreTerritoryInSeki)
+        strictSekiMode = try flag(.strictSekiMode, default: defaults.strictSekiMode)
+        agaHandicapScoring = try flag(.agaHandicapScoring, default: defaults.agaHandicapScoring)
+
+        blackPlayerId = try container.decode(Int.self, forKey: .blackPlayerId)
+        whitePlayerId = try container.decode(Int.self, forKey: .whitePlayerId)
+        width = try container.decode(Int.self, forKey: .width)
+        height = try container.decode(Int.self, forKey: .height)
+        gameId = try container.decode(Int.self, forKey: .gameId)
+        gameName = try container.decode(String.self, forKey: .gameName)
+        handicap = try container.decode(Int.self, forKey: .handicap)
+        ranked = try container.decode(Bool.self, forKey: .ranked)
+        self.private = try container.decodeIfPresent(Bool.self, forKey: .private)
+        initialPlayer = try container.decode(StoneColor.self, forKey: .initialPlayer)
+        initialState = try container.decode(InitialState.self, forKey: .initialState)
+        komi = try container.decode(Double.self, forKey: .komi)
+        moves = try container.decode([OGSMove].self, forKey: .moves)
+        players = try container.decode(Players.self, forKey: .players)
+        playerPool = try container.decodeIfPresent([Int: OGSUser].self, forKey: .playerPool)
+        timeControl = try container.decode(TimeControl.self, forKey: .timeControl)
+        clock = try container.decode(OGSClock.self, forKey: .clock)
+        pauseControl = try container.decodeIfPresent(OGSPauseControl.self, forKey: .pauseControl)
+        outcome = try container.decodeIfPresent(String.self, forKey: .outcome)
+        winner = try container.decodeIfPresent(Int.self, forKey: .winner)
+        removed = try container.decodeIfPresent(String.self, forKey: .removed)
+        score = try container.decodeIfPresent(GameScores.self, forKey: .score)
+        autoScoringDone = try container.decodeIfPresent(Bool.self, forKey: .autoScoringDone)
+        undoRequested = try container.decodeIfPresent(OGSUndoRequest.self, forKey: .undoRequested)
+        tournamentId = try container.decodeIfPresent(Int.self, forKey: .tournamentId)
+        ladderId = try container.decodeIfPresent(Int.self, forKey: .ladderId)
+        rengo = try container.decodeIfPresent(Bool.self, forKey: .rengo)
+        rengoTeams = try container.decodeIfPresent(RengoTeams.self, forKey: .rengoTeams)
+        rengoCasualMode = try container.decodeIfPresent(Bool.self, forKey: .rengoCasualMode)
+
+        if rengo == true,
+           moves.contains(where: { $0.extra?.playerUpdate != nil && $0.extra?.playerUpdate?.rengoTeams == nil }) {
+            throw DecodingError.dataCorruptedError(
+                forKey: .moves,
+                in: container,
+                debugDescription: "Rengo move player updates require team membership."
+            )
+        }
+    }
 }

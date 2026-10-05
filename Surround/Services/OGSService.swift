@@ -13,6 +13,111 @@ import DictionaryCoding
 import WebKit
 import WidgetKit
 
+struct FinishedGamePreviewRateLimitError: Error {
+    let retryNotBefore: Date
+}
+
+/// Shared by a service's history views. The fallback is a client retry policy,
+/// not an estimate of the server's request quota.
+final class FinishedGamePreviewCooldown {
+    private let lock = NSRecursiveLock()
+    private let now: () -> Date
+    private let fallbackInterval: TimeInterval
+    private var deadline: Date?
+    private let subject = CurrentValueSubject<Date?, Never>(nil)
+
+    init(now: @escaping () -> Date = Date.init, fallbackInterval: TimeInterval = 60) {
+        self.now = now
+        self.fallbackInterval = fallbackInterval.isFinite && fallbackInterval > 0 ? fallbackInterval : 60
+    }
+
+    var changes: AnyPublisher<Date?, Never> {
+        subject.removeDuplicates().eraseToAnyPublisher()
+    }
+
+    var retryNotBefore: Date? { refresh() }
+
+    var remainingInterval: TimeInterval? {
+        lock.lock()
+        defer { lock.unlock() }
+        let currentTime = now()
+        return refresh(at: currentTime).map { max(0, $0.timeIntervalSince(currentTime)) }
+    }
+
+    @discardableResult
+    func refresh() -> Date? {
+        lock.lock()
+        defer { lock.unlock() }
+        return refresh(at: now())
+    }
+
+    @discardableResult
+    func record(retryAfter: String?) -> Date {
+        lock.lock()
+        defer { lock.unlock() }
+        let currentTime = now()
+        let candidate = Self.headerDeadline(retryAfter, now: currentTime)
+            ?? currentTime.addingTimeInterval(fallbackInterval)
+        return record(candidate, now: currentTime)
+    }
+
+    /// Typed request errors already contain a parsed deadline. Keep its bounds
+    /// when another view or an injected publisher delivers the same response.
+    @discardableResult
+    func record(retryNotBefore candidate: Date) -> Date {
+        lock.lock()
+        defer { lock.unlock() }
+        let currentTime = now()
+        let safeCandidate = candidate.timeIntervalSinceReferenceDate.isFinite
+            ? max(candidate, currentTime) : currentTime.addingTimeInterval(fallbackInterval)
+        return record(safeCandidate, now: currentTime)
+    }
+
+    private func refresh(at currentTime: Date) -> Date? {
+        if let deadline, deadline <= currentTime {
+            self.deadline = nil
+            subject.send(nil)
+        }
+        return deadline
+    }
+
+    private func record(_ candidate: Date, now currentTime: Date) -> Date {
+        let next = max(deadline ?? currentTime, candidate)
+        if deadline != next {
+            deadline = next
+            subject.send(next)
+        }
+        return next
+    }
+
+    private static func headerDeadline(_ header: String?, now currentTime: Date) -> Date? {
+        guard let header = header?.trimmingCharacters(in: .whitespacesAndNewlines), !header.isEmpty else {
+            return nil
+        }
+        // A zero or elapsed bound provides no useful pause after a 429. Apply
+        // the same client fallback as an absent header rather than draining
+        // pending visible rows into another immediate burst.
+        if header.utf8.allSatisfy({ (48...57).contains($0) }),
+           let seconds = TimeInterval(header), seconds.isFinite, seconds > 0 {
+            let candidate = currentTime.addingTimeInterval(seconds)
+            return candidate.timeIntervalSinceReferenceDate.isFinite ? candidate : nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.isLenient = false
+        formatter.twoDigitStartDate = formatter.calendar.date(byAdding: .year, value: -50, to: currentTime)
+        for format in ["EEE',' dd MMM yyyy HH':'mm':'ss 'GMT'",
+                       "EEEE',' dd-MMM-yy HH':'mm':'ss 'GMT'",
+                       "EEE MMM d HH':'mm':'ss yyyy"] {
+            formatter.dateFormat = format
+            if let candidate = formatter.date(from: header), candidate > currentTime { return candidate }
+        }
+        return nil
+    }
+}
+
 enum OGSServiceError: Error {
     case invalidJSON
     case notLoggedIn
@@ -952,6 +1057,18 @@ class OGSService: ObservableObject {
         return authenticationGenerationStorage
     }
 
+    /// Preview queues use the same identity fence as their detail requests.
+    var finishedGamePreviewAuthenticationGeneration: UInt { authenticationGeneration }
+
+    /// Optional history previews share one cooldown across all history surfaces.
+    /// Metadata pagination and active-game requests do not use this gate.
+    let finishedGamePreviewCooldown: FinishedGamePreviewCooldown
+
+    func finishedGamePreviewCanStart(gameID: Int) -> Bool {
+        finishedGamePreviewCooldown.retryNotBefore == nil
+            || FinishedGameCache.shared.contains(gameID: gameID)
+    }
+
     private func advanceAuthenticationGeneration() {
         authenticationGenerationLock.lock()
         authenticationGenerationStorage &+= 1
@@ -1339,6 +1456,7 @@ class OGSService: ObservableObject {
             Date().timeIntervalSince1970
         },
         remoteSettings: OGSRemoteSetting? = nil,
+        finishedGamePreviewCooldown: FinishedGamePreviewCooldown = FinishedGamePreviewCooldown(),
         initialState: BootstrapState? = nil
     ) {
         self.environment = environment
@@ -1349,6 +1467,7 @@ class OGSService: ObservableObject {
         self.automatchReconciliationTimeout = automatchReconciliationTimeout
         self.automatchConfirmationTimeout = automatchConfirmationTimeout
         self.currentTime = currentTime
+        self.finishedGamePreviewCooldown = finishedGamePreviewCooldown
         self.preferences = preferences
         self.remoteSettingStore = remoteSettings ?? OGSRemoteSetting(preferences: preferences)
         self.ogsWebsocket = ogsWebsocket
@@ -1763,10 +1882,15 @@ class OGSService: ObservableObject {
                 return
             }
             if move.count > 4, let playerUpdate = move[4] as? [String: Any] {
-                connectedGame.latestPlayerUpdate = try? dictionaryDecoder.decode(
+                let update = try? dictionaryDecoder.decode(
                     OGSMoveExtra.self,
                     from: playerUpdate
                 ).playerUpdate
+                if !connectedGame.rengo || update?.rengoTeams != nil {
+                    connectedGame.latestPlayerUpdate = update
+                } else {
+                    connectedGame.latestPlayerUpdate = nil
+                }
             } else {
                 connectedGame.latestPlayerUpdate = nil
             }
@@ -1901,6 +2025,7 @@ class OGSService: ObservableObject {
                 let decoder = DictionaryDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
+                    guard !connectedGame.rengo || playerUpdate.rengoTeams != nil else { return }
                     connectedGame.latestPlayerUpdate = playerUpdate
                     resynchronizeRengoPlayersIfNeeded(gameID: ogsGameId, game: connectedGame)
                 }
@@ -2546,10 +2671,8 @@ class OGSService: ObservableObject {
     ///
     /// Hits OGS's `players/{id}/game_history` listing
     /// (most-recently-finished first), matching the official web client.
-    /// Each result is turned into a lightweight `Game` (players, board size)
-    /// via `createGame(fromShortGameData:)`. Call
-    /// `fetchHydratedFinishedGames(...)` when every returned model must already
-    /// contain its final board position and result.
+    /// Valid results carry their listing summaries without waiting for replay
+    /// detail. Views can load optional boards through `FinishedGamePreviewLoader`.
     /// `hasNextPage` reflects the endpoint's `next` cursor.
     /// - Parameter reusing: already-built rows keyed by OGS game id. A game
     ///   present here is returned as-is instead of being rebuilt, so repeated
@@ -2615,17 +2738,25 @@ class OGSService: ObservableObject {
                 }
                 let responseValue = try response.result.get()
                 guard let data = try JSONSerialization.jsonObject(with: responseValue) as? [String: Any],
-                      let results = data["results"] as? [[String: Any]] else {
+                      let results = data["results"] as? [Any] else {
                     throw OGSServiceError.invalidJSON
                 }
                 let hasNextPage = (data["next"] as? String) != nil
                 var games = [Game]()
-                for var result in results {
-                    if let gameId = result["id"] as? Int,
-                       let existing = self.desiredGameConnections[gameId]?.game
-                        ?? self.connectedGames[gameId]
-                        ?? existingGames[gameId] {
-                        if let annulled = result["annulled"] as? Bool {
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                for entry in results {
+                    guard var result = entry as? [String: Any],
+                          let summaryData = try? JSONSerialization.data(withJSONObject: result),
+                          let summary = try? decoder.decode(FinishedGameSummary.self, from: summaryData) else {
+                        continue
+                    }
+                    if let existing = self.desiredGameConnections[summary.gameID]?.game
+                        ?? self.connectedGames[summary.gameID]
+                        ?? existingGames[summary.gameID] {
+                        existing.historySummary = summary
+                        Self.refreshHistoryListingPlayers(for: existing, from: result)
+                        if let annulled = summary.annulled {
                             existing.historyAnnulled = annulled
                         }
                         games.append(existing)
@@ -2638,7 +2769,8 @@ class OGSService: ObservableObject {
                         result["white"] = players["white"]
                     }
                     if let game = self.createGame(fromShortGameData: result) {
-                        game.historyAnnulled = result["annulled"] as? Bool
+                        game.historySummary = summary
+                        game.historyAnnulled = summary.annulled
                         games.append(game)
                     }
                 }
@@ -2649,13 +2781,78 @@ class OGSService: ObservableObject {
         .eraseToAnyPublisher()
     }
 
+    private static func refreshHistoryListingPlayers(for game: Game, from data: [String: Any]) {
+        guard let players = data["players"] as? [String: Any] else { return }
+        let decoder = DictionaryDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        if let black = players["black"] as? [String: Any],
+           var player = try? decoder.decode(OGSUser.self, from: black) {
+            if player.id == game.blackPlayer?.id, player.acceptedStones == nil {
+                player.acceptedStones = game.blackPlayer?.acceptedStones
+            }
+            game.blackPlayer = player
+        }
+        if let white = players["white"] as? [String: Any],
+           var player = try? decoder.decode(OGSUser.self, from: white) {
+            if player.id == game.whitePlayer?.id, player.acceptedStones == nil {
+                player.acceptedStones = game.whitePlayer?.acceptedStones
+            }
+            game.whitePlayer = player
+        }
+    }
+
+    /// Enriches one history preview without coupling it to the other rows.
+    func loadFinishedGamePreview(for game: Game) -> AnyPublisher<Void, Error> {
+        let requestAuthenticationGeneration = authenticationGeneration
+        return Deferred { () -> AnyPublisher<Void, Error> in
+            guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                return Fail(error: OGSServiceError.staleAuthenticationContext).eraseToAnyPublisher()
+            }
+            guard let gameID = game.ogsID, gameID > 0 else {
+                return Fail(error: OGSServiceError.invalidJSON).eraseToAnyPublisher()
+            }
+            if game.hasCompleteFinishedGameDetail {
+                game.historyDetailState = .ready
+                return Just(()).setFailureType(to: Error.self).eraseToAnyPublisher()
+            }
+            return self.loadFinishedGameData(gameID: gameID)
+                .receive(on: RunLoop.main)
+                .tryMap { detail in
+                    guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                        throw OGSServiceError.staleAuthenticationContext
+                    }
+                    guard detail.ogsGame.phase == .finished,
+                          detail.ogsGame.width == game.width, detail.ogsGame.height == game.height else {
+                        throw OGSServiceError.invalidJSON
+                    }
+                    let preview = Game(ogsGame: detail.ogsGame)
+                    preview.ogsRawData = detail.rawData
+                    guard let finalPosition = preview.finishedHistoryPosition else {
+                        throw OGSServiceError.invalidJSON
+                    }
+                    if game.gameData != nil || self.desiredGameConnections[gameID] != nil
+                        || self.connectedGames[gameID] != nil {
+                        // A history thumbnail must not change a live or selected
+                        // replay position, analysis branch, or draft.
+                        game.historyPreviewPosition = finalPosition
+                    } else {
+                        Self.applyFinishedGameDetail(detail, to: game)
+                    }
+                    game.historyDetailState = .ready
+                    return ()
+                }
+                .eraseToAnyPublisher()
+        }
+        .eraseToAnyPublisher()
+    }
+
     /// Fetches a history page and fills every row with full game detail before
     /// emitting it. Detail requests are bounded so a page cannot turn into an
     /// unrestrained request burst, and the original server ordering is retained
     /// even when individual requests finish out of order.
     ///
-    /// This is the presentation-facing history API. `fetchFinishedGames`
-    /// remains available for callers that only need the summary payload.
+    /// This strict batch API fails if any detail is unavailable. Presentation
+    /// uses `fetchFinishedGames` with independent optional preview requests.
     func fetchHydratedFinishedGames(
         playerId: Int,
         page: Int,
@@ -2749,25 +2946,33 @@ class OGSService: ObservableObject {
             .eraseToAnyPublisher()
     }
 
-    /// Applies detail while retaining the fresher player/rank values supplied
-    /// by the history listing. Assigning `gameData` last replays all moves and
-    /// computes the final board position before the game is published as ready.
+    /// Replays detail before restoring the fresher player/rank values supplied
+    /// by the history listing, so archived player updates cannot replace them.
     static func applyFinishedGameDetail(_ detail: FinishedGameDetail, to game: Game) {
-        let listedBlackPlayer = game.blackPlayer
-        let listedWhitePlayer = game.whitePlayer
+        var listedPlayersByID: [Int: OGSUser] = [:]
+        for player in [game.blackPlayer, game.whitePlayer].compactMap({ $0 }) {
+            listedPlayersByID[player.id] = player
+        }
         var rawData = detail.rawData
         if let listedAnnulled = game.historyAnnulled {
             // A newly fetched listing can postdate the cached game detail.
             rawData["annulled"] = listedAnnulled
         }
         game.ogsRawData = rawData
-        if let listedBlackPlayer {
-            game.blackPlayer = listedBlackPlayer
-        }
-        if let listedWhitePlayer {
-            game.whitePlayer = listedWhitePlayer
-        }
         game.gameData = detail.ogsGame
+        var players = game.playerByOGSId
+        for player in listedPlayersByID.values {
+            players[player.id] = player
+        }
+        game.playerByOGSId = players
+        // Replay can change the active player IDs, particularly in Rengo.
+        // Restore metadata by identity without undoing those player changes.
+        if let id = game.blackPlayer?.id, let player = listedPlayersByID[id] {
+            game.blackPlayer = player
+        }
+        if let id = game.whitePlayer?.id, let player = listedPlayersByID[id] {
+            game.whitePlayer = player
+        }
     }
 
     /// Appends history pages without allowing mutable page boundaries to
@@ -2837,9 +3042,21 @@ class OGSService: ObservableObject {
 
         // `Deferred` matters: a bare `Future` runs its closure when it is
         // *created*, which would fire this request on every cache hit too.
-        let fetchFromOGS = Deferred {
-            Future<FinishedGameDetail, Error> { promise in
-                self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate().responseData(queue: queue) { response in
+        let fetchFromOGS = Deferred { () -> AnyPublisher<FinishedGameDetail, Error> in
+            guard self.authenticationGeneration == requestAuthenticationGeneration else {
+                return Fail(error: OGSServiceError.staleAuthenticationContext).eraseToAnyPublisher()
+            }
+            if let retryNotBefore = self.finishedGamePreviewCooldown.retryNotBefore {
+                return Fail(error: FinishedGamePreviewRateLimitError(retryNotBefore: retryNotBefore))
+                    .eraseToAnyPublisher()
+            }
+            let request = self.httpClient.session.request("\(self.ogsRoot)/api/v1/games/\(gameID)").validate()
+            return Future<FinishedGameDetail, Error> { promise in
+                request.responseData(queue: queue) { response in
+                    guard !request.isCancelled else {
+                        promise(.failure(AFError.explicitlyCancelled))
+                        return
+                    }
                     guard self.authenticationGeneration == requestAuthenticationGeneration else {
                         promise(.failure(OGSServiceError.staleAuthenticationContext))
                         return
@@ -2855,10 +3072,19 @@ class OGSService: ObservableObject {
                         }
                         promise(.success(decoded))
                     case .failure(let error):
+                        if response.response?.statusCode == 429 {
+                            let retryNotBefore = self.finishedGamePreviewCooldown.record(
+                                retryAfter: response.response?.value(forHTTPHeaderField: "Retry-After")
+                            )
+                            promise(.failure(FinishedGamePreviewRateLimitError(retryNotBefore: retryNotBefore)))
+                            return
+                        }
                         promise(.failure(error))
                     }
                 }
             }
+            .handleEvents(receiveCancel: { request.cancel() })
+            .eraseToAnyPublisher()
         }
 
         return cacheLookup
@@ -5920,6 +6146,13 @@ final class FinishedGameCache {
                 return nil
             }
             return try? Data(contentsOf: fileURL)
+        }
+    }
+
+    func contains(gameID: Int) -> Bool {
+        queue.sync {
+            guard let fileURL = fileURL(forGameID: gameID) else { return false }
+            return fileManager.fileExists(atPath: fileURL.path)
         }
     }
 

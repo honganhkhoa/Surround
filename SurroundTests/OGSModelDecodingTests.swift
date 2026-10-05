@@ -363,8 +363,8 @@ final class OGSModelDecodingTests: XCTestCase {
         XCTAssertEqual(full.edited, false)
         XCTAssertEqual(full.extra?.playedBy, 1526)
         XCTAssertEqual(full.extra?.playerUpdate?.players, .init(black: 1526, white: 1769))
-        XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams.black, [1526, 1767, 1765])
-        XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams.white, [1769])
+        XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams?.black, [1526, 1767, 1765])
+        XCTAssertEqual(full.extra?.playerUpdate?.rengoTeams?.white, [1769])
     }
 
     private func decodeChatLine(

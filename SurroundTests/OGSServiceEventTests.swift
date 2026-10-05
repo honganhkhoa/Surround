@@ -926,6 +926,82 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.map(\.command), ["game/disconnect", "game/connect"])
     }
 
+    func testRengoMoveIgnoresPlayerOnlyMetadataAndStillAppliesLegalMove() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 430)
+        var replacementBlack = data.players.black
+        replacementBlack.id = 900_101
+        var replacementWhite = data.players.white
+        replacementWhite.id = 900_102
+        data.rengo = true
+        data.rengoTeams = .init(
+            black: [data.players.black, replacementBlack],
+            white: [data.players.white, replacementWhite]
+        )
+        data.playerPool = [replacementBlack.id: replacementBlack, replacementWhite.id: replacementWhite]
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        defer { service.releaseConnection(gameID: 430, owner: owner) }
+        socket.emissions.removeAll()
+
+        socket.deliver(name: "game/430/move", data: [
+            "move_number": 1,
+            "move": [0, 0, 125, false, ["player_update": [
+                "players": ["black": replacementBlack.id, "white": replacementWhite.id],
+                "rengo_teams": [String: Any](),
+            ]]] as [Any],
+        ])
+
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertEqual(game.currentPosition.lastMove, .placeStone(0, 0))
+        XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
+        XCTAssertEqual(game.blackPlayer?.id, data.players.black.id)
+        XCTAssertEqual(game.whitePlayer?.id, data.players.white.id)
+        XCTAssertEqual(game.orderedRengoTeam[.black]?.map(\.id), [data.players.black.id, replacementBlack.id])
+        XCTAssertEqual(game.orderedRengoTeam[.white]?.map(\.id), [data.players.white.id, replacementWhite.id])
+        XCTAssertNil(game.latestPlayerUpdate)
+        XCTAssertFalse(game.hasUnresolvedRengoPlayers)
+        XCTAssertTrue(socket.emissions.isEmpty)
+    }
+
+    func testOrdinaryMoveAppliesPlayerOnlyMetadataUsingKnownPlayerPool() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        var data = try makeEmptyGameData(id: 431)
+        var replacementBlack = data.players.black
+        replacementBlack.id = 900_103
+        var replacementWhite = data.players.white
+        replacementWhite.id = 900_104
+        data.playerPool = [replacementBlack.id: replacementBlack, replacementWhite.id: replacementWhite]
+        let game = Game(ogsGame: data)
+        game.ogs = service
+        let owner = OGSService.GameConnectionOwner.explicit(UUID())
+        service.connect(to: game, owner: owner)
+        defer { service.releaseConnection(gameID: 431, owner: owner) }
+        socket.emissions.removeAll()
+
+        socket.deliver(name: "game/431/move", data: [
+            "move_number": 1,
+            "move": [0, 0, 125, false, ["played_by": data.players.black.id, "player_update": [
+                "players": ["black": replacementBlack.id, "white": replacementWhite.id],
+                "rengo_teams": [String: Any](),
+            ]]] as [Any],
+        ])
+
+        XCTAssertFalse(game.rengo)
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 1)
+        XCTAssertEqual(game.currentPosition[0, 0], .hasStone(.black))
+        XCTAssertEqual(game.blackPlayer?.id, replacementBlack.id)
+        XCTAssertEqual(game.whitePlayer?.id, replacementWhite.id)
+        XCTAssertEqual(game.latestPlayerUpdate?.players?.black, replacementBlack.id)
+        XCTAssertEqual(game.latestPlayerUpdate?.players?.white, replacementWhite.id)
+        XCTAssertNil(game.latestPlayerUpdate?.rengoTeams)
+        XCTAssertTrue(socket.emissions.isEmpty)
+    }
+
     func testConditionalMovesEventRoutesRuntimePayloadAndSurvivesReconnectAndGameData() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)
