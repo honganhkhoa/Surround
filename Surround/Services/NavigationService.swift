@@ -145,6 +145,14 @@ struct GameOpenResolver<GameValue> {
 struct MainViewParameters {
     var rootView: RootView = .home
     var showWaitingGames = false
+    var accountSheet: AccountSheet?
+}
+
+enum AccountSheet: String, Identifiable {
+    case profile
+    case settings
+
+    var id: String { rawValue }
 }
 
 struct HomeViewParameters {
@@ -167,6 +175,15 @@ struct GameHistoryViewParameters {
 class NavigationService: ObservableObject {
     static var shared = NavigationService()
     static var instances = [String: NavigationService]()
+
+    /// iPad account-sheet prototype; phone and Catalyst keep their existing navigation.
+    static var usesIPadAccountSheets: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
     
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
@@ -246,6 +263,7 @@ class NavigationService: ObservableObject {
         pendingGameOpen = nil
 
         main.showWaitingGames = false
+        main.accountSheet = nil
 
         if rootView != .home {
             home.activeGame = nil

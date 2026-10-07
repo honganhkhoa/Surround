@@ -132,38 +132,58 @@ struct MainView: View {
         })
     }
     
+    private func hostedTabContent(_ root: RootView) -> AnyView {
+        AnyView(root.navigationView
+            .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
+            .environmentObject(ogs)
+            .environmentObject(sgs)
+            .environmentObject(nav)
+            .environment(\.openURL, environment.openURL)
+            .environment(\.locale, environment.locale)
+            .environment(\.layoutDirection, environment.layoutDirection)
+            .environment(\.colorScheme, environment.colorScheme)
+            .environment(\.dynamicTypeSize, environment.dynamicTypeSize)
+            .environment(\.scenePhase, environment.scenePhase)
+            .environment(\.surroundAllowsLocalPersistence, environment.surroundAllowsLocalPersistence)
+            .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+            .modifier(AppReviewHostedPresentation(root: root))
+            .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
+            .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
+    }
+
     @ViewBuilder
     private var tabNavigation: some View {
         let navigationCurrentView = Binding<RootView>(
             get: { nav.main.rootView },
             set: { nav.main.rootView = $0 }
         )
-        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
-        if #available(iOS 27.0, *), UIDevice.current.userInterfaceIdiom == .phone {
-            DuoTabContainer(selection: navigationCurrentView, isLoggedIn: ogs.isLoggedIn, messagesBadgeCount: messagesBadgeCount) { root in
-                AnyView(root.navigationView
-                    .id(root == .privateMessages || root == .profile ? ogs.user?.id : nil)
-                    .environmentObject(ogs)
-                    .environmentObject(sgs)
-                    .environmentObject(nav)
-                    .environment(\.openURL, environment.openURL)
-                    .environment(\.locale, environment.locale)
-                    .environment(\.layoutDirection, environment.layoutDirection)
-                    .environment(\.colorScheme, environment.colorScheme)
-                    .environment(\.dynamicTypeSize, environment.dynamicTypeSize)
-                    .environment(\.scenePhase, environment.scenePhase)
-                    .environment(\.surroundAllowsLocalPersistence, environment.surroundAllowsLocalPersistence)
-                    .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
-                    .modifier(AppReviewHostedPresentation(root: root))
-                    .environment(\.appReviewCoordinator, environment.appReviewCoordinator)
-                    .environment(\.appReviewPresentationRelay, environment.appReviewPresentationRelay))
-            }
-            // UIKit owns the full window and its keyboard avoidance. Shrinking
-            // this controller in SwiftUI moves its tab bar above the keyboard
-            // and applies an extra bottom inset to the hosted composer.
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if NavigationService.usesIPadAccountSheets {
+            IPadTabContainer(
+                selection: navigationCurrentView,
+                isLoggedIn: ogs.isLoggedIn,
+                messagesBadgeCount: messagesBadgeCount,
+                onAccountSheet: { nav.main.accountSheet = $0 },
+                content: hostedTabContent
+            )
             .ignoresSafeArea()
         } else {
+            #if canImport(SwiftUI, _version: 8.0)
+            if #available(iOS 27.0, *), UIDevice.current.userInterfaceIdiom == .phone {
+                DuoTabContainer(
+                    selection: navigationCurrentView,
+                    isLoggedIn: ogs.isLoggedIn,
+                    messagesBadgeCount: messagesBadgeCount,
+                    content: hostedTabContent
+                )
+                // UIKit owns the window and keyboard avoidance.
+                .ignoresSafeArea()
+            } else {
+                swiftUITabs(selection: navigationCurrentView)
+            }
+            #else
             swiftUITabs(selection: navigationCurrentView)
+            #endif
         }
         #else
         swiftUITabs(selection: navigationCurrentView)
@@ -257,7 +277,6 @@ struct MainView: View {
                 }
             }
         }
-
         return ZStack(alignment: .top) {
             tabNavigation
             .sheet(isPresented: $nav.main.showWaitingGames) {
@@ -277,6 +296,9 @@ struct MainView: View {
             if ogs.isLoggedIn {
                 NotificationPopup()
             }
+        }
+        .sheet(item: $nav.main.accountSheet) { destination in
+            IPadAccountSheet(destination: destination)
         }
         .onChange(of: ogs.isLoggedIn, initial: true) { _, _ in
             redirectSignedOutAccountDestination()
@@ -323,6 +345,36 @@ struct MainView: View {
             allowing: ["*"]
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+    }
+}
+
+private struct IPadAccountSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let destination: AccountSheet
+
+    private var navigation: some View {
+        AppNavigationStack {
+            Group {
+                switch destination {
+                case .profile: AccountProfileView()
+                case .settings: SettingsView()
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark") { dismiss() }
+                        .accessibilityIdentifier("account.sheet.done")
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        if destination == .profile {
+            navigation.presentationSizing(.page)
+        } else {
+            navigation
+        }
     }
 }
 

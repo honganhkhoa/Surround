@@ -249,6 +249,7 @@ private func appReviewContext(
         || nav.home.showingNewGameView
         || nav.home.showingPreferredSettings
         || nav.home.showingSettings
+        || nav.main.accountSheet != nil
         || nav.main.showWaitingGames
         || ogs.isLoadingOverview
         || ogs.socketStatus != .connected

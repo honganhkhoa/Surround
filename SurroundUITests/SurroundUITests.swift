@@ -1216,6 +1216,23 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.CompatibilityScene.home.rawValue,
         ])
 
+        #if !targetEnvironment(macCatalyst)
+        let usesIPadAccountSheets = UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        let usesIPadAccountSheets = false
+        #endif
+        func dismissAccountSheetReturningToMessages() {
+            let done = element("account.sheet.done", in: app, matching: .button)
+            tap(done, description: "Dismiss the account sheet to return to Messages", in: app)
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: done
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
+            let messages = element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+            XCTAssertTrue(waitUntilHittable(messages, timeout: 10),
+                          "Dismissing the account sheet must retain the selected Messages destination.")
+        }
+
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationPublicGames, in: app)
@@ -1224,13 +1241,15 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.navigationMessages, in: app)
         element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
 
-        tap(SurroundUITestContract.AccessibilityID.navigationProfile, in: app)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationProfile, in: app)
         assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        if usesIPadAccountSheets { dismissAccountSheetReturningToMessages() }
 
-        tap(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationSettings, in: app)
         element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+        if usesIPadAccountSheets { dismissAccountSheetReturningToMessages() }
 
-        tap(SurroundUITestContract.AccessibilityID.navigationAbout, in: app)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationAbout, in: app)
         let about = element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
         let reviewLink = element(
             SurroundUITestContract.AccessibilityID.aboutWriteReview,
@@ -1244,7 +1263,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         // The offline root discards URL actions; this must remain in the app.
         XCTAssertTrue(about.exists)
 
-        tap(SurroundUITestContract.AccessibilityID.navigationBrowser, in: app)
+        selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationBrowser, in: app)
         element(SurroundUITestContract.AccessibilityID.screenBrowser, in: app)
 
         tap(SurroundUITestContract.AccessibilityID.navigationHome, in: app)

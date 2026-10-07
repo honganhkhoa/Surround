@@ -46,6 +46,7 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.tabBarPlacement) private var tabBarPlacement
+    @Environment(\.iPadTabContext) private var iPadTabContext
     #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
     @Environment(\.duoTabContext) private var duoTabContext
     #endif
@@ -593,6 +594,9 @@ struct HomeView: View {
 
     var shouldShowSettingsButton: Bool {
         #if os(iOS)
+        if let iPadTabContext {
+            return !iPadTabContext.sidebarVisible
+        }
         #if !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
         if #available(iOS 27.0, *), let duoTabContext {
             return !duoTabContext.sidebarAvailable
@@ -625,11 +629,19 @@ struct HomeView: View {
             }
             Divider()
             Button("Profile", systemImage: "person.crop.circle") {
-                if let user = ogs.user { openPlayerProfile?(user) }
+                if NavigationService.usesIPadAccountSheets {
+                    nav.main.accountSheet = .profile
+                } else if let user = ogs.user {
+                    openPlayerProfile?(user)
+                }
             }
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenuProfile)
             Button("Settings", systemImage: "gearshape") {
-                nav.home.showingSettings = true
+                if NavigationService.usesIPadAccountSheets {
+                    nav.main.accountSheet = .settings
+                } else {
+                    nav.home.showingSettings = true
+                }
             }
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.accountMenuSettings)
             Divider()

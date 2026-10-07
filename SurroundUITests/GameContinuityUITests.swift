@@ -258,9 +258,20 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         element(ID.gameBoard, in: app)
         let draft = "Keep this draft while checking Settings"
         typeDraft(draft, in: app)
-        tap(ID.navigationSettings, in: app)
-        element(ID.screenSettings, in: app)
-        tap(ID.navigationHome, in: app)
+        #if !targetEnvironment(macCatalyst)
+        let usesIPadAccountSheets = UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        let usesIPadAccountSheets = false
+        #endif
+        if usesIPadAccountSheets {
+            selectMainNavigation(ID.navigationPublicGames, in: app)
+            element(ID.screenPublicGames, in: app)
+            selectMainNavigation(ID.navigationHome, in: app)
+        } else {
+            tap(ID.navigationSettings, in: app)
+            element(ID.screenSettings, in: app)
+            tap(ID.navigationHome, in: app)
+        }
         assertProperty("value", equals: draft,
                        of: element(ID.gameChatInput, in: app, matching: .textField))
         XCTAssertFalse(chatInputHasKeyboardFocus(in: app))

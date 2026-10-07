@@ -455,8 +455,14 @@ private struct SidebarNavigationContentLayout: ViewModifier {
     }
 }
 
+#endif
+
+#if os(iOS) && !targetEnvironment(macCatalyst)
 private struct AppTabBarVisibility: ViewModifier {
+    #if canImport(SwiftUI, _version: 8.0)
     @Environment(\.duoTabContext) private var tabs
+    #endif
+    @Environment(\.iPadTabContext) private var iPadTabs
     @State private var owner = UUID()
     let hidden: Bool
 
@@ -464,29 +470,38 @@ private struct AppTabBarVisibility: ViewModifier {
         content
             .toolbar(hidden ? .hidden : .automatic, for: .tabBar)
             .onAppear {
+                iPadTabs?.setTabBarHidden(hidden, owner: owner)
+                #if canImport(SwiftUI, _version: 8.0)
                 if #available(iOS 27.0, *) {
                     tabs?.setTabBarHidden(hidden, owner: owner)
                 }
+                #endif
             }
             .onChange(of: hidden) { _, value in
+                iPadTabs?.setTabBarHidden(value, owner: owner)
+                #if canImport(SwiftUI, _version: 8.0)
                 if #available(iOS 27.0, *) {
                     tabs?.setTabBarHidden(value, owner: owner)
                 }
+                #endif
             }
             .onDisappear {
+                iPadTabs?.removeTabBarHiddenRequest(owner: owner)
+                #if canImport(SwiftUI, _version: 8.0)
                 if #available(iOS 27.0, *) {
                     tabs?.removeTabBarHiddenRequest(owner: owner)
                 }
+                #endif
             }
     }
 }
 #endif
 
 extension View {
-    /// SwiftUI shells keep their native preference; the owned Duo container
-    /// receives the same request without inspecting generated controllers.
+    /// SwiftUI shells keep their native preference; owned native containers
+    /// receive the same request without inspecting generated controllers.
     func appTabBarHidden(_ hidden: Bool) -> some View {
-        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         modifier(AppTabBarVisibility(hidden: hidden))
         #else
         toolbar(hidden ? .hidden : .automatic, for: .tabBar)
@@ -618,6 +633,7 @@ extension EnvironmentValues {
 /// pushes use AppNavigationLink/appNavigationDestination for the same policy.
 struct AppNavigationStack<Content: View>: View {
     @EnvironmentObject private var nav: NavigationService
+    @Environment(\.iPadTabContext) private var iPadTabContext
     #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
     @Environment(\.duoTabContext) private var duoTabContext
     #endif
@@ -648,6 +664,7 @@ struct AppNavigationStack<Content: View>: View {
             if navigation.isActive { FriendshipNoticeBanner() }
         }
         .environmentObject(navigation)
+        .environment(\.iPadTabContext, rootView == nil ? nil : iPadTabContext)
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
         // Presented stacks have their own safe area and chrome ownership.
         .environment(\.duoTabContext, rootView == nil ? nil : duoTabContext)

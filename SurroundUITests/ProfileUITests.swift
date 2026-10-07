@@ -295,8 +295,188 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(alert.waitForExistence(timeout: 10), "A failed friendship action must explain the error.")
         tap(alert.buttons["Retry"].firstMatch, description: "Retry the failed friendship action", in: app)
     }
+    func testIPadAccountSheetsShareEntryPointsAndPreserveSelectedTab() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This prototype uses iPad account sheets.")
+        #else
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad,
+                      "This prototype preserves the existing phone account navigation.")
+        let app = launchProfileContent(additionalLaunchArguments: [
+            SurroundUITestContract.messagesContentLaunchArgument,
+        ])
+        let id = SurroundUITestContract.AccessibilityID.self
+        let peerID = 765_826
+        let draft = "Unsent draft while trying iPad account sheets"
 
+        func assertAccountTabsAbsent() {
+            for (identifier, title) in [(id.navigationProfile, "Profile"), (id.navigationSettings, "Settings")] {
+                XCTAssertFalse(app.tabBars.buttons[title].exists,
+                               "Account actions must not add a \(title) top tab.")
+                XCTAssertFalse(app.tabBars.descendants(matching: .any)
+                    .matching(identifier: identifier).firstMatch.exists)
+            }
+        }
 
+        func dismissAccountSheet(returningTo destinationID: String) {
+            let done = element("account.sheet.done", in: app, matching: .button)
+            tap(done, description: "Dismiss the account sheet", in: app)
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: done
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed,
+                           "Done must dismiss the account sheet.")
+            XCTAssertTrue(element(destinationID, in: app).isHittable,
+                          "Done must reveal the previously selected primary tab.")
+            assertAccountTabsAbsent()
+        }
+
+        func visibleSidebarRow(_ identifier: String) -> XCUIElement? {
+            let cells = app.cells.matching(identifier: identifier).allElementsBoundByIndex
+            return cells.first(where: { $0.isHittable })
+                ?? app.descendants(matching: .any).matching(identifier: identifier)
+                    .allElementsBoundByIndex.first(where: { $0.elementType != .staticText && $0.isHittable })
+        }
+
+        func openSidebarAccountSheet(_ identifier: String, title: String) {
+            if visibleSidebarRow(identifier) == nil {
+                tap(app.buttons["Toggle sidebar"].firstMatch,
+                    description: "Show the native navigation sidebar", in: app)
+            }
+            var entry: XCUIElement?
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                entry = visibleSidebarRow(identifier)
+                return entry != nil
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                           "The native \(title) sidebar row must remain available.")
+            guard let entry,
+                  let messages = visibleSidebarRow(id.navigationMessages),
+                  let profile = visibleSidebarRow(id.navigationProfile),
+                  let settings = visibleSidebarRow(id.navigationSettings),
+                  let about = visibleSidebarRow(id.navigationAbout),
+                  let web = visibleSidebarRow(id.navigationBrowser) else {
+                return XCTFail("Expected the original native sidebar rows.")
+            }
+            let surround = app.staticTexts["Surround"].firstMatch
+            XCTAssertTrue(surround.exists && surround.isHittable)
+            XCTAssertLessThan(messages.frame.midY, profile.frame.midY)
+            XCTAssertLessThan(profile.frame.midY, surround.frame.midY)
+            XCTAssertLessThan(settings.frame.midY, about.frame.midY)
+            XCTAssertTrue(about.label.contains("About & Support"),
+                          "The sidebar must retain the full About & Support label.")
+            XCTAssertLessThan(about.frame.midY, web.frame.midY)
+            tap(entry, description: "Open native sidebar \(title)", in: app)
+        }
+
+        func assertConversationDraftRetained() {
+            let composers = app.textFields.matching(identifier: id.privateMessageComposer)
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let active = composers.allElementsBoundByIndex.filter { $0.isHittable }
+                return active.count == 1 && active[0].placeholderValue == "Message hakhoa"
+                    && active[0].value as? String == draft
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                           "The selected Messages peer and its unsent draft must survive the sheet.")
+            let selectedPeer = element(id.profileMessageToolbarEntry(peerID), in: app)
+            XCTAssertTrue(selectedPeer.isHittable && selectedPeer.label.contains("hakhoa"))
+        }
+
+        assertAccountTabsAbsent()
+        selectMainNavigation(id.navigationMessages, in: app)
+        element(id.screenMessages, in: app)
+        let inbox = element("messages.inboxScroll", in: app, matching: .scrollView)
+        tap(elementAfterScrolling(id.privateMessageRow(peerID), in: app, within: inbox, matching: .button),
+            description: "Select hakhoa's offline conversation", in: app)
+        let composer = element(id.privateMessageComposer, in: app, matching: .textField)
+        XCTAssertEqual(composer.placeholderValue, "Message hakhoa")
+        tap(composer, description: "Write a draft before opening account sheets", in: app)
+        composer.typeText(String(draft.prefix(1)))
+        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: 10))
+        composer.typeText(String(draft.dropFirst()))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+
+        for visit in 1...2 {
+            openSidebarAccountSheet(id.navigationProfile, title: "Profile")
+            assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+            element("account.sheet.done", in: app, matching: .button)
+            keepScreenshot("iPad prototype – sidebar Profile over Messages visit \(visit)", in: app)
+            dismissAccountSheet(returningTo: id.screenMessages)
+            assertConversationDraftRetained()
+        }
+
+        openSidebarAccountSheet(id.navigationSettings, title: "Settings")
+        element(id.screenSettings, in: app)
+        tap(id.profileSettingsEntry, in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(id.screenSettings, in: app)
+        keepScreenshot("iPad prototype – Settings after nested Profile Back", in: app)
+        dismissAccountSheet(returningTo: id.screenMessages)
+        assertConversationDraftRetained()
+
+        tap(id.profileMessageToolbarEntry(peerID), in: app, matching: .button)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        openSidebarAccountSheet(id.navigationSettings, title: "Settings")
+        element(id.screenSettings, in: app)
+        dismissAccountSheet(returningTo: id.screenPlayerProfile)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        navigateBackFromPlayerProfile(in: app)
+        element(id.screenMessages, in: app)
+        assertConversationDraftRetained()
+        keepScreenshot("iPad prototype – Messages stack and draft after modal visits", in: app)
+
+        selectMainNavigation(id.navigationPublicGames, in: app)
+        element(id.screenPublicGames, in: app)
+        selectMainNavigation(id.navigationMessages, in: app)
+        element(id.screenMessages, in: app)
+        assertConversationDraftRetained()
+
+        selectMainNavigation(id.navigationHome, in: app)
+        element(id.screenHome, in: app)
+        let account = app.buttons[id.accountMenu].firstMatch
+        if !account.exists || !account.isHittable {
+            let hideSidebar = app.buttons["Hide Sidebar"].firstMatch
+            let toggleSidebar = app.buttons["Toggle sidebar"].firstMatch
+            tap(hideSidebar.exists ? hideSidebar : toggleSidebar,
+                description: "Show the top tab bar and avatar menu", in: app)
+        }
+        for (identifier, title) in [(id.navigationHome, "Home"),
+                                    (id.navigationPublicGames, "Public games"),
+                                    (id.navigationMessages, "Messages")] {
+            let primary = app.buttons[identifier].firstMatch
+            XCTAssertTrue(primary.waitForExistence(timeout: 10),
+                          "The top bar must retain an independent \(title) control.")
+            XCTAssertTrue(primary.isHittable,
+                          "The \(title) control must be visible without opening a group menu.")
+        }
+        let about = app.buttons[id.navigationAbout].firstMatch
+        XCTAssertTrue(about.waitForExistence(timeout: 10) && about.isHittable)
+        XCTAssertEqual(about.label, "About")
+        tap(about, description: "Open the localized About top tab", in: app)
+        element(id.screenAbout, in: app)
+        selectMainNavigation(id.navigationHome, in: app)
+        element(id.screenHome, in: app)
+        keepScreenshot("iPad prototype – independent primary top controls", in: app)
+        tap(id.accountMenu, in: app, matching: .button)
+        tap(requiredMenuButton(id.accountMenuProfile, title: "Profile", in: app),
+            description: "Open avatar Profile sheet", in: app)
+        assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
+        let history = revealProfileControl(id.profileAllHistory, in: app)
+        tap(history, description: "Open history inside the Profile sheet", in: app)
+        element(id.screenProfileGameHistory, in: app)
+        keepScreenshot("iPad prototype – Profile sheet nested game history", in: app)
+        backToProfile(from: "Game history", destinationID: id.screenProfileGameHistory, in: app)
+        element("account.sheet.done", in: app, matching: .button)
+        dismissAccountSheet(returningTo: id.screenHome)
+
+        tap(id.accountMenu, in: app, matching: .button)
+        tap(requiredMenuButton(id.accountMenuSettings, title: "Settings", in: app),
+            description: "Open avatar Settings sheet", in: app)
+        element(id.screenSettings, in: app)
+        keepScreenshot("iPad prototype – avatar Settings sheet", in: app)
+        dismissAccountSheet(returningTo: id.screenHome)
+        #endif
+    }
 
     func testCompactAccountMenuPushesOwnProfileAndOpensSettings() throws {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone,
@@ -1101,7 +1281,19 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: 10),
                       "The profile must resolve the requested appearance, independent of the test host.")
         keepScreenshot("Own profile – \(appearance.rawValue) appearance", in: app)
-        if usesAccountMenu {
+        #if !targetEnvironment(macCatalyst)
+        let usesIPadAccountSheets = UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        let usesIPadAccountSheets = false
+        #endif
+        if usesIPadAccountSheets {
+            let done = element("account.sheet.done", in: app, matching: .button)
+            tap(done, description: "Dismiss the own Profile appearance sheet", in: app)
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: done
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
+        } else if usesAccountMenu {
             navigateBackFromPlayerProfile(in: app)
         } else {
             selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationHome, in: app)
