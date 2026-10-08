@@ -37,7 +37,7 @@ struct PlayerProfileRatings: View {
                             if showsRatings {
                                 Text("Gray ratings are provisional.")
                             } else {
-                                Text("? means provisional — the range is where their rank likely is.")
+                                Text("? means provisional — the range shows the likely rank.")
                             }
                         }
                             .font(.caption)

@@ -357,7 +357,9 @@ private struct IPadAccountSheet: View {
             Group {
                 switch destination {
                 case .profile: AccountProfileView()
-                case .settings: SettingsView()
+                case .settings:
+                    SettingsView()
+                        .backgroundStyle(Color(uiColor: .secondarySystemBackground))
                 }
             }
             .toolbar {

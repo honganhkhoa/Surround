@@ -668,8 +668,8 @@
       },
       "shouldTranslate" : false
     },
-    "? means provisional — the range is where their rank likely is." : {
-      "comment" : "Conditional explanation under the Profile rank grid when at least one category is provisional. The question mark is the visible rank marker; the range is an estimate, not a confirmed rank.",
+    "? means provisional — the range shows the likely rank." : {
+      "comment" : "Conditional explanation under the Profile rank grid when at least one category is provisional. Used on both the signed-in player's own Profile and other players' Profiles, so avoid personal owner pronouns. The question mark is the visible rank marker; the range is an estimate, not a confirmed rank.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -680,7 +680,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "? indica un rango provisional — el intervalo muestra dónde probablemente se sitúa su rango."
+            "value" : "? indica un rango provisional — el intervalo muestra dónde probablemente se sitúa el rango."
           }
         },
         "fr" : {
@@ -740,13 +740,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「?」表示段级位暂定，所示范围是其段级位可能所在的区间。"
+            "value" : "「?」表示段级位暂定，所示范围是段级位可能所在的区间。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「?」表示棋力暫定，所示範圍是其棋力可能所在的區間。"
+            "value" : "「?」表示棋力暫定，所示範圍是棋力可能所在的區間。"
           }
         }
       }

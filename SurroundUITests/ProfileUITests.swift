@@ -921,7 +921,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let overall = element(SurroundUITestContract.AccessibilityID.profileRatingCategory("overall"), in: app)
         XCTAssertFalse((overall.value as? String ?? "").contains("Provisional"))
         let key = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingKey, in: app)
-        XCTAssertTrue(key.label.contains("? means provisional"))
+        XCTAssertEqual(key.label, "? means provisional — the range shows the likely rank.")
         keepScreenshot("Profile ratings – seven display-only rank categories", in: app)
 
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingMode, in: app)
@@ -951,6 +951,9 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
         assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
         element(SurroundUITestContract.AccessibilityID.profileRatings, in: app)
+        let key = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingKey, in: app)
+        XCTAssertEqual(key.label, "? means provisional — the range shows the likely rank.",
+                       "The provisional legend must also read naturally on the signed-in player's own Profile.")
         keepScreenshot("Own profile – supporter identity and section margins", in: app)
         for identifier in [SurroundUITestContract.AccessibilityID.profileActiveGames,
                            SurroundUITestContract.AccessibilityID.profileHeadToHead] {

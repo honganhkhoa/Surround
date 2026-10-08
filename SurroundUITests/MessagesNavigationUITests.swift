@@ -392,12 +392,70 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
     }
 
+    func testConversationTypingKeepsLatestReadableThroughSoftwareKeyboardTransition() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey requires the iOS software keyboard.")
+        #else
+        let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.messagesOverflowLaunchArgument])
+        let wide = usesColumns(in: app)
+        if !wide { openInboxConversation(firstPeerID, in: app) }
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        let pane = wide ? element("messages.detailPane", in: app) : app.windows.firstMatch
+        let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertFalse(keyboard.exists, "The initial latest witness must precede keyboard focus.")
+        let letterKey = keyboard.keys.matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
+
+        func assertLatestIsReadable(_ checkpoint: String, requiresSoftwareKeyboard: Bool,
+                                    requiresKeyboardAbsent: Bool = false) {
+            let readable = waitForCondition {
+                let window = app.windows.firstMatch.frame
+                let composerFrame = composer.frame
+                guard !window.isEmpty, !window.isNull, composer.exists, composer.isHittable,
+                      !composerFrame.isEmpty, !composerFrame.isNull, window.contains(composerFrame) else { return false }
+                if requiresSoftwareKeyboard {
+                    // A visible letter key distinguishes a full software keyboard
+                    // from a hardware-keyboard accessory bar.
+                    guard keyboard.exists, letterKey.exists, letterKey.isHittable else { return false }
+                    let keyboardFrame = keyboard.frame
+                    let keyFrame = letterKey.frame
+                    guard !keyboardFrame.isEmpty, !keyboardFrame.isNull,
+                          !keyFrame.isEmpty, !keyFrame.isNull,
+                          window.contains(keyboardFrame), keyboardFrame.contains(keyFrame),
+                          composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
+                } else if requiresKeyboardAbsent && keyboard.exists { return false }
+                guard latest.exists, latest.isHittable else { return false }
+                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+                let latestFrame = latest.frame
+                return !viewport.isEmpty && !viewport.isNull && !latestFrame.isEmpty && !latestFrame.isNull
+                    && viewport.contains(latestFrame)
+            }
+            keepScreenshot(checkpoint, in: app)
+            XCTAssertTrue(readable, "\(checkpoint): the exact latest message and composer must fit the same unobscured viewport without a repair gesture.")
+        }
+        assertLatestIsReadable("Messages before draft typing", requiresSoftwareKeyboard: false,
+                               requiresKeyboardAbsent: true)
+        let draft = "Unsent through software keyboard transition"
+        tap(composer, description: "Focus the private-message draft", in: app)
+        composer.typeText(String(draft.prefix(1)))
+        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: 10))
+        // The first typeText call can show only the hardware-keyboard accessory.
+        // Keep the first-character readability check before completing the draft.
+        assertLatestIsReadable("Messages after first draft character", requiresSoftwareKeyboard: false)
+        composer.typeText(String(draft.dropFirst()))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        assertLatestIsReadable("Messages after complete draft with full software keyboard", requiresSoftwareKeyboard: true)
+        #endif
+    }
+
     func testLongHistoryIncomingMessagesFollowLatestWithKeyboardAndDraft() throws {
         let app = launchMessages(additionalLaunchArguments: [
             SurroundUITestContract.messagesOverflowLaunchArgument,
             SurroundUITestContract.messagesIncomingLaunchArgument,
         ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_DELAY": "40",
-                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"])
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1",
+                               "SURROUND_UI_MESSAGES_REPLAY_HELD": "1"])
         let wide = usesColumns(in: app)
         if !wide { openInboxConversation(firstPeerID, in: app) }
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
@@ -411,6 +469,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         #if !targetEnvironment(macCatalyst)
         XCTAssertTrue(app.keyboards.firstMatch.exists, "Incoming replies must exercise the software-keyboard viewport.")
         #endif
+        keepScreenshot("Following latest before incoming replay", in: app)
+        tap("test.messagesReplay.release", in: app, matching: .button)
         XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
                       "Both fresh incoming replies must be delivered through the offline service.")
         let latest = transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch
@@ -427,7 +487,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.messagesOverflowLaunchArgument,
             SurroundUITestContract.messagesIncomingLaunchArgument,
         ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_DELAY": "40",
-                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"])
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1",
+                               "SURROUND_UI_MESSAGES_REPLAY_HELD": "1"])
         let wide = usesColumns(in: app)
         if !wide { openInboxConversation(firstPeerID, in: app) }
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
@@ -435,20 +496,26 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         enterDraft(draft, in: composer, app: app)
         let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
         let initialLatest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
-        for _ in 0..<4 {
-            transcript.swipeDown()
-            if !initialLatest.isHittable { break }
-        }
-        XCTAssertFalse(initialLatest.isHittable, "Seed a reading position that is independent of latest.")
         func readableViewport() -> CGRect {
             let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
             return CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width,
                           height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
                 .insetBy(dx: 8, dy: 8)
         }
-        let olderMessages = transcript.staticTexts.matching(NSPredicate(
+        let olderHistory = transcript.staticTexts.matching(NSPredicate(
             format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
-        )).allElementsBoundByIndex.filter { readableViewport().contains($0.frame) && $0.isHittable }
+        ))
+        for _ in 0..<4 {
+            dragMessagesViewport(transcriptViewport(transcript, above: composer,
+                within: wide ? element("messages.detailPane", in: app).frame : app.windows.firstMatch.frame, in: app),
+                                 toward: nil, earlierWhenAbsent: true, in: app)
+            if !initialLatest.isHittable {
+                let viewport = readableViewport()
+                if olderHistory.allElementsBoundByIndex.contains(where: { viewport.contains($0.frame) && $0.isHittable }) { break }
+            }
+        }
+        XCTAssertFalse(initialLatest.isHittable, "Seed a reading position that is independent of latest.")
+        let olderMessages = olderHistory.allElementsBoundByIndex.filter { readableViewport().contains($0.frame) && $0.isHittable }
             .sorted { $0.frame.midY < $1.frame.midY }
         let witnessLabel = try XCTUnwrap(olderMessages.dropFirst(olderMessages.count / 2).first?.label,
                                         "Seed one fully readable older-message witness.")
@@ -456,6 +523,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let progress = transcript
         XCTAssertEqual(progress.value as? String, "delivered:0/2", "The reading witness must precede the appends.")
         keepScreenshot("Older witness before incoming replay", in: app)
+        tap("test.messagesReplay.release", in: app, matching: .button)
         XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
                       "Both incoming replies must arrive while the older history remains selected.")
         XCTAssertTrue(witness.isHittable && readableViewport().contains(witness.frame),
@@ -741,6 +809,26 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let wide = usesColumns(in: app)
         if !wide { openInboxConversation(firstPeerID, in: app) }
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "Capture the unfocused composer before the software keyboard appears.")
+        let keyboardHiddenWindow = app.windows.firstMatch.frame
+        let keyboardHiddenComposer = composer.frame
+        XCTAssertTrue(keyboardHiddenWindow.contains(keyboardHiddenComposer))
+        keepScreenshot("Messages keyboard-hidden composer baseline", in: app)
+
+        func assertKeyboardHiddenComposerMatchesBaseline() {
+            XCTAssertFalse(app.keyboards.firstMatch.exists, "Returning to Messages must leave keyboard focus dismissed.")
+            let window = app.windows.firstMatch.frame
+            let returnedComposer = composer.frame
+            XCTAssertEqual(window, keyboardHiddenWindow, "This background journey must return to the same native window bounds.")
+            XCTAssertTrue(composer.isHittable && window.contains(returnedComposer))
+            // First focus can change a text field's AX intrinsic size.
+            // Compare its center with this run's unfocused baseline.
+            XCTAssertEqual(returnedComposer.midX - window.minX,
+                           keyboardHiddenComposer.midX - keyboardHiddenWindow.minX, accuracy: 1)
+            XCTAssertEqual(window.maxY - returnedComposer.midY,
+                           keyboardHiddenWindow.maxY - keyboardHiddenComposer.midY, accuracy: 1,
+                           "A dismissed keyboard must restore the composer to its original distance from the window bottom.")
+        }
         let draft = "Unsent through repeated background returns"
         enterDraft(draft, in: composer, app: app)
         let sceneProbe = app.descendants(matching: .any).matching(identifier: "test.sceneActivation").firstMatch
@@ -773,6 +861,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
             XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
             assertLatestMessageIsReadable()
+            assertKeyboardHiddenComposerMatchesBaseline()
             keepScreenshot("Messages after background return \(cycle)", in: app)
         }
 
@@ -780,18 +869,27 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         // Freeze an external label; a different nearby message cannot satisfy it.
         let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
         let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
+        func readableViewport() -> CGRect {
+            let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
+            return CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width,
+                          height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
+                .insetBy(dx: 8, dy: 8)
+        }
+        let olderHistory = transcript.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
+        ))
         for _ in 0..<8 {
-            transcript.swipeDown()
-            if !latest.isHittable { break }
+            dragMessagesViewport(transcriptViewport(transcript, above: composer,
+                within: wide ? element("messages.detailPane", in: app).frame : app.windows.firstMatch.frame, in: app),
+                                 toward: nil, earlierWhenAbsent: true, in: app)
+            if !latest.isHittable {
+                let viewport = readableViewport()
+                if olderHistory.allElementsBoundByIndex.contains(where: { viewport.contains($0.frame) && $0.isHittable }) { break }
+            }
         }
         XCTAssertFalse(latest.isHittable, "Seed an actual older reading position before backgrounding.")
-        let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
-        let viewport = CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width,
-                              height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
-            .insetBy(dx: 8, dy: 8)
-        let visibleOlderMessages = transcript.staticTexts.matching(NSPredicate(
-            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
-        )).allElementsBoundByIndex.filter { viewport.contains($0.frame) && $0.isHittable }
+        let viewport = readableViewport()
+        let visibleOlderMessages = olderHistory.allElementsBoundByIndex.filter { viewport.contains($0.frame) && $0.isHittable }
             .sorted { $0.frame.midY < $1.frame.midY }
         XCTAssertFalse(visibleOlderMessages.isEmpty, "Seed a fully readable older-message witness.")
         let historyLabel = try XCTUnwrap(visibleOlderMessages.dropFirst(visibleOlderMessages.count / 2).first?.label)
@@ -812,10 +910,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let returned = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
             XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
             XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
-            XCTAssertTrue(waitUntilHittable(history, timeout: 10),
-                          "The same older message must remain readable without another scroll gesture.")
+            XCTAssertTrue(waitForCondition {
+                history.isHittable && readableViewport().contains(history.frame)
+            }, "The exact older message must remain fully readable without another scroll gesture.")
             XCTAssertLessThanOrEqual(history.frame.maxY, composer.frame.minY + 1)
             XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+            assertKeyboardHiddenComposerMatchesBaseline()
             keepScreenshot("Older message after background return \(cycle)", in: app)
         }
         #endif
@@ -1306,6 +1406,26 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertDefaultFriendsStrip(in: app)
     }
 
+    func testConversationUsernameProfileBackPreservesDraft() {
+        let app = launchMessages()
+        let wide = usesColumns(in: app)
+        let bounds = wide ? assertWideRoot(in: app) : nil
+        if !wide { openInboxConversation(firstPeerID, in: app) }
+        let draft = "Unsent while viewing the conversation peer"
+        enterDraft(draft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), app: app)
+
+        tapVisible("messages.conversation.profile.\(firstPeerID)", in: app)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        if let bounds {
+            assertFullWidthDestination(SurroundUITestContract.AccessibilityID.screenPlayerProfile, over: bounds, in: app)
+        }
+        keepScreenshot("Conversation username opens peer Profile", in: app)
+        back(from: "hakhoa", to: wide ? SurroundUITestContract.AccessibilityID.screenMessages : "messages.conversation", in: app)
+        XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: 10),
+                      "Back from the username's Profile must retain the selected peer and unsent draft.")
+        keepScreenshot("Conversation username Profile Back retains draft", in: app)
+    }
+
     func testWideFullWidthProfileAndChallengeBackRestoreRootDraftAndQuery() throws {
         let app = launchMessages()
         try requireColumns(in: app)
@@ -1607,34 +1727,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func revealBiographyInboxAnchor(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
-        let pane = element("messages.inboxPane", in: app)
-        let anchor = element(identifier, in: app, matching: .button)
-        func currentViewport() -> CGRect {
-            var bounds = scroll.frame.intersection(pane.frame).intersection(app.frame)
-            for keyboard in app.keyboards.allElementsBoundByIndex where keyboard.frame.intersects(bounds) {
-                bounds.size.height = max(0, min(bounds.maxY, keyboard.frame.minY) - bounds.minY)
-            }
-            return bounds.insetBy(dx: 8, dy: 12)
-        }
-        for _ in 0..<8 {
-            let viewport = currentViewport()
-            if viewport.contains(anchor.frame) && anchor.isHittable { break }
-            let maximumDelta = viewport.height * 0.3
-            let delta = min(maximumDelta, max(-maximumDelta, viewport.midY - anchor.frame.midY))
-            guard !viewport.isEmpty, abs(delta) >= 12 else { break }
-            // Inbox AX bounds can include the sidebar. Anchor app-space points
-            // to the window so the gesture stays in the visible inbox pane.
-            let window = app.windows.firstMatch
-            let start = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
-                dx: viewport.midX - window.frame.minX,
-                dy: viewport.midY - window.frame.minY))
-            start.press(forDuration: 0.05,
-                        thenDragTo: start.withOffset(CGVector(dx: 0, dy: delta)),
-                        withVelocity: XCUIGestureVelocity(rawValue: 400), thenHoldForDuration: 0.2)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        let viewport = currentViewport()
-        XCTAssertTrue(viewport.contains(anchor.frame) && anchor.isHittable,
+        let anchor = inboxElement(identifier, in: app)
+        let viewport = inboxViewport(scroll, in: app)
+        XCTAssertTrue(anchor.exists && viewport.contains(anchor.frame) && anchor.isHittable,
                       "The biography journey must begin with a visible scrolled inbox anchor.")
         return anchor
     }
@@ -1806,7 +1901,92 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     @discardableResult
     private func inboxElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let scroll = element("messages.inboxScroll", in: app, matching: .scrollView)
-        return elementAfterScrolling(identifier, in: app, within: scroll, matching: .button)
+        // Lazy friend rows must be revealed before requiring AX existence.
+        let candidate = scroll.descendants(matching: .button).matching(identifier: identifier).firstMatch
+        for _ in 0..<8 {
+            let viewport = inboxViewport(scroll, in: app)
+            if candidate.exists && viewport.contains(candidate.frame) && candidate.isHittable { return candidate }
+            dragMessagesViewport(viewport, toward: candidate.exists ? candidate.frame : nil,
+                                 earlierWhenAbsent: false, in: app)
+        }
+        XCTAssertTrue(waitForCondition {
+            candidate.exists && self.inboxViewport(scroll, in: app).contains(candidate.frame) && candidate.isHittable
+        },
+                      "Expected \(identifier) to be fully readable inside its inbox viewport after bounded scrolling.")
+        return candidate
+    }
+
+    private func messagesViewport(_ bounds: CGRect, in app: XCUIApplication) -> CGRect {
+        let bounds = bounds.intersection(app.windows.firstMatch.frame).intersection(app.frame)
+        guard !bounds.isEmpty, !bounds.isNull, bounds.minX.isFinite, bounds.minY.isFinite,
+              bounds.width.isFinite, bounds.height.isFinite else { return .zero }
+        var top = bounds.minY
+        var bottom = bounds.maxY
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.frame.intersects(bounds) {
+            top = max(top, bar.frame.maxY)
+        }
+        for bar in app.tabBars.allElementsBoundByIndex where bar.frame.intersects(bounds) {
+            bottom = min(bottom, bar.frame.minY)
+        }
+        for keyboard in app.keyboards.allElementsBoundByIndex where keyboard.frame.intersects(bounds) {
+            bottom = min(bottom, keyboard.frame.minY)
+        }
+        // Keyboard AX can omit the input-assistant strip. The visible peer
+        // composer supplies a measured boundary for both Messages panes.
+        let composers = app.textFields.matching(identifier: SurroundUITestContract.AccessibilityID.privateMessageComposer)
+        if let composer = composers.allElementsBoundByIndex.first(where: { $0.isHittable }) {
+            bottom = min(bottom, composer.frame.minY)
+        }
+        guard bottom > top + 24, bounds.width > 16 else { return .zero }
+        return CGRect(x: bounds.minX, y: top, width: bounds.width, height: bottom - top)
+            .insetBy(dx: 8, dy: 12)
+    }
+
+    private func inboxViewport(_ scroll: XCUIElement, in app: XCUIApplication) -> CGRect {
+        // This is also polled inside waitForCondition; avoid nested waits.
+        guard scroll.exists else { return .zero }
+        let pane = query("messages.inboxPane", in: app)
+        let bounds = pane.exists ? scroll.frame.intersection(pane.frame) : scroll.frame
+        let viewport = messagesViewport(bounds, in: app)
+        guard !viewport.isEmpty else { return .zero }
+        let search = app.textFields.matching(identifier: "messages.playerSearchField").firstMatch
+        let top = search.exists ? max(viewport.minY, search.frame.maxY + 12) : viewport.minY
+        return CGRect(x: viewport.minX, y: top, width: viewport.width, height: max(0, viewport.maxY - top))
+    }
+
+    private func transcriptViewport(_ transcript: XCUIElement, above composer: XCUIElement,
+                                    within paneBounds: CGRect, in app: XCUIApplication) -> CGRect {
+        let viewport = messagesViewport(transcript.frame.intersection(paneBounds), in: app)
+        guard !viewport.isEmpty else { return .zero }
+        let heading = query("messages.conversation.heading", in: app)
+        let top = heading.exists && heading.isHittable && heading.frame.intersects(paneBounds)
+            ? max(viewport.minY, heading.frame.maxY + 12) : viewport.minY
+        let bottom = min(viewport.maxY, composer.frame.minY - 12)
+        return CGRect(x: viewport.minX, y: top, width: viewport.width,
+                      height: max(0, bottom - top))
+    }
+
+    private func dragMessagesViewport(_ viewport: CGRect, toward target: CGRect?,
+                                      earlierWhenAbsent: Bool, in app: XCUIApplication) {
+        XCTAssertFalse(viewport.isEmpty, "A Messages scroll gesture needs an unobscured viewport.")
+        guard !viewport.isEmpty else { return }
+        let target = target.flatMap { frame in
+            !frame.isEmpty && !frame.isNull && frame.minY.isFinite && frame.height.isFinite ? frame : nil
+        }
+        let maximumDelta = viewport.height * 0.8
+        let requestedDelta = target.map { viewport.midY - $0.midY }
+            ?? (earlierWhenAbsent ? maximumDelta : -maximumDelta)
+        let delta = min(maximumDelta, max(-maximumDelta, requestedDelta))
+        guard abs(delta) >= min(12, maximumDelta) else { return }
+        let startY = delta > 0 ? viewport.minY + viewport.height * 0.1
+            : viewport.maxY - viewport.height * 0.1
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: viewport.midX - window.frame.minX, dy: startY - window.frame.minY))
+        // Both contacts stay in the measured viewport, even when AX includes
+        // the sidebar, composer, or keyboard in a ScrollView's full bounds.
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: delta)),
+                    withVelocity: target == nil ? .fast : .slow, thenHoldForDuration: 0)
     }
 
     private func cancelInboxSearch(in app: XCUIApplication) {
@@ -1833,8 +2013,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(profile.label.contains(username))
         if (presentation ?? (usesColumns(in: app) ? .wideRoot : .nativePush)) == .wideRoot {
             let heading = element("messages.conversation.heading", in: app)
-            let identity = heading.staticTexts.matching(NSPredicate(format: "label == %@", username)).firstMatch
+            let identity = heading.buttons["messages.conversation.profile.\(peerID)"].firstMatch
             XCTAssertTrue(waitUntilHittable(identity, timeout: 10), "The wide root must visibly identify its selected peer.")
+            XCTAssertTrue(identity.label.contains(username))
         }
         return composer
     }
@@ -2003,23 +2184,19 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func revealNativeOlderHistory(username: String, index: Int, over bounds: CGRect, in app: XCUIApplication) {
         let transcript = nativeTranscript(over: bounds, in: app)
+        let composer = visibleElement(SurroundUITestContract.AccessibilityID.privateMessageComposer,
+                                      in: app, matching: .textField)
         let marker = transcript.staticTexts.matching(NSPredicate(
             format: "label == %@",
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
         for _ in 0..<8 {
-            let viewport = transcript.frame.insetBy(dx: 8, dy: 8)
-            if marker.exists {
-                let frame = marker.frame
-                if viewport.contains(frame) && marker.isHittable { break }
-                if frame.maxY > viewport.maxY {
-                    transcript.swipeUp()
-                    continue
-                }
-            }
-            transcript.swipeDown()
+            let viewport = transcriptViewport(transcript, above: composer, within: bounds, in: app)
+            if marker.exists && viewport.contains(marker.frame) && marker.isHittable { break }
+            dragMessagesViewport(viewport, toward: marker.exists ? marker.frame : nil,
+                                 earlierWhenAbsent: true, in: app)
         }
-        XCTAssertTrue(marker.exists && transcript.frame.insetBy(dx: 8, dy: 8).contains(marker.frame) && marker.isHittable,
+        XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer, within: bounds, in: app).contains(marker.frame) && marker.isHittable,
                       "The native push must reach a fully visible older message before Back.")
         XCTAssertFalse(transcript.staticTexts["Offline message from \(username)"].firstMatch.isHittable)
     }
@@ -2038,23 +2215,20 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func revealOlderHistory(username: String, index: Int, in app: XCUIApplication) {
         let transcript = rootTranscript(in: app)
+        let pane = element("messages.detailPane", in: app)
+        let composer = visibleElement(SurroundUITestContract.AccessibilityID.privateMessageComposer,
+                                      in: app, matching: .textField)
         let marker = transcript.staticTexts.matching(NSPredicate(
             format: "label == %@",
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
         for _ in 0..<8 {
-            let viewport = transcript.frame.insetBy(dx: 8, dy: 8)
-            if marker.exists {
-                let frame = marker.frame
-                if viewport.contains(frame) && marker.isHittable { break }
-                if frame.maxY > viewport.maxY {
-                    transcript.swipeUp()
-                    continue
-                }
-            }
-            transcript.swipeDown()
+            let viewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+            if marker.exists && viewport.contains(marker.frame) && marker.isHittable { break }
+            dragMessagesViewport(viewport, toward: marker.exists ? marker.frame : nil,
+                                 earlierWhenAbsent: true, in: app)
         }
-        XCTAssertTrue(marker.exists && transcript.frame.insetBy(dx: 8, dy: 8).contains(marker.frame) && marker.isHittable,
+        XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer, within: pane.frame, in: app).contains(marker.frame) && marker.isHittable,
                       "The older message seed must be fully inside the transcript viewport before navigation.")
         assertOlderHistoryVisible(username: username, index: index, in: app)
     }

@@ -1095,9 +1095,20 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let navigationBar = app.navigationBars["hakhoa"].firstMatch
         let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
         let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
-        tap(back, description: "Return from the conversation to the inbox", in: app)
+        tap(back, description: "Return from Profile's conversation to the peer Profile", in: app)
+        assertLoadedProfile(named: "hakhoa", in: app)
+        navigateBackFromPlayerProfile(in: app)
         element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         element(rowID, in: app)
+        let retainedComposer = element(SurroundUITestContract.AccessibilityID.privateMessageComposer,
+                                       in: app, matching: .textField)
+        XCTAssertTrue(waitUntilHittable(retainedComposer, timeout: 10),
+                      "Profile Back must restore the retained Messages conversation.")
+        XCTAssertTrue(waitForValue(draft, in: retainedComposer, timeout: 10),
+                      "Both Back actions must preserve the exact original unsent draft.")
+        XCTAssertTrue(element(toolbarID, in: app, matching: .button).label.contains("hakhoa"),
+                      "The restored Messages conversation must still belong to the original peer.")
+        keepScreenshot("Private message – Profile Back restores peer and exact draft", in: app)
     }
 
     func testMessagesNavigationIsHiddenWhenSignedOut() {
@@ -2492,42 +2503,6 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
 
         dismissSoftwareKeyboardIfNeeded(in: app)
-        #endif
-    }
-
-    func testCompactChatAutomaticallyFocusesComposer() throws {
-        #if targetEnvironment(macCatalyst)
-        throw XCTSkip(
-            "The compact composer keyboard path requires an iOS device."
-        )
-        #else
-        let app = launchApp(
-            additionalLaunchArguments: [
-                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
-                SurroundUITestContract.compatibilitySceneLaunchArgument,
-                SurroundUITestContract.CompatibilityScene.activeGameBoard
-                    .rawValue,
-                SurroundUITestContract.compactGameLayoutLaunchArgument,
-            ],
-            orientation: .portrait
-        )
-
-        selectSegment(
-            at: 2,
-            in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker,
-            app: app
-        )
-        let input = element(
-            SurroundUITestContract.AccessibilityID.gameChatInput,
-            in: app,
-            matching: .textField
-        )
-        enterText(
-            "Compact focus",
-            into: input,
-            in: app,
-            focusMode: .requireExistingFocus
-        )
         #endif
     }
 

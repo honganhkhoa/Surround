@@ -16,14 +16,30 @@ private final class MessagesHistoryReplayUITestProgress: ObservableObject {
     static let shared = MessagesHistoryReplayUITestProgress()
     @Published var delivered = 0
     @Published var expected = 0
+    @Published var canRelease = false
 }
 
 private struct MessagesHistoryReplayUITestModifier: ViewModifier {
+    @EnvironmentObject private var ogs: OGSService
     @ObservedObject private var progress = MessagesHistoryReplayUITestProgress.shared
 
     func body(content: Content) -> some View {
         if SurroundUITestContract.includesMessagesIncoming {
             content.accessibilityValue(Text(verbatim: "delivered:\(progress.delivered)/\(progress.expected)"))
+                .toolbar {
+                    if MessagesHistoryReplayUITestGate.isHeld {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                MessagesHistoryReplayUITestGate.release(service: ogs, peerID: 765826)
+                            } label: {
+                                Text(verbatim: "Replay incoming")
+                                    .frame(minWidth: 44, minHeight: 44)
+                            }
+                            .disabled(!progress.canRelease)
+                            .accessibilityIdentifier("test.messagesReplay.release")
+                        }
+                    }
+                }
         } else {
             content
         }
@@ -39,19 +55,40 @@ extension View {
 /// Delivers an opt-in offline history only after its transcript appears.
 private enum MessagesHistoryReplayUITestGate {
     static var pending = [ObjectIdentifier: [OGSPrivateMessage]]()
+    static var isHeld: Bool {
+        SurroundUITestContract.includesMessagesIncoming
+            && ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_REPLAY_HELD"] == "1"
+    }
     private static let log = Logger(subsystem: "com.honganhkhoa.Surround.MessagesReplay", category: "offline")
 
     static func begin(service: OGSService, peerID: Int) {
         guard peerID == 765826,
-              let messages = pending.removeValue(forKey: ObjectIdentifier(service)) else { return }
+              let messages = pending[ObjectIdentifier(service)] else { return }
         let progress = MessagesHistoryReplayUITestProgress.shared
         progress.delivered = 0
         progress.expected = messages.count
+        progress.canRelease = isHeld
+        if isHeld {
+            log.notice("Offline history replay held; count=\(messages.count)")
+            return
+        }
+        pending.removeValue(forKey: ObjectIdentifier(service))
+        let requestedDelay = Double(ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_REPLAY_DELAY"] ?? "") ?? 2
+        schedule(messages, service: service, peerID: peerID, delay: min(60, max(0, requestedDelay)))
+    }
+
+    static func release(service: OGSService, peerID: Int) {
+        guard isHeld, peerID == 765826,
+              let messages = pending.removeValue(forKey: ObjectIdentifier(service)) else { return }
+        MessagesHistoryReplayUITestProgress.shared.canRelease = false
+        schedule(messages, service: service, peerID: peerID, delay: 0)
+    }
+
+    private static func schedule(_ messages: [OGSPrivateMessage], service: OGSService,
+                                 peerID: Int, delay: Double) {
+        let progress = MessagesHistoryReplayUITestProgress.shared
         log.notice("Offline history replay started; count=\(messages.count)")
-        let environment = ProcessInfo.processInfo.environment
-        let requestedDelay = Double(environment["SURROUND_UI_MESSAGES_REPLAY_DELAY"] ?? "") ?? 2
-        let delay = min(60, max(0, requestedDelay))
-        let requestedInterval = Double(environment["SURROUND_UI_MESSAGES_REPLAY_INTERVAL"] ?? "") ?? 0.35
+        let requestedInterval = Double(ProcessInfo.processInfo.environment["SURROUND_UI_MESSAGES_REPLAY_INTERVAL"] ?? "") ?? 0.35
         let interval = min(1, max(0, requestedInterval))
         for (index, message) in messages.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay + Double(index) * interval) { [weak service] in

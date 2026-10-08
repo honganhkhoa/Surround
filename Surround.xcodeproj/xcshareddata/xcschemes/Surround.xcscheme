@@ -48,11 +48,6 @@
                BlueprintName = "SurroundTests"
                ReferencedContainer = "container:Surround.xcodeproj">
             </BuildableReference>
-            <SkippedTests>
-               <Test
-                  Identifier = "SurroundTests">
-               </Test>
-            </SkippedTests>
          </TestableReference>
          <TestableReference
             skipped = "NO">

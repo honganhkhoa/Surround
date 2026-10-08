@@ -188,6 +188,50 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  ipad-messages-ui-tests:
+    runs-on: macos-26
+    timeout-minutes: 80
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select an iPadOS 26 simulator
+        id: simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 26 hardware keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.simulator.outputs.id }}"
+
+      - name: Build iPad UI tests
+        id: ipad_ui_build
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 60
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Upload iPad Messages UI test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ipad-messages-ui-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
   ipad-profile-ui-tests:
     runs-on: macos-26
     timeout-minutes: 80
@@ -354,6 +398,56 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surround-ios-18-ui-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14
+
+  minimum-ios-18-messages-ui-tests:
+    runs-on: macos-15
+    timeout-minutes: 80
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        shell: bash
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Select an iPadOS 18 simulator
+        id: ipad_simulator
+        shell: bash
+        run: |
+          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Prefer an iPadOS 18 hardware keyboard
+        shell: bash
+        run: |
+          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
+            "${{ steps.ipad_simulator.outputs.id }}"
+
+      - name: Build iPad UI tests on iPadOS 18
+        id: ipad_ui_build
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh build \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 60
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Upload iPadOS 18 Messages UI test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ios-18-messages-ui-test-results
           path: TestResults
           if-no-files-found: warn
           retention-days: 14

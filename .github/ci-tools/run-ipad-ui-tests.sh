@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|profile|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|profile|messages|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|profile|composer|continuity)
+  build|preflight|main|profile|messages|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, profile, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, profile, messages, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -63,6 +63,9 @@ readonly test_case="${test_target}/${test_class}"
 readonly profile_test_class="ProfileUITests"
 readonly profile_test_source="SurroundUITests/${profile_test_class}.swift"
 readonly profile_test_case="${test_target}/${profile_test_class}"
+readonly messages_test_class="MessagesNavigationUITests"
+readonly messages_test_source="SurroundUITests/${messages_test_class}.swift"
+readonly messages_test_case="${test_target}/${messages_test_class}"
 readonly continuity_test_class="GameContinuityUITests"
 readonly continuity_test_source="SurroundUITests/${continuity_test_class}.swift"
 readonly continuity_test_case="${test_target}/${continuity_test_class}"
@@ -71,9 +74,8 @@ readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInpu
 # These tests intentionally focus a chat composer or exercise layout while that
 # composer owns keyboard focus. Isolate them from the main suite so an XCTest
 # keyboard-animation quiescence failure cannot slow unrelated journeys. The
-# continuity class has its own phase and time budget.
+# Messages and continuity classes have their own phases and time budgets.
 readonly composer_test_names=(
-  testCompactChatAutomaticallyFocusesComposer
   testCompactChatCanHideAndShowMainBoard
   testLiveGameBannerRestoresCompactChatBoard
   testCompactVariationSharingHidesMainBoardAndShowsComposerPreview
@@ -90,8 +92,8 @@ readonly composer_test_names=(
 # xcodebuild accepts an unknown -only-testing or -skip-testing selector and
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
-# into main, or leave the profile or continuity phase empty.
-for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}" "${continuity_test_class}:${continuity_test_source}"; do
+# into main, or leave the profile, Messages, or continuity phase empty.
+for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}" "${messages_test_class}:${messages_test_source}" "${continuity_test_class}:${continuity_test_source}"; do
   class_name="${class_and_source%%:*}"
   class_source="${class_and_source#*:}"
   test_class_count="$(
@@ -102,6 +104,16 @@ for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${
   )"
   if [[ "$test_class_count" != "1" ]]; then
     echo "Expected exactly one ${class_name} declaration in ${class_source}. Update the isolated UI-test manifest when renaming or moving it." >&2
+    exit 1
+  fi
+  test_declaration_count="$(
+    grep -Ec \
+      "^[[:space:]]*func[[:space:]]+test[[:alnum:]_]*[[:space:]]*\\(" \
+      "$class_source" \
+      || true
+  )"
+  if [[ "$test_declaration_count" == "0" ]]; then
+    echo "Expected test declarations in ${class_source}; ${class_name} cannot have an empty UI-test phase." >&2
     exit 1
   fi
 done
@@ -155,13 +167,14 @@ case "$phase" in
       "-only-testing:${test_target}"
       "-skip-testing:${test_case}/${keyboard_preflight_test_name}"
       "-skip-testing:${profile_test_case}"
+      "-skip-testing:${messages_test_case}"
       "-skip-testing:${continuity_test_case}"
     )
     for test_name in "${composer_test_names[@]}"; do
       selection_arguments+=("-skip-testing:${test_case}/${test_name}")
     done
 
-    echo "Running the main iPad UI suite without profile, composer, or continuity tests."
+    echo "Running the main iPad UI suite without profile, Messages, composer, or continuity tests."
     xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
@@ -183,6 +196,19 @@ case "$phase" in
       -maximum-test-execution-time-allowance 900 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Profile.xcresult"
+    ;;
+
+  messages)
+    mkdir -p TestResults
+    echo "Running the isolated iPad Messages navigation and conversation UI tests."
+    xcodebuild test-without-building \
+      "${common_arguments[@]}" \
+      "-only-testing:${messages_test_case}" \
+      -test-timeouts-enabled YES \
+      -default-test-execution-time-allowance 900 \
+      -maximum-test-execution-time-allowance 900 \
+      -resultBundlePath \
+      "TestResults/SurroundUITests-${result_label}-Messages.xcresult"
     ;;
 
   composer)

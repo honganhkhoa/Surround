@@ -889,9 +889,57 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
         // UIKit exposes BackButton on recent systems; older releases use
         // the preceding page's title for the first navigation-bar button.
-        let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
-        let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
-        tap(back, description: "Back from profile", in: app, file: file, line: line)
+        if app.descendants(matching: .any).matching(identifier: "navigation.container.duo").firstMatch.exists {
+            // Duo places native Back outside the navigation bar. Resolve the
+            // window owning this profile and container before selecting it.
+            var owningWindowCount = 0
+            var visibleBackCount = 0
+            var visibleBack: XCUIElement?
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                visibleBack = nil
+                visibleBackCount = 0
+                let windows = app.windows.allElementsBoundByIndex.filter { window in
+                    guard window.exists, window.frame.width > 1, window.frame.height > 1 else { return false }
+                    let ownsDuo = window.identifier == "navigation.container.duo"
+                        || window.descendants(matching: .any)
+                            .matching(identifier: "navigation.container.duo").firstMatch.exists
+                    let ownsProfile = window.descendants(matching: .any)
+                        .matching(identifier: SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists
+                    return ownsDuo && ownsProfile
+                }
+                owningWindowCount = windows.count
+                guard windows.count == 1, let window = windows.first else { return false }
+                let buttons = window.buttons.matching(identifier: "BackButton")
+                    .allElementsBoundByIndex.filter { $0.isHittable }
+                visibleBackCount = buttons.count
+                guard buttons.count == 1, let button = buttons.first else { return false }
+                visibleBack = button
+                return true
+            }, object: nil)
+            let readiness = XCTWaiter.wait(for: [ready], timeout: 10)
+            if readiness != .completed {
+                let hierarchy = XCTAttachment(string: """
+                    Profile-owning Duo windows: \(owningWindowCount)
+                    Hittable native Back buttons: \(visibleBackCount)
+
+                    Application hierarchy:
+                    \(app.debugDescription)
+                    """)
+                hierarchy.name = "Accessibility hierarchy – ambiguous Duo profile Back"
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+            }
+            XCTAssertEqual(readiness, .completed,
+                           "Expected one profile-owning Duo window with one hittable native Back action.",
+                           file: file, line: line)
+            guard readiness == .completed, let back = visibleBack else { return }
+            // Readiness above replaces tap's 10-second hittability wait.
+            activate(back)
+        } else {
+            let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
+            let back = identifiedBack.exists ? identifiedBack : navigationBar.buttons.firstMatch
+            tap(back, description: "Back from profile", in: app, file: file, line: line)
+        }
         let returned = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"),
             // A conversation can have the same username title. The profile

@@ -470,6 +470,7 @@ private struct MessagesConversationRow: View {
 /// native navigation chrome; Profile and Challenge retain the stack's Back.
 struct MessagesConversationView: View {
     @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
     @EnvironmentObject private var navigation: StackRouter
     @Environment(\.owningStackRoute) private var owningStackRoute
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
@@ -533,20 +534,31 @@ struct MessagesConversationView: View {
                 scrollBookmark: navigation.conversationScrollBookmark(for: peer.id, accountID: ogs.user?.id),
                 showsProfileToolbar: false,
                 focusIsSuspended: navigation.path.last != owningStackRoute
-                    || !navigation.isActive)
+                    || !navigation.isActive,
+                composerFocusIsSuspended: nav.main.accountSheet != nil)
         }
         .background(Color(uiColor: .systemBackground))
     }
 
     private var peerHeading: some View {
-        VStack(alignment: isPane ? .leading : .center, spacing: 2) {
-            Text(verbatim: peer.username).font(.headline)
-                .foregroundStyle(peer.uiColor).lineLimit(1)
-            HStack(spacing: 4) {
-                Text(verbatim: peer.formattedRank)
-                if ogs.friendship(for: peer.id) == .friends { Text("· Friend") }
-            }.font(.caption).foregroundStyle(.secondary)
+        Button { navigation.openProfile(peer) } label: {
+            VStack(alignment: isPane ? .leading : .center, spacing: 2) {
+                Text(verbatim: peer.username).font(.headline)
+                    .foregroundStyle(peer.uiColor).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(verbatim: peer.formattedRank)
+                    if ogs.friendship(for: peer.id) == .friends { Text("· Friend") }
+                }.font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("View \(peer.username)’s profile"))
+        .accessibilityValue(ogs.friendship(for: peer.id) == .friends
+            ? Text(verbatim: "\(peer.formattedRank) ") + Text("· Friend")
+            : Text(verbatim: peer.formattedRank))
+        .accessibilityIdentifier("messages.conversation.profile.\(peer.id)")
     }
 
     private var challengeButton: some View {

@@ -89,6 +89,10 @@ struct PrivateMessageLine: View {
 }
 
 private struct PrivateMessageComposer: View {
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
+
     let peer: OGSUser
     let ogs: OGSService
     let allowsRemoteActivity: Bool
@@ -170,12 +174,14 @@ private struct PrivateMessageComposer: View {
                 isFocused = false
             }
         }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                isFocused = false
+            }
+        }
+        #endif
     }
-}
-
-private struct PrivateMessageViewport: Equatable {
-    let containerSize: CGSize
-    let bottomInset: CGFloat
 }
 
 private struct PrivateMessageTranscript: View {
@@ -260,7 +266,8 @@ private struct PrivateMessageTranscript: View {
     private func rememberUserPosition(in geometry: ScrollGeometry) {
         guard isVisible, isPresented, !messages.isEmpty,
               geometry.containerSize.height > 0, geometry.contentSize.height > 0 else { return }
-        let isAtEnd = geometry.visibleRect.maxY >= geometry.contentSize.height - 2
+        // visibleRect includes the area under the composer and keyboard inset.
+        let isAtEnd = geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 2
         if atEndOfChat != isAtEnd {
             atEndOfChat = isAtEnd
         }
@@ -288,7 +295,7 @@ private struct PrivateMessageTranscript: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
+            VStack(spacing: 2) {
                 ForEach(Array(messages.enumerated()), id: \.1.messageKey) { index, message in
                     PrivateMessageLine(
                         message: message,
@@ -305,18 +312,9 @@ private struct PrivateMessageTranscript: View {
         .defaultScrollAnchor(followsLatestMessages ? .bottom : nil, for: .initialOffset)
         .defaultScrollAnchor(.bottom, for: .alignment)
         .defaultScrollAnchor(followsLatestMessages ? .bottom : nil, for: .sizeChanges)
-        .onScrollGeometryChange(for: PrivateMessageViewport.self) { geometry in
-            PrivateMessageViewport(
-                containerSize: geometry.containerSize,
-                bottomInset: geometry.contentInsets.bottom
-            )
-        } action: { oldViewport, newViewport in
-            guard oldViewport != newViewport else { return }
-            scrollToLatestMessageIfFollowing()
-        }
         .onScrollGeometryChange(for: Bool?.self) { geometry in
             guard geometry.containerSize.height > 0, geometry.contentSize.height > 0 else { return nil }
-            return geometry.visibleRect.maxY >= geometry.contentSize.height - 2
+            return geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 2
         } action: { _, isAtEnd in
             guard isVisible, isPresented, !messages.isEmpty, let isAtEnd else { return }
             // Initial programmatic layout must agree with the retained mode
@@ -369,7 +367,19 @@ private struct PrivateMessageTranscript: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { markThreadAsRead() }
+            if phase == .active {
+                scrollToLatestMessageIfFollowing()
+                #if os(iOS) && !targetEnvironment(macCatalyst)
+                // Background layouts can clamp an older transcript's offset.
+                // Restore its saved message in the active layout.
+                if isVisible, isPresented, !atEndOfChat, !bookmark.isAtEndOfChat,
+                   !Self.isUserScrolling(scrollPhase), let key = bookmark.messageKey,
+                   messages.contains(where: { $0.messageKey == key }) {
+                    scrollPosition.scrollTo(id: key, anchor: .center)
+                }
+                #endif
+                markThreadAsRead()
+            }
         }
         .onChange(of: marksThreadAsRead) { _, _ in
             markThreadAsRead()
@@ -402,6 +412,7 @@ struct PrivateMessageLog: View {
     private let scrollBookmarkOverride: PrivateMessageScrollBookmark?
     private let showsProfileToolbar: Bool
     private let focusIsSuspended: Bool
+    private let composerFocusIsSuspended: Bool
 
     init(
         peer: OGSUser,
@@ -410,7 +421,8 @@ struct PrivateMessageLog: View {
         draft: Binding<String>? = nil,
         scrollBookmark: PrivateMessageScrollBookmark? = nil,
         showsProfileToolbar: Bool = true,
-        focusIsSuspended: Bool = false
+        focusIsSuspended: Bool = false,
+        composerFocusIsSuspended: Bool = false
     ) {
         self.peer = peer
         messagesOverride = messages
@@ -419,6 +431,7 @@ struct PrivateMessageLog: View {
         scrollBookmarkOverride = scrollBookmark
         self.showsProfileToolbar = showsProfileToolbar
         self.focusIsSuspended = focusIsSuspended
+        self.composerFocusIsSuspended = composerFocusIsSuspended
     }
 
     var messages: [OGSPrivateMessage] {
@@ -465,7 +478,7 @@ struct PrivateMessageLog: View {
                 peer: peer,
                 ogs: ogs,
                 allowsRemoteActivity: allowsRemoteActivity,
-                focusIsSuspended: focusIsSuspended,
+                focusIsSuspended: focusIsSuspended || composerFocusIsSuspended,
                 draft: draft,
                 sendSession: PrivateMessageSendSessions.session(for: ogs, peerID: peer.id)
             )
