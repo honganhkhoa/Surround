@@ -376,6 +376,7 @@ private struct IPadAccountSheet: View {
             navigation.presentationSizing(.page)
         } else {
             navigation
+                .presentationBackground(Color(uiColor: .systemBackground))
         }
     }
 }

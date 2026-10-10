@@ -115,7 +115,7 @@ struct PrivateMessagesView: View {
                 }
                 .background(usesColumns == true ? Color(uiColor: .systemBackground) : MessagesStyle.canvas)
                 .navigationTitle("Messages")
-                .navigationBarTitleDisplayMode(.large)
+                .navigationBarTitleDisplayMode(usesColumns == true ? .inline : .large)
                 .toolbar {
                     if #available(iOS 26.0, *) {
                         ToolbarItem(placement: .topBarTrailing) {

@@ -18,13 +18,13 @@ struct SingleGameView: View {
     var goToNextGame: (() -> ())?
     var horizontal = false
     @Binding var zenMode: Bool
-    var exitZenMode: (() -> ())?
     
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject private var stackRouter: StackRouter
     @EnvironmentObject private var navigation: NavigationService
     @Environment(\.owningStackRoute) private var owningStackRoute
     @Environment(\.compactGameModesInToolbar) private var compactGameModesInToolbar
+    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @State private var owningRootView: RootView?
     @Environment(\.colorScheme) private var colorScheme
@@ -1002,7 +1002,9 @@ struct SingleGameView: View {
 //            print("Geometry \(geometry.safeAreaInsets)")
             let width = geometry.size.width
             let height = geometry.size.height
-            let minimumPlayerInfoWidth: CGFloat = 350
+            // The vertical bar leaves less horizontal room; use the existing
+            // narrow control layout so the square board can fill the height.
+            let minimumPlayerInfoWidth: CGFloat = isVerticalToolbar ? 300 : 350
             let minimumChatWidth: CGFloat = 250
             let minimumPlayerInfoHeight: CGFloat = 80 + 15 * 2
             let boardSizeInfoLeft = min(height - 15 * 2, width - minimumPlayerInfoWidth - 15 * 3)
@@ -1093,6 +1095,8 @@ struct SingleGameView: View {
     
     func zenModeTimer(playerColor: StoneColor, horizontal: Bool = true) -> some View {
         let captures = game.currentPosition.captures[playerColor] ?? 0
+        let stoneSize: CGFloat = 20
+        let stoneOverflow = stoneSize / 2
         let topLeft = playerColor == topLeftPlayerColor
         let hasTimeControl = game.gameData?.timeControl.system != .None
         let timer = TimerView(
@@ -1130,10 +1134,14 @@ struct SingleGameView: View {
                 .padding(.vertical, 10)
             }
             Stone(color: playerColor, shadowRadius: 2)
-                .frame(width: 20, height: 20)
-                .offset(x: topLeft ? -10 : 10, y: topLeft ? -10 : 10)
+                .frame(width: stoneSize, height: stoneSize)
+                .offset(x: topLeft ? -stoneOverflow : stoneOverflow,
+                        y: topLeft ? -stoneOverflow : stoneOverflow)
         }
         .background(zenModeTimerBackground(playerColor: playerColor).shadow(radius: 2))
+        // Reserve the corner stone's overhang when laying out clocks at
+        // safe-area edges.
+        .padding(stoneOverflow)
     }
     
     var zenModeBody: some View {
@@ -1187,15 +1195,6 @@ struct SingleGameView: View {
                         Spacer()
                     }
                 }
-            }
-            if !compact {
-                Button(action: { if let exitZenMode { exitZenMode() } }) {
-                    Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
-                        .labelStyle(IconOnlyLabelStyle())
-                }
-                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
-                .surroundUITestZenShortcut()
-                .padding()
             }
         }
     }

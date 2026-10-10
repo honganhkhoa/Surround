@@ -221,7 +221,6 @@ struct GameDetailView: View {
                     goToNextGame: goToNextGame,
                     horizontal: horizontal,
                     zenMode: $zenMode,
-                    exitZenMode: exitZenMode,
                     attachedKeyboardVisible: effectiveAttachedKeyboardVisible,
                     interaction: $interaction,
                     showsCompactChatBoard: $showsCompactChatBoard,
@@ -253,7 +252,6 @@ struct GameDetailView: View {
         GeometryReader { geometry in
             content(geometry: geometry)
         }
-        .ignoresSafeArea(edges: compactLayout && navigationBarHidden ? [.top] : [])
     }
 
     private func content(geometry: GeometryProxy) -> some View {
@@ -366,10 +364,9 @@ struct GameDetailView: View {
                 }
             }
         }
-        // Catalyst keeps this useful as the Mac window title even when Zen
-        // mode hides the in-window navigation chrome.
+        // Catalyst keeps this useful as the Mac window title in Zen mode.
         .navigationTitle(navigationTitle)
-        .navigationBarHidden(navigationBarHidden && !compactLayout)
+        .navigationBarHidden(navigationBarHidden && !compactLayout && !zenMode)
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -437,7 +434,15 @@ struct GameDetailView: View {
         
         return AnyView(
             result.toolbar {
-                if compactLayout {
+                if zenMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: exitZenMode) {
+                            Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
+                        }
+                        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
+                        .surroundUITestZenShortcut()
+                    }
+                } else if compactLayout {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
                             if compactDisplayMode == .chat {
@@ -478,12 +483,6 @@ struct GameDetailView: View {
                                 Label("Options", systemImage: "gearshape.2")
                             }
                             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
-                        } else if zenMode {
-                            Button(action: exitZenMode) {
-                                Label("Exit Zen mode", systemImage: "arrow.down.forward.and.arrow.up.backward")
-                            }
-                            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenExit)
-                            .surroundUITestZenShortcut()
                         }
                     }
                 } else {

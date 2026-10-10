@@ -7,70 +7,47 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BA09806D16FF4219A1D91BB8 /* OGSPlayerUpdateCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */; };
-		1A57865CFAAC482C8638C865 /* FinishedGamePreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */; };
-		3A28708B37954FC78203C96A /* OGSGameCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */; };
-		868D9BE6401442998F41D69C /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
-		2BD98F4D00EE4081AF3AF851 /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
-		A389720DAEAD420B956A2398 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
-		AE2CDDECB73441EEB7AEEA57 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
-		60852AEE87C44A5CBEB515EA /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
-		CE2BAD00CC394E78B69BF9F7 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
-		4258474839C94E3A9A020D0B /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
-		AFA610012026100400000001 /* ProfileBiographyBrowserServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */; };
-		D10400012026100400000001 /* SceneActivationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10400022026100400000002 /* SceneActivationUITests.swift */; };
-		F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06A00023D00000000000002 /* LocalizationUITests.swift */; };
 		0BBE9E97B9304CA190073BCA /* MessagesNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */; };
+		1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */; };
+		1A57865CFAAC482C8638C865 /* FinishedGamePreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */; };
 		274ACDD01C764687872BE0D2 /* MessagesLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */; };
-		C44DED6BB70146278FF1AB21 /* PrivateMessageSendSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */; };
-		4994A315A8D4438AA3A870A1 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
-		38CA9CF98683472A84F0BE22 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
-		DD3754945BD4410D94211589 /* MessagesFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */; };
-		DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
-		E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
-		D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100122026100100000012 /* DuoProfileSidebarUITests.swift */; };
-		D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100042026100100000004 /* SidebarKeyboardUITests.swift */; };
-		D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100022026100100000002 /* AppReviewPresentationUITests.swift */; };
-		D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000042026093000000004 /* DuoSidebarUITests.swift */; };
-		D03000012026093000000001 /* DuoTabContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000022026093000000002 /* DuoTabContainer.swift */; };
-		D00600012026100600000001 /* IPadTabContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00600022026100600000002 /* IPadTabContainer.swift */; };
-		A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */; };
-		F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
-		2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
-		D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */; };
-		794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */; };
-		8B5F21EBE5A5494DBCB11929 /* ChatSessionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0982EB6654F4DB084896E94 /* ChatSessionStateTests.swift */; };
+		2BD98F4D00EE4081AF3AF851 /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
 		2C140ECF70E64EA99531999F /* GameDetailInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */; };
+		2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
 		3753FB40BEEC4990A677F1F5 /* GameDetailInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */; };
-		822153073E0C4D8593067A7D /* GameControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB7716AFD83430980B45D64 /* GameControlState.swift */; };
-		BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB7716AFD83430980B45D64 /* GameControlState.swift */; };
-		C42D11E94B9A48AEB3E62EC6 /* ChatSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */; };
-		B6F7514611BD405D81540CA9 /* ChatSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */; };
+		38CA9CF98683472A84F0BE22 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
+		3A28708B37954FC78203C96A /* OGSGameCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */; };
+		4258474839C94E3A9A020D0B /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
 		496E83BB7FBC43CCBA7CBF4C /* SurroundIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2178C188085D4FE181437D90 /* SurroundIcon.icon */; };
-		AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700042026091700000004 /* ProfileRatingTests.swift */; };
-		AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700032026091700000003 /* PlayerProfileGames.swift */; };
-		AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700022026091700000002 /* PlayerProfileRatings.swift */; };
-		AA1700212026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
-		AA1700112026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
-		AA1600222026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
-		AA1600212026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
-		AA1600132026091600000003 /* StackRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600032026091600000003 /* StackRouterTests.swift */; };
-		AA1600122026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
-		AA1600112026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
-		AA1500102026091500000000 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
-		4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
-		AA1500102026091500000001 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		4994A315A8D4438AA3A870A1 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
 		4A70F0CEAA1A421A91A36B87 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
-		AA1500102026091500000002 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
+		60852AEE87C44A5CBEB515EA /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
 		7531C54A7F254432BCAE7BBA /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
+		794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */; };
+		822153073E0C4D8593067A7D /* GameControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB7716AFD83430980B45D64 /* GameControlState.swift */; };
+		868D9BE6401442998F41D69C /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
+		8B5F21EBE5A5494DBCB11929 /* ChatSessionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0982EB6654F4DB084896E94 /* ChatSessionStateTests.swift */; };
+		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
+		A389720DAEAD420B956A2398 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */; };
+		AA1500102026091500000000 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		AA1500102026091500000001 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
+		AA1500102026091500000002 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
 		AA1500102026091500000003 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
-		F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500102026091500000004 /* OGSPlayerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500012026091500000001 /* OGSPlayerProfile.swift */; };
-		F25D04D509B847029CD1EB05 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		AA1500202026091500000001 /* PlayerProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500022026091500000002 /* PlayerProfileView.swift */; };
 		AA1500202026091500000002 /* OGSPlayerProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1500032026091500000003 /* OGSPlayerProfileTests.swift */; };
-		DC54F11B65C8433CAF5354CD /* OGSFriendshipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */; };
-		91F3C27239326B704A6E6AD2 /* OGSBetaGamePlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */; };
+		AA1600112026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
+		AA1600122026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
+		AA1600132026091600000003 /* StackRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600032026091600000003 /* StackRouterTests.swift */; };
+		AA1600212026091600000001 /* ChallengeDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600012026091600000001 /* ChallengeDraft.swift */; };
+		AA1600222026091600000002 /* StackRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1600022026091600000002 /* StackRouter.swift */; };
+		AA1700112026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
+		AA1700122026091700000002 /* PlayerProfileRatings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700022026091700000002 /* PlayerProfileRatings.swift */; };
+		AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700032026091700000003 /* PlayerProfileGames.swift */; };
+		AA1700142026091700000004 /* ProfileRatingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700042026091700000004 /* ProfileRatingTests.swift */; };
+		AA1700212026091700000001 /* ProfileRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1700012026091700000001 /* ProfileRating.swift */; };
 		AA9000024000000000000002 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000034000000000000003 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
 		AA9000044000000000000004 /* BoardMarkup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9000014000000000000001 /* BoardMarkup.swift */; };
@@ -89,6 +66,7 @@
 		AE20000A39A000000000000A /* OGSPauseControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000A39A000000000000A /* OGSPauseControlTests.swift */; };
 		AE20000B39A000000000000B /* TimeUtilitiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000B39A000000000000B /* TimeUtilitiesTests.swift */; };
 		AE20000C39A000000000000C /* OGSUserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE10000C39A000000000000C /* OGSUserTests.swift */; };
+		AE2CDDECB73441EEB7AEEA57 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
 		AE3000013A00000000000001 /* PlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3000023A00000000000002 /* PlatformServices.swift */; };
 		AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
 		AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100053A00000000000005 /* SurroundUITestOfflineServices.swift */; };
@@ -115,6 +93,15 @@
 		AF2000043E00000000000004 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
 		AF2000053E00000000000005 /* OGSConditionalMoves.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000063E00000000000006 /* OGSConditionalMoves.swift */; };
 		AF3000013F00000000000001 /* ConditionalMovesPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3000023F00000000000002 /* ConditionalMovesPopover.swift */; };
+		AFA600022026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
+		AFA600022026100400000002 /* ProfileBiographyWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000002 /* ProfileBiographyWebView.swift */; };
+		AFA600022026100400000003 /* PlayerAboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000003 /* PlayerAboutView.swift */; };
+		AFA600022026100400000004 /* ProfileBiographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000004 /* ProfileBiographyTests.swift */; };
+		AFA600022026100400000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
+		AFA600032026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
+		AFA610012026100400000001 /* ProfileBiographyBrowserServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */; };
+		B6F7514611BD405D81540CA9 /* ChatSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */; };
+		BA09806D16FF4219A1D91BB8 /* OGSPlayerUpdateCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */; };
 		BC042AF324AB2CF50050B2D1 /* SurroundApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */; };
 		BC042AF524AB2CF50050B2D1 /* MainViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */; };
 		BC042AF724AB2CFA0050B2D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
@@ -258,6 +245,7 @@
 		BC70596225FF00F400AC4DE9 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596125FF00F400AC4DE9 /* AboutView.swift */; };
 		BC70596A25FF209300AC4DE9 /* SupporterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC70596925FF209300AC4DE9 /* SupporterView.swift */; };
 		BC7407DB25493B71001D5581 /* SurroundService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7407DA25493B71001D5581 /* SurroundService.swift */; };
+		BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB7716AFD83430980B45D64 /* GameControlState.swift */; };
 		BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8CE87E2657B1B100E4BE1A /* GameTests.swift */; };
 		BC8CE8802657B2E100E4BE1A /* OGSGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3624AB2DD00050B2D1 /* OGSGame.swift */; };
 		BC8CE8812657B2E100E4BE1A /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
@@ -358,7 +346,6 @@
 		BCC3276327BB69B2005EB2E3 /* OGSChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */; };
 		BCC8203324BDA6CC005D6A5E /* InlineTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */; };
 		BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */; };
-		1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */; };
 		BCD0849C2B6B96E4000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849D2B6B96E5000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		BCD0849E2B6B96E6000B15D6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
@@ -398,7 +385,18 @@
 		C0D100072026082900000007 /* AppRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100062026082900000006 /* AppRouteTests.swift */; };
 		C0D100082026082900000008 /* NavigationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC649426253FF940002B2200 /* NavigationService.swift */; };
 		C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
+		C42D11E94B9A48AEB3E62EC6 /* ChatSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */; };
+		C44DED6BB70146278FF1AB21 /* PrivateMessageSendSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */; };
+		CE2BAD00CC394E78B69BF9F7 /* FinishedGameSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30129213567E4FB69263A42F /* FinishedGameSummary.swift */; };
+		D00600012026100600000001 /* IPadTabContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00600022026100600000002 /* IPadTabContainer.swift */; };
+		D03000012026093000000001 /* DuoTabContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000022026093000000002 /* DuoTabContainer.swift */; };
+		D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03000042026093000000004 /* DuoSidebarUITests.swift */; };
 		D10000012026083100000001 /* QuickMatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022026083100000002 /* QuickMatchView.swift */; };
+		D10100012026100100000001 /* AppReviewPresentationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100022026100100000002 /* AppReviewPresentationUITests.swift */; };
+		D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100042026100100000004 /* SidebarKeyboardUITests.swift */; };
+		D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10100122026100100000012 /* DuoProfileSidebarUITests.swift */; };
+		D10400012026100400000001 /* SceneActivationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10400022026100400000002 /* SceneActivationUITests.swift */; };
+		D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */; };
 		D90700012026090700000001 /* AppReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700022026090700000002 /* AppReviewPolicy.swift */; };
 		D90700032026090700000003 /* AppReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700022026090700000002 /* AppReviewPolicy.swift */; };
 		D90700042026090700000004 /* AppReviewPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700052026090700000005 /* AppReviewPresentation.swift */; };
@@ -406,12 +404,14 @@
 		D90700082026090700000008 /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
 		D907000A202609070000000A /* AppReviewGameActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90700092026090700000009 /* AppReviewGameActivity.swift */; };
 		D907000B202609070000000B /* AppReviewGameActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D907000C202609070000000C /* AppReviewGameActivityTests.swift */; };
-		AFA600022026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
-		AFA600022026100400000002 /* ProfileBiographyWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000002 /* ProfileBiographyWebView.swift */; };
-		AFA600022026100400000003 /* PlayerAboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000003 /* PlayerAboutView.swift */; };
-		AFA600022026100400000004 /* ProfileBiographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000004 /* ProfileBiographyTests.swift */; };
-		AFA600032026100400000001 /* ProfileBiographyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA600012026100400000001 /* ProfileBiographyDocument.swift */; };
-		AFA600022026100400000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BC042AF624AB2CFA0050B2D1 /* Assets.xcassets */; };
+		DC54F11B65C8433CAF5354CD /* OGSFriendshipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */; };
+		DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
+		DD3754945BD4410D94211589 /* MessagesFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */; };
+		E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */; };
+		F06A00013D00000000000001 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06A00023D00000000000002 /* LocalizationUITests.swift */; };
+		F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
+		F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
+		F25D04D509B847029CD1EB05 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -476,49 +476,35 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerUpdateCompatibilityTests.swift; sourceTree = "<group>"; };
-		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
-		88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSGameCompatibilityTests.swift; sourceTree = "<group>"; };
-		686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewLoader.swift; sourceTree = "<group>"; };
+		06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendshipControls.swift; sourceTree = "<group>"; };
+		07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesFoldLayout.swift; sourceTree = "<group>"; };
+		0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContinuityUITests.swift; sourceTree = "<group>"; };
+		2178C188085D4FE181437D90 /* SurroundIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.icon; path = SurroundIcon.icon; sourceTree = "<group>"; };
 		30129213567E4FB69263A42F /* FinishedGameSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGameSummary.swift; sourceTree = "<group>"; };
-		AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyBrowserServer.swift; sourceTree = "<group>"; };
-		D10400022026100400000002 /* SceneActivationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneActivationUITests.swift; sourceTree = "<group>"; };
-		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
+		37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendshipTests.swift; sourceTree = "<group>"; };
+		4FB7716AFD83430980B45D64 /* GameControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlState.swift; sourceTree = "<group>"; };
+		5F7C61D62C184BB98B5E7338 /* FinishedGamePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewTests.swift; sourceTree = "<group>"; };
 		655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesNavigationUITests.swift; sourceTree = "<group>"; };
-		B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesLayoutTests.swift; sourceTree = "<group>"; };
-		9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSessionTests.swift; sourceTree = "<group>"; };
+		686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishedGamePreviewLoader.swift; sourceTree = "<group>"; };
+		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlStateTests.swift; sourceTree = "<group>"; };
+		7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLayoutUITestHarness.swift; sourceTree = "<group>"; };
+		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
+		88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSGameCompatibilityTests.swift; sourceTree = "<group>"; };
 		8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSession.swift; sourceTree = "<group>"; };
 		9932FB46E36E47B6A222B4A8 /* MessagesFriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesFriendsView.swift; sourceTree = "<group>"; };
-		07613D00CC3F4C05A355028B /* MessagesFoldLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesFoldLayout.swift; sourceTree = "<group>"; };
-		D10100122026100100000012 /* DuoProfileSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoProfileSidebarUITests.swift; sourceTree = "<group>"; };
-		D10100042026100100000004 /* SidebarKeyboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarKeyboardUITests.swift; sourceTree = "<group>"; };
-		D10100022026100100000002 /* AppReviewPresentationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentationUITests.swift; sourceTree = "<group>"; };
-		D03000042026093000000004 /* DuoSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoSidebarUITests.swift; sourceTree = "<group>"; };
-		D03000022026093000000002 /* DuoTabContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoTabContainer.swift; sourceTree = "<group>"; };
-		D00600022026100600000002 /* IPadTabContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadTabContainer.swift; sourceTree = "<group>"; };
-		0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContinuityUITests.swift; sourceTree = "<group>"; };
-		7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLayoutUITestHarness.swift; sourceTree = "<group>"; };
-		E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteractionTests.swift; sourceTree = "<group>"; };
-		78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlStateTests.swift; sourceTree = "<group>"; };
+		9F4F5D4C1E294576BFE3BFA1 /* PrivateMessageSendSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSessionTests.swift; sourceTree = "<group>"; };
 		A0982EB6654F4DB084896E94 /* ChatSessionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionStateTests.swift; sourceTree = "<group>"; };
-		B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteraction.swift; sourceTree = "<group>"; };
-		4FB7716AFD83430980B45D64 /* GameControlState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlState.swift; sourceTree = "<group>"; };
-		EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionState.swift; sourceTree = "<group>"; };
-		2178C188085D4FE181437D90 /* SurroundIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.icon; path = SurroundIcon.icon; sourceTree = "<group>"; };
-		AA1700042026091700000004 /* ProfileRatingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRatingTests.swift; sourceTree = "<group>"; };
-		AA1700032026091700000003 /* PlayerProfileGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileGames.swift; sourceTree = "<group>"; };
-		AA1700022026091700000002 /* PlayerProfileRatings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileRatings.swift; sourceTree = "<group>"; };
-		AA1700012026091700000001 /* ProfileRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRating.swift; sourceTree = "<group>"; };
-		AA1600032026091600000003 /* StackRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouterTests.swift; sourceTree = "<group>"; };
-		AA1600022026091600000002 /* StackRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouter.swift; sourceTree = "<group>"; };
-		AA1600012026091600000001 /* ChallengeDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeDraft.swift; sourceTree = "<group>"; };
 		AA1500012026091500000001 /* OGSPlayerProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerProfile.swift; sourceTree = "<group>"; };
-		D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendship.swift; sourceTree = "<group>"; };
 		AA1500022026091500000002 /* PlayerProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileView.swift; sourceTree = "<group>"; };
 		AA1500032026091500000003 /* OGSPlayerProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerProfileTests.swift; sourceTree = "<group>"; };
-		37BD0194F1BB4F278C6BABA3 /* OGSFriendshipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendshipTests.swift; sourceTree = "<group>"; };
-		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
+		AA1600012026091600000001 /* ChallengeDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeDraft.swift; sourceTree = "<group>"; };
+		AA1600022026091600000002 /* StackRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouter.swift; sourceTree = "<group>"; };
+		AA1600032026091600000003 /* StackRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackRouterTests.swift; sourceTree = "<group>"; };
+		AA1700012026091700000001 /* ProfileRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRating.swift; sourceTree = "<group>"; };
+		AA1700022026091700000002 /* PlayerProfileRatings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileRatings.swift; sourceTree = "<group>"; };
+		AA1700032026091700000003 /* PlayerProfileGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileGames.swift; sourceTree = "<group>"; };
+		AA1700042026091700000004 /* ProfileRatingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRatingTests.swift; sourceTree = "<group>"; };
 		AA9000014000000000000001 /* BoardMarkup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkup.swift; sourceTree = "<group>"; };
 		AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundAnimationDiagnostics.swift; sourceTree = "<group>"; };
 		AE10000139A0000000000001 /* TimeControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeControlTests.swift; sourceTree = "<group>"; };
@@ -554,6 +540,14 @@
 		AF1000023D00000000000002 /* AnalyzeControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyzeControlBar.swift; sourceTree = "<group>"; };
 		AF2000063E00000000000006 /* OGSConditionalMoves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSConditionalMoves.swift; sourceTree = "<group>"; };
 		AF3000023F00000000000002 /* ConditionalMovesPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalMovesPopover.swift; sourceTree = "<group>"; };
+		AFA600012026100400000001 /* ProfileBiographyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyDocument.swift; sourceTree = "<group>"; };
+		AFA600012026100400000002 /* ProfileBiographyWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyWebView.swift; sourceTree = "<group>"; };
+		AFA600012026100400000003 /* PlayerAboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAboutView.swift; sourceTree = "<group>"; };
+		AFA600012026100400000004 /* ProfileBiographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyTests.swift; sourceTree = "<group>"; };
+		AFA610022026100400000002 /* ProfileBiographyBrowserServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyBrowserServer.swift; sourceTree = "<group>"; };
+		B0A4377DA93A47D3BEA90CC7 /* MessagesLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesLayoutTests.swift; sourceTree = "<group>"; };
+		B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteraction.swift; sourceTree = "<group>"; };
+		B4421CD4E698496E8D67D0E6 /* OGSPlayerUpdateCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSPlayerUpdateCompatibilityTests.swift; sourceTree = "<group>"; };
 		BC042AEF24AB2CF50050B2D1 /* Surround.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Surround.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC042AF224AB2CF50050B2D1 /* SurroundApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundApp.swift; sourceTree = "<group>"; };
 		BC042AF424AB2CF50050B2D1 /* MainViewWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewWrapper.swift; sourceTree = "<group>"; };
@@ -672,7 +666,6 @@
 		BCC3275F27B66475005EB2E3 /* OGSChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatMessage.swift; sourceTree = "<group>"; };
 		BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTimerView.swift; sourceTree = "<group>"; };
 		BCC8DFF125E0F38B00A6D500 /* NotificationPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPopup.swift; sourceTree = "<group>"; };
-		06D2A58E5E3E4C3695A597A0 /* FriendshipControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendshipControls.swift; sourceTree = "<group>"; };
 		BCD214D6255A946D00F78E2A /* SurroundNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SurroundNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCD214D8255A946D00F78E2A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		BCD214DA255A946D00F78E2A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -687,16 +680,23 @@
 		C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayout.swift; sourceTree = "<group>"; };
 		C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayoutTests.swift; sourceTree = "<group>"; };
 		C0D100062026082900000006 /* AppRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteTests.swift; sourceTree = "<group>"; };
+		D00600022026100600000002 /* IPadTabContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadTabContainer.swift; sourceTree = "<group>"; };
+		D03000022026093000000002 /* DuoTabContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoTabContainer.swift; sourceTree = "<group>"; };
+		D03000042026093000000004 /* DuoSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoSidebarUITests.swift; sourceTree = "<group>"; };
 		D10000022026083100000002 /* QuickMatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickMatchView.swift; sourceTree = "<group>"; };
+		D10100022026100100000002 /* AppReviewPresentationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentationUITests.swift; sourceTree = "<group>"; };
+		D10100042026100100000004 /* SidebarKeyboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarKeyboardUITests.swift; sourceTree = "<group>"; };
+		D10100122026100100000012 /* DuoProfileSidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoProfileSidebarUITests.swift; sourceTree = "<group>"; };
+		D10400022026100400000002 /* SceneActivationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneActivationUITests.swift; sourceTree = "<group>"; };
+		D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSFriendship.swift; sourceTree = "<group>"; };
 		D90700022026090700000002 /* AppReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicy.swift; sourceTree = "<group>"; };
 		D90700052026090700000005 /* AppReviewPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPresentation.swift; sourceTree = "<group>"; };
 		D90700072026090700000007 /* AppReviewPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicyTests.swift; sourceTree = "<group>"; };
 		D90700092026090700000009 /* AppReviewGameActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivity.swift; sourceTree = "<group>"; };
 		D907000C202609070000000C /* AppReviewGameActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewGameActivityTests.swift; sourceTree = "<group>"; };
-		AFA600012026100400000001 /* ProfileBiographyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyDocument.swift; sourceTree = "<group>"; };
-		AFA600012026100400000002 /* ProfileBiographyWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyWebView.swift; sourceTree = "<group>"; };
-		AFA600012026100400000003 /* PlayerAboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAboutView.swift; sourceTree = "<group>"; };
-		AFA600012026100400000004 /* ProfileBiographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileBiographyTests.swift; sourceTree = "<group>"; };
+		E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailInteractionTests.swift; sourceTree = "<group>"; };
+		EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionState.swift; sourceTree = "<group>"; };
+		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1924,15 +1924,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconBeta;
-				EXCLUDED_SOURCE_FILE_NAMES = ("$(inherited)", SurroundIcon.icon,);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"$(inherited)",
+					SurroundIcon.icon,
+				);
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1941,7 +1944,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1958,7 +1961,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -1968,7 +1971,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1983,7 +1986,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1991,7 +1994,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2006,7 +2009,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2016,7 +2019,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2033,7 +2036,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2045,7 +2048,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2061,7 +2064,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2069,7 +2072,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2083,15 +2086,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconBeta;
-				EXCLUDED_SOURCE_FILE_NAMES = ("$(inherited)", SurroundIcon.icon,);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"$(inherited)",
+					SurroundIcon.icon,
+				);
 				GCC_PREPROCESSOR_DEFINITIONS = "";
 				INFOPLIST_FILE = Surround/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -2100,7 +2106,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2281,7 +2287,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2293,7 +2299,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.Beta.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2451,7 +2457,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2464,7 +2470,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2483,7 +2489,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Surround/Surround.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				DEVELOPMENT_ASSET_PATHS = "\"Surround/Preview Content\"";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -2496,7 +2502,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "-D MAIN_APP";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2597,7 +2603,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2605,7 +2611,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2620,7 +2626,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationContent/SurroundNotificationContent.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				INFOPLIST_FILE = SurroundNotificationContent/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2628,7 +2634,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationContent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2645,7 +2651,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2657,7 +2663,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2675,7 +2681,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = SurroundWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "";
@@ -2687,7 +2693,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2745,7 +2751,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2755,7 +2761,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2770,7 +2776,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SurroundNotificationService/SurroundNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2026091401;
+				CURRENT_PROJECT_VERSION = 2026101001;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				INFOPLIST_FILE = SurroundNotificationService/Info.plist;
@@ -2780,7 +2786,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.3.1;
+				MARKETING_VERSION = 2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.honganhkhoa.Surround.SurroundNotificationService;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
