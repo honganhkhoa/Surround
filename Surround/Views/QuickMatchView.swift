@@ -171,7 +171,7 @@ private struct QuickMatchActionArea: View {
         }
         .padding(.horizontal)
         .padding(.bottom, 12)
-        .background(Color(uiColor: .systemGray6))
+        .background(Color(uiColor: .systemGray6), ignoresSafeAreaEdges: [])
         .overlay(alignment: .bottom) { Divider() }
         .onAppear {
             if isSearching {
@@ -377,7 +377,7 @@ private struct QuickMatchPopularityRequestKey: Hashable {
     let upperRankDifference: Int
 }
 
-struct QuickMatchForm: View {
+struct QuickMatchForm<Header: View>: View {
     @Binding var draft: OGSQuickMatchDraft
     @Binding var realtimeClockPreference: OGSQuickMatchClockPreference
     @Binding var realtimeClocks: Set<OGSQuickMatchClockSelection>
@@ -395,6 +395,7 @@ struct QuickMatchForm: View {
     let onFind: () -> Void
     let onCancel: (OGSAutomatchEntry) -> Void
     let onShowOpenChallenges: () -> Void
+    let header: Header
 
     @EnvironmentObject private var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
@@ -508,31 +509,36 @@ struct QuickMatchForm: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            QuickMatchActionArea(
-                recap: recap,
-                accessibleRecap: accessibleRecap,
-                findTitle: findTitle,
-                isSearching: activeLiveEntry != nil,
-                isSubmitting: isSubmitting,
-                isCancelling: activeLiveEntry.map { cancellingEntryID == $0.uuid } ?? false,
-                canFind: draft.quickMatchIsValid
-                    && activeLiveEntry == nil
-                    && isConnected
-                    && !restorationBlocksFind
-                    && !isSubmitting,
-                canCancel: isConnected && cancellingEntryID == nil,
-                disabledReason: activeLiveEntry != nil
-                    ? (!isConnected
-                        ? String(localized: "Reconnect to OGS to cancel this search.")
-                        : nil)
-                    : findDisabledReason,
-                onFind: onFind,
-                onCancel: {
-                    if let activeLiveEntry {
-                        onCancel(activeLiveEntry)
+            VStack(spacing: 0) {
+                header
+                QuickMatchActionArea(
+                    recap: recap,
+                    accessibleRecap: accessibleRecap,
+                    findTitle: findTitle,
+                    isSearching: activeLiveEntry != nil,
+                    isSubmitting: isSubmitting,
+                    isCancelling: activeLiveEntry.map { cancellingEntryID == $0.uuid } ?? false,
+                    canFind: draft.quickMatchIsValid
+                        && activeLiveEntry == nil
+                        && isConnected
+                        && !restorationBlocksFind
+                        && !isSubmitting,
+                    canCancel: isConnected && cancellingEntryID == nil,
+                    disabledReason: activeLiveEntry != nil
+                        ? (!isConnected
+                            ? String(localized: "Reconnect to OGS to cancel this search.")
+                            : nil)
+                        : findDisabledReason,
+                    onFind: onFind,
+                    onCancel: {
+                        if let activeLiveEntry {
+                            onCancel(activeLiveEntry)
+                        }
                     }
-                }
-            )
+                )
+            }
+            .background(Color(.systemGray6).shadow(radius: 2))
+            .zIndex(1)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {

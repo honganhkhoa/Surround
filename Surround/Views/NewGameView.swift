@@ -314,7 +314,7 @@ struct NewGameView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
                 }
-                .background(Color(.systemIndigo))
+                .background(Color(.systemIndigo), ignoresSafeAreaEdges: [])
                 .padding(.horizontal, -18)
                 .accessibilityHint("Show active searches")
                 .accessibilityIdentifier(
@@ -369,14 +369,11 @@ struct NewGameView: View {
                 Spacer().frame(height: 10)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 18)
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            newGameOptionsPicker
-                .background(Color(.systemGray6).shadow(radius: 2))
-
             if newGameOption == .quickMatch {
                 QuickMatchForm(
                     draft: $quickMatchDraft,
@@ -399,18 +396,25 @@ struct NewGameView: View {
                     onCancel: cancelQuickMatch,
                     onShowOpenChallenges: {
                         newGameOption = .openChallenges
-                    }
+                    },
+                    header: newGameOptionsPicker
                 )
-            } else if newGameOption == .custom {
-                CustomGameForm(draft: customGameDraft, onChooseOpponent: {
-                    stackRouter.openOpponentPicker(for: customGameDraft)
-                })
-            } else if newGameOption == .openChallenges {
-                OpenChallengesForm(
-                    eligibleOpenChallenges: eligibleOpenChallenges
-                )
-            }
+            } else {
+                newGameOptionsPicker
+                    .background(Color(.systemGray6).shadow(radius: 2))
 
+                if newGameOption == .custom {
+                    CustomGameForm(draft: customGameDraft, onChooseOpponent: {
+                        stackRouter.openOpponentPicker(for: customGameDraft)
+                    })
+                } else if newGameOption == .openChallenges {
+                    OpenChallengesForm(
+                        eligibleOpenChallenges: eligibleOpenChallenges
+                    )
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {
                 Text(verbatim: "New game")

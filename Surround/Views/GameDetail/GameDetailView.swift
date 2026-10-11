@@ -116,6 +116,14 @@ struct GameDetailView: View {
             return false
         }
     }
+
+    private var placesActiveGamesAtTop: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
     
     func updateDetailOfCurrentGameIfNecessary() {
         guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
@@ -278,9 +286,12 @@ struct GameDetailView: View {
         let hasRoomForActiveGamesButton = remainingHeight
             >= (compactBottomBarWasVisible ? 0 : 70)
         let showsActiveGamesButton = canShowActiveGames
-            && (!compactLayout || isVerticalToolbar || hasRoomForActiveGamesButton)
+            && (placesActiveGamesAtTop || !compactLayout
+                || isVerticalToolbar || hasRoomForActiveGamesButton)
+        let showsBottomActiveGamesButton = showsActiveGamesButton
+            && !placesActiveGamesAtTop
         let showsCompactBottomBar = compactLayout && !isVerticalToolbar
-            && showsActiveGamesButton
+            && showsBottomActiveGamesButton
         let reserveCompactBottomBarClearance: Bool
         #if os(iOS) && !targetEnvironment(macCatalyst)
         if #available(iOS 26.0, *) {
@@ -443,6 +454,11 @@ struct GameDetailView: View {
                         .surroundUITestZenShortcut()
                     }
                 } else if compactLayout {
+                    if placesActiveGamesAtTop && showsActiveGamesButton {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            activeGamesButton
+                        }
+                    }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if !navigationBarHidden {
                             if compactDisplayMode == .chat {
@@ -500,6 +516,11 @@ struct GameDetailView: View {
                             SurroundUITestContract.AccessibilityID.gameAnalyzeToggle
                         )
                     }
+                    if placesActiveGamesAtTop && showsActiveGamesButton {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            activeGamesButton
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: enterZenMode) {
                             Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
@@ -515,8 +536,10 @@ struct GameDetailView: View {
                         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameOptions)
                     }
                 }
-                if showsActiveGamesButton {
-                    ToolbarItem(placement: .bottomBar) { activeGamesButton }
+                if showsBottomActiveGamesButton {
+                    ToolbarItem(placement: .bottomBar) {
+                        activeGamesButton
+                    }
                     #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
                     if #available(iOS 26.0, *) {
                         ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -528,13 +551,13 @@ struct GameDetailView: View {
                     #endif
                 }
             }
-            // Keep the bottom mode group above the Active Games item.
+            // Separate vertical mode controls from a bottom Active Games item.
             .modifier(GameToolbarLayout(
                 game: currentGame,
                 interaction: $interaction,
                 compact: compactLayout,
                 navigationBarHidden: navigationBarHidden,
-                showsActiveGamesButton: showsActiveGamesButton
+                showsBottomActiveGamesButton: showsBottomActiveGamesButton
             ))
             .appTabBarHidden(compactLayout || zenMode)
         )
@@ -560,7 +583,7 @@ private struct GameToolbarLayout: ViewModifier {
     @Binding var interaction: GameDetailInteraction
     let compact: Bool
     let navigationBarHidden: Bool
-    let showsActiveGamesButton: Bool
+    let showsBottomActiveGamesButton: Bool
 
     private func panelSelection(_ panel: GameDetailPanel) -> Binding<Bool> {
         Binding(
@@ -597,7 +620,7 @@ private struct GameToolbarLayout: ViewModifier {
             .environment(\.compactGameModesInToolbar, showsModeButtons)
             .toolbar {
                 if showsModeButtons {
-                    AppVerticalToolbarGroup(separatesNextGroup: showsActiveGamesButton) {
+                    AppVerticalToolbarGroup(separatesNextGroup: showsBottomActiveGamesButton) {
                         panelButton(
                             .analyze,
                             title: game.analysisAvailable

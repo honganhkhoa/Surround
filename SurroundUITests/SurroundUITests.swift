@@ -1965,6 +1965,66 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testRegularIPadToolbarPlacesActiveGamesBetweenAnalyzeAndZen() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This toolbar order applies to native iPad.")
+        #else
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom != .pad,
+            "This toolbar order applies to native iPad."
+        )
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .landscapeLeft)
+        let gameID = SurroundUITestContract.liveBannerCorrespondenceGameIDs[0]
+        let firstGame = elementAfterScrolling(SurroundUITestContract.AccessibilityID.homeGame(gameID), in: app)
+        scrollIntoTappableArea(firstGame, in: app)
+        tap(firstGame, description: "Open the first correspondence game", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+
+        XCTAssertGreaterThan(
+            app.frame.width, app.frame.height,
+            "This test requires a wide native iPad window."
+        )
+        XCTAssertFalse(
+            app.toolbars.buttons
+                .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
+                .firstMatch.exists,
+            "iPad must not retain the bottom Active Games item."
+        )
+        let analyzeButton = app.navigationBars.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameAnalyzeToggle)
+            .firstMatch
+        let activeGamesButton = app.navigationBars.buttons
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesButton)
+            .firstMatch
+        let zenButton = app.navigationBars.buttons
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameZenEnter)
+            .firstMatch
+        for button in [analyzeButton, activeGamesButton, zenButton] {
+            XCTAssertTrue(button.waitForExistence(timeout: 10), "Expected a direct toolbar control: \(button)")
+            XCTAssertTrue(waitUntilHittable(button, timeout: 10), "Expected a hittable toolbar control: \(button)")
+        }
+        let order = XCTAttachment(string: """
+            Analyze: \(analyzeButton.frame)
+            Active Games: \(activeGamesButton.frame)
+            Zen: \(zenButton.frame)
+            """)
+        order.name = "Required regular iPad toolbar order"
+        order.lifetime = .keepAlways
+        add(order)
+        keepScreenshot("Wide iPad toolbar order", in: app)
+        XCTAssertLessThan(
+            analyzeButton.frame.midX, activeGamesButton.frame.midX,
+            "Active Games must follow Analyze in the regular iPad toolbar."
+        )
+        XCTAssertLessThan(
+            activeGamesButton.frame.midX, zenButton.frame.midX,
+            "Active Games must precede Zen in the regular iPad toolbar."
+        )
+        #endif
+    }
+
     func testActiveGamesPopoverSwitchesGameAndDismisses() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
@@ -1977,14 +2037,67 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let carousel = app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel).firstMatch
         XCTAssertFalse(carousel.exists, "Game thumbnails must not occupy the game screen by default.")
-        let activeGamesButton = element(
-            SurroundUITestContract.AccessibilityID.gameActiveGamesButton,
-            in: app,
-            matching: .button
-        )
-        // iOS 27 reports this visible bottom-bar item as not hittable while
-        // the hidden tab bar retains an accessibility frame over it.
-        activeGamesButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        func openActiveGames() {
+            let identifier = SurroundUITestContract.AccessibilityID
+                .gameActiveGamesButton
+            #if !targetEnvironment(macCatalyst)
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                XCTAssertFalse(
+                    app.toolbars.buttons.matching(identifier: identifier)
+                        .firstMatch.exists,
+                    "iPad must not retain the bottom Active Games item."
+                )
+                let topButton = app.navigationBars.buttons
+                    .matching(identifier: identifier).firstMatch
+                if topButton.exists {
+                    let analyzeButton = app.navigationBars.descendants(matching: .any)
+                        .matching(identifier: SurroundUITestContract.AccessibilityID.gameAnalyzeToggle)
+                        .firstMatch
+                    let zenButton = app.navigationBars.buttons
+                        .matching(identifier: SurroundUITestContract.AccessibilityID.gameZenEnter)
+                        .firstMatch
+                    if analyzeButton.isHittable && topButton.isHittable && zenButton.isHittable {
+                        let order = XCTAttachment(string: """
+                            Analyze: \(analyzeButton.frame)
+                            Active Games: \(topButton.frame)
+                            Zen: \(zenButton.frame)
+                            """)
+                        order.name = "Regular iPad toolbar order checked"
+                        order.lifetime = .keepAlways
+                        add(order)
+                        XCTAssertLessThan(
+                            analyzeButton.frame.midX, topButton.frame.midX,
+                            "Active Games must follow Analyze in the regular iPad toolbar."
+                        )
+                        XCTAssertLessThan(
+                            topButton.frame.midX, zenButton.frame.midX,
+                            "Active Games must precede Zen in the regular iPad toolbar."
+                        )
+                    }
+                    tap(topButton, description: "Top Active Games action", in: app)
+                } else {
+                    tap(
+                        app.navigationBars.buttons["More"].firstMatch,
+                        description: "Game toolbar overflow",
+                        in: app
+                    )
+                    tap(
+                        requiredMenuButton(identifier, title: "Active games", in: app),
+                        description: "Overflowed Active Games action",
+                        in: app
+                    )
+                }
+                return
+            }
+            #endif
+            let activeGamesButton = element(identifier, in: app, matching: .button)
+            // iOS 27 reports this visible bottom-bar item as not hittable while
+            // the hidden tab bar retains an accessibility frame over it.
+            activeGamesButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+
+        openActiveGames()
         let popover = element(SurroundUITestContract.AccessibilityID.gameActiveGamesPopover, in: app)
         element(SurroundUITestContract.AccessibilityID.gameActiveGamesCarousel, in: app)
         for gameID in gameIDs {
@@ -2014,7 +2127,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: popover)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
         XCTAssertFalse(carousel.exists, "Selecting a game must return to its unobstructed board.")
-        element(SurroundUITestContract.AccessibilityID.gameActiveGamesButton, in: app)
+        openActiveGames()
+        let reopened = element(SurroundUITestContract.AccessibilityID.gameActiveGamesPopover, in: app)
+        let selectedGame = reopened.descendants(matching: .button)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameActiveGamesEntry(gameIDs[1]))
+            .firstMatch
+        XCTAssertTrue(selectedGame.waitForExistence(timeout: 10))
+        XCTAssertTrue(selectedGame.isSelected, "Reopening must retain the selected game.")
+        tap(selectedGame, description: "Return to the selected game", in: app)
+        let reopenedDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: reopened
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [reopenedDismissed], timeout: 10), .completed)
     }
 
     func testLiveGameBannerUsesHomeNavigationStack() {

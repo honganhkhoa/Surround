@@ -44,6 +44,7 @@ enum SurroundUITestContract {
     static let friendshipGatedResponseLaunchArgument = "--surround-friendship-gated-response"
     static let emptyMessagesLaunchArgument = "--surround-empty-messages"
     static let messagesContentLaunchArgument = "--surround-messages-content"
+    static let messagesMarketingLaunchArgument = "--surround-messages-marketing"
     static let messagesOverflowLaunchArgument = "--surround-messages-overflow"
     static let messagesShortHistoryLaunchArgument = "--surround-messages-short-history"
     static let messagesDelayedHistoryLaunchArgument = "--surround-messages-delayed-history"
@@ -225,6 +226,15 @@ enum SurroundUITestContract {
         case preferredSettings = "preferred-settings"
         case preferredSettingEditor = "preferred-setting-editor"
         case gameChat = "game-chat"
+
+        var isNewGame: Bool {
+            switch self {
+            case .quickMatch, .openChallenges, .rengoOpenChallenges, .customGame:
+                true
+            default:
+                false
+            }
+        }
     }
 
     #if DEBUG && MAIN_APP
@@ -284,6 +294,14 @@ enum SurroundUITestContract {
 
     static var includesMessagesContent: Bool {
         isEnabled && ProcessInfo.processInfo.arguments.contains(messagesContentLaunchArgument)
+    }
+
+    /// Standalone marketing drafts use the real Messages inbox and conversation.
+    /// Other offline journeys and the exact-ten App Store capture stay unchanged.
+    static var includesMessagesMarketing: Bool {
+        isCapturingCompatibilityScreenshots
+            && compatibilityScene == .messagesInbox
+            && ProcessInfo.processInfo.arguments.contains(messagesMarketingLaunchArgument)
     }
 
     static var includesMessagesOverflow: Bool {
@@ -784,6 +802,7 @@ enum SurroundUITestContract {
         static let gameHistoryEmpty = "gameHistory.empty"
 
         static let homeNewGame = "home.newGame"
+        static let newGameClose = "newGame.close"
         static let liveGameBanner = "notification.liveGame"
         static let homePreferredSettings = "home.preferredSettings"
 

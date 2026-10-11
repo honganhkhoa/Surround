@@ -85,7 +85,7 @@ The journey checks both group headings, a stationary Public games card while the
 
 ## Offline iPad UI tests
 
-The shared iPadOS and Mac Catalyst journeys cover top-level sidebar navigation including the own Profile entry, an empty Messages inbox, signed-out navigation without Messages, opening the bundled fixture game, switching active games through the bottom-bar popover, and entering and leaving Zen mode. `--surround-empty-messages` clears only offline private-message threads for the empty-inbox regression. The suite selects landscape orientation itself:
+The shared iPadOS and Mac Catalyst journeys cover top-level sidebar navigation including the own Profile entry, an empty Messages inbox, signed-out navigation without Messages, opening the bundled fixture game, switching active games through the toolbar popover, and entering and leaving Zen mode. On iPad, Active Games uses the top toolbar between Analyze and Zen mode; compact windows retain their mode picker with Active Games before the existing top actions and native overflow, with no dedicated bottom bar. iPhone and Mac Catalyst retain the bottom placement. `--surround-empty-messages` clears only offline private-message threads for the empty-inbox regression. The suite selects landscape orientation itself:
 
 ```sh
 simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"

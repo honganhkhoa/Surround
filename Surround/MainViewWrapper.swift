@@ -254,6 +254,9 @@ private extension NavigationService {
             main.rootView = .about
         case .browser:
             main.rootView = .browser
+        case .quickMatch, .openChallenges, .rengoOpenChallenges, .customGame:
+            main.rootView = .home
+            home.showingNewGameView = true
         default:
             main.rootView = .home
         }
@@ -428,12 +431,8 @@ private struct CompatibilityScreenshotRootView: View {
                     allowsActiveGamesCarousel: false
                 )
             }
-        case .quickMatch:
-            newGameScene(option: .quickMatch)
-        case .openChallenges, .rengoOpenChallenges:
-            newGameScene(option: .openChallenges)
-        case .customGame:
-            newGameScene(option: .custom)
+        case .quickMatch, .openChallenges, .rengoOpenChallenges, .customGame:
+            MainView(allowsRemoteActivity: false)
         case .opponentPicker:
             AppNavigationStack {
                 UserSelectionView(user: $selectedOpponent)
@@ -483,33 +482,25 @@ private struct CompatibilityScreenshotRootView: View {
         }
     }
 
-    private func newGameScene(
-        option: NewGameView.NewGameOption
-    ) -> some View {
-        AppNavigationStack {
-            NewGameView(newGameOption: option)
-                .navigationTitle("New game")
-                .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
     var body: some View {
         sceneView
             .modifier(GameLayoutTransitionUITestModifier())
             .modifier(
-                CompatibilityScreenshotReadinessModifier(scene: scene)
+                CompatibilityScreenshotReadinessModifier(
+                    scene: scene.isNewGame ? nil : scene
+                )
             )
     }
 }
 
-private struct CompatibilityScreenshotReadinessModifier: ViewModifier {
-    let scene: SurroundUITestContract.CompatibilityScene
+struct CompatibilityScreenshotReadinessModifier: ViewModifier {
+    let scene: SurroundUITestContract.CompatibilityScene?
     @State private var isReady = false
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .topLeading) {
-                if isReady && scene != .gameOptions {
+                if let scene, isReady && scene != .gameOptions {
                     Text(verbatim: scene.rawValue)
                         .foregroundStyle(.clear)
                         .frame(width: 1, height: 1)
@@ -522,6 +513,7 @@ private struct CompatibilityScreenshotReadinessModifier: ViewModifier {
             }
             .task(id: scene) {
                 isReady = false
+                guard scene != nil else { return }
                 // Let navigation, lazy fixture lists, and the first layout pass
                 // settle before XCTest treats the route as capture-ready.
                 try? await Task.sleep(nanoseconds: 600_000_000)

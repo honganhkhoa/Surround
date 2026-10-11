@@ -806,6 +806,10 @@ private enum AppStoreScreenshotProfileData {
         professional: false
     )
 
+    static var messagesMarketingFriends: [OGSUser] {
+        [cedarWave, jadeLantern, harborMist, quietPine]
+    }
+
     private static func matchupTitle(
         _ title: String,
         whitePlayer: OGSUser,
@@ -1329,6 +1333,53 @@ extension OGSService {
             if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.emptyMessagesLaunchArgument) {
                 state.privateMessages = []
             }
+            if SurroundUITestContract.includesMessagesMarketing {
+                let account = AppStoreScreenshotProfileData.profileOwner
+                let friends = AppStoreScreenshotProfileData.messagesMarketingFriends
+                let peer = friends[0]
+                let timestamp: Double = 1_791_568_800 // October 9, 2026, 18:00 UTC.
+                let texts = [
+                    "gg that was close",
+                    "yeah I thought you had me after that ko",
+                    "same haha",
+                    "one more?",
+                    "sure let’s swap colors",
+                ]
+                state.user = account
+                state.friends = friends
+                state.friendInvitations = []
+                for user in [account] + friends {
+                    state.cachedUsersById[user.id] = user
+                }
+                state.privateMessages = texts.enumerated().map { index, text in
+                    let outgoing = !index.isMultiple(of: 2)
+                    return OGSPrivateMessage(
+                        from: outgoing ? account : peer,
+                        to: outgoing ? peer : account,
+                        content: OGSPrivateMessageContent(
+                            id: "messages-marketing-\(peer.id)-\(index)",
+                            message: text,
+                            timestamp: timestamp + Double(index * 60)
+                        )
+                    )
+                }
+                let previews = [
+                    "gg wanna play again later",
+                    "oh wow I missed that ladder",
+                    "same time tomorrow?",
+                ]
+                state.privateMessages += zip(friends.dropFirst(), previews).enumerated().map { index, entry in
+                    OGSPrivateMessage(
+                        from: account,
+                        to: entry.0,
+                        content: OGSPrivateMessageContent(
+                            id: "messages-marketing-\(entry.0.id)-preview",
+                            message: entry.1,
+                            timestamp: timestamp - Double(index + 1) * 86_400
+                        )
+                    )
+                }
+            }
             // Opt-in team fixture for adaptive game-layout journeys. Normal
             // compatibility and App Store captures keep their existing data.
             if ProcessInfo.processInfo.arguments.contains("--surround-rengo-game"),
@@ -1674,6 +1725,11 @@ extension OGSService {
                 remoteSettings: OGSRemoteSetting(preferences: userDefaults),
                 initialState: state
             )
+            if SurroundUITestContract.includesMessagesMarketing {
+                for friend in state.friends {
+                    service.markPrivateMessageThreadAsRead(peerId: friend.id)
+                }
+            }
             if !delayedHistory.isEmpty {
                 MessagesHistoryReplayUITestGate.pending[ObjectIdentifier(service)] = delayedHistory
             }

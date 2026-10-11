@@ -241,6 +241,73 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
         )
     }
 
+    func testNewGameCompatibilityScenesSupportCloseAndReentry() {
+        let scenes: [SurroundUITestContract.CompatibilityScene] = [
+            .quickMatch,
+            .openChallenges,
+            .rengoOpenChallenges,
+            .customGame,
+        ]
+
+        for scene in scenes {
+            let app = launchApp(for: scene, forceEnglishLocale: true)
+            let close = app.buttons
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .newGameClose
+                )
+                .firstMatch
+            let homeNewGame = app.buttons
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .homeNewGame
+                )
+                .firstMatch
+            let readinessMarker = app.descendants(matching: .any)
+                .matching(
+                    identifier: SurroundUITestContract.AccessibilityID
+                        .compatibilityScreen(scene)
+                )
+                .firstMatch
+
+            for dismissal in 0..<2 {
+                XCTAssertTrue(
+                    close.waitForExistence(timeout: 10),
+                    "Expected Close in the \(scene.rawValue) sheet."
+                )
+                XCTAssertEqual(close.label, "Close")
+                XCTAssertTrue(close.isHittable)
+                close.tap()
+
+                let sheetDismissed = XCTNSPredicateExpectation(
+                    predicate: NSPredicate { _, _ in
+                        homeNewGame.isHittable
+                            && !close.exists
+                            && !readinessMarker.exists
+                    },
+                    object: app
+                )
+                XCTAssertEqual(
+                    XCTWaiter.wait(for: [sheetDismissed], timeout: 10),
+                    .completed,
+                    "Closing \(scene.rawValue) must return to Home without reopening the sheet or retaining its readiness marker."
+                )
+
+                if dismissal == 0 {
+                    homeNewGame.tap()
+                    element(
+                        SurroundUITestContract.AccessibilityID
+                            .compatibilityScreen(scene),
+                        in: app
+                    )
+                    waitForSceneContent(scene, in: app)
+                    capture("\(scene.rawValue)-reopened", in: app)
+                }
+            }
+            app.terminate()
+        }
+    }
+
     func testAdaptiveWidgetRegressionScreenshots() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip(

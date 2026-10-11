@@ -673,6 +673,21 @@ struct HomeView: View {
         }
     }
 
+    private var initialNewGameOption: NewGameView.NewGameOption {
+        switch SurroundUITestContract.compatibilityScene {
+        case .quickMatch?:
+            .quickMatch
+        case .openChallenges?, .rengoOpenChallenges?:
+            .openChallenges
+        case .customGame?:
+            .custom
+        default:
+            SurroundUITestContract.isCapturingAppStoreScreenshots
+                ? .openChallenges
+                : .quickMatch
+        }
+    }
+
     var body: some View {
         return VStack {
             if ogs.isLoggedIn {
@@ -785,18 +800,24 @@ struct HomeView: View {
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
         .sheet(isPresented: $nav.home.showingNewGameView) {
             AppNavigationStack {
-                NewGameView(
-                    newGameOption: SurroundUITestContract.isCapturingAppStoreScreenshots
-                        ? .openChallenges
-                        : .quickMatch
-                )
+                NewGameView(newGameOption: initialNewGameOption)
                     .navigationTitle("New game")
                     .navigationBarTitleDisplayMode(.inline)
+                    #if DEBUG && MAIN_APP
+                    .modifier(CompatibilityScreenshotReadinessModifier(
+                        scene: SurroundUITestContract.compatibilityScene
+                            .flatMap { $0.isNewGame ? $0 : nil }
+                    ))
+                    #endif
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(action: { nav.home.showingNewGameView = false }) {
-                                Text("Close")
+                                Label("Close", systemImage: "xmark")
                             }
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier(
+                                SurroundUITestContract.AccessibilityID.newGameClose
+                            )
                         }
                     }
                     .environmentObject(ogs)
