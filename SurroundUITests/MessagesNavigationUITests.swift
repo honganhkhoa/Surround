@@ -470,7 +470,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(app.keyboards.firstMatch.exists, "Incoming replies must exercise the software-keyboard viewport.")
         #endif
         keepScreenshot("Following latest before incoming replay", in: app)
-        tap("test.messagesReplay.release", in: app, matching: .button)
+        releaseMessagesReplay(in: app)
         XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
                       "Both fresh incoming replies must be delivered through the offline service.")
         let latest = transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch
@@ -482,13 +482,151 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         keepScreenshot("Long history follows incoming replies with retained draft", in: app)
     }
 
+    func testShortHistoryIncomingMessagesFollowLatestWithSoftwareKeyboardAndDraft() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey requires the iOS software keyboard.")
+        #else
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesShortHistoryLaunchArgument,
+            SurroundUITestContract.messagesIncomingLaunchArgument,
+        ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_HELD": "1",
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"])
+        let wide = usesColumns(in: app)
+        openInboxConversation(firstPeerID, in: app)
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
+        let pane = wide ? element("messages.detailPane", in: app) : app.windows.firstMatch
+        let draft = "Unsent short conversation draft"
+        enterDraft(draft, in: composer, app: app)
+        let initialLatest = transcript.staticTexts.matching(NSPredicate(
+            format: "label == %@", SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
+        assertMessagesReadableWithSoftwareKeyboard([initialLatest], transcript: transcript,
+            composer: composer, pane: pane, draft: draft,
+            checkpoint: "Short history follows latest before incoming replay", in: app)
+        let latest = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
+        assertMessagesReadableWithSoftwareKeyboard([latest], transcript: transcript,
+            composer: composer, pane: pane, draft: draft,
+            checkpoint: "Short history follows incoming replies without a repair gesture", in: app)
+        #endif
+    }
+
+    func testFittingHistoryKeepsLatestThroughRotationWithSoftwareKeyboardAndDraft() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey requires native iPad rotation with the software keyboard.")
+        #else
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("Run on an iPad mini to exercise a fitting portrait transcript becoming scrollable in landscape.")
+        }
+        let app = launchMessages(additionalLaunchArguments: [
+            SurroundUITestContract.messagesShortHistoryLaunchArgument,
+            SurroundUITestContract.messagesIncomingLaunchArgument,
+        ], launchEnvironment: ["SURROUND_UI_MESSAGES_SHORT_COUNT": "2",
+                               "SURROUND_UI_MESSAGES_REPLAY_HELD": "1",
+                               "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1"], orientation: .portrait)
+        guard app.windows.firstMatch.frame.width < 800 else {
+            throw XCTSkip("This fitting-to-overflow fixture targets the iPad mini's smaller viewport.")
+        }
+        try requireColumns(in: app)
+        openInboxConversation(firstPeerID, in: app)
+        let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
+        let transcript = rootTranscript(in: app)
+        let pane = element("messages.detailPane", in: app)
+        let draft = "Unsent draft through rotation"
+        enterDraft(draft, in: composer, app: app)
+        let latest = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
+        let oldest = transcript.staticTexts["Hello"].firstMatch
+        // The endpoint witnesses prove that all four ordered messages fit before
+        // rotation; this specifically covers fitting content becoming scrollable.
+        assertMessagesReadableWithSoftwareKeyboard([oldest, latest], transcript: transcript,
+            composer: composer, pane: pane, draft: draft,
+            checkpoint: "Short history fits portrait above the full software keyboard", in: app)
+        let portraitViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(waitForCondition { app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height })
+        assertMessagesReadableWithSoftwareKeyboard([latest], transcript: transcript,
+            composer: composer, pane: pane, draft: draft,
+            checkpoint: "Rotation retains latest with keyboard and draft without a repair gesture", in: app)
+        let landscapeViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+        XCTAssertLessThan(landscapeViewport.height, portraitViewport.height)
+        XCTAssertTrue(!oldest.exists || !landscapeViewport.contains(oldest.frame),
+                      "Use an iPad mini: the landscape viewport must overflow the previously fitting history.")
+        #endif
+    }
+
+    private func assertMessagesReadableWithSoftwareKeyboard(_ messages: [XCUIElement],
+        transcript: XCUIElement, composer: XCUIElement, pane: XCUIElement, draft: String,
+        checkpoint: String, in app: XCUIApplication) {
+        let keyboard = app.keyboards.firstMatch
+        let letterKey = keyboard.keys.matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
+        let readable = waitForCondition {
+            guard composer.exists, composer.isHittable, (composer.value as? String) == draft,
+                  keyboard.exists, letterKey.exists, letterKey.isHittable else { return false }
+            let window = app.windows.firstMatch.frame
+            let keyboardFrame = keyboard.frame
+            let composerFrame = composer.frame
+            guard !window.isEmpty, !keyboardFrame.isEmpty, !composerFrame.isEmpty,
+                  window.contains(composerFrame), window.contains(keyboardFrame),
+                  keyboardFrame.contains(letterKey.frame),
+                  composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
+            let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+            return !viewport.isEmpty && messages.allSatisfy {
+                $0.exists && $0.isHittable && !$0.frame.isEmpty && viewport.contains($0.frame)
+            }
+        }
+        keepScreenshot(checkpoint, in: app)
+        XCTAssertTrue(readable,
+                      "\(checkpoint): the entire message must be readable above the composer with the exact draft and a full software letter keyboard retained.")
+    }
+
+    private func releaseMessagesReplay(in app: XCUIApplication) {
+        let identifier = "test.messagesReplay.release"
+        let button = app.buttons.matching(identifier: identifier).firstMatch
+        if button.exists && button.isHittable {
+            tap(button, description: "Release the held incoming replies", in: app)
+            return
+        }
+        // Compact navigation bars can move the test action into their native
+        // overflow. Opening that menu must not dismiss composer focus first.
+        tap(app.navigationBars.buttons["More"].firstMatch,
+            description: "Open the conversation toolbar overflow", in: app)
+        let menuItem = requiredMenuButton(identifier, title: "Replay incoming", in: app)
+        XCTAssertTrue(menuItem.isEnabled, "The held incoming replay must be ready to release.")
+        tap(menuItem, description: "Release the held incoming replies from overflow", in: app)
+    }
+
+    private func releaseMessagesReplayAndAssertDelivery(transcript: XCUIElement,
+                                                        in app: XCUIApplication) -> XCUIElement {
+        let replies = [SurroundUITestContract.messagesIncomingFirstText,
+                       SurroundUITestContract.messagesIncomingLatestText].map { text in
+            transcript.staticTexts.matching(NSPredicate(format: "label == %@", text))
+        }
+        for reply in replies {
+            XCTAssertFalse(reply.firstMatch.exists,
+                           "Incoming replies must remain absent until the keyboard and draft are ready.")
+        }
+        releaseMessagesReplay(in: app)
+        for reply in replies {
+            XCTAssertTrue(reply.firstMatch.waitForExistence(timeout: 50),
+                          "Both held incoming replies must arrive in the selected transcript.")
+            XCTAssertEqual(reply.count, 1, "Each incoming reply must be delivered exactly once.")
+        }
+        return replies[1].firstMatch
+    }
+
     func testLongHistoryIncomingMessagesPreserveOlderReadingPositionAndDraft() throws {
+        #if targetEnvironment(macCatalyst)
+        let orientation: UIDeviceOrientation? = nil
+        #else
+        // Leave room for a complete multiline witness above the software keyboard.
+        let orientation: UIDeviceOrientation? = .portrait
+        #endif
         let app = launchMessages(additionalLaunchArguments: [
             SurroundUITestContract.messagesOverflowLaunchArgument,
             SurroundUITestContract.messagesIncomingLaunchArgument,
         ], launchEnvironment: ["SURROUND_UI_MESSAGES_REPLAY_DELAY": "40",
                                "SURROUND_UI_MESSAGES_REPLAY_INTERVAL": "1",
-                               "SURROUND_UI_MESSAGES_REPLAY_HELD": "1"])
+                               "SURROUND_UI_MESSAGES_REPLAY_HELD": "1"], orientation: orientation)
         let wide = usesColumns(in: app)
         if !wide { openInboxConversation(firstPeerID, in: app) }
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
@@ -502,31 +640,52 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                           height: max(0, min(bounds.maxY, composer.frame.minY) - bounds.minY))
                 .insetBy(dx: 8, dy: 8)
         }
-        let olderHistory = transcript.staticTexts.matching(NSPredicate(
-            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Offline history ", " for hakhoa\n"
-        ))
+        func olderWitnessLabel(in viewport: CGRect) throws -> String? {
+            // Inspect one immutable hierarchy instead of resolving all 50 live
+            // message queries repeatedly while the keyboard is present.
+            var pending = [try transcript.snapshot()]
+            var readableMessages = [(label: String, frame: CGRect)]()
+            while let snapshot = pending.popLast() {
+                if snapshot.elementType == .staticText,
+                   snapshot.label.hasPrefix("Offline history "),
+                   snapshot.label.contains(" for hakhoa\n"),
+                   !snapshot.frame.isEmpty, viewport.contains(snapshot.frame) {
+                    readableMessages.append((snapshot.label, snapshot.frame))
+                }
+                pending.append(contentsOf: snapshot.children)
+            }
+            let centeredMessages = readableMessages.sorted {
+                abs($0.frame.midY - viewport.midY) < abs($1.frame.midY - viewport.midY)
+            }
+            for message in centeredMessages {
+                let candidate = transcript.staticTexts.matching(NSPredicate(format: "label == %@", message.label)).firstMatch
+                if candidate.isHittable { return message.label }
+            }
+            return nil
+        }
+        var selectedWitnessLabel: String?
         for _ in 0..<4 {
             dragMessagesViewport(transcriptViewport(transcript, above: composer,
                 within: wide ? element("messages.detailPane", in: app).frame : app.windows.firstMatch.frame, in: app),
                                  toward: nil, earlierWhenAbsent: true, in: app)
             if !initialLatest.isHittable {
                 let viewport = readableViewport()
-                if olderHistory.allElementsBoundByIndex.contains(where: { viewport.contains($0.frame) && $0.isHittable }) { break }
+                selectedWitnessLabel = try olderWitnessLabel(in: viewport)
+                if selectedWitnessLabel != nil { break }
             }
         }
         XCTAssertFalse(initialLatest.isHittable, "Seed a reading position that is independent of latest.")
-        let olderMessages = olderHistory.allElementsBoundByIndex.filter { readableViewport().contains($0.frame) && $0.isHittable }
-            .sorted { $0.frame.midY < $1.frame.midY }
-        let witnessLabel = try XCTUnwrap(olderMessages.dropFirst(olderMessages.count / 2).first?.label,
+        keepScreenshot("Older witness before incoming replay", in: app)
+        let witnessLabel = try XCTUnwrap(selectedWitnessLabel,
                                         "Seed one fully readable older-message witness.")
         let witness = transcript.staticTexts.matching(NSPredicate(format: "label == %@", witnessLabel)).firstMatch
         let progress = transcript
         XCTAssertEqual(progress.value as? String, "delivered:0/2", "The reading witness must precede the appends.")
-        keepScreenshot("Older witness before incoming replay", in: app)
-        tap("test.messagesReplay.release", in: app, matching: .button)
+        releaseMessagesReplay(in: app)
         XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
                       "Both incoming replies must arrive while the older history remains selected.")
-        XCTAssertTrue(witness.isHittable && readableViewport().contains(witness.frame),
+        let retainedViewport = readableViewport()
+        XCTAssertTrue(witness.isHittable && retainedViewport.contains(witness.frame),
                       "The exact older reading witness must remain fully readable after incoming appends.")
         XCTAssertFalse(initialLatest.isHittable, "New replies must not switch older reading back to latest.")
         XCTAssertFalse(transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch.isHittable)
@@ -1676,7 +1835,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     }
 
     private func launchMessages(additionalLaunchArguments: [String] = [],
-                                launchEnvironment: [String: String] = [:]) -> XCUIApplication {
+                                launchEnvironment: [String: String] = [:],
+                                orientation: UIDeviceOrientation? = nil) -> XCUIApplication {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
@@ -1684,7 +1844,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.profileContentLaunchArgument,
             SurroundUITestContract.messagesContentLaunchArgument,
         ] + additionalLaunchArguments, launchEnvironment: launchEnvironment,
-        orientation: UIDevice.current.userInterfaceIdiom == .phone ? .portrait : .landscapeLeft)
+        orientation: orientation ?? (UIDevice.current.userInterfaceIdiom == .phone ? .portrait : .landscapeLeft))
         element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         return app
     }

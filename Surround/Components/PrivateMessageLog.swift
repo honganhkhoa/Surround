@@ -184,6 +184,16 @@ private struct PrivateMessageComposer: View {
     }
 }
 
+private struct PrivateMessageTranscriptLayout: Equatable {
+    let containerSize: CGSize
+    let contentSize: CGSize
+    let contentInsets: EdgeInsets
+
+    var overflows: Bool {
+        contentSize.height > containerSize.height - contentInsets.top - contentInsets.bottom
+    }
+}
+
 private struct PrivateMessageTranscript: View {
     @EnvironmentObject private var ogs: OGSService
     @Environment(\.scenePhase) private var scenePhase
@@ -199,6 +209,7 @@ private struct PrivateMessageTranscript: View {
     @State private var scrollPosition: ScrollPosition
     @State private var scrollPhase: ScrollPhase = .idle
     @State private var visibleMessageKeys = [String]()
+    @State private var transcriptLayout: PrivateMessageTranscriptLayout?
 
     init(peerID: Int, messages: [OGSPrivateMessage], marksThreadAsRead: Bool,
          isPresented: Bool, bookmark: PrivateMessageScrollBookmark) {
@@ -281,10 +292,18 @@ private struct PrivateMessageTranscript: View {
 
     private func scrollToLatestMessageIfFollowing() {
         guard isVisible, isPresented, followsLatestMessages,
-              !Self.isUserScrolling(scrollPhase), !messages.isEmpty else { return }
-        // A fitting transcript is already bottom-aligned. Target its edge to
-        // avoid applying that alignment again through a message-ID anchor.
-        scrollPosition.scrollTo(edge: .bottom)
+              scrollPhase != .tracking, !Self.isUserScrolling(scrollPhase),
+              !messages.isEmpty else { return }
+        if let layout = transcriptLayout, layout.overflows {
+            // Use the measured bottom offset: repeated edge requests can stay
+            // at the old end, and ID anchors can align beneath the composer.
+            scrollPosition.scrollTo(y: layout.contentSize.height - layout.containerSize.height
+                                    + layout.contentInsets.bottom)
+        } else {
+            // Fitting content is already bottom-aligned; an ID anchor would
+            // apply that alignment a second time and clip the last message.
+            scrollPosition.scrollTo(edge: .bottom)
+        }
     }
 
     private func markThreadAsRead() {
@@ -312,6 +331,20 @@ private struct PrivateMessageTranscript: View {
         .defaultScrollAnchor(followsLatestMessages ? .bottom : nil, for: .initialOffset)
         .defaultScrollAnchor(.bottom, for: .alignment)
         .defaultScrollAnchor(followsLatestMessages ? .bottom : nil, for: .sizeChanges)
+        .onScrollGeometryChange(for: PrivateMessageTranscriptLayout.self) { geometry in
+            PrivateMessageTranscriptLayout(
+                containerSize: geometry.containerSize,
+                contentSize: geometry.contentSize,
+                contentInsets: geometry.contentInsets
+            )
+        } action: { _, layout in
+            guard layout.containerSize.height > 0, layout.contentSize.height > 0 else { return }
+            transcriptLayout = layout
+            // Appends, rotation, and keyboard avoidance can finish laying out
+            // after a message-change scroll request. Follow the settled layout,
+            // without observing offsets or changing an older reading position.
+            scrollToLatestMessageIfFollowing()
+        }
         .onScrollGeometryChange(for: Bool?.self) { geometry in
             guard geometry.containerSize.height > 0, geometry.contentSize.height > 0 else { return nil }
             return geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 2
@@ -341,6 +374,9 @@ private struct PrivateMessageTranscript: View {
                 // The settled geometry also handles a geometry callback that
                 // arrived before native gesture ownership changed.
                 rememberUserPosition(in: context.geometry)
+            } else if newPhase == .idle && oldPhase == .tracking {
+                // A touch without a drag can defer an append's scroll request.
+                scrollToLatestMessageIfFollowing()
             }
         }
         #if DEBUG && MAIN_APP
@@ -361,10 +397,8 @@ private struct PrivateMessageTranscript: View {
             if scrollPhase != .idle { scrollPhase = .idle }
         }
         .onChange(of: messages) { _, _ in
-            if isVisible && isPresented && followsLatestMessages, !messages.isEmpty {
-                scrollPosition.scrollTo(edge: .bottom)
-                markThreadAsRead()
-            }
+            scrollToLatestMessageIfFollowing()
+            markThreadAsRead()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

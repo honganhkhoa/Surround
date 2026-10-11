@@ -320,7 +320,7 @@ enum SurroundUITestContract {
     }
 
     static var includesMessagesIncoming: Bool {
-        includesMessagesOverflow
+        includesMessagesContent
             && ProcessInfo.processInfo.arguments.contains(messagesIncomingLaunchArgument)
     }
 

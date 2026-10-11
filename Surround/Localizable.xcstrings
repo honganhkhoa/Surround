@@ -14837,6 +14837,7 @@
       }
     },
     "Black wins by Cancellation" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -58578,6 +58579,7 @@
       }
     },
     "White wins by Cancellation" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

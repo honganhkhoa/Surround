@@ -79,6 +79,75 @@ class GameTests: XCTestCase {
         }
     }
 
+    func testAnnulledStatusTakesPrecedenceOverWinnerAndDraw() throws {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.outcome = "Resignation"
+        game.historyAnnulled = true
+        game.ogsRawData = ["annulled": false]
+
+        for winner in [try XCTUnwrap(game.whitePlayer?.id), 0] {
+            game.gameData?.winner = winner
+            XCTAssertEqual(game.status, String(localized: "Annulled"))
+        }
+    }
+
+    func testAnnulledStatusUsesRawDetailWithoutHistoryMetadata() {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.ogsRawData = ["annulled": true]
+
+        XCTAssertEqual(game.status, String(localized: "Annulled"))
+    }
+
+    func testFreshHistoryCanClearCachedAnnulmentStatus() throws {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.outcome = "Resignation"
+        game.gameData?.winner = try XCTUnwrap(game.whitePlayer?.id)
+        game.ogsRawData = ["annulled": true]
+        game.historyAnnulled = false
+
+        XCTAssertEqual(game.status, String(localized: "White wins by Resignation"))
+    }
+
+    func testHistorySummaryAnnulmentTakesPrecedenceOverCachedMetadata() {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.historySummary = FinishedGameSummary(
+            gameID: 26_268_396, blackPlayerID: 1, whitePlayerID: 2,
+            width: 19, height: 19, annulled: true
+        )
+        game.historyAnnulled = false
+        game.ogsRawData = ["annulled": false]
+
+        XCTAssertEqual(game.status, String(localized: "Annulled"))
+    }
+
+    func testCancellationStatusNeverClaimsAWinOrDraw() throws {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        let whiteID = try XCTUnwrap(game.whitePlayer?.id)
+        let winners: [Int?] = [nil, 0, whiteID]
+        for outcome in ["Cancellation", " CANCELLATION\n"] {
+            game.gameData?.outcome = outcome
+            for winner in winners {
+                game.gameData?.winner = winner
+                XCTAssertEqual(game.status, String(localized: "Cancellation"))
+            }
+        }
+    }
+
+    func testOrdinaryFinishedStatusesRetainWinnerAndDraw() throws {
+        let game = GameTests.sampleGame(ogsId: 26_268_396)
+        game.gameData?.outcome = "Resignation"
+        game.gameData?.winner = try XCTUnwrap(game.blackPlayer?.id)
+        XCTAssertEqual(game.status, String(localized: "Black wins by Resignation"))
+
+        game.gameData?.outcome = "6.5 points"
+        game.gameData?.winner = try XCTUnwrap(game.whitePlayer?.id)
+        XCTAssertEqual(game.status, String(localized: "White wins by \(Float(6.5), specifier: "%.1f") points"))
+
+        game.gameData?.outcome = "0 points"
+        game.gameData?.winner = 0
+        XCTAssertEqual(game.status, String(localized: "Game ended in a draw"))
+    }
+
     func testPlayerCacheRefreshPublishesOneRosterAndSkipsUnchangedValues() {
         let game = Game(width: 5, height: 5, blackName: "Black", whiteName: "White", gameId: .OGS(1))
         game.blackPlayer = OGSUser(username: "Black", id: -101)

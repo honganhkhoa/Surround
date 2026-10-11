@@ -1116,6 +1116,16 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
     }
     
     var status: String {
+        // Listing metadata can be newer than cached game detail. An annulled
+        // result must not become a win or draw because OGS also sends a winner.
+        if historySummary?.annulled ?? historyAnnulled
+            ?? (ogsRawData?["annulled"] as? Bool) ?? false {
+            return String(localized: "Annulled")
+        }
+        if gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() == "cancellation" {
+            return String(localized: "Cancellation", comment: "HistoryGameCell game outcome")
+        }
         if let outcome = gameData?.outcome, let winnerId = gameData?.winner {
             if winnerId == 0 {
                 return String(localized: "Game ended in a draw")
@@ -1133,8 +1143,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                     return winnerColor == .black ? String(localized: "Black wins by Stone Removal Timeout") : String(localized: "White wins by Stone Removal Timeout")
                 case "timeout":
                     return winnerColor == .black ? String(localized: "Black wins by Timeout") : String(localized: "White wins by Timeout")
-                case "cancellation":
-                    return winnerColor == .black ? String(localized: "Black wins by Cancellation") : String(localized: "White wins by Cancellation")
                 case "disqualification":
                     return winnerColor == .black ? String(localized: "Black wins by Disqualification") : String(localized: "White wins by Disqualification")
                 case "moderator decision":
