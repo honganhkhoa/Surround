@@ -76,7 +76,10 @@ struct PrivateMessagesView: View {
                         if layout.usesColumns {
                             Color.clear
                                 .frame(width: 1)
-                                .background(Color(uiColor: .separator), ignoresSafeAreaEdges: .vertical)
+                                .background {
+                                    Color(uiColor: .separator)
+                                        .ignoresSafeArea(.all, edges: .vertical)
+                                }
                                 .frame(width: layout.gap)
                                 .accessibilityHidden(true)
                             Group {
@@ -95,10 +98,12 @@ struct PrivateMessagesView: View {
                     .background(alignment: .leading) {
                         // Paint up to the separator at the center of the native
                         // division clearance; keep pane controls out of it.
+                        // Extend only the paint through keyboard clearance so
+                        // a tabletop fold does not expose the white backing.
                         MessagesStyle.canvas
                             .frame(width: layout.inboxWidth + layout.gap / 2)
                             .clipped()
-                            .ignoresSafeArea(.container, edges: .vertical)
+                            .ignoresSafeArea(.all, edges: .vertical)
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenMessages)
