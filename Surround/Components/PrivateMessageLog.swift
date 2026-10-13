@@ -205,6 +205,7 @@ private struct PrivateMessageTranscript: View {
     let bookmark: PrivateMessageScrollBookmark
 
     @State private var isVisible = false
+    @State private var hasPresented = false
     @State private var atEndOfChat: Bool
     @State private var scrollPosition: ScrollPosition
     @State private var scrollPhase: ScrollPhase = .idle
@@ -262,8 +263,8 @@ private struct PrivateMessageTranscript: View {
     }
 
     private func rememberVisibleMessages(_ keys: [String]) {
-        // Only a presented user gesture owns the cache. Restoration and
-        // teardown must not replace this transcript's reading context.
+        // User gestures own a new reading context. Layout and teardown must
+        // not replace this transcript's restored reading context.
         guard isVisible, isPresented, Self.isUserScrolling(scrollPhase) else { return }
         let visible = Set(keys)
         let orderedVisible = messages.map(\.messageKey).filter { visible.contains($0) }
@@ -304,6 +305,18 @@ private struct PrivateMessageTranscript: View {
             // apply that alignment a second time and clip the last message.
             scrollPosition.scrollTo(edge: .bottom)
         }
+    }
+
+    private func restoreInitialOlderPositionIfNeeded() {
+        guard isPresented, !hasPresented else { return }
+        hasPresented = true
+        guard !atEndOfChat, !bookmark.isAtEndOfChat,
+              !Self.isUserScrolling(scrollPhase), let key = bookmark.messageKey,
+              messages.contains(where: { $0.messageKey == key }) else { return }
+        scrollPosition.scrollTo(id: key, anchor: .center)
+        // Retain this instance's key if a covered same-peer transcript later
+        // changes the shared bookmark before the root is shown again.
+        visibleMessageKeys = [key]
     }
 
     private func markThreadAsRead() {
@@ -385,6 +398,9 @@ private struct PrivateMessageTranscript: View {
         .onAppear {
             isVisible = true
             publishRetainedPosition()
+            // A recreated transcript can start at the top despite its initial
+            // saved ID. Apply the older reading position when it appears.
+            restoreInitialOlderPositionIfNeeded()
             scrollToLatestMessageIfFollowing()
             ogs.setUpNewPeerIfNecessary(peerId: peerID)
             markThreadAsRead()
@@ -422,6 +438,7 @@ private struct PrivateMessageTranscript: View {
             if scrollPhase != .idle { scrollPhase = .idle }
             if presented {
                 publishRetainedPosition()
+                restoreInitialOlderPositionIfNeeded()
                 scrollToLatestMessageIfFollowing()
                 markThreadAsRead()
             }

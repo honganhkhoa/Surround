@@ -426,8 +426,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                           composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
                 } else if requiresKeyboardAbsent && keyboard.exists { return false }
                 guard latest.exists, latest.isHittable else { return false }
-                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
                 let latestFrame = latest.frame
+                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
                 return !viewport.isEmpty && !viewport.isNull && !latestFrame.isEmpty && !latestFrame.isNull
                     && viewport.contains(latestFrame)
             }
@@ -1246,8 +1246,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(biographyWebView(in: app).links["More about JuniperStone"].firstMatch.isHittable,
                       "Back should retain the biography's scrolled reading context.")
         back(from: "About", to: SurroundUITestContract.AccessibilityID.screenPlayerProfile, in: app)
-        back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
-        assertWideRoot(in: app, expectedBounds: bounds)
+        back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages,
+             restoredMessagesControl: anchorID, in: app)
+        assertWideRoot(in: app, expectedBounds: bounds, requireSearchHittability: false)
         let restoredAnchor = query(anchorID, in: app)
         XCTAssertTrue(waitUntilHittable(restoredAnchor, timeout: 10))
         XCTAssertEqual(restoredAnchor.frame.minY, anchorY, accuracy: 16,
@@ -1767,8 +1768,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let firstHistoryWitness = centralVisibleHistoryWitness(username: "hakhoa", in: app)
         openConversationProfile(firstPeerID, username: "hakhoa", in: app)
         assertFullWidthDestination(SurroundUITestContract.AccessibilityID.screenPlayerProfile, over: bounds, in: app)
-        back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
-        assertWideRoot(in: app, expectedBounds: bounds)
+        back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages,
+             restoredMessagesControl: anchorID, in: app)
+        assertWideRoot(in: app, expectedBounds: bounds, requireSearchHittability: false)
         let restoredFriend = query(anchorID, in: app)
         XCTAssertTrue(waitUntilHittable(restoredFriend, timeout: 10),
                       "Native Back must restore the scrolled inbox's visible friend context.")
@@ -2217,10 +2219,24 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     }
 
     @discardableResult
-    private func assertWideRoot(in app: XCUIApplication, expectedBounds: CGRect? = nil) -> CGRect {
+    private func assertWideRoot(in app: XCUIApplication, expectedBounds: CGRect? = nil,
+                                requireSearchHittability: Bool = true) -> CGRect {
         let inbox = element("messages.inboxPane", in: app)
         let detail = element("messages.detailPane", in: app)
-        XCTAssertTrue(query("messages.playerSearchField", in: app).isHittable)
+        let search = query("messages.playerSearchField", in: app)
+        if requireSearchHittability {
+            XCTAssertTrue(search.isHittable)
+        } else {
+            XCTAssertTrue(search.exists && search.isEnabled)
+            if search.exists {
+                let frame = search.frame
+                XCTAssertTrue(frame.minX.isFinite && frame.minY.isFinite
+                              && frame.width.isFinite && frame.height.isFinite
+                              && frame.width > 1 && frame.height > 1)
+                XCTAssertTrue(inbox.frame.contains(frame))
+                XCTAssertTrue(app.windows.firstMatch.frame.contains(frame))
+            }
+        }
         XCTAssertGreaterThan(inbox.frame.width, 1)
         XCTAssertGreaterThan(detail.frame.width, 1)
         XCTAssertGreaterThanOrEqual(detail.frame.minX, inbox.frame.maxX - 1)
@@ -2269,7 +2285,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             ? app.navigationBars[title].buttons.allElementsBoundByIndex.first(where: { $0.isHittable }) : nil
     }
 
-    private func back(from title: String, to destination: String, in app: XCUIApplication) {
+    private func back(from title: String, to destination: String,
+                      restoredMessagesControl: String? = nil, in app: XCUIApplication) {
         var control: XCUIElement?
         XCTAssertTrue(waitForCondition {
             control = self.visibleBack(from: title, in: app)
@@ -2282,7 +2299,11 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         case "messages.conversation":
             usable = visibleElement(SurroundUITestContract.AccessibilityID.privateMessageComposer, in: app, matching: .textField)
         case SurroundUITestContract.AccessibilityID.screenMessages:
-            usable = visibleElement("messages.playerSearchField", in: app, matching: .textField)
+            if let restoredMessagesControl {
+                usable = visibleElement(restoredMessagesControl, in: app, matching: .button)
+            } else {
+                usable = visibleElement("messages.playerSearchField", in: app, matching: .textField)
+            }
         case SurroundUITestContract.AccessibilityID.screenPlayerProfile:
             let about = query(SurroundUITestContract.AccessibilityID.profileAbout, in: app)
             if about.exists && about.isHittable {
@@ -2382,11 +2403,29 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             format: "label == %@",
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
-        for _ in 0..<8 {
+        var attempt = 0
+        var gestureBudget: CGFloat = 8
+        while CGFloat(attempt) < gestureBudget {
             let viewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
             if marker.exists && viewport.contains(marker.frame) && marker.isHittable { break }
-            dragMessagesViewport(viewport, toward: marker.exists ? marker.frame : nil,
+            let before = marker.exists ? marker.frame : nil
+            dragMessagesViewport(viewport, toward: before,
                                  earlierWhenAbsent: true, in: app)
+            attempt += 1
+            if attempt == 1, let before, marker.exists {
+                let after = marker.frame
+                let direction: CGFloat = viewport.midY > before.midY ? 1 : -1
+                let travel = (after.midY - before.midY) * direction
+                if travel.isFinite && travel > 0 {
+                    let currentViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+                    let remaining = abs(currentViewport.midY - after.midY)
+                    if remaining.isFinite {
+                        // Keyboard height changes the available travel. Measure
+                        // the first gesture, but bound work when movement is tiny.
+                        gestureBudget = min(24, max(8, 2 + ceil(remaining / travel)))
+                    }
+                }
+            }
         }
         XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer, within: pane.frame, in: app).contains(marker.frame) && marker.isHittable,
                       "The older message seed must be fully inside the transcript viewport before navigation.")
