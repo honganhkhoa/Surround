@@ -19,7 +19,6 @@ import subprocess
 import sys
 import threading
 import time
-import uuid
 
 
 APP = "com.honganhkhoa.Surround"
@@ -291,47 +290,16 @@ def capture(args, output, stop):
 
 
 def log_stream(args, output, stop):
-    # A guest log process can outlive its host simctl. Record an ownership nonce
-    # and its exact PID; native --timeout also bounds an unverifiable orphan.
-    owner = uuid.uuid4().hex
-    guest_pid = None
-
-    def receive(line):
-        nonlocal guest_pid
-        match = re.fullmatch(r"SurroundAnimationCollectorPID=(\d+)", line)
-        if match:
-            guest_pid = int(match.group(1))
-
-    environment = os.environ.copy()
-    environment["SIMCTL_CHILD_SURROUND_ANIMATION_LOG_OWNER"] = owner
-    command = ["xcrun", "simctl", "spawn", args.simulator, "/bin/sh", "-c",
-               'printf "SurroundAnimationCollectorPID=%s\\n" "$$"; export DYLD_ROOT_PATH="$SIMULATOR_ROOT"; exec "$SIMULATOR_ROOT/usr/bin/log" stream "$@"',
-               "surround-animation-log", "--style", "compact", "--level", "debug",
+    # iOS Simulator runtimes provide log, but no guest /bin/sh. A direct
+    # stream can outlive host simctl cancellation; native timeout bounds it.
+    command = ["xcrun", "simctl", "spawn", args.simulator, "log", "stream",
+               "--style", "compact", "--level", "debug",
                "--timeout", str(args.log_seconds), "--predicate", LOG_PREDICATE]
     result = tool(command, output / "simulator.log", args.log_seconds + 5, stop,
-                  args.log_max_bytes, receive, environment)
-    result["guestPID"] = guest_pid
-    if guest_pid:
-        # Never retain environment contents. Verify ownership immediately before
-        # signalling only our log process, not any simulator app or test runner.
-        try:
-            check = subprocess.run(["ps", "eww", "-p", str(guest_pid), "-o", "command="],
-                                   capture_output=True, text=True, timeout=3)
-            if check.returncode == 1 and not check.stdout.strip():
-                result["guestCleanup"] = "already-exited"
-            elif (check.returncode == 0 and "/usr/bin/log stream " in check.stdout
-                  and re.search(r"(?:^|\s)SIMULATOR_UDID=" + re.escape(args.simulator) + r"(?:\s|$)", check.stdout, re.I)
-                  and re.search(r"(?:^|\s)SURROUND_ANIMATION_LOG_OWNER=" + owner + r"(?:\s|$)", check.stdout)):
-                os.kill(guest_pid, signal.SIGTERM)
-                result["guestCleanup"] = "owned-log-SIGTERM"
-            else:
-                result["guestCleanupError"] = "Ownership unverified; no guest signal sent; native log timeout remains"
-        except ProcessLookupError:
-            result["guestCleanup"] = "already-exited"
-        except (OSError, subprocess.SubprocessError) as error:
-            result["guestCleanupError"] = str(error)
-    elif result.get("stopped") or result.get("error"):
-        result["guestCleanupError"] = "Guest PID unavailable; native log timeout remains"
+                  args.log_max_bytes)
+    result["guestPID"] = None
+    result["nativeLogTimeoutSeconds"] = args.log_seconds
+    result["guestCleanup"] = "not-signalled-native-timeout"
     return result
 
 
@@ -345,6 +313,7 @@ def run(args):
     command = None
     interrupted = None
     interrupt_time = None
+    signal_forwarded = False
     capture_future = None
     previous_handlers = {}
 
@@ -353,11 +322,18 @@ def run(args):
         if interrupted is None:
             interrupted, interrupt_time = signum, time.monotonic()
             stop.set()
-            if command is not None and command.poll() is None:
-                try:
-                    command.send_signal(signum)  # Exact wrapped PID, no process-group or runner signal.
-                except ProcessLookupError:
-                    pass
+            # Forward now if assigned; replay after Popen if it is still returning.
+            forward_interrupt_if_needed()
+
+    def forward_interrupt_if_needed():
+        nonlocal signal_forwarded
+        if interrupted is None or signal_forwarded or command is None or command.poll() is not None:
+            return
+        signal_forwarded = True
+        try:
+            command.send_signal(interrupted)  # Exact wrapped PID, no process-group or runner signal.
+        except ProcessLookupError:
+            pass
 
     def maybe_capture(trigger, pool):
         nonlocal capture_future
@@ -375,12 +351,15 @@ def run(args):
                 with open(output / "console.log", "wb", buffering=0) as console:
                     command = subprocess.Popen(args.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                                bufsize=0, start_new_session=True)
+                    # A signal may have arrived while Popen was creating this child.
+                    forward_interrupt_if_needed()
                     pending = b""
                     console_open = True
                     command_exited_at = None
                     with selectors.DefaultSelector() as selector:
                         selector.register(command.stdout, selectors.EVENT_READ)
                         while selector.get_map() or command.poll() is None:
+                            forward_interrupt_if_needed()
                             if command.poll() is not None:
                                 stop.set()
                                 if command_exited_at is None:

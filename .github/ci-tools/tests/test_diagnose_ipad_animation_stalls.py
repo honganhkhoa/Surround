@@ -142,22 +142,45 @@ name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with (root / "calls.jsonl").open("a") as f:
     f.write(json.dumps([name] + args) + "\n")
-if name == "xcrun" and "/bin/sh" in args:
-    (root / "stream.pid").write_text(str(os.getpid()))
+if name == "xcrun" and args[:2] == ["simctl", "spawn"] and args[3:5] == ["log", "stream"]:
+    seconds = int(args[args.index("--timeout") + 1])
+    assert seconds > 0
     def end(signum, frame):
         (root / "stream-stopped").write_text(str(signum))
         sys.exit(0)
     signal.signal(signal.SIGTERM, end)
-    print("SurroundAnimationCollectorPID=" + str(os.getpid()), flush=True)
-    while True:
+    (root / "stream.pid").write_text(str(os.getpid()))
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
         time.sleep(0.05)
+    (root / "stream-expired").touch()
 elif name == "xcrun" and args[-2:] == ["launchctl", "list"]:
     print("1110 0 UIKitApplication:com.honganhkhoa.Surround[abc][rb-legacy]")
     print("2220 0 UIKitApplication:com.honganhkhoa.SurroundUITests.xctrunner[def]")
     print("3330 0 UIKitApplication:com.example.unrelated[ghi]")
 elif name == "xcrun" and "screenshot" in args:
-    pathlib.Path(args[-1]).write_bytes(b"fake simulator screenshot")
+    started = root / "screenshot-started"
+    temporary = started.with_name(started.name + ".tmp")
+    temporary.write_text(str(os.getpid()))
+    os.replace(temporary, started)
+    screenshot = pathlib.Path(args[-1])
+    temporary = screenshot.with_name(screenshot.name + ".tmp")
+    temporary.write_bytes(b"fake simulator screenshot")
+    os.replace(temporary, screenshot)
 elif name == "sample":
+    started = root / ("sample-" + args[0] + "-started")
+    temporary = started.with_name(started.name + ".tmp")
+    temporary.write_text(str(os.getpid()))
+    os.replace(temporary, started)
+    if os.environ.get("FAKE_SAMPLE_WAIT_FOR_CONSOLE"):
+        console = root / "result" / "console.log"
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            if console.exists() and b"command continued" in console.read_bytes():
+                break
+            time.sleep(0.02)
+        else:
+            sys.exit(18)
     if os.environ.get("FAKE_SAMPLE_HANG"):
         time.sleep(60)
     if os.environ.get("FAKE_SAMPLE_FAIL"):
@@ -195,21 +218,51 @@ class WrapperSubprocessTests(unittest.TestCase):
                 "--stall-seconds", "0.12", "--capture-timeout", "2", "--log-seconds", "5",
                 *extra, "--", sys.executable, "-u", "-c", source]
 
-    def invoke(self, source, extra=()):
+    def wait_for_markers(self, *names):
+        paths = [str(self.root / name) for name in names]
+        return ("markers=[pathlib.Path(p) for p in %r]\n"
+                "deadline=time.monotonic()+3\n"
+                "while not all(m.exists() for m in markers) and time.monotonic()<deadline: time.sleep(.02)\n"
+                "assert all(m.exists() for m in markers), 'fake-tool markers missing'\n") % paths
+
+    def wait_for_process_exits(self, *pid_markers):
+        paths = [str(self.root / name) for name in pid_markers]
+        return ("import os,pathlib,time\n"
+                "pids=[int(pathlib.Path(p).read_text()) for p in %r]\n"
+                "deadline=time.monotonic()+3\n"
+                "while pids and time.monotonic()<deadline:\n"
+                "    for pid in pids[:]:\n"
+                "        try: os.kill(pid,0)\n"
+                "        except ProcessLookupError: pids.remove(pid)\n"
+                "    if pids: time.sleep(.02)\n"
+                "assert not pids, 'fake-tool processes still running'\n") % paths
+
+    def invoke(self, source, extra=(), expect_native_expiry=False):
         result = subprocess.run(self.command(source, extra), env=self.environment,
                                 capture_output=True, timeout=8)
         status = json.loads((self.output / "status.json").read_text())
         calls = [json.loads(x) for x in (self.root / "calls.jsonl").read_text().splitlines()]
-        self.assertTrue((self.root / "stream-stopped").exists())
+        if expect_native_expiry:
+            self.assertTrue((self.root / "stream-expired").exists())
+            self.assertFalse((self.root / "stream-stopped").exists())
+            self.assertNotIn("stopped", status["simulatorLog"])
+        else:
+            self.assertTrue((self.root / "stream-stopped").exists())
+            self.assertFalse((self.root / "stream-expired").exists())
+            self.assertEqual(status["simulatorLog"]["stopped"], "wrapper-finished")
         for call in calls:
             if call[0] == "xcrun":
                 self.assertIn(UDID, call)
                 self.assertNotIn("booted", call)
         self.assertEqual((self.output / "console.log").read_bytes(), result.stdout)
+        self.assertIsNone(status["simulatorLog"]["guestPID"])
+        self.assertEqual(status["simulatorLog"]["guestCleanup"], "not-signalled-native-timeout")
+        self.assertFalse(any(c[0] == "ps" or "/bin/sh" in c for c in calls))
         return result, status, calls
 
     def test_normal_completion_preserves_raw_console_and_nonzero_exit(self):
-        source = "import time,sys; print(%r); print(%r); time.sleep(.3); sys.exit(65)" % (START, IDLE)
+        source = ("import time,sys,pathlib\n" + self.wait_for_markers("stream.pid")
+                  + "print(%r); print(%r); time.sleep(.3); sys.exit(65)" % (START, IDLE))
         result, status, calls = self.invoke(source)
         self.assertEqual(result.returncode, 65)
         self.assertEqual(status["commandExitCode"], 65)
@@ -217,25 +270,52 @@ class WrapperSubprocessTests(unittest.TestCase):
         self.assertEqual((status["animationIdle"]["requests"], status["animationIdle"]["unanswered"]), (0, []))
         self.assertFalse(any(c[0] == "sample" for c in calls))
 
+    def test_native_log_timeout_does_not_stop_wrapped_command(self):
+        result, status, calls = self.invoke(
+            "import os,time,sys,pathlib\n" + self.wait_for_markers("stream.pid", "stream-expired")
+            + self.wait_for_process_exits("stream.pid")
+            + "print('continued after log expiry'); sys.exit(7)",
+            ["--log-seconds", "1"], expect_native_expiry=True)
+        self.assertEqual(status["simulatorLog"]["nativeLogTimeoutSeconds"], 1)
+        self.assertEqual((result.returncode, status["commandExitCode"]), (7, 7))
+        self.assertIn(b"continued after log expiry", result.stdout)
+        stream = next(c for c in calls if c[0] == "xcrun" and "stream" in c)
+        self.assertEqual(stream[:6], ["xcrun", "simctl", "spawn", UDID, "log", "stream"])
+
     def test_chunked_lines_long_wait_and_warning_capture_once_without_pausing_command(self):
-        source = ("import sys,time; print(%r); sys.stdout.write(%r); sys.stdout.flush(); "
-                  "time.sleep(.03); print(%r); print(%r); time.sleep(.18); "
-                  "print('[SurroundAnimation] unrelated trace'); time.sleep(.4); print(%r); "
-                  "print('command continued'); sys.exit(0)") % (START, ARM[:19], ARM[19:], IDLE, diagnostics.WARNING)
+        self.environment["FAKE_SAMPLE_WAIT_FOR_CONSOLE"] = "1"
+        source = ("import sys,time,pathlib\n" + self.wait_for_markers("stream.pid")
+                  + ("print(%r); sys.stdout.write(%r); sys.stdout.flush(); "
+                     "time.sleep(.03); print(%r); print(%r); time.sleep(.18); "
+                     "print('[SurroundAnimation] unrelated trace')\n")
+                    % (START, ARM[:19], ARM[19:], IDLE)
+                  + self.wait_for_markers("sample-1110-started", "sample-2220-started")
+                  + "print('command continued', flush=True)\n"
+                  + self.wait_for_markers("sample-1110-done", "sample-2220-done")
+                  + self.wait_for_process_exits("sample-1110-started", "sample-2220-started")
+                  + self.wait_for_markers("screenshot-started", "result/early-capture/simulator.png")
+                  + self.wait_for_process_exits("screenshot-started")
+                  + "print(%r); sys.exit(0)" % diagnostics.WARNING)
         result, status, calls = self.invoke(source)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(status["trigger"]["reason"], "long-idle-wait")
         self.assertEqual(sorted(c[1] for c in calls if c[0] == "sample"), ["1110", "2220"])
         self.assertEqual(sum("screenshot" in c for c in calls), 1)
         self.assertIn(b"command continued", result.stdout)
+        self.assertEqual(status["capture"]["tools"]["app"]["exitCode"], 0)
+        self.assertEqual(status["capture"]["tools"]["runner"]["exitCode"], 0)
+        self.assertEqual(status["capture"]["tools"]["screenshot"]["exitCode"], 0)
+        self.assertEqual((self.output / "early-capture/simulator.png").read_bytes(),
+                         b"fake simulator screenshot")
         self.assertTrue((self.output / "early-capture/app.sample.txt").exists())
 
     def test_capture_failure_does_not_mask_test_failure(self):
         self.environment["FAKE_SAMPLE_FAIL"] = "1"
-        source = ("import time,sys,pathlib; print(%r); print(%r); print(%r); "
-                  "deadline=time.monotonic()+3\n"
-                  "while not pathlib.Path(%r).exists() and time.monotonic()<deadline: time.sleep(.02)\n"
-                  "time.sleep(.1); sys.exit(65)") % (START, ARM, diagnostics.WARNING, str(self.root / "sample-2220-done"))
+        source = ("import time,sys,pathlib\n" + self.wait_for_markers("stream.pid")
+                  + "print(%r); print(%r); print(%r)\n" % (START, ARM, diagnostics.WARNING)
+                  + self.wait_for_markers("sample-1110-done", "sample-2220-done")
+                  + self.wait_for_process_exits("sample-1110-started", "sample-2220-started")
+                  + "sys.exit(65)")
         result, status, _ = self.invoke(source)
         self.assertEqual(result.returncode, 65)
         self.assertEqual(status["trigger"]["reason"], "missing-animation-completion")
@@ -244,13 +324,17 @@ class WrapperSubprocessTests(unittest.TestCase):
 
     def test_hanging_collectors_are_bounded_and_do_not_kill_test(self):
         self.environment["FAKE_SAMPLE_HANG"] = "1"
-        source = "import time,sys; print(%r); print(%r); print(%r); time.sleep(1.2); print('finished'); sys.exit(0)" % (START, ARM, diagnostics.WARNING)
-        result, status, _ = self.invoke(source, ["--capture-timeout", "0.5"])
+        source = ("import sys,pathlib,time\n" + self.wait_for_markers("stream.pid")
+                  + "print(%r); print(%r); print(%r)\n" % (START, ARM, diagnostics.WARNING)
+                  + self.wait_for_markers("sample-1110-started", "sample-2220-started")
+                  + self.wait_for_process_exits("sample-1110-started", "sample-2220-started")
+                  + "print('finished'); sys.exit(0)")
+        result, status, _ = self.invoke(source, ["--capture-timeout", "1"])
         self.assertEqual(result.returncode, 0)
         self.assertEqual(status["capture"]["tools"]["app"]["error"], "collector timeout")
         self.assertIn(b"finished", result.stdout)
 
-    def test_sigterm_cleans_owned_stream_and_preserves_signal_status(self):
+    def test_sigterm_cleans_owned_host_collector_and_preserves_signal_status(self):
         source = "import time; print(%r); time.sleep(60)" % START
         process = subprocess.Popen(self.command(source), env=self.environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -270,10 +354,111 @@ class WrapperSubprocessTests(unittest.TestCase):
                 process.kill()
                 process.communicate()
 
+    def test_sigterm_during_wrapped_popen_reaches_exact_child_once(self):
+        completed = self.root / "wrapped-completed"
+        source = "import pathlib,time; time.sleep(2); pathlib.Path(%r).touch()" % str(completed)
+        args = type("Args", (), {"simulator": UDID, "output": str(self.output), "stall_seconds": 15,
+                                  "command": [sys.executable, "-u", "-c", source]})()
+        real_popen = subprocess.Popen
+        children = []
+        forwarded = []
+
+        def interrupt_before_assignment(*command, **kwargs):
+            child = real_popen(*command, **kwargs)
+            children.append(child)
+            real_send_signal = child.send_signal
+
+            def record_signal(signum):
+                forwarded.append((child.pid, signum))
+                return real_send_signal(signum)
+
+            child.send_signal = record_signal
+            os.kill(os.getpid(), signal.SIGTERM)
+            return child
+
+        try:
+            with mock.patch.object(diagnostics, "log_stream", return_value={"stopped": "synthetic"}), \
+                    mock.patch.object(diagnostics.subprocess, "Popen", side_effect=interrupt_before_assignment):
+                wrapper_code = diagnostics.run(args)
+        finally:
+            for child in children:
+                if child.poll() is None:
+                    child.kill()
+                    child.wait(timeout=2)
+
+        self.assertEqual(len(children), 1)
+        self.assertEqual(wrapper_code, 143)
+        self.assertEqual(forwarded, [(children[0].pid, signal.SIGTERM)])
+        self.assertEqual(children[0].returncode, -signal.SIGTERM)
+        status = json.loads((self.output / "status.json").read_text())
+        self.assertEqual(status["signal"], signal.SIGTERM)
+        self.assertEqual(status["commandExitCode"], -signal.SIGTERM)
+        self.assertFalse(completed.exists())
+
+    def test_sigterm_reaches_child_before_blocked_wrapper_stdout_is_drained(self):
+        ready = self.root / "wrapped-ready"
+        signalled = self.root / "wrapped-signalled"
+        finished_writing = self.root / "wrapped-finished-writing"
+        source = ("import os,pathlib,signal,time\n" + self.wait_for_markers("stream.pid")
+                  + "def end(signum, frame):\n"
+                  + "    pathlib.Path(%r).touch()\n" % str(signalled)
+                  + "    os._exit(143)\n"
+                  + "signal.signal(signal.SIGTERM, end)\n"
+                  + "ready=pathlib.Path(%r)\n" % str(ready)
+                  + "temporary=ready.with_name(ready.name+'.tmp')\n"
+                  + "temporary.write_text(str(os.getpid()))\n"
+                  + "os.replace(temporary, ready)\n"
+                  + "remaining=1024*1024\n"
+                  + "while remaining:\n"
+                  + "    remaining-=os.write(1, b'x'*min(65536,remaining))\n"
+                  + "pathlib.Path(%r).touch()\n" % str(finished_writing)
+                  + "time.sleep(60)\n")
+        process = subprocess.Popen(self.command(source), env=self.environment,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            console = self.output / "console.log"
+            deadline = time.monotonic() + 4
+            previous_size = -1
+            stable_since = None
+            blocked = False
+            while time.monotonic() < deadline:
+                size = console.stat().st_size if console.exists() else 0
+                if ready.exists() and 0 < size < 1024 * 1024 and not finished_writing.exists():
+                    stable_since = stable_since if size == previous_size else time.monotonic()
+                    if time.monotonic() - stable_since >= .2:
+                        blocked = True
+                        break
+                previous_size = size
+                time.sleep(.02)
+            self.assertTrue(blocked, "wrapped output did not block the unread wrapper stdout")
+
+            process.send_signal(signal.SIGTERM)
+            deadline = time.monotonic() + 1.5
+            while not signalled.exists() and time.monotonic() < deadline:
+                time.sleep(.02)
+            delivered_before_drain = signalled.exists()
+            stdout, _ = process.communicate(timeout=5)
+            status = json.loads((self.output / "status.json").read_text())
+            self.assertTrue(delivered_before_drain, "wrapped child received SIGTERM only after stdout drain")
+            self.assertFalse(finished_writing.exists())
+            self.assertTrue(stdout)
+            self.assertEqual(process.returncode, 143)
+            self.assertEqual(status["signal"], signal.SIGTERM)
+            self.assertEqual(status["commandExitCode"], 143)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.communicate(timeout=5)
+                if ready.exists():
+                    try:
+                        os.kill(int(ready.read_text()), signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+
     def test_inherited_stdout_is_drained_for_a_bounded_time(self):
         child_pid = self.root / "inherited-stdout.pid"
-        source = ("import subprocess,sys,pathlib,time; "
-                  "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+        source = ("import subprocess,sys,pathlib,time\n" + self.wait_for_markers("stream.pid")
+                  + "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
                   "pathlib.Path(%r).write_text(str(p.pid)); print('parent exiting'); time.sleep(.2); sys.exit(7)") % str(child_pid)
         try:
             result, status, _ = self.invoke(source)
