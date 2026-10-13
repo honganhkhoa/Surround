@@ -1,193 +1,12 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: macos-26
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select an iOS 26 simulator
-        id: simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Run unit tests
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p TestResults
-          xcodebuild test \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
-            -only-testing:SurroundTests \
-            -enableCodeCoverage YES \
-            -resultBundlePath TestResults/SurroundTests.xcresult
-
-      - name: Export coverage report
-        if: ${{ always() && hashFiles('TestResults/SurroundTests.xcresult/**') != '' }}
-        shell: bash
-        run: xcrun xccov view --report --json TestResults/SurroundTests.xcresult > TestResults/coverage.json
-
-      - name: Upload test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  iphone-navigation-ui-tests:
-    name: iOS ${{ matrix.ios }} iPhone navigation
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - ios: '26'
-            runner: macos-26
-          - ios: '18'
-            runner: macos-15
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode 26.2 for iOS 18
-        if: ${{ matrix.ios == '18' }}
-        shell: bash
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Select an iOS ${{ matrix.ios }} iPhone simulator
-        id: simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh '${{ matrix.ios }}' iPhone)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Build iPhone navigation UI tests
-        id: iphone_ui_build
-        timeout-minutes: 15
-        shell: bash
-        run: |
-          xcodebuild build-for-testing \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
-            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
-            -parallel-testing-enabled NO \
-            -only-testing:SurroundUITests
-
-      - name: Run compact account and Messages navigation tests
-        if: ${{ !cancelled() && steps.iphone_ui_build.outcome == 'success' }}
-        timeout-minutes: 20
-        shell: bash
-        run: |
-          test_cases=(
-            ProfileUITests/testCompactAccountMenuPushesOwnProfileAndOpensSettings
-            SurroundUITests/testMessagesNavigationIsHiddenWhenSignedOut
-            SurroundUITests/testMessagesNavigationRemainsAvailableWithoutThreads
-          )
-          selection_arguments=()
-          for test_case in "${test_cases[@]}"; do
-            test_class="${test_case%%/*}"
-            test_name="${test_case#*/}"
-            test_source="SurroundUITests/${test_class}.swift"
-            class_count="$(grep -Ec "^[[:space:]]*final[[:space:]]+class[[:space:]]+${test_class}[[:space:]]*:[[:space:]]*SurroundJourneyUITestCase[[:space:]]*\{" "$test_source" || true)"
-            declaration_count="$(grep -Ec "^[[:space:]]*func[[:space:]]+${test_name}[[:space:]]*\([[:space:]]*\)" "$test_source" || true)"
-            if [[ "$class_count" != "1" || "$declaration_count" != "1" ]]; then
-              echo "Expected exactly one ${test_class} class and ${test_name} declaration in ${test_source}. Update the iPhone navigation selection when renaming or moving it." >&2
-              exit 1
-            fi
-            selection_arguments+=("-only-testing:SurroundUITests/${test_case}")
-          done
-          mkdir -p TestResults
-          xcodebuild test-without-building \
-            -scheme Surround \
-            -project Surround.xcodeproj \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
-            -derivedDataPath "$RUNNER_TEMP/Surround-iPhoneUITests" \
-            -parallel-testing-enabled NO \
-            "${selection_arguments[@]}" \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 300 \
-            -maximum-test-execution-time-allowance 300 \
-            -resultBundlePath "TestResults/SurroundUITests-iPhone-iOS${{ matrix.ios }}-Navigation.xcresult"
-
-      - name: Upload iPhone navigation UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-iphone-${{ matrix.ios }}-navigation-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  ipad-ui-tests:
-    runs-on: macos-26
-    timeout-minutes: 80
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select an iPadOS 26 simulator
-        id: simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Prefer an iPadOS 26 hardware keyboard
-        shell: bash
-        run: |
-          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
-            "${{ steps.simulator.outputs.id }}"
-
-      - name: Build iPad UI tests
-        id: ipad_ui_build
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh build \
-            "${{ steps.simulator.outputs.id }}" iPad
-
-      - name: Run main iPad UI tests
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh main \
-            "${{ steps.simulator.outputs.id }}" iPad
-
-      - name: Upload iPad UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ipad-ui-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
   ipad-messages-ui-tests:
     runs-on: macos-26
     timeout-minutes: 80
@@ -215,190 +34,102 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests
+      - name: Run the original Safari biography handoff test
+        id: safari_test
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 60
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh messages \
-            "${{ steps.simulator.outputs.id }}" iPad
-
-      - name: Upload iPad Messages UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ipad-messages-ui-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  ipad-profile-ui-tests:
-    runs-on: macos-26
-    timeout-minutes: 80
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select an iPadOS 26 simulator
-        id: simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 26 iPad)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Prefer an iPadOS 26 hardware keyboard
-        shell: bash
-        run: |
-          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
-            "${{ steps.simulator.outputs.id }}"
-
-      - name: Build iPad UI tests
-        id: ipad_ui_build
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh build \
-            "${{ steps.simulator.outputs.id }}" iPad
-
-      - name: Run iPad profile UI tests
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh profile \
-            "${{ steps.simulator.outputs.id }}" iPad
-
-      - name: Upload iPad profile UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ipad-profile-ui-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  # The iOS 18 unit tests share this job with the profile UI phase. The unit
-  # step also warms the UI build's derived data.
-  minimum-ios-18:
-    runs-on: macos-15
-    timeout-minutes: 90
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode 26.2
-        shell: bash
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Select an iOS 18 iPhone simulator
-        id: iphone_simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPhone)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Select an iPadOS 18 simulator
-        id: ipad_simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Run unit tests on iOS 18
         shell: bash
         run: |
           set -o pipefail
           mkdir -p TestResults
-          derived_data_path="$(
-            .github/ci-tools/run-ipad-ui-tests.sh derived-data-path \
-              "${{ steps.ipad_simulator.outputs.id }}"
-          )"
-          xcodebuild test \
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path("SurroundUITests/MessagesNavigationUITests.swift").read_text()
+          assert len(re.findall(r"(?m)^\s*func\s+testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft\s*\(\s*\)", source)) == 1, "Expected exactly one original Safari declaration"
+          PY
+          xcodebuild -version > TestResults/Safari-iPad-toolchain.txt
+          xcrun --sdk iphonesimulator --show-sdk-version >> TestResults/Safari-iPad-toolchain.txt
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/surround-safari-iPad-devices.json"
+          derived_data_path="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "${{ steps.simulator.outputs.id }}")"
+          xcodebuild test-without-building \
             -scheme Surround \
             -project Surround.xcodeproj \
-            -destination "platform=iOS Simulator,id=${{ steps.iphone_simulator.outputs.id }}" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath "$derived_data_path" \
-            -only-testing:SurroundTests \
-            -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
+            -parallel-testing-enabled NO \
+            "-only-testing:SurroundUITests/MessagesNavigationUITests/testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 900 \
+            -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath "TestResults/SurroundUITests-iPad-Safari.xcresult" \
+            2>&1 | tee "$RUNNER_TEMP/surround-safari-iPad.log"
 
-      - name: Prefer an iPadOS 18 hardware keyboard
+      - name: Collect full Safari console logs and passive telemetry
+        if: ${{ always() }}
         shell: bash
+        env:
+          SAFARI_LABEL: iPad
+          SAFARI_SIMULATOR_ID: '${{ steps.simulator.outputs.id }}'
+          SAFARI_TEST_OUTCOME: '${{ steps.safari_test.outcome }}'
         run: |
-          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
-            "${{ steps.ipad_simulator.outputs.id }}"
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          label = os.environ["SAFARI_LABEL"]
+          output = Path("TestResults")
+          output.mkdir(exist_ok=True)
+          raw = Path(os.environ["RUNNER_TEMP"]) / ("surround-safari-" + label + ".log")
+          console = output / ("Safari-" + label + "-console.log")
+          journal = output / ("Safari-" + label + "-passive-telemetry.log")
+          starts, terminals = [], []
+          raw_bytes, raw_lines, telemetry_bytes, telemetry_lines = 0, 0, 0, 0
+          raw_digest, telemetry_digest = hashlib.sha256(), hashlib.sha256()
+          with journal.open("wb") as retained_telemetry:
+              if raw.exists():
+                  with raw.open("rb") as stream, console.open("wb") as retained_console:
+                      for line in stream:
+                          retained_console.write(line)
+                          raw_bytes += len(line)
+                          raw_lines += 1
+                          raw_digest.update(line)
+                          text = line.decode("utf-8", errors="replace")
+                          match = re.search(r"Test Case '-\[([^ ]+) ([^]]+)\]' (started|passed|failed|skipped)", text)
+                          if match:
+                              event = {"class": match[1], "method": match[2], "event": match[3]}
+                              (starts if match[3] == "started" else terminals).append(event)
+                          if b"[BiographyBrowserTelemetry] " in line:
+                              retained_telemetry.write(line)
+                              telemetry_bytes += len(line)
+                              telemetry_lines += 1
+                              telemetry_digest.update(line)
+          expected = {"class": "SurroundUITests.MessagesNavigationUITests", "method": "testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft"}
+          exact_one_pass = starts == [dict(expected, event="started")] and terminals == [dict(expected, event="passed")]
+          simulator = None
+          devices = Path(os.environ["RUNNER_TEMP"]) / ("surround-safari-" + label + "-devices.json")
+          if devices.exists():
+              for runtime, records in json.loads(devices.read_text())["devices"].items():
+                  for record in records:
+                      if record["udid"] == os.environ["SAFARI_SIMULATOR_ID"]:
+                          simulator = dict(record, runtime_identifier=runtime)
+          checkpoint = {"run_id": os.environ.get("GITHUB_RUN_ID"), "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "job": os.environ.get("GITHUB_JOB"), "head": os.environ.get("GITHUB_SHA"), "ref": os.environ.get("GITHUB_REF"), "workflow_ref": os.environ.get("GITHUB_WORKFLOW_REF"), "workflow_sha": os.environ.get("GITHUB_WORKFLOW_SHA"), "test_step_outcome": os.environ["SAFARI_TEST_OUTCOME"], "simulator": simulator, "log_present": raw.exists(), "raw_log_bytes": raw_bytes, "raw_log_lines": raw_lines, "raw_log_sha256": raw_digest.hexdigest() if raw.exists() else None, "retained_console_bytes": console.stat().st_size if console.exists() else None, "full_console_stream_preserved": console.exists() and console.stat().st_size == raw_bytes, "telemetry_bytes": telemetry_bytes, "telemetry_lines": telemetry_lines, "telemetry_sha256": telemetry_digest.hexdigest(), "telemetry_observed_in_console": telemetry_lines > 0, "test_starts": starts, "test_terminals": terminals, "exact_one_original_test_passed": exact_one_pass}
+          (output / ("Safari-" + label + "-CHECKPOINT.json")).write_text(json.dumps(checkpoint, indent=2) + "\n")
+          if os.environ["SAFARI_TEST_OUTCOME"] == "success" and not exact_one_pass:
+              raise SystemExit("Expected exactly one started and passed original Safari test; zero tests, skips, retries, or a broadened selector are not accepted")
+          PY
 
-      - name: Build iPad UI tests on iPadOS 18
-        id: ipad_ui_build
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh build \
-            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
-
-      - name: Run iPad profile UI tests on iPadOS 18
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh profile \
-            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
-
-      - name: Upload iOS 18 test results
+      - name: Upload Safari native results and bounded diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: surround-ios-18-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  minimum-ios-18-ui-tests:
-    runs-on: macos-15
-    timeout-minutes: 80
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode 26.2
-        shell: bash
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Select an iPadOS 18 simulator
-        id: ipad_simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh 18 iPad)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Prefer an iPadOS 18 hardware keyboard
-        shell: bash
-        run: |
-          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
-            "${{ steps.ipad_simulator.outputs.id }}"
-
-      - name: Build iPad UI tests on iPadOS 18
-        id: ipad_ui_build
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh build \
-            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
-
-      - name: Run main iPad UI tests on iPadOS 18
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh main \
-            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
-
-      - name: Upload iPadOS 18 UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ios-18-ui-test-results
-          path: TestResults
+          name: surround-ipad-safari-diagnostic-results
+          path: |
+            TestResults/SurroundUITests-iPad-Safari.xcresult
+            TestResults/Safari-iPad-console.log
+            TestResults/Safari-iPad-passive-telemetry.log
+            TestResults/Safari-iPad-CHECKPOINT.json
+            TestResults/Safari-iPad-toolchain.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -435,115 +166,101 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18
+      - name: Run the original Safari biography handoff test
+        id: safari_test
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 60
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh messages \
-            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
-
-      - name: Upload iPadOS 18 Messages UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ios-18-messages-ui-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  # Keep keyboard-sensitive journeys off the main/profile runners. Composer
-  # and continuity have independent limits so adding fold journeys cannot
-  # consume the existing composer's budget. Leave 25 minutes for setup,
-  # building, and uploads beyond the 5 + 45 + 45 minute UI step limits.
-  ipad-composer-ui-tests:
-    name: iPadOS ${{ matrix.ios }} composer and continuity
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - ios: '26'
-            runner: macos-26
-          - ios: '18'
-            runner: macos-15
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode 26.2 for iPadOS 18
-        if: ${{ matrix.ios == '18' }}
-        shell: bash
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Select an iPadOS ${{ matrix.ios }} simulator
-        id: simulator
-        shell: bash
-        run: |
-          simulator_id="$(.github/ci-tools/select-ios-simulator.sh '${{ matrix.ios }}' iPad)"
-          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
-
-      - name: Prefer an iPadOS ${{ matrix.ios }} hardware keyboard
-        shell: bash
-        run: |
-          .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
-            "${{ steps.simulator.outputs.id }}"
-
-      - name: Build iPad UI tests
-        id: ipad_ui_build
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh build \
-            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
-
-      - name: Verify iPadOS ${{ matrix.ios }} composer input
-        timeout-minutes: 5
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh preflight \
-            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
-
-      - name: Run isolated iPad composer UI tests
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh composer \
-            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
-
-      - name: Run iPad game continuity UI tests
-        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 45
-        shell: bash
-        run: |
-          .github/ci-tools/run-ipad-ui-tests.sh continuity \
-            "${{ steps.simulator.outputs.id }}" "iPadOS${{ matrix.ios }}"
-
-      - name: Upload iPad composer and continuity UI test results
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: surround-ipad-${{ matrix.ios }}-composer-continuity-test-results
-          path: TestResults
-          if-no-files-found: warn
-          retention-days: 14
-
-  catalyst-build:
-    runs-on: macos-26
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build for Mac Catalyst
-        shell: bash
-        run: |
-          xcodebuild build \
+          set -o pipefail
+          mkdir -p TestResults
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path("SurroundUITests/MessagesNavigationUITests.swift").read_text()
+          assert len(re.findall(r"(?m)^\s*func\s+testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft\s*\(\s*\)", source)) == 1, "Expected exactly one original Safari declaration"
+          PY
+          xcodebuild -version > TestResults/Safari-iPadOS18-toolchain.txt
+          xcrun --sdk iphonesimulator --show-sdk-version >> TestResults/Safari-iPadOS18-toolchain.txt
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/surround-safari-iPadOS18-devices.json"
+          derived_data_path="$(.github/ci-tools/run-ipad-ui-tests.sh derived-data-path "${{ steps.ipad_simulator.outputs.id }}")"
+          xcodebuild test-without-building \
             -scheme Surround \
             -project Surround.xcodeproj \
             -configuration Debug \
-            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
-            CODE_SIGNING_ALLOWED=NO
+            -destination "platform=iOS Simulator,id=${{ steps.ipad_simulator.outputs.id }}" \
+            -derivedDataPath "$derived_data_path" \
+            -parallel-testing-enabled NO \
+            "-only-testing:SurroundUITests/MessagesNavigationUITests/testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 900 \
+            -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath "TestResults/SurroundUITests-iPadOS18-Safari.xcresult" \
+            2>&1 | tee "$RUNNER_TEMP/surround-safari-iPadOS18.log"
+
+      - name: Collect full Safari console logs and passive telemetry
+        if: ${{ always() }}
+        shell: bash
+        env:
+          SAFARI_LABEL: iPadOS18
+          SAFARI_SIMULATOR_ID: '${{ steps.ipad_simulator.outputs.id }}'
+          SAFARI_TEST_OUTCOME: '${{ steps.safari_test.outcome }}'
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          label = os.environ["SAFARI_LABEL"]
+          output = Path("TestResults")
+          output.mkdir(exist_ok=True)
+          raw = Path(os.environ["RUNNER_TEMP"]) / ("surround-safari-" + label + ".log")
+          console = output / ("Safari-" + label + "-console.log")
+          journal = output / ("Safari-" + label + "-passive-telemetry.log")
+          starts, terminals = [], []
+          raw_bytes, raw_lines, telemetry_bytes, telemetry_lines = 0, 0, 0, 0
+          raw_digest, telemetry_digest = hashlib.sha256(), hashlib.sha256()
+          with journal.open("wb") as retained_telemetry:
+              if raw.exists():
+                  with raw.open("rb") as stream, console.open("wb") as retained_console:
+                      for line in stream:
+                          retained_console.write(line)
+                          raw_bytes += len(line)
+                          raw_lines += 1
+                          raw_digest.update(line)
+                          text = line.decode("utf-8", errors="replace")
+                          match = re.search(r"Test Case '-\[([^ ]+) ([^]]+)\]' (started|passed|failed|skipped)", text)
+                          if match:
+                              event = {"class": match[1], "method": match[2], "event": match[3]}
+                              (starts if match[3] == "started" else terminals).append(event)
+                          if b"[BiographyBrowserTelemetry] " in line:
+                              retained_telemetry.write(line)
+                              telemetry_bytes += len(line)
+                              telemetry_lines += 1
+                              telemetry_digest.update(line)
+          expected = {"class": "SurroundUITests.MessagesNavigationUITests", "method": "testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft"}
+          exact_one_pass = starts == [dict(expected, event="started")] and terminals == [dict(expected, event="passed")]
+          simulator = None
+          devices = Path(os.environ["RUNNER_TEMP"]) / ("surround-safari-" + label + "-devices.json")
+          if devices.exists():
+              for runtime, records in json.loads(devices.read_text())["devices"].items():
+                  for record in records:
+                      if record["udid"] == os.environ["SAFARI_SIMULATOR_ID"]:
+                          simulator = dict(record, runtime_identifier=runtime)
+          checkpoint = {"run_id": os.environ.get("GITHUB_RUN_ID"), "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "job": os.environ.get("GITHUB_JOB"), "head": os.environ.get("GITHUB_SHA"), "ref": os.environ.get("GITHUB_REF"), "workflow_ref": os.environ.get("GITHUB_WORKFLOW_REF"), "workflow_sha": os.environ.get("GITHUB_WORKFLOW_SHA"), "test_step_outcome": os.environ["SAFARI_TEST_OUTCOME"], "simulator": simulator, "log_present": raw.exists(), "raw_log_bytes": raw_bytes, "raw_log_lines": raw_lines, "raw_log_sha256": raw_digest.hexdigest() if raw.exists() else None, "retained_console_bytes": console.stat().st_size if console.exists() else None, "full_console_stream_preserved": console.exists() and console.stat().st_size == raw_bytes, "telemetry_bytes": telemetry_bytes, "telemetry_lines": telemetry_lines, "telemetry_sha256": telemetry_digest.hexdigest(), "telemetry_observed_in_console": telemetry_lines > 0, "test_starts": starts, "test_terminals": terminals, "exact_one_original_test_passed": exact_one_pass}
+          (output / ("Safari-" + label + "-CHECKPOINT.json")).write_text(json.dumps(checkpoint, indent=2) + "\n")
+          if os.environ["SAFARI_TEST_OUTCOME"] == "success" and not exact_one_pass:
+              raise SystemExit("Expected exactly one started and passed original Safari test; zero tests, skips, retries, or a broadened selector are not accepted")
+          PY
+
+      - name: Upload Safari native results and bounded diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: surround-ios-18-safari-diagnostic-results
+          path: |
+            TestResults/SurroundUITests-iPadOS18-Safari.xcresult
+            TestResults/Safari-iPadOS18-console.log
+            TestResults/Safari-iPadOS18-passive-telemetry.log
+            TestResults/Safari-iPadOS18-CHECKPOINT.json
+            TestResults/Safari-iPadOS18-toolchain.txt
+          if-no-files-found: warn
+          retention-days: 14

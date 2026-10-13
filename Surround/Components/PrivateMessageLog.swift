@@ -385,6 +385,13 @@ private struct PrivateMessageTranscript: View {
         .onAppear {
             isVisible = true
             publishRetainedPosition()
+            // A recreated transcript can start at the top despite its initial
+            // saved ID. Apply the older reading position when it appears.
+            if isPresented, !atEndOfChat, !bookmark.isAtEndOfChat,
+               !Self.isUserScrolling(scrollPhase), let key = bookmark.messageKey,
+               messages.contains(where: { $0.messageKey == key }) {
+                scrollPosition.scrollTo(id: key, anchor: .center)
+            }
             scrollToLatestMessageIfFollowing()
             ogs.setUpNewPeerIfNecessary(peerId: peerID)
             markThreadAsRead()

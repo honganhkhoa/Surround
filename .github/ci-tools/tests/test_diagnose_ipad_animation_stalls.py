@@ -142,15 +142,18 @@ name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with (root / "calls.jsonl").open("a") as f:
     f.write(json.dumps([name] + args) + "\n")
-if name == "xcrun" and "/bin/sh" in args:
+if name == "xcrun" and args[:2] == ["simctl", "spawn"] and args[3:5] == ["log", "stream"]:
+    seconds = int(args[args.index("--timeout") + 1])
+    assert seconds > 0
     (root / "stream.pid").write_text(str(os.getpid()))
     def end(signum, frame):
         (root / "stream-stopped").write_text(str(signum))
         sys.exit(0)
     signal.signal(signal.SIGTERM, end)
-    print("SurroundAnimationCollectorPID=" + str(os.getpid()), flush=True)
-    while True:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
         time.sleep(0.05)
+    (root / "stream-expired").touch()
 elif name == "xcrun" and args[-2:] == ["launchctl", "list"]:
     print("1110 0 UIKitApplication:com.honganhkhoa.Surround[abc][rb-legacy]")
     print("2220 0 UIKitApplication:com.honganhkhoa.SurroundUITests.xctrunner[def]")
@@ -200,12 +203,15 @@ class WrapperSubprocessTests(unittest.TestCase):
                                 capture_output=True, timeout=8)
         status = json.loads((self.output / "status.json").read_text())
         calls = [json.loads(x) for x in (self.root / "calls.jsonl").read_text().splitlines()]
-        self.assertTrue((self.root / "stream-stopped").exists())
+        self.assertTrue((self.root / "stream-stopped").exists() or (self.root / "stream-expired").exists())
         for call in calls:
             if call[0] == "xcrun":
                 self.assertIn(UDID, call)
                 self.assertNotIn("booted", call)
         self.assertEqual((self.output / "console.log").read_bytes(), result.stdout)
+        self.assertIsNone(status["simulatorLog"]["guestPID"])
+        self.assertEqual(status["simulatorLog"]["guestCleanup"], "not-signalled-native-timeout")
+        self.assertFalse(any(c[0] == "ps" or "/bin/sh" in c for c in calls))
         return result, status, calls
 
     def test_normal_completion_preserves_raw_console_and_nonzero_exit(self):
@@ -216,6 +222,17 @@ class WrapperSubprocessTests(unittest.TestCase):
         self.assertIsNone(status["capture"])
         self.assertEqual((status["animationIdle"]["requests"], status["animationIdle"]["unanswered"]), (0, []))
         self.assertFalse(any(c[0] == "sample" for c in calls))
+
+    def test_native_log_timeout_does_not_stop_wrapped_command(self):
+        result, status, calls = self.invoke(
+            "import time,sys; time.sleep(1.3); print('continued after log expiry'); sys.exit(7)",
+            ["--log-seconds", "1"])
+        self.assertTrue((self.root / "stream-expired").exists())
+        self.assertEqual(status["simulatorLog"]["nativeLogTimeoutSeconds"], 1)
+        self.assertEqual((result.returncode, status["commandExitCode"]), (7, 7))
+        self.assertIn(b"continued after log expiry", result.stdout)
+        stream = next(c for c in calls if c[0] == "xcrun" and "stream" in c)
+        self.assertEqual(stream[:6], ["xcrun", "simctl", "spawn", UDID, "log", "stream"])
 
     def test_chunked_lines_long_wait_and_warning_capture_once_without_pausing_command(self):
         source = ("import sys,time; print(%r); sys.stdout.write(%r); sys.stdout.flush(); "
@@ -250,7 +267,7 @@ class WrapperSubprocessTests(unittest.TestCase):
         self.assertEqual(status["capture"]["tools"]["app"]["error"], "collector timeout")
         self.assertIn(b"finished", result.stdout)
 
-    def test_sigterm_cleans_owned_stream_and_preserves_signal_status(self):
+    def test_sigterm_cleans_owned_host_collector_and_preserves_signal_status(self):
         source = "import time; print(%r); time.sleep(60)" % START
         process = subprocess.Popen(self.command(source), env=self.environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:

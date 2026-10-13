@@ -426,8 +426,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                           composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
                 } else if requiresKeyboardAbsent && keyboard.exists { return false }
                 guard latest.exists, latest.isHittable else { return false }
-                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
                 let latestFrame = latest.frame
+                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
                 return !viewport.isEmpty && !viewport.isNull && !latestFrame.isEmpty && !latestFrame.isNull
                     && viewport.contains(latestFrame)
             }
@@ -2382,11 +2382,28 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             format: "label == %@",
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
-        for _ in 0..<8 {
+        var attempt = 0
+        var gestureBudget: CGFloat = 8
+        while CGFloat(attempt) < gestureBudget {
             let viewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
             if marker.exists && viewport.contains(marker.frame) && marker.isHittable { break }
-            dragMessagesViewport(viewport, toward: marker.exists ? marker.frame : nil,
+            let before = marker.exists ? marker.frame : nil
+            dragMessagesViewport(viewport, toward: before,
                                  earlierWhenAbsent: true, in: app)
+            attempt += 1
+            if attempt == 1, let before, marker.exists {
+                let after = marker.frame
+                let direction: CGFloat = viewport.midY > before.midY ? 1 : -1
+                let travel = (after.midY - before.midY) * direction
+                guard travel.isFinite, travel > 0 else { break }
+                let currentViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
+                let remaining = abs(currentViewport.midY - after.midY)
+                guard remaining.isFinite else { break }
+                // Keyboard height changes the available travel. Measure the
+                // first gesture, then allow its distance plus one correction.
+                gestureBudget = 1 + ceil(remaining / travel) + 1
+                guard gestureBudget.isFinite else { break }
+            }
         }
         XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer, within: pane.frame, in: app).contains(marker.frame) && marker.isHittable,
                       "The older message seed must be fully inside the transcript viewport before navigation.")
