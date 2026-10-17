@@ -26,7 +26,6 @@ struct GameDetailView: View {
     
     @State var showSettings = false
     @State private var showsActiveGames = false
-    @State private var compactBottomBarWasVisible = false
     @State var attachedKeyboardVisible = false
     @State var zenMode = false
     @State var interaction = GameDetailInteraction()
@@ -124,7 +123,38 @@ struct GameDetailView: View {
         false
         #endif
     }
-    
+
+    /// The window's own bottom inset (the home indicator), without the bars
+    /// that the tab bar and navigation controllers add to this view.
+    private var windowBottomSafeAreaInset: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
+    }
+
+    /// Whether the compact layout has room for the bottom Active games bar.
+    ///
+    /// A bottom toolbar or tab bar moves its height from this view into its
+    /// bottom safe-area inset, so `height + bottomSafeAreaInset` does not
+    /// change as either appears. Measuring from that sum keeps the decision
+    /// the same with or without the bar. Deciding from `height` alone
+    /// flipped on every pass when UIKit laid out repeatedly inside
+    /// `setTabBarHidden(_:animated:)`, before an `onChange` could record the
+    /// previous decision, which froze the app on smaller iPhones.
+    static func hasRoomForCompactBottomBar(
+        height: CGFloat,
+        bottomSafeAreaInset: CGFloat,
+        windowBottomSafeAreaInset: CGFloat,
+        boardSize: CGFloat,
+        fixedContentHeight: CGFloat
+    ) -> Bool {
+        let heightWithoutBottomBars = height + bottomSafeAreaInset
+            - windowBottomSafeAreaInset
+        return heightWithoutBottomBars - boardSize - fixedContentHeight >= 70
+    }
+
     func updateDetailOfCurrentGameIfNecessary() {
         guard let requestedGame = currentGame, requestedGame.ogsID != nil else {
             detailConnection.release()
@@ -280,11 +310,13 @@ struct GameDetailView: View {
         let remainingHeight = geometry.size.height
             - min(geometry.size.width, geometry.size.height)
             - controlRowHeight - playerInfoHeight - 20
-        // Decide during layout, including the first pass. Remember only whether
-        // the previous pass already reserved the horizontal bar's height;
-        // this hysteresis avoids toggling as the bar consumes/releases space.
-        let hasRoomForActiveGamesButton = remainingHeight
-            >= (compactBottomBarWasVisible ? 0 : 70)
+        let hasRoomForActiveGamesButton = Self.hasRoomForCompactBottomBar(
+            height: geometry.size.height,
+            bottomSafeAreaInset: geometry.safeAreaInsets.bottom,
+            windowBottomSafeAreaInset: windowBottomSafeAreaInset,
+            boardSize: min(geometry.size.width, geometry.size.height),
+            fixedContentHeight: controlRowHeight + playerInfoHeight + 20
+        )
         let showsActiveGamesButton = canShowActiveGames
             && (placesActiveGamesAtTop || !compactLayout
                 || isVerticalToolbar || hasRoomForActiveGamesButton)
@@ -337,9 +369,6 @@ struct GameDetailView: View {
             reserveCompactBottomBarClearance: reserveCompactBottomBarClearance
         )
         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-        .onChange(of: showsCompactBottomBar, initial: true) { _, isVisible in
-            compactBottomBarWasVisible = isVisible
-        }
         .onChange(of: showsActiveGamesButton) { _, isVisible in
             if !isVisible { showsActiveGames = false }
         }
