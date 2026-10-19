@@ -2,7 +2,7 @@
 //  GameContinuityUITests.swift
 //  SurroundUITests
 //
-//  Keep the game route alive while replacing its compact/regular descendants.
+//  Keep game state alive while the same route adapts between compact/regular layouts.
 //  These tests run in the composer phase because some transitions own focus.
 //
 
@@ -67,14 +67,19 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             of: element(GameLayoutUITestContract.current, in: app),
             file: file, line: line
         )
-        let picker = app.segmentedControls[ID.gameDisplayModePicker]
-        let changed = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == %@", NSNumber(value: compact)),
-            object: picker
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [changed], timeout: 10), .completed,
-            "Expected the actual game subtree to adopt the requested layout.",
+        if app.buttons[ID.gameZenExit].exists {
+            XCTAssertFalse(gameAnalyzeControl(in: app).exists,
+                           "Zen keeps the native mode controls hidden while adapting.")
+            return
+        }
+        // Native overflow can remove the toolbar toggle from accessibility.
+        // The game content remains the stable owner through the size change.
+        XCTAssertTrue(
+            pollUntil(timeout: 10) {
+                app.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch.exists
+                    || app.scrollViews[ID.gameChatLog].exists
+            },
+            "Expected the retained game content after the requested layout change.",
             file: file, line: line
         )
     }
@@ -102,6 +107,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
     }
 
     private func typeDraft(_ text: String, in app: XCUIApplication) {
+        openGameChat(in: app)
         let input = element(ID.gameChatInput, in: app, matching: .textField)
         if !chatInputHasKeyboardFocus(in: app) {
             tap(input, description: "chat composer", in: app)
@@ -111,6 +117,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
     }
 
     private func selectPersonalChannel(in app: XCUIApplication) {
+        openGameChat(in: app)
         tap(ID.gameChatChannelPicker, in: app)
         tap(
             requiredMenuButton(
@@ -194,30 +201,28 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         assertProperty("value", equals: currentBoard, of: element(ID.gameBoard, in: app))
     }
 
-    func testExplicitAnalyzeExitResetsPositionAndToolInBothLayouts() throws {
+    func testAnalyzeOffAndOnPreservesPositionAndToolInBothLayouts() throws {
         for compact in [false, true] {
             let app = compact ? launchContinuityScene(.activeGameBoard) : launchNativeGame()
             let liveBoard = try boardValue(in: app)
             if compact { changeLayout(toCompact: true, in: app) }
             func setAnalyzing(_ analyzing: Bool) {
-                if compact {
-                    selectSegment(at: analyzing ? 0 : 1, in: ID.gameDisplayModePicker, app: app)
-                } else {
-                    tap(ID.gameAnalyzeToggle, in: app)
-                }
+                setGameAnalyzing(analyzing, in: app)
             }
             setAnalyzing(true)
-            let defaultTool = try XCTUnwrap(element(ID.gameAnalyzeMarkerMenu, in: app).value as? String)
             tap(ID.gameAnalyzePrevious, in: app, matching: .button)
-            XCTAssertNotEqual(try boardValue(in: app), liveBoard)
+            let exploredBoard = try boardValue(in: app)
+            XCTAssertNotEqual(exploredBoard, liveBoard)
             tap(ID.gameAnalyzeMarkerMenu, in: app)
             tap(analyzeMenuItem(ID.gameAnalyzeMarkerTool("letters"), catalystTitle: "Letters", in: app),
                 description: "Letters marker tool", in: app)
 
+            let selectedTool = try XCTUnwrap(element(ID.gameAnalyzeMarkerMenu, in: app).value as? String)
             setAnalyzing(false)
-            setAnalyzing(true)
             assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))
-            assertProperty("value", equals: defaultTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
+            setAnalyzing(true)
+            assertProperty("value", equals: exploredBoard, of: element(ID.gameBoard, in: app))
+            assertProperty("value", equals: selectedTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
             setAnalyzing(false)
             app.terminate()
         }
@@ -281,8 +286,8 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         let app = launchNativeGame()
         let draft = "Keep this draft while concentrating on the board"
         typeDraft(draft, in: app)
-        // The regular layout hides its navigation bar while typing. Follow
-        // the real entry path, then verify Zen does not undo that dismissal.
+        // Dismissing the keyboard is deliberate; entering and leaving Zen
+        // must preserve the draft without restoring keyboard focus.
         dismissSoftwareKeyboardIfNeeded(in: app)
         tap(ID.gameZenEnter, in: app, matching: .button)
         element(ID.gameZenExit, in: app)
@@ -356,44 +361,142 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(channel.value as? String, channelValue)
     }
 
-    func testAnalysisNavigationBecomesActiveAfterTypingInWideChat() throws {
+    func testPanelSwitchesRetainWorkWithoutRestoringHiddenPanelsAcrossLayouts() throws {
         let app = launchContinuityScene(.gameAnalysis)
         let initialBoard = try boardValue(in: app)
         let draft = "Keep this thought while exploring the next move"
         typeDraft(draft, in: app)
         dismissSoftwareKeyboardIfNeeded(in: app)
-
-        // Wide layout supports both tasks. Returning to analysis controls is
-        // the latest explicit intent, even though a chat draft remains alive.
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists)
+        setGameAnalyzing(true, in: app)
+        XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
         tap(ID.gameAnalyzeNext, in: app, matching: .button)
         let exploredBoard = try boardValue(in: app)
         XCTAssertNotEqual(exploredBoard, initialBoard)
+        for compact in [true, false] {
+            changeLayout(toCompact: compact, in: app)
+            assertProperty("value", equals: exploredBoard, of: element(ID.gameBoard, in: app))
+            XCTAssertFalse(app.textFields[ID.gameChatInput].exists,
+                           "Resizing preserves Analyze as the only open panel")
+        }
+        openGameChat(in: app)
+        assertProperty("value", equals: draft, of: element(ID.gameChatInput, in: app, matching: .textField))
+        setGameChatVisible(false, in: app)
+        let liveBoard = try boardValue(in: app)
         changeLayout(toCompact: true, in: app)
-        let analyzeSegment = element(
-            ID.gameDisplayModePicker, in: app, matching: .segmentedControl
-        ).buttons.element(boundBy: 0)
-        XCTAssertTrue(
-            analyzeSegment.isSelected,
-            "Folding should reveal the analysis task most recently used."
-        )
-        element(ID.gameAnalyzeControlBar, in: app)
-        assertProperty(
-            "value", equals: exploredBoard, of: element(ID.gameBoard, in: app)
-        )
-
+        tap(ID.gameZenEnter, in: app, matching: .button)
+        element(ID.gameZenExit, in: app)
         changeLayout(toCompact: false, in: app)
-        assertProperty(
-            "value", equals: draft,
-            of: element(ID.gameChatInput, in: app, matching: .textField)
+        assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))
+        tap(ID.gameZenExit, in: app, matching: .button)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists,
+                       "Exiting Zen preserves Play rather than restoring a hidden panel")
+        XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
+        setGameAnalyzing(true, in: app)
+        assertProperty("value", equals: exploredBoard, of: element(ID.gameBoard, in: app))
+        openGameChat(in: app)
+        assertProperty("value", equals: draft, of: element(ID.gameChatInput, in: app, matching: .textField))
+    }
+
+    func testAnalysisAndExplicitChatRetainWorkAcrossNativeRotation() throws {
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom != .pad,
+            "This journey exercises the two regular iPad arrangements."
         )
-        assertProperty(
-            "value", equals: exploredBoard, of: element(ID.gameBoard, in: app)
+        let app = launchNativeGame()
+        XCTAssertFalse(gameToolbarToggleIsOn(gameAnalyzeControl(in: app)))
+        XCTAssertFalse(gameToolbarToggleIsOn(gameChatControl(in: app)))
+        XCTAssertFalse(app.textFields[ID.gameChatInput].exists,
+                       "Chat starts closed until the user requests it.")
+        setGameAnalyzing(true, in: app)
+        tap(ID.gameAnalyzePrevious, in: app, matching: .button)
+        tap(ID.gameAnalyzeMarkerMenu, in: app)
+        tap(analyzeMenuItem(ID.gameAnalyzeMarkerTool("letters"), catalystTitle: "Letters", in: app),
+            description: "Letters marker tool", in: app)
+        element(ID.gameBoard, in: app)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let markedBoard = try boardValue(in: app)
+        XCTAssertTrue(markedBoard.contains("|marks:A="))
+        let markerTool = try XCTUnwrap(element(ID.gameAnalyzeMarkerMenu, in: app).value as? String)
+
+        XCUIDevice.shared.orientation = .portrait
+        let portrait = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.frame.height > app.frame.width
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [portrait], timeout: 10), .completed)
+        assertProperty("value", equals: markedBoard, of: element(ID.gameBoard, in: app))
+        assertProperty("value", equals: markerTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
+        XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
+
+        let draft = "Keep this marked position while rotating"
+        typeDraft(draft, in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists,
+                       "Chat replaces Analyze while preserving its work")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.frame.width > app.frame.height
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 10), .completed)
+        assertProperty("value", equals: draft, of: element(ID.gameChatInput, in: app, matching: .textField))
+        XCTAssertFalse(chatInputHasKeyboardFocus(in: app))
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists)
+        setGameAnalyzing(true, in: app)
+        assertProperty("value", equals: markedBoard, of: element(ID.gameBoard, in: app))
+        assertProperty("value", equals: markerTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
+        XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
+        openGameChat(in: app)
+        assertProperty("value", equals: draft, of: element(ID.gameChatInput, in: app, matching: .textField))
+    }
+
+    func testPhoneAnalysisAndChatRetainWorkAcrossNativeRotation() throws {
+        try XCTSkipIf(
+            UIDevice.current.userInterfaceIdiom != .phone,
+            "This journey exercises the phone's compact portrait arrangement."
         )
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+        ], orientation: .portrait)
+        tap(ID.gameAnalyzeMarkerMenu, in: app)
+        tap(analyzeMenuItem(ID.gameAnalyzeMarkerTool("letters"), catalystTitle: "Letters", in: app),
+            description: "Letters marker tool", in: app)
+        element(ID.gameBoard, in: app)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let markedBoard = try boardValue(in: app)
+        XCTAssertTrue(markedBoard.contains("|marks:A="))
+        let markerTool = try XCTUnwrap(element(ID.gameAnalyzeMarkerMenu, in: app).value as? String)
+
+        let draft = "Keep this phone draft while rotating"
+        typeDraft(draft, in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) { app.frame.width > app.frame.height })
+        assertProperty("value", equals: draft,
+                       of: element(ID.gameChatInput, in: app, matching: .textField))
+        XCTAssertFalse(chatInputHasKeyboardFocus(in: app))
+        setGameChatVisible(false, in: app)
+        setGameAnalyzing(true, in: app)
+        assertProperty("value", equals: markedBoard, of: element(ID.gameBoard, in: app))
+        assertProperty("value", equals: markerTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
+
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(pollUntil(timeout: 10) { app.frame.height > app.frame.width })
+        assertProperty("value", equals: markedBoard, of: element(ID.gameBoard, in: app))
+        openGameChat(in: app)
+        assertProperty("value", equals: draft,
+                       of: element(ID.gameChatInput, in: app, matching: .textField))
+        keepScreenshot("Phone analysis and chat retained through rotation", in: app)
     }
 
     func testSharingKeepsDraftAndAnalysisSessionAcrossLayouts() throws {
         let app = launchContinuityScene(.gameAnalysis)
-        tap(ID.gameAnalyzeNextBranch, in: app, matching: .button)
+        // The narrow analysis pane intentionally drops adjacent-branch buttons.
+        // Either destination gives this journey a non-live position to mark.
+        let nextBranch = app.buttons[ID.gameAnalyzeNextBranch]
+        tap(nextBranch.exists ? ID.gameAnalyzeNextBranch : ID.gameAnalyzePrevious,
+            in: app, matching: .button)
         tap(ID.gameAnalyzeMarkerMenu, in: app)
         tap(
             analyzeMenuItem(
@@ -448,7 +551,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         }
 
         tap(ID.gameVariationShareCancel, in: app, matching: .button)
-        selectSegment(at: 0, in: ID.gameDisplayModePicker, app: app)
+        setGameAnalyzing(true, in: app)
         assertProperty(
             "value", equals: sourceBoard, of: element(ID.gameBoard, in: app)
         )

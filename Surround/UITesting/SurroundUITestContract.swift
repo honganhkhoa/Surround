@@ -17,6 +17,31 @@ enum SurroundUITestContract {
         "--surround-compatibility-screenshots"
     static let compatibilitySceneLaunchArgument =
         "--surround-compatibility-scene"
+    static let gameDetailClockStateLaunchArgument = "--surround-game-detail-clock-state"
+    static let gameDetailPlayersLaunchArgument = "--surround-game-detail-players"
+    /// DEBUG review switch: the design fixture opens with the socket down
+    /// (`.reconnecting`) and its game clock ticking locally each second, as
+    /// the service's timer can while disconnected.
+    static let gameDetailSocketDownLaunchArgument = "--surround-game-detail-socket-down"
+    static let gameDetailDesignArtboardLaunchArgument = "--surround-game-detail-design-artboard"
+    static let gameDetailDesignAnalysisBaseMoveNumber = 38
+    static let gameDetailDesignAnalysisSelectedMoveNumber = 41
+    static let gameDetailDesignAnalysisSelectedRow = 10
+    static let gameDetailDesignAnalysisSelectedColumn = 12
+    static let gameDetailDesignChatDraft = "Probably not, the hane at 2-2 kills it"
+
+    /// A separate, explicit fixture contract for the October 15 Game Detail design.
+    /// App Store captures must never inherit these illustrative game snapshots.
+    static func gameDetailDesignArtboard(in arguments: [String]) -> Int? {
+        guard arguments.contains(launchArgument),
+              arguments.contains(compatibilityScreenshotLaunchArgument),
+              !arguments.contains(screenshotLaunchArgument),
+              let index = arguments.firstIndex(of: gameDetailDesignArtboardLaunchArgument),
+              arguments.indices.contains(index + 1),
+              let artboard = Int(arguments[index + 1]),
+              (1...91).contains(artboard) else { return nil }
+        return artboard
+    }
     static let compatibilityWidgetProofTokenLaunchArgument =
         "--surround-compatibility-widget-proof-token"
     static let compatibilityWidgetGameCountLaunchArgument =
@@ -60,6 +85,9 @@ enum SurroundUITestContract {
     static let messagesIncomingFirstText = "Offline incoming reply 1/2. A new message should follow the latest conversation while keeping the composer usable."
     static let messagesIncomingLatestText = "Offline incoming reply 2/2. The latest reply stays above the composer; a reader of older history keeps that reading position."
     static let appearanceLaunchArgument = "--surround-ui-appearance"
+    /// Starts the isolated UI-test preferences suite with "Hide ranks and
+    /// ratings" on. It never reaches a signed-in app's preferences.
+    static let hidesRankLaunchArgument = "--surround-ui-hides-rank"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
     static let analysisDisabledLaunchArgument =
@@ -255,6 +283,33 @@ enum SurroundUITestContract {
             && ProcessInfo.processInfo.arguments.contains(
                 compatibilityScreenshotLaunchArgument
             )
+    }
+
+    static var gameDetailDesignArtboard: Int? {
+        gameDetailDesignArtboard(in: ProcessInfo.processInfo.arguments)
+    }
+
+    /// Opt-in review variants never change the default compatibility/App Store scenes.
+    static var gameDetailClockState: String? {
+        guard isCapturingCompatibilityScreenshots || isCapturingAppStoreScreenshots else { return nil }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: gameDetailClockStateLaunchArgument),
+              arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
+    static var simulatesGameDetailSocketDown: Bool {
+        (isCapturingCompatibilityScreenshots || isCapturingAppStoreScreenshots)
+            && ProcessInfo.processInfo.arguments.contains(gameDetailSocketDownLaunchArgument)
+    }
+
+    /// Comma-separated audit variants, usable with either offline capture route.
+    static var gameDetailPlayers: Set<String> {
+        guard isCapturingCompatibilityScreenshots || isCapturingAppStoreScreenshots else { return [] }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: gameDetailPlayersLaunchArgument),
+              arguments.indices.contains(index + 1) else { return [] }
+        return Set(arguments[index + 1].split(separator: ",").map(String.init))
     }
 
     static var simulatesHomeHistoryFailureOnce: Bool {
@@ -545,6 +600,8 @@ enum SurroundUITestContract {
     static let isEnabled = false
     static let isCapturingAppStoreScreenshots = false
     static let isCapturingCompatibilityScreenshots = false
+    static let gameDetailDesignArtboard: Int? = nil
+    static let simulatesGameDetailSocketDown = false
     static let simulatesUnavailableProfile = false
     static let simulatesUnavailableProfileSections = false
     static let includesProfileContent = false
@@ -804,6 +861,7 @@ enum SurroundUITestContract {
         static let homeNewGame = "home.newGame"
         static let newGameClose = "newGame.close"
         static let liveGameBanner = "notification.liveGame"
+        static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
 
         static let quickMatchScroll = "quickMatch.scroll"
@@ -969,6 +1027,8 @@ enum SurroundUITestContract {
         static let gameResign = "game.resign"
         static let gameZenEnter = "game.zen.enter"
         static let gameZenExit = "game.zen.exit"
+        static let gameSidebarToggle = "game.sidebar.toggle"
+        static let gameBack = "game.back"
 
         static func compatibilityScreen(
             _ scene: CompatibilityScene

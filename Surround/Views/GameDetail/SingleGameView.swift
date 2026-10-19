@@ -11,23 +11,25 @@ import Combine
 
 struct SingleGameView: View {
     var compact: Bool
-    var compactBoardSize: CGFloat = 0
     @ObservedObject var game: Game
-    var reducedPlayerInfoVerticalPadding: Bool = false
-    var reserveCompactBottomBarClearance = false
     var goToNextGame: (() -> ())?
     var horizontal = false
     @Binding var zenMode: Bool
+    var zenBoardCenterY: CGFloat? = nil
+    /// Duo wide poses: the top of the band that holds our own chrome.
+    var chromeBandTop: CGFloat? = nil
+    /// The pose uses the vertical toolbar, also in Zen where it is turned off.
+    var verticalToolbarPose = false
     
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject private var stackRouter: StackRouter
     @EnvironmentObject private var navigation: NavigationService
     @Environment(\.owningStackRoute) private var owningStackRoute
-    @Environment(\.compactGameModesInToolbar) private var compactGameModesInToolbar
-    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
-    @Environment(\.openPlayerProfile) private var openPlayerProfile
     @State private var owningRootView: RootView?
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.locale) private var locale
+    @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    @ScaledMetric(relativeTo: .body) private var clockScale: CGFloat = 1
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
     @State private var isVisibleForAppReview = false
@@ -42,30 +44,30 @@ struct SingleGameView: View {
     @State var stoneRemovalSelectedPoints = Set<[Int]>()
     @State var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var attachedKeyboardVisible = false
+    var keyboardOverlap: CGFloat = 0
+    @State private var messageComposerHeight: CGFloat = 50
+    @State private var variationComposerHeight: CGFloat = 188
+    #if DEBUG && MAIN_APP
+    /// Every size the conversation laid out at since it appeared, for UI tests.
+    @State private var chatPanelLayoutSizes: [String] = []
+    #endif
     
     @Binding var interaction: GameDetailInteraction
-    private var compactDisplayMode: GameDetailPanel {
+    private var displayedPanel: GameDetailPanel {
         get { interaction.panel }
         nonmutating set { interaction.selectPanel(newValue) }
     }
-    private var panelSelection: Binding<GameDetailPanel> {
-        Binding(get: { interaction.panel },
-                set: { interaction.selectPanel($0) })
-    }
-    @StateObject private var chatSession = ChatSessionState()
-    @StateObject private var gameControlState = GameControlState()
-    @State private var showsRengoTeamDetail = false
+    @ObservedObject var chatSession: ChatSessionState
+    @ObservedObject var gameControlState = GameControlState()
+    var selectedConditionalVariation: Binding<ConditionalMoveBranch?> = .constant(nil)
     @State private var preferredNextPositionByPosition =
         [ObjectIdentifier: BoardPosition]()
     var showsCompactChatBoard: Binding<Bool> = .constant(true)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var selectedChatChannel: Binding<OGSChatSendChannel> = .constant(.main)
-    private var analyzeMode: Binding<Bool> {
-        Binding(get: { interaction.isAnalyzing },
-                set: { interaction.setAnalyzing($0) })
-    }
     @Setting(.showsBoardCoordinates) var showsBoardCoordinates: Bool
     @Setting(.soundOnStonePlacement) var soundOnStonePlacement: Bool
+    @Setting(.hidesRank) private var hidesRank: Bool
 
     @State private var selectedChatItem: ChatLogSelection?
     
@@ -83,7 +85,6 @@ struct SingleGameView: View {
     @State private var hasUsedAddToConditionalMoves =
         userDefaults[.hasUsedAddToConditionalMoves] ?? false
     
-    @Namespace var animation
     
     typealias DisplayMode = GameDetailPanel
 
@@ -212,15 +213,6 @@ struct SingleGameView: View {
         }
     }
 
-    private var showsCompactHorizontalControlRow: Bool {
-        compactDisplayMode != .analyze
-            && (
-                !attachedKeyboardVisible
-                    || (compactDisplayMode == .chat
-                        && !showsCompactChatBoard.wrappedValue)
-            )
-    }
-
     private var reviewGamePhase: AppReviewGamePhase? {
         AppReviewGameActivity.phase(
             game.gamePhase,
@@ -263,12 +255,12 @@ struct SingleGameView: View {
         observedReviewGameID = nil
     }
     
-    private var showsAnalysisBoard: Bool {
-        interaction.isAnalyzing && (!compact || compactDisplayMode == .analyze)
+    private var showsAnalysisPanel: Bool {
+        !zenMode && interaction.isAnalyzing
     }
 
     private var showsChatPreview: Bool {
-        selectedChatItem?.preview.position != nil
+        !zenMode && selectedChatItem?.preview.position != nil
     }
 
     private var chatPreviewTitle: Text {
@@ -300,43 +292,20 @@ struct SingleGameView: View {
         .background(.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    var controlRow: some View {
-        GameControlRow(
-            game: game,
-            state: gameControlState,
-            pendingMove: $pendingMove,
-            pendingPosition: $pendingPosition,
-            goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption
-        )
-    }
-    
-    var verticalControlRow: some View {
-        GameControlRow(
-            game: game,
-            state: gameControlState,
-            horizontal: false,
-            pendingMove: $pendingMove,
-            pendingPosition: $pendingPosition,
-            goToNextGame: goToNextGame,
-            stoneRemovalOption: $stoneRemovalOption
-        )
-    }
-    
     var boardView: some View {
-        let selectedChatPreview = selectedChatItem?.preview
+        let selectedChatPreview = zenMode ? nil : selectedChatItem?.preview
         return ZStack {
             if let selectedChatPosition = selectedChatPreview?.position {
                 BoardView(
                     boardPosition: selectedChatPosition,
                     variation: selectedChatPreview?.variation,
-                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
+                    showsCoordinate: showsBoardCoordinates,
                     highlightCoordinates: selectedChatPreview?.coordinates ?? [],
                     markups: .constant(
                         selectedChatPreview?.variation?.markups ?? [:]
                     )
                 )
-            } else if let analyticsPosition = analyticsPosition, showsAnalysisBoard {
+            } else if let analyticsPosition = analyticsPosition, showsAnalysisPanel {
                 BoardView(
                     boardPosition: analyticsPosition,
                     variation: game.moveTree.variation(to: analyticsPosition),
@@ -361,9 +330,9 @@ struct SingleGameView: View {
             } else {
                 BoardView(
                     boardPosition: game.currentPosition,
-                    showsCoordinate: showsBoardCoordinates && !(compact && attachedKeyboardVisible),
-                    playable: game.isUserTurn && !gameControlState.blocksGameActions,
-                    stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval && !gameControlState.blocksGameActions,
+                    showsCoordinate: showsBoardCoordinates,
+                    playable: game.isUserTurn && !gameControlState.blocksGameActions && ogs.socketStatus == .connected,
+                    stoneRemovable: game.isUserPlaying && game.gamePhase == .stoneRemoval && !gameControlState.blocksGameActions && ogs.socketStatus == .connected,
                     stoneRemovalOption: stoneRemovalOption,
                     newMove: $pendingMove,
                     newPosition: $pendingPosition,
@@ -396,7 +365,7 @@ struct SingleGameView: View {
 
     #if DEBUG && MAIN_APP
     private var boardUITestAccessibilityValue: String {
-        if let preview = selectedChatItem?.preview,
+        if !zenMode, let preview = selectedChatItem?.preview,
            let position = preview.position {
             return boardUITestAccessibilityValue(
                 position: position,
@@ -405,7 +374,7 @@ struct SingleGameView: View {
             )
         }
         if let analyticsPosition,
-           showsAnalysisBoard {
+           showsAnalysisPanel {
             return boardUITestAccessibilityValue(
                 position: analyticsPosition,
                 variation: game.moveTree.variation(to: analyticsPosition),
@@ -461,10 +430,8 @@ struct SingleGameView: View {
         selectedChatItem = nil
         analyticsPosition = branch.position
         withAnimation {
-            if compact {
-                compactDisplayMode = .analyze
-            }
-            analyzeMode.wrappedValue = true
+            zenMode = false
+            displayedPanel = .analyze
         }
     }
 
@@ -561,118 +528,7 @@ struct SingleGameView: View {
         }
     }
 
-    var compactDisplayModePicker: some View {
-        ZStack(alignment: .topTrailing) {
-            Picker(selection: panelSelection.animation(), label: Text("Display mode")) {
-                if game.analysisAvailable {
-                    Label("Analyze mode", systemImage: "arrow.triangle.branch")
-                        .labelStyle(IconOnlyLabelStyle())
-                        .tag(DisplayMode.analyze)
-                } else {
-                    Label("Playback mode", systemImage: "arrow.left.and.right")
-                        .labelStyle(IconOnlyLabelStyle())
-                        .tag(DisplayMode.analyze)
-                }
-                Label("Player info", systemImage: "person.crop.square.fill.and.at.rectangle")
-                    .labelStyle(IconOnlyLabelStyle())
-                    .tag(DisplayMode.playerInfo)
-                Label("Chat", systemImage: "message")
-                    .labelStyle(IconOnlyLabelStyle())
-                    .tag(DisplayMode.chat)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .accessibilityIdentifier(
-                SurroundUITestContract.AccessibilityID.gameDisplayModePicker
-            )
-            .fixedSize()
-            .padding(.horizontal, 15)
-            .padding(.vertical, 5)
-            if game.chatUnreadCount > 0 {
-                ZStack {
-                    Circle().fill(Color(.systemRed))
-                    Text(verbatim: game.chatUnreadCount > 9 ? "9+" : "\(game.chatUnreadCount)")
-                        .font(.caption2).bold()
-                        .minimumScaleFactor(0.2)
-                        .foregroundColor(.white)
-                        .frame(width: 15, height: 15)
-                }
-                .frame(width: 15, height: 15)
-                .offset(x: -18, y: 5)
-            }
-        }
-        .matchedGeometryEffect(id: "compactDisplayModePicker", in: animation)
-    }
-    
-    var playerInfo: some View {
-        ZStack(alignment: .topTrailing) {
-            PlayersBannerView(
-                game: game,
-                topLeftPlayerColor: topLeftPlayerColor,
-                reducesVerticalPadding: reducedPlayerInfoVerticalPadding,
-                showsPlayersName: true,
-                extendsBackgroundIntoTopSafeArea: compact,
-                onSelectConditionalVariation: showConditionalVariation,
-                rengoTeamDetail: $showsRengoTeamDetail
-            )
-            if !showsRengoTeamDetail && !compactGameModesInToolbar {
-                compactDisplayModePicker
-            }
-        }
-    }
-    
-    @ViewBuilder
-    var compactClockHeader: some View {
-        HStack(spacing: 0) {
-            Spacer().frame(width: 10)
-            if let currentPlayerColor = game.clock?.currentPlayerColor {
-                HStack(spacing: 5) {
-                    Stone(color: currentPlayerColor, shadowRadius: 2)
-                        .frame(width: 20, height: 20)
-                    InlineTimerView(
-                        timeControl: game.gameData?.timeControl,
-                        clock: game.clock,
-                        player: currentPlayerColor,
-                        pauseControl: game.pauseControl,
-                        showsPauseReason: true
-                    )
-                }
-            }
-            Spacer(minLength: 10)
-            if !compactGameModesInToolbar {
-                compactDisplayModePicker
-            }
-        }
-        .frame(minHeight: compactGameModesInToolbar ? 30 : nil)
-    }
-    
-    var chatLog: some View {
-        VStack(spacing: 0) {
-            compactClockHeader
-            ChatLog(
-                game: game,
-                session: chatSession,
-                selection: chatSelection,
-                selectedChannel: selectedChatChannel,
-                variationShareDraft: currentGameVariationShareDraft,
-                focusInputOnAppear: true,
-                // This panel is already Chat. An outgoing composer's late
-                // callback must not undo an explicit switch to another mode.
-                onVariationShared: finishVariationSharing,
-                onCancelVariationSharing:
-                    cancelVariationSharing
-            )
-            .zIndex(-1)
-        }
-    }
-
-    var analyzeTree: some View {
-        VStack(spacing: 0) {
-            compactClockHeader
-            AnalyzeTreeView(game: game, selectedPosition: analysisPositionSelection)
-        }
-    }
-
-    var analyzeControlBar: some View {
+    func analyzeControlBar(verticalTree: Bool) -> some View {
         let state = analyzeControlBarConditionalState
         return AnalyzeControlBar(
             moveTree: game.moveTree,
@@ -697,7 +553,9 @@ struct SingleGameView: View {
             addToConditionalMoves: addSelectedVariationToConditionalMoves,
             removeFromConditionalMoves:
                 removeSelectedVariationFromConditionalMoves,
-            deleteBranch: deleteAnalysisBranch
+            deleteBranch: deleteAnalysisBranch,
+            verticalTree: verticalTree,
+            currentPosition: game.currentPosition
         )
     }
 
@@ -861,384 +719,389 @@ struct SingleGameView: View {
         )
     }
     
-    var compactBody: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            switch compactDisplayMode {
-            case .playerInfo:
-                playerInfo
-            case .chat:
-                chatLog
-            case .analyze:
-                analyzeTree
-            }
-            if compactDisplayMode == .analyze && !attachedKeyboardVisible {
-                analyzeControlBar
-            }
-            if showsCompactHorizontalControlRow && !showsChatPreview {
-                Spacer(minLength: 10).frame(maxHeight: 15)
-                controlRow
-                    .padding(.horizontal)
-                if reserveCompactBottomBarClearance {
-                    Spacer(minLength: 10).frame(maxHeight: 15)
-                } else {
-                    Spacer(minLength: 10)
-                }
-            }
-            if showsChatPreview {
-                chatPreviewBar.padding(.horizontal, 10).padding(.vertical, 5)
-            }
-            if compactDisplayMode != .chat
-                || showsCompactChatBoard.wrappedValue {
-                if attachedKeyboardVisible && compactBoardSize < 320 {
-                    EmptyView()
-                } else {
-                    if attachedKeyboardVisible, let blackPlayer = game.currentPlayer(with: .black), let whitePlayer = game.currentPlayer(with: .white) {
-                        HStack(alignment: .top) {
-                            boardView.frame(width: compactBoardSize / 2, height: compactBoardSize / 2)
-                            Spacer(minLength: 0)
-                            VStack(alignment: .trailing, spacing: 0) {
-                                HStack {
-                                    Text(verbatim: blackPlayer.usernameAndRank)
-                                        .font(.footnote).bold()
-                                        .minimumScaleFactor(0.5)
-
-                                    Stone(color: .black, shadowRadius: 2)
-                                        .frame(width: 20, height: 20)
-                                }
-                                Spacer().frame(height: 5)
-                                HStack {
-                                    Text(verbatim: whitePlayer.usernameAndRank)
-                                        .font(.footnote).bold()
-                                        .minimumScaleFactor(0.5)
-                                    Stone(color: .white, shadowRadius: 2)
-                                        .frame(width: 20, height: 20)
-                                }
-                                Spacer().frame(height: 15)
-                                if !showsChatPreview {
-                                    verticalControlRow
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding([.leading, .trailing])
-                            .padding(.top, 5)
-                        }
-                    } else {
-                        boardView.frame(width: compactBoardSize, height: compactBoardSize)
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-        }
-    }
-    /// SwiftUI measures the scalable preview first. The board then fits the
-    /// remaining space instead of assuming the preview is one fixed-height row.
-    private var regularBoardWithPreview: some View {
-        VStack(spacing: showsChatPreview ? 5 : 0) {
-            if showsChatPreview {
-                chatPreviewBar
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            GeometryReader { geometry in
-                let size = max(0, min(geometry.size.width, geometry.size.height))
-                boardView
-                    .frame(width: size, height: size)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
-        }
+    private var showsChatPanel: Bool {
+        !zenMode && interaction.isChatVisible
     }
 
-    var regularVerticalBody: some View {
-        GeometryReader { geometry -> AnyView in
-            let width = geometry.size.width
-            let height = geometry.size.height
-            let chatHeight: CGFloat = 270
-            let boardSize = max(0, min(width - 15 * 2, height - chatHeight - 15 * 3))
-            return AnyView(erasing: VStack(alignment: .center, spacing: 0) {
-                HStack(alignment: .top, spacing: 0) {
-                    ChatLog(
-                        game: game,
-                        session: chatSession,
-                        selection: chatSelection,
-                        selectedChannel: selectedChatChannel,
-                        variationShareDraft: currentGameVariationShareDraft,
-                        onInteraction: { interaction.beginChatInteraction() },
-                        onVariationShared: finishVariationSharing,
-                        onCancelVariationSharing:
-                            cancelVariationSharing
-                    )
-                        .frame(height: chatHeight)
-                    Spacer(minLength: 15)
-                    VStack {
-                        PlayersBannerView(
-                            game: game,
-                            topLeftPlayerColor: topLeftPlayerColor,
-                            playerIconSize: 80,
-                            playerIconsOffset: 25,
-                            showsPlayersName: true,
-                            onSelectConditionalVariation:
-                                showConditionalVariation,
-                            rengoTeamDetail: $showsRengoTeamDetail
-                        )
-                        if !analyzeMode.wrappedValue && !showsChatPreview {
-                            Spacer(minLength: 15).frame(maxHeight: 15)
-                            controlRow
-                        }
-                    }.frame(width: 350)
-                }
-                Spacer(minLength: 15)
-                if showsChatPreview {
-                    regularBoardWithPreview.frame(width: boardSize, height: boardSize)
-                } else {
-                    boardView.frame(width: boardSize, height: boardSize)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding())
-        }
+
+    private var gameActions: GameControlRow {
+        GameControlRow(game: game, state: gameControlState,
+                       pendingMove: $pendingMove, pendingPosition: $pendingPosition,
+                       goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption)
     }
-    
-    var regularHorizontalBody: some View {
-        GeometryReader { geometry -> AnyView in
-//            print("Geometry \(geometry.safeAreaInsets)")
-            let width = geometry.size.width
-            let height = geometry.size.height
-            // The vertical bar leaves less horizontal room; use the existing
-            // narrow control layout so the square board can fill the height.
-            let minimumPlayerInfoWidth: CGFloat = isVerticalToolbar ? 300 : 350
-            let minimumChatWidth: CGFloat = 250
-            let minimumPlayerInfoHeight: CGFloat = 80 + 15 * 2
-            let boardSizeInfoLeft = min(height - 15 * 2, width - minimumPlayerInfoWidth - 15 * 3)
-            let boardSizeInfoTop = min(height - 15 * 3 - minimumPlayerInfoHeight, width - 15 * 3 - minimumChatWidth)
-            let infoLeft = boardSizeInfoLeft > boardSizeInfoTop
-            let boardSize = infoLeft ? boardSizeInfoLeft : boardSizeInfoTop
-            var playerIconsOffset: CGFloat = 25
-            let horizontalPlayerInfoWidth = width - boardSize - 15 * 3
-            if infoLeft {
-                if horizontalPlayerInfoWidth > 600 {
-                    playerIconsOffset = -80
-                } else if horizontalPlayerInfoWidth > 400 {
-                    playerIconsOffset = -10
-                }
-            } else {
-                playerIconsOffset = -80
-            }
-            if boardSize <= 0 {
-                return AnyView(EmptyView())
-            }
-            return AnyView(erasing: ZStack {
-                VStack(spacing: 15) {
-                    if !infoLeft {
-                        PlayersBannerView(
-                            game: game,
-                            topLeftPlayerColor: topLeftPlayerColor,
-                            playerIconSize: 80,
-                            playerIconsOffset: playerIconsOffset,
-                            showsPlayersName: true,
-                            onSelectConditionalVariation:
-                                showConditionalVariation,
-                            rengoTeamDetail: $showsRengoTeamDetail
-                        )
-                    }
-                    HStack(alignment: .top, spacing: 15) {
-                        VStack(alignment: .trailing, spacing: 15) {
-                            if infoLeft {
-                                PlayersBannerView(
-                                    game: game,
-                                    topLeftPlayerColor: topLeftPlayerColor,
-                                    playerIconSize: 80,
-                                    playerIconsOffset: playerIconsOffset,
-                                    showsPlayersName: true,
-                                    onSelectConditionalVariation:
-                                        showConditionalVariation,
-                                    rengoTeamDetail: $showsRengoTeamDetail
-                                ).frame(minWidth: minimumPlayerInfoWidth)
-                            }
-                            if !analyzeMode.wrappedValue && !showsChatPreview {
-                                if horizontalPlayerInfoWidth < 350 {
-                                    verticalControlRow
-                                        .padding(.bottom, -15)
-                                } else {
-                                    controlRow
-                                }
-                            }
-                            ChatLog(
-                                game: game,
-                                session: chatSession,
-                                selection: chatSelection,
-                                selectedChannel: selectedChatChannel,
-                                variationShareDraft:
-                                    currentGameVariationShareDraft,
-                                onInteraction: { interaction.beginChatInteraction() },
-                                onVariationShared: finishVariationSharing,
-                                onCancelVariationSharing:
-                                    cancelVariationSharing
-                            )
-                        }
-                        if showsChatPreview {
-                            regularBoardWithPreview.frame(width: boardSize)
-                        } else {
-                            boardView.frame(width: boardSize, height: boardSize)
-                        }
-                    }.frame(height: boardSize)
-                }.padding(15)
-            }.frame(width: width, height: height))
-        }
+
+    private var recoveryHeight: CGFloat {
+        gameControlState.scoringNotice == nil ? 0 : max(72, 72 * min(clockScale, 1.65))
     }
-    
-    func zenModeTimerBackground(playerColor: StoneColor) -> Color {
-        if colorScheme == .dark {
-            return playerColor == .black ? Color(.systemGray6) : Color(.systemGray4)
-        } else {
-            return playerColor == .black ? Color(.systemGray2) : Color(.systemGray5)
-        }
-    }
-    
-    func zenModeTimer(playerColor: StoneColor, horizontal: Bool = true) -> some View {
-        let captures = game.currentPosition.captures[playerColor] ?? 0
-        let stoneSize: CGFloat = 20
-        let stoneOverflow = stoneSize / 2
-        let topLeft = playerColor == topLeftPlayerColor
-        let hasTimeControl = game.gameData?.timeControl.system != .None
-        let timer = TimerView(
-            timeControl: game.gameData?.timeControl,
-            clock: game.clock,
-            player: playerColor,
-            mainFont: compact ? Font.body : Font.title3,
-            subFont: compact ? Font.subheadline : Font.body)
-        return ZStack(alignment: topLeft ? .topLeading : .bottomTrailing) {
-            if horizontal {
-                HStack {
-                    if hasTimeControl && topLeft {
-                        timer
-                        Divider()
-                    }
-                    Text("\(captures) captures", comment: "SingleGameView - vary for plural")
-                    if hasTimeControl && !topLeft {
-                        Divider()
-                        timer
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 25)
-                .padding(.vertical, 10)
-            } else {
-                VStack(alignment: .trailing) {
-                    if hasTimeControl {
-                        timer
-                        Divider()
-                    }
-                    Text("\(captures) captures", comment: "SingleGameView - vary for plural")
-                }
-                .fixedSize(horizontal: /*@START_MENU_TOKEN@*/true/*@END_MENU_TOKEN@*/, vertical: false)
-                .padding(.horizontal, 25)
-                .padding(.vertical, 10)
-            }
-            Stone(color: playerColor, shadowRadius: 2)
-                .frame(width: stoneSize, height: stoneSize)
-                .offset(x: topLeft ? -stoneOverflow : stoneOverflow,
-                        y: topLeft ? -stoneOverflow : stoneOverflow)
-        }
-        .background(zenModeTimerBackground(playerColor: playerColor).shadow(radius: 2))
-        // Reserve the corner stone's overhang when laying out clocks at
-        // safe-area edges.
-        .padding(stoneOverflow)
-    }
-    
-    var zenModeBody: some View {
-        ZStack(alignment: .topTrailing) {
-            GeometryReader { geometry in
-                if geometry.size.height > geometry.size.width - 200 {
-                    VStack(spacing: 0) {
-                        Spacer()
-                        HStack {
-                            zenModeTimer(playerColor: topLeftPlayerColor)
-                                .padding(.leading, 15)
-                            Spacer()
-                        }
-                        Spacer()
-                        boardView
-                            .padding(compact ? 0 : 15)
-                            .aspectRatio(1, contentMode: .fit)
-                        if compact {
-                            controlRow.padding()
-                        }
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            if !compact {
-                                verticalControlRow.padding()
-                            }
-                            zenModeTimer(playerColor: topLeftPlayerColor.opponentColor())
-                                .padding(.trailing, 15)
-                        }
-                        Spacer()
-                    }
-                } else {
-                    HStack(spacing: 0) {
-                        Spacer()
-                        VStack {
-                            zenModeTimer(playerColor: topLeftPlayerColor, horizontal: false)
-                                .padding(.top, 15)
-                            Spacer()
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            boardView.padding(15).aspectRatio(1, contentMode: .fit)
-                            verticalControlRow.padding(.horizontal)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Spacer()
-                            zenModeTimer(playerColor: topLeftPlayerColor.opponentColor(), horizontal: false)
-                                .padding(.bottom, 15)
-                        }
-                        Spacer()
-                    }
-                }
-            }
-        }
-    }
-    
-    // Bound each type-checking expression while retaining one state owner and
-    // the same unconditional modifier chain across adaptive layouts.
-    private var gameContent: some View {
+
+    private var recoveryBanner: some View {
         Group {
-            if zenMode {
-                zenModeBody
-            } else {
-                if compact {
-                    compactBody
-                } else {
-                    VStack(spacing: 0) {
-                        if horizontal {
-                            regularHorizontalBody
-                        } else {
-                            regularVerticalBody
-                        }
-                        if analyzeMode.wrappedValue {
-                            // Keep the menu presenter alive while the keyboard
-                            // opens and the Share menu finishes dismissing.
-                            analyzeControlBar
-                                .frame(height: attachedKeyboardVisible ? 0 : nil)
-                                .clipped()
-                                .allowsHitTesting(!attachedKeyboardVisible)
-                                .accessibilityHidden(attachedKeyboardVisible)
-                                #if DEBUG && MAIN_APP
-                                .surroundAnimationObservation(
-                                    "analyze.collapsibleRegion",
-                                    ownerID: animationObservationID,
-                                    focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
-                                )
-                                #endif
-                            if !attachedKeyboardVisible {
-                                AnalyzeTreeView(game: game, selectedPosition: analysisPositionSelection)
-                                    .frame(maxHeight: 240)
-                            }
-                        }
+            if gameControlState.scoringNotice != nil {
+                gameActions.recoveryStatus
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// v149: both column chips keep their second line (rank, Rengo's Next)
+    /// unless it is empty for both or the column's cards wrap.
+    private func columnChipSecondLine(_ plan: GameDetailLayoutPlan) -> Bool {
+        GameDetailPlayerIdentity.columnChipsHaveSecondLine(game: game, hidesRank: hidesRank)
+            && !plan.compactColumnIdentityDropsSecondLine
+    }
+
+    private func actionCorner(plan: GameDetailLayoutPlan, columnStyle: ColumnIdentityStyle) -> some View {
+        let compactIdentity = compact && !plan.verticalActions && dynamicTypeSize < .xxxLarge
+            && plan.hidesOpponentIdentity
+        let stacksCorner = plan.verticalActions || plan.columnActionRow
+        let layout = stacksCorner
+            ? AnyLayout(VStackLayout(alignment: plan.horizontalActionsInColumn ? .leading : .trailing, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
+        return layout {
+            if !stacksCorner { Spacer(minLength: 0) }
+            if !showsAnalysisPanel && !showsChatPreview {
+                GameControlRow(game: game, state: gameControlState,
+                               horizontal: !plan.verticalActions || plan.horizontalActionsInColumn,
+                               columnRow: plan.columnActionRow,
+                               wrapsMainAction: plan.wrapsMainAction,
+                               alignsControlsToBottom: zenMode,
+                               alignsControlsToLeading: plan.horizontalActionsInColumn,
+                               alignsMoreToTrailing: plan.trailsMoreInColumn,
+                               pendingMove: $pendingMove, pendingPosition: $pendingPosition,
+                               goToNextGame: goToNextGame, stoneRemovalOption: $stoneRemovalOption)
+                    .layoutPriority(stacksCorner ? 1 : 0)
+            }
+            if !plan.hidesActionIdentity {
+                GameDetailPlayerIdentity(game: game, color: topLeftPlayerColor.opponentColor(),
+                                         vertical: stacksCorner && plan.verticalOpponentIdentity,
+                                         facesBoard: stacksCorner,
+                                         compactHeader: compactIdentity,
+                                         columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
+                                         columnPadding: columnStyle.padding,
+                                         compactColumn: plan.compactColumnIdentity,
+                                         columnSecondLine: columnChipSecondLine(plan))
+                    .frame(maxWidth: stacksCorner ? .infinity : nil,
+                           alignment: stacksCorner && !plan.compactColumnIdentity ? .leading : .trailing)
+                    .layoutPriority(stacksCorner ? 0 : 1)
+            }
+        }
+        .frame(maxHeight: stacksCorner ? .infinity : nil, alignment: .bottom)
+    }
+
+    /// Using the conversation keeps chat the open panel. A chat that is closing
+    /// (its views fade out briefly) never re-presents itself, for example when
+    /// its field regains focus after the toolbar's overflow menu closes.
+    private func chatInteractionOccurred() {
+        guard showsChatPanel else { return }
+        interaction.beginChatInteraction()
+    }
+
+    // Opening chat never focuses the field; the keyboard appears only when
+    // the field is tapped. Sharing a variation still requests focus itself.
+    private var conversationPanel: some View {
+        ChatLog(game: game, session: chatSession, selection: chatSelection,
+                selectedChannel: selectedChatChannel,
+                variationShareDraft: currentGameVariationShareDraft,
+                showsComposer: false,
+                onInteraction: chatInteractionOccurred,
+                onVariationShared: finishVariationSharing,
+                onCancelVariationSharing: cancelVariationSharing)
+            .background(GameDetailAppearance.panel)
+            #if DEBUG && MAIN_APP
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                guard SurroundUITestContract.isEnabled else { return }
+                let entry = "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+                if chatPanelLayoutSizes.last != entry && chatPanelLayoutSizes.count < 64 {
+                    chatPanelLayoutSizes.append(entry)
+                }
+            }
+            .onDisappear { chatPanelLayoutSizes = [] }
+            #endif
+    }
+
+    /// Chat arrives at its final size, fading in with a short slide from the
+    /// edge it opens from: the leading side for a side column or the other
+    /// screen, the top above a portrait board. Its frame never interpolates
+    /// from an empty slot, so lines never rewrap while it animates.
+    private func chatPanelTransition(panel: CGRect, board: CGRect) -> AnyTransition {
+        let fromLeading = !board.isEmpty && panel.maxX <= board.minX + 1
+        return .opacity.combined(with: .offset(x: fromLeading ? -16 : 0, y: fromLeading ? 0 : -16))
+    }
+
+    private var chatComposerHeight: CGFloat {
+        guard ogs.user != nil else { return 0 }
+        return currentGameVariationShareDraft.wrappedValue == nil
+            ? messageComposerHeight : variationComposerHeight
+    }
+
+    private var chatComposer: some View {
+        NewChatInput(game: game, session: chatSession,
+                     selectedChannel: selectedChatChannel,
+                     variationShareDraft: currentGameVariationShareDraft,
+                     onInteraction: chatInteractionOccurred,
+                     onVariationShared: finishVariationSharing,
+                     onCancelVariationSharing: cancelVariationSharing)
+            .id(chatSession.composerPresentationID)
+            .frame(minHeight: 50)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { ceil($0.size.height) } action: { height in
+                let height = max(50, height)
+                if currentGameVariationShareDraft.wrappedValue == nil {
+                    if messageComposerHeight != height { messageComposerHeight = height }
+                } else if variationComposerHeight != height {
+                    variationComposerHeight = height
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .background(GameDetailAppearance.panel)
+            .overlay(alignment: .top) { Divider().allowsHitTesting(false) }
+    }
+
+    private func analysisPanel(plan: GameDetailLayoutPlan) -> some View {
+        AnalyzeTreeView(game: game, selectedPosition: analysisPositionSelection,
+                        vertical: plan.verticalAnalysisTree)
+            .background(GameDetailAppearance.panel, in: RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func availablePanelDivision(in geometry: GeometryProxy) -> CGRect? {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) {
+            return geometry.reservedRegions(kind: .division, options: .includeInactive)
+                .first.map(\.frame)
+        }
+        #endif
+        return nil
+    }
+
+    private func activeDivision(in geometry: GeometryProxy) -> CGRect? {
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) {
+            // ReservedRegion.frame already includes its interaction margins.
+            // Expanding it again needlessly takes space from both screen panes.
+            return geometry.reservedRegions(kind: .division)
+                .first(where: \.isActive).map(\.frame)
+        }
+        #endif
+        return nil
+    }
+
+    private struct ColumnIdentityStyle {
+        let avatarSize: CGFloat
+        let padding: CGFloat
+    }
+
+    private func columnIdentityStyle(in geometry: GeometryProxy) -> ColumnIdentityStyle {
+        if compact { return .init(avatarSize: 40, padding: 5) }
+        if let division = activeDivision(in: geometry), division.width > division.height {
+            return .init(avatarSize: 56, padding: 8)
+        }
+        return .init(avatarSize: 52, padding: 8)
+    }
+
+    private func layoutPlan(in geometry: GeometryProxy, columnStyle: ColumnIdentityStyle,
+                            analyze: Bool? = nil, chat: Bool? = nil) -> GameDetailLayoutPlan {
+        let actionMetrics = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale,
+                                                 phase: game.gamePhase)
+        // v149: the Duo Closed landscape column's detail lines, measured for
+        // the values the cards show (the disconnect snapshot while offline).
+        let connected = ogs.socketStatus == .connected
+        let frozenClock = connected ? nil : game.disconnectedClock
+        func columnDetail(fullCards: Bool) -> GameDetailColumnDetailLayouts {
+            GameDetailColumnDetailLayouts(game: game, fullCards: fullCards, cardWidth: 126,
+                                          scale: min(clockScale, 1.65),
+                                          clockOverride: frozenClock, isConnected: connected)
+        }
+        return GameDetailLayoutPlan(
+            size: geometry.size, compact: compact, zen: zenMode,
+            analyze: analyze ?? showsAnalysisPanel, chat: chat ?? showsChatPanel,
+            hidesBoard: !showsCompactChatBoard.wrappedValue,
+            keyboard: attachedKeyboardVisible, keyboardLandscape: horizontal,
+            accessibility: dynamicTypeSize.isAccessibilitySize,
+            foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: min(clockScale, 1.65),
+            actionSize: actionMetrics.horizontalSize, actionMetrics: actionMetrics,
+            composerHeight: chatComposerHeight, keyboardOverlap: keyboardOverlap,
+            division: activeDivision(in: geometry), panelDivision: availablePanelDivision(in: geometry),
+            usesVerticalToolbar: isVerticalToolbar || verticalToolbarPose, preview: showsChatPreview,
+            zenBoardCenterY: zenBoardCenterY,
+            identityRowHeight: GameDetailPlayerIdentity.rowHeight(dynamicTypeSize: dynamicTypeSize),
+            identityColumnHeight: GameDetailPlayerIdentity.columnHeight(
+                dynamicTypeSize: dynamicTypeSize, avatarSize: columnStyle.avatarSize,
+                padding: columnStyle.padding),
+            opponentSharesStatusWhenFolded: compact && UIDevice.current.userInterfaceIdiom == .pad
+                && availablePanelDivision(in: geometry) == nil,
+            recoveryHeight: recoveryHeight,
+            fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65)),
+            compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65)),
+            compactColumnIdentityHeight: GameDetailPlayerIdentity.compactColumnHeight(
+                dynamicTypeSize: dynamicTypeSize,
+                secondLine: GameDetailPlayerIdentity.columnChipsHaveSecondLine(game: game, hidesRank: hidesRank)),
+            compactColumnIdentityShortHeight: GameDetailPlayerIdentity.compactColumnHeight(
+                dynamicTypeSize: dynamicTypeSize, secondLine: false),
+            columnDetail: columnDetail(fullCards: true), compactColumnDetail: columnDetail(fullCards: false),
+            chromeBandTop: chromeBandTop)
+    }
+
+    #if DEBUG && MAIN_APP
+    private var clockModelDiagnostic: String {
+        let black = game.clock?.blackTime.timeLeft.map { timeString(timeLeft: $0) } ?? "-"
+        let white = game.clock?.whiteTime.timeLeft.map { timeString(timeLeft: $0) } ?? "-"
+        return "black=\(black);white=\(white);frozen=\(game.disconnectedClock != nil)"
+    }
+
+    private func layoutDiagnostic(in geometry: GeometryProxy, plan: GameDetailLayoutPlan) -> String {
+        var value = "content=\(geometry.size);global=\(geometry.frame(in: .global));safeArea=\(geometry.safeAreaInsets);board=\(plan[.board])"
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
+        if #available(iOS 27.1, *) {
+            let regions = geometry.reservedRegions(kind: .division, options: .includeInactive)
+            for region in regions {
+                value += ";division(active=\(region.isActive),frame=\(region.frame),margins=\(region.margins))"
+            }
+        }
+        #endif
+        return value
+    }
+    #endif
+
+    private func clockStyle(_ style: GameDetailLayoutPlan.ClockStyle) -> GameDetailClockStyle {
+        switch style {
+        case .full: return .full
+        case .compact: return .compact
+        case .inline: return .inline
+        }
+    }
+
+    private var gameContent: some View {
+        GeometryReader { geometry in
+            let columnStyle = columnIdentityStyle(in: geometry)
+            let plan = layoutPlan(in: geometry, columnStyle: columnStyle)
+            // Chat's slots always hold the frames chat has when open, so it
+            // appears and leaves at its final size instead of growing out of
+            // an empty slot.
+            let chatPlan = showsChatPanel ? plan
+                : layoutPlan(in: geometry, columnStyle: columnStyle, analyze: false, chat: true)
+            let chatTransition = chatPanelTransition(panel: chatPlan[.chat], board: chatPlan[.board])
+            let opponentFacesBoard = plan.verticalActions
+                || (plan[.opponent].width > 0 && plan[.opponent].maxX < plan[.board].minX)
+            GameDetailLayout(plan: plan, chatPlan: chatPlan) {
+                // Keep this board in a single structural slot across every pose,
+                // panel and Zen transition. Selection lives in this screen. The
+                // layout animates its frame, so it redraws at every size.
+                boardView
+                    .gameDetailSlot(.board, plan: plan)
+                GameDetailClockPair(game: game, topLeftPlayerColor: topLeftPlayerColor,
+                                    stacked: plan.stackedClocks, style: clockStyle(plan.clockStyle),
+                                    narrowFullCards: plan.narrowFullClocks,
+                                    narrowCompactCards: plan.narrowCompactClocks,
+                                    spaciousCompact: plan.spaciousCompactClocks,
+                                    columnCards: plan.columnClockCards,
+                                    columnDetailLayouts: plan.columnDetailLayouts,
+                                    columnCardsGrow: plan.columnCardsGrow,
+                                    showsCurrentPlayerOnly: plan.showsCurrentPlayerClockOnly,
+                                    fullCardScale: plan.fullClockScale,
+                                    showsRoleNames: plan.hidesIdentity && !zenMode && dynamicTypeSize.isAccessibilitySize,
+                                    blocksGameActions: gameControlState.blocksGameActions,
+                                    showsStatus: true)
+                    .gameDetailSlot(.clocks, plan: plan)
+                recoveryBanner.gameDetailSlot(.status, plan: plan).zIndex(2)
+                GameDetailPlayerIdentity(game: game, color: topLeftPlayerColor,
+                                         vertical: plan.verticalOpponentIdentity,
+                                         facesBoard: opponentFacesBoard,
+                                         columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
+                                         columnPadding: columnStyle.padding,
+                                         compactColumn: plan.compactColumnIdentity,
+                                         columnSecondLine: columnChipSecondLine(plan))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: opponentFacesBoard ? .topTrailing : .leading)
+                    .gameDetailSlot(.opponent, plan: plan)
+                actionCorner(plan: plan, columnStyle: columnStyle).gameDetailSlot(.actions, plan: plan)
+                Group { if showsAnalysisPanel { analysisPanel(plan: plan) } }
+                    .gameDetailSlot(.analysis, plan: plan)
+                Group {
+                    if showsAnalysisPanel {
+                        analyzeControlBar(verticalTree: plan.verticalAnalysisTree)
+                    }
+                }
+                    .gameDetailSlot(.analysisControls, plan: plan)
+                GameDetailInformationCard(game: game)
+                    .gameDetailSlot(.information, plan: plan)
+                Group { if showsChatPanel {
+                    conversationPanel.clipShape(UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12))
+                        .transition(chatTransition)
+                } }
+                    .gameDetailSlot(.chat, plan: chatPlan)
+                Group { if showsChatPanel && ogs.user != nil {
+                    chatComposer.clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
+                        .transition(chatTransition)
+                } }
+                    .gameDetailSlot(.composer, plan: chatPlan)
+                Group { if showsChatPreview { chatPreviewBar } }
+                    .gameDetailSlot(.preview, plan: plan)
+            }
+            .preference(key: GameDetailClocksInHeaderPreferenceKey.self, value: plan.clocksInHeader)
+            .preference(key: GameDetailCurrentPlayerClockInHeaderPreferenceKey.self,
+                        value: plan.clocksInHeader && plan.showsCurrentPlayerClockOnly)
+            .preference(key: GameDetailOpponentHeaderPreferenceKey.self,
+                        value: plan.hidesOpponentIdentity)
+            #if DEBUG && MAIN_APP
+            .overlay(alignment: .topLeading) {
+                if SurroundUITestContract.isEnabled {
+                    ZStack {
+                        Color.clear.frame(width: 1, height: 1)
+                            .allowsHitTesting(false)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Game layout geometry")
+                            .accessibilityIdentifier("game.layout.geometry")
+                            .accessibilityValue(Text(verbatim: layoutDiagnostic(in: geometry, plan: plan)))
+                        Color.clear.frame(width: 1, height: 1)
+                            .allowsHitTesting(false)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Chat panel layout sizes")
+                            .accessibilityIdentifier("game.chat.layoutSizes")
+                            .accessibilityValue(Text(verbatim: chatPanelLayoutSizes.joined(separator: ";")))
+                        // The shared model clock, which keeps ticking locally
+                        // while the displayed clocks hold the disconnect value.
+                        Color.clear.frame(width: 1, height: 1)
+                            .allowsHitTesting(false)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Clock model")
+                            .accessibilityIdentifier("game.clock.model")
+                            .accessibilityValue(Text(verbatim: clockModelDiagnostic))
                     }
                 }
             }
+            #endif
+            .overlay {
+                if chatSession.wantsInputFocus && showsChatPanel && attachedKeyboardVisible {
+                    // A first tap outside the composer dismisses the on-screen
+                    // keyboard without triggering the board, a clock popover, or
+                    // an action. With a hardware keyboard nothing covers the
+                    // board, so the tap plays and ends editing (below).
+                    let outsideChat = Path { path in
+                        path.addRect(CGRect(origin: .zero, size: geometry.size))
+                        path.addRect(plan[.chat])
+                        path.addRect(plan[.composer])
+                    }
+                    outsideChat.fill(.clear, style: FillStyle(eoFill: true))
+                        .contentShape(outsideChat, eoFill: true)
+                        .onTapGesture {
+                            chatSession.dismissInput()
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
+                        .accessibilityHidden(true)
+                }
+            }
+            .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                // Hardware keyboard: a tap outside chat ends editing while the
+                // board, clock or action under it still receives the tap.
+                guard chatSession.wantsInputFocus, showsChatPanel, !attachedKeyboardVisible,
+                      !plan[.chat].contains(tap.location), !plan[.composer].contains(tap.location)
+                else { return }
+                chatSession.dismissInput()
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            })
         }
+        .modifier(GameDetailVoiceCountdown(game: game))
     }
 
     private var presentedGameContent: some View {
@@ -1249,12 +1112,6 @@ struct SingleGameView: View {
             pendingMove: $pendingMove,
             pendingPosition: $pendingPosition
         ))
-        .environment(\.openPlayerProfile, openPlayerProfile.map { openProfile in
-            { player in
-                chatSession.gamePresentationDisappeared()
-                openProfile(player)
-            }
-        })
         .onChange(of: isChatRouteActive) { _, active in
             chatSession.setGamePresentationActive(active && !zenMode)
         }
@@ -1265,7 +1122,7 @@ struct SingleGameView: View {
         )
         .surroundAnimationState(
             "game.layoutState",
-            value: "compact=\(compact);horizontal=\(horizontal);analyze=\(analyzeMode.wrappedValue);attachedKeyboard=\(attachedKeyboardVisible);zen=\(zenMode)",
+            value: "compact=\(compact);horizontal=\(horizontal);analyze=\(interaction.isAnalyzing);attachedKeyboard=\(attachedKeyboardVisible);zen=\(zenMode)",
             ownerID: animationObservationID,
             focusRequestID: variationShareDraft.wrappedValue?.focusRequestID
         )
@@ -1310,20 +1167,29 @@ struct SingleGameView: View {
             #if DEBUG && MAIN_APP
             if !hasAppliedUITestScene {
                 hasAppliedUITestScene = true
-                switch SurroundUITestContract.compatibilityScene {
-                case .gameAnalysis, .finishedGamePlayback:
-                    compactDisplayMode = .analyze
-                    analyzeMode.wrappedValue = true
+                let designArtboard = SurroundUITestContract.gameDetailDesignArtboard
+                let designAnalysis = designArtboard.map { (22...31).contains($0) || [72, 82].contains($0) } ?? false
+                let scene = SurroundUITestContract.compatibilityScene
+                if designAnalysis || scene == .gameAnalysis || scene == .finishedGamePlayback {
+                    displayedPanel = .analyze
                     DispatchQueue.main.async {
-                        analyticsPosition = game.positionByLastMoveNumber[
-                            SurroundUITestContract
-                                .screenshotAnalysisSelectedMoveNumber
-                        ] ?? game.currentPosition
+                        if designAnalysis {
+                            analyticsPosition = game.moveTree.positionsByLastMoveNumber[
+                                SurroundUITestContract.gameDetailDesignAnalysisSelectedMoveNumber
+                            ]?.compactMap { $0 }.first {
+                                $0.lastMove == .placeStone(
+                                    SurroundUITestContract.gameDetailDesignAnalysisSelectedRow,
+                                    SurroundUITestContract.gameDetailDesignAnalysisSelectedColumn
+                                )
+                            } ?? game.currentPosition
+                        } else {
+                            analyticsPosition = game.positionByLastMoveNumber[
+                                SurroundUITestContract.screenshotAnalysisSelectedMoveNumber
+                            ] ?? game.currentPosition
+                        }
                     }
-                case .gameChat:
-                    compactDisplayMode = .chat
-                default:
-                    break
+                } else if scene == .gameChat {
+                    displayedPanel = .chat
                 }
             }
             #endif
@@ -1356,25 +1222,36 @@ struct SingleGameView: View {
 
     private var interactiveGameContent: some View {
         observedGameContent
-        .onChange(of: compactDisplayMode) { oldValue, newValue in
+        .onChange(of: selectedConditionalVariation.wrappedValue) { _, branch in
+            guard let branch else { return }
+            selectedConditionalVariation.wrappedValue = nil
+            guard game.conditionalMoveBranches.contains(where: { $0.id == branch.id }) else { return }
+            showConditionalVariation(branch)
+        }
+        .onChange(of: displayedPanel) { oldValue, newValue in
             if oldValue == .chat && newValue != .chat {
                 selectedChatItem = nil
+                // A task switch dismisses input; replacing its adaptive host
+                // during rotation still preserves focus through the session.
+                chatSession.dismissInput()
             }
         }
         .onChange(of: interaction.isAnalyzing, initial: true) { _, analyzing in
-            analyticsPendingMove = nil
-            analyticsPendingPosition = nil
-            if analyzing {
-                selectedChatItem = nil
-                if analyticsPosition == nil {
-                    analyticsPosition = game.currentPosition
-                }
+            guard analyzing else { return }
+            selectedChatItem = nil
+            if analyticsPosition == nil {
+                analyticsPosition = game.currentPosition
             }
         }
+        .onChange(of: showsChatPanel, initial: true) { _, visible in
+            if visible { game.markAllChatAsRead() }
+        }
         .onChange(of: interaction.analysisResetRevision) { _, _ in
-            // Only explicit mode exits reset the session. Folding, sharing,
-            // and selecting a read-only chat preview can resume its position.
+            // Account and game-speed changes reset the session. Panel switches,
+            // folding and chat previews retain its position and tools.
             analyticsPosition = interaction.isAnalyzing ? game.currentPosition : nil
+            analyticsPendingMove = nil
+            analyticsPendingPosition = nil
             preferredNextPositionByPosition.removeAll()
             resetAnalyzeBoardTool()
         }
@@ -1386,10 +1263,7 @@ struct SingleGameView: View {
         }
         .onChange(of: zenMode) { _, newValue in
             chatSession.setGamePresentationActive(!newValue && isChatRouteActive)
-            if newValue {
-                selectedChatItem = nil
-                resetAnalyzeBoardTool()
-            } else if currentGameVariationShareDraft.wrappedValue != nil {
+            if !newValue && currentGameVariationShareDraft.wrappedValue != nil {
                 // Leaving Zen explicitly resumes the suspended sharing flow.
                 // A size-class change alone keeps any keyboard dismissal.
                 chatSession.requestInputFocus()
@@ -1399,13 +1273,15 @@ struct SingleGameView: View {
 
     var body: some View {
         interactiveGameContent
+        .onChange(of: selectedChatChannel.wrappedValue, initial: true) { _, channel in
+            chatSession.selectChannel(channel)
+        }
         .onChange(of: game.ID) { _, _ in
             updateReviewGameObservation()
             chatSession.reset()
             conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
             showingConditionalMoveSubmissionError = false
             preferredNextPositionByPosition.removeAll()
-            showsRengoTeamDetail = false
             pendingMove = nil
             pendingPosition = nil
             stoneRemovalSelectedPoints.removeAll()
@@ -1464,6 +1340,7 @@ struct SingleGameView: View {
 #if DEBUG
 #Preview("Play — Player info", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @StateObject var chatSession = ChatSessionState()
     @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.Ongoing19x19wBot3
     let ogs = OGSService.previewInstance(
@@ -1474,10 +1351,10 @@ struct SingleGameView: View {
     NavigationView {
         SingleGameView(
             compact: true,
-            compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            interaction: $interaction
+            interaction: $interaction,
+            chatSession: chatSession
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1488,6 +1365,7 @@ struct SingleGameView: View {
 
 #Preview("Play — Analysis", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @StateObject var chatSession = ChatSessionState()
     @Previewable @State var interaction = GameDetailInteraction(panel: .analyze)
     let game = TestData.Ongoing19x19wBot3
     let ogs = OGSService.previewInstance(
@@ -1498,10 +1376,10 @@ struct SingleGameView: View {
     NavigationView {
         SingleGameView(
             compact: true,
-            compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            interaction: $interaction
+            interaction: $interaction,
+            chatSession: chatSession
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1512,6 +1390,7 @@ struct SingleGameView: View {
 
 #Preview("Finished game — Chat", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @StateObject var chatSession = ChatSessionState()
     @Previewable @State var interaction = GameDetailInteraction(panel: .chat)
     let game = TestData.EuropeanChampionshipWithChat
     let ogs = OGSService.previewInstance(
@@ -1522,10 +1401,10 @@ struct SingleGameView: View {
     NavigationView {
         SingleGameView(
             compact: true,
-            compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            interaction: $interaction
+            interaction: $interaction,
+            chatSession: chatSession
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1536,6 +1415,7 @@ struct SingleGameView: View {
 
 #Preview("Stone removal", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @StateObject var chatSession = ChatSessionState()
     @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.StoneRemoval9x9
     let ogs = OGSService.previewInstance(
@@ -1546,10 +1426,10 @@ struct SingleGameView: View {
     NavigationView {
         SingleGameView(
             compact: true,
-            compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            interaction: $interaction
+            interaction: $interaction,
+            chatSession: chatSession
         )
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -1560,6 +1440,7 @@ struct SingleGameView: View {
 
 #Preview("Finished game — Score and playback", traits: .fixedLayout(width: 390, height: 844)) {
     @Previewable @State var zenMode = false
+    @Previewable @StateObject var chatSession = ChatSessionState()
     @Previewable @State var interaction = GameDetailInteraction(panel: .playerInfo)
     let game = TestData.Scored19x19Korean
     let ogs = OGSService.previewInstance(
@@ -1570,10 +1451,10 @@ struct SingleGameView: View {
     NavigationView {
         SingleGameView(
             compact: true,
-            compactBoardSize: 390,
             game: game,
             zenMode: $zenMode,
-            interaction: $interaction
+            interaction: $interaction,
+            chatSession: chatSession
         )
         .navigationBarTitleDisplayMode(.inline)
     }

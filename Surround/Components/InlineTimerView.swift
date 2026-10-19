@@ -95,6 +95,7 @@ struct InlineTimerView: View {
     var subFont: Font?
     var pauseControl: OGSPauseControl?
     var showsPauseReason = true
+    var spacing: CGFloat? = nil
 
     var body: some View {
         guard let clock = clock, let timeControl = timeControl, timeControl.system.supportsClock else {
@@ -109,7 +110,7 @@ struct InlineTimerView: View {
         let isPaused = pauseControl?.isPaused() ?? false
         let pausedReason = pauseControl?.pauseReason(playerId: playerId) ?? ""
         
-        return AnyView(HStack(alignment: .firstTextBaseline) {
+        return AnyView(HStack(alignment: .firstTextBaseline, spacing: spacing) {
             if !clock.started {
                 if let timeLeft = clock.timeUntilExpiration {
                     if clock.currentPlayerColor == player {

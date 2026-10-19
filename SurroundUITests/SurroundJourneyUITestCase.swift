@@ -33,6 +33,17 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         FileHandle.standardOutput.write(Data(message.utf8))
     }
 
+    /// English unless a manual fit run sets SURROUND_UI_LANGUAGE (Xcode
+    /// forwards TEST_RUNNER_SURROUND_UI_LANGUAGE), for example `de` or `ja`.
+    var languageLaunchArguments: [String] {
+        let language = ProcessInfo.processInfo.environment["SURROUND_UI_LANGUAGE"] ?? "en"
+        let locales = ["en": "en_US", "de": "de_DE", "es": "es_ES", "fr": "fr_FR", "id": "id_ID",
+                       "ja": "ja_JP", "ko": "ko_KR", "ms": "ms_MY", "pt-BR": "pt_BR", "pt-PT": "pt_PT",
+                       "th": "th_TH", "vi": "vi_VN", "zh-Hans": "zh_CN", "zh-Hant": "zh_TW"]
+        return ["-AppleLanguages", "(\(language))",
+                "-AppleLocale", locales[language] ?? language.replacingOccurrences(of: "-", with: "_")]
+    }
+
     func launchApp(
         additionalLaunchArguments: [String] = [],
         launchEnvironment: [String: String] = [:],
@@ -44,9 +55,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment = launchEnvironment
-        app.launchArguments = [
-            "-AppleLanguages", "(en)",
-            "-AppleLocale", "en_US",
+        app.launchArguments = languageLaunchArguments + [
             SurroundUITestContract.launchArgument,
         ] + additionalLaunchArguments
         if animationDiagnosticsEnabled {
@@ -286,6 +295,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
+        openGameChat(in: app, file: file, line: line)
         let chatLog = element(
             SurroundUITestContract.AccessibilityID.gameChatLog,
             in: app,
@@ -730,6 +740,67 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         XCTAssertTrue(waitUntilHittable(candidate, timeout: 10),
                       "Expected \(identifier) to be usable after bounded scrolling", file: file, line: line)
         return candidate
+    }
+
+    /// Closes a popover the way a person does: with a tap outside it.
+    func dismissPopover(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let popover = app.popovers.firstMatch
+        guard popover.exists else { return }
+        let dismissRegion = app.otherElements["PopoverDismissRegion"].firstMatch
+        if dismissRegion.exists && dismissRegion.isHittable {
+            dismissRegion.tap()
+        } else {
+            // The window corner farthest from the popover.
+            let window = app.windows.firstMatch.frame
+            let frame = popover.frame
+            let x = frame.midX < window.midX ? window.maxX - 24 : window.minX + 24
+            let y = frame.midY < window.midY ? window.maxY - 80 : window.minY + 80
+            app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: x - window.minX, dy: y - window.minY)).tap()
+        }
+        XCTAssertTrue(pollUntil(timeout: 5) { !popover.exists },
+                      "A tap outside closes the popover", file: file, line: line)
+    }
+
+    /// Chat arrives at its final size (v145): the conversation lays out at one
+    /// width while it appears instead of growing out of an empty slot, so its
+    /// lines never rewrap mid-animation. The app records every size it lays
+    /// out at in a UI-test-only probe.
+    func assertChatPanelLaidOutAtOneWidth(_ context: String, in app: XCUIApplication,
+                                          file: StaticString = #filePath, line: UInt = #line) {
+        let probe = app.descendants(matching: .any).matching(identifier: "game.chat.layoutSizes").firstMatch
+        guard probe.waitForExistence(timeout: 5) else {
+            XCTFail("Missing the chat layout probe", file: file, line: line)
+            return
+        }
+        let value = probe.value as? String ?? ""
+        let sizes = value.split(separator: ";").map(String.init)
+        let widths = Set(sizes.compactMap { $0.split(separator: "x").first })
+        let evidence = XCTAttachment(string: "\(context): \(value)")
+        evidence.name = "chat-layout-sizes-\(context)"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        print("[ChatLayoutSizes] \(context) \(value)")
+        XCTAssertFalse(sizes.isEmpty, "The conversation reported no layout", file: file, line: line)
+        XCTAssertEqual(widths.count, 1,
+                       "The conversation laid out at more than one width while appearing: \(value)",
+                       file: file, line: line)
+    }
+
+    /// Opens and closes chat while the host records the screen; the runner
+    /// starts and stops `simctl io recordVideo` on these markers.
+    func recordChatToggle(_ name: String, in app: XCUIApplication,
+                          open: () -> Void, close: () -> Void) {
+        FileHandle.standardOutput.write(Data("[RecordStart] \(name)\n".utf8))
+        Thread.sleep(forTimeInterval: 2)
+        open()
+        Thread.sleep(forTimeInterval: 1.5)
+        assertChatPanelLaidOutAtOneWidth(name, in: app)
+        keepScreenshot(name + "-open", in: app)
+        close()
+        Thread.sleep(forTimeInterval: 1.5)
+        FileHandle.standardOutput.write(Data("[RecordStop] \(name)\n".utf8))
+        Thread.sleep(forTimeInterval: 1)
     }
 
     func keepScreenshot(_ name: String, in app: XCUIApplication) {

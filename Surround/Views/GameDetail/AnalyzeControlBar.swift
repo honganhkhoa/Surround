@@ -28,6 +28,8 @@ struct AnalyzeControlBar: View {
     var addToConditionalMoves: () -> Void
     var removeFromConditionalMoves: () -> Void
     var deleteBranch: (BoardPosition) -> Void
+    var verticalTree = false
+    var currentPosition: BoardPosition? = nil
 
     @State private var showingDeleteConfirmation = false
     #if DEBUG && MAIN_APP
@@ -105,30 +107,72 @@ struct AnalyzeControlBar: View {
         )
     }
 
+    private var livePosition: BoardPosition? {
+        guard let currentPosition, selectedPosition !== currentPosition,
+              moveTree.indexByBoardPosition[ObjectIdentifier(currentPosition)] != nil else { return nil }
+        return currentPosition
+    }
+
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            controlBarContent(
-                showsAdjacentBranches: true,
-                conditionalMoveQuickActionPresentation: .labeled
-            )
-            controlBarContent(
-                showsAdjacentBranches: false,
-                conditionalMoveQuickActionPresentation: .labeled
-            )
-            controlBarContent(
-                showsAdjacentBranches: false,
-                conditionalMoveQuickActionPresentation: .iconOnly
-            )
+            if analysisAvailable {
+                if showsConditionalMoveQuickAction && selectedPosition != nil
+                    && (canAddConditionalMoves || canRemoveConditionalMoves) {
+                    // Measure the complete row rather than impose width
+                    // thresholds. Shorten the conditional label before hiding
+                    // branch navigation, so a 400pt bar retains every arrow.
+                    controlBarContent(
+                        showsAdjacentBranches: true,
+                        conditionalMoveQuickActionPresentation: .labeled,
+                        showsLiveButton: false
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                    controlBarContent(
+                        showsAdjacentBranches: true,
+                        conditionalMoveQuickActionPresentation: .iconOnly,
+                        showsLiveButton: false
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                    controlBarContent(
+                        showsAdjacentBranches: false,
+                        conditionalMoveQuickActionPresentation: .labeled,
+                        showsLiveButton: false
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                    controlBarContent(
+                        showsAdjacentBranches: false,
+                        conditionalMoveQuickActionPresentation: .iconOnly,
+                        showsLiveButton: false
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                } else {
+                    controlBarContent(
+                        showsAdjacentBranches: true,
+                        conditionalMoveQuickActionPresentation: .labeled,
+                        showsLiveButton: false,
+                        showsConditionalShortcut: false
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+                // At the absolute 254pt minimum, the conditional action remains
+                // in More and the five essential targets retain their width.
+                controlBarContent(
+                    showsAdjacentBranches: false,
+                    conditionalMoveQuickActionPresentation: .labeled,
+                    showsLiveButton: false,
+                    showsConditionalShortcut: false
+                )
+                .fixedSize(horizontal: true, vertical: false)
+            } else {
+                controlBarContent(
+                    showsAdjacentBranches: false,
+                    conditionalMoveQuickActionPresentation: .labeled
+                )
+            }
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 52)
-        .background(Color(.secondarySystemBackground), ignoresSafeAreaEdges: [])
-        .overlay(alignment: .top) {
-            Divider()
-        }
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
+        .modifier(AnalyzeControlBarSurface())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
@@ -167,7 +211,9 @@ struct AnalyzeControlBar: View {
     private func controlBarContent(
         showsAdjacentBranches: Bool,
         conditionalMoveQuickActionPresentation:
-            ConditionalMoveQuickActionPresentation
+            ConditionalMoveQuickActionPresentation,
+        showsLiveButton: Bool = true,
+        showsConditionalShortcut: Bool = true
     ) -> some View {
         HStack(spacing: 2) {
             if analysisAvailable {
@@ -183,23 +229,25 @@ struct AnalyzeControlBar: View {
                         markups: markups,
                         tool: $boardTool
                     )
-                    conditionalMoveQuickAction(
-                        presentation: conditionalMoveQuickActionPresentation
-                    )
+                    if showsConditionalShortcut {
+                        conditionalMoveQuickAction(
+                            presentation: conditionalMoveQuickActionPresentation
+                        )
+                    }
                 }
             }
             Spacer(minLength: 8)
             if analysisAvailable && showsAdjacentBranches {
                 controlButton(
                     "Previous branch",
-                    systemImage: "arrow.up",
+                    systemImage: verticalTree ? "arrow.left" : "arrow.up",
                     accessibilityIdentifier: SurroundUITestContract
                         .AccessibilityID.gameAnalyzePreviousBranch,
                     destination: previousBranch
                 )
                 controlButton(
                     "Next branch",
-                    systemImage: "arrow.down",
+                    systemImage: verticalTree ? "arrow.right" : "arrow.down",
                     accessibilityIdentifier: SurroundUITestContract
                         .AccessibilityID.gameAnalyzeNextBranch,
                     destination: nextBranch
@@ -208,7 +256,7 @@ struct AnalyzeControlBar: View {
             if analysisAvailable {
                 controlButton(
                     "Back to fork",
-                    systemImage: "arrow.turn.left.up",
+                    systemImage: verticalTree ? "arrow.turn.up.left" : "arrow.turn.left.up",
                     accessibilityIdentifier: SurroundUITestContract
                         .AccessibilityID.gameAnalyzeBackToFork,
                     destination: nearestForkDestination
@@ -216,7 +264,7 @@ struct AnalyzeControlBar: View {
             }
             controlButton(
                 "Previous",
-                systemImage: "chevron.left",
+                systemImage: verticalTree ? "chevron.up" : "chevron.left",
                 accessibilityIdentifier: SurroundUITestContract
                     .AccessibilityID.gameAnalyzePrevious,
                 destination: previousPosition,
@@ -224,11 +272,16 @@ struct AnalyzeControlBar: View {
             )
             controlButton(
                 "Next",
-                systemImage: "chevron.right",
+                systemImage: verticalTree ? "chevron.down" : "chevron.right",
                 accessibilityIdentifier: SurroundUITestContract
                     .AccessibilityID.gameAnalyzeNext,
                 destination: nextPosition
             )
+            if showsLiveButton {
+                controlButton("Back to live", systemImage: "forward.end",
+                              accessibilityIdentifier: "game.analyze.live",
+                              destination: livePosition)
+            }
         }
         #if DEBUG && MAIN_APP
         .surroundAnimationObservation(
@@ -245,6 +298,14 @@ struct AnalyzeControlBar: View {
     // the same separators in the same places and keeps the identifiers.
     private var actionsMenu: some View {
         Menu {
+            Button {
+                if let livePosition { selectedPosition = livePosition }
+            } label: {
+                Label("Back to live", systemImage: "forward.end")
+            }
+            .disabled(livePosition == nil)
+            .accessibilityIdentifier("game.analyze.live.menu")
+
             Button(action: shareVariation) {
                 Label("Share variation in chat", systemImage: "message")
             }
@@ -520,5 +581,16 @@ private struct MarkerToolMenu: View {
         case .cross: "xmark"
         case .eraser: "eraser"
         }
+    }
+}
+
+private struct AnalyzeControlBarSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(GameDetailAppearance.panel, ignoresSafeAreaEdges: [])
+            .overlay {
+                Rectangle().stroke(GameDetailAppearance.panelBorder, lineWidth: 0.5)
+                    .allowsHitTesting(false)
+            }
     }
 }

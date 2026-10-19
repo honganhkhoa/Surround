@@ -28,6 +28,9 @@ private func makeSurroundUserDefaults() -> UserDefaults {
             fatalError("Unable to create the isolated Surround UI-test preferences suite.")
         }
         defaults.removePersistentDomain(forName: suiteName)
+        if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.hidesRankLaunchArgument) {
+            defaults.set(true, forKey: SettingKey<Bool>.hidesRank.name)
+        }
         return defaults
     }
     #endif

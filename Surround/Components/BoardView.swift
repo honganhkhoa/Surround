@@ -293,25 +293,26 @@ struct Stones: View {
             return false
         }
         
+        // One structure at every size: shaded stones and the small flat ones
+        // differ only in style. Switching views at the 14 pt threshold (or
+        // identifying the paths by their contents) made a resizing board, as
+        // when chat opens, fade between two boards of different sizes.
+        let dropShadow = drawsShadow ? Color(.sRGBLinear, white: 0, opacity: 0.33) : .clear
         return ZStack {
-            if drawsShadow {
-                ForEach(whitePaths, id:\.self) { path in
-                    Path(path).fill(
-                        Color.white
-                            .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                    ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
-                }
-
-                ForEach(blackPaths, id:\.self) { path in
-                    Path(path).fill(
-                        Color(red: 0.6, green: 0.6, blue: 0.6)
-                            .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                    ).shadow(radius: 2, x: shadowOffset, y: shadowOffset)
-                }
-            } else {
-                Path(whiteLivingPath).fill(Color.white)
-                Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5)
-                Path(blackLivingPath).fill(Color.black)
+            ForEach(whitePaths.indices, id: \.self) { index in
+                Path(whitePaths[index]).fill(drawsShadow
+                    ? AnyShapeStyle(Color.white
+                        .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
+                    : AnyShapeStyle(Color.white))
+                .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
+            }
+            Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5).opacity(drawsShadow ? 0 : 1)
+            ForEach(blackPaths.indices, id: \.self) { index in
+                Path(blackPaths[index]).fill(drawsShadow
+                    ? AnyShapeStyle(Color(red: 0.6, green: 0.6, blue: 0.6)
+                        .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
+                    : AnyShapeStyle(Color.black))
+                .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
             }
             
             if boardPosition.removedStones != nil {

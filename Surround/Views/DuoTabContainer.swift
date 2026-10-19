@@ -21,6 +21,13 @@ final class DuoTabContext {
 
     @ObservationIgnored private var hiddenTabBarOwners = Set<UUID>()
     @ObservationIgnored var onTabBarVisibilityChange: (() -> Void)?
+    @ObservationIgnored var onToggleSidebar: (() -> Void)?
+
+    /// For screens that hide the navigation bar, and with it the system
+    /// sidebar toggle, and draw their own.
+    func toggleSidebar() {
+        onToggleSidebar?()
+    }
 
     func setTabBarHidden(_ hidden: Bool, owner: UUID) {
         let wasHidden = prefersTabBarHidden
@@ -171,6 +178,9 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                 tabContext.onTabBarVisibilityChange = { [weak self] in
                     self?.applyTabBarVisibility()
                 }
+                tabContext.onToggleSidebar = { [weak self] in
+                    self?.toggleSidebar()
+                }
                 contexts[root] = tabContext
                 let host = DuoTabHostingController(rootView: hostedContent(root))
                 host.onLayout = { [weak self] in self?.measureLayout() }
@@ -313,6 +323,11 @@ struct DuoTabContainer: UIViewControllerRepresentable {
                 print("DUO-SELECTION root=\(root.rawValue) selectedController=\(selectedController) hostParent=\(parent) hostWindow=\(host?.viewIfLoaded?.window != nil) groupWindow=\(groupController?.viewIfLoaded?.window != nil)")
             }
             #endif
+        }
+
+        private func toggleSidebar() {
+            guard let controller, controller.sidebar.isAvailable else { return }
+            controller.sidebar.isHidden.toggle()
         }
 
         private func applyTabBarVisibility() {

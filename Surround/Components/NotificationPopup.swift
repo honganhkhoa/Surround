@@ -35,12 +35,96 @@ struct FriendshipNoticeBanner: View {
     }
 }
 
+/// Reuses the same message access and presentation from the global notice row
+/// or native Game Detail toolbar, where the system keeps it clear of clocks.
+struct PrivateMessageNotificationButton: View {
+    @EnvironmentObject private var ogs: OGSService
+    @EnvironmentObject private var nav: NavigationService
+    var isInToolbar = false
+
+    static func isVisible(ogs: OGSService, nav: NavigationService) -> Bool {
+        guard ogs.socketStatus == .connected else { return false }
+        if !ogs.superchatPeerIds.isEmpty || nav.showingPrivateChatView { return true }
+        if nav.main.rootView == .privateMessages { return false }
+        return ogs.privateMessagesUnreadCount > 0
+    }
+
+    private var messageLabel: some View {
+        Label("Messages", systemImage: "message.fill")
+            .overlay(alignment: .topTrailing) {
+                if ogs.privateMessagesUnreadCount > 0 {
+                    Text(verbatim: "\(ogs.privateMessagesUnreadCount)")
+                        .font(.caption2.bold())
+                        .minimumScaleFactor(0.2)
+                        .foregroundStyle(.white)
+                        .frame(width: 15, height: 15)
+                        .background(.red, in: Circle())
+                        .offset(x: 6, y: -6)
+                }
+            }
+    }
+
+    private var toolbarLabel: some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: "message.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.orange)
+                .frame(width: 44, height: 44)
+            if ogs.privateMessagesUnreadCount > 0 {
+                Text(verbatim: String(ogs.privateMessagesUnreadCount))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(.red, in: Capsule())
+                    .fixedSize()
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .contentShape(Rectangle())
+    }
+
+    private var messageButton: some View {
+        Button {
+            guard !nav.showingPrivateChatView || ogs.superchatPeerIds.isEmpty else { return }
+            nav.showingPrivateChatView.toggle()
+        } label: {
+            if isInToolbar {
+                toolbarLabel
+            } else {
+                messageLabel.labelStyle(.iconOnly)
+                    .padding()
+                    .foregroundStyle(.white)
+                    .background(Color.orange, in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .accessibilityLabel(Text("Messages"))
+        .accessibilityValue(Text(verbatim: String(ogs.privateMessagesUnreadCount)))
+        .accessibilityIdentifier("global.privateMessages")
+    }
+
+    var body: some View {
+        if isInToolbar {
+            // Native toolbar extraction drops a Label's overlay and value.
+            // Keep the badge, accessibility and action in one custom item.
+            ZStack {
+                messageButton.buttonStyle(.plain)
+            }
+            .frame(width: 44, height: 44)
+            .accessibilityElement(children: .contain)
+        } else {
+            messageButton
+        }
+    }
+}
+
 struct NotificationPopup: View {
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
     @Environment(\.colorScheme) private var colorScheme
     
-    @State var showingPrivateChatView = false
     @State private var friendshipNotice: OGSFriendshipNotice?
 
     
@@ -62,9 +146,41 @@ struct NotificationPopup: View {
         .cornerRadius(10)
         .opacity(ogs.socketStatus == .connected ? 0 : 1)
         .animation(Animation.easeInOut.delay(2), value: ogs.socketStatus)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.connectionBanner)
+        .accessibilityHidden(ogs.socketStatus == .connected)
+        .allowsHitTesting(false)
+    }
+
+    /// The banner gives way only while a visible game renders its own
+    /// Reconnecting… badge on the running clock. Everywhere else, including
+    /// stone removal, a finished game and Analyze's glow-only chips, it shows
+    /// as on other screens and explains why the game's controls are disabled.
+    private var showsConnectionPopup: Bool {
+        !nav.visibleGameDetailShowsReconnectingBadge
+    }
+
+    private var connectionBannerShown: Bool {
+        showsConnectionPopup && ogs.socketStatus != .connected
+    }
+
+    /// Tells the game when the banner occupies its title slot: from the
+    /// moment it shows until "Connected" has faded (2 s delay, 0.35 s fade).
+    private func publishConnectionBanner() async {
+        if !connectionBannerShown && nav.connectionBannerVisible
+            && ogs.socketStatus == .connected && showsConnectionPopup {
+            try? await Task.sleep(for: .seconds(2.4))
+            guard !Task.isCancelled else { return }
+        }
+        if nav.connectionBannerVisible != connectionBannerShown {
+            nav.connectionBannerVisible = connectionBannerShown
+        }
     }
     
     var viewingLiveGames: Bool {
+        if nav.gameDetailNotificationContexts.values.contains(true) {
+            return true
+        }
         if nav.main.rootView == .home {
             if let gameSpeed = nav.home.activeGame?.gameData?.timeControl.speed {
                 return gameSpeed.isRealtime
@@ -140,41 +256,21 @@ struct NotificationPopup: View {
         }
     }
     
-    var shouldShowMessageNotificationIcon: Bool {
-        if ogs.superchatPeerIds.count > 0 {
-            return true
-        }
-        
-        if showingPrivateChatView {
-            return true
-        }
-        
-        if nav.main.rootView == .privateMessages {
-            return false
-        }
-        
-        return ogs.privateMessagesUnreadCount > 0
+    private var gameOwnsNotificationAccess: Bool {
+        !nav.gameDetailNotificationContexts.isEmpty
     }
-    
+
     func closeChatWindow() {
         guard ogs.superchatPeerIds.count == 0 else {
             return
         }
         
-        self.showingPrivateChatView = false
-    }
-    
-    func toggleChatWindow() {
-        if showingPrivateChatView {
-            closeChatWindow()
-        } else {
-            showingPrivateChatView = true
-        }
+        nav.showingPrivateChatView = false
     }
     
     var body: some View {
         ZStack(alignment: .top) {
-            if showingPrivateChatView {
+            if nav.showingPrivateChatView {
                 Color.white
                     .opacity(0.01)
                     .contentShape(Rectangle())
@@ -183,6 +279,8 @@ struct NotificationPopup: View {
             if ogs.socketStatus == .connected {
                 VStack {
                     HStack {
+                        // Game Detail owns connection status, but its active
+                        // picker does not replace cross-speed live/challenge notices.
                         if ogs.liveGames.filter({ $0.gameData?.outcome == nil }).count > 0 && !viewingLiveGames {
                             liveGamesPopup
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
@@ -190,33 +288,16 @@ struct NotificationPopup: View {
                         } else if shouldShowChallengeReceivedPopup {
                             challengeReceivedPopup
                         }
-                        if shouldShowMessageNotificationIcon {
-                            Button(action: toggleChatWindow) {
-                                ZStack(alignment: .topTrailing) {
-                                    Text(Image(systemName: "message.fill"))
-                                    if ogs.privateMessagesUnreadCount > 0 {
-                                        ZStack {
-                                            Circle().fill(Color.red)
-                                            Text(verbatim: "\(ogs.privateMessagesUnreadCount)")
-                                                .font(.caption2).bold()
-                                                .minimumScaleFactor(0.2)
-                                                .foregroundColor(.white)
-                                                .frame(width: 15, height: 15)
-                                        }
-                                        .frame(width: 15, height: 15)
-                                        .offset(x: 6, y: -6)
-                                    }
-                                }
-                                .padding()
-                                .foregroundColor(.white)
-                                .background(Color.orange)
-                                .cornerRadius(10)
-                            }
+                        if !gameOwnsNotificationAccess,
+                           PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav) {
+                            PrivateMessageNotificationButton()
                         }
                     }
-                    if showingPrivateChatView {
+                    if nav.showingPrivateChatView {
                         ZStack {
                             PrivateMessageNotificationView()
+                                .accessibilityElement(children: .contain)
+                                .accessibilityIdentifier("global.privateMessagesPanel")
                                 .frame(maxWidth: 540)
                                 .background(
                                     Color(colorScheme == .dark ? .systemGray6 : .systemBackground)
@@ -228,12 +309,21 @@ struct NotificationPopup: View {
                     }
                 }
             }
-            connectionPopup
+            if showsConnectionPopup {
+                connectionPopup
+            }
+        }
+        .task(id: connectionBannerShown) { await publishConnectionBanner() }
+        .onDisappear {
+            if nav.connectionBannerVisible { nav.connectionBannerVisible = false }
         }
         .onChange(of: ogs.superchatPeerIds) { _, superchatPeerIds in
             if superchatPeerIds.count > 0 {
+                let accountID = ogs.user?.id
                 DispatchQueue.main.async {
-                    self.showingPrivateChatView = true
+                    guard let accountID, ogs.user?.id == accountID,
+                          !ogs.superchatPeerIds.isEmpty else { return }
+                    nav.showingPrivateChatView = true
                 }
             }
         }
@@ -249,7 +339,12 @@ struct NotificationPopup: View {
             catch { return }
             ogs.dismissFriendshipNotice(id: noticeID)
         }
-        .appReviewPresentationBlocked(showingPrivateChatView)
+        .onReceive(ogs.$user) { user in
+            // The popup previously lost its local state on sign-out. Keep the
+            // shared presenter closed when that account lifetime ends.
+            if user == nil { nav.showingPrivateChatView = false }
+        }
+        .appReviewPresentationBlocked(nav.showingPrivateChatView)
     }
 }
 
@@ -261,6 +356,7 @@ private func notificationPopupPreview(
 ) -> some View {
     let nav = NavigationService()
     nav.main.rootView = .publicGames
+    nav.showingPrivateChatView = showingPrivateChatView
     return ZStack(alignment: .top) {
         if showsNavigationBackground {
             NavigationView {
@@ -273,7 +369,7 @@ private func notificationPopupPreview(
         } else {
             Color(.systemBackground)
         }
-        NotificationPopup(showingPrivateChatView: showingPrivateChatView)
+        NotificationPopup()
     }
     .environmentObject(ogs)
     .environmentObject(nav)

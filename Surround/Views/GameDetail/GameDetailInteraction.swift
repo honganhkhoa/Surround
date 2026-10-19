@@ -1,6 +1,5 @@
-/// The current task is independent of the layout presenting it. A wide layout
-/// can show analysis and a chat composer together; a compact one shows the panel
-/// where the user most recently interacted, without discarding analysis work.
+/// Every layout presents the same single panel. Switching tasks changes only
+/// presentation; their retained analysis work and chat draft belong to the game.
 enum GameDetailPanel: Hashable {
     case playerInfo
     case chat
@@ -9,42 +8,47 @@ enum GameDetailPanel: Hashable {
 
 struct GameDetailInteraction: Equatable {
     private(set) var panel: GameDetailPanel
-    private(set) var isAnalyzing: Bool
-    // A temporary chat presentation does not end the analysis session.
-    // Explicit exits reset it even when a preview has already hidden Analyze.
+    var isAnalyzing: Bool { panel == .analyze }
+    var isChatVisible: Bool { panel == .chat }
+    // Context changes reset retained work even when Analyze is not visible.
     private(set) var analysisResetRevision = 0
 
     init(panel: GameDetailPanel = .playerInfo) {
         self.panel = panel
-        isAnalyzing = panel == .analyze
     }
 
     mutating func selectPanel(_ panel: GameDetailPanel) {
         self.panel = panel
-        isAnalyzing = panel == .analyze
-        if !isAnalyzing {
-            analysisResetRevision += 1
-        }
     }
 
     mutating func setAnalyzing(_ analyzing: Bool) {
-        isAnalyzing = analyzing
         if analyzing {
             panel = .analyze
-        } else {
-            analysisResetRevision += 1
-            if panel == .analyze {
-                panel = .playerInfo
-            }
+        } else if isAnalyzing {
+            panel = .playerInfo
         }
     }
 
+    mutating func setChatVisible(_ visible: Bool) {
+        if visible {
+            panel = .chat
+        } else if panel == .chat {
+            panel = .playerInfo
+        }
+    }
+
+    /// Reset presentation intent on account or game-speed transitions. Preserve
+    /// a monotonic revision so the retained game owner observes the reset.
+    mutating func resetPanels() {
+        panel = .playerInfo
+        analysisResetRevision += 1
+    }
+
     mutating func beginChatInteraction() {
-        panel = .chat
+        setChatVisible(true)
     }
 
     mutating func beginChatPreview() {
-        panel = .chat
-        isAnalyzing = false
+        setChatVisible(true)
     }
 }

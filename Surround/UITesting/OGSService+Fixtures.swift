@@ -1305,6 +1305,388 @@ extension OGSService {
         return OGSService(previewState: state)
     }
 
+    /// Source-artboard snapshots are deliberately independent of the App Store
+    /// games. Setup stones and a legal move-21...38 history preserve the exact
+    /// illustrated position while supporting real playback and analysis.
+    static func gameDetailDesignFixture(artboard: Int, clockState: String? = nil)
+        -> (game: Game, user: OGSUser, readyGames: [Game]) {
+        precondition((1...91).contains(artboard))
+        let correspondence = Set([6, 7, 8, 9, 10, 15, 18, 19, 20, 27, 28, 29, 30, 31, 33, 34, 35, 41, 42, 43, 44, 45]).contains(artboard)
+        // v147: "undo-offered" seats you as Black so the opponent's Undo? badge
+        // shares the White card's header with komi (the tightest badge line).
+        let localBlack = (artboard == 79 && ["disconnected", "undo-offered"].contains(clockState ?? "")) || Set([4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 39, 40, 41, 42, 43, 44, 45, 54, 55, 58, 59, 62, 63, 70, 71]).contains(artboard)
+        let spectator = (46...48).contains(artboard)
+        let rengo = (49...52).contains(artboard)
+        let longNames = (53...55).contains(artboard)
+        let scoring = [64, 65, 66, 83].contains(artboard) || clockState == "stone-removal"
+        let user = OGSUser(username: longNames ? "sabaki_and_shinogi_forever" : "kosumi",
+                           id: SurroundUITestContract.profileFixtureOwnerID, ranking: longNames ? 30 : 31,
+                           uiClass: "supporter", supporter: true)
+        let opponent = OGSUser(username: longNames ? "the_extremely_patient_kibitzer" : "tenuki_tom",
+                               id: 915_100, ranking: longNames ? 18 : 32)
+        var black = localBlack ? user : opponent
+        var white = localBlack ? opponent : user
+        if spectator {
+            black = OGSUser(username: "shusaku_fan", id: 915_110, ranking: 33,
+                            uiClass: "moderator", isModerator: true)
+            // The source supplies a professional name style but an amateur
+            // 5d rank. ui_class preserves both, as lightweight OGS users can.
+            white = OGSUser(username: "honinbo_jr", id: 915_111, ranking: 34,
+                            uiClass: "professional")
+        }
+        var blackTeam = [black]
+        var whiteTeam = [white]
+        if rengo {
+            blackTeam = [opponent, OGSUser(username: "dave", id: 915_101, ranking: 30),
+                         OGSUser(username: "emma", id: 915_102, ranking: 28)]
+            whiteTeam = [OGSUser(username: "bob_k", id: 915_103, ranking: 29),
+                         OGSUser(username: "carol", id: 915_104, ranking: 27,
+                                 uiClass: "supporter", supporter: true), user]
+            black = blackTeam[0]
+            white = whiteTeam[0]
+        }
+        let blackPoints = [[15,3],[3,15],[16,15],[13,2],[2,13],[5,16],[15,9],[16,6],[9,3],[14,15],
+                           [13,16],[16,12],[10,15],[3,9],[4,4],[5,3],[6,2],[2,6],[9,10],[8,9]]
+        let whitePoints = [[3,3],[15,16],[16,16],[2,4],[3,2],[16,3],[16,2],[17,4],[13,13],[14,12],
+                           [11,14],[2,16],[3,16],[4,17],[9,9],[10,10],[2,10],[12,4],[10,9]]
+        func encoded(_ points: [[Int]]) -> String {
+            points.map { Move.placeStone($0[1], $0[0]).toOGSString() }.joined()
+        }
+        func makeGame(id: Int, ready: Bool = false) -> Game {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let fixtureURL = Bundle(for: Game.self).url(forResource: "game-27053412", withExtension: "json")!
+            var data = try! decoder.decode(OGSGame.self, from: Data(contentsOf: fixtureURL))
+            data.gameId = id
+            data.gameName = "Friendly Match"
+            data.width = 19
+            data.height = 19
+            data.handicap = 0
+            data.freeHandicapPlacement = false
+            data.ranked = !correspondence && !rengo
+            data.rules = .japanese
+            data.komi = 6.5
+            data.players = OGSGame.Players(black: ready ? user : black, white: ready ? opponent : white)
+            data.blackPlayerId = data.players.black.id
+            data.whitePlayerId = data.players.white.id
+            data.playerPool = nil
+            data.rengo = rengo && !ready
+            data.rengoTeams = rengo && !ready ? OGSGame.RengoTeams(black: blackTeam, white: whiteTeam) : nil
+            data.rengoCasualMode = rengo && !ready
+            data.phase = .play
+            data.outcome = nil
+            data.winner = nil
+            data.undoRequested = nil
+            data.removed = nil
+            data.score = nil
+            data.autoScoringDone = nil
+            data.pauseControl = nil
+            data.disableAnalysis = false
+            data.tournamentId = nil
+            data.ladderId = nil
+            data.scoreHandicap = false
+            data.scorePasses = false
+            data.scorePrisoners = true
+            data.scoreStones = false
+            data.scoreTerritory = true
+            data.initialPlayer = .white
+            data.initialState = OGSGame.InitialState(black: encoded(Array(blackPoints.prefix(12))),
+                                                    white: encoded(Array(whitePoints.prefix(10))))
+            let blackSuffix = Array(blackPoints.suffix(8))
+            let whiteSuffix = Array(whitePoints.suffix(9))
+            let moves = (0..<17).map { index -> [Int] in
+                let point = index.isMultiple(of: 2) ? whiteSuffix[index / 2] : blackSuffix[index / 2]
+                return [point[0], point[1], 0]
+            }
+            data.moves = try! JSONDecoder().decode([OGSMove].self, from: JSONSerialization.data(withJSONObject: moves))
+            data.timeControl = correspondence
+                ? TimeControlSystem.Fischer(initialTime: 259_200, timeIncrement: 86_400, maxTime: 604_800).timeControlObject
+                : TimeControlSystem.ByoYomi(mainTime: 600, periods: 5, periodTime: 30).timeControlObject
+            data.clock.blackPlayerId = data.players.black.id
+            data.clock.whitePlayerId = data.players.white.id
+            data.clock.currentPlayerColor = spectator || rengo ? .white : .black
+            if ready { data.clock.currentPlayerColor = .black }
+            data.clock.currentPlayerId = data.clock.currentPlayerColor == .black ? data.players.black.id : data.players.white.id
+            let blackTime: Double = spectator ? 728 : correspondence ? 38_820 : 272
+            let whiteTime: Double = spectator ? 591 : correspondence ? 111_600 : 375
+            data.clock.blackTime = ThinkingTime(thinkingTime: blackTime, thinkingTimeLeft: blackTime,
+                periods: 3, periodsLeft: 3, periodTime: 30, periodTimeLeft: 30)
+            data.clock.whiteTime = ThinkingTime(thinkingTime: whiteTime, thinkingTimeLeft: whiteTime,
+                periods: spectator ? 3 : 5, periodsLeft: spectator ? 3 : 5, periodTime: 30, periodTimeLeft: 30)
+            data.clock.started = true
+            data.clock.lastMoveTime = Date().timeIntervalSince1970 * 1_000
+            data.clock.expiration = nil
+            data.clock.timeUntilExpiration = nil
+            data.clock.pausedTime = nil
+            data.clock.pauseControl = nil
+            data.clock.autoResignTime = [:]
+            data.clock.blackTimeUntilAutoResign = nil
+            data.clock.whiteTimeUntilAutoResign = nil
+            let game = Game(width: 19, height: 19, blackName: data.players.black.username,
+                            whiteName: data.players.white.username, gameId: .OGS(id))
+            game.initialPosition.lastMoveNumber = 21
+            game.initialPosition.captures = [.black: spectator ? 4 : 2, .white: spectator ? 2 : 1]
+            game.moveTree = MoveTree(position: game.initialPosition)
+            game.positionByLastMoveNumber = [21: game.initialPosition]
+            game.gameData = data
+            game.ogsRawData = [:]
+            // The live clock's turn is authoritative for spectator and Rengo
+            // examples; their illustrated stone snapshot is otherwise identical.
+            game.currentPosition.nextToMove = data.clock.currentPlayerColor
+            if let teams = data.rengoTeams {
+                game.latestPlayerUpdate = OGSPlayerUpdate(
+                    players: .init(black: data.players.black.id, white: data.players.white.id),
+                    rengoTeams: .init(black: teams.black.map(\.id), white: teams.white.map(\.id)))
+            }
+            return game
+        }
+        let game = makeGame(id: SurroundUITestContract.screenshotPrimaryGameID)
+        if let clockState, [78, 79].contains(artboard) {
+            applyGameDetailClockReviewState(clockState, to: game)
+            var data = game.gameData!
+            data.clock.currentPlayerColor = .black
+            func byo(_ seconds: Double, periods: Int = 5, period: Double = 30) -> ThinkingTime {
+                ThinkingTime(thinkingTime: seconds, thinkingTimeLeft: seconds,
+                    periods: periods, periodsLeft: periods, periodTime: 30, periodTimeLeft: period)
+            }
+            if case .ByoYomi = data.timeControl.system {
+                data.timeControl = TimeControlSystem.ByoYomi(mainTime: 600, periods: 5, periodTime: 30).timeControlObject
+                if !["not-started", "first-move"].contains(clockState) {
+                    data.clock.whiteTime = byo(375)
+                }
+            }
+            switch clockState {
+            case "byoyomi-overtime":
+                data.clock.blackTime = byo(0, periods: 3, period: artboard == 79 ? 24 : 21)
+                if artboard == 79 {
+                    data.clock.whiteTime = byo(190)
+                    data.undoRequested = OGSUndoRequest(moveNumber: 38, requestedBy: user.id)
+                }
+            case "undo-offered":
+                // Your turn; the opponent (White) asks to take back move 38.
+                if artboard == 79 {
+                    data.undoRequested = OGSUndoRequest(moveNumber: 38, requestedBy: data.players.white.id)
+                }
+            case "sudden-death":
+                if artboard == 79 {
+                    data.clock.blackTime = byo(72, periods: 2)
+                    data.clock.whiteTime = byo(0, periods: 1, period: 8)
+                    data.clock.currentPlayerColor = .white
+                } else { data.clock.blackTime = byo(0, periods: 1, period: 8) }
+            case "fischer":
+                if artboard == 79 {
+                    data.timeControl = TimeControlSystem.Fischer(initialTime: 600, timeIncrement: 10, maxTime: 600).timeControlObject
+                    data.clock.currentPlayerColor = .white
+                } else { data.clock.whiteTime = ThinkingTime(thinkingTime: 375, thinkingTimeLeft: 375) }
+            case "canadian-overtime":
+                data.clock.blackTime = ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0,
+                    movesLeft: 7, blockTime: 180, blockTimeLeft: 102)
+                data.clock.whiteTime = ThinkingTime(thinkingTime: 350, thinkingTimeLeft: 350,
+                    movesLeft: 10, blockTime: 180, blockTimeLeft: 180)
+            case "simple", "absolute": data.clock.currentPlayerColor = .white
+            case "disconnected":
+                data.clock.currentPlayerColor = .white
+                if artboard == 79 {
+                    data.clock.blackTime = byo(171, periods: 3)
+                    data.clock.whiteTimeUntilAutoResign = 252
+                    data.clock.autoResignTime[.white] = Date().timeIntervalSince1970 * 1_000 + 252_000
+                }
+            case "finished-timeout": data.winner = data.players.white.id
+            case "draw":
+                data.score?.black.total = 60
+                data.score?.white.total = 60
+            default: break
+            }
+            data.clock.currentPlayerId = data.clock.currentPlayerColor == .black ? data.players.black.id : data.players.white.id
+            game.gameData = data
+            if clockState == "finished-resignation" { game.currentPosition.lastMoveNumber = 142 }
+            if clockState == "finished-timeout" { game.currentPosition.lastMoveNumber = 87 }
+            if clockState == "canceled" { game.currentPosition.lastMoveNumber = 2 }
+            if artboard == 79 {
+                switch clockState {
+                case "byoyomi-overtime", "sudden-death": game.currentPosition.captures = [.black: 7, .white: 4]
+                case "fischer":
+                    game.currentPosition.captures = [.black: 3, .white: 5]
+                    game.currentPosition.lastMove = .pass
+                    game.currentPosition.lastMoveColor = .black
+                case "paused": game.currentPosition.captures = [.black: 12, .white: 9]
+                default: break
+                }
+            }
+            if ["not-started", "first-move"].contains(clockState) {
+                let empty = BoardPosition(width: 19, height: 19)
+                game.initialPosition = empty
+                game.currentPosition = empty
+                game.positionByLastMoveNumber = [0: empty]
+                game.moveTree = MoveTree(position: empty)
+            }
+        }
+        // These are real legal branches, also decoded by the chat model, rather
+        // than visual overlays painted onto the board for a screenshot.
+        if !spectator && !rengo && ![78, 79].contains(artboard) {
+            for moves in [
+                [[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[15,8]],
+                [[11,9],[11,10],[12,10]],
+                [[11,9],[12,9],[13,9]]
+            ] {
+                var position = game.currentPosition
+                for point in moves {
+                    position = try! game.makeMove(move: .placeStone(point[1], point[0]), fromAnalyticsPosition: position)
+                }
+            }
+        }
+        let chatOpponent = spectator ? black : opponent
+        let chatLocal = spectator ? white : user
+        func addChat(id: String, move: Int, body: Any, author: OGSUser) {
+            let payload: [String: Any] = ["channel": "main", "line": [
+                "body": body, "chat_id": id, "date": 1_720_000_000,
+                "move_number": move, "player_id": author.id, "professional": false,
+                "ranking": author.ranking ?? 30, "ui_class": "", "username": author.username]]
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            game.addChatLine(try! decoder.decode(OGSChatLine.self, from: JSONSerialization.data(withJSONObject: payload)))
+        }
+        addChat(id: "app-store-chat-1", move: 1, body: "Good luck, have fun!", author: chatOpponent)
+        addChat(id: "app-store-chat-2", move: 1, body: "You too!", author: chatLocal)
+        addChat(id: "app-store-chat-variation", move: 38,
+                body: ["type": "analysis", "from": 38, "moves": "ljlkmk", "name": "is the 3-3 invasion still alive?"], author: chatOpponent)
+        if !localBlack && !spectator && !rengo && !scoring && ![78, 79].contains(artboard) {
+            let paths: [[Move]] = [[[11,9],[11,10]], [[9,8],[10,8]]].map { points in
+                points.map { .placeStone($0[1], $0[0]) }
+            }
+            let plan = try! ConditionalMovePlan(gameID: game.ogsID!, ownerID: user.id, rootMoveNumber: 38, paths: paths)
+            precondition(game.setConditionalMovePlan(plan, expectedOwnerID: user.id))
+        }
+        if scoring {
+            var data = game.gameData!
+            let removed = [[12,4],[9,3]]
+            data.phase = .stoneRemoval
+            data.autoScoringDone = true
+            data.removed = encoded(removed)
+            data.players.black.acceptedStones = data.removed
+            data.players.white.acceptedStones = nil
+            data.clock.timeUntilExpiration = 48
+            data.clock.expiration = Date().timeIntervalSince1970 * 1_000 + 48_000
+            let blackTerritory = [[8,0],[9,0],[10,0],[8,1],[9,1],[10,1],[7,0]]
+            let whiteTerritory = [[0,0],[1,0],[0,1],[1,1],[2,0],[0,2],[18,18],[17,18],[18,17]]
+            data.score = GameScores(
+                black: PlayerScore(handicap: 0, komi: 0, scoringPositions: Set(blackTerritory.map { [$0[1], $0[0]] }), stones: 0, territory: 58, prisoners: 2, total: 60),
+                white: PlayerScore(handicap: 0, komi: 6.5, scoringPositions: Set(whiteTerritory.map { [$0[1], $0[0]] }), stones: 0, territory: 49, prisoners: 1, total: 56.5))
+            game.gameData = data
+            // The design declares a partial territory illustration and score
+            // snapshot, not a fully scored legal endgame. Preserve that supplied
+            // snapshot instead of replacing it with a local territory estimate.
+            // Updating the scoring input invalidates any queued earlier estimate.
+            game.currentPosition.removedStones = Set(removed.map { [$0[1], $0[0]] })
+            game.currentPosition.gameScores = data.score
+            if artboard == 79 {
+                game.removedStonesAccepted = [.white: game.currentPosition.removedStones ?? []]
+                game.clock?.expiration = nil
+                game.clock?.timeUntilExpiration = nil
+            }
+        }
+        return (game, user, [makeGame(id: SurroundUITestContract.screenshotNextGameID, ready: true),
+                             makeGame(id: 915_200, ready: true)])
+    }
+
+    /// Applied only after ordinary fixture assertions and widget snapshots, so the
+    /// established capture contract is unchanged unless this review flag is supplied.
+    private static func applyGameDetailClockReviewState(_ state: String, to game: Game) {
+        guard var data = game.gameData else { return }
+        let now = Date().timeIntervalSince1970 * 1_000
+        data.phase = .play
+        data.outcome = nil
+        data.winner = nil
+        data.pauseControl = nil
+        data.clock.started = true
+        data.clock.pausedTime = nil
+        data.clock.pauseControl = nil
+        data.clock.expiration = nil
+        data.clock.timeUntilExpiration = nil
+        data.clock.autoResignTime = [:]
+        data.clock.blackTimeUntilAutoResign = nil
+        data.clock.whiteTimeUntilAutoResign = nil
+        data.clock.lastMoveTime = now
+        data.clock.currentPlayerColor = .white
+        data.clock.currentPlayerId = data.players.white.id
+        data.timeControl = TimeControlSystem.ByoYomi(mainTime: 600, periods: 3, periodTime: 30).timeControlObject
+        data.clock.blackTime = ThinkingTime(thinkingTime: 272, thinkingTimeLeft: 272,
+            periods: 3, periodsLeft: 3, periodTime: 30, periodTimeLeft: 30)
+        data.clock.whiteTime = ThinkingTime(thinkingTime: 375, thinkingTimeLeft: 375,
+            periods: 3, periodsLeft: 3, periodTime: 30, periodTimeLeft: 30)
+        switch state {
+        case "byoyomi-main", "undo-offered": break
+        case "byoyomi-overtime", "sudden-death":
+            let last = state == "sudden-death"
+            data.clock.whiteTime = ThinkingTime(thinkingTime: 0, thinkingTimeLeft: 0,
+                periods: last ? 1 : 3, periodsLeft: last ? 1 : 3,
+                periodTime: 30, periodTimeLeft: last ? 8 : 21)
+        case "fischer", "paused":
+            let paused = state == "paused"
+            data.timeControl = TimeControlSystem.Fischer(initialTime: paused ? 259200 : 600,
+                timeIncrement: paused ? 86400 : 30, maxTime: paused ? 604800 : 600).timeControlObject
+            data.clock.blackTime = ThinkingTime(thinkingTime: paused ? 187200 : 461, thinkingTimeLeft: paused ? 187200 : 461)
+            data.clock.whiteTime = ThinkingTime(thinkingTime: paused ? 298800 : 302, thinkingTimeLeft: paused ? 298800 : 302)
+            if paused {
+                data.pauseControl = try! JSONDecoder().decode(OGSPauseControl.self, from: Data(#"{"weekend":true}"#.utf8))
+                data.clock.pausedTime = now
+            }
+        case "canadian-main", "canadian-overtime":
+            data.timeControl = TimeControlSystem.Canadian(mainTime: 600, periodTime: 180, stonesPerPeriod: 10).timeControlObject
+            data.clock.blackTime = ThinkingTime(thinkingTime: 492, thinkingTimeLeft: 492, movesLeft: 10, blockTime: 180, blockTimeLeft: 180)
+            let overtime = state == "canadian-overtime"
+            data.clock.whiteTime = ThinkingTime(thinkingTime: overtime ? 0 : 350, thinkingTimeLeft: overtime ? 0 : 350,
+                movesLeft: overtime ? 7 : 10, blockTime: overtime ? 102 : 180, blockTimeLeft: overtime ? 102 : 180)
+        case "simple":
+            data.timeControl = TimeControlSystem.Simple(perMove: 30).timeControlObject
+            data.clock.blackTime = ThinkingTime(thinkingTime: 30, thinkingTimeLeft: 30)
+            data.clock.whiteTime = ThinkingTime(thinkingTime: 24, thinkingTimeLeft: 24)
+        case "absolute":
+            data.timeControl = TimeControlSystem.Absolute(totalTime: 1200).timeControlObject
+            data.clock.blackTime = ThinkingTime(thinkingTime: 725, thinkingTimeLeft: 725)
+            data.clock.whiteTime = ThinkingTime(thinkingTime: 600, thinkingTimeLeft: 600)
+        case "untimed": data.timeControl = TimeControlSystem.None.timeControlObject
+        case "not-started", "first-move":
+            data.moves = []
+            data.clock.started = false
+            data.clock.currentPlayerColor = .black
+            data.clock.currentPlayerId = data.players.black.id
+            data.clock.blackTime = ThinkingTime()
+            data.clock.whiteTime = ThinkingTime()
+            if state == "first-move" {
+                data.clock.expiration = now + 45_000
+                data.clock.timeUntilExpiration = 45
+            }
+        case "disconnected":
+            data.clock.whiteTimeUntilAutoResign = 291
+            data.clock.autoResignTime[.white] = now + 291_000
+        case "stone-removal":
+            data.phase = .stoneRemoval
+            data.autoScoringDone = true
+            data.removed = ""
+            data.clock.expiration = now + 48_000
+            data.clock.timeUntilExpiration = 48
+            data.players.black.acceptedStones = ""
+            data.players.white.acceptedStones = nil
+        case "finished-points", "finished-resignation", "finished-timeout", "draw", "annulled", "canceled":
+            data.phase = .finished
+            data.winner = data.players.black.id
+            data.outcome = "6.5 points"
+            if state == "finished-resignation" { data.outcome = "Resignation" }
+            if state == "finished-timeout" { data.outcome = "Timeout" }
+            if state == "draw" { data.outcome = "0 points"; data.winner = 0 }
+            if state == "canceled" { data.outcome = "Cancellation"; data.moves = Array(data.moves.prefix(2)) }
+            if state == "annulled" { game.historyAnnulled = true }
+            if state == "finished-points" || state == "draw" {
+                data.score = GameScores(
+                    black: PlayerScore(handicap: 0, komi: 0, scoringPositions: [], stones: 0, territory: 61, prisoners: 2, total: 63),
+                    white: PlayerScore(handicap: 0, komi: 6.5, scoringPositions: [], stones: 0, territory: 49, prisoners: 1, total: state == "draw" ? 63 : 56.5))
+            }
+        default: preconditionFailure("Unknown game-detail clock review state: \(state)")
+        }
+        game.gameData = data
+    }
+
     #if MAIN_APP
     /// A deterministic, signed-in OGS service for app-driven UI tests.
     ///
@@ -1811,6 +2193,10 @@ extension OGSService {
                 }
                 historyData.gameId = SurroundUITestContract.liveBannerHistoryGameID
                 historyData.phase = .finished
+                // A finished game still reports this user as a participant.
+                // Realtime history must not claim to own the live-game picker
+                // and hide the banner for a different, currently active game.
+                historyData.timeControl = TimeControlSpeed.live.defaultTimeOptions[0].timeControlObject
                 // Like OGS's game_history endpoint, the fixture feed lists only
                 // games the requested player took part in.
                 if var playerPool = historyData.playerPool {
@@ -3326,6 +3712,44 @@ extension OGSService {
         }
         state.sortedPublicGames = publicGames
 
+        if let artboard = SurroundUITestContract.gameDetailDesignArtboard {
+            let fixture = gameDetailDesignFixture(artboard: artboard, clockState: SurroundUITestContract.gameDetailClockState)
+            // Opt-in identity variants apply to design boards as well.
+            let artboardPlayerVariants = SurroundUITestContract.gameDetailPlayers
+            if !artboardPlayerVariants.isEmpty {
+                applyGameDetailPlayerReviewVariants(artboardPlayerVariants, to: fixture.game)
+            }
+            state.user = fixture.user
+            state.activeGames = Dictionary(uniqueKeysWithValues: ([fixture.game] + fixture.readyGames).map { ($0.ogsID!, $0) })
+            state.publicGames = [fixture.game.ogsID!: fixture.game]
+            state.sortedPublicGames = [fixture.game]
+            for game in [fixture.game] + fixture.readyGames {
+                for player in game.playerByOGSId.values { state.cachedUsersById[player.id] = player }
+                for player in [game.blackPlayer, game.whitePlayer].compactMap({ $0 }) { state.cachedUsersById[player.id] = player }
+            }
+            state.cachedUsersById[fixture.user.id] = fixture.user
+            if SurroundUITestContract.simulatesGameDetailSocketDown {
+                state.socketStatus = .reconnecting
+            }
+            let service = makeService(from: state)
+            if SurroundUITestContract.simulatesGameDetailSocketDown {
+                GameDetailSocketDownUITestClock.start(fixture.game)
+            }
+            return service
+        }
+
+        if let clockState = SurroundUITestContract.gameDetailClockState {
+            applyGameDetailClockReviewState(clockState, to: fixtureGame)
+        }
+
+        let playerVariants = SurroundUITestContract.gameDetailPlayers
+        if !playerVariants.isEmpty {
+            applyGameDetailPlayerReviewVariants(playerVariants, to: fixtureGame)
+            for player in fixtureGame.playerByOGSId.values {
+                state.cachedUsersById[player.id] = player
+            }
+        }
+
         if SurroundUITestContract.compatibilityScene == .welcome {
             state.user = nil
             state.isLoggedIn = false
@@ -3333,6 +3757,106 @@ extension OGSService {
 
         return makeService(from: state)
     }
+    /// The socket-down review switch keeps the design game's clock moving as
+    /// OGSService's 1 s timer does for a connected game, so a test can tell a
+    /// display frozen at the disconnect from one that follows the local clock.
+    private enum GameDetailSocketDownUITestClock {
+        private static var timer: Timer?
+
+        static func start(_ game: Game) {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak game] _ in
+                guard let game, game.gameData?.outcome == nil,
+                      let system = game.gameData?.timeControl.system else { return }
+                if game.gamePhase == .stoneRemoval || !(game.pauseControl?.isPaused() ?? false) {
+                    game.clock?.calculateTimeLeft(with: system, pauseControl: game.pauseControl)
+                }
+            }
+        }
+    }
+
+    /// Opt-in layout audit data. Identities and roles change together; the board,
+    /// branch fixtures, normal captures, and offline transport contract stay intact.
+    private static func applyGameDetailPlayerReviewVariants(_ variants: Set<String>, to game: Game) {
+        precondition(variants.isSubset(of: ["rengo", "rengo-live", "long-names", "user-white", "spectator"]),
+                     "Unknown game-detail player review variant")
+        guard var data = game.gameData else { return }
+        let winnerColor: StoneColor? = data.winner == data.players.black.id ? .black
+            : data.winner == data.players.white.id ? .white : nil
+        if variants.contains("user-white") {
+            let black = data.players.black
+            data.players.black = data.players.white
+            data.players.white = black
+        }
+        if variants.contains("spectator") {
+            if data.players.black.id == AppStoreScreenshotProfileData.profileOwner.id {
+                data.players.black.id = 915_100
+                data.players.black.username = "ObsidianWing"
+            } else {
+                data.players.white.id = 915_100
+                data.players.white.username = "ObsidianWing"
+            }
+        }
+        if variants.contains("long-names") {
+            data.players.black.username = "JuniperStoneAcrossTheQuietMountain"
+            data.players.white.username = "CopperKoiSwimmingUnderAutumnMoonlight"
+        }
+        data.blackPlayerId = data.players.black.id
+        data.whitePlayerId = data.players.white.id
+        data.clock.blackPlayerId = data.players.black.id
+        data.clock.whitePlayerId = data.players.white.id
+        data.clock.currentPlayerId = data.clock.currentPlayerColor == .black
+            ? data.players.black.id : data.players.white.id
+        if let winnerColor {
+            data.winner = winnerColor == .black ? data.players.black.id : data.players.white.id
+        }
+        if variants.contains("rengo") {
+            data.rengo = true
+            data.rengoCasualMode = true
+            data.ranked = false
+            let black = [data.players.black,
+                         OGSUser(username: "SilverHeron", id: 915_101, ranking: 31),
+                         OGSUser(username: "RiverWillow", id: 915_102, ranking: 29)]
+            let white = [data.players.white,
+                         OGSUser(username: "CloudPebble", id: 915_103, ranking: 30),
+                         OGSUser(username: "MossCrane", id: 915_104, ranking: 32)]
+            data.rengoTeams = OGSGame.RengoTeams(black: black, white: white)
+            data.playerPool = Dictionary(uniqueKeysWithValues: (black + white).map { ($0.id, $0) })
+        }
+        if variants.contains("rengo-live") {
+            // Live Beta game 22238's shape: two-player teams of provisional
+            // ("?") accounts whose names differ only in their last character.
+            data.rengo = true
+            data.rengoCasualMode = true
+            data.ranked = false
+            func live(_ user: OGSUser, _ name: String) -> OGSUser {
+                var user = user
+                user.username = name
+                user.uiClass = "provisional"
+                return user
+            }
+            let ownerIsBlack = data.players.black.id == SurroundUITestContract.profileFixtureOwnerID
+            data.players.black = live(data.players.black, ownerIsBlack ? "hakhoa3" : "hakhoa")
+            data.players.white = live(data.players.white, ownerIsBlack ? "hakhoa" : "hakhoa3")
+            let black = [data.players.black,
+                         live(OGSUser(username: "", id: 915_101, ranking: 31), ownerIsBlack ? "hakhoa2" : "hakhoa4")]
+            let white = [data.players.white,
+                         live(OGSUser(username: "", id: 915_103, ranking: 30), ownerIsBlack ? "hakhoa4" : "hakhoa2")]
+            data.rengoTeams = OGSGame.RengoTeams(black: black, white: white)
+            data.playerPool = Dictionary(uniqueKeysWithValues: (black + white).map { ($0.id, $0) })
+        }
+        // The ordinary metadata merge deliberately preserves live player names.
+        // These new audit identities must therefore be installed explicitly.
+        game.blackPlayer = data.players.black
+        game.whitePlayer = data.players.white
+        game.gameData = data
+        if let teams = data.rengoTeams {
+            game.latestPlayerUpdate = OGSPlayerUpdate(
+                players: OGSPlayerUpdate.Players(black: data.players.black.id, white: data.players.white.id),
+                rengoTeams: OGSPlayerUpdate.RengoTeams(black: teams.black.map(\.id), white: teams.white.map(\.id)))
+        }
+    }
+
     #endif
 }
 #endif

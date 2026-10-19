@@ -388,6 +388,27 @@ final class StackRouter: ObservableObject {
     }
 }
 
+/// Distinguish a drawer's added occlusion from the closed host's own chrome.
+/// Content reclaims the drawer inset while retaining the window's physical edges.
+struct AppSidebarInsets: Equatable {
+    let occlusion: EdgeInsets
+    let physical: EdgeInsets
+
+    init(current: EdgeInsets, closed: EdgeInsets, physical: EdgeInsets, sidebarVisible: Bool) {
+        occlusion = EdgeInsets(top: sidebarVisible ? max(0, current.top - closed.top) : 0,
+            leading: sidebarVisible ? max(0, current.leading - closed.leading) : 0,
+            bottom: sidebarVisible ? max(0, current.bottom - closed.bottom) : 0,
+            trailing: sidebarVisible ? max(0, current.trailing - closed.trailing) : 0)
+        self.physical = EdgeInsets(top: 0, leading: max(0, physical.leading),
+                                   bottom: 0, trailing: max(0, physical.trailing))
+    }
+
+    static func horizontal(left: CGFloat, right: CGFloat, rightToLeft: Bool) -> EdgeInsets {
+        EdgeInsets(top: 0, leading: rightToLeft ? right : left,
+                   bottom: 0, trailing: rightToLeft ? left : right)
+    }
+}
+
 #if MAIN_APP
 /// Central switch for reclaiming Duo's empty navigation inset in compact layouts.
 enum AppNavigationLayout {
@@ -419,38 +440,47 @@ struct AppNavigationContentLayout: ViewModifier {
         if #available(iOS 27.1, *) {
             content.modifier(VerticalNavigationContentLayout())
                 .modifier(SidebarNavigationContentLayout())
-        } else if #available(iOS 27.0, *) {
-            content.environment(\.isVerticalToolbar, false)
-                .modifier(SidebarNavigationContentLayout())
         } else {
             content.environment(\.isVerticalToolbar, false)
+                .modifier(SidebarNavigationContentLayout())
         }
+        #elseif os(iOS) && !targetEnvironment(macCatalyst)
+        content.environment(\.isVerticalToolbar, false)
+            .modifier(SidebarNavigationContentLayout())
         #else
         content.environment(\.isVerticalToolbar, false)
         #endif
     }
 }
 
-#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
+#if os(iOS) && !targetEnvironment(macCatalyst)
 /// Reclaim only sidebar occlusion inside the navigation content host. UIKit
 /// retains its safe area for the title and toolbars outside this body.
-@available(iOS 27.0, *)
 private struct SidebarNavigationContentLayout: ViewModifier {
-    @Environment(\.duoTabContext) private var tabs
+    @Environment(\.duoTabContext) private var duoTabs
+    @Environment(\.iPadTabContext) private var iPadTabs
 
-    private var preservedInsets: EdgeInsets {
-        guard let tabs, tabs.sidebarAvailable else { return EdgeInsets() }
+    private var preservedInsets: EdgeInsets? {
         // Measure outside this content: feeding its own safe-area geometry back
         // into padding can oscillate at pixel boundaries during native layout.
-        return tabs.physicalHorizontalInsets
+        if let iPadTabs, iPadTabs.sidebarAvailable { return iPadTabs.physicalHorizontalInsets }
+        if let duoTabs, duoTabs.sidebarAvailable { return duoTabs.physicalHorizontalInsets }
+        return nil
     }
 
     func body(content: Content) -> some View {
-        let usesOverlap = tabs?.sidebarAvailable == true
+        let preservedInsets = preservedInsets
+        let usesOverlap = preservedInsets != nil
+        // A portrait native sidebar can also reserve space for hidden tab
+        // chrome. Reclaim only its delta from the settled closed host, keeping
+        // navigation bars and the physical bottom safe area in place.
+        let sidebarInsets = iPadTabs?.sidebarAvailable == true ? iPadTabs?.sidebarInsets : nil
         content
             .frame(maxWidth: usesOverlap ? .infinity : nil)
-            .padding(.leading, usesOverlap ? preservedInsets.leading : 0)
-            .padding(.trailing, usesOverlap ? preservedInsets.trailing : 0)
+            .padding(.leading, preservedInsets?.leading ?? 0)
+            .padding(.trailing, preservedInsets?.trailing ?? 0)
+            .padding(.top, -(sidebarInsets?.top ?? 0))
+            .padding(.bottom, -(sidebarInsets?.bottom ?? 0))
             .ignoresSafeArea(.container, edges: usesOverlap ? .horizontal : [])
     }
 }

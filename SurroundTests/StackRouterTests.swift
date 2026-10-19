@@ -10,6 +10,61 @@ final class StackRouterTests: XCTestCase {
     private var firstPlayer: User { User(username: "First player", id: 101) }
     private var secondPlayer: User { User(username: "Second player", id: 102) }
 
+    func testSidebarOcclusionExcludesClosedNavigationChromeAndKeepsPhysicalEdges() {
+        let physical = EdgeInsets(top: 24, leading: 20, bottom: 34, trailing: 12)
+        let closed = EdgeInsets(top: 58, leading: 84, bottom: 34, trailing: 12)
+        let open = EdgeInsets(top: 58, leading: 364, bottom: 34, trailing: 12)
+        let metrics = AppSidebarInsets(current: open, closed: closed,
+                                      physical: physical, sidebarVisible: true)
+
+        XCTAssertEqual(metrics.occlusion, EdgeInsets(top: 0, leading: 280, bottom: 0, trailing: 0))
+        XCTAssertEqual(metrics.physical, EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 12))
+        let collapsed = AppSidebarInsets(current: open, closed: closed,
+                                        physical: physical, sidebarVisible: false)
+        XCTAssertEqual(collapsed.occlusion, EdgeInsets())
+        XCTAssertEqual(collapsed.physical, metrics.physical,
+                       "Opening or closing navigation must not change the body's physical edge reservation.")
+    }
+
+    func testRightToLeftSidebarUsesLogicalLeadingEdgeWithoutLosingPhysicalInsets() {
+        let metrics = AppSidebarInsets(
+            current: .init(top: 0, leading: 320, bottom: 0, trailing: 12),
+            closed: .init(top: 0, leading: 40, bottom: 0, trailing: 12),
+            physical: AppSidebarInsets.horizontal(left: 12, right: 40, rightToLeft: true),
+            sidebarVisible: true)
+
+        XCTAssertEqual(metrics.occlusion.leading, 280)
+        XCTAssertEqual(metrics.occlusion.trailing, 0)
+        XCTAssertEqual(metrics.physical.leading, 40)
+        XCTAssertEqual(metrics.physical.trailing, 12)
+    }
+
+    func testPortraitSidebarReclaimsAddedBottomChromeWithoutLosingClosedSafeArea() {
+        let closed = EdgeInsets(top: 86, leading: 0, bottom: 20, trailing: 0)
+        let open = EdgeInsets(top: 86, leading: 280, bottom: 64, trailing: 0)
+        let metrics = AppSidebarInsets(current: open, closed: closed,
+                                      physical: .init(), sidebarVisible: true)
+
+        XCTAssertEqual(metrics.occlusion.top, 0, "The existing navigation header stays reserved.")
+        XCTAssertEqual(metrics.occlusion.bottom, 44)
+        XCTAssertEqual(open.bottom - metrics.occlusion.bottom, closed.bottom,
+                       "Opening the drawer preserves the same vertical content viewport.")
+        let hidden = AppSidebarInsets(current: open, closed: closed,
+                                     physical: .init(), sidebarVisible: false)
+        XCTAssertEqual(hidden.occlusion, EdgeInsets())
+    }
+
+    func testSidebarTransitionCannotTurnReducedHostInsetsIntoNegativeOcclusion() {
+        let metrics = AppSidebarInsets(
+            current: .init(top: 0, leading: 20, bottom: 0, trailing: 0),
+            closed: .init(top: 0, leading: 84, bottom: 0, trailing: 12),
+            physical: .init(top: 0, leading: 20, bottom: 0, trailing: 0),
+            sidebarVisible: true)
+
+        XCTAssertEqual(metrics.occlusion, EdgeInsets())
+        XCTAssertEqual(metrics.physical.leading, 20)
+    }
+
     func testBiographyPlayerLinksLoadByIDAndKeepTheirSourceAboutForBack() {
         let router = Router()
         let profile = OGSPlayerProfile(user: firstPlayer, about: "A linked biography")

@@ -6,7 +6,10 @@ import Observation
 @MainActor
 @Observable
 final class IPadTabContext {
+    private(set) var sidebarAvailable = false
     private(set) var sidebarVisible = false
+    private(set) var sidebarInsets = EdgeInsets()
+    private(set) var physicalHorizontalInsets = EdgeInsets()
     @ObservationIgnored private var hiddenTabBarOwners = Set<UUID>()
     @ObservationIgnored var onTabBarVisibilityChange: (() -> Void)?
 
@@ -19,7 +22,27 @@ final class IPadTabContext {
 
     func removeTabBarHiddenRequest(owner: UUID) { setTabBarHidden(false, owner: owner) }
     fileprivate var prefersTabBarHidden: Bool { !hiddenTabBarOwners.isEmpty }
-    fileprivate func setSidebarVisible(_ visible: Bool) { sidebarVisible = visible }
+    fileprivate func update(_ metrics: IPadTabMetrics) {
+        sidebarAvailable = metrics.sidebarAvailable
+        sidebarVisible = metrics.sidebarVisible
+        sidebarInsets = metrics.insets.occlusion
+        physicalHorizontalInsets = metrics.insets.physical
+    }
+}
+
+fileprivate struct IPadTabMetrics: Equatable {
+    let sidebarAvailable: Bool
+    let sidebarVisible: Bool
+    let insets: AppSidebarInsets
+}
+
+private struct IPadHostBaselineKey: Hashable {
+    let root: RootView
+    let width: CGFloat
+    let height: CGFloat
+    let physicalLeft: CGFloat
+    let physicalRight: CGFloat
+    let rightToLeft: Bool
 }
 
 private struct IPadTabContextKey: EnvironmentKey {
@@ -34,7 +57,7 @@ extension EnvironmentValues {
 }
 
 #if os(iOS) && !targetEnvironment(macCatalyst)
-/// Prototype: native sidebar ordering with account rows that open the shared
+/// Native overlay navigation with account rows that open the shared
 /// sheet presenter. Each SwiftUI root retains its own navigation stack.
 @available(iOS 18.0, *)
 struct IPadTabContainer: UIViewControllerRepresentable {
@@ -64,7 +87,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
     final class Coordinator: NSObject, UITabBarControllerDelegate, UITabBarController.Sidebar.Delegate {
         private var parent: IPadTabContainer
         private weak var controller: IPadTabBarController?
-        private var hosts = [RootView: UIHostingController<AnyView>]()
+        private var hosts = [RootView: IPadTabHostingController]()
         private var tabs = [RootView: UITab]()
         private var contexts = [RootView: IPadTabContext]()
         private let surroundContent = IPadTabGroupContentController()
@@ -74,6 +97,12 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private var topology: [String] = []
         private var changingTabs = false
         private var regularWidth = false
+        private var hiddenHostBaselines = [IPadHostBaselineKey: UIEdgeInsets]()
+        private var sidebarTransitionID = UUID()
+        private var sidebarTransitionInProgress = false
+        private var pendingMetrics: IPadTabMetrics?
+        private var deliveredMetrics: IPadTabMetrics?
+        private var metricsDeliveryScheduled = false
 
         init(_ parent: IPadTabContainer) { self.parent = parent }
 
@@ -83,14 +112,20 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             controller.view.accessibilityIdentifier = "navigation.container.ipad"
             controller.delegate = self
             controller.mode = .tabSidebar
+            controller.sidebar.preferredLayout = .overlap
+            controller.sidebar.isHidden = true
             controller.sidebar.delegate = self
-            controller.onHorizontalSizeClassChange = { [weak self] in self?.applyTabs(regularWidth: $0) }
-            controller.onDidAppear = { [weak self] in self?.updateSidebarVisibility() }
+            controller.onHorizontalSizeClassChange = { [weak self] in
+                self?.hiddenHostBaselines.removeAll()
+                self?.applyTabs(regularWidth: $0)
+            }
+            controller.onLayout = { [weak self] in self?.measureLayout() }
             for root in RootView.allCases {
                 let tabContext = IPadTabContext()
                 tabContext.onTabBarVisibilityChange = { [weak self] in self?.applyTabBarVisibility() }
                 contexts[root] = tabContext
-                let host = UIHostingController(rootView: hostedContent(root))
+                let host = IPadTabHostingController(rootView: hostedContent(root))
+                host.onLayout = { [weak self] in self?.measureLayout() }
                 hosts[root] = host
                 let tab = UITab(title: root == .about ? String(localized: "About") : root.title,
                                 image: UIImage(systemName: root.systemImage),
@@ -147,8 +182,14 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
 
         private func applyLayoutDirection(_ direction: LayoutDirection) {
-            controller?.view.semanticContentAttribute = direction == .rightToLeft
+            guard let controller else { return }
+            let attribute: UISemanticContentAttribute = direction == .rightToLeft
                 ? .forceRightToLeft : .forceLeftToRight
+            if controller.view.semanticContentAttribute != attribute {
+                controller.sidebar.isHidden = true
+                hiddenHostBaselines.removeAll()
+                controller.view.semanticContentAttribute = attribute
+            }
         }
 
         private func applyTabs(regularWidth: Bool) {
@@ -156,6 +197,9 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             self.regularWidth = regularWidth
             tabs[.browser]?.preferredPlacement = regularWidth ? .sidebarOnly : .fixed
             let root = selectedRoot
+            if let selected = controller.selectedTab, effectiveRoot(selected) != root {
+                controller.sidebar.isHidden = true
+            }
             var primary: [RootView] = [.home, .publicGames]
             if parent.isLoggedIn { primary.append(.privateMessages) }
             var roots = primary
@@ -213,7 +257,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             applyTabBarVisibility()
             // Trait and representable updates both use this path. Publish the
             // current visibility after SwiftUI finishes its controller update.
-            DispatchQueue.main.async { [weak self] in self?.updateSidebarVisibility() }
+            DispatchQueue.main.async { [weak self] in self?.measureLayout() }
         }
 
         private func effectiveRoot(_ tab: UITab) -> RootView? {
@@ -227,6 +271,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
 
         func tabBarController(_ controller: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
+            controller.sidebar.isHidden = true
             switch effectiveRoot(tab) {
             case .profile:
                 if parent.isLoggedIn { parent.onAccountSheet(.profile) }
@@ -241,17 +286,31 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         func tabBarController(_ controller: UITabBarController, didSelectTab tab: UITab, previousTab: UITab?) {
             guard !changingTabs, let root = effectiveRoot(tab) else { return }
             if parent.selection != root { parent.selection = root }
+            controller.sidebar.isHidden = true
             applyTabs(regularWidth: regularWidth)
         }
 
         func tabBarController(_ controller: UITabBarController, sidebarAvailabilityDidChange sidebar: UITabBarController.Sidebar) {
             applyTabs(regularWidth: controller.traitCollection.horizontalSizeClass == .regular)
-            updateSidebarVisibility()
+            measureLayout()
         }
 
         func tabBarController(_ controller: UITabBarController, sidebarVisibilityWillChange sidebar: UITabBarController.Sidebar,
                               animator: any UITabBarController.Sidebar.Animating) {
-            animator.addCompletion { [weak self] in self?.updateSidebarVisibility() }
+            sidebarTransitionID = UUID()
+            sidebarTransitionInProgress = true
+            let transitionID = sidebarTransitionID
+            animator.addAnimations { [weak self] in self?.measureLayout() }
+            animator.addCompletion { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.sidebarTransitionID == transitionID else { return }
+                    self.controller?.view.layoutIfNeeded()
+                    self.measureLayout()
+                    self.deliverMetrics()
+                    self.sidebarTransitionInProgress = false
+                    self.measureLayout()
+                }
+            }
         }
 
         func tabBarController(_ controller: UITabBarController, sidebar: UITabBarController.Sidebar,
@@ -269,16 +328,75 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             item.contentConfiguration = configuration
         }
 
-        private func updateSidebarVisibility() {
-            guard let controller else { return }
-            let visible = regularWidth && controller.mode != .tabBar && !controller.sidebar.isHidden
-            for context in contexts.values where context.sidebarVisible != visible { context.setSidebarVisible(visible) }
+        private func measureLayout() {
+            guard let controller, controller.isViewLoaded,
+                  let host = hosts[selectedRoot], host.isViewLoaded,
+                  let window = host.view.window else { return }
+            let bounds = host.view.bounds
+            let physicalFrame = host.view.convert(window.safeAreaLayoutGuide.layoutFrame, from: window)
+            let physicalLeft = max(0, physicalFrame.minX - bounds.minX)
+            let physicalRight = max(0, bounds.maxX - physicalFrame.maxX)
+            let rightToLeft = host.view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+            let hostInsets = host.view.safeAreaInsets
+            let available: Bool
+            #if canImport(SwiftUI, _version: 8.0)
+            if #available(iOS 27.0, *) { available = controller.sidebar.isAvailable }
+            else { available = regularWidth && controller.mode != .tabBar }
+            #else
+            available = regularWidth && controller.mode != .tabBar
+            #endif
+            let visible = available && !controller.sidebar.isHidden
+            let key = IPadHostBaselineKey(root: selectedRoot, width: bounds.width, height: bounds.height,
+                physicalLeft: physicalLeft, physicalRight: physicalRight, rightToLeft: rightToLeft)
+            if !visible && !sidebarTransitionInProgress { hiddenHostBaselines[key] = hostInsets }
+            // Rotation may introduce a new baseline while the drawer is open.
+            // With hidden tabs, this outer host reserves only physical vertical
+            // edges when closed; the child navigation stack owns its header.
+            // Use those edges until a closed sample exists for the new size.
+            // Other screens retain their own native chrome as the fallback.
+            let fallbackInsets = controller.isTabBarHidden
+                ? UIEdgeInsets(top: max(0, physicalFrame.minY - bounds.minY),
+                               left: hostInsets.left,
+                               bottom: max(0, bounds.maxY - physicalFrame.maxY),
+                               right: hostInsets.right)
+                : hostInsets
+            let closedInsets = hiddenHostBaselines[key] ?? fallbackInsets
+            pendingMetrics = IPadTabMetrics(
+                sidebarAvailable: available, sidebarVisible: visible,
+                insets: AppSidebarInsets(
+                    current: EdgeInsets(top: hostInsets.top,
+                        leading: rightToLeft ? hostInsets.right : hostInsets.left,
+                        bottom: hostInsets.bottom,
+                        trailing: rightToLeft ? hostInsets.left : hostInsets.right),
+                    closed: EdgeInsets(top: closedInsets.top,
+                        leading: rightToLeft ? closedInsets.right : closedInsets.left,
+                        bottom: closedInsets.bottom,
+                        trailing: rightToLeft ? closedInsets.left : closedInsets.right),
+                    physical: AppSidebarInsets.horizontal(left: physicalLeft, right: physicalRight,
+                                                          rightToLeft: rightToLeft),
+                    sidebarVisible: visible))
+            if !metricsDeliveryScheduled {
+                metricsDeliveryScheduled = true
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.metricsDeliveryScheduled = false
+                    self.deliverMetrics()
+                }
+            }
+        }
+
+        private func deliverMetrics() {
+            guard let latest = pendingMetrics, latest != deliveredMetrics else { return }
+            deliveredMetrics = latest
+            for context in contexts.values { context.update(latest) }
         }
 
         private func applyTabBarVisibility() {
             guard let controller else { return }
             let hidden = contexts[selectedRoot]?.prefersTabBarHidden ?? false
             if controller.isTabBarHidden != hidden {
+                controller.sidebar.isHidden = true
+                hiddenHostBaselines.removeAll()
                 controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
             }
         }
@@ -341,7 +459,7 @@ private final class IPadTabGroupContentController: UIViewController {
 @available(iOS 18.0, *)
 private final class IPadTabBarController: UITabBarController {
     var onHorizontalSizeClassChange: ((Bool) -> Void)?
-    var onDidAppear: (() -> Void)?
+    var onLayout: (() -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -349,6 +467,36 @@ private final class IPadTabBarController: UITabBarController {
             controller.onHorizontalSizeClassChange?(controller.traitCollection.horizontalSizeClass == .regular)
         }
     }
-    override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); onDidAppear?() }
+    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); onLayout?() }
+
+    /// While a game hides the tab bar, a size transition must not open the
+    /// sidebar. UIKit restores its own landscape visibility on rotation (the
+    /// size class stays regular, so no trait change fires); close it again if
+    /// it was closed before. A sidebar the person opened stays open.
+    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
+        let keepsSidebarClosed = isTabBarHidden && sidebar.isHidden
+        super.viewWillTransition(to: size, with: coordinator)
+        guard keepsSidebarClosed else { return }
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            self?.closeSidebarIfReopened()
+        }) { [weak self] _ in
+            self?.closeSidebarIfReopened()
+            // UIKit can apply its restored visibility after the completion.
+            DispatchQueue.main.async { [weak self] in self?.closeSidebarIfReopened() }
+        }
+    }
+
+    private func closeSidebarIfReopened() {
+        guard isTabBarHidden, !sidebar.isHidden else { return }
+        sidebar.isHidden = true
+    }
+}
+
+@available(iOS 18.0, *)
+private final class IPadTabHostingController: UIHostingController<AnyView> {
+    var onLayout: (() -> Void)?
+
+    override func viewSafeAreaInsetsDidChange() { super.viewSafeAreaInsetsDidChange(); onLayout?() }
+    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); onLayout?() }
 }
 #endif

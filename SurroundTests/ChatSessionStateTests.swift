@@ -4,6 +4,35 @@ import XCTest
 final class ChatSessionStateTests: XCTestCase {
     private enum SendError: Error { case unavailable }
 
+    func testChannelDraftsRemainIndependentAcrossSwitches() {
+        let session = ChatSessionState()
+        session.message = "Public draft"
+        session.selectChannel(.personal)
+        XCTAssertEqual(session.message, "")
+        session.message = "Private note"
+        session.selectChannel(.main)
+        XCTAssertEqual(session.message, "Public draft")
+        session.selectChannel(.personal)
+        XCTAssertEqual(session.message, "Private note")
+        session.reset()
+        session.selectChannel(.personal)
+        XCTAssertEqual(session.message, "")
+    }
+
+    func testSendCompletionClearsOnlyTheSubmittedChannelDraft() {
+        let session = ChatSessionState()
+        let response = PassthroughSubject<Void, Error>()
+        session.message = "Public message"
+        session.sendMessage { _ in response.eraseToAnyPublisher() }
+        session.selectChannel(.personal)
+        session.message = "Private note"
+        response.send(())
+        drainMainQueue()
+        XCTAssertEqual(session.message, "Private note")
+        session.selectChannel(.main)
+        XCTAssertEqual(session.message, "")
+    }
+
     func testPendingSendSurvivesComposerReplacementAndPreventsDuplicate() {
         let session = ChatSessionState()
         let response = PassthroughSubject<Void, Error>()
@@ -342,6 +371,76 @@ final class ChatSessionStateTests: XCTestCase {
         XCTAssertFalse(session.wantsInputFocus)
     }
 
+    func testWindowTransitionPreservesFocusedComposerThroughTransientLoss() throws {
+        let session = ChatSessionState()
+        let composer = UUID()
+        session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+        session.message = "Unsent through rotation"
+        let transition = try XCTUnwrap(session.beginWindowSizeTransition())
+
+        // UIKit can resign, restore, then resign the same field during rotation.
+        session.recordInputFocus(false, composerID: composer)
+        session.recordInputFocus(true, composerID: composer)
+        session.recordInputFocus(false, composerID: composer)
+        XCTAssertTrue(session.wantsInputFocus)
+        XCTAssertEqual(session.focusRestorationRevision, 0)
+
+        session.completeWindowSizeTransition(transition)
+        XCTAssertEqual(session.focusRestorationRevision, 1)
+        XCTAssertEqual(session.message, "Unsent through rotation")
+        session.completeWindowSizeTransition(transition)
+        XCTAssertEqual(session.focusRestorationRevision, 1, "Completion only restores once")
+        session.recordInputFocus(false, composerID: composer)
+        XCTAssertFalse(session.wantsInputFocus, "Ordinary focus loss after rotation still dismisses")
+    }
+
+    func testWindowTransitionRestorationIsCancelledByDismissalNavigationOrReset() throws {
+        let interruptions: [(String, (ChatSessionState) -> Void)] = [
+            ("explicit dismissal", { $0.dismissInput() }),
+            ("navigation", { $0.gamePresentationDisappeared() }),
+            ("game or account reset", { $0.reset() }),
+        ]
+        for (name, interrupt) in interruptions {
+            let session = ChatSessionState()
+            let composer = UUID()
+            session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+            let transition = try XCTUnwrap(session.beginWindowSizeTransition())
+            interrupt(session)
+            session.completeWindowSizeTransition(transition)
+            XCTAssertFalse(session.wantsInputFocus, name)
+            XCTAssertEqual(session.focusRestorationRevision, 0, name)
+        }
+    }
+
+    func testWindowTransitionDoesNotFocusAnUnfocusedComposer() {
+        let session = ChatSessionState()
+        session.composerAppeared(id: UUID(), automaticallyFocus: false, shareFocusRequestID: nil)
+        XCTAssertNil(session.beginWindowSizeTransition())
+        XCTAssertFalse(session.wantsInputFocus)
+        XCTAssertEqual(session.focusRestorationRevision, 0)
+    }
+
+    func testNewShareFocusRequestSupersedesWindowTransitionRestoration() throws {
+        let session = ChatSessionState()
+        session.composerAppeared(id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil)
+        let transition = try XCTUnwrap(session.beginWindowSizeTransition())
+        session.requestShareFocus(UUID())
+        session.completeWindowSizeTransition(transition)
+        XCTAssertTrue(session.wantsInputFocus)
+        XCTAssertEqual(session.focusRestorationRevision, 0)
+    }
+
+    func testWindowLosingKeyStatusEndsGuardWithoutRestoringFocus() throws {
+        let session = ChatSessionState()
+        let composer = UUID()
+        session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+        let transition = try XCTUnwrap(session.beginWindowSizeTransition())
+        session.completeWindowSizeTransition(transition, allowsRestoration: false)
+        XCTAssertEqual(session.focusRestorationRevision, 0)
+        session.recordInputFocus(false, composerID: composer)
+        XCTAssertFalse(session.wantsInputFocus)
+    }
+
     func testFirstCompactAppearanceFocusesButDoesNotUndoUserDismissal() {
         let session = ChatSessionState()
         session.composerAppeared(
@@ -357,6 +456,66 @@ final class ChatSessionStateTests: XCTestCase {
             id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil
         )
         XCTAssertFalse(session.wantsInputFocus)
+    }
+
+    func testKeyboardAndViewportResizeCannotStopFollowingLatestMessages() {
+        let session = ChatSessionState()
+        // Opening a keyboard can hide the end marker several times while the
+        // viewport and lazy content settle, without a user scrolling history.
+        for _ in 0..<3 {
+            session.recordScrollPosition(
+                atEnd: false, anchor: "earlier-message", userInitiated: false
+            )
+        }
+        XCTAssertTrue(session.isAtEndOfChat)
+        XCTAssertNil(session.scrollAnchor)
+    }
+
+    func testOlderReadingPositionSurvivesKeyboardDismissalAndNewMessages() {
+        let session = ChatSessionState()
+        session.recordScrollPosition(
+            atEnd: false, anchor: "move-42", userInitiated: true
+        )
+        // A larger viewport can temporarily expose the bottom, and an append
+        // can hide it again. Neither event should replace the user's bookmark.
+        session.recordScrollPosition(
+            atEnd: true, anchor: "latest-message", userInitiated: false
+        )
+        session.recordScrollPosition(
+            atEnd: false, anchor: "move-57", userInitiated: false
+        )
+        XCTAssertFalse(session.isAtEndOfChat)
+        XCTAssertEqual(session.scrollAnchor, "move-42")
+    }
+
+    func testScrollingBackToLatestMessageResumesFollowingAcrossReplacement() {
+        let session = ChatSessionState()
+        session.recordScrollPosition(
+            atEnd: false, anchor: "move-42", userInitiated: true
+        )
+        session.recordScrollPosition(
+            atEnd: true, anchor: "latest-message", userInitiated: true
+        )
+        session.recordScrollPosition(
+            atEnd: false, anchor: nil, userInitiated: false
+        )
+        XCTAssertTrue(session.isAtEndOfChat)
+        XCTAssertNil(session.scrollAnchor)
+    }
+
+    func testTransientMissingVisibleRowsRetainOlderBookmark() {
+        let session = ChatSessionState()
+        session.recordScrollPosition(
+            atEnd: false, anchor: "move-42", userInitiated: true
+        )
+        session.recordScrollPosition(
+            atEnd: false, anchor: nil, userInitiated: true
+        )
+        XCTAssertFalse(session.isAtEndOfChat)
+        XCTAssertEqual(session.scrollAnchor, "move-42")
+        session.reset()
+        XCTAssertTrue(session.isAtEndOfChat)
+        XCTAssertNil(session.scrollAnchor)
     }
 
     private func drainMainQueue() {

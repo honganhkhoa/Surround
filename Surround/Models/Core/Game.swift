@@ -196,6 +196,11 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
     }
     @Published var clock: OGSClock?
+    /// The clock as it stood when the socket left `.connected`, taken and
+    /// cleared by OGSService. Every Game Detail clock shows this one value
+    /// while disconnected, so a pair mounted later (a header chip, reopened
+    /// Chat, a return from a pushed screen) cannot show a later local tick.
+    @Published var disconnectedClock: OGSClock?
     @Published var pauseControl: OGSPauseControl?
     var canBeCancelled: Bool {
         if gamePhase != .play {

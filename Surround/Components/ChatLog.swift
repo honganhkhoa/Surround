@@ -54,6 +54,16 @@ struct ChatLogSelectionPreview {
     var coordinates: [[Int]] = []
 }
 
+private struct GameChatTranscriptLayout: Equatable {
+    let containerSize: CGSize
+    let contentSize: CGSize
+    let contentInsets: EdgeInsets
+
+    var overflows: Bool {
+        contentSize.height > containerSize.height - contentInsets.top - contentInsets.bottom
+    }
+}
+
 struct ChatLog: View {
     @ObservedObject var game: Game
     @ObservedObject var session: ChatSessionState
@@ -64,12 +74,47 @@ struct ChatLog: View {
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
     var focusInputOnAppear = false
+    var showsComposer = true
     var onInteraction: () -> Void = {}
     var onVariationShared: () -> Void = {}
     var onCancelVariationSharing: () -> Void = {}
     
     @State private var isVisible = false
     @State private var visibleScrollAnchor: String?
+    @State private var followsLatestMessages = true
+    @State private var scrollPosition = ScrollPosition(idType: String.self, edge: .bottom)
+    @State private var scrollPhase: ScrollPhase = .idle
+    @State private var transcriptLayout: GameChatTranscriptLayout?
+
+    private static func isUserScrolling(_ phase: ScrollPhase) -> Bool {
+        phase == .interacting || phase == .decelerating
+    }
+
+    private func rememberUserPosition(in geometry: ScrollGeometry) {
+        guard isVisible, geometry.containerSize.height > 0,
+              geometry.contentSize.height > 0 else { return }
+        let atEnd = geometry.visibleRect.maxY - geometry.contentInsets.bottom
+            >= geometry.contentSize.height - 2
+        if followsLatestMessages != atEnd { followsLatestMessages = atEnd }
+        session.recordScrollPosition(
+            atEnd: atEnd, anchor: visibleScrollAnchor, userInitiated: true
+        )
+        if atEnd { game.markAllChatAsRead() }
+    }
+
+    private func scrollToLatestMessageIfFollowing() {
+        guard isVisible, followsLatestMessages, session.isAtEndOfChat,
+              scrollPhase != .tracking, !Self.isUserScrolling(scrollPhase) else { return }
+        if let layout = transcriptLayout, layout.overflows,
+           let latestMessageID = game.chatLog.last?.id {
+            // Lazy rows can still have estimated heights during a keyboard
+            // resize. Target the actual last row rather than an estimated
+            // content offset, which can temporarily land beyond all content.
+            scrollPosition.scrollTo(id: latestMessageID, anchor: .bottom)
+        } else {
+            scrollPosition.scrollTo(edge: .bottom)
+        }
+    }
 
     private func clearSelection() {
         selection.wrappedValue = nil
@@ -213,101 +258,129 @@ struct ChatLog: View {
         VStack(spacing: 0) {
             GeometryReader { scrollViewGeometry in
                 ScrollView {
-                    ScrollViewReader { scrollView in
-                        LazyVStack(spacing: 0) {
-                            chatLines
-                            Spacer().frame(height: 8)
-                            // Observe visibility outside lazy layout evaluation.
-                            // Querying this marker's frame inside GeometryReader
-                            // can loop layout on iOS 18 when the composer shrinks.
-                            Color.clear
-                                .frame(width: 10, height: 1)
-                                .id("scrollViewBottom")
-                                .onScrollVisibilityChange { isVisible in
-                                    guard self.isVisible,
-                                          session.isAtEndOfChat != isVisible else {
-                                        return
-                                    }
-                                    session.isAtEndOfChat = isVisible
-                                    if isVisible {
-                                        game.markAllChatAsRead()
-                                    }
-                                }
-                        }
-                        .scrollTargetLayout()
-                        .padding(.horizontal, 10)
-                        .padding(.top, 10)
-                        .padding(.bottom, 0)
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: scrollViewGeometry.size.height,
-                            alignment: .top
-                        )
-                        .background {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture(
-                                    perform: clearSelectionAndDismissInput
-                                )
-                                .accessibilityHidden(true)
-                        }
-                        .onAppear {
-                            isVisible = true
-                            if let anchor = session.scrollAnchor,
-                               !session.isAtEndOfChat {
-                                // Restore after lazy rows have joined the layout.
-                                DispatchQueue.main.async {
-                                    guard isVisible else { return }
-                                    scrollView.scrollTo(anchor, anchor: .top)
-                                }
-                            }
-                            game.markAllChatAsRead()
-                        }
-                        .onDisappear { isVisible = false }
-                        .onChange(of: game.ID) { _, _ in
-                            scrollView.scrollTo("scrollViewBottom")
-                        }
-                        .onReceive(game.$chatLog) { newChatLog in
-                            if !selectionStillExists(in: newChatLog) {
-                                clearSelection()
-                            }
-                            if session.isAtEndOfChat {
-                                DispatchQueue.main.async {
-                                    scrollView.scrollTo("scrollViewBottom")
-                                    game.markAllChatAsRead()
-                                }
-                            }
-                        }
-                        .onReceive(SystemPlatformServices.shared.keyboardWillChangeFramePublisher) { _ in
-                            session.shouldScrollToEndAfterKeyboardChange =
-                                session.isAtEndOfChat
-                        }
-                        .onReceive(SystemPlatformServices.shared.keyboardDidChangeFramePublisher) { _ in
-                            if session.shouldScrollToEndAfterKeyboardChange {
-                                DispatchQueue.main.async {
-                                    scrollView.scrollTo("scrollViewBottom")
-                                    session.shouldScrollToEndAfterKeyboardChange = false
-                                }
-                            }
-                        }
+                    LazyVStack(spacing: 0) {
+                        chatLines
+                        Color.clear.frame(height: 8)
+                    }
+                    .scrollTargetLayout()
+                    .padding(.horizontal, 10)
+                    .padding(.top, 10)
+                    // Fill the viewport so blank chat space keeps the same tap
+                    // behavior as row gutters, while short transcripts stay at the bottom.
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: scrollViewGeometry.size.height,
+                        alignment: .bottom
+                    )
+                    .background {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture(perform: clearSelectionAndDismissInput)
+                            .accessibilityHidden(true)
                     }
                 }
-                .scrollPosition(id: $visibleScrollAnchor, anchor: .top)
-                .onChange(of: visibleScrollAnchor) { _, anchor in
-                    // Persist the last visible row without publishing scroll
-                    // layout changes back through the entire game hierarchy.
-                    // A departing view must not erase the replacement's anchor.
-                    guard isVisible, let anchor else { return }
-                    session.scrollAnchor = anchor
+                .scrollPosition($scrollPosition, anchor: followsLatestMessages ? .bottom : .top)
+                .defaultScrollAnchor(
+                    session.isAtEndOfChat ? .bottom : .top, for: .initialOffset
+                )
+                .defaultScrollAnchor(.bottom, for: .alignment)
+                .defaultScrollAnchor(
+                    followsLatestMessages ? .bottom : nil, for: .sizeChanges
+                )
+                .onScrollGeometryChange(for: GameChatTranscriptLayout.self) { geometry in
+                    GameChatTranscriptLayout(
+                        containerSize: geometry.containerSize,
+                        contentSize: geometry.contentSize,
+                        contentInsets: geometry.contentInsets
+                    )
+                } action: { _, layout in
+                    guard layout.containerSize.height > 0,
+                          layout.contentSize.height > 0 else { return }
+                    transcriptLayout = layout
+                    // Content appends, the keyboard, and folds all use the settled
+                    // viewport. A resize never changes the user's reading intent.
+                    scrollToLatestMessageIfFollowing()
                 }
-                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .onScrollGeometryChange(for: Bool?.self) { geometry in
+                    guard geometry.containerSize.height > 0,
+                          geometry.contentSize.height > 0 else { return nil }
+                    return geometry.visibleRect.maxY - geometry.contentInsets.bottom
+                        >= geometry.contentSize.height - 2
+                } action: { _, atEnd in
+                    guard isVisible, let atEnd else { return }
+                    let userInitiated = Self.isUserScrolling(scrollPhase)
+                    session.recordScrollPosition(
+                        atEnd: atEnd, anchor: visibleScrollAnchor,
+                        userInitiated: userInitiated
+                    )
+                    if userInitiated && followsLatestMessages != atEnd {
+                        followsLatestMessages = atEnd
+                    }
+                    if atEnd && followsLatestMessages { game.markAllChatAsRead() }
+                }
+                .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.5) { ids in
+                    guard isVisible, Self.isUserScrolling(scrollPhase) else { return }
+                    let visibleIDs = Set(ids)
+                    visibleScrollAnchor = game.chatLog.first {
+                        visibleIDs.contains($0.id)
+                    }?.id
+                    session.recordScrollPosition(
+                        atEnd: followsLatestMessages, anchor: visibleScrollAnchor,
+                        userInitiated: true
+                    )
+                }
+                .onScrollPhaseChange { oldPhase, newPhase, context in
+                    guard isVisible else { return }
+                    scrollPhase = newPhase
+                    if Self.isUserScrolling(newPhase)
+                        || (newPhase == .idle && Self.isUserScrolling(oldPhase)) {
+                        rememberUserPosition(in: context.geometry)
+                    } else if newPhase == .idle && oldPhase == .tracking {
+                        scrollToLatestMessageIfFollowing()
+                    }
+                }
                 .coordinateSpace(name: "scrollView")
                 .scrollDismissesKeyboard(.interactively)
                 .accessibilityIdentifier(
                     SurroundUITestContract.AccessibilityID.gameChatLog
                 )
+                .onAppear {
+                    isVisible = true
+                    followsLatestMessages = session.isAtEndOfChat
+                    if let anchor = session.scrollAnchor, !session.isAtEndOfChat {
+                        scrollPosition.scrollTo(id: anchor, anchor: .top)
+                    } else {
+                        scrollToLatestMessageIfFollowing()
+                        game.markAllChatAsRead()
+                    }
+                }
+                .onDisappear {
+                    isVisible = false
+                    scrollPhase = .idle
+                }
+                .onChange(of: game.ID) { _, _ in
+                    // The active-game picker retains this transcript view. Its
+                    // local reading intent must reset with the owning session.
+                    followsLatestMessages = true
+                    visibleScrollAnchor = nil
+                    scrollPosition.scrollTo(edge: .bottom)
+                    if isVisible { game.markAllChatAsRead() }
+                }
+                .onReceive(game.$chatLog) { newChatLog in
+                    if !selectionStillExists(in: newChatLog) { clearSelection() }
+                    if followsLatestMessages {
+                        // Lazy rows may join layout after this model emission.
+                        DispatchQueue.main.async {
+                            scrollToLatestMessageIfFollowing()
+                            if isVisible && session.isAtEndOfChat {
+                                game.markAllChatAsRead()
+                            }
+                        }
+                    }
+                }
             }
-            if ogs.user != nil {
+            if showsComposer && ogs.user != nil {
+                Divider()
                 NewChatInput(
                     game: game,
                     session: session,
@@ -321,10 +394,7 @@ struct ChatLog: View {
                     .id(session.composerPresentationID)
             }
         }
-        .background(
-            Color(colorScheme == .dark ? UIColor.systemBackground : UIColor.systemGray6)
-                .shadow(radius: 2)
-        )
+        .background(GameDetailAppearance.panel)
         .onChange(of: game.ID) { _, _ in
             clearSelection()
         }
@@ -385,7 +455,7 @@ private struct VariationSharePreviewRow: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .trailing, spacing: 0) {
+            VStack(alignment: .trailing, spacing: 8) {
                 Text(title)
                     .font(Font.title2.bold())
                     .lineLimit(2)
@@ -396,7 +466,6 @@ private struct VariationSharePreviewRow: View {
                         SurroundUITestContract.AccessibilityID
                             .gameVariationShareStatus
                     )
-                Spacer(minLength: 0)
                 Button("Cancel", action: onCancel)
                     .padding(10)
                     .contentShape(RoundedRectangle(cornerRadius: 10))
@@ -406,7 +475,7 @@ private struct VariationSharePreviewRow: View {
                             .gameVariationShareCancel
                     )
             }
-            .frame(height: 120)
+            .frame(height: 120, alignment: .top)
         }
     }
 }
@@ -422,6 +491,7 @@ struct NewChatInput: View {
     var onVariationShared: () -> Void = {}
     var onCancelVariationSharing: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var channelDividerHeight: CGFloat = 28
+    @ScaledMetric(relativeTo: .body) private var sendIconSize: CGFloat = 30
     
     @FocusState private var isInputFocused: Bool
     @State private var composerID = UUID()
@@ -516,6 +586,7 @@ struct NewChatInput: View {
     ) -> some View {
         Button {
             onInteraction()
+            session.selectChannel(channel)
             selectedChannel.wrappedValue = channel
         } label: {
             Label {
@@ -549,7 +620,7 @@ struct NewChatInput: View {
     private var backgroundColor: Color {
         switch selectedChannel.wrappedValue {
         case .main:
-            return Color(.systemBackground)
+            return GameDetailAppearance.panel
         case .malkovich:
             return Color(.systemGreen).opacity(0.2)
         case .personal:
@@ -719,6 +790,8 @@ struct NewChatInput: View {
                     || !session.isSending {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: min(sendIconSize, 40)))
+                            .frame(width: 44, height: 44)
                     }
                     .disabled(!canSend)
                     .accessibilityIdentifier(
@@ -726,9 +799,10 @@ struct NewChatInput: View {
                     )
                 } else {
                     ProgressView()
+                        .frame(width: 44, height: 44)
                 }
             }
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .padding(.horizontal, 10)
         }
         .background(backgroundColor)
@@ -770,6 +844,9 @@ struct NewChatInput: View {
                 isInputFocused = false
             }
         }
+        .onChange(of: session.focusRestorationRevision) { _, _ in
+            if session.wantsInputFocus { focusInput() }
+        }
         .onChange(of: isInputFocused) { _, focused in
             if focused {
                 guard session.isActiveComposer(composerID) else { return }
@@ -779,10 +856,16 @@ struct NewChatInput: View {
                 }
                 isRestoringFocus = false
             } else {
+                // A window transition can resign and restore the same native
+                // field. Do not queue that transient loss as a user dismissal.
+                guard !session.preservesInputFocusDuringWindowTransition(
+                    composerID: composerID
+                ) else { return }
                 // Focus can fall before onDisappear during layout replacement.
                 // Record a user dismissal only if this composer remains active.
                 let revision = session.focusRevision
                 DispatchQueue.main.async {
+                    guard !isInputFocused else { return }
                     session.recordInputFocus(
                         false, composerID: composerID,
                         expectedRevision: revision

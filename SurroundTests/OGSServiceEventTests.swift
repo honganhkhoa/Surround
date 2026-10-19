@@ -731,6 +731,63 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(socket.emissions.filter { $0.command == "game/connect" }.count, 2)
     }
 
+    private func drainMainQueue() {
+        let drained = expectation(description: "main queue drained")
+        DispatchQueue.main.async { drained.fulfill() }
+        wait(for: [drained], timeout: 2)
+    }
+
+    /// v148: one disconnect snapshot per game, shared by every Game Detail
+    /// clock. A later local tick or another pair asking again cannot move it;
+    /// reconnection clears it.
+    func testDisconnectFreezesOneClockSnapshotPerGameUntilReconnected() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket(authenticate: true)
+        drainMainQueue()
+        XCTAssertEqual(service.socketStatus, .connected)
+        let data = try makeEmptyGameData(id: 4242)
+        let game = Game(ogsGame: data)
+        game.clock = data.clock
+        game.clock?.blackTime.thinkingTimeLeft = 272
+        let canonical = service.connect(to: game, owner: .detail(UUID()))
+        XCTAssertNil(canonical.disconnectedClock, "Connected games hold no snapshot")
+
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(service.socketStatus, .reconnecting)
+        XCTAssertEqual(canonical.disconnectedClock?.blackTime.thinkingTimeLeft, 272,
+                       "Leaving .connected freezes the clock it had")
+        canonical.clock?.blackTime.thinkingTimeLeft = 265
+        service.freezeClockIfDisconnected(canonical)
+        XCTAssertEqual(canonical.disconnectedClock?.blackTime.thinkingTimeLeft, 272,
+                       "A pair mounted later reads the same snapshot, not the local tick")
+        XCTAssertEqual(canonical.clock?.blackTime.thinkingTimeLeft, 265, "The shared model is never stopped")
+
+        socket.openSocket(authenticate: true)
+        drainMainQueue()
+        XCTAssertNil(canonical.disconnectedClock, "Reconnection clears the snapshot")
+        service.freezeClockIfDisconnected(canonical)
+        XCTAssertNil(canonical.disconnectedClock, "No snapshot is taken while connected")
+    }
+
+    func testGameOpenedWhileDisconnectedFreezesAtItsKnownClock() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        socket.openSocket(authenticate: true)
+        socket.dropSocket()
+        drainMainQueue()
+        XCTAssertEqual(service.socketStatus, .reconnecting)
+        let data = try makeEmptyGameData(id: 4243)
+        let game = Game(ogsGame: data)
+        game.clock = data.clock
+        game.clock?.whiteTime.thinkingTimeLeft = 375
+        let canonical = service.connect(to: game, owner: .detail(UUID()))
+        XCTAssertEqual(canonical.disconnectedClock?.whiteTime.thinkingTimeLeft, 375)
+        canonical.clock?.whiteTime.thinkingTimeLeft = 360
+        XCTAssertEqual(canonical.disconnectedClock?.whiteTime.thinkingTimeLeft, 375)
+    }
+
     func testMissingRengoPlayersRequestOneSnapshotAndRecoverInServerOrder() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket)

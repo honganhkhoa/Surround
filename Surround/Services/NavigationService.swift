@@ -185,6 +185,35 @@ class NavigationService: ObservableObject {
         #endif
     }
     
+    /// Visible Game Detail owners, including UIKit-hosted tab content. True
+    /// means their picker covers the user's live games; correspondence and
+    /// spectator screens still need notices. Each window has its own service.
+    @Published var gameDetailNotificationContexts: [UUID: Bool] = [:]
+    /// The Reconnecting… badges each Game Detail context is rendering. The
+    /// app's connection banner gives way only while a visible game shows one;
+    /// in stone removal, after the game, in Analyze's glow-only chips or a
+    /// chip without its label, the banner explains the disabled controls.
+    @Published private(set) var gameDetailReconnectingBadges: [UUID: Set<UUID>] = [:]
+    /// The app's connection banner is on screen, including its "Connected"
+    /// fade-out. On iPhone it sits in the title slot, so the title gives way.
+    @Published var connectionBannerVisible = false
+    /// The global message presenter and a visible game's native toolbar share
+    /// one presentation in this window.
+    @Published var showingPrivateChatView = false
+
+    var visibleGameDetailShowsReconnectingBadge: Bool {
+        gameDetailReconnectingBadges.contains { context, badges in
+            !badges.isEmpty && gameDetailNotificationContexts[context] != nil
+        }
+    }
+
+    func setGameDetailReconnectingBadge(_ badge: UUID, context: UUID, shown: Bool) {
+        var badges = gameDetailReconnectingBadges[context] ?? []
+        let changed = shown ? badges.insert(badge).inserted : badges.remove(badge) != nil
+        guard changed else { return }
+        gameDetailReconnectingBadges[context] = badges.isEmpty ? nil : badges
+    }
+
     @Published var home = HomeViewParameters()
     @Published var main = MainViewParameters()
     @Published var publicGames = PublicGamesViewParameter()

@@ -22,6 +22,23 @@ class SurroundUITestCase: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        // Older capture journeys describe the three game tasks as segment
+        // indices. Route those calls through the native toolbar controls while
+        // keeping unrelated segmented controls (ratings, matchmaking) intact.
+        if identifier == SurroundUITestContract.AccessibilityID.gameDisplayModePicker {
+            switch index {
+            case 0:
+                setGameAnalyzing(true, in: app, file: file, line: line)
+            case 1:
+                setGameAnalyzing(false, in: app, file: file, line: line)
+                setGameChatVisible(false, in: app, file: file, line: line)
+            case 2:
+                openGameChat(in: app, file: file, line: line)
+            default:
+                XCTFail("Unknown game display mode \(index)", file: file, line: line)
+            }
+            return
+        }
         let controls = app
             .descendants(matching: .segmentedControl)
             .matching(identifier: identifier)
@@ -53,6 +70,122 @@ class SurroundUITestCase: XCTestCase {
             return
         }
         hittableSegment.tap()
+    }
+
+    func gameAnalyzeControl(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier == %@ OR identifier == %@",
+            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
+            SurroundUITestContract.AccessibilityID.gameDisplayModePicker + ".analyze"
+        )).firstMatch
+    }
+
+    func gameChatControl(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameDisplayModePicker + ".chat"
+        ).firstMatch
+    }
+
+    func gameToolbarToggleIsOn(_ control: XCUIElement) -> Bool {
+        guard control.exists else { return false }
+        return control.isSelected || (control.value as? String) == "1"
+    }
+
+    func setGameAnalyzing(
+        _ analyzing: Bool,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        setGameToolbarToggle(
+            gameAnalyzeControl(in: app), selected: analyzing,
+            labels: ["Analyze mode", "Playback mode"],
+            isPresented: {
+                app.descendants(matching: .any).matching(identifier:
+                    SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists
+            },
+            in: app, file: file, line: line
+        )
+    }
+
+    func openGameChat(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        setGameChatVisible(true, in: app, file: file, line: line)
+    }
+
+    func setGameChatVisible(
+        _ visible: Bool,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        setGameToolbarToggle(
+            gameChatControl(in: app), selected: visible,
+            labels: ["Chat"],
+            isPresented: {
+                app.descendants(matching: .any).matching(identifier:
+                    SurroundUITestContract.AccessibilityID.gameChatLog).firstMatch.exists
+            },
+            in: app, file: file, line: line
+        )
+    }
+
+    private func setGameToolbarToggle(
+        _ control: XCUIElement,
+        selected: Bool,
+        labels: [String],
+        isPresented: () -> Bool,
+        in app: XCUIApplication,
+        file: StaticString,
+        line: UInt
+    ) {
+        if isPresented() == selected { return }
+        var target = control
+        if !target.exists || !target.isHittable {
+            let overflow = app.buttons.matching(NSPredicate(
+                format: "identifier IN %@ OR label == %@",
+                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
+            )).allElementsBoundByIndex.first { $0.isHittable }
+            guard let overflow else {
+                keepHierarchy(of: app, name: "missing game toolbar overflow")
+                XCTFail("Expected the game mode or native toolbar overflow", file: file, line: line)
+                return
+            }
+            overflow.tap()
+            if !target.exists || !target.isHittable {
+                let menuActions = app.buttons.matching(NSPredicate(format: "label IN %@", labels))
+                target = menuActions.allElementsBoundByIndex.first { $0.isHittable }
+                    ?? menuActions.firstMatch
+            }
+        }
+        XCTAssertTrue(pollUntil(timeout: 5) { target.exists && target.isHittable },
+                      "Expected the native game mode action", file: file, line: line)
+        #if targetEnvironment(macCatalyst)
+        target.click()
+        #else
+        target.tap()
+        #endif
+        // Native overflow can remove or replace its toggle node after tapping.
+        // The destination is the stable indication of the selected panel.
+        let changed = pollUntil(timeout: 10) {
+            isPresented() == selected
+        }
+        if !changed {
+            print("[GameToolbarToggle] expected=\(selected) control=\(target.debugDescription)\n\(app.debugDescription)")
+            keepHierarchy(of: app, name: "game toolbar toggle did not change")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Game toolbar toggle did not change"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        XCTAssertTrue(
+            changed,
+            "Expected the game toolbar toggle to become \(selected ? "on" : "off")",
+            file: file, line: line
+        )
     }
 
     func dismissCompactChatInputAndWaitForLayout(
@@ -96,20 +229,14 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
 
-        // Preserve the focus-on-appear assertion before dismissing it,
-        // regardless of whether this simulator uses a hardware keyboard.
-        XCTAssertTrue(
-            pollUntil(timeout: timeout) {
-                chatInputHasKeyboardFocus(in: app)
-            },
-            "Expected the compact chat composer to receive keyboard focus automatically.",
-            file: file,
-            line: line
-        )
-
-        guard tapChatLogBackground(
-            chatLog, in: app, file: file, line: line
-        ) else { return }
+        // Opening chat never focuses the composer (v145); the keyboard
+        // appears only when the field is tapped. A retained focus from earlier
+        // typing is still dismissed through the log's background.
+        if chatInputHasKeyboardFocus(in: app) {
+            guard tapChatLogBackground(
+                chatLog, in: app, file: file, line: line
+            ) else { return }
+        }
 
         XCTAssertTrue(
             pollUntil(timeout: timeout) {
@@ -194,9 +321,41 @@ class SurroundUITestCase: XCTestCase {
             file: file,
             line: line
         )
-        guard tapChatLogBackground(
-            chatLog, in: app, file: file, line: line
-        ) else { return }
+        let viewport = visibleChatLogViewport(chatLog.frame, in: app)
+        let usedChatBackground = viewport.width > 8 && viewport.height > 8
+            && chatLog.isHittable
+        if usedChatBackground {
+            guard tapChatLogBackground(
+                chatLog, in: app, file: file, line: line
+            ) else { return }
+        } else {
+            let board = app.descendants(matching: .any).matching(
+                identifier: SurroundUITestContract.AccessibilityID.gameBoard
+            ).firstMatch
+            let frame = board.exists ? board.frame : .null
+            let point = CGPoint(x: frame.minX + frame.width * 0.1,
+                                y: frame.minY + frame.height * 0.1)
+            let keyboard = app.keyboards.firstMatch
+            let hasUncoveredBoard = board.exists && board.isHittable
+                && app.frame.contains(point)
+                && (!keyboard.exists || !keyboard.frame.contains(point))
+            let headerClock = app.navigationBars.buttons["game.clock.black"].firstMatch
+            if !hasUncoveredBoard && headerClock.exists && headerClock.isHittable
+                && softwareKeyboardIsVisible(keyboard, in: app) {
+                // Landscape sharing hides the main board and can leave no
+                // history gutter. Its native header clock is the remaining
+                // intended first-tap keyboard dismissal target.
+                headerClock.tap()
+                XCTAssertFalse(app.staticTexts["Time control"].exists,
+                               "The first clock tap dismisses focus without opening details",
+                               file: file, line: line)
+            } else {
+                // Preserve the board-tap/no-move acceptance in wide layouts.
+                guard tapBoardToDismissChatKeyboard(
+                    in: app, file: file, line: line
+                ) else { return }
+            }
+        }
         let dismissed = pollUntil(timeout: 10) {
             !chatInputHasKeyboardFocus(in: app)
                 && !softwareKeyboardIsVisible(app.keyboards.firstMatch, in: app)
@@ -210,13 +369,50 @@ class SurroundUITestCase: XCTestCase {
             file: file,
             line: line
         )
-        assertNoSelectedChatItem(
-            in: chatLog,
-            timeout: 3,
-            file: file,
-            line: line
-        )
+        if usedChatBackground {
+            assertNoSelectedChatItem(
+                in: chatLog,
+                timeout: 3,
+                file: file,
+                line: line
+            )
+        }
         #endif
+    }
+
+    private func tapBoardToDismissChatKeyboard(
+        in app: XCUIApplication,
+        file: StaticString,
+        line: UInt
+    ) -> Bool {
+        let board = app.descendants(matching: .any).matching(
+            identifier: SurroundUITestContract.AccessibilityID.gameBoard
+        ).firstMatch
+        guard board.exists, board.isHittable else {
+            keepHierarchy(of: app, name: "no uncovered board for keyboard dismissal")
+            XCTFail("Expected a chat gutter or uncovered board to dismiss the keyboard",
+                    file: file, line: line)
+            return false
+        }
+        let frame = board.frame
+        let point = CGPoint(x: frame.minX + frame.width * 0.1,
+                            y: frame.minY + frame.height * 0.1)
+        let keyboard = app.keyboards.firstMatch
+        guard app.frame.contains(point),
+              !keyboard.exists || !keyboard.frame.contains(point) else {
+            XCTFail("Expected the board dismissal tap to be above the keyboard",
+                    file: file, line: line)
+            return false
+        }
+        let boardValue = board.value as? String
+        board.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).tap()
+        let dismissed = pollUntil(timeout: 10) { !self.chatInputHasKeyboardFocus(in: app) }
+        XCTAssertTrue(dismissed, "The first board tap must dismiss chat focus",
+                      file: file, line: line)
+        XCTAssertEqual(board.value as? String, boardValue,
+                       "The keyboard dismissal tap must not change the Go position or marks",
+                       file: file, line: line)
+        return dismissed
     }
 
     // The chat background clears FocusState and dismisses the keyboard in one
@@ -414,7 +610,7 @@ class SurroundUITestCase: XCTestCase {
         add(hierarchy)
     }
 
-    private func pollUntil(
+    func pollUntil(
         timeout: TimeInterval,
         condition: () -> Bool
     ) -> Bool {

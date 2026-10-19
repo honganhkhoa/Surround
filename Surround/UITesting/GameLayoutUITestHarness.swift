@@ -2,8 +2,8 @@
 //  GameLayoutUITestHarness.swift
 //  Surround
 //
-//  Deterministically exercise adaptive subtree replacement without rebuilding
-//  the game route. Actual device-pose changes remain a Simulator smoke check.
+//  Deterministically exercise adaptive arrangements without rebuilding the
+//  game route. Actual device-pose changes remain a Simulator smoke check.
 //
 
 import SwiftUI
@@ -35,7 +35,10 @@ struct GameLayoutTransitionUITestModifier: ViewModifier {
                 )
                 .frame(maxWidth: compact ? 430 : .infinity)
                 .frame(maxWidth: .infinity)
-                .safeAreaInset(edge: .top, spacing: 0) {
+                // An inset around NavigationStack covers its native toolbar
+                // on iPad. Keep the fixture controls in the unused leading
+                // title area so Analyze and Chat receive their actual taps.
+                .overlay(alignment: .topLeading) {
                     HStack {
                         Button("Compact layout") { compact = true }
                             .accessibilityIdentifier(
@@ -52,8 +55,9 @@ struct GameLayoutTransitionUITestModifier: ViewModifier {
                     }
                     .buttonStyle(.bordered)
                     .padding(6)
-                    .frame(maxWidth: .infinity)
-                    .background(.bar)
+                    .background(.bar, in: Capsule())
+                    .padding(.leading, 12)
+                    .padding(.top, 4)
                 }
         } else {
             content

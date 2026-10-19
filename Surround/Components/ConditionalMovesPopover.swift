@@ -84,10 +84,13 @@ enum ConditionalMovesPopoverLayout {
 struct ConditionalMovesButton: View {
     @ObservedObject var game: Game
     var context: ConditionalMovesPresentationContext
+    var usesClearGlass = false
+    var usesToolbarStyle = false
     var onSelect: ((ConditionalMoveBranch) -> Void)?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var isPresented = false
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 17
 
     private var popoverLayout: ConditionalMovesPopoverLayout {
         horizontalSizeClass == .compact ? .compact : .regular
@@ -98,11 +101,11 @@ struct ConditionalMovesButton: View {
             isPresented = true
         } label: {
             Image(systemName: "envelope.and.arrow.trianglehead.branch")
-                .foregroundStyle(.white)
+                .font(usesToolbarStyle ? nil : context == .gameDetail ? .system(size: 14)
+                      : usesClearGlass ? .system(size: min(iconSize, 24)) : nil)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
-        .tint(.conditionalMoveHighlight)
+        .modifier(ConditionalMoveButtonSurface(usesClearGlass: usesClearGlass,
+                                              usesToolbarStyle: usesToolbarStyle))
         .accessibilityLabel(Text("Conditional moves"))
         .accessibilityIdentifier(context.buttonAccessibilityIdentifier)
         .popover(isPresented: $isPresented) {
@@ -124,6 +127,25 @@ struct ConditionalMovesButton: View {
             }
         }
         .appReviewPresentationBlocked(isPresented)
+    }
+}
+
+private struct ConditionalMoveButtonSurface: ViewModifier {
+    var usesClearGlass: Bool
+    var usesToolbarStyle: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @ViewBuilder func body(content: Content) -> some View {
+        if usesToolbarStyle {
+            content.buttonStyle(.plain).tint(Color.conditionalMoveHighlight)
+                .foregroundStyle(Color.conditionalMoveHighlight)
+        } else if usesClearGlass, #available(iOS 26, *), !reduceTransparency {
+            content.buttonStyle(.plain).padding(.horizontal, 10).frame(minHeight: 44)
+                .glassEffect(.clear.interactive(), in: Capsule())
+                .foregroundStyle(Color.conditionalMoveHighlight)
+        } else {
+            content.buttonStyle(.borderedProminent).controlSize(.small)
+                .tint(.conditionalMoveHighlight).foregroundStyle(.white)
+        }
     }
 }
 

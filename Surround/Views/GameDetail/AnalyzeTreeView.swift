@@ -8,9 +8,21 @@
 import SwiftUI
 
 struct AnalyzeTreeSlice: View {
+    struct SelectionFrame: Equatable {
+        let position: ObjectIdentifier
+        let vertical: Bool
+        let rect: CGRect
+    }
+
     @ObservedObject var moveTree: MoveTree
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
+    var vertical = false
+    var onSelectedBranchFrameChange: ((SelectionFrame) -> Void)?
+
+    private func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        vertical ? CGPoint(x: y, y: x) : CGPoint(x: x, y: y)
+    }
 
     private func accessibilityIdentifier(
         for position: BoardPosition
@@ -30,7 +42,22 @@ struct AnalyzeTreeSlice: View {
     }
     
     var body: some View {
-        VStack {
+        if vertical {
+            HStack(spacing: 0) {
+                nodes.padding(.horizontal, 5)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            VStack {
+                nodes.padding(.vertical, 5)
+                Spacer()
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private var nodes: some View {
             ZStack {
                 ForEach(Array((moveTree.positionsByLastMoveNumber[lastMoveNumber] ?? []).enumerated()), id: \.0) { _, position in
                     if let position = position {
@@ -41,28 +68,28 @@ struct AnalyzeTreeSlice: View {
                                 let currentY: CGFloat = CGFloat(level) * 40 + 15
                                 let previousY: CGFloat = CGFloat(previousLevel) * 40 + 15
                                 Path { path in
-                                    path.move(to: CGPoint(x: 15, y: currentY))
+                                    path.move(to: point(15, currentY))
                                     path.addCurve(
-                                        to: CGPoint(x: -25, y: previousY),
-                                        control1: CGPoint(x: -10, y: currentY),
-                                        control2: CGPoint(x: -25, y: previousY)
+                                        to: point(-25, previousY),
+                                        control1: point(-10, currentY),
+                                        control2: point(-25, previousY)
                                     )
                                 }.stroke(Color(.label))
                             }
                             if isConditionalVariation {
                                 Color.conditionalMoveHighlight.frame(width: 40, height: 40)
                                     .cornerRadius(20)
-                                    .position(x: 15, y: CGFloat(level) * 40 + 15)
+                                    .position(point(15, CGFloat(level) * 40 + 15))
                             }
                             if isSelected(position) {
                                 Color(UIColor.systemTeal).frame(width: 36, height: 36)
                                     .cornerRadius(18)
-                                    .position(x: 15, y: CGFloat(level) * 40 + 15)
+                                    .position(point(15, CGFloat(level) * 40 + 15))
                             }
                             
                             Stone(color: lastMoveColor, shadowRadius: 2)
                                 .frame(width: 30, height: 30)
-                                .position(x: 15, y: CGFloat(level) * 40 + 15)
+                                .position(point(15, CGFloat(level) * 40 + 15))
                                 .onTapGesture {
                                     self.selectedPosition = position
                                 }
@@ -100,10 +127,27 @@ struct AnalyzeTreeSlice: View {
 //                    }
                 }
             }
-            .frame(width: 30, height: CGFloat(moveTree.maxLevel) * 40 + 32)
-            .padding(.vertical, 5)
-            Spacer()
-        }.frame(maxHeight: .infinity)
+            .frame(width: vertical ? CGFloat(moveTree.maxLevel) * 40 + 32 : 30,
+                   height: vertical ? 30 : CGFloat(moveTree.maxLevel) * 40 + 32)
+            .onGeometryChange(for: SelectionFrame?.self) { geometry in
+                guard onSelectedBranchFrameChange != nil,
+                      let selectedPosition,
+                      selectedPosition.lastMoveNumber == lastMoveNumber,
+                      let level = moveTree.levelByBoardPosition[ObjectIdentifier(selectedPosition)] else {
+                    return nil
+                }
+                let frame = geometry.frame(in: .named("analysisBranchContent"))
+                // Include the selection ring, which extends 3 pt beyond the stone.
+                let rect = vertical
+                    ? CGRect(x: frame.minX + CGFloat(level) * 40 - 3, y: 0,
+                             width: 36, height: 36)
+                    : CGRect(x: 0, y: frame.minY + CGFloat(level) * 40 - 3,
+                             width: 36, height: 36)
+                return SelectionFrame(position: ObjectIdentifier(selectedPosition),
+                                      vertical: vertical, rect: rect)
+            } action: { frame in
+                if let frame { onSelectedBranchFrameChange?(frame) }
+            }
     }
 }
 
@@ -113,6 +157,7 @@ struct BackgroundSlice: View {
     var game: Game
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
+    var vertical = false
     
     var shouldShowBoardThumbnail: Bool {
         if height < 180 {
@@ -146,8 +191,8 @@ struct BackgroundSlice: View {
         if shouldShowAxis {
             ZStack(alignment: .bottom) {
                 Path { path in
-                    path.move(to: CGPoint(x: 15, y: 30))
-                    path.addLine(to: CGPoint(x: 15, y: 800))
+                    path.move(to: vertical ? CGPoint(x: 30, y: 15) : CGPoint(x: 15, y: 30))
+                    path.addLine(to: vertical ? CGPoint(x: height, y: 15) : CGPoint(x: 15, y: 800))
                 }.stroke(Color(colorScheme == .dark ? .systemGray6 : .systemGray4))
                 if shouldShowBoardThumbnail {
                     if let position = game.positionByLastMoveNumber[lastMoveNumber] {
@@ -161,13 +206,13 @@ struct BackgroundSlice: View {
                                 .frame(width: 104, height: 104)
                         }
                         .frame(width: 110, height: 110)
-                        .position(x: 15, y: height - 60)
+                        .position(vertical ? CGPoint(x: height - 60, y: 15) : CGPoint(x: 15, y: height - 60))
                         .onTapGesture {
                             self.selectedPosition = position
                         }
                     }
                 }
-            }.frame(width: 30)
+            }.frame(width: vertical ? nil : 30, height: vertical ? 30 : nil)
         }
     }
 }
@@ -176,9 +221,74 @@ struct AnalyzeTreeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var game: Game
     @Binding var selectedPosition: BoardPosition?
+    var vertical = false
+    @State private var branchScrollPosition = ScrollPosition(edge: .top)
+    @State private var branchViewport = CGRect.zero
+    @State private var horizontalViewport = CGSize.zero
+    @State private var selectedBranchFrame: AnalyzeTreeSlice.SelectionFrame?
+
+    private struct ScrollRequest: Equatable {
+        let game: ObjectIdentifier
+        let moveNumber: Int
+        let lastMoveNumber: Int
+        let viewport: CGSize
+        let vertical: Bool
+        let selection: ObjectIdentifier?
+    }
+
+    private func scrollRequest(in viewport: CGSize) -> ScrollRequest {
+        ScrollRequest(game: ObjectIdentifier(game),
+                      moveNumber: selectedPosition?.lastMoveNumber ?? game.moveTree.largestLastMoveNumber,
+                      lastMoveNumber: game.moveTree.largestLastMoveNumber,
+                      viewport: viewport, vertical: vertical,
+                      selection: selectedPosition.map(ObjectIdentifier.init))
+    }
+
+    @MainActor private func restoreSelection(_ request: ScrollRequest, in proxy: ScrollViewProxy) async {
+        // Let the lazy rows join this layout. A new selection or viewport
+        // cancels the previous task, so an earlier launch-size request cannot
+        // overwrite the final centered position.
+        await Task.yield()
+        guard !Task.isCancelled, request.viewport.width > 0,
+              request.viewport.height > 0 else { return }
+        proxy.scrollTo(request.moveNumber, anchor: .center)
+        revealSelectedBranchIfNeeded()
+    }
+
+    private func revealSelectedBranchIfNeeded() {
+        guard let selectedPosition, let selectedBranchFrame,
+              selectedBranchFrame.position == ObjectIdentifier(selectedPosition),
+              selectedBranchFrame.vertical == vertical else { return }
+        let frame = selectedBranchFrame.rect
+        let viewportLength = vertical ? branchViewport.width : branchViewport.height
+        guard viewportLength > 0 else { return }
+        let selectedStart = vertical ? frame.minX : frame.minY
+        let selectedEnd = vertical ? frame.maxX : frame.maxY
+        let viewportStart = vertical ? branchViewport.minX : branchViewport.minY
+        let viewportEnd = vertical ? branchViewport.maxX : branchViewport.maxY
+        let clearance: CGFloat = 4
+        let offset: CGFloat
+        if selectedStart < viewportStart + clearance {
+            offset = max(0, selectedStart - clearance)
+        } else if selectedEnd > viewportEnd - clearance {
+            offset = max(0, selectedEnd + clearance - viewportLength)
+        } else { return }
+        if vertical { branchScrollPosition.scrollTo(x: offset) }
+        else { branchScrollPosition.scrollTo(y: offset) }
+    }
+
+    private func recordBranchViewport(from old: CGRect, to new: CGRect) {
+        branchViewport = new
+        // Manual scrolling may leave selection offscreen. Restore only
+        // when the viewport changes, or when a new selection is made.
+        if old.size != new.size { revealSelectedBranchIfNeeded() }
+    }
     
     var body: some View {
         GeometryReader { geometry in
+            if vertical {
+                verticalTree(in: geometry.size)
+            } else {
             ScrollView(.vertical) {
                 VStack {
                     ScrollView(.horizontal, showsIndicators: true) {
@@ -203,7 +313,11 @@ struct AnalyzeTreeView: View {
                                             AnalyzeTreeSlice(
                                                 moveTree: self.game.moveTree,
                                                 lastMoveNumber: lastMoveNumber,
-                                                selectedPosition: self.$selectedPosition
+                                                selectedPosition: self.$selectedPosition,
+                                                onSelectedBranchFrameChange: { frame in
+                                                    selectedBranchFrame = frame
+                                                    revealSelectedBranchIfNeeded()
+                                                }
                                             )
                                         }
                                     }
@@ -214,28 +328,8 @@ struct AnalyzeTreeView: View {
                                 EmptyView().id("endOfAnalyzeTree")
                             }
                             .padding(.horizontal, 10)
-                            .onChange(of: self.selectedPosition?.lastMoveNumber) { _, newLastMoveNumber in
-                                DispatchQueue.main.async {
-                                    withAnimation {
-                                        horizontalScrollView.scrollTo(newLastMoveNumber)
-                                    }
-                                }
-                            }
-                            .onAppear {
-                                // A fold can insert this lazy tree at a retained
-                                // node. Scroll after insertion has finished;
-                                // synchronous scrolling re-enters its layout.
-                                DispatchQueue.main.async {
-                                    if let lastMoveNumber = self.selectedPosition?.lastMoveNumber {
-                                        if lastMoveNumber == self.game.moveTree.largestLastMoveNumber {
-                                            horizontalScrollView.scrollTo("endOfAnalyzeTree")
-                                        } else {
-                                            horizontalScrollView.scrollTo(lastMoveNumber, anchor: .center)
-                                        }
-                                    } else {
-                                        horizontalScrollView.scrollTo("endOfAnalyzeTree")
-                                    }
-                                }
+                            .task(id: scrollRequest(in: horizontalViewport)) {
+                                await restoreSelection(scrollRequest(in: horizontalViewport), in: horizontalScrollView)
                             }
                         }
                     }
@@ -243,14 +337,79 @@ struct AnalyzeTreeView: View {
                         SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll
                     )
                     .frame(minHeight: geometry.size.height)
-                }.frame(minHeight: geometry.size.height)
-            }.frame(height: geometry.size.height)
+                    .onScrollGeometryChange(for: CGSize.self) { $0.containerSize } action: { _, size in
+                        // A parent resize can precede the native scroll view's
+                        // layout. Center only after its actual viewport changes.
+                        horizontalViewport = size
+                    }
+                }
+                .frame(minHeight: geometry.size.height)
+                .coordinateSpace(name: "analysisBranchContent")
+            }
+            .scrollPosition($branchScrollPosition)
+            .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { old, new in
+                recordBranchViewport(from: old, to: new)
+            }
+            .frame(height: geometry.size.height)
+            }
         }
         // Slices overlap to connect branches; clip only the complete viewport
         // so scrolling cannot draw or receive taps beneath a side toolbar.
         .clipped()
         .contentShape(Rectangle())
-        .background(Color(colorScheme == .dark ? .systemGray4 : .systemGray6).shadow(radius: 2))
+        .background(GameDetailAppearance.panel, ignoresSafeAreaEdges: [])
+    }
+
+    private func verticalTree(in size: CGSize) -> some View {
+        let contentWidth = max(size.width, CGFloat(game.moveTree.maxLevel) * 40 + 102)
+        return ScrollView(.horizontal) {
+            ScrollViewReader { scrollView in
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(game.moveTree.moveNumberRange), id: \.self) { moveNumber in
+                            ZStack(alignment: .leading) {
+                                BackgroundSlice(height: contentWidth - 60, game: game,
+                                                lastMoveNumber: moveNumber,
+                                                selectedPosition: $selectedPosition, vertical: true)
+                                    .padding(.leading, 40)
+                                HStack(spacing: 10) {
+                                    Text(verbatim: "\(moveNumber)")
+                                        .font(.body.monospacedDigit())
+                                        .fontWeight(moveNumber % 5 == 0 ? .bold : .light)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.5)
+                                        .frame(width: 30, height: 30)
+                                    AnalyzeTreeSlice(moveTree: game.moveTree,
+                                                     lastMoveNumber: moveNumber,
+                                                     selectedPosition: $selectedPosition,
+                                                     vertical: true,
+                                                     onSelectedBranchFrameChange: { frame in
+                                                         selectedBranchFrame = frame
+                                                         revealSelectedBranchIfNeeded()
+                                                     })
+                                }
+                            }
+                            .frame(height: 30)
+                            .zIndex(-Double(moveNumber))
+                            .id(moveNumber)
+                        }
+                        Color.clear.frame(height: 60).id("endOfAnalyzeTree")
+                    }
+                    .padding(10)
+                    .task(id: scrollRequest(in: size)) {
+                        await restoreSelection(scrollRequest(in: size), in: scrollView)
+                    }
+                }
+                .frame(width: contentWidth, height: size.height)
+                .coordinateSpace(name: "analysisBranchContent")
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll)
+            }
+        }
+        .scrollPosition($branchScrollPosition)
+        .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { old, new in
+            recordBranchViewport(from: old, to: new)
+        }
+        .frame(height: size.height)
     }
 }
 
@@ -323,5 +482,10 @@ private struct ConditionalAnalyzeTreePreviewState {
         game: preview.game,
         selectedPosition: $preview.selectedPosition
     )
+}
+
+#Preview("Analysis tree — Vertical conditional", traits: .fixedLayout(width: 320, height: 600)) {
+    @Previewable @State var preview = ConditionalAnalyzeTreePreviewState()
+    AnalyzeTreeView(game: preview.game, selectedPosition: $preview.selectedPosition, vertical: true)
 }
 #endif

@@ -46,13 +46,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
            !control.exists {
             // Narrow navigation bars move this action into the native overflow.
-            let navigationBar = app.navigationBars.containing(
-                .button,
-                identifier: SurroundUITestContract.AccessibilityID
-                    .gameAnalyzeToggle
-            ).firstMatch
             tap(
-                navigationBar.buttons["More"].firstMatch,
+                app.navigationBars.buttons["More"].firstMatch,
                 description: "game toolbar overflow",
                 in: app,
                 file: file,
@@ -174,6 +169,72 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
+    private func dismissAnalyzeActionsMenu(
+        containing menuItem: XCUIElement,
+        in app: XCUIApplication,
+        restoring identifiers: [String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(menuItem.exists, file: file, line: line)
+        #if targetEnvironment(macCatalyst)
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        #else
+        let dismissButton = app.buttons["Dismiss context menu"].firstMatch
+        if dismissButton.exists && dismissButton.isHittable {
+            tap(dismissButton, description: "Dismiss Analyze menu", in: app,
+                file: file, line: line)
+        } else {
+            // This runtime exposes the native menu as a collection view, with
+            // no dismissal button. Derive an uncovered backdrop point from its
+            // observed frame: a fixed point on the board can hit Share instead.
+            let menu = app.collectionViews.containing(.button, identifier: menuItem.identifier).firstMatch
+            guard menu.waitForExistence(timeout: 3) else {
+                keepTextInputHierarchy(menuItem, in: app, reason: "missing Analyze menu surface")
+                XCTFail("Expected the native collection containing the Analyze menu item", file: file, line: line)
+                return
+            }
+            let window = app.frame
+            let covered = menu.frame.intersection(window)
+                .insetBy(dx: -8, dy: -8).intersection(window)
+            let clearRegions = [
+                CGRect(x: window.minX, y: window.minY, width: window.width,
+                       height: max(0, covered.minY - window.minY)),
+                CGRect(x: covered.maxX, y: window.minY,
+                       width: max(0, window.maxX - covered.maxX), height: window.height),
+                CGRect(x: window.minX, y: covered.maxY, width: window.width,
+                       height: max(0, window.maxY - covered.maxY)),
+                CGRect(x: window.minX, y: window.minY,
+                       width: max(0, covered.minX - window.minX), height: window.height),
+            ]
+            guard !covered.isNull, !covered.isEmpty,
+                  let region = clearRegions.filter({ $0.width >= 20 && $0.height >= 20 })
+                    .max(by: { $0.width * $0.height < $1.width * $1.height }) else {
+                keepTextInputHierarchy(menuItem, in: app, reason: "no Analyze menu dismissal region")
+                XCTFail("Expected visible backdrop outside the native Analyze menu", file: file, line: line)
+                return
+            }
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: region.midX - window.minX,
+                                     dy: region.midY - window.minY)).tap()
+        }
+        #endif
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: menuItem
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout),
+            .completed,
+            "Expected the Analyze menu to dismiss without selecting an action.",
+            file: file,
+            line: line
+        )
+        for identifier in identifiers {
+            element(identifier, in: app, file: file, line: line)
+        }
+    }
+
     private func assertAnalyzeMenuSubtitle(
         _ subtitle: String,
         for menuItem: XCUIElement,
@@ -273,6 +334,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        openGameChat(in: app, file: file, line: line)
         tap(
             SurroundUITestContract.AccessibilityID.gameChatChannelPicker,
             in: app,
@@ -362,9 +424,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             guard attempt < 10, let viewport else { break }
 
             let interactionPoint = CGVector(dx: 0.5, dy: 0.5)
+            // A tree scrolls along moves and across branches. Choose the
+            // clipped dimension of this node, not just the tree's main axis.
+            let scrollAxis: ScrollRevealAxis
+            if targetExists {
+                scrollAxis = targetFrame.minY < viewport.minY + 4
+                    || targetFrame.maxY > viewport.maxY - 4 ? .vertical : .horizontal
+            } else {
+                scrollAxis = viewport.height > viewport.width ? .vertical : .horizontal
+            }
             guard dragScrollView(
                 analysisTree,
-                axis: .horizontal,
+                axis: scrollAxis,
                 targetFrame: targetExists
                     ? validInteractionFrame(
                         targetFrame,
@@ -2141,6 +2212,69 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [reopenedDismissed], timeout: 10), .completed)
     }
 
+    func testGameMessageNotificationUsesToolbarWithoutCoveringClocks() {
+        // The basic game fixture has no private messages. Explicitly seed
+        // incoming messages so this journey exercises the unread notice.
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.messagesContentLaunchArgument,
+        ], orientation: .portrait)
+        let id = SurroundUITestContract.AccessibilityID.self
+        let messageIdentifier = "global.privateMessages"
+        let messageButton = element(messageIdentifier, in: app, matching: .button)
+        let unreadCount = Int(messageButton.value as? String ?? "") ?? 0
+        XCTAssertGreaterThan(unreadCount, 0,
+                             "The notification fixture must contain unread private messages.")
+        tap(id.homeGame(SurroundUITestContract.fixtureGameID), in: app)
+        setGameAnalyzing(true, in: app)
+
+        XCTAssertTrue(messageButton.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons.matching(identifier: messageIdentifier).count, 1,
+                       "Game Detail replaces the overlay icon with one native toolbar action.")
+        XCTAssertTrue(messageButton.isHittable,
+                      "Private messages must remain reachable in Game Detail.")
+        XCTAssertEqual(Int(messageButton.value as? String ?? ""), unreadCount,
+                       "Native toolbar extraction must preserve the unread-message count.")
+        XCTAssertGreaterThanOrEqual(messageButton.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(messageButton.frame.height, 44)
+        XCTAssertTrue(pollUntil(timeout: 5) {
+            app.buttons.matching(identifier: "game.clock.white").allElementsBoundByIndex
+                .contains { $0.isHittable }
+        }, "The current clock must remain reachable.")
+        let clockCandidates = ["game.clock.black", "game.clock.white"].flatMap { identifier in
+            app.buttons.matching(identifier: identifier).allElementsBoundByIndex
+        }
+        // Retained hidden content can remain in the XCTest tree.
+        // Count the reachable controls, including any duplicate targets.
+        let visibleClocks = clockCandidates.filter { $0.isHittable }
+        let currentClockIsInHorizontalNavigationBar = app.navigationBars.allElementsBoundByIndex.contains { bar in
+            bar.frame.width > bar.frame.height
+                && bar.buttons.matching(identifier: "game.clock.white").allElementsBoundByIndex
+                    .contains { $0.isHittable }
+        }
+        let clockEvidence = XCTAttachment(string: clockCandidates.map {
+            "\($0.identifier): hittable=\($0.isHittable), frame=\($0.frame)"
+        }.joined(separator: "\n") + "\n\n" + app.debugDescription)
+        clockEvidence.name = "Notification toolbar clock candidates"
+        clockEvidence.lifetime = .keepAlways
+        add(clockEvidence)
+        keepScreenshot("Private-message toolbar leaves game clocks visible", in: app)
+        if app.frame.width < 500 && currentClockIsInHorizontalNavigationBar {
+            XCTAssertEqual(visibleClocks.count, 1,
+                           "The crowded phone header must show the complete current clock instead of compressing two Fischer clocks.")
+        }
+        XCTAssertEqual(visibleClocks.filter { $0.identifier == "game.clock.white" }.count, 1,
+                       "The selected layout must expose exactly one reachable current clock.")
+        for clock in visibleClocks {
+            XCTAssertTrue(clock.isHittable, "Each displayed clock must remain reachable.")
+            let overlap = messageButton.frame.intersection(clock.frame)
+            XCTAssertTrue(overlap.isNull || overlap.isEmpty,
+                          "The message action must not cover \(clock.identifier): \(overlap)")
+            XCTAssertGreaterThanOrEqual(clock.frame.height, 44)
+        }
+        tap(messageButton, description: "Open private messages from Game Detail", in: app)
+        element("global.privateMessagesPanel", in: app)
+    }
+
     func testLiveGameBannerUsesHomeNavigationStack() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
@@ -2262,8 +2396,12 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .firstMatch
         XCTAssertTrue(historyGame.waitForExistence(timeout: 10))
         scrollIntoTappableArea(historyGame, in: app)
-        tap(historyGame, description: "Open a finished game from history", in: app)
+        tap(historyGame, description: "Open your finished realtime game from history", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.gameActiveGamesButton].exists,
+                       "A history game does not own an active-games picker.")
+        XCTAssertTrue(banner.waitForExistence(timeout: 5),
+                      "Your finished realtime game must preserve the banner for the separate active live game.")
         openLiveGameFromBanner()
         keepScreenshot("Live banner – replaces a history detail", in: app)
         backToHome()
@@ -2567,16 +2705,73 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.AccessibilityID.homeGame(SurroundUITestContract.fixtureGameID),
             in: app
         )
+        let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        let livePosition = board.value as? String
+        setGameAnalyzing(true, in: app)
+        tap(SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
+            in: app, matching: .button)
+        let analysisPosition = board.value as? String
+        XCTAssertNotEqual(analysisPosition, livePosition)
         activateZenControl(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
             in: app
         )
         element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        XCTAssertEqual(board.value as? String, livePosition,
+                       "Zen should show the live game while retaining analysis work.")
         activateZenControl(
             SurroundUITestContract.AccessibilityID.gameZenExit,
             in: app
         )
         element(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists)
+        XCTAssertEqual(board.value as? String, analysisPosition,
+                       "Leaving Zen should restore the selected analysis position.")
+    }
+
+    func testPendingMoveAndPassConfirmationSurviveRotation() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This journey verifies native iPhone and iPad rotation.")
+        #else
+        let app = launchApp(orientation: .portrait)
+        let id = SurroundUITestContract.AccessibilityID.self
+        tap(id.homeGame(SurroundUITestContract.fixtureGameID), in: app)
+        let board = element(id.gameBoard, in: app)
+        let livePosition = try XCTUnwrap(board.value as? String)
+        let pass = app.buttons["Pass"].firstMatch
+        XCTAssertTrue(pass.waitForExistence(timeout: 10))
+        tap(pass, description: "Open the pass confirmation", in: app)
+        let confirmation = app.alerts["Are you sure you want to pass?"].firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        XCTAssertTrue(confirmation.buttons["Pass"].isEnabled)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) { app.frame.width > app.frame.height },
+                      "The app must actually adopt landscape before validating retention.")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10),
+                      "Rotation must preserve the pending confirmation.")
+        tap(confirmation.buttons["Dismiss"], description: "Keep playing without passing", in: app)
+        XCTAssertEqual(board.value as? String, livePosition)
+        XCTAssertTrue(pass.isEnabled)
+
+        // A19 is empty in the bundled ongoing fixture. The board exposes its
+        // full bounds, including half-cell margins around the 19 intersections.
+        board.coordinate(withNormalizedOffset: CGVector(dx: 0.025, dy: 0.025)).tap()
+        let submit = app.buttons["Submit move"].firstMatch
+        XCTAssertTrue(submit.waitForExistence(timeout: 10),
+                      "A legal tentative move must reveal the Submit move action.")
+        XCTAssertTrue(submit.isEnabled)
+        XCTAssertEqual(board.value as? String, livePosition,
+                       "The authoritative position must not change before submission.")
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            app.frame.height > app.frame.width && submit.isHittable
+        })
+        XCTAssertTrue(submit.isEnabled,
+                      "The tentative move must survive rotation without being sent.")
+        XCTAssertEqual(board.value as? String, livePosition)
+        keepScreenshot("Tentative move retained after rotation", in: app)
+        #endif
     }
 
     func testKeyboardPreflightSupportsComposerInput() throws {
@@ -2606,24 +2801,18 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             in: app,
             matching: .textField
         )
-        let focusAcquired = waitForChatInputFocus(in: app, timeout: 10)
-        if !focusAcquired {
-            keepTextInputHierarchy(
-                input,
-                in: app,
-                reason: "keyboard preflight did not focus composer"
-            )
-        }
-        XCTAssertTrue(
-            focusAcquired,
-            "Expected the compact composer to receive focus during the keyboard preflight."
+        // Opening chat never focuses the composer; the preflight focuses it
+        // the way a person does, by tapping the field.
+        XCTAssertFalse(
+            waitForChatInputFocus(in: app, timeout: 2),
+            "Opening chat must not focus the composer."
         )
 
         enterText(
             "Keyboard preflight",
-            into: resolvedChatInput(in: app),
+            into: input,
             in: app,
-            focusMode: .requireExistingFocus
+            focusMode: .acquireWithRetry
         )
 
         dismissSoftwareKeyboardIfNeeded(in: app)
@@ -3063,15 +3252,13 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         if usesRegularGameLayout {
             tapChatItem(moveID, in: app, matching: .button)
             assertSelected(moveID, in: app)
-            tap(
-                SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
-                in: app
-            )
+            setGameAnalyzing(true, in: app)
             let analyzeControlBar = element(
                 SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
                 in: app
             )
-            assertNotSelected(moveID, in: app)
+            XCTAssertFalse(app.scrollViews[SurroundUITestContract.AccessibilityID.gameChatLog].exists,
+                           "Analyze replaces the selected Chat preview")
 
             tapChatItem(moveID, in: app, matching: .button)
             assertSelected(moveID, in: app)
@@ -3743,10 +3930,6 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             )
         tapAnalysisPosition(conflictingNodeIdentifier, in: app)
         assertSelected(conflictingNodeIdentifier, in: app)
-        let detailDismissalPoint = popoverDismissalPoint(
-            in: app,
-            navigationTitle: "Tournament Game: Correspondence"
-        )
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzeActionsMenu,
             in: app
@@ -3765,10 +3948,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             for: replacingAddItem,
             in: app
         )
-        dismissPopover(
-            in: app,
-            at: detailDismissalPoint,
+        dismissAnalyzeActionsMenu(
             containing: replacingAddItem,
+            in: app,
             restoring: [
                 SurroundUITestContract.AccessibilityID.gameDetail(gameID),
                 SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
@@ -3825,10 +4007,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 in: app
             ).isEnabled
         )
-        dismissPopover(
-            in: app,
-            at: detailDismissalPoint,
+        dismissAnalyzeActionsMenu(
             containing: addAfterRemoval,
+            in: app,
             restoring: [
                 SurroundUITestContract.AccessibilityID.gameDetail(gameID),
                 SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
@@ -4216,39 +4397,16 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             focusMode: .requireExistingFocus
         )
 
-        #if !targetEnvironment(macCatalyst)
-        let keyboard = app.keyboards.firstMatch
-        let keyboardFrame = keyboard.exists ? keyboard.frame : .zero
-        let appFrame = app.frame
-        // Floating keyboards and hardware-keyboard strips leave the regular
-        // Analyze toolbar visible. XCTest's docked keyboard bounds can stop
-        // a few points above the screen edge.
-        if keyboardFrame.height > 100,
-           abs(keyboardFrame.minX - appFrame.minX) <= 1,
-           abs(keyboardFrame.width - appFrame.width) <= 1,
-           abs(keyboardFrame.maxY - appFrame.maxY) <= 10 {
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Retained Analyze toolbar with keyboard"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-            XCTAssertFalse(
-                app.buttons[
-                    SurroundUITestContract.AccessibilityID.gameAnalyzePrevious
-                ].isHittable,
-                "Hidden Analyze actions must not accept interaction while the keyboard is visible."
-            )
-            dismissSoftwareKeyboardIfNeeded(in: app)
-            XCTAssertTrue(
-                element(
-                    SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
-                    in: app,
-                    matching: .button
-                ).isHittable,
-                "The Analyze toolbar must become usable again after keyboard dismissal."
-            )
-            assertSelected(selectedIdentifier, in: app)
-        }
-        #endif
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists,
+            "Sharing opens Chat as the only panel")
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists,
+            "Dismissing the keyboard keeps Chat selected")
+        XCTAssertEqual(variationNameInput.value as? String, "Focused variation")
+        setGameAnalyzing(true, in: app)
+        assertSelected(selectedIdentifier, in: app)
     }
 
     func testShareVariationUsesSelectedChannelAndStaysInChatAfterSending() {
@@ -4352,7 +4510,14 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             ).label,
             "Hidden from opponent during the game"
         )
+        XCTAssertTrue(app.scrollViews[SurroundUITestContract.AccessibilityID.gameChatLog].exists,
+                      "Sending the variation must keep Chat open.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists)
         dismissSoftwareKeyboardIfNeeded(in: app)
+        // Every device shows one requested panel. Returning to Analyze
+        // must reveal the same branch that was just shared.
+        setGameAnalyzing(true, in: app)
         element(
             SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
             in: app
@@ -4360,7 +4525,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         assertSelected(selectedIdentifier, in: app)
     }
 
-    func testPlaybackControlBarOnlyShowsPreviousAndNext() {
+    func testPlaybackControlBarShowsNavigationAndBackToLiveWithoutEditing() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
@@ -4395,6 +4560,16 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 "Expected Playback mode to hide \(hiddenIdentifier)."
             )
         }
+        let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        let selected = board.value as? String
+        let live = element("game.analyze.live", in: app, matching: .button)
+        XCTAssertTrue(live.isEnabled)
+        tap(live, description: "Return playback to the live position", in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { !live.isEnabled })
+        XCTAssertNotEqual(board.value as? String, selected)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists,
+            "Back to live must retain the playback session.")
     }
 
     func testFinishedAnalysisDisabledGameShowsFullAnalyzeControlBar() {

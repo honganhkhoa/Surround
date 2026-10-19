@@ -1000,7 +1000,13 @@ class OGSService: ObservableObject {
 
     @Published var isLoggedIn: Bool = false
     @Published var user: OGSUser? = nil
-    @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected
+    @Published private(set) public var socketStatus = OGSWebsocketStatus.disconnected {
+        didSet {
+            if socketStatus != oldValue { updateDisconnectedClocks() }
+        }
+    }
+    /// Games holding a `disconnectedClock`, cleared together on reconnection.
+    private var gamesWithDisconnectedClock = [ObjectIdentifier: Game]()
     private let authoritativeGameSnapshots = PassthroughSubject<Game, Never>()
     private let authoritativeGamePhases = PassthroughSubject<(game: Game, phase: OGSGamePhase), Never>()
 
@@ -3891,7 +3897,35 @@ class OGSService: ObservableObject {
             )
         }
         connectIfReady(gameID: ogsID)
-        return desiredGameConnections[ogsID]?.game ?? game
+        let canonicalGame = desiredGameConnections[ogsID]?.game ?? game
+        // A game opened while the socket is down freezes at its known clock.
+        freezeClockIfDisconnected(canonicalGame)
+        return canonicalGame
+    }
+
+    /// One snapshot per game while the socket is not `.connected`. The 1 s
+    /// timer and other updates may still change `game.clock` locally; every
+    /// clock view reads this snapshot instead, so they all keep one value.
+    /// It is taken once (when the socket leaves `.connected`, or when a game
+    /// or its first clock appears while disconnected) and cleared on return.
+    func freezeClockIfDisconnected(_ game: Game) {
+        guard socketStatus != .connected, game.disconnectedClock == nil,
+              let clock = game.clock else { return }
+        game.disconnectedClock = clock
+        gamesWithDisconnectedClock[ObjectIdentifier(game)] = game
+    }
+
+    private func updateDisconnectedClocks() {
+        if socketStatus == .connected {
+            for game in gamesWithDisconnectedClock.values {
+                game.disconnectedClock = nil
+            }
+            gamesWithDisconnectedClock.removeAll()
+        } else {
+            for game in desiredGameConnections.values.map(\.game) + Array(connectedGames.values) {
+                freezeClockIfDisconnected(game)
+            }
+        }
     }
 
     private func reconcileDesiredGameConnections() {

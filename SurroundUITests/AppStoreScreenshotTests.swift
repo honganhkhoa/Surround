@@ -406,6 +406,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        openGameChat(in: app, file: file, line: line)
         tap(
             SurroundUITestContract.AccessibilityID.gameChatChannelPicker,
             in: app,
