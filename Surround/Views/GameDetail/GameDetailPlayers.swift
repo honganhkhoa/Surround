@@ -21,42 +21,6 @@ enum GameDetailAppearance {
             ? UIColor(red: 56 / 255, green: 56 / 255, blue: 58 / 255, alpha: 1)
             : UIColor.black.withAlphaComponent(0.12)
     })
-    static let surfaceShadow = Color(uiColor: UIColor { traits in
-        UIColor.black.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.4 : 0.08)
-    })
-    static let surfaceBorder = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 56 / 255, green: 56 / 255, blue: 58 / 255, alpha: 1)
-            : UIColor(red: 229 / 255, green: 229 / 255, blue: 234 / 255, alpha: 1)
-    })
-}
-
-/// A shadow on the surface keeps the identity and status content crisp.
-struct GameDetailSurface: View {
-    var cornerRadius: CGFloat
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(GameDetailAppearance.panel)
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(GameDetailAppearance.surfaceBorder, lineWidth: 1)
-            }
-            .shadow(color: GameDetailAppearance.surfaceShadow, radius: 5, x: 0, y: 2)
-    }
-}
-
-enum GameDetailClockStyle {
-    case full, compact, inline
-
-    /// At the default text size. The pair scales both cards together.
-    var cardHeight: CGFloat {
-        switch self {
-        case .full: return 96
-        case .compact: return 50
-        case .inline: return 44
-        }
-    }
 }
 
 /// The order follows the players' corners, independently of their stone colors.

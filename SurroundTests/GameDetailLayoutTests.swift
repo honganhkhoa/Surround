@@ -10,7 +10,7 @@ final class GameDetailLayoutTests: XCTestCase {
 
     private func plan(_ size: CGSize, compact: Bool = false, zen: Bool = false,
                       analyze: Bool = false, chat: Bool = false, keyboard: Bool = false,
-                      keyboardLandscape: Bool? = nil, hidesBoard: Bool = false,
+                      hidesBoard: Bool = false,
                       composerHeight: CGFloat = 0, keyboardOverlap: CGFloat = 0,
                       division: CGRect? = nil, panelDivision: CGRect? = nil,
                       usesVerticalToolbar: Bool = false,
@@ -20,7 +20,6 @@ final class GameDetailLayoutTests: XCTestCase {
                       chromeBandTop: CGFloat? = nil) -> GameDetailLayoutPlan {
         GameDetailLayoutPlan(size: size, compact: compact, zen: zen, analyze: analyze,
                              chat: chat, hidesBoard: hidesBoard, keyboard: keyboard,
-                             keyboardLandscape: keyboardLandscape,
                              accessibility: false, foldsClock: false,
                              composerHeight: composerHeight, keyboardOverlap: keyboardOverlap,
                              division: division, panelDivision: panelDivision,
@@ -626,7 +625,7 @@ final class GameDetailLayoutTests: XCTestCase {
                                    composerHeight: composerHeight,
                                    usesVerticalToolbar: verticalToolbar)
                 let typing = plan(size, compact: true, chat: true, keyboard: true,
-                                  keyboardLandscape: true, composerHeight: composerHeight,
+                                  composerHeight: composerHeight,
                                   keyboardOverlap: overlap, usesVerticalToolbar: verticalToolbar)
                 XCTAssertFalse(resting[.board].isEmpty)
                 XCTAssertEqual(typing[.board], resting[.board])
@@ -658,7 +657,7 @@ final class GameDetailLayoutTests: XCTestCase {
                                    composerHeight: composerHeight,
                                    usesVerticalToolbar: verticalToolbar)
                 let typing = plan(size, compact: true, chat: true, keyboard: true,
-                                  keyboardLandscape: false, composerHeight: composerHeight,
+                                  composerHeight: composerHeight,
                                   keyboardOverlap: 300, usesVerticalToolbar: verticalToolbar)
                 XCTAssertFalse(resting[.board].isEmpty)
                 assertSceneOutsideChat(typing, equals: resting)
@@ -674,7 +673,7 @@ final class GameDetailLayoutTests: XCTestCase {
         let size = CGSize(width: 300, height: 740)
         let resting = plan(size, compact: true, chat: true, composerHeight: 50)
         let typing = plan(size, compact: true, chat: true, keyboard: true,
-                          keyboardLandscape: false, composerHeight: 50, keyboardOverlap: 300)
+                          composerHeight: 50, keyboardOverlap: 300)
         XCTAssertFalse(resting[.board].isEmpty)
         assertSceneOutsideChat(typing, equals: resting)
         XCTAssertEqual(typing[.composer].height, 50)
@@ -687,7 +686,7 @@ final class GameDetailLayoutTests: XCTestCase {
             let resting = plan(size, compact: true, chat: true,
                                composerHeight: composerHeight)
             let typing = plan(size, compact: true, chat: true, keyboard: true,
-                              keyboardLandscape: false, composerHeight: composerHeight,
+                              composerHeight: composerHeight,
                               keyboardOverlap: 300)
             XCTAssertFalse(resting[.board].isEmpty)
             assertSceneOutsideChat(typing, equals: resting)
@@ -717,7 +716,7 @@ final class GameDetailLayoutTests: XCTestCase {
                                 (CGSize(width: 820, height: 1080), false)] {
             let resting = plan(size, compact: compact, chat: true, composerHeight: 50)
             let typing = plan(size, compact: compact, chat: true, keyboard: true,
-                              keyboardLandscape: false, composerHeight: 50, keyboardOverlap: 0)
+                              composerHeight: 50, keyboardOverlap: 0)
             assertSceneOutsideChat(typing, equals: resting)
             XCTAssertEqual(typing[.chat], resting[.chat])
             XCTAssertEqual(typing[.composer], resting[.composer])
@@ -729,7 +728,7 @@ final class GameDetailLayoutTests: XCTestCase {
         let resting = plan(size, compact: true, chat: true, hidesBoard: true,
                            composerHeight: 188)
         let typing = plan(size, compact: true, chat: true, keyboard: true,
-                          keyboardLandscape: false, hidesBoard: true,
+                          hidesBoard: true,
                           composerHeight: 188, keyboardOverlap: 300)
         assertSceneOutsideChat(typing, equals: resting)
         XCTAssertTrue(typing[.board].isEmpty)
@@ -1157,7 +1156,7 @@ final class GameDetailLayoutTests: XCTestCase {
                                    composerHeight: composerHeight,
                                    usesVerticalToolbar: verticalToolbar)
                 let typing = plan(size, compact: true, chat: true, keyboard: true,
-                                  keyboardLandscape: false, hidesBoard: true,
+                                  hidesBoard: true,
                                   composerHeight: composerHeight, keyboardOverlap: 300,
                                   usesVerticalToolbar: verticalToolbar)
                 XCTAssertTrue(resting[.board].isEmpty)
@@ -1176,7 +1175,7 @@ final class GameDetailLayoutTests: XCTestCase {
         let resting = plan(size, compact: true, chat: true, hidesBoard: true,
                            composerHeight: 188)
         let typing = plan(size, compact: true, chat: true, keyboard: true,
-                          keyboardLandscape: true, hidesBoard: true,
+                          hidesBoard: true,
                           composerHeight: 188, keyboardOverlap: 140)
         XCTAssertTrue(typing[.board].isEmpty, "Only the explicit Hide main board hides it")
         assertClockPresentation(typing, equals: resting)
@@ -1479,7 +1478,7 @@ final class GameDetailLayoutTests: XCTestCase {
         for composerHeight in [CGFloat(50), CGFloat(188)] {
             let p = GameDetailLayoutPlan(size: size, compact: false, zen: false,
                 analyze: false, chat: true, hidesBoard: false, keyboard: true,
-                keyboardLandscape: true, accessibility: true, foldsClock: true,
+                accessibility: true, foldsClock: true,
                 clockScale: 1.65, composerHeight: composerHeight, keyboardOverlap: 280)
             XCTAssertEqual(p.clockStyle, .inline)
             XCTAssertTrue(p.clocksInHeader)

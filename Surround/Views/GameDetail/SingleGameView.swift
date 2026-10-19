@@ -916,7 +916,7 @@ struct SingleGameView: View {
             size: geometry.size, compact: compact, zen: zenMode,
             analyze: analyze ?? showsAnalysisPanel, chat: chat ?? showsChatPanel,
             hidesBoard: !showsCompactChatBoard.wrappedValue,
-            keyboard: attachedKeyboardVisible, keyboardLandscape: horizontal,
+            keyboard: attachedKeyboardVisible,
             accessibility: dynamicTypeSize.isAccessibilitySize,
             foldsClock: dynamicTypeSize >= .xxxLarge, clockScale: min(clockScale, 1.65),
             actionSize: actionMetrics.horizontalSize, actionMetrics: actionMetrics,
@@ -963,14 +963,6 @@ struct SingleGameView: View {
     }
     #endif
 
-    private func clockStyle(_ style: GameDetailLayoutPlan.ClockStyle) -> GameDetailClockStyle {
-        switch style {
-        case .full: return .full
-        case .compact: return .compact
-        case .inline: return .inline
-        }
-    }
-
     private var gameContent: some View {
         GeometryReader { geometry in
             let columnStyle = columnIdentityStyle(in: geometry)
@@ -990,7 +982,7 @@ struct SingleGameView: View {
                 boardView
                     .gameDetailSlot(.board, plan: plan)
                 GameDetailClockPair(game: game, topLeftPlayerColor: topLeftPlayerColor,
-                                    stacked: plan.stackedClocks, style: clockStyle(plan.clockStyle),
+                                    stacked: plan.stackedClocks, style: plan.clockStyle,
                                     narrowFullCards: plan.narrowFullClocks,
                                     narrowCompactCards: plan.narrowCompactClocks,
                                     spaciousCompact: plan.spaciousCompactClocks,

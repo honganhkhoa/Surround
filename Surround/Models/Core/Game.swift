@@ -422,16 +422,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         return nil
     }
     
-    func playerIcon(for stoneColor: StoneColor, size: Int) -> String? {
-        let iconFromGameData = stoneColor == .black ? gameData?.players.black.iconUrl : gameData?.players.white.iconUrl
-        
-        guard let icon = iconFromGameData ?? ((self.ogsRawData ?? [:]) as NSDictionary).value(forKeyPath: stoneColor == .black ? "players.black.icon" : "players.white.icon") as? String else {
-            return nil
-        }
-        
-        return Game.iconURL(from: icon, withSize: size)
-    }
-    
 //    func rengoTeamOrderedFromNextToMove(with stoneColor: StoneColor) -> [OGSUser] {
 //        if let rengoTeamIds = self.latestPlayerUpdate?.rengoTeams[stoneColor] {
 //            return rengoTeamIds.map { playerByOGSId[$0]! }
@@ -446,15 +436,6 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
 //        }
 //        return []
 //    }
-    
-    static func iconURL(from urlString: String, withSize size: Int) -> String {
-        let regex1 = try! NSRegularExpression(pattern: "-[0-9]+.png")
-        let regex2 = try! NSRegularExpression(pattern: "s=[0-9]+")
-        var result = urlString
-        result = regex1.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "-\(size).png")
-        result = regex2.stringByReplacingMatches(in: result, options: [], range: NSRange(result.startIndex..., in: result), withTemplate: "s=\(size)")
-        return result
-    }
     
     init(width: Int, height: Int, blackName: String, whiteName: String, gameId: GameID) {
         self.width = width

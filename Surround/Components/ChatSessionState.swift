@@ -134,17 +134,10 @@ final class ChatSessionState: ObservableObject {
             } receiveValue: { _ in }
     }
 
-    func composerAppeared(
-        id: UUID,
-        automaticallyFocus: Bool,
-        shareFocusRequestID: UUID?
-    ) {
+    func composerAppeared(id: UUID, shareFocusRequestID: UUID?) {
         activeComposerID = id
         guard isGamePresentationActive else { return }
         requestShareFocus(shareFocusRequestID)
-        if !hasFocusIntent && automaticallyFocus {
-            requestInputFocus()
-        }
     }
 
     func composerDisappeared(id: UUID) {

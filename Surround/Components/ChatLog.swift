@@ -73,7 +73,6 @@ struct ChatLog: View {
     var selection: Binding<ChatLogSelection?> = .constant(nil)
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
-    var focusInputOnAppear = false
     var showsComposer = true
     var onInteraction: () -> Void = {}
     var onVariationShared: () -> Void = {}
@@ -386,7 +385,6 @@ struct ChatLog: View {
                     session: session,
                     selectedChannel: selectedChannel,
                     variationShareDraft: variationShareDraft,
-                    focusInputOnAppear: focusInputOnAppear,
                     onInteraction: onInteraction,
                     onVariationShared: onVariationShared,
                     onCancelVariationSharing: onCancelVariationSharing
@@ -486,7 +484,6 @@ struct NewChatInput: View {
     @EnvironmentObject var ogs: OGSService
     var selectedChannel: Binding<OGSChatSendChannel> = .constant(.main)
     var variationShareDraft: Binding<VariationShareDraft?> = .constant(nil)
-    var focusInputOnAppear = false
     var onInteraction: () -> Void = {}
     var onVariationShared: () -> Void = {}
     var onCancelVariationSharing: () -> Void = {}
@@ -809,7 +806,6 @@ struct NewChatInput: View {
         .onAppear {
             session.composerAppeared(
                 id: composerID,
-                automaticallyFocus: focusInputOnAppear,
                 shareFocusRequestID: variationShareDraft.wrappedValue?.focusRequestID
             )
             if session.wantsInputFocus {

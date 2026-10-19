@@ -247,52 +247,6 @@ struct GameControlRow: View {
         return gamesWaiting > 0 ? gamesWaiting : nil
     }
 
-    func statusText(lineLimit: Int = 2) -> some View {
-        Group {
-            if game.canAcceptUndo || game.canCancelUndo {
-                Menu {
-                    if game.canAcceptUndo {
-                        Button(action: { performGameAction { ogs.acceptUndo(game: game) } }) {
-                            Label("Accept undo", systemImage: "arrow.uturn.left")
-                        }
-                        Button(action: { performGameAction { ogs.cancelUndo(game: game) } }) {
-                            Label(
-                                String(
-                                    localized: "Reject undo",
-                                    comment: "Button to reject the opponent's pending undo request"
-                                ),
-                                systemImage: "xmark"
-                            )
-                        }
-                    } else if game.canCancelUndo {
-                        Button(action: { performGameAction { ogs.cancelUndo(game: game) } }) {
-                            Label(
-                                String(
-                                    localized: "Cancel undo",
-                                    comment: "Button to withdraw the user's own pending undo request"
-                                ),
-                                systemImage: "xmark"
-                            )
-                        }
-                    }
-                }
-                label: {
-                    Text(verbatim: "\(game.status) ▾")
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(lineLimit)
-                        .allowsTightening(true)
-                        .minimumScaleFactor(0.7)
-                }
-                .disabled(blocksGameActions)
-            } else {
-                Text(game.status).font(.subheadline.weight(.semibold))
-                    .lineLimit(lineLimit)
-                    .allowsTightening(true)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-    }
-    
     var actionsMenu: some View {
         Menu {
             Section {

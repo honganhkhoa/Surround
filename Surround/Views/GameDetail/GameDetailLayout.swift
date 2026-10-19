@@ -14,13 +14,25 @@ enum GameDetailBottomEdgePolicy {
     }
 }
 
+enum GameDetailClockStyle {
+    case full, compact, inline
+
+    /// At the default text size. The pair scales both cards together.
+    var cardHeight: CGFloat {
+        switch self {
+        case .full: return 96
+        case .compact: return 50
+        case .inline: return 44
+        }
+    }
+}
+
 /// Geometry only: neither names nor the currently visible action can move the board.
 /// All children keep the same structural slots while their frames rearrange.
 struct GameDetailLayoutPlan {
     enum Slot: Int, CaseIterable { case board, clocks, status, opponent, actions, analysis, analysisControls, chat, composer, preview, information }
-    enum ClockStyle { case full, compact, inline }
     var frames: [Slot: CGRect] = [:]
-    var clockStyle = ClockStyle.full
+    var clockStyle = GameDetailClockStyle.full
     var stackedClocks = false
     var verticalActions = false
     var horizontalActionsInColumn = false
@@ -71,7 +83,7 @@ struct GameDetailLayoutPlan {
     subscript(_ slot: Slot) -> CGRect { frames[slot] ?? .zero }
 
     init(size: CGSize, compact: Bool, zen: Bool, analyze: Bool, chat: Bool,
-         hidesBoard: Bool, keyboard: Bool, keyboardLandscape: Bool? = nil, accessibility: Bool,
+         hidesBoard: Bool, keyboard: Bool, accessibility: Bool,
          foldsClock: Bool, clockScale: CGFloat = 1, actionSize: CGSize = CGSize(width: 180, height: 48),
          actionMetrics: GameControlRowMetrics? = nil,
          composerHeight: CGFloat = 0, keyboardOverlap: CGFloat = 0,
@@ -115,15 +127,15 @@ struct GameDetailLayoutPlan {
         let identityBoardGap: CGFloat = 4
         spaciousCompactClocks = !compact && zen && division == nil && panelDivision == nil
         let spaciousPortraitZen = spaciousCompactClocks && width <= height && !accessibility
-        let fullClock = 96 * fullClockScale
-        let foldedClock = (accessibility || spaciousCompactClocks ? 76 : 50) * clockScale
+        let fullClock = GameDetailClockStyle.full.cardHeight * fullClockScale
+        let foldedClock = (accessibility || spaciousCompactClocks ? 76 : GameDetailClockStyle.compact.cardHeight) * clockScale
         func compactClockHeight(cardWidth: CGFloat) -> CGFloat {
             // Narrow folded clocks put their turn badge on a third line.
             // Reserve it for both players so a turn never moves the board.
             !accessibility && (cardWidth < compactClockBadgeWidth || enlargedCompactClockBadges)
                 ? max(foldedClock, 68 * clockScale) : foldedClock
         }
-        let inlineClock = max(44, 44 * clockScale)
+        let inlineClock = max(GameDetailClockStyle.inline.cardHeight, GameDetailClockStyle.inline.cardHeight * clockScale)
         let analysisControlHeight: CGFloat = 52
         let preferredTreeHeight: CGFloat = 190
         let preferredAnalysisHeight = preferredTreeHeight + gap + analysisControlHeight
@@ -159,7 +171,7 @@ struct GameDetailLayoutPlan {
         func fullClockHeight(at width: CGFloat, stacked: Bool = false) -> CGFloat {
             // A second footer line only when the measured footer needs it.
             let cardWidth = stacked ? width : (width - gap) / 2
-            return (cardWidth < footerWidth ? 110 : 96) * fullClockScale
+            return (cardWidth < footerWidth ? 110 : GameDetailClockStyle.full.cardHeight) * fullClockScale
         }
         func portraitFullClockHeight(at availableWidth: CGFloat, reserving fixedHeight: CGFloat) -> CGFloat {
             let preferred = fullClockHeight(at: availableWidth)
@@ -574,9 +586,6 @@ struct GameDetailLayoutPlan {
             clockStyle = zen ? .compact : .full
             var landscapeIdentityHeight = identityHeight
             if compact {
-                verticalOpponentIdentity = !hidesIdentity && !accessibility && usesVerticalToolbar
-                    && columnIdentityHeight + landscapeFullClock * 2 + gap * 2 <= height - outer * 2
-                if verticalOpponentIdentity { landscapeIdentityHeight = columnIdentityHeight }
                 func fitsClockCards(_ cardHeight: CGFloat) -> Bool {
                     landscapeIdentityHeight + cardHeight * 2 + gap * 2 + outer * 2 <= height
                 }
@@ -612,17 +621,12 @@ struct GameDetailLayoutPlan {
             let b = self[.board]
             let clockX = spaciousWideZen ? 24 : (compactHorizontalZen || unfoldedHorizontalZen ? b.minX - boardGap - left : outer)
             let clockWidth = spaciousWideZen ? max(0, b.minX - gap - clockX) : left
-            let ih = verticalOpponentIdentity ? columnIdentityHeight : landscapeIdentityHeight
-            let opponentWidth = verticalOpponentIdentity ? min(sideActionWidth, left) : left
-            let alignsToBoard = compact && usesVerticalToolbar && verticalOpponentIdentity
-                && b.minY + ih + clockHeight + gap <= height - outer
-            let opponentY = alignsToBoard ? b.minY : outer
-            frames[.opponent] = rect(outer + left - opponentWidth, opponentY, opponentWidth, ih)
+            frames[.opponent] = rect(outer, outer, left, landscapeIdentityHeight)
             let clockCenter = spaciousCompactClocks || trayFreeZenTop != nil ? b.midY : height / 2
-            let clockY = zen ? max(outer, clockCenter - clockHeight / 2) : opponentY + ih + gap
+            let clockY = zen ? max(outer, clockCenter - clockHeight / 2) : outer + landscapeIdentityHeight + gap
             frames[.clocks] = rect(clockX, clockY, clockWidth, clockHeight)
             let cornerHeight = (showsActions ? columnActionHeight : 0)
-                + (showsCornerIdentity ? gap + (verticalOpponentIdentity ? columnIdentityHeight : identityHeight) : 0)
+                + (showsCornerIdentity ? gap + identityHeight : 0)
             let surplusActionWidth = max(0, width - outer - b.maxX - boardGap)
             horizontalActionsInColumn = compact && !usesVerticalToolbar && !zen
                 && !accessibility && !rowActions && showsActions && actionSize.width <= surplusActionWidth

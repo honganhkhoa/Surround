@@ -37,10 +37,7 @@ final class ChatSessionStateTests: XCTestCase {
         let session = ChatSessionState()
         let response = PassthroughSubject<Void, Error>()
         let firstComposer = UUID()
-        session.composerAppeared(
-            id: firstComposer, automaticallyFocus: false,
-            shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: firstComposer, shareFocusRequestID: nil)
         session.message = "Retain this draft"
         var submissions = [String]()
         let send: (String) -> AnyPublisher<Void, Error> = { message in
@@ -50,9 +47,7 @@ final class ChatSessionStateTests: XCTestCase {
 
         session.sendMessage(using: send)
         session.composerDisappeared(id: firstComposer)
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: nil)
         session.sendMessage(using: send)
 
         XCTAssertTrue(session.isSending)
@@ -74,9 +69,7 @@ final class ChatSessionStateTests: XCTestCase {
         response.send(completion: .failure(SendError.unavailable))
         drainMainQueue()
 
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: false, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: nil)
         XCTAssertFalse(session.isSending)
         XCTAssertEqual(session.message, "Retry after folding")
         XCTAssertEqual(session.failure, .messageSend)
@@ -134,17 +127,11 @@ final class ChatSessionStateTests: XCTestCase {
         let session = ChatSessionState()
         let request = UUID()
         let firstComposer = UUID()
-        session.composerAppeared(
-            id: firstComposer, automaticallyFocus: false,
-            shareFocusRequestID: request
-        )
+        session.composerAppeared(id: firstComposer, shareFocusRequestID: request)
         XCTAssertTrue(session.wantsInputFocus)
         session.dismissInput()
         session.composerDisappeared(id: firstComposer)
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true,
-            shareFocusRequestID: request
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: request)
         XCTAssertFalse(session.wantsInputFocus)
 
         session.requestShareFocus(UUID())
@@ -155,17 +142,11 @@ final class ChatSessionStateTests: XCTestCase {
         let session = ChatSessionState()
         let presentationID = session.composerPresentationID
         let oldComposer = UUID()
-        session.composerAppeared(
-            id: oldComposer, automaticallyFocus: false,
-            shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: oldComposer, shareFocusRequestID: nil)
         session.recordInputFocus(true, composerID: oldComposer)
         session.composerDisappeared(id: oldComposer)
         let replacement = UUID()
-        session.composerAppeared(
-            id: replacement, automaticallyFocus: false,
-            shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: replacement, shareFocusRequestID: nil)
         session.recordInputFocus(false, composerID: oldComposer)
         session.composerDisappeared(id: oldComposer)
 
@@ -177,9 +158,8 @@ final class ChatSessionStateTests: XCTestCase {
     func testNavigationSuspendsFocusWithoutDiscardingDraftOrPendingSend() {
         let session = ChatSessionState()
         let composer = UUID()
-        session.composerAppeared(
-            id: composer, automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         session.message = "Finish this thought after viewing a profile"
         session.scrollAnchor = "earlier-message"
         let response = PassthroughSubject<Void, Error>()
@@ -192,9 +172,7 @@ final class ChatSessionStateTests: XCTestCase {
         session.recordInputFocus(false, composerID: composer)
         session.composerDisappeared(id: composer)
         session.setGamePresentationActive(true)
-        session.composerAppeared(
-            id: composer, automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
         session.recordInputFocus(
             false, composerID: composer, expectedRevision: oldRevision
         )
@@ -214,33 +192,14 @@ final class ChatSessionStateTests: XCTestCase {
     func testNavigationDoesNotRepeatShareFocusButANewShareStillFocuses() {
         let session = ChatSessionState()
         let shareRequest = UUID()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: false,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: shareRequest)
         XCTAssertTrue(session.wantsInputFocus)
         session.gamePresentationDisappeared()
         session.setGamePresentationActive(true)
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: shareRequest)
         XCTAssertFalse(session.wantsInputFocus)
 
         session.requestShareFocus(UUID())
-        XCTAssertTrue(session.wantsInputFocus)
-    }
-
-    func testNavigationBeforeFirstFocusKeepsFirstCompactAppearancePolicy() {
-        let session = ChatSessionState()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: false, shareFocusRequestID: nil
-        )
-        session.gamePresentationDisappeared()
-        session.setGamePresentationActive(true)
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil
-        )
         XCTAssertTrue(session.wantsInputFocus)
     }
 
@@ -248,36 +207,24 @@ final class ChatSessionStateTests: XCTestCase {
         let session = ChatSessionState()
         let shareRequest = UUID()
         let originalComposer = UUID()
-        session.composerAppeared(
-            id: originalComposer, automaticallyFocus: false,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: originalComposer, shareFocusRequestID: shareRequest)
         session.dismissInput()
         session.composerDisappeared(id: originalComposer)
 
         // A fold alone retains the user's keyboard dismissal.
         let replacement = UUID()
-        session.composerAppeared(
-            id: replacement, automaticallyFocus: true,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: replacement, shareFocusRequestID: shareRequest)
         XCTAssertFalse(session.wantsInputFocus)
         session.gamePresentationDisappeared()
 
         // Explicitly returning from Zen can resume the pending share task.
         session.setGamePresentationActive(true)
         session.requestInputFocus()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: false,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: shareRequest)
         XCTAssertTrue(session.wantsInputFocus)
 
         session.dismissInput()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true,
-            shareFocusRequestID: shareRequest
-        )
+        session.composerAppeared(id: UUID(), shareFocusRequestID: shareRequest)
         XCTAssertFalse(session.wantsInputFocus)
     }
 
@@ -285,9 +232,8 @@ final class ChatSessionStateTests: XCTestCase {
         let session = ChatSessionState()
         let oldComposer = UUID()
         let oldPresentation = session.composerPresentationID
-        session.composerAppeared(
-            id: oldComposer, automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: oldComposer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: oldComposer)
         session.message = "Draft retained through profile navigation"
 
         // The profile action invalidates first; route and disappearance follow.
@@ -299,10 +245,7 @@ final class ChatSessionStateTests: XCTestCase {
         XCTAssertEqual(session.composerPresentationID, returningPresentation)
 
         let returningComposer = UUID()
-        session.composerAppeared(
-            id: returningComposer, automaticallyFocus: true,
-            shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: returningComposer, shareFocusRequestID: nil)
         session.recordInputFocus(true, composerID: oldComposer)
         session.recordInputFocus(true, composerID: returningComposer)
         session.requestInputFocus()
@@ -319,9 +262,8 @@ final class ChatSessionStateTests: XCTestCase {
     func testQueuedFocusRestoreRequiresCurrentComposerAndRevision() {
         let session = ChatSessionState()
         let composer = UUID()
-        session.composerAppeared(
-            id: composer, automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         let queuedRevision = session.focusRevision
         XCTAssertTrue(session.shouldRestoreInputFocus(
             composerID: composer, revision: queuedRevision
@@ -339,9 +281,7 @@ final class ChatSessionStateTests: XCTestCase {
         session.gamePresentationDisappeared()
         session.setGamePresentationActive(true)
         let replacement = UUID()
-        session.composerAppeared(
-            id: replacement, automaticallyFocus: true, shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: replacement, shareFocusRequestID: nil)
         session.requestInputFocus()
         XCTAssertFalse(session.shouldRestoreInputFocus(
             composerID: composer, revision: session.focusRevision
@@ -354,10 +294,8 @@ final class ChatSessionStateTests: XCTestCase {
     func testDelayedFocusLossCannotOverrideNewShareRequest() {
         let session = ChatSessionState()
         let composer = UUID()
-        session.composerAppeared(
-            id: composer, automaticallyFocus: true,
-            shareFocusRequestID: nil
-        )
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         let oldRevision = session.focusRevision
         session.requestShareFocus(UUID())
         session.recordInputFocus(
@@ -374,7 +312,8 @@ final class ChatSessionStateTests: XCTestCase {
     func testWindowTransitionPreservesFocusedComposerThroughTransientLoss() throws {
         let session = ChatSessionState()
         let composer = UUID()
-        session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         session.message = "Unsent through rotation"
         let transition = try XCTUnwrap(session.beginWindowSizeTransition())
 
@@ -403,7 +342,8 @@ final class ChatSessionStateTests: XCTestCase {
         for (name, interrupt) in interruptions {
             let session = ChatSessionState()
             let composer = UUID()
-            session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+            session.composerAppeared(id: composer, shareFocusRequestID: nil)
+            session.recordInputFocus(true, composerID: composer)
             let transition = try XCTUnwrap(session.beginWindowSizeTransition())
             interrupt(session)
             session.completeWindowSizeTransition(transition)
@@ -414,7 +354,7 @@ final class ChatSessionStateTests: XCTestCase {
 
     func testWindowTransitionDoesNotFocusAnUnfocusedComposer() {
         let session = ChatSessionState()
-        session.composerAppeared(id: UUID(), automaticallyFocus: false, shareFocusRequestID: nil)
+        session.composerAppeared(id: UUID(), shareFocusRequestID: nil)
         XCTAssertNil(session.beginWindowSizeTransition())
         XCTAssertFalse(session.wantsInputFocus)
         XCTAssertEqual(session.focusRestorationRevision, 0)
@@ -422,7 +362,9 @@ final class ChatSessionStateTests: XCTestCase {
 
     func testNewShareFocusRequestSupersedesWindowTransitionRestoration() throws {
         let session = ChatSessionState()
-        session.composerAppeared(id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil)
+        let composer = UUID()
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         let transition = try XCTUnwrap(session.beginWindowSizeTransition())
         session.requestShareFocus(UUID())
         session.completeWindowSizeTransition(transition)
@@ -433,28 +375,12 @@ final class ChatSessionStateTests: XCTestCase {
     func testWindowLosingKeyStatusEndsGuardWithoutRestoringFocus() throws {
         let session = ChatSessionState()
         let composer = UUID()
-        session.composerAppeared(id: composer, automaticallyFocus: true, shareFocusRequestID: nil)
+        session.composerAppeared(id: composer, shareFocusRequestID: nil)
+        session.recordInputFocus(true, composerID: composer)
         let transition = try XCTUnwrap(session.beginWindowSizeTransition())
         session.completeWindowSizeTransition(transition, allowsRestoration: false)
         XCTAssertEqual(session.focusRestorationRevision, 0)
         session.recordInputFocus(false, composerID: composer)
-        XCTAssertFalse(session.wantsInputFocus)
-    }
-
-    func testFirstCompactAppearanceFocusesButDoesNotUndoUserDismissal() {
-        let session = ChatSessionState()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: false, shareFocusRequestID: nil
-        )
-        XCTAssertFalse(session.wantsInputFocus)
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil
-        )
-        XCTAssertTrue(session.wantsInputFocus)
-        session.dismissInput()
-        session.composerAppeared(
-            id: UUID(), automaticallyFocus: true, shareFocusRequestID: nil
-        )
         XCTAssertFalse(session.wantsInputFocus)
     }
 

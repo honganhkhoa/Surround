@@ -178,7 +178,7 @@
 		BC3037F72692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
 		BC3037F82692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
 		BC3037F92692D03300181570 /* MoveTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3037F42692D03300181570 /* MoveTree.swift */; };
-		BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */; };
+		BC33384B250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC33384A250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift */; };
 		BC361AB6256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
 		BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC361AB5256246B4000C47F4 /* OGSChatLine.swift */; };
@@ -616,7 +616,7 @@
 		BC285BCE2559377A005378F9 /* SurroundNotificationContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SurroundNotificationContent.entitlements; sourceTree = "<group>"; };
 		BC28A917277ACDDD007A417E /* game-beta-11359.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "game-beta-11359.json"; sourceTree = "<group>"; };
 		BC3037F42692D03300181570 /* MoveTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveTree.swift; sourceTree = "<group>"; };
-		BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayersBannerView.swift; sourceTree = "<group>"; };
+		BC33384A250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotAvatar.swift; sourceTree = "<group>"; };
 		BC361AB5256246B4000C47F4 /* OGSChatLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChatLine.swift; sourceTree = "<group>"; };
 		BC38FA342F52B599008541A6 /* CustomGameForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomGameForm.swift; sourceTree = "<group>"; };
 		BC39EE3725DBC23C00562C68 /* TextUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextUtilities.swift; sourceTree = "<group>"; };
@@ -1125,7 +1125,7 @@
 				1C70DA827D5C4B4FA1029CF7 /* GameDetailClockState.swift */,
 				409392721D4541B59A6E13B6 /* GameDetailLayout.swift */,
 				AF1000023D00000000000002 /* AnalyzeControlBar.swift */,
-				BC33384A250B6F410002F4D8 /* PlayersBannerView.swift */,
+				BC33384A250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift */,
 				BC4658AD2508927D00859316 /* ActiveGamesCarousel.swift */,
 				BC3F72F024F6485D0080DAA2 /* GameDetailView.swift */,
 				AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */,
@@ -1584,7 +1584,7 @@
 				BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */,
 				BCFA11510000000000000002 /* GameHistoryView.swift in Sources */,
 				BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */,
-				BC33384B250B6F410002F4D8 /* PlayersBannerView.swift in Sources */,
+				BC33384B250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift in Sources */,
 				BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */,
 				BC5EEC29259D851B00675761 /* Variation.swift in Sources */,
 				BC70596225FF00F400AC4DE9 /* AboutView.swift in Sources */,
