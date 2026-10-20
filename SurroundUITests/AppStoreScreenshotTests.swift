@@ -465,7 +465,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let board = element(
+        element(
             SurroundUITestContract.AccessibilityID.gameBoard,
             in: app,
             file: file,
@@ -478,13 +478,8 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             file: file,
             line: line
         )
-        let boardHidden = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: board
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [boardHidden], timeout: 10),
-            .completed,
+        XCTAssertTrue(
+            pollUntil(timeout: 10) { !gameBoardIsShown(in: app) },
             "Expected the iPhone Chat screenshot to hide the main board.",
             file: file,
             line: line

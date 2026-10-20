@@ -188,6 +188,18 @@ class SurroundUITestCase: XCTestCase {
         )
     }
 
+    /// Whether the main board is on screen. Game Detail keeps a hidden board
+    /// mounted in a layout slot shrunk to nothing, so the board can remain in
+    /// the accessibility tree with an empty frame.
+    func gameBoardIsShown(in app: XCUIApplication) -> Bool {
+        app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.gameBoard)
+            .allElementsBoundByIndex.contains { board in
+                let frame = board.frame
+                return !frame.isEmpty && !frame.isInfinite && frame.intersects(app.frame)
+            }
+    }
+
     func dismissCompactChatInputAndWaitForLayout(
         in app: XCUIApplication,
         timeout: TimeInterval = 10,
@@ -322,7 +334,10 @@ class SurroundUITestCase: XCTestCase {
             line: line
         )
         let viewport = visibleChatLogViewport(chatLog.frame, in: app)
-        let usedChatBackground = viewport.width > 8 && viewport.height > 8
+        // The sharing composer and keyboard can leave a sliver of transcript
+        // (11-inch landscape), where rows cover the background. Tap outside
+        // chat instead; the first such tap only ends editing.
+        let usedChatBackground = viewport.width > 8 && viewport.height >= 44
             && chatLog.isHittable
         if usedChatBackground {
             guard tapChatLogBackground(
@@ -339,13 +354,20 @@ class SurroundUITestCase: XCTestCase {
             let hasUncoveredBoard = board.exists && board.isHittable
                 && app.frame.contains(point)
                 && (!keyboard.exists || !keyboard.frame.contains(point))
-            let headerClock = app.navigationBars.buttons["game.clock.black"].firstMatch
-            if !hasUncoveredBoard && headerClock.exists && headerClock.isHittable
-                && softwareKeyboardIsVisible(keyboard, in: app) {
-                // Landscape sharing hides the main board and can leave no
-                // history gutter. Its native header clock is the remaining
-                // intended first-tap keyboard dismissal target.
-                headerClock.tap()
+            // Compact layouts put the clocks in the header; regular layouts
+            // keep them beside or above the board. A hidden layout slot can
+            // leave a squeezed copy at the content's corner; take the largest.
+            let clock = app.buttons.matching(identifier: "game.clock.black")
+                .allElementsBoundByIndex.filter {
+                    $0.isHittable && app.frame.contains($0.frame)
+                        && (!keyboard.exists || !keyboard.frame.intersects($0.frame))
+                }
+                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            if !hasUncoveredBoard, let clock, softwareKeyboardIsVisible(keyboard, in: app) {
+                // Sharing can hide the main board and leave no history
+                // gutter. A clock is the remaining intended first-tap
+                // keyboard dismissal target.
+                clock.tap()
                 XCTAssertFalse(app.staticTexts["Time control"].exists,
                                "The first clock tap dismisses focus without opening details",
                                file: file, line: line)

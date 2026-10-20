@@ -823,9 +823,26 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         let title = app.navigationBars.staticTexts
             .matching(NSPredicate(format: "label BEGINSWITH %@", navigationTitle))
             .firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
-        XCTAssertTrue(title.isHittable, "Expected the owning page's navigation title.")
-        let frame = title.frame
+        let bar = app.navigationBars.matching(identifier: navigationTitle).firstMatch
+        XCTAssertTrue(pollUntil(timeout: 10) { title.exists || bar.exists },
+                      "Expected the owning page's navigation bar.")
+        var frame = title.exists && title.isHittable ? title.frame : .null
+        if frame.isNull {
+            // iPad shows its top tab bar in place of the inline title while
+            // the sidebar is hidden. Use the widest empty stretch of the bar.
+            let barFrame = bar.frame
+            let occupied = (bar.buttons.allElementsBoundByIndex
+                + app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'navigation.'"))
+                    .allElementsBoundByIndex)
+                .map(\.frame).filter { $0.intersects(barFrame) }.sorted { $0.minX < $1.minX }
+            var start = barFrame.minX
+            for item in occupied + [CGRect(x: barFrame.maxX, y: barFrame.minY, width: 0, height: 0)] {
+                if item.minX - start > (frame.isNull ? 0 : frame.width) {
+                    frame = CGRect(x: start, y: barFrame.minY, width: item.minX - start, height: barFrame.height)
+                }
+                start = max(start, item.maxX)
+            }
+        }
         XCTAssertTrue(app.frame.contains(frame))
         XCTAssertGreaterThan(frame.width, 0)
         XCTAssertGreaterThan(frame.height, 0)
@@ -836,6 +853,78 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             dy: frame.midY - app.frame.minY
         ))
         #endif
+    }
+
+    /// Taps a Zen control, through the native toolbar overflow when a
+    /// narrow navigation bar moves it there.
+    func activateZenControl(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        #if targetEnvironment(macCatalyst)
+        element(
+            identifier,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        app.typeKey("z", modifierFlags: [.control, .option])
+        #else
+        let control = app.buttons.matching(identifier: identifier).firstMatch
+        if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
+           !control.exists {
+            // Narrow navigation bars move this action into the native overflow.
+            tap(
+                app.navigationBars.buttons["More"].firstMatch,
+                description: "game toolbar overflow",
+                in: app,
+                file: file,
+                line: line
+            )
+            let menuItem = requiredMenuButton(
+                identifier,
+                title: "Zen mode",
+                in: app,
+                file: file,
+                line: line
+            )
+            XCTAssertTrue(
+                menuItem.isEnabled,
+                "Expected the overflowed Zen action to be enabled",
+                file: file,
+                line: line
+            )
+            tap(
+                menuItem,
+                description: identifier,
+                in: app,
+                file: file,
+                line: line
+            )
+            return
+        }
+        tap(
+            identifier,
+            in: app,
+            matching: .button,
+            file: file,
+            line: line
+        )
+        #endif
+    }
+
+    /// The control that shows the native navigation sidebar. iPadOS names it
+    /// by release ("Toggle sidebar", "Show Sidebar", "Hide Sidebar"); a game
+    /// hides the tab bar and keeps it in the navigation bar, and Duo's wide
+    /// poses draw the game's own button in its place.
+    func nativeSidebarToggle(in app: XCUIApplication) -> XCUIElement? {
+        app.buttons.matching(NSPredicate(
+            format: "identifier IN %@ OR label CONTAINS[c] %@",
+            ["ToggleSidebar", SurroundUITestContract.AccessibilityID.gameSidebarToggle], "sidebar"
+        )).allElementsBoundByIndex.first { $0.isHittable }
     }
 
     func selectMainNavigation(_ identifier: String, in app: XCUIApplication) {
@@ -865,12 +954,9 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in visibleEntry() }, object: nil)
             return XCTWaiter.wait(for: [ready], timeout: 10) == .completed
         }
-        if !waitForEntry() {
-            let sidebar = app.buttons["Toggle sidebar"].firstMatch
-            if sidebar.exists && sidebar.isHittable {
-                tap(sidebar, description: "Show navigation sidebar", in: app)
-                _ = waitForEntry()
-            }
+        if !waitForEntry(), let sidebar = nativeSidebarToggle(in: app) {
+            tap(sidebar, description: "Show navigation sidebar", in: app)
+            _ = waitForEntry()
         }
         XCTAssertNotNil(entry, "Expected a visible main navigation entry: \(identifier)")
         guard let entry else { return }

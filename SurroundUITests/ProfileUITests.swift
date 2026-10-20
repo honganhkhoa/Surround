@@ -338,9 +338,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         }
 
         func openSidebarAccountSheet(_ identifier: String, title: String) {
-            if visibleSidebarRow(identifier) == nil {
-                tap(app.buttons["Toggle sidebar"].firstMatch,
-                    description: "Show the native navigation sidebar", in: app)
+            if visibleSidebarRow(identifier) == nil, let sidebar = nativeSidebarToggle(in: app) {
+                tap(sidebar, description: "Show the native navigation sidebar", in: app)
             }
             var entry: XCUIElement?
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -1335,8 +1334,9 @@ final class ProfileUITests: SurroundJourneyUITestCase {
 
         func selectTab(_ identifier: String) {
             let tabs = app.descendants(matching: .any).matching(identifier: identifier)
-            if !tabs.allElementsBoundByIndex.contains(where: { $0.isHittable }) {
-                tap(app.buttons["Toggle sidebar"], description: "Show navigation sidebar", in: app)
+            if !tabs.allElementsBoundByIndex.contains(where: { $0.isHittable }),
+               let sidebar = nativeSidebarToggle(in: app) {
+                tap(sidebar, description: "Show navigation sidebar", in: app)
             }
             var visibleTab: XCUIElement?
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in

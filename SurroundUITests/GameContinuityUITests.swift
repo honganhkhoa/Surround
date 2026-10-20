@@ -232,7 +232,16 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         let app = launchNativeGame()
         let draft = "Keep this draft while viewing the player"
         typeDraft(draft, in: app)
-        tap(ID.profileBannerAvatarEntry(SurroundUITestContract.profileFixtureOpponentID), in: app, matching: .button)
+        let avatar = element(ID.profileBannerAvatarEntry(SurroundUITestContract.profileFixtureOpponentID),
+                             in: app, matching: .button)
+        let profile = app.descendants(matching: .any).matching(identifier: ID.profileLoaded).firstMatch
+        tap(avatar, description: "Opponent avatar", in: app)
+        if !profile.waitForExistence(timeout: 5) {
+            // With the on-screen keyboard up, a first tap outside chat only
+            // ends editing; it must not also act on what it lands on.
+            XCTAssertFalse(chatInputHasKeyboardFocus(in: app))
+            tap(avatar, description: "Opponent avatar", in: app)
+        }
         element(ID.profileLoaded, in: app)
         navigateBackFromPlayerProfile(in: app)
 
@@ -289,7 +298,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         // Dismissing the keyboard is deliberate; entering and leaving Zen
         // must preserve the draft without restoring keyboard focus.
         dismissSoftwareKeyboardIfNeeded(in: app)
-        tap(ID.gameZenEnter, in: app, matching: .button)
+        activateZenControl(ID.gameZenEnter, in: app)
         element(ID.gameZenExit, in: app)
         tap(ID.gameZenExit, in: app, matching: .button)
         assertProperty("value", equals: draft,
@@ -384,7 +393,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         setGameChatVisible(false, in: app)
         let liveBoard = try boardValue(in: app)
         changeLayout(toCompact: true, in: app)
-        tap(ID.gameZenEnter, in: app, matching: .button)
+        activateZenControl(ID.gameZenEnter, in: app)
         element(ID.gameZenExit, in: app)
         changeLayout(toCompact: false, in: app)
         assertProperty("value", equals: liveBoard, of: element(ID.gameBoard, in: app))

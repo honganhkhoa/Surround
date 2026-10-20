@@ -26,65 +26,6 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         case requireExistingFocus
     }
 
-    private func activateZenControl(
-        _ identifier: String,
-        in app: XCUIApplication,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        #if targetEnvironment(macCatalyst)
-        element(
-            identifier,
-            in: app,
-            matching: .button,
-            file: file,
-            line: line
-        )
-        app.typeKey("z", modifierFlags: [.control, .option])
-        #else
-        let control = app.buttons.matching(identifier: identifier).firstMatch
-        if identifier == SurroundUITestContract.AccessibilityID.gameZenEnter,
-           !control.exists {
-            // Narrow navigation bars move this action into the native overflow.
-            tap(
-                app.navigationBars.buttons["More"].firstMatch,
-                description: "game toolbar overflow",
-                in: app,
-                file: file,
-                line: line
-            )
-            let menuItem = requiredMenuButton(
-                identifier,
-                title: "Zen mode",
-                in: app,
-                file: file,
-                line: line
-            )
-            XCTAssertTrue(
-                menuItem.isEnabled,
-                "Expected the overflowed Zen action to be enabled",
-                file: file,
-                line: line
-            )
-            tap(
-                menuItem,
-                description: identifier,
-                in: app,
-                file: file,
-                line: line
-            )
-            return
-        }
-        tap(
-            identifier,
-            in: app,
-            matching: .button,
-            file: file,
-            line: line
-        )
-        #endif
-    }
-
     private func openGameFailureAlert(
         in app: XCUIApplication,
         file: StaticString = #filePath,
@@ -2336,7 +2277,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let openedSidebar = !publicGamesTabs.allElementsBoundByIndex.contains { $0.isHittable }
         if openedSidebar {
             keepScreenshot("Live banner – overlaps iPad tabs", in: app)
-            tap(app.buttons["Toggle sidebar"], description: "Show navigation sidebar", in: app)
+            if let sidebar = nativeSidebarToggle(in: app) {
+                tap(sidebar, description: "Show navigation sidebar", in: app)
+            }
         }
         var publicGamesTab: XCUIElement?
         let publicGamesReady = XCTNSPredicateExpectation(
@@ -2362,7 +2305,9 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.navigationSettings)
             .allElementsBoundByIndex.contains(where: { $0.isHittable }) {
             // Restore the initial sidebar state so it cannot affect later tests.
-            tap(app.buttons["Toggle sidebar"], description: "Hide navigation sidebar", in: app)
+            if let sidebar = nativeSidebarToggle(in: app) {
+                tap(sidebar, description: "Hide navigation sidebar", in: app)
+            }
         }
         openLiveGameFromBanner()
         backToHome()
@@ -2428,8 +2373,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         dismissCompactChatInputAndWaitForLayout(in: app)
         tap(SurroundUITestContract.AccessibilityID.gameChatBoardHide, in: app, matching: .button)
         element(SurroundUITestContract.AccessibilityID.gameChatBoardShow, in: app, matching: .button)
-        XCTAssertFalse(app.descendants(matching: .any)
-            .matching(identifier: SurroundUITestContract.AccessibilityID.gameBoard).firstMatch.exists)
+        XCTAssertTrue(pollUntil(timeout: 10) { !gameBoardIsShown(in: app) })
 
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.gameDisplayModePicker, app: app)
         activateZenControl(SurroundUITestContract.AccessibilityID.gameZenEnter, in: app)
@@ -2845,7 +2789,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             app: app
         )
         dismissCompactChatInputAndWaitForLayout(in: app)
-        let board = element(
+        element(
             SurroundUITestContract.AccessibilityID.gameBoard,
             in: app
         )
@@ -2862,13 +2806,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
 
         hideBoard.tap()
-        let boardHidden = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: board
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [boardHidden], timeout: 10),
-            .completed,
+        XCTAssertTrue(
+            pollUntil(timeout: 10) { !gameBoardIsShown(in: app) },
             "Expected Hide main board to remove the compact Chat board."
         )
         element(
@@ -2884,7 +2823,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(showBoard.label, "Show main board")
 
         showBoard.tap()
-        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { gameBoardIsShown(in: app) },
+                      "Expected Show main board to restore the board.")
         XCTAssertEqual(
             element(
                 SurroundUITestContract.AccessibilityID.gameChatBoardHide,
@@ -2930,7 +2870,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             ],
             orientation: .portrait
         )
-        let board = element(
+        element(
             SurroundUITestContract.AccessibilityID.gameBoard,
             in: app
         )
@@ -3011,13 +2951,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
         dismissSoftwareKeyboardIfNeeded(in: app)
 
-        let boardHidden = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: board
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [boardHidden], timeout: 10),
-            .completed,
+        XCTAssertTrue(
+            pollUntil(timeout: 10) { !gameBoardIsShown(in: app) },
             "Expected compact Variation sharing to hide the main board."
         )
         let showBoard = element(
@@ -3028,7 +2963,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(showBoard.label, "Show main board")
 
         showBoard.tap()
-        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) { gameBoardIsShown(in: app) },
+                      "Expected Show main board to restore the board.")
         XCTAssertEqual(
             element(
                 SurroundUITestContract.AccessibilityID
@@ -3046,13 +2982,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(hideBoard.label, "Hide main board")
 
         hideBoard.tap()
-        let boardHiddenAgain = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: board
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [boardHiddenAgain], timeout: 10),
-            .completed,
+        XCTAssertTrue(
+            pollUntil(timeout: 10) { !gameBoardIsShown(in: app) },
             "Expected the toolbar to hide the main board again."
         )
         element(
@@ -3172,13 +3103,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             .completed,
             "Expected Send to dismiss the compact sharing preview."
         )
-        let boardStillHidden = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: board
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [boardStillHidden], timeout: 10),
-            .completed,
+        XCTAssertTrue(
+            pollUntil(timeout: 10) { !gameBoardIsShown(in: app) },
             "Expected Send to preserve the hidden main-board state."
         )
         element(
@@ -3425,29 +3351,15 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let draft = beginVariationSharingDraft(named: "Persistent variation")
         let app = draft.app
 
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
-            in: app
-        )
-        dismissSoftwareKeyboardIfNeeded(in: app)
+        // Sharing opens Chat in place of Analyze. Returning to Analyze hides
+        // the composer; the draft must survive navigating there and back.
+        setGameAnalyzing(true, in: app)
         XCTAssertFalse(
-            app.descendants(matching: .any)[
-                SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar
-            ].exists,
-            "Expected the first toggle to leave Analyze mode."
-        )
-        assertVariationSharingDraftIsIntact(draft)
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
-            in: app
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
-            in: app
+            app.textFields[SurroundUITestContract.AccessibilityID.gameChatInput].exists,
+            "Expected Analyze to replace the sharing composer."
         )
         // tapAnalysisPosition verifies the exact Button's stable selection.
         tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
-        assertVariationSharingDraftIsIntact(draft)
         let selectedAnalyzeBoardValue = draft.mainBoard.value as? String
         XCTAssertNotNil(selectedAnalyzeBoardValue)
         tap(
@@ -3461,10 +3373,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             selectedAnalyzeBoardValue,
             "Expected Analyze navigation to update the main board independently of the frozen composer preview."
         )
-        assertVariationSharingDraftIsIntact(draft)
 
         // tapAnalysisPosition verifies the exact Button's stable selection.
         tapAnalysisPosition(draft.selectedAnalysisPosition, in: app)
+        openGameChat(in: app)
         assertVariationSharingDraftIsIntact(draft)
     }
 
@@ -3472,11 +3384,6 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let draft = beginVariationSharingDraft(named: "Persistent variation")
         let app = draft.app
 
-        tap(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeToggle,
-            in: app
-        )
-        dismissSoftwareKeyboardIfNeeded(in: app)
         assertVariationSharingDraftIsIntact(draft)
         activateZenControl(
             SurroundUITestContract.AccessibilityID.gameZenEnter,
@@ -3527,6 +3434,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let draft = beginVariationSharingDraft(named: "Persistent variation")
         let app = draft.app
 
+        // Sharing opened Chat in place of Analyze; return to pick another branch.
+        setGameAnalyzing(true, in: app)
         tap(
             SurroundUITestContract.AccessibilityID.gameAnalyzePrevious,
             in: app,
@@ -4060,11 +3969,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             quickRemoveAfterAdd.label,
             "Remove from conditional moves"
         )
-        XCTAssertGreaterThan(
-            quickRemoveAfterAdd.frame.width,
-            44,
-            "The shortcut should visibly include its short Remove label."
-        )
+        // The regular side column is 400pt wide; the bar shortens the
+        // shortcut to its icon there so every branch arrow stays visible.
+        XCTAssertGreaterThanOrEqual(quickRemoveAfterAdd.frame.width, 44)
+        XCTAssertTrue(quickRemoveAfterAdd.isHittable)
         XCTAssertEqual(quickRemoveAfterAdd.frame.height, 44, accuracy: 4)
         XCTAssertFalse(
             quickAddConditional.exists,
@@ -4111,11 +4019,10 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             matching: .button
         )
         XCTAssertEqual(quickAddAfterRemoval.label, "Add to conditional moves")
-        XCTAssertGreaterThan(
-            quickAddAfterRemoval.frame.width,
-            44,
-            "The shortcut should visibly include its short Add label."
-        )
+        // The regular side column is 400pt wide; the bar shortens the
+        // shortcut to its icon there so every branch arrow stays visible.
+        XCTAssertGreaterThanOrEqual(quickAddAfterRemoval.frame.width, 44)
+        XCTAssertTrue(quickAddAfterRemoval.isHittable)
         XCTAssertEqual(quickAddAfterRemoval.frame.height, 44, accuracy: 4)
         XCTAssertFalse(
             quickRemoveConditional.exists,
@@ -4878,10 +4785,8 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             ).label,
             "Say hi!"
         )
-        element(
-            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar,
-            in: app
-        )
+        // Cancel leaves Chat open; Analyze retains its marked position.
+        setGameAnalyzing(true, in: app)
         XCTAssertTrue(
             (board.value as? String)?.contains("|marks:A=") == true,
             "Expected Cancel to preserve the active Analyze position."
