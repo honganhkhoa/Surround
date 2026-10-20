@@ -18,8 +18,13 @@ struct GameDetailView: View {
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
 
     @Binding var currentGame: Game?
+    /// Back clears the game as the slide-out begins. The screen keeps drawing
+    /// it until it is gone, instead of turning blank while still visible.
+    @State private var departingGame: Game?
     @State var activeGames: [Game] = []
     @State var activeGameByOGSID: [Int: Game] = [:]
     @State private var detailConnection = GameDetailConnectionCoordinator()
@@ -509,7 +514,7 @@ struct GameDetailView: View {
         return VStack(alignment: .leading, spacing: compact ? nil : 0) {
             // Keep this view in one structural slot as the size class changes,
             // so folding preserves analysis and pending board moves.
-            if let currentGame {
+            if let currentGame = currentGame ?? departingGame {
                 SingleGameView(
                     compact: compact,
                     game: currentGame,
@@ -595,6 +600,9 @@ struct GameDetailView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
             contentWidth = width
         }
+        .onChange(of: currentGame) { oldGame, newGame in
+            departingGame = newGame == nil ? oldGame : nil
+        }
         .onChange(of: isVerticalToolbar, initial: true) { _, vertical in
             if !zenMode { verticalToolbarOutsideZen = vertical }
         }
@@ -627,7 +635,7 @@ struct GameDetailView: View {
     }
 
     private func content(geometry: GeometryProxy) -> some View {
-        guard let currentGame = self.currentGame else {
+        guard let currentGame = self.currentGame ?? departingGame else {
             return AnyView(EmptyView())
         }
         let viewingOwnLiveGame = allowsActiveGamesCarousel
@@ -681,7 +689,7 @@ struct GameDetailView: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
-        .background(GameDetailAppearance.background.ignoresSafeArea(.container))
+        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
         .overlay(alignment: .topTrailing) { zenExitOverlay }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
@@ -822,6 +830,10 @@ struct GameDetailView: View {
                 }
             })
             .environment(\.gameDetailNotificationContextID, notificationContextID)
+            // A departing screen gives the window back at once, so the
+            // screen sliding in already has its own appearance.
+            .gameDetailTheme(SurroundTheme.current(storedID: gameThemeID),
+                             ownsWindow: self.currentGame != nil)
         )
     }
 }

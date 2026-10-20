@@ -22,6 +22,7 @@ enum StoneRemovalOption: Int {
 
 struct Goban: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.boardAppearance) private var appearance
     var geometry: GeometryProxy
     var width: Int
     var height: Int
@@ -52,8 +53,8 @@ struct Goban: View {
             }
         }
         let highlightColor = stoneRemovable
-            ? UIColor.systemTeal
-            : (isHoveredPointValid ?? false) ? UIColor.systemGreen : UIColor.systemRed
+            ? appearance.crosshair.removal
+            : (isHoveredPointValid ?? false) ? appearance.crosshair.valid : appearance.crosshair.invalid
         let coordinates = "ABCDEFGHJKLMNOPQRSTUVWXYZ".map { String($0) }
         return Group {
             ZStack {
@@ -61,14 +62,14 @@ struct Goban: View {
                     ForEach(0..<width, id: \.self) { col in
                         Text(verbatim: "\(coordinates[col])").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
-                            .foregroundColor(.black)
+                            .foregroundColor(appearance.coordinateColor)
                             .frame(width: size, height: size)
                             .position(x: (CGFloat(col) + 0.5) * size, y: -0.5 * size)
                     }
                     ForEach(0..<height, id: \.self) { row in
                         Text(verbatim: "\(height - row)").font(.system(size: size > 30 ? size / 1.5 : size))
                             .minimumScaleFactor(0.2)
-                            .foregroundColor(.black)
+                            .foregroundColor(appearance.coordinateColor)
                             .frame(width: size, height: size)
                             .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
                     }
@@ -83,14 +84,14 @@ struct Goban: View {
                         path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
                 }
-                .stroke(Color.black, lineWidth: size < 10 ? 1 / displayScale : 0.5)
+                .stroke(appearance.gridColor, lineWidth: size < 10 ? 1 / displayScale : 0.5 * appearance.gridLineScale)
                 Path { path in
                     path.move(to: CGPoint(x: size / 2, y: size / 2))
                     path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
                     path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     path.addLine(to: CGPoint(x: size / 2, y: (CGFloat(height) - 0.5) * size))
                     path.closeSubpath()
-                }.stroke(Color.black, lineWidth: size < 10 ? 0.5 : 1)
+                }.stroke(appearance.gridColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
                 if starPoints.count > 0 {
                     Path { path in
                         for starPoint in starPoints {
@@ -98,7 +99,7 @@ struct Goban: View {
                             let starPointRect = CGRect(x: (starPoint[0] + 0.5) * size - starPointSize / 2, y: (starPoint[1] + 0.5) * size - starPointSize / 2, width: starPointSize, height: starPointSize)
                             path.addEllipse(in: starPointRect)
                         }
-                    }.fill(Color.black)
+                    }.fill(appearance.gridColor)
                 }
                 if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
                     Path { path in
@@ -108,7 +109,7 @@ struct Goban: View {
                         path.move(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: size / 2))
                         path.addLine(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
-                    .stroke(Color(highlightColor), lineWidth: 1)
+                    .stroke(highlightColor, lineWidth: appearance.crosshairWidth)
                 }
             }
         }
@@ -160,6 +161,7 @@ struct Goban: View {
 }
 
 struct VariationNumberings: View {
+    @Environment(\.boardAppearance) private var appearance
     var variation: Variation
     var cellSize: CGFloat
     
@@ -175,7 +177,7 @@ struct VariationNumberings: View {
                         Text(verbatim: "\(label)")
                             .font(.system(size: labelSize))
                             .bold()
-                            .foregroundColor(stoneColor == .black ? .white : .black)
+                            .foregroundColor(appearance.stones(stoneColor).label)
                             .minimumScaleFactor(0.2)
                             .frame(width: labelSize, height: labelSize)
                             .position(
@@ -191,8 +193,138 @@ struct VariationNumberings: View {
     }
 }
 
+/// The board's reflected light, beneath the grid and stones. Specks are
+/// placed by fraction of the surface, so they keep their pattern as the board
+/// resizes, and scale in number with its area.
+private struct BoardReflectionView: View {
+    let reflection: BoardReflection
+
+    private struct Speck {
+        let x: CGFloat
+        let y: CGFloat
+        let radius: CGFloat
+        let opacity: Double
+    }
+
+    private static let dust: [Speck] = specks(count: 4000, seed: 0x57A2_2026, radius: 0.25...0.6, opacity: 0.12...0.42)
+    private static let glints: [Speck] = specks(count: 120, seed: 0x6E1A_7051, radius: 0.5...1.0, opacity: 0.55...0.9)
+
+    private static func specks(count: Int, seed: UInt64, radius: ClosedRange<CGFloat>,
+                               opacity: ClosedRange<Double>) -> [Speck] {
+        var state = seed
+        func next() -> Double {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Double(state >> 33) / Double(1 << 31)
+        }
+        return (0..<count).map { _ in
+            Speck(x: next(), y: next(),
+                  radius: radius.lowerBound + (radius.upperBound - radius.lowerBound) * pow(next(), 3),
+                  opacity: opacity.lowerBound + (opacity.upperBound - opacity.lowerBound) * next())
+        }
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let origin = CGPoint(x: -0.12 * size.width, y: -0.12 * size.height)
+            let reach = reflection.reach * max(size.width, size.height)
+            // The sheen, screened over the surface so it lightens without
+            // greying the indigo.
+            var sheen = context
+            sheen.blendMode = .screen
+            sheen.fill(Path(CGRect(origin: .zero, size: size)), with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: reflection.color.opacity(reflection.corner), location: 0),
+                    .init(color: reflection.color.opacity(reflection.middle), location: 0.45),
+                    .init(color: reflection.color.opacity(reflection.edge), location: 1)
+                ]),
+                center: origin, startRadius: 0, endRadius: reach))
+            // Specks are brighter where the sheen is.
+            func lit(_ point: CGPoint) -> Double {
+                max(0.35, 1 - hypot(point.x - origin.x, point.y - origin.y) / reach)
+            }
+            let area = size.width * size.height / 10_000
+            for speck in Self.dust.prefix(min(Self.dust.count, Int(area * reflection.dustDensity))) {
+                let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
+                var dot = context
+                dot.opacity = speck.opacity * lit(center)
+                dot.fill(Path(ellipseIn: CGRect(x: center.x - speck.radius, y: center.y - speck.radius,
+                                                width: speck.radius * 2, height: speck.radius * 2)),
+                         with: .color(Color(red: 0.86, green: 0.89, blue: 1)))
+            }
+            for speck in Self.glints.prefix(min(Self.glints.count, Int(area * reflection.glintDensity))) {
+                let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
+                let halo = speck.radius * 5
+                let strength = speck.opacity * lit(center)
+                context.fill(Path(ellipseIn: CGRect(x: center.x - halo, y: center.y - halo, width: halo * 2, height: halo * 2)),
+                             with: .radialGradient(Gradient(colors: [Color(red: 0.91, green: 0.93, blue: 1).opacity(0.3 * strength), .clear]),
+                                                   center: center, startRadius: 0, endRadius: halo))
+                var dot = context
+                dot.opacity = strength
+                dot.fill(Path(ellipseIn: CGRect(x: center.x - speck.radius, y: center.y - speck.radius,
+                                                width: speck.radius * 2, height: speck.radius * 2)),
+                         with: .color(Color(red: 0.96, green: 0.96, blue: 1)))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct ImageStone {
+    var rect: CGRect
+    var color: StoneColor
+    var isRemoved: Bool
+    var variant: Int
+}
+
+/// Rendered stones in one Canvas, so a full board is a few dozen image draws
+/// rather than a view per stone. One blurred layer holds every contact
+/// shadow, under all stones, lit from the upper left like the images.
+private struct ImageStoneCanvas: View {
+    var stones: [ImageStone]
+    var images: StoneImages?
+    var cellSize: CGFloat
+    private let overhang: CGFloat = 6
+
+    var body: some View {
+        Canvas(rendersAsynchronously: false) { context, _ in
+            guard let images, !stones.isEmpty else { return }
+            context.translateBy(x: overhang, y: overhang)
+            let black = images.black.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
+            let white = images.white.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
+
+            let offset = CGSize(width: cellSize * 0.03, height: cellSize * 0.06)
+            context.drawLayer { shadows in
+                shadows.addFilter(.blur(radius: max(1, cellSize * 0.06)))
+                var path = Path()
+                for stone in stones where !stone.isRemoved {
+                    path.addEllipse(in: stone.rect.offsetBy(dx: offset.width, dy: offset.height).insetBy(dx: 0.5, dy: 0.5))
+                }
+                shadows.fill(path, with: .color(.black.opacity(0.5)))
+            }
+
+            for stone in stones {
+                let variants = stone.color == .black ? black : white
+                guard !variants.isEmpty else { continue }
+                var stoneContext = context
+                // Scoring fades the whole stone, as removed flat stones do.
+                if stone.isRemoved { stoneContext.opacity = 0.5 }
+                let side = stone.rect.width / images.footprint
+                stoneContext.draw(variants[stone.variant % variants.count],
+                                  in: CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
+                                             width: side, height: side))
+            }
+        }
+        // Room for the edge stones' shadows.
+        .padding(-overhang)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct Stones: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.boardAppearance) private var appearance
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
     var geometry: GeometryProxy
@@ -215,8 +347,10 @@ struct Stones: View {
         let whiteEstimatedScore = CGMutablePath()
         let blackEstimatedScore = CGMutablePath()
 
-        let drawsShadow = size >= 14
+        let drawsShadow = usesDetailedStoneRendering(at: size)
         let shadowOffset: CGFloat = size > 30 ? 2 : 1
+        let stoneImages = drawsShadow ? appearance.stoneImages : nil
+        var imageStones = [ImageStone]()
         
         let whitePaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
         let blackPaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
@@ -226,7 +360,15 @@ struct Stones: View {
                 if case .hasStone(let stoneColor) = boardPosition[row, column] {
                     let padding = size < 10 ? CGFloat(0.0) : CGFloat(1.0)
                     let stoneRect = CGRect(x: CGFloat(column) * size + padding, y: CGFloat(row) * size + padding, width: size - padding * 2, height: size - padding * 2)
-                    if boardPosition.removedStones?.contains([row, column]) ?? false {
+                    let isRemoved = boardPosition.removedStones?.contains([row, column]) ?? false
+                    if let stoneImages {
+                        imageStones.append(ImageStone(
+                            rect: stoneRect, color: stoneColor, isRemoved: isRemoved,
+                            variant: StoneImages.variantIndex(row: row, column: column,
+                                                              count: stoneImages.variants(stoneColor).count)
+                        ))
+                    }
+                    if isRemoved {
                         if stoneColor == .white {
                             whiteCapturedPath.addEllipse(in: stoneRect)
                         } else {
@@ -297,28 +439,45 @@ struct Stones: View {
         // differ only in style. Switching views at the 14 pt threshold (or
         // identifying the paths by their contents) made a resizing board, as
         // when chat opens, fade between two boards of different sizes.
-        let dropShadow = drawsShadow ? Color(.sRGBLinear, white: 0, opacity: 0.33) : .clear
+        // Image stones take over at detailed sizes; the drawn layers stay in
+        // place, transparent, for the same reason.
+        let drawsPaths = stoneImages == nil
+        let dropShadow = drawsShadow && drawsPaths ? Color(.sRGBLinear, white: 0, opacity: 0.33) : .clear
+        let black = appearance.black
+        let white = appearance.white
+        let fill = { (palette: StonePalette) -> AnyShapeStyle in
+            if !drawsPaths { return AnyShapeStyle(Color.clear) }
+            return drawsShadow
+                ? AnyShapeStyle(palette.highlight
+                    .shadow(.inner(color: palette.shade, radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
+                : AnyShapeStyle(palette.flat)
+        }
+        // Edges are always present and only change color, for the same reason.
+        let edge = { (palette: StonePalette) in
+            drawsPaths ? (drawsShadow ? palette.rim : palette.outline) ?? .clear : .clear
+        }
         return ZStack {
             ForEach(whitePaths.indices, id: \.self) { index in
-                Path(whitePaths[index]).fill(drawsShadow
-                    ? AnyShapeStyle(Color.white
-                        .shadow(.inner(color: Color(red: 0.8, green: 0.8, blue: 0.8), radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
-                    : AnyShapeStyle(Color.white))
+                Path(whitePaths[index]).fill(fill(white))
                 .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
             }
-            Path(whiteLivingPath).stroke(Color.gray, lineWidth: 0.5).opacity(drawsShadow ? 0 : 1)
+            Path(whiteLivingPath).stroke(edge(white), lineWidth: 0.5)
             ForEach(blackPaths.indices, id: \.self) { index in
-                Path(blackPaths[index]).fill(drawsShadow
-                    ? AnyShapeStyle(Color(red: 0.6, green: 0.6, blue: 0.6)
-                        .shadow(.inner(color: Color.black, radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
-                    : AnyShapeStyle(Color.black))
+                Path(blackPaths[index]).fill(fill(black))
                 .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
             }
+            Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
+            ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size)
             
             if boardPosition.removedStones != nil {
-                Path(whiteCapturedPath).fill(Color.white).opacity(0.5)
-                Path(whiteCapturedPath).stroke(Color.gray)
-                Path(blackCapturedPath).fill(Color.black).opacity(0.5)
+                Path(whiteCapturedPath).fill(drawsPaths ? white.flat : .clear).opacity(0.5)
+                Path(whiteCapturedPath).stroke(drawsPaths ? appearance.markOutline : .clear)
+                Path(blackCapturedPath).fill(drawsPaths ? black.flat : .clear).opacity(0.5)
+                let removedOutline = appearance.removedStoneOutline ?? .clear
+                let removedOutlineStyle = StrokeStyle(lineWidth: size >= 20 ? 1 : 0.75,
+                                                      dash: [max(1.5, size * 0.12), max(1.5, size * 0.1)])
+                Path(whiteCapturedPath).stroke(removedOutline, style: removedOutlineStyle)
+                Path(blackCapturedPath).stroke(removedOutline, style: removedOutlineStyle)
             }
 
             if indicatorMode == .variationNumberings, let variation {
@@ -336,7 +495,7 @@ struct Stones: View {
                                 path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
                                 path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
                             }
-                            .stroke(lastColor == .white ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
+                            .stroke(appearance.stones(lastColor).lastMove, lineWidth: lastMoveIndicatorWidth)
                         } else {
                             Path { path in
                                 path.addEllipse(in: CGRect(
@@ -345,7 +504,7 @@ struct Stones: View {
                                                     width: size / 2,
                                                     height: size / 2))
                             }
-                            .stroke(lastColor == .white ? Color.gray : Color.white, lineWidth: lastMoveIndicatorWidth)
+                            .stroke(appearance.stones(lastColor).lastMove, lineWidth: lastMoveIndicatorWidth)
                         }
                     }
                 }
@@ -358,7 +517,7 @@ struct Stones: View {
                     if case .hasStone(let stoneColor) = boardPosition[row, column] {
                         Text(verbatim: "↶")
                             .font(.system(size: size * 0.65, weight: .bold))
-                            .foregroundColor(stoneColor == .black ? .white : .black)
+                            .foregroundColor(appearance.stones(stoneColor).label)
                             .minimumScaleFactor(0.2)
                             .frame(width: size, height: size)
                             .position(
@@ -372,18 +531,18 @@ struct Stones: View {
             }
             
             if boardPosition.gameScores != nil {
-                Path(dameIndicator).stroke(Color(UIColor.systemIndigo), lineWidth: lastMoveIndicatorWidth)
-                Path(whiteScoreIndicator).fill(Color.white)
-                Path(whiteScoreIndicator).stroke(Color.gray, lineWidth: 0.5)
-                Path(blackScoreIndicator).fill(Color.black)
-                Path(blackScoreIndicator).stroke(Color.gray, lineWidth: 0.5)
+                Path(dameIndicator).stroke(appearance.dameColor, lineWidth: lastMoveIndicatorWidth)
+                Path(whiteScoreIndicator).fill(white.territoryMark)
+                Path(whiteScoreIndicator).stroke(appearance.markOutline, lineWidth: 0.5)
+                Path(blackScoreIndicator).fill(black.territoryMark)
+                Path(blackScoreIndicator).stroke(appearance.markOutline, lineWidth: 0.5)
             }
 
             if boardPosition.estimatedScores != nil {
-                Path(whiteEstimatedScore).fill(Color.white)
-                Path(whiteEstimatedScore).stroke(Color.gray, lineWidth: 0.5)
-                Path(blackEstimatedScore).fill(Color.black)
-                Path(blackEstimatedScore).stroke(Color.gray, lineWidth: 0.5)
+                Path(whiteEstimatedScore).fill(white.territoryMark)
+                Path(whiteEstimatedScore).stroke(appearance.markOutline, lineWidth: 0.5)
+                Path(blackEstimatedScore).fill(black.territoryMark)
+                Path(blackEstimatedScore).stroke(appearance.markOutline, lineWidth: 0.5)
             }
         }
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
@@ -392,6 +551,7 @@ struct Stones: View {
 
 struct StoneRemovalOverlay: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.boardAppearance) private var appearance
     @ObservedObject var boardPosition: BoardPosition
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var geometry: GeometryProxy
@@ -434,10 +594,14 @@ struct StoneRemovalOverlay: View {
         }
         let indicatorWidth: CGFloat = size >= 20 ? 2.5 : (size > 10 ? 2 : 1)
         
+        let casing = appearance.removalMarkCasing ?? .clear
+        let casingStyle = StrokeStyle(lineWidth: indicatorWidth + 2, lineCap: .round)
         return ZStack {
             Color.clear
-            Path(toBeRemovedPath).stroke(Color(UIColor.systemRed), lineWidth: indicatorWidth)
-            Path(toBeAddedPath).stroke(Color(UIColor.systemGreen), lineWidth: indicatorWidth)
+            Path(toBeRemovedPath).stroke(casing, style: casingStyle)
+            Path(toBeAddedPath).stroke(casing, style: casingStyle)
+            Path(toBeRemovedPath).stroke(appearance.removeMark, lineWidth: indicatorWidth)
+            Path(toBeAddedPath).stroke(appearance.restoreMark, lineWidth: indicatorWidth)
         }
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
         .contentShape(Rectangle())
@@ -481,6 +645,7 @@ struct StoneRemovalOverlay: View {
 
 struct CoordinateHighlightOverlay: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.boardAppearance) private var appearance
     @ObservedObject var boardPosition: BoardPosition
     var geometry: GeometryProxy
     var highlightCoordinates: [[Int]]
@@ -513,13 +678,14 @@ struct CoordinateHighlightOverlay: View {
         
         return ZStack {
             Path(highlightedCoordinatesPath)
-                .stroke(Color(.systemBlue), lineWidth: highlightWidth)
+                .stroke(appearance.highlightColor, lineWidth: highlightWidth)
         }.frame(width: size * CGFloat(width), height: size * CGFloat(height))
     }
 }
 
 struct BoardMarkupOverlay: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.boardAppearance) private var appearance
     @ObservedObject var boardPosition: BoardPosition
     var markups: BoardMarkups
     var geometry: GeometryProxy
@@ -585,15 +751,15 @@ struct BoardMarkupOverlay: View {
 
     private var emptyPointBackground: Color {
         widgetRenderingMode == .fullColor
-            ? Color(red: 0.86, green: 0.69, blue: 0.42)
+            ? appearance.boardColor
             : Color.white.opacity(0.8)
     }
 
     private func markerColor(at point: BoardPoint) -> Color {
-        if boardPosition[point.row, point.column] == .hasStone(.black) {
-            return .white
+        if case .hasStone(let color) = boardPosition[point.row, point.column] {
+            return appearance.stones(color).label
         }
-        return .black
+        return widgetRenderingMode == .fullColor ? appearance.emptyPointMarker : .black
     }
 }
 
@@ -714,6 +880,7 @@ private struct BoardMarkupEditingOverlay: View {
 }
 
 struct BoardView: View {
+    @Environment(\.boardAppearance) private var appearance
     var widgetRenderingMode: WidgetRenderingMode = .fullColor
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
@@ -831,7 +998,58 @@ struct BoardView: View {
         return GeometryReader { geometry in
             ZStack(alignment: .center) {
                 if widgetRenderingMode == .fullColor {
-                    Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(cornerRadius).shadow(radius: 2)
+                    appearance.boardColor
+                        .overlay {
+                            if let texture = appearance.boardTexture {
+                                let paint = ImagePaint(image: Image(uiImage: texture.image),
+                                                       scale: texture.tileSize / max(1, texture.image.size.width))
+                                Rectangle().fill(paint)
+                                    .overlay {
+                                        if appearance.boardBevel {
+                                            // Lift the existing mineral detail only in the margin,
+                                            // fading before the outer grid line half a cell in.
+                                            let fade = 0.45 / (max(width, height) + (showsCoordinate ? 1 : 0))
+                                            let stops: [Gradient.Stop] = [
+                                                .init(color: .white.opacity(0.75), location: 0),
+                                                .init(color: .clear, location: fade),
+                                                .init(color: .clear, location: 1 - fade),
+                                                .init(color: .white.opacity(0.75), location: 1)
+                                            ]
+                                            Rectangle().fill(paint)
+                                                .brightness(0.1)
+                                                .contrast(1.25)
+                                                .mask {
+                                                    LinearGradient(stops: stops, startPoint: .top, endPoint: .bottom)
+                                                        .overlay {
+                                                            LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing)
+                                                        }
+                                                }
+                                        }
+                                    }
+                            }
+                        }
+                        .overlay {
+                            if let reflection = appearance.boardReflection {
+                                BoardReflectionView(reflection: reflection)
+                            }
+                        }
+                        .cornerRadius(cornerRadius)
+                        .overlay {
+                            if let edge = appearance.boardEdge {
+                                RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(edge, lineWidth: 1)
+                            }
+                        }
+                        .overlay {
+                            if appearance.boardBevel {
+                                RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(
+                                    LinearGradient(colors: [.white.opacity(0.18), .clear, .black.opacity(0.45)],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    lineWidth: 3)
+                            }
+                        }
+                        .shadow(color: .black.opacity(appearance.boardBevel ? 0.55 : 0.33),
+                                radius: appearance.boardBevel ? 10 : 2,
+                                y: appearance.boardBevel ? 6 : 0)
                 } else {
                     Color.white.cornerRadius(cornerRadius).opacity(0.5)
                 }

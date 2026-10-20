@@ -16,6 +16,7 @@ private func gameChatReviewLabel(reviewID: Int) -> Text {
 
 struct ChatLine: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.surroundTheme) private var theme
 
     var chatLine: OGSChatLine
     var showUsername = true
@@ -152,7 +153,7 @@ struct ChatLine: View {
         case .hidden:
             return Color(.systemPurple).opacity(0.2)
         case .main, .spectator, .shadowban:
-            return Color(.systemGray4)
+            return theme.chatBubble
         }
     }
 

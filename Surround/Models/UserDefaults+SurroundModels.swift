@@ -28,8 +28,13 @@ private func makeSurroundUserDefaults() -> UserDefaults {
             fatalError("Unable to create the isolated Surround UI-test preferences suite.")
         }
         defaults.removePersistentDomain(forName: suiteName)
-        if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.hidesRankLaunchArgument) {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains(SurroundUITestContract.hidesRankLaunchArgument) {
             defaults.set(true, forKey: SettingKey<Bool>.hidesRank.name)
+        }
+        if let index = arguments.firstIndex(of: SurroundUITestContract.themeLaunchArgument),
+           arguments.indices.contains(index + 1) {
+            defaults.set(arguments[index + 1], forKey: SettingKey<String>.gameTheme.name)
         }
         return defaults
     }
@@ -209,6 +214,11 @@ extension SettingKey {
 #if MAIN_APP
     static var homeViewDisplayMode: SettingKey<String> {
         return .init(name: "homeViewDisplayMode")
+    }
+
+    /// Game Detail's theme (`SurroundTheme`); a Debug-only preview for now.
+    static var gameTheme: SettingKey<String> {
+        return .init(name: "gameTheme", defaultValue: "standard")
     }
 #endif
     

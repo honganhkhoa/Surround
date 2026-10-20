@@ -66,7 +66,7 @@ struct SurroundApp: App {
             )
             .background(CatalystWindowResizeConfigurator())
             #endif
-            .preferredColorScheme(fixtureColorScheme)
+            .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
     }
 
     private var fixtureColorScheme: ColorScheme? {
@@ -74,12 +74,30 @@ struct SurroundApp: App {
         if let appearance = SurroundUITestContract.appearanceOverride {
             return appearance == .dark ? .dark : .light
         }
+        // A requested theme decides its own appearance.
+        if ProcessInfo.processInfo.arguments.contains(SurroundUITestContract.themeLaunchArgument) {
+            return nil
+        }
         #endif
         if SurroundUITestContract.isCapturingAppStoreScreenshots
             || SurroundUITestContract.isCapturingCompatibilityScreenshots {
             return .light
         }
         return nil
+    }
+}
+
+/// Applies a fixture's appearance only when it has one. An unconditional
+/// `preferredColorScheme(nil)` at the root would replace a screen's own choice.
+private struct FixtureColorScheme: ViewModifier {
+    let colorScheme: ColorScheme?
+
+    func body(content: Content) -> some View {
+        if let colorScheme {
+            content.preferredColorScheme(colorScheme)
+        } else {
+            content
+        }
     }
 }
 

@@ -17,14 +17,20 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
 
     private func launchGame(artboard: Int, dark: Bool = false, portrait: Bool = false,
                             largeText: Bool = false, players: String? = nil,
-                            clock: String? = nil, socketDown: Bool = false) -> XCUIApplication {
+                            clock: String? = nil, socketDown: Bool = false,
+                            theme: String? = nil) -> XCUIApplication {
         var arguments = [SurroundUITestContract.compatibilityScreenshotLaunchArgument,
                          SurroundUITestContract.emptyMessagesLaunchArgument,
                          SurroundUITestContract.compatibilitySceneLaunchArgument,
                          SurroundUITestContract.CompatibilityScene.home.rawValue,
                          SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, String(artboard),
-                         SurroundUITestContract.appearanceLaunchArgument, dark ? "dark" : "light",
         ]
+        // A theme decides its own appearance.
+        if let theme {
+            arguments += [SurroundUITestContract.themeLaunchArgument, theme]
+        } else {
+            arguments += [SurroundUITestContract.appearanceLaunchArgument, dark ? "dark" : "light"]
+        }
         if largeText {
             arguments += ["-UIPreferredContentSizeCategoryName", UIContentSizeCategory.accessibilityExtraLarge.rawValue]
         }
@@ -183,6 +189,37 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     /// both orientations (where it lands is logged); in Play the running
     /// card's Reconnecting… badge stands in for it. Portrait Chat's two title
     /// chips show only the glow, no label, so the banner returns there.
+    /// Nebula & Pearl through the shipping route: its scene, board and dark
+    /// window in both orientations, then Home's own appearance after Back.
+    func testNebulaPearlThemeOrientations() {
+        let app = launchGame(artboard: 1, theme: "nebulaPearl")
+        defer {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            app.terminate()
+        }
+        Thread.sleep(forTimeInterval: 1)
+        keepScreenshot("nebula-pearl-ipad-landscape", in: app)
+
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            return window.height > window.width
+        })
+        Thread.sleep(forTimeInterval: 1)
+        keepScreenshot("nebula-pearl-ipad-portrait", in: app)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height
+        })
+        Thread.sleep(forTimeInterval: 1)
+        tap(app.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: app)
+        element(ID.screenHome, in: app)
+        Thread.sleep(forTimeInterval: 1)
+        keepScreenshot("nebula-pearl-ipad-home-after-back", in: app)
+    }
+
     func testConnectionBannerPlacement() {
         for portrait in [false, true] {
             let app = launchGame(artboard: portrait ? 14 : 3, portrait: portrait,

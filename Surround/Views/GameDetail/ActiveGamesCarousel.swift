@@ -85,6 +85,7 @@ struct ActiveGamesCarousel: View {
 private struct ActiveGamePopoverEntry: View {
     @EnvironmentObject private var ogs: OGSService
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surroundTheme) private var theme
     @ObservedObject private var preferences = userDefaults
     @ObservedObject var game: Game
     let isSelected: Bool
@@ -128,15 +129,12 @@ private struct ActiveGamePopoverEntry: View {
             VStack(alignment: .trailing) {
                 ZStack(alignment: .center) {
                     if game.gamePhase == .stoneRemoval {
-                        Color(UIColor.systemOrange).cornerRadius(3)
+                        theme.stoneRemovalMark.cornerRadius(3)
                     } else if game.clock?.currentPlayerId == ogs.user?.id {
-                        Color(UIColor.systemTeal).cornerRadius(3)
+                        theme.userTurnMark.cornerRadius(3)
+                            .shadow(color: theme.userTurnGlow ?? .clear, radius: 5)
                     } else {
-                        if colorScheme == .dark {
-                            Color(UIColor.systemGray5)
-                        } else {
-                            Color(UIColor.systemBackground)
-                        }
+                        theme.idleGameMark(scheme: colorScheme)
                     }
                     BoardView(boardPosition: game.currentPosition)
                         .frame(width: cellSize, height: cellSize)

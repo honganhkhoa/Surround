@@ -11,16 +11,12 @@ private func gameDetailProfileColor(_ player: OGSUser?, dark: Bool) -> Color {
     return Color(uiColor: UIColor(player.uiColor).resolvedColor(with: traits))
 }
 
-/// The neutral Game Detail surfaces follow the system's light/dark appearance.
-/// These are independent of the board and stone rendering.
+/// The neutral Game Detail surfaces follow the theme, and in the standard
+/// theme the system's light/dark appearance.
 enum GameDetailAppearance {
-    static let background = Color(uiColor: .systemGroupedBackground)
-    static let panel = Color(uiColor: .secondarySystemGroupedBackground)
-    static let panelBorder = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 56 / 255, green: 56 / 255, blue: 58 / 255, alpha: 1)
-            : UIColor.black.withAlphaComponent(0.12)
-    })
+    static let background = GameDetailSurfaceStyle(role: .page)
+    static let panel = GameDetailSurfaceStyle(role: .panel)
+    static let panelBorder = GameDetailSurfaceStyle(role: .panelBorder)
 }
 
 /// The order follows the players' corners, independently of their stone colors.
@@ -333,28 +329,27 @@ private struct GameDetailClockCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.surroundTheme) private var theme
 
     private var state: GameDetailClockState {
         .init(game: game, color: color, clockOverride: clockOverride, isConnected: isConnected)
     }
     private var foreground: Color {
-        color == .black ? .white : Color(white: colorScheme == .dark ? 19 / 255 : 32 / 255)
+        theme.clockForeground(color, scheme: colorScheme)
     }
     private var accent: Color {
         if state.suddenDeath {
             return color == .white ? Color(red: 0.75, green: 0.10, blue: 0.07)
                 : Color(red: 1, green: 0.34, blue: 0.30)
         }
-        return Color(uiColor: .systemIndigo)
+        return theme.clockAccent(color)
     }
     private var turnOutline: Color {
         if state.suddenDeath { return Color(uiColor: .systemRed) }
-        return colorScheme == .dark
-            ? Color(red: 125 / 255, green: 122 / 255, blue: 1)
-            : Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
+        return theme.turnOutline(scheme: colorScheme)
     }
     private var turnGlow: Color {
-        state.suddenDeath ? Color(uiColor: .systemRed) : Color(uiColor: .systemIndigo)
+        state.suddenDeath ? Color(uiColor: .systemRed) : theme.turnGlow
     }
     // Match the scale used by the layout plan. Letting semantic fonts grow
     // beyond that cap makes their ideal height escape the fixed clock surface.
@@ -388,12 +383,12 @@ private struct GameDetailClockCard: View {
         displaysStatus && isConnected && (state.canAnswerUndo || state.canWithdrawUndo)
     }
     private var badgeBackground: Color {
-        if state.reconnecting { return Color(uiColor: .systemIndigo) }
+        if state.reconnecting { return theme.statusBadge }
         if state.ownsUndoRequest { return Color(red: 196 / 255, green: 106 / 255, blue: 0) }
         if state.passed || (state.notStarted && !state.firstMoveDeadline) {
             return Color(uiColor: .systemGray)
         }
-        return state.suddenDeath ? Color.red : Color(uiColor: .systemIndigo)
+        return state.suddenDeath ? Color.red : theme.statusBadge
     }
     private var agreementColor: Color {
         color == .black ? Color(red: 125 / 255, green: 210 / 255, blue: 141 / 255)
@@ -420,7 +415,8 @@ private struct GameDetailClockCard: View {
                 .frame(height: style == .inline ? max(34, height - 10) : height)
                 .background { surface }
                 .overlay { clockOutline }
-                .modifier(GameDetailClearGlass(shape: shape, enabled: !reduceTransparency))
+                .modifier(GameDetailClearGlass(shape: shape, enabled: !reduceTransparency,
+                                               tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
                 .contentShape(Rectangle())
         }
@@ -531,32 +527,25 @@ private struct GameDetailClockCard: View {
         }
     }
 
-    @ViewBuilder private var surface: some View {
-        if reduceTransparency || contrast == .increased {
-            shape.fill(color == .black ? Color(white: 0.06) : Color(white: 0.98))
-        } else {
-            shape.fill(LinearGradient(stops: surfaceStops, startPoint: .top, endPoint: .bottom))
+    /// Scene clocks in a glass theme; header chips already sit on the bar's
+    /// glass, and accessibility settings keep the solid surfaces.
+    private var showsThemeGlass: Bool {
+        guard theme.usesGlassControls, style != .inline, !reduceTransparency, contrast != .increased else {
+            return false
         }
+        if #available(iOS 26, *) { return true }
+        return false
     }
 
-    private var surfaceStops: [Gradient.Stop] {
-        if color == .black {
-            if colorScheme == .dark {
-                return [.init(color: Color(white: 125 / 255), location: 0),
-                        .init(color: Color(white: 51 / 255), location: 0.5),
-                        .init(color: Color(white: 12 / 255), location: 1)]
-            }
-            return [.init(color: Color(red: 125 / 255, green: 126 / 255, blue: 125 / 255), location: 0),
-                    .init(color: Color(white: 14 / 255), location: 1)]
+    @ViewBuilder private var surface: some View {
+        if showsThemeGlass {
+            Color.clear
+        } else if reduceTransparency || contrast == .increased {
+            shape.fill(theme.clockSolidSurface(color))
+        } else {
+            shape.fill(LinearGradient(stops: theme.clockSurfaceStops(color, scheme: colorScheme),
+                                      startPoint: .top, endPoint: .bottom))
         }
-        if colorScheme == .dark {
-            return [.init(color: Color(white: 136 / 255), location: 0),
-                    .init(color: Color(white: 239 / 255), location: 0.5),
-                    .init(color: Color(white: 239 / 255), location: 1)]
-        }
-        return [.init(color: Color(white: 204 / 255), location: 0),
-                .init(color: Color(white: 238 / 255), location: 0.3),
-                .init(color: .white, location: 1)]
     }
 
     // The halo and outline belong to the glass's foreground content. Applying
@@ -571,7 +560,7 @@ private struct GameDetailClockCard: View {
             shape.strokeBorder(
                 state.running
                     ? turnOutline.opacity(contrast == .increased ? 1 : (colorScheme == .dark ? 0.85 : 0.7))
-                    : (contrast == .increased ? foreground.opacity(0.5) : GameDetailAppearance.panelBorder),
+                    : (contrast == .increased ? foreground.opacity(0.5) : theme.panelBorder),
                 lineWidth: contrast == .increased ? 2 : 1
             )
         }
@@ -985,9 +974,16 @@ private struct GameDetailClockCard: View {
 private struct GameDetailClearGlass: ViewModifier {
     let shape: RoundedRectangle
     let enabled: Bool
+    /// Regular glass in this tint; nil keeps clear glass over a solid fill.
+    var tint: Color? = nil
+    var interactive = true
     func body(content: Content) -> some View {
         if #available(iOS 26, *), enabled {
-            content.glassEffect(.clear.interactive(), in: shape)
+            if let tint {
+                content.glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
+            } else {
+                content.glassEffect(.clear.interactive(interactive), in: shape)
+            }
         } else {
             content
         }
@@ -1080,6 +1076,9 @@ struct GameDetailPlayerIdentity: View {
     var columnSecondLine = true
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
     @Setting(.hidesRank) private var hidesRank: Bool
     @State private var showsTeam = false
     #if DEBUG && MAIN_APP
@@ -1090,7 +1089,7 @@ struct GameDetailPlayerIdentity: View {
     private var player: OGSUser? { game.currentPlayer(with: color) }
     private var team: [OGSUser] { game.orderedRengoTeam[color] ?? game.gameData?.rengoTeams?[color] ?? [] }
     private var secondaryColor: Color {
-        color == .black ? Color(white: 174 / 255) : Color(red: 108 / 255, green: 108 / 255, blue: 112 / 255)
+        theme.identitySecondary(color)
     }
     private var nameColor: Color { roleColor(player) }
     /// A row chip at accessibility sizes: 44 pt avatar, 22/20 pt text, 64 pt row.
@@ -1133,16 +1132,21 @@ struct GameDetailPlayerIdentity: View {
                                                        padding: columnPadding)) : nil,
                alignment: isBottomRightPlayer ? .bottom : .top)
         .background {
-            RoundedRectangle(cornerRadius: compactColumn ? 9 : (vertical ? 12 : 10))
-                .fill(LinearGradient(colors: color == .black
-                    ? [Color(red: 61 / 255, green: 62 / 255, blue: 61 / 255), Color(white: 18 / 255)]
-                    : [Color(white: 236 / 255), .white], startPoint: .top, endPoint: .bottom))
-                .overlay {
-                    RoundedRectangle(cornerRadius: compactColumn ? 9 : (vertical ? 12 : 10))
-                        .strokeBorder(color == .black ? Color.white.opacity(0.15) : Color.black.opacity(0.12), lineWidth: 1)
-                }
+            if !showsThemeGlass {
+                RoundedRectangle(cornerRadius: chipCornerRadius)
+                    .fill(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: chipCornerRadius)
+                            .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                    }
+            }
         }
-        .foregroundStyle(color == .black ? Color.white : Color(white: 32 / 255))
+        // The avatar and name are the chip's buttons; the glass itself
+        // stays still.
+        .modifier(GameDetailClearGlass(shape: RoundedRectangle(cornerRadius: chipCornerRadius),
+                                       enabled: showsThemeGlass,
+                                       tint: theme.identityGlassTint(color), interactive: false))
+        .foregroundStyle(theme.identityForeground(color))
         #if DEBUG && MAIN_APP
         .onGeometryChange(for: CGSize.self) { $0.size } action: {
             columnWidths.chip = $0.width
@@ -1171,6 +1175,18 @@ struct GameDetailPlayerIdentity: View {
             }
         }
         #endif
+    }
+
+    private var chipCornerRadius: CGFloat { compactColumn ? 9 : (vertical ? 12 : 10) }
+
+    /// Scene chips in a glass theme; the navigation header sits on the bar's
+    /// glass, and accessibility settings keep the solid chip.
+    private var showsThemeGlass: Bool {
+        guard theme.usesGlassControls, !navigationHeader, !reduceTransparency, contrast != .increased else {
+            return false
+        }
+        if #available(iOS 26, *) { return true }
+        return false
     }
 
     private var nameFont: Font {

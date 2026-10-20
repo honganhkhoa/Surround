@@ -14,11 +14,19 @@ struct AnalyzeTreeSlice: View {
         let rect: CGRect
     }
 
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.boardAppearance) private var appearance
     @ObservedObject var moveTree: MoveTree
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
     var vertical = false
     var onSelectedBranchFrameChange: ((SelectionFrame) -> Void)?
+
+    /// The selection ring around a 30 pt stone; a keyline widens it a little
+    /// so the ring keeps its weight.
+    private var selectionDiameter: CGFloat {
+        theme.treeMarkKeyline == nil ? 36 : 37
+    }
 
     private func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
         vertical ? CGPoint(x: y, y: x) : CGPoint(x: x, y: y)
@@ -77,13 +85,21 @@ struct AnalyzeTreeSlice: View {
                                 }.stroke(Color(.label))
                             }
                             if isConditionalVariation {
-                                Color.conditionalMoveHighlight.frame(width: 40, height: 40)
+                                (theme.conditionalMark ?? .conditionalMoveHighlight)
+                                    .frame(width: 40, height: 40)
                                     .cornerRadius(20)
                                     .position(point(15, CGFloat(level) * 40 + 15))
                             }
                             if isSelected(position) {
-                                Color(UIColor.systemTeal).frame(width: 36, height: 36)
-                                    .cornerRadius(18)
+                                theme.selectionMark
+                                    .frame(width: selectionDiameter, height: selectionDiameter)
+                                    .cornerRadius(selectionDiameter / 2)
+                                    .position(point(15, CGFloat(level) * 40 + 15))
+                            }
+                            if let keyline = theme.treeMarkKeyline,
+                               isConditionalVariation || isSelected(position) {
+                                keyline.frame(width: 32, height: 32)
+                                    .cornerRadius(16)
                                     .position(point(15, CGFloat(level) * 40 + 15))
                             }
                             
@@ -114,7 +130,7 @@ struct AnalyzeTreeSlice: View {
                         } else if lastMoveNumber == 0 {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))
-                                .background(Color(red: 0.86, green: 0.69, blue: 0.42).cornerRadius(2))
+                                .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {
                                     self.selectedPosition = position
                                 }
@@ -137,12 +153,14 @@ struct AnalyzeTreeSlice: View {
                     return nil
                 }
                 let frame = geometry.frame(in: .named("analysisBranchContent"))
-                // Include the selection ring, which extends 3 pt beyond the stone.
+                // Include the selection ring, which extends beyond the stone.
+                let ring = selectionDiameter
+                let overhang = (ring - 30) / 2
                 let rect = vertical
-                    ? CGRect(x: frame.minX + CGFloat(level) * 40 - 3, y: 0,
-                             width: 36, height: 36)
-                    : CGRect(x: 0, y: frame.minY + CGFloat(level) * 40 - 3,
-                             width: 36, height: 36)
+                    ? CGRect(x: frame.minX + CGFloat(level) * 40 - overhang, y: 0,
+                             width: ring, height: ring)
+                    : CGRect(x: 0, y: frame.minY + CGFloat(level) * 40 - overhang,
+                             width: ring, height: ring)
                 return SelectionFrame(position: ObjectIdentifier(selectedPosition),
                                       vertical: vertical, rect: rect)
             } action: { frame in
@@ -153,6 +171,7 @@ struct AnalyzeTreeSlice: View {
 
 struct BackgroundSlice: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surroundTheme) private var theme
     var height: CGFloat
     var game: Game
     var lastMoveNumber: Int
@@ -193,12 +212,12 @@ struct BackgroundSlice: View {
                 Path { path in
                     path.move(to: vertical ? CGPoint(x: 30, y: 15) : CGPoint(x: 15, y: 30))
                     path.addLine(to: vertical ? CGPoint(x: height, y: 15) : CGPoint(x: 15, y: 800))
-                }.stroke(Color(colorScheme == .dark ? .systemGray6 : .systemGray4))
+                }.stroke(theme.treeGuide(scheme: colorScheme))
                 if shouldShowBoardThumbnail {
                     if let position = game.positionByLastMoveNumber[lastMoveNumber] {
                         ZStack {
                             if selectedPosition === position {
-                                Color(.systemTeal)
+                                theme.selectionMark
                                     .cornerRadius(3)
                                     .frame(width: 110, height: 110)
                             }

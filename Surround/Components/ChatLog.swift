@@ -619,14 +619,14 @@ struct NewChatInput: View {
         }
     }
 
-    private var backgroundColor: Color {
+    private var backgroundColor: AnyShapeStyle {
         switch selectedChannel.wrappedValue {
         case .main:
-            return GameDetailAppearance.panel
+            return AnyShapeStyle(GameDetailAppearance.panel)
         case .malkovich:
-            return Color(.systemGreen).opacity(0.2)
+            return AnyShapeStyle(Color(.systemGreen).opacity(0.2))
         case .personal:
-            return Color(.systemBlue).opacity(0.2)
+            return AnyShapeStyle(Color(.systemBlue).opacity(0.2))
         }
     }
 

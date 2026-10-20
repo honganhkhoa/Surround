@@ -88,6 +88,9 @@ enum SurroundUITestContract {
     /// Starts the isolated UI-test preferences suite with "Hide ranks and
     /// ratings" on. It never reaches a signed-in app's preferences.
     static let hidesRankLaunchArgument = "--surround-ui-hides-rank"
+    /// Starts the isolated UI-test preferences suite with a Game Detail
+    /// theme selected: `--surround-ui-theme nebulaPearl`.
+    static let themeLaunchArgument = "--surround-ui-theme"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
     static let analysisDisabledLaunchArgument =

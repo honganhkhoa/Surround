@@ -74,9 +74,10 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
     /// kept its tint, so a disabled Accept looked active).
     var disabled = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.surroundTheme) private var theme
 
     private var prominentFill: Color {
-        disabled ? Color(uiColor: .systemGray) : Color.accentColor
+        disabled ? Color(uiColor: .systemGray) : (theme.actionTint ?? Color.accentColor)
     }
 
     @ViewBuilder
@@ -166,6 +167,10 @@ struct GameControlRow: View {
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
+    #if DEBUG
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
+    #endif
     @ObservedObject var game: Game
     @ObservedObject var state: GameControlState
     var horizontal = true
@@ -309,6 +314,19 @@ struct GameControlRow: View {
                     Label("Open in browser", systemImage: "safari")
                 }
             }
+            #if DEBUG
+            // Temporary: themes need a proper home before they ship.
+            Section {
+                Picker(selection: $gameThemeID) {
+                    ForEach(SurroundTheme.allCases) { theme in
+                        Text(verbatim: theme.debugTitle).tag(theme.rawValue)
+                    }
+                } label: {
+                    Label { Text(verbatim: "Theme") } icon: { Image(systemName: "paintpalette") }
+                }
+                .pickerStyle(.menu)
+            }
+            #endif
             if game.isUserPlaying && game.gamePhase != .finished {
                 Section {
                     if game.canBeCancelled {
