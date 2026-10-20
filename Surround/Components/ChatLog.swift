@@ -292,12 +292,17 @@ struct ChatLog: View {
                         contentSize: geometry.contentSize,
                         contentInsets: geometry.contentInsets
                     )
-                } action: { _, layout in
+                } action: { oldLayout, layout in
                     guard layout.containerSize.height > 0,
                           layout.contentSize.height > 0 else { return }
                     transcriptLayout = layout
-                    // Content appends, the keyboard, and folds all use the settled
-                    // viewport. A resize never changes the user's reading intent.
+                    // The keyboard and folds use the settled viewport. A resize
+                    // never changes the user's reading intent. Appends follow
+                    // through the chat log itself: a content size change alone
+                    // can come from this scroll realizing lazy rows of another
+                    // estimated height, and answering it would never settle.
+                    guard oldLayout.containerSize != layout.containerSize
+                            || oldLayout.contentInsets != layout.contentInsets else { return }
                     scrollToLatestMessageIfFollowing()
                 }
                 .onScrollGeometryChange(for: Bool?.self) { geometry in

@@ -12,6 +12,13 @@ final class IPadTabContext {
     private(set) var physicalHorizontalInsets = EdgeInsets()
     @ObservationIgnored private var hiddenTabBarOwners = Set<UUID>()
     @ObservationIgnored var onTabBarVisibilityChange: (() -> Void)?
+    @ObservationIgnored var onToggleSidebar: (() -> Void)?
+
+    /// Before iPadOS 27, the sidebar toggle lives in the tab bar; a screen
+    /// that hides the tab bar draws its own.
+    func toggleSidebar() {
+        onToggleSidebar?()
+    }
 
     func setTabBarHidden(_ hidden: Bool, owner: UUID) {
         let previous = prefersTabBarHidden
@@ -123,6 +130,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             for root in RootView.allCases {
                 let tabContext = IPadTabContext()
                 tabContext.onTabBarVisibilityChange = { [weak self] in self?.applyTabBarVisibility() }
+                tabContext.onToggleSidebar = { [weak self] in self?.toggleSidebar() }
                 contexts[root] = tabContext
                 let host = IPadTabHostingController(rootView: hostedContent(root))
                 host.onLayout = { [weak self] in self?.measureLayout() }
@@ -389,6 +397,11 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             guard let latest = pendingMetrics, latest != deliveredMetrics else { return }
             deliveredMetrics = latest
             for context in contexts.values { context.update(latest) }
+        }
+
+        private func toggleSidebar() {
+            guard let controller, regularWidth, controller.mode != .tabBar else { return }
+            controller.sidebar.isHidden.toggle()
         }
 
         private func applyTabBarVisibility() {

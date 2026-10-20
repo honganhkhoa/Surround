@@ -275,15 +275,19 @@ struct SingleGameView: View {
         HStack(spacing: 12) {
             chatPreviewTitle
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             Spacer(minLength: 0)
             Button {
                 selectedChatItem = nil
             } label: {
                 Label("Return to game", systemImage: "arrow.uturn.backward")
                     .fontWeight(.semibold)
+                    .lineLimit(1)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.purple)
+            // The title gives way first: the action stays readable.
+            .layoutPriority(1)
             .accessibilityIdentifier("game.chat.preview.return")
         }
         .font(.callout)
@@ -900,7 +904,8 @@ struct SingleGameView: View {
     }
 
     private func layoutPlan(in geometry: GeometryProxy, columnStyle: ColumnIdentityStyle,
-                            analyze: Bool? = nil, chat: Bool? = nil) -> GameDetailLayoutPlan {
+                            analyze: Bool? = nil, chat: Bool? = nil,
+                            zen: Bool? = nil) -> GameDetailLayoutPlan {
         let actionMetrics = GameControlRowMetrics(dynamicTypeSize: dynamicTypeSize, locale: locale,
                                                  phase: game.gamePhase)
         // v149: the Duo Closed landscape column's detail lines, measured for
@@ -913,7 +918,7 @@ struct SingleGameView: View {
                                           clockOverride: frozenClock, isConnected: connected)
         }
         return GameDetailLayoutPlan(
-            size: geometry.size, compact: compact, zen: zenMode,
+            size: geometry.size, compact: compact, zen: zen ?? zenMode,
             analyze: analyze ?? showsAnalysisPanel, chat: chat ?? showsChatPanel,
             hidesBoard: !showsCompactChatBoard.wrappedValue,
             keyboard: attachedKeyboardVisible,
@@ -969,9 +974,10 @@ struct SingleGameView: View {
             let plan = layoutPlan(in: geometry, columnStyle: columnStyle)
             // Chat's slots always hold the frames chat has when open, so it
             // appears and leaves at its final size instead of growing out of
-            // an empty slot.
+            // an empty slot. Chat is never open in Zen: entering Zen fades it
+            // out in place rather than shrinking it into an empty slot.
             let chatPlan = showsChatPanel ? plan
-                : layoutPlan(in: geometry, columnStyle: columnStyle, analyze: false, chat: true)
+                : layoutPlan(in: geometry, columnStyle: columnStyle, analyze: false, chat: true, zen: false)
             let chatTransition = chatPanelTransition(panel: chatPlan[.chat], board: chatPlan[.board])
             let opponentFacesBoard = plan.verticalActions
                 || (plan[.opponent].width > 0 && plan[.opponent].maxX < plan[.board].minX)
@@ -996,13 +1002,19 @@ struct SingleGameView: View {
                                     showsStatus: true)
                     .gameDetailSlot(.clocks, plan: plan)
                 recoveryBanner.gameDetailSlot(.status, plan: plan).zIndex(2)
-                GameDetailPlayerIdentity(game: game, color: topLeftPlayerColor,
-                                         vertical: plan.verticalOpponentIdentity,
-                                         facesBoard: opponentFacesBoard,
-                                         columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
-                                         columnPadding: columnStyle.padding,
-                                         compactColumn: plan.compactColumnIdentity,
-                                         columnSecondLine: columnChipSecondLine(plan))
+                HStack(spacing: 12) {
+                    GameDetailPlayerIdentity(game: game, color: topLeftPlayerColor,
+                                             vertical: plan.verticalOpponentIdentity,
+                                             facesBoard: opponentFacesBoard,
+                                             columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
+                                             columnPadding: columnStyle.padding,
+                                             compactColumn: plan.compactColumnIdentity,
+                                             columnSecondLine: columnChipSecondLine(plan))
+                        .layoutPriority(1)
+                    if showsChatPreview && plan.previewInOpponentRow {
+                        chatPreviewBar.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: opponentFacesBoard ? .topTrailing : .leading)
                     .gameDetailSlot(.opponent, plan: plan)
@@ -1027,7 +1039,7 @@ struct SingleGameView: View {
                         .transition(chatTransition)
                 } }
                     .gameDetailSlot(.composer, plan: chatPlan)
-                Group { if showsChatPreview { chatPreviewBar } }
+                Group { if showsChatPreview && !plan.previewInOpponentRow { chatPreviewBar } }
                     .gameDetailSlot(.preview, plan: plan)
             }
             .preference(key: GameDetailClocksInHeaderPreferenceKey.self, value: plan.clocksInHeader)

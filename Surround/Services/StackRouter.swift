@@ -19,6 +19,15 @@ enum StackRoute: Hashable {
     case conversation(Int)
 }
 
+extension StackRoute {
+    var showsGameDetail: Bool {
+        switch self {
+        case .homeGame, .historyGame, .publicGame, .game: true
+        default: false
+        }
+    }
+}
+
 enum OpponentSelectionAction: Equatable {
     case selectOpponent
     case challengeWithSettings
@@ -435,18 +444,22 @@ extension EnvironmentValues {
 /// area, so ignoring the safe area on the outside of the stack has no effect.
 /// Keep this private so navigation entry points own the policy, not screens.
 struct AppNavigationContentLayout: ViewModifier {
+    /// iPad's sidebar overlays only Game Detail, which uses the whole window.
+    /// Other iPad screens keep the inset UIKit gives them beside the sidebar.
+    var overlaysIPadSidebar = false
+
     func body(content: Content) -> some View {
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             content.modifier(VerticalNavigationContentLayout())
-                .modifier(SidebarNavigationContentLayout())
+                .modifier(SidebarNavigationContentLayout(overlaysIPadSidebar: overlaysIPadSidebar))
         } else {
             content.environment(\.isVerticalToolbar, false)
-                .modifier(SidebarNavigationContentLayout())
+                .modifier(SidebarNavigationContentLayout(overlaysIPadSidebar: overlaysIPadSidebar))
         }
         #elseif os(iOS) && !targetEnvironment(macCatalyst)
         content.environment(\.isVerticalToolbar, false)
-            .modifier(SidebarNavigationContentLayout())
+            .modifier(SidebarNavigationContentLayout(overlaysIPadSidebar: overlaysIPadSidebar))
         #else
         content.environment(\.isVerticalToolbar, false)
         #endif
@@ -459,11 +472,14 @@ struct AppNavigationContentLayout: ViewModifier {
 private struct SidebarNavigationContentLayout: ViewModifier {
     @Environment(\.duoTabContext) private var duoTabs
     @Environment(\.iPadTabContext) private var iPadTabs
+    let overlaysIPadSidebar: Bool
 
     private var preservedInsets: EdgeInsets? {
         // Measure outside this content: feeding its own safe-area geometry back
         // into padding can oscillate at pixel boundaries during native layout.
-        if let iPadTabs, iPadTabs.sidebarAvailable { return iPadTabs.physicalHorizontalInsets }
+        if let iPadTabs, iPadTabs.sidebarAvailable {
+            return overlaysIPadSidebar ? iPadTabs.physicalHorizontalInsets : nil
+        }
         if let duoTabs, duoTabs.sidebarAvailable { return duoTabs.physicalHorizontalInsets }
         return nil
     }
@@ -474,7 +490,8 @@ private struct SidebarNavigationContentLayout: ViewModifier {
         // A portrait native sidebar can also reserve space for hidden tab
         // chrome. Reclaim only its delta from the settled closed host, keeping
         // navigation bars and the physical bottom safe area in place.
-        let sidebarInsets = iPadTabs?.sidebarAvailable == true ? iPadTabs?.sidebarInsets : nil
+        let sidebarInsets = overlaysIPadSidebar && iPadTabs?.sidebarAvailable == true
+            ? iPadTabs?.sidebarInsets : nil
         content
             .frame(maxWidth: usesOverlap ? .infinity : nil)
             .padding(.leading, preservedInsets?.leading ?? 0)
@@ -686,7 +703,7 @@ struct AppNavigationStack<Content: View>: View {
                 .environment(\.owningStackRoute, nil)
                 .navigationDestination(for: StackRoute.self) { route in
                     destination(for: route)
-                        .modifier(AppNavigationContentLayout())
+                        .modifier(AppNavigationContentLayout(overlaysIPadSidebar: route.showsGameDetail))
                         .environment(\.owningStackRoute, route)
                 }
         }

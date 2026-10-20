@@ -62,6 +62,9 @@ struct GameDetailLayoutPlan {
     var spaciousCompactClocks = false
     /// Portrait chat columns put More under the action's trailing edge.
     var trailsMoreInColumn = false
+    /// Regular landscape: the chat preview bar shares the opponent's row above
+    /// the board, beside the chip, so previewing never moves the board.
+    var previewInOpponentRow = false
     /// Regular layouts at accessibility sizes cap a full card's growth. Its
     /// metadata lines keep scaling; the countdown grows less.
     private(set) var fullClockScale: CGFloat = 1
@@ -384,6 +387,13 @@ struct GameDetailLayoutPlan {
                            max(panelY, height - outer - controlsHeight), side, controlsHeight)
                     : rect(outer + boardSide + gap, boardY, side, boardSide)
                 frames[.chat] = rect(outer, panelY, width - outer * 2, boardY - gap - panelY)
+                if preview && !compact {
+                    // The preview bar takes the conversation's last row,
+                    // directly above the board, which never moves.
+                    let barY = boardY - gap - previewHeight
+                    frames[.preview] = rect(outer, barY, boardSide, previewHeight)
+                    frames[.chat] = rect(outer, panelY, width - outer * 2, max(0, barY - gap - panelY))
+                }
             } else {
                 let rowHeight = actionRowHeight(at: width - outer * 2)
                 frames[.actions] = rect(outer, height - outer - rowHeight, width - outer * 2, rowHeight)
@@ -528,6 +538,9 @@ struct GameDetailLayoutPlan {
             let boardY = top + identityHeight + identityBoardGap
             frames[.board] = rect(boardX, boardY, boardSide, boardSide)
             frames[.opponent] = rect(boardX, top, boardSide, identityHeight)
+            // The row is at least 52 pt (64 at accessibility sizes): room for
+            // the bar's single line beside the chip.
+            previewInOpponentRow = preview && identityHeight > 0
             frames[.actions] = rect(boardX, self[.board].maxY + identityBoardGap, boardSide, footer)
             let panelTop = usesVerticalToolbar ? max(boardY, bandLeadingTop ?? 0) : top
             let column = rect(leading, panelTop, columnWidth, height - bottom - panelTop)
@@ -785,7 +798,7 @@ struct GameDetailLayoutPlan {
             hidesActionIdentity = !showsCornerIdentity
         }
         if hidesIdentity { hidesActionIdentity = true }
-        if preview && self[.preview].isEmpty {
+        if preview && !previewInOpponentRow && self[.preview].isEmpty {
             let b = self[.board]
             frames[.preview] = rect(b.minX, b.minY, b.width, min(previewHeight, b.height))
         }

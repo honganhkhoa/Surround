@@ -215,15 +215,22 @@ struct GameDetailView: View {
     }
 
     /// Zen keeps only Exit: on iPad, whose navigation bar carries the sidebar
-    /// toggle iPadOS adds once the tab bar hides (no API removes it alone),
-    /// and on Duo Open wide, whose tray would otherwise sit over the board.
-    /// Duo Book wide keeps its tray.
+    /// toggle (iPadOS 27 adds it once the tab bar hides, with no API to remove
+    /// it alone; earlier versions show the game's own), and on Duo Open wide,
+    /// whose tray would otherwise sit over the board. Duo Book wide keeps its tray.
     private var hidesZenChrome: Bool {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         return zenMode && (UIDevice.current.userInterfaceIdiom == .pad || openLandscape)
         #else
         return false
         #endif
+    }
+
+    /// Before iPadOS 26, the multitasking control stays at the top centre with
+    /// the status bar hidden, and the app's banners would move under it.
+    private var hidesStatusBarInZen: Bool {
+        if #available(iOS 26.0, *) { return true }
+        return false
     }
 
     /// Where Duo's wide poses draw our own chrome (the sidebar button, Exit
@@ -613,7 +620,7 @@ struct GameDetailView: View {
         .persistentSystemOverlays(hidesHomeIndicator ? .hidden : .automatic)
         #endif
         .modifier(GameToolbarOrientation(prefersHorizontal: prefersHorizontalZenToolbar))
-        .statusBarHidden(hidesZenChrome)
+        .statusBarHidden(hidesZenChrome && hidesStatusBarInZen)
         // Typing never changes the scene's geometry. The conversation places
         // its composer above the keyboard using the owning window's overlap.
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -942,6 +949,7 @@ extension EnvironmentValues {
 private struct GameToolbarLayout: ViewModifier {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
+    @Environment(\.iPadTabContext) private var iPadTabContext
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
@@ -1133,7 +1141,7 @@ private struct GameToolbarLayout: ViewModifier {
                 Label("Zen mode", systemImage: "arrow.up.backward.and.arrow.down.forward")
                     .modifier(GameToolbarMinimumTouchTarget())
             }
-            .disabled(analyzingIsPresented)
+            // Zen from Analyze shows the live game; leaving restores the analysis.
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameZenEnter)
             .surroundUITestZenShortcut()
         }
@@ -1214,6 +1222,26 @@ private struct GameToolbarLayout: ViewModifier {
             return titleGivesWayToConnectionBanner ? .none : .title
         }
         return .none
+    }
+
+    /// The game hides iPad's tab bar, which holds the sidebar toggle before
+    /// iPadOS 27; iPadOS 27 adds its own to the navigation bar instead.
+    private var showsIPadSidebarButton: Bool {
+        guard !zenMode, iPadTabContext?.sidebarAvailable == true else { return false }
+        if #available(iOS 27.0, *) { return false }
+        return true
+    }
+
+    @ToolbarContentBuilder private var iPadSidebarItems: some ToolbarContent {
+        if showsIPadSidebarButton, let iPadTabContext {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { iPadTabContext.toggleSidebar() } label: {
+                    Label("Toggle sidebar", systemImage: "sidebar.left")
+                        .modifier(GameToolbarMinimumTouchTarget())
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.gameSidebarToggle)
+            }
+        }
     }
 
     @ToolbarContentBuilder private var principalItems: some ToolbarContent {
@@ -1346,6 +1374,7 @@ private struct GameToolbarLayout: ViewModifier {
                     controlItems
                 }
             }
+            .toolbar { iPadSidebarItems }
             .modifier(GameToolbarCompression())
     }
 }

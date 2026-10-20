@@ -1191,7 +1191,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let boardValue = board.value as? String
         XCTAssertFalse(boardValue?.isEmpty ?? true,
                        "The linked fixture board must expose its position before testing Back retention.")
-        if let bounds { assertFullWidthDestination(SurroundUITestContract.AccessibilityID.gameDetail(gameID), over: bounds, in: app) }
+        if let bounds {
+            assertFullWidthDestination(SurroundUITestContract.AccessibilityID.gameDetail(gameID), over: bounds,
+                                       in: app, measuredFrame: { self.gameLayoutFrame(in: app) })
+        }
         tap(SurroundUITestContract.AccessibilityID.profileBannerAvatarEntry(
             SurroundUITestContract.profileFixtureOwnerID), in: app, matching: .button)
         assertLoadedProfile(named: "JuniperStone", isOwnProfile: true, in: app)
@@ -2248,18 +2251,33 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         return bounds
     }
 
-    private func assertFullWidthDestination(_ identifier: String, over bounds: CGRect, in app: XCUIApplication) {
-        var destination: XCUIElement?
+    /// Game Detail's container reports the union of its accessible content,
+    /// which leaves out the margin beside a centred board. Its layout probe
+    /// reports the frame the game occupies.
+    private func gameLayoutFrame(in app: XCUIApplication) -> CGRect? {
+        let probe = app.descendants(matching: .any).matching(identifier: "game.layout.geometry").firstMatch
+        guard probe.exists, let value = probe.value as? String,
+              let range = value.range(of: #"global=\([^)]*\)"#, options: .regularExpression) else { return nil }
+        let numbers = value[range].dropFirst("global=(".count).dropLast()
+            .split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        guard numbers.count == 4 else { return nil }
+        return CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])
+    }
+
+    private func assertFullWidthDestination(_ identifier: String, over bounds: CGRect, in app: XCUIApplication,
+                                            measuredFrame: (() -> CGRect?)? = nil) {
+        var frame: CGRect?
         XCTAssertTrue(waitForCondition {
-            destination = app.descendants(matching: .any).matching(identifier: identifier)
-                .allElementsBoundByIndex.first {
-                    $0.frame.width >= bounds.width * 0.9 && $0.frame.intersects(bounds)
+            let candidates = app.descendants(matching: .any).matching(identifier: identifier)
+                .allElementsBoundByIndex.compactMap { element in
+                    element.exists ? (measuredFrame?() ?? element.frame) : nil
                 }
-            return destination != nil
+            frame = candidates.first { $0.width >= bounds.width * 0.9 && $0.intersects(bounds) }
+            return frame != nil
         }, "The pushed destination must span the allocated Messages content, including both root columns.")
-        if let destination {
-            XCTAssertLessThanOrEqual(destination.frame.minX, bounds.minX + 24)
-            XCTAssertGreaterThanOrEqual(destination.frame.maxX, bounds.maxX - 24)
+        if let frame {
+            XCTAssertLessThanOrEqual(frame.minX, bounds.minX + 24)
+            XCTAssertGreaterThanOrEqual(frame.maxX, bounds.maxX - 24)
         }
         XCTAssertFalse(query("messages.playerSearchField", in: app).isHittable, "The full-width push must cover root inbox controls.")
         let detail = query("messages.detailPane", in: app)

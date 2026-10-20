@@ -326,6 +326,7 @@ private struct GameDetailClockCard: View {
     var showsStatus = true
     var inlineDetail = GameDetailInlineChipDetail.full
     @EnvironmentObject private var ogs: OGSService
+    @Environment(\.gameDetailSlotVisible) private var slotVisible
     @State private var showsDetails = false
     @ScaledMetric(relativeTo: .body) private var textScale: CGFloat = 1
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -427,7 +428,10 @@ private struct GameDetailClockCard: View {
         .accessibilityLabel(Text(verbatim: state.accessibilityLabel))
         .accessibilityValue(Text(verbatim: state.accessibilityValue))
         .accessibilityHint("Shows game details")
-        .accessibilityIdentifier(color == .black ? "game.clock.black" : "game.clock.white")
+        // VoiceOver skips a clock kept mounted in an empty slot, but XCTest
+        // still lists it; only the clock on screen carries the clock's name.
+        .accessibilityIdentifier((color == .black ? "game.clock.black" : "game.clock.white")
+            + (slotVisible ? "" : ".hidden"))
         .overlayPreferenceValue(GameDetailClockUndoAnchor.self) { anchor in
             if hasUndoMenu, let anchor {
                 GeometryReader { geometry in

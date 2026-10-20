@@ -13,7 +13,7 @@ final class GameDetailLayoutTests: XCTestCase {
                       hidesBoard: Bool = false,
                       composerHeight: CGFloat = 0, keyboardOverlap: CGFloat = 0,
                       division: CGRect? = nil, panelDivision: CGRect? = nil,
-                      usesVerticalToolbar: Bool = false,
+                      usesVerticalToolbar: Bool = false, preview: Bool = false,
                       zenBoardCenterY: CGFloat? = nil,
                       recoveryHeight: CGFloat = 0, fullClockFooterWidth: CGFloat = 0,
                       compactClockLineWidth: CGFloat = 0,
@@ -23,7 +23,7 @@ final class GameDetailLayoutTests: XCTestCase {
                              accessibility: false, foldsClock: false,
                              composerHeight: composerHeight, keyboardOverlap: keyboardOverlap,
                              division: division, panelDivision: panelDivision,
-                             usesVerticalToolbar: usesVerticalToolbar,
+                             usesVerticalToolbar: usesVerticalToolbar, preview: preview,
                              zenBoardCenterY: zenBoardCenterY,
                              recoveryHeight: recoveryHeight,
                              fullClockFooterWidth: fullClockFooterWidth,
@@ -1592,6 +1592,30 @@ final class GameDetailLayoutTests: XCTestCase {
             XCTAssertEqual(analysis[.board].width, play[.board].width, accuracy: 0.001,
                            "Analyze must inherit the resolved Play clock budget")
             for p in [play, analysis] { assertOccupiedSlotsFit(p, in: size) }
+        }
+    }
+
+    func testChatPreviewBarSharesTheOpponentRowInRegularLandscape() {
+        for size in [CGSize(width: 1376, height: 958), CGSize(width: 1194, height: 790)] {
+            let chat = plan(size, chat: true)
+            let previewing = plan(size, chat: true, preview: true)
+            XCTAssertTrue(previewing.previewInOpponentRow)
+            XCTAssertTrue(previewing[.preview].isEmpty, "The opponent's row carries the bar.")
+            XCTAssertEqual(previewing[.board], chat[.board], "Previewing never moves the board.")
+            XCTAssertEqual(previewing[.opponent], chat[.opponent])
+            XCTAssertLessThanOrEqual(previewing[.opponent].maxY, previewing[.board].minY)
+        }
+    }
+
+    func testChatPreviewBarSitsAboveTheBoardInRegularPortrait() {
+        for size in [CGSize(width: 1032, height: 1290), CGSize(width: 834, height: 1100)] {
+            let chat = plan(size, chat: true, composerHeight: 50)
+            let previewing = plan(size, chat: true, composerHeight: 50, preview: true)
+            XCTAssertEqual(previewing[.board], chat[.board], "Previewing never moves the board.")
+            XCTAssertFalse(previewing[.preview].isEmpty)
+            XCTAssertLessThanOrEqual(previewing[.preview].maxY, previewing[.board].minY)
+            XCTAssertLessThanOrEqual(previewing[.composer].maxY, previewing[.preview].minY)
+            XCTAssertEqual(previewing[.preview].minX, previewing[.board].minX)
         }
     }
 
