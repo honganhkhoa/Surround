@@ -212,80 +212,220 @@ struct VariationNumberings: View {
     }
 }
 
-/// The board's reflected light, beneath the grid and stones. Specks are
-/// placed by fraction of the surface, so they keep their pattern as the board
-/// resizes, and scale in number with its area.
+/// The board's reflected light, beneath the grid and stones: a gradient sheen
+/// and a tiled image of dust and glints, drawn once, that fades away from the
+/// light. Views rather than a Canvas, so a resize redraws nothing; the specks
+/// keep their density per area and stay put like the texture.
 private struct BoardReflectionView: View {
     let reflection: BoardReflection
-
-    private struct Speck {
-        let x: CGFloat
-        let y: CGFloat
-        let radius: CGFloat
-        let opacity: Double
-    }
-
-    private static let dust: [Speck] = specks(count: 4000, seed: 0x57A2_2026, radius: 0.25...0.6, opacity: 0.12...0.42)
-    private static let glints: [Speck] = specks(count: 120, seed: 0x6E1A_7051, radius: 0.5...1.0, opacity: 0.55...0.9)
-
-    private static func specks(count: Int, seed: UInt64, radius: ClosedRange<CGFloat>,
-                               opacity: ClosedRange<Double>) -> [Speck] {
-        var state = seed
-        func next() -> Double {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
-            return Double(state >> 33) / Double(1 << 31)
-        }
-        return (0..<count).map { _ in
-            Speck(x: next(), y: next(),
-                  radius: radius.lowerBound + (radius.upperBound - radius.lowerBound) * pow(next(), 3),
-                  opacity: opacity.lowerBound + (opacity.upperBound - opacity.lowerBound) * next())
-        }
-    }
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        Canvas { context, size in
-            let origin = CGPoint(x: -0.12 * size.width, y: -0.12 * size.height)
-            let reach = reflection.reach * max(size.width, size.height)
-            // The sheen, screened over the surface so it lightens without
-            // greying the indigo.
-            var sheen = context
-            sheen.blendMode = .screen
-            sheen.fill(Path(CGRect(origin: .zero, size: size)), with: .radialGradient(
-                Gradient(stops: [
+        let tile = BoardReflectionTile.image(dustDensity: reflection.dustDensity,
+                                             glintDensity: reflection.glintDensity, scale: displayScale)
+        let light = UnitPoint(x: -0.12, y: -0.12)
+        GeometryReader { geometry in
+            let reach = reflection.reach * max(geometry.size.width, geometry.size.height)
+            ZStack {
+                Rectangle().fill(RadialGradient(stops: [
                     .init(color: reflection.color.opacity(reflection.corner), location: 0),
                     .init(color: reflection.color.opacity(reflection.middle), location: 0.45),
                     .init(color: reflection.color.opacity(reflection.edge), location: 1)
-                ]),
-                center: origin, startRadius: 0, endRadius: reach))
-            // Specks are brighter where the sheen is.
-            func lit(_ point: CGPoint) -> Double {
-                max(0.35, 1 - hypot(point.x - origin.x, point.y - origin.y) / reach)
-            }
-            let area = size.width * size.height / 10_000
-            for speck in Self.dust.prefix(min(Self.dust.count, Int(area * reflection.dustDensity))) {
-                let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
-                var dot = context
-                dot.opacity = speck.opacity * lit(center)
-                dot.fill(Path(ellipseIn: CGRect(x: center.x - speck.radius, y: center.y - speck.radius,
-                                                width: speck.radius * 2, height: speck.radius * 2)),
-                         with: .color(Color(red: 0.86, green: 0.89, blue: 1)))
-            }
-            for speck in Self.glints.prefix(min(Self.glints.count, Int(area * reflection.glintDensity))) {
-                let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
-                let halo = speck.radius * 5
-                let strength = speck.opacity * lit(center)
-                context.fill(Path(ellipseIn: CGRect(x: center.x - halo, y: center.y - halo, width: halo * 2, height: halo * 2)),
-                             with: .radialGradient(Gradient(colors: [Color(red: 0.91, green: 0.93, blue: 1).opacity(0.3 * strength), .clear]),
-                                                   center: center, startRadius: 0, endRadius: halo))
-                var dot = context
-                dot.opacity = strength
-                dot.fill(Path(ellipseIn: CGRect(x: center.x - speck.radius, y: center.y - speck.radius,
-                                                width: speck.radius * 2, height: speck.radius * 2)),
-                         with: .color(Color(red: 0.96, green: 0.96, blue: 1)))
+                ], center: light, startRadius: 0, endRadius: reach))
+                // Specks are brighter where the sheen is: full near the
+                // light, fading to 35% two thirds of the way out.
+                Image(uiImage: tile)
+                    .resizable(resizingMode: .tile)
+                    .mask(RadialGradient(stops: [.init(color: .white, location: 0),
+                                                 .init(color: .white.opacity(0.35), location: 0.65)],
+                                         center: light, startRadius: 0, endRadius: reach))
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// The reflection's dust and glints on one seamless tile, rendered once per
+/// density and display scale. Its side is not a multiple of the texture's,
+/// so the two repeats do not line up.
+@MainActor
+private enum BoardReflectionTile {
+    static let side: CGFloat = 384
+
+    private struct Key: Hashable {
+        let dust: CGFloat
+        let glints: CGFloat
+        let scale: CGFloat
+    }
+
+    private static var cache: [Key: UIImage] = [:]
+
+    static func image(dustDensity: CGFloat, glintDensity: CGFloat, scale: CGFloat) -> UIImage {
+        let key = Key(dust: dustDensity, glints: glintDensity, scale: scale)
+        if let image = cache[key] { return image }
+        let image = render(dustDensity: dustDensity, glintDensity: glintDensity, scale: scale)
+        cache[key] = image
+        return image
+    }
+
+    private static func render(dustDensity: CGFloat, glintDensity: CGFloat, scale: CGFloat) -> UIImage {
+        var state: UInt64 = 0x57A2_2026
+        func next() -> CGFloat {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return CGFloat(state >> 33) / CGFloat(1 << 31)
+        }
+        let area = side * side / 10_000
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
+            let context = renderer.cgContext
+            let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+            // Each speck is drawn again across any edge it overlaps, so the
+            // tile repeats without seams.
+            func wrapped(_ center: CGPoint, reach: CGFloat, draw: (CGPoint) -> Void) {
+                for dx in [-side, 0, side] where center.x + dx + reach > 0 && center.x + dx - reach < side {
+                    for dy in [-side, 0, side] where center.y + dy + reach > 0 && center.y + dy - reach < side {
+                        draw(CGPoint(x: center.x + dx, y: center.y + dy))
+                    }
+                }
+            }
+            for _ in 0..<Int(area * dustDensity) {
+                let center = CGPoint(x: next() * side, y: next() * side)
+                let radius = 0.25 + 0.35 * pow(next(), 3)
+                let opacity = 0.12 + 0.3 * next()
+                context.setFillColor(CGColor(srgbRed: 0.86, green: 0.89, blue: 1, alpha: opacity))
+                wrapped(center, reach: radius) { point in
+                    context.fillEllipse(in: CGRect(x: point.x - radius, y: point.y - radius,
+                                                   width: radius * 2, height: radius * 2))
+                }
+            }
+            for _ in 0..<Int(area * glintDensity) {
+                let center = CGPoint(x: next() * side, y: next() * side)
+                let radius = 0.5 + 0.5 * pow(next(), 3)
+                let strength = 0.55 + 0.35 * next()
+                let halo = radius * 5
+                let gradient = CGGradient(colorsSpace: colorSpace, colors: [
+                    CGColor(srgbRed: 0.91, green: 0.93, blue: 1, alpha: 0.3 * strength),
+                    CGColor(srgbRed: 0.91, green: 0.93, blue: 1, alpha: 0)] as CFArray, locations: [0, 1])!
+                wrapped(center, reach: halo) { point in
+                    context.drawRadialGradient(gradient, startCenter: point, startRadius: 0,
+                                               endCenter: point, endRadius: halo, options: [])
+                    context.setFillColor(CGColor(srgbRed: 0.96, green: 0.96, blue: 1, alpha: strength))
+                    context.fillEllipse(in: CGRect(x: point.x - radius, y: point.y - radius,
+                                                   width: radius * 2, height: radius * 2))
+                }
+            }
+        }
+    }
+}
+
+/// The board texture as images rather than an ImagePaint fill, so an
+/// animated resize does not redraw the layer on every frame: a tile repeated
+/// at its tile size, or one composition covering the board from its top-left
+/// corner at `paintScale(in:)`, as the paint placed it.
+private struct BoardTextureImage: View {
+    let texture: BoardTexture
+    /// The margin's lift: `brightness(0.1)` then `contrast(1.25)`.
+    let lifted: Bool
+    let boardSize: CGSize
+
+    var body: some View {
+        let image = BoardTextureImages.image(for: texture, lifted: lifted)
+        switch texture.mapping {
+        case .tiled:
+            Image(uiImage: image).resizable(resizingMode: .tile)
+        case .board:
+            let scale = texture.paintScale(in: boardSize)
+            Color.clear
+                .overlay(alignment: .topLeading) {
+                    Image(uiImage: image).resizable()
+                        .frame(width: texture.image.size.width * scale,
+                               height: texture.image.size.height * scale)
+                }
+                .clipped()
+        }
+    }
+}
+
+/// Texture images prepared once: a tile given its point size, and copies
+/// with the margin's lift applied, which is 1.25× each channel, rather than
+/// filters computed on every frame.
+@MainActor
+private enum BoardTextureImages {
+    private struct Key: Hashable {
+        let source: ObjectIdentifier
+        let lifted: Bool
+        let tileSize: CGFloat?
+    }
+
+    private static var cache: [Key: (source: UIImage, image: UIImage)] = [:]
+
+    static func image(for texture: BoardTexture, lifted: Bool) -> UIImage {
+        let tileSize = texture.mapping == .tiled ? texture.tileSize : nil
+        let key = Key(source: ObjectIdentifier(texture.image), lifted: lifted, tileSize: tileSize)
+        if let entry = cache[key], entry.source === texture.image { return entry.image }
+        guard let source = texture.image.cgImage else { return texture.image }
+        let pixels = lifted ? liftedCopy(of: source) ?? source : source
+        let scale = tileSize.map { CGFloat(source.width) / max(1, $0) } ?? texture.image.scale
+        let image = UIImage(cgImage: pixels, scale: scale, orientation: .up)
+        cache[key] = (texture.image, image)
+        return image
+    }
+
+    private static func liftedCopy(of source: CGImage) -> CGImage? {
+        let width = source.width, height = source.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        return pixels.withUnsafeMutableBytes { buffer -> CGImage? in
+            guard let context = CGContext(data: buffer.baseAddress, width: width, height: height,
+                                          bitsPerComponent: 8, bytesPerRow: width * 4,
+                                          space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+            for index in stride(from: 0, to: buffer.count, by: 4) {
+                let alpha = buffer[index + 3]
+                for channel in 0..<3 {
+                    buffer[index + channel] = UInt8(min(Int(alpha), Int(buffer[index + channel]) * 5 / 4))
+                }
+            }
+            return context.makeImage()
+        }
+    }
+}
+
+/// A border inside the board drawn as four edge strips, its colors running
+/// from the top-left corner through the middle to the bottom-right one like
+/// a diagonal gradient across the square board. A stroked outline, above all
+/// a gradient one, is redrawn across the whole board on every frame of a
+/// resize; strips cost only their own area.
+private struct BoardBorder: View {
+    let start: Color
+    let middle: Color
+    let end: Color
+    let width: CGFloat
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [start, middle], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: width)
+                Spacer(minLength: 0)
+                LinearGradient(colors: [middle, end], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: width)
+            }
+            // The sides stop at the top and bottom strips, so the corners are
+            // not covered twice.
+            HStack(spacing: 0) {
+                LinearGradient(colors: [start, middle], startPoint: .top, endPoint: .bottom)
+                    .frame(width: width)
+                Spacer(minLength: 0)
+                LinearGradient(colors: [middle, end], startPoint: .top, endPoint: .bottom)
+                    .frame(width: width)
+            }
+            .padding(.vertical, width)
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -1024,9 +1164,7 @@ struct BoardView: View {
                     appearance.boardColor
                         .overlay {
                             if let texture = appearance.boardTexture {
-                                let paint = ImagePaint(image: Image(uiImage: texture.image),
-                                                       scale: texture.paintScale(in: geometry.size))
-                                Rectangle().fill(paint)
+                                BoardTextureImage(texture: texture, lifted: false, boardSize: geometry.size)
                                     .overlay {
                                         if appearance.boardBevel {
                                             // Lift the existing mineral detail only in the margin,
@@ -1038,9 +1176,7 @@ struct BoardView: View {
                                                 .init(color: .clear, location: 1 - fade),
                                                 .init(color: .white.opacity(0.75), location: 1)
                                             ]
-                                            Rectangle().fill(paint)
-                                                .brightness(0.1)
-                                                .contrast(1.25)
+                                            BoardTextureImage(texture: texture, lifted: true, boardSize: geometry.size)
                                                 .mask {
                                                     LinearGradient(stops: stops, startPoint: .top, endPoint: .bottom)
                                                         .overlay {
@@ -1058,21 +1194,26 @@ struct BoardView: View {
                         }
                         .cornerRadius(cornerRadius)
                         .overlay {
-                            if let edge = appearance.boardEdge {
-                                RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(edge, lineWidth: 1)
+                            ZStack {
+                                if let edge = appearance.boardEdge {
+                                    BoardBorder(start: edge, middle: edge, end: edge, width: 1)
+                                }
+                                if appearance.boardBevel {
+                                    BoardBorder(start: .white.opacity(0.18), middle: .clear,
+                                                end: .black.opacity(0.45), width: 3)
+                                }
                             }
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                         }
-                        .overlay {
-                            if appearance.boardBevel {
-                                RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(
-                                    LinearGradient(colors: [.white.opacity(0.18), .clear, .black.opacity(0.45)],
-                                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                                    lineWidth: 3)
-                            }
+                        // The board's shape casts the shadow, so the layers above
+                        // are not drawn offscreen to find their outline.
+                        .background {
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .fill(appearance.boardColor)
+                                .shadow(color: .black.opacity(appearance.boardBevel ? 0.55 : 0.33),
+                                        radius: appearance.boardBevel ? 10 : 2,
+                                        y: appearance.boardBevel ? 6 : 0)
                         }
-                        .shadow(color: .black.opacity(appearance.boardBevel ? 0.55 : 0.33),
-                                radius: appearance.boardBevel ? 10 : 2,
-                                y: appearance.boardBevel ? 6 : 0)
                 } else {
                     Color.white.cornerRadius(cornerRadius).opacity(0.5)
                 }

@@ -12,6 +12,7 @@
 		34BE4DBE8768431EB8AF87F4 /* GameControlRowMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */; };
 		4D1739ECA3104C94BEEA82BB /* ArtboardPhoneAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */; };
 		31918698BFEB4CE09EE2C520 /* GameDetailIPadArtboardAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4C93033626462FA2E9EDC6 /* GameDetailIPadArtboardAuditTests.swift */; };
+		7E1A2B3C4D5E6F7081920A1B /* GameDetailThemePerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7081920A1C /* GameDetailThemePerformanceTests.swift */; };
 		9E9D055A19B544A88B5DDE1D /* GameDetailClockState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C70DA827D5C4B4FA1029CF7 /* GameDetailClockState.swift */; };
 		E0859B1543664105A57101FA /* GameDetailClockState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C70DA827D5C4B4FA1029CF7 /* GameDetailClockState.swift */; };
 		3926FD13319F4740ACBC94F6 /* GameDetailClockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6E63D75AB347B8BACD9A02 /* GameDetailClockStateTests.swift */; };
@@ -499,6 +500,7 @@
 		87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRowMetricsTests.swift; sourceTree = "<group>"; };
 		466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtboardPhoneAuditTests.swift; sourceTree = "<group>"; };
 		0C4C93033626462FA2E9EDC6 /* GameDetailIPadArtboardAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailIPadArtboardAuditTests.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7081920A1C /* GameDetailThemePerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailThemePerformanceTests.swift; sourceTree = "<group>"; };
 		1C70DA827D5C4B4FA1029CF7 /* GameDetailClockState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailClockState.swift; sourceTree = "<group>"; };
 		DB6E63D75AB347B8BACD9A02 /* GameDetailClockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailClockStateTests.swift; sourceTree = "<group>"; };
 		8C96A63686294F338D527DD2 /* GameControlRowMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRowMetrics.swift; sourceTree = "<group>"; };
@@ -950,6 +952,7 @@
 				0D79800C2C35496EA956CB6F /* GameContinuityUITests.swift */,
 				466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */,
 				0C4C93033626462FA2E9EDC6 /* GameDetailIPadArtboardAuditTests.swift */,
+				7E1A2B3C4D5E6F7081920A1C /* GameDetailThemePerformanceTests.swift */,
 				0ED8268715BD49398AD409E1 /* GameDetailDuoArtboardAuditTests.swift */,
 				AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */,
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
@@ -1786,6 +1789,7 @@
 				A3C9D7A53A92404EAEB44721 /* GameContinuityUITests.swift in Sources */,
 				4D1739ECA3104C94BEEA82BB /* ArtboardPhoneAuditTests.swift in Sources */,
 				31918698BFEB4CE09EE2C520 /* GameDetailIPadArtboardAuditTests.swift in Sources */,
+				7E1A2B3C4D5E6F7081920A1B /* GameDetailThemePerformanceTests.swift in Sources */,
 				54BD24A1EC3F40B58CDBDCDF /* GameDetailDuoArtboardAuditTests.swift in Sources */,
 				F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */,
 				C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */,
