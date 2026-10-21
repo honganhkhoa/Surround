@@ -690,6 +690,10 @@ struct GameDetailView: View {
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
         .background { GameDetailBackdrop().ignoresSafeArea(.container) }
+        .overlay {
+            GameDetailSceneForeground(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
+                .ignoresSafeArea(.container)
+        }
         .overlay(alignment: .topTrailing) { zenExitOverlay }
         .overlay(alignment: .topLeading) { duoSidebarButton }
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }

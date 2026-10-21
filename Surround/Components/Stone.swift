@@ -31,8 +31,9 @@ struct StonePalette: Equatable {
 
 /// Rendered stones: a few variants per player, so a full board does not
 /// repeat one image. Every image follows the same contract: a straight-down
-/// view lit from the upper left, centered, filling `footprint` of the square,
-/// opaque inside and transparent outside, with no shadow or board baked in.
+/// view with lighting matching `BoardAppearance.stoneLightDirection`, centered,
+/// filling `footprint` of the square, opaque inside and transparent outside,
+/// with no shadow or board baked in.
 struct StoneImages: Equatable {
     var black: [UIImage]
     var white: [UIImage]
@@ -54,11 +55,36 @@ struct StoneImages: Equatable {
     }
 }
 
-/// A seamless surface tile repeated at a fixed size, whatever the board size.
+/// Native shading and contact shadows follow the rendered stones' key light.
+enum StoneLightDirection: Equatable {
+    case upperLeft, upperRight
+
+    var shadowXSign: CGFloat { self == .upperLeft ? 1 : -1 }
+}
+
+/// A board surface, either a seamless fixed-size tile or one composition
+/// scaled to cover the entire board without repeating within its bounds.
 struct BoardTexture: Equatable {
+    enum Mapping: Equatable {
+        case tiled, board
+    }
+
     var image: UIImage
-    /// The tile's width in points.
-    var tileSize: CGFloat
+    /// The tile's width in points; unused for a board-wide composition.
+    var tileSize: CGFloat = 320
+    var mapping: Mapping = .tiled
+
+    func paintScale(in size: CGSize) -> CGFloat {
+        switch mapping {
+        case .tiled:
+            return tileSize / max(1, image.size.width)
+        case .board:
+            // Cover either aspect ratio with one image. A temporarily empty
+            // layout slot still needs a positive, finite ImagePaint scale.
+            return max(max(1, size.width) / max(1, image.size.width),
+                       max(1, size.height) / max(1, image.size.height))
+        }
+    }
 }
 
 /// Light the polished board reflects: a broad sheen from the upper left,
@@ -82,6 +108,92 @@ func usesDetailedStoneRendering(at size: CGFloat) -> Bool {
     size >= 14
 }
 
+enum BoardGridStyle: Equatable {
+    case straight, ragged
+
+    func usesRaggedEdges(at cellSize: CGFloat) -> Bool {
+        self == .ragged && cellSize >= 10
+    }
+}
+
+/// A straight grid with scratched edges. The sample pattern belongs to the
+/// row/column and fractional cell, so resizing never reseeds the texture.
+struct RaggedGridGeometry: Equatable {
+    var width: Int
+    var height: Int
+    var cellSize: CGFloat
+    var lineScale: CGFloat
+
+    static let samplesPerCell = 20
+    static let edgeVariation: CGFloat = 0.18
+
+    var path: Path {
+        guard width >= 2, height >= 2, cellSize >= 10,
+              cellSize.isFinite, lineScale.isFinite, lineScale > 0 else { return Path() }
+        var result = Path()
+        for row in 0..<height {
+            addLine(to: &result, line: row, cells: width - 1, vertical: false,
+                    outer: row == 0 || row == height - 1)
+        }
+        for column in 0..<width {
+            addLine(to: &result, line: column, cells: height - 1, vertical: true,
+                    outer: column == 0 || column == width - 1)
+        }
+        return result
+    }
+
+    private func coreWidth(outer: Bool) -> CGFloat {
+        max(0.5, (outer ? 1 : 0.5) * lineScale - 2 * Self.edgeVariation)
+    }
+
+    private func sampleHash(line: Int, sample: Int, vertical: Bool) -> UInt32 {
+        var hash = UInt32(truncatingIfNeeded: line &* 92_821 &+ sample &* 68_917)
+        hash ^= vertical ? 0xA341_316C : 0xC801_3EA4
+        hash ^= hash >> 16
+        hash &*= 0x7FEB_352D
+        hash ^= hash >> 15
+        return hash
+    }
+
+    private func addLine(to path: inout Path, line: Int, cells: Int, vertical: Bool, outer: Bool) {
+        let sampleCount = cells * Self.samplesPerCell
+        let center = (CGFloat(line) + 0.5) * cellSize
+        let coreHalfWidth = coreWidth(outer: outer) / 2
+        func point(along: CGFloat, offset: CGFloat) -> CGPoint {
+            // Both axes wind the same way, so overlapping filled strips
+            // cannot cancel each other at an intersection.
+            vertical ? CGPoint(x: center - offset, y: along) : CGPoint(x: along, y: center + offset)
+        }
+        // A continuous spine guarantees intact intersections. Extending
+        // the outer spines by half their width also closes all four corners.
+        let start = cellSize / 2 - (outer ? coreHalfWidth : 0)
+        let end = (CGFloat(cells) + 0.5) * cellSize + (outer ? coreHalfWidth : 0)
+        path.move(to: point(along: start, offset: -coreHalfWidth))
+        path.addLine(to: point(along: end, offset: -coreHalfWidth))
+        path.addLine(to: point(along: end, offset: coreHalfWidth))
+        path.addLine(to: point(along: start, offset: coreHalfWidth))
+        path.closeSubpath()
+        func edgePoint(_ sample: Int, side: CGFloat) -> CGPoint {
+            let hash = sampleHash(line: line, sample: sample, vertical: vertical)
+            let irregularity = (CGFloat(hash & 0xFFFF) / 65_535 * 2 - 1) * Self.edgeVariation
+            let halfWidth = max(coreHalfWidth, (outer ? 0.5 : 0.25) * lineScale + irregularity)
+            // Unequal short runs avoid regular teeth along the edge. The
+            // endpoints remain exact and the sample order stays monotonic.
+            let jitter = sample == 0 || sample == sampleCount ? 0 : (CGFloat(hash >> 16) / 65_535 - 0.5) * 0.6
+            let along = (0.5 + (CGFloat(sample) + jitter) / CGFloat(Self.samplesPerCell)) * cellSize
+            return point(along: along, offset: side * halfWidth)
+        }
+        path.move(to: edgePoint(0, side: -1))
+        for sample in 1...sampleCount {
+            path.addLine(to: edgePoint(sample, side: -1))
+        }
+        for sample in stride(from: sampleCount, through: 0, by: -1) {
+            path.addLine(to: edgePoint(sample, side: 1))
+        }
+        path.closeSubpath()
+    }
+}
+
 /// The board and stone colors shared by full boards and standalone stones.
 /// A theme supplies its own; everything else keeps `.standard`.
 struct BoardAppearance: Equatable {
@@ -94,9 +206,12 @@ struct BoardAppearance: Equatable {
     var boardReflection: BoardReflection? = nil
     /// Scales the grid's line widths on detailed boards.
     var gridLineScale: CGFloat = 1
+    /// Roughens only the line edges; intersections stay on the same grid.
+    var gridStyle: BoardGridStyle = .straight
     /// Rendered stones for detailed sizes; the palettes still draw small
     /// boards, widgets and markers.
     var stoneImages: StoneImages? = nil
+    var stoneLightDirection: StoneLightDirection = .upperLeft
     var gridColor: Color
     var coordinateColor: Color
     var black: StonePalette
@@ -177,6 +292,7 @@ struct Stone: View {
     var body: some View {
         GeometryReader { geometry -> AnyView in
             let size = geometry.size.width
+            let shadowXSign = appearance.stoneLightDirection.shadowXSign
             let path = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size, height: size), transform: nil)
             return AnyView(erasing: Group {
                 switch color {
@@ -190,14 +306,15 @@ struct Stone: View {
                             .frame(width: size / images.footprint, height: size / images.footprint)
                             .frame(width: size, height: size)
                             .shadow(color: .black.opacity(0.35), radius: shadowRadius,
-                                    x: shadowRadius / 2, y: shadowRadius)
+                                    x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                     } else {
                         ZStack {
                             if shadowRadius > 0 {
                                 Path(path).fill(
                                     palette.highlight
-                                        .shadow(.inner(color: palette.shade, radius: size / 4, x: -size / 2.5, y: -size / 2.5))
-                                ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                                        .shadow(.inner(color: palette.shade, radius: size / 4,
+                                                       x: -shadowXSign * size / 2.5, y: -size / 2.5))
+                                ).shadow(radius: shadowRadius, x: shadowXSign * shadowRadius, y: shadowRadius)
                             } else {
                                 Circle().fill(palette.flat)
                             }
@@ -216,7 +333,7 @@ struct Stone: View {
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
-                            ).shadow(radius: shadowRadius, x: shadowRadius, y: shadowRadius)
+                            ).shadow(radius: shadowRadius, x: shadowXSign * shadowRadius, y: shadowRadius)
                         }
                         Text(verbatim: "?").font(Font.system(size: size / 1.5).bold()).foregroundColor(Color.white)
                         Circle().stroke(Color.gray, lineWidth: 0.5)

@@ -27,7 +27,8 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         fromMainNavigation: Bool = true,
         dark: Bool = false,
         socketDown: Bool = false,
-        hidesRank: Bool = false
+        hidesRank: Bool = false,
+        theme: String? = nil
     ) -> XCUIApplication {
         let usesHome = fromMainNavigation
         var arguments = [
@@ -48,7 +49,10 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         if let textSize {
             arguments += ["-UIPreferredContentSizeCategoryName", textSize.rawValue]
         }
-        if dark {
+        if let theme {
+            // Scene themes choose their own window appearance.
+            arguments += [SurroundUITestContract.themeLaunchArgument, theme]
+        } else if dark {
             arguments += [SurroundUITestContract.appearanceLaunchArgument, "dark"]
         }
         if socketDown {
@@ -78,6 +82,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         } else {
             routeNote = "Standalone clock-reference scene \(scene.rawValue)."
         }
+        if let theme { routeNote += " Theme: \(theme)." }
         element(ID.gameBoard, in: app)
         return app
     }
@@ -442,6 +447,74 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         capture(1, app: app, note: "Design-matched players, board, clock values and waiting turn.")
         rotate(.landscapeLeft, app: app)
         capture(2, app: app, note: "Design-matched waiting state in native landscape.")
+    }
+
+    /// Scene art and stone rendering must fit the same compact layouts as the
+    /// standard board. The existing captures also check panel separation and
+    /// the usable landscape board size.
+    func testRakedGardenThemeStates() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The compact theme audit requires an iPhone.")
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let scenes: [(Scene, Int, Int, String)] = [
+            (.activeGameBoard, 1, 2, "play"),
+            (.activeGameBoard, 11, 12, "chat"),
+            (.gameAnalysis, 22, 23, "analyze"),
+            (.zenMode, 36, 37, "zen"),
+        ]
+        for (scene, portrait, landscape, state) in scenes {
+            let app = launch(scene, artboard: portrait, theme: "rakedGarden")
+            if state == "chat" { startChat(in: app, typing: false) }
+            if state == "analyze" {
+                XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
+                               "The themed Analyze view remains the only open panel")
+                assertSelectedBranchVisible(["lj", "lk", "mk"], in: app)
+            }
+            let board = element(ID.gameBoard, in: app)
+            let value = board.value as? String
+            XCTAssertNotNil(value, "The audit records an identifiable board position")
+            capture(portrait, app: app, note: "Raked Garden \(state), portrait.",
+                    suffix: "-raked-garden")
+            rotate(.landscapeLeft, app: app)
+            XCTAssertEqual(board.value as? String, value, "Rotation retains the displayed position")
+            if state == "analyze" { assertSelectedBranchVisible(["lj", "lk", "mk"], in: app) }
+            if state == "zen" { element(ID.gameZenExit, in: app, matching: .button) }
+            capture(landscape, app: app, note: "Raked Garden \(state), native landscape.",
+                    suffix: "-raked-garden")
+            app.terminate()
+        }
+    }
+
+    func testRakedGardenThemeScoring() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The compact scoring audit requires an iPhone.")
+        let app = launch(artboard: 64, theme: "rakedGarden")
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["Accept"].firstMatch.waitForExistence(timeout: 5),
+                      "The theme retains the stone-removal action")
+        capture(64, app: app, note: "Raked Garden removed-stone marks and scoring overlays.",
+                suffix: "-raked-garden")
+        tap("game.clock.black", in: app)
+        capture(65, app: app, note: "Raked Garden score details.",
+                suffix: "-raked-garden")
+    }
+
+    /// Use the small-phone fixtures on an SE-size simulator; unlike the
+    /// full-size portrait analysis artboard, these do not require four rows.
+    func testRakedGardenThemeSmallPhone() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The small-phone theme audit requires an iPhone.")
+        for (scene, number, state) in [
+            (Scene.activeGameBoard, 81, "play"),
+            (.gameAnalysis, 82, "analyze"),
+            (.activeGameBoard, 83, "scoring"),
+        ] {
+            let app = launch(scene, artboard: number, theme: "rakedGarden")
+            if scene == .gameAnalysis { assertSelectedBranchVisible(["lj", "lk", "mk"], in: app) }
+            capture(number, app: app, note: "Raked Garden small-phone \(state).",
+                    suffix: "-raked-garden")
+            app.terminate()
+        }
     }
 
     func testPhoneChat() {

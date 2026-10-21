@@ -91,9 +91,9 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     private func capture(_ number: Int, _ state: String, in app: XCUIApplication,
-                         note: String = "") {
+                         note: String = "", suffix: String = "") {
         Thread.sleep(forTimeInterval: 0.7)
-        let name = String(format: "artboard-%03d-ipad", number)
+        let name = String(format: "artboard-%03d-ipad", number) + suffix
         recordArtboardCapture(number, screenshotName: name, in: app,
                               note: [state, note].joined(separator: " "))
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -218,6 +218,64 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         element(ID.screenHome, in: app)
         Thread.sleep(forTimeInterval: 1)
         keepScreenshot("nebula-pearl-ipad-home-after-back", in: app)
+    }
+
+    func testRakedGardenThemeOrientations() {
+        let app = launchGame(artboard: 17, theme: "rakedGarden")
+        defer {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            app.terminate()
+        }
+        setSidebarCollapsed(true, in: app)
+        let board = element(ID.gameBoard, in: app)
+        let value = board.value as? String
+        XCTAssertNotNil(value, "The audit records an identifiable board position")
+        for portrait in [false, true] {
+            XCUIDevice.shared.orientation = portrait ? .portrait : .landscapeLeft
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let window = app.windows.firstMatch.frame
+                return (window.height > window.width) == portrait
+                    && abs(board.frame.width - board.frame.height) < 1
+                    && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+            }, "The square themed board fits the active window after rotation")
+            XCTAssertEqual(board.value as? String, value, "Rotation retains the displayed position")
+            capture(17, "Raked Garden Play", in: app,
+                    note: "The same game is retained through native rotation.",
+                    suffix: portrait ? "-raked-garden-portrait" : "-raked-garden-landscape")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height
+        })
+        tap(app.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: app)
+        element(ID.screenHome, in: app)
+        keepScreenshot("raked-garden-ipad-home-after-back", in: app)
+    }
+
+    func testRakedGardenThemePanels() {
+        defer { XCUIDevice.shared.orientation = .landscapeLeft }
+        for (number, portrait, state) in [
+            (3, false, "chat"), (14, true, "chat"),
+            (24, false, "analyze"), (26, true, "analyze"),
+            (38, false, "zen"), (40, true, "zen"),
+        ] {
+            let app = launchGame(artboard: number, portrait: portrait, theme: "rakedGarden")
+            setSidebarCollapsed(true, in: app)
+            auditChat(state == "chat", in: app)
+            if state == "chat" {
+                dismissSoftwareKeyboardIfNeeded(in: app)
+                element(ID.gameChatInput, in: app, matching: .textField)
+                XCTAssertFalse(app.descendants(matching: .any)
+                    .matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists)
+            }
+            if state == "zen" {
+                auditToolbarAction(ID.gameZenEnter, label: "Zen mode", in: app)
+                assertZenHidesChrome(in: app)
+            }
+            capture(number, "Raked Garden \(state)", in: app, suffix: "-raked-garden")
+            app.terminate()
+        }
     }
 
     func testConnectionBannerPlacement() {

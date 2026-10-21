@@ -57,6 +57,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
 
     private var pose: Pose!
     private var launchedArtboard: Int!
+    private var launchedTheme: String?
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -74,12 +75,13 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
 
     private func launchScene(_ scene: Scene, artboard: Int, appearance: String? = nil,
                              clock: String? = nil, socketDown: Bool = false,
-                             rightToLeft: Bool = false) -> XCUIApplication {
+                             rightToLeft: Bool = false, theme: String? = nil) -> XCUIApplication {
         // Keep the operator-selected fold pose, then apply its artboard orientation.
         // XCTest can restore portrait when its runner launches.
         XCUIDevice.shared.orientation = [.closedLandscape, .bookWide, .openWide].contains(pose) ? .landscapeLeft : .portrait
         let app = XCUIApplication()
         launchedArtboard = artboard
+        launchedTheme = theme
         app.launchArguments = languageLaunchArguments + [
             SurroundUITestContract.launchArgument,
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
@@ -87,7 +89,9 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             SurroundUITestContract.compatibilitySceneLaunchArgument, Scene.home.rawValue,
             SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, String(artboard),
         ]
-        if let appearance {
+        if let theme {
+            app.launchArguments += [SurroundUITestContract.themeLaunchArgument, theme]
+        } else if let appearance {
             app.launchArguments += [SurroundUITestContract.appearanceLaunchArgument, appearance]
         }
         if let clock {
@@ -153,6 +157,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         Keyboard visible: \(app.keyboards.firstMatch.exists)
         \(clocks)
         Fixture: exact design artboard \(launchedArtboard!), with its player roles, clocks, board, and chat.
+        Theme: \(launchedTheme ?? "standard")
         Route: MainView Home → design fixture game; native navigation chrome.
 
         \(app.debugDescription)
@@ -163,7 +168,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         add(attachment)
     }
 
-    private func capture(_ number: Int, in app: XCUIApplication) {
+    private func capture(_ number: Int, in app: XCUIApplication, suffix: String = "") {
         // The system may briefly show the home indicator after launch or an
         // interaction even when this landscape view requests automatic hiding.
         Thread.sleep(forTimeInterval: pose == .closedLandscape ? 10 : 0.7)
@@ -173,7 +178,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertEqual(window.width > window.height, expectsLandscape,
                        "Capture orientation must match the operator-selected physical pose")
-        let name = String(format: "native-%03d-duo-", number) + pose.rawValue
+        let name = String(format: "native-%03d-duo-", number) + pose.rawValue + suffix
         attachState(name, in: app)
         recordArtboardCapture(number, screenshotName: name, in: app,
                               note: "Host must capture and verify the active Duo display.",
@@ -495,6 +500,37 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertTrue(pollUntil(timeout: 5) { !board.exists }, "Back leaves the game")
             keepScreenshot("duo-\(pose.rawValue)-after-back", in: app)
         }
+    }
+
+    /// Run once per operator-selected physical pose. Reuse the ordinary
+    /// artboard assertions for clock targets, fold panes and native chrome.
+    func testRakedGardenThemeStates() {
+        var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, theme: "rakedGarden")
+        capture(pose.playArtboard, in: app, suffix: "-raked-garden")
+        app.terminate()
+
+        if let number = pose.playChatArtboard {
+            app = launchScene(.activeGameBoard, artboard: number, theme: "rakedGarden")
+            openAuditChat(in: app)
+            XCTAssertFalse(app.descendants(matching: .any)
+                .matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists,
+                           "Chat remains the only open panel")
+            capture(number, in: app, suffix: "-raked-garden")
+            app.terminate()
+        }
+
+        app = launchScene(.gameAnalysis, artboard: pose.analyzeArtboard, theme: "rakedGarden")
+        XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
+                       "Analyze remains the only open panel")
+        XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, "variation:38:lj-lk-mk")
+        assertSelectedAuditBranchVisible(in: app)
+        capture(pose.analyzeArtboard, in: app, suffix: "-raked-garden")
+        app.terminate()
+
+        app = launchScene(.zenMode, artboard: pose.zenArtboard, theme: "rakedGarden")
+        element(ID.gameZenExit, in: app, matching: .button)
+        capture(pose.zenArtboard, in: app, suffix: "-raked-garden")
+        app.terminate()
     }
 
     func testV143WidePanelsPreserveBoardAndFullClocks() throws {

@@ -5,6 +5,7 @@ import SwiftUI
 enum SurroundTheme: String, CaseIterable, Identifiable {
     case standard
     case nebulaPearl
+    case rakedGarden
 
     var id: Self { self }
 
@@ -23,6 +24,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard: "Surround"
         case .nebulaPearl: "Nebula & Pearl"
+        case .rakedGarden: "Raked Garden"
         }
     }
 
@@ -31,6 +33,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard: nil
         case .nebulaPearl: .dark
+        case .rakedGarden: .light
         }
     }
 
@@ -94,6 +97,54 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 // Dead glass is nearly the board's own color at half opacity.
                 removedStoneOutline: silver.opacity(0.75)
             )
+        case .rakedGarden:
+            return BoardAppearance(
+                boardColor: Color(themeHex: 0xE5DCCA),
+                boardEdge: Color(themeHex: 0x8D8069).opacity(0.45),
+                boardTexture: RakedGardenAssets.board,
+                // A scratched grid on quiet sand; curved rake grooves and
+                // deeper relief belong to the surrounding garden scene.
+                gridLineScale: 1.6,
+                gridStyle: .ragged,
+                stoneImages: RakedGardenAssets.stones,
+                // Match the canopy's down-left cast and the stones' key light.
+                stoneLightDirection: .upperRight,
+                gridColor: Color(themeHex: 0x736550),
+                coordinateColor: Color(themeHex: 0x62533F),
+                black: StonePalette(
+                    highlight: Color(themeHex: 0x6A485A),
+                    shade: Color(themeHex: 0x241C27),
+                    flat: Color(themeHex: 0x382736),
+                    outline: Color(themeHex: 0x241C27),
+                    rim: Color(themeHex: 0x8D6976).opacity(0.5),
+                    lastMove: Color(themeHex: 0xFFF9E8),
+                    label: Color(themeHex: 0xFFF9E8)
+                ),
+                white: StonePalette(
+                    highlight: Color(themeHex: 0xE8F2B6),
+                    shade: Color(themeHex: 0x7C9842),
+                    flat: Color(themeHex: 0xBCD273),
+                    // Jade stays pale: its contour, not stronger saturation,
+                    // separates it from sand at thumbnail sizes.
+                    outline: Color(themeHex: 0x52632D),
+                    rim: Color(themeHex: 0x52632D).opacity(0.7),
+                    lastMove: Color(themeHex: 0x293419),
+                    label: Color(themeHex: 0x293419),
+                    territory: Color(themeHex: 0x6C7D35)
+                ),
+                emptyPointMarker: Color(themeHex: 0x382736),
+                markOutline: Color(themeHex: 0x62533F),
+                dameColor: Color(themeHex: 0x8D4E2C),
+                highlightColor: Color(themeHex: 0x285E6E),
+                crosshair: .init(valid: Color(themeHex: 0x28684D),
+                                 invalid: Color(themeHex: 0x9B3437),
+                                 removal: Color(themeHex: 0x285E6E)),
+                crosshairWidth: 1.5,
+                removeMark: Color(themeHex: 0x9B3437),
+                restoreMark: Color(themeHex: 0x28684D),
+                removalMarkCasing: Color(themeHex: 0xFFF9E8),
+                removedStoneOutline: Color(themeHex: 0x62533F)
+            )
         }
     }
 }
@@ -113,6 +164,19 @@ private enum NebulaPearlAssets {
     static let board = UIImage(named: "NebulaPearlBoard").map { BoardTexture(image: $0, tileSize: 320) }
 }
 
+private enum RakedGardenAssets {
+    static let stones: StoneImages? = {
+        let black = (0..<4).compactMap { UIImage(named: "RakedGardenBasalt\($0)") }
+        let white = (0..<4).compactMap { UIImage(named: "RakedGardenJade\($0)") }
+        guard black.count == 4, white.count == 4 else { return nil }
+        return StoneImages(black: black, white: white)
+    }()
+
+    /// One quiet sand field scales with the board; fine grain naturally
+    /// softens in thumbnails while the native grid retains its contrast.
+    static let board = UIImage(named: "RakedGardenBoard").map { BoardTexture(image: $0, mapping: .board) }
+}
+
 // MARK: - Game Detail surfaces
 
 extension SurroundTheme {
@@ -121,6 +185,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
+        case .rakedGarden: Color(themeHex: 0xEFEAE1)
         }
     }
 
@@ -128,6 +193,14 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
+        case .rakedGarden: Color(themeHex: 0xF7F4EE)
+        }
+    }
+
+    var foreground: Color {
+        switch self {
+        case .standard, .nebulaPearl: .primary
+        case .rakedGarden: Color(themeHex: 0x2B2621)
         }
     }
 
@@ -140,27 +213,40 @@ extension SurroundTheme {
                     : UIColor.black.withAlphaComponent(0.12)
             })
         case .nebulaPearl: Color.white.opacity(0.14)
+        case .rakedGarden: Color(themeHex: 0x89785D).opacity(0.28)
         }
     }
 
     /// Whether Game Detail draws a scene instead of a plain page.
-    var hasScene: Bool { self == .nebulaPearl }
+    var hasScene: Bool { self != .standard }
 
     /// Clocks, player chips and the main action are tinted Liquid Glass,
     /// letting the scene show through; other themes keep solid surfaces.
-    var usesGlassControls: Bool { self == .nebulaPearl }
+    var usesGlassControls: Bool { self != .standard }
 
-    /// Tinted Liquid Glass for a player's clock, in the stone's color. The
-    /// violet clock is light enough to show the sky; the pearl clock needs a
-    /// full tint, since lighter pearl glass turns grey over the dark scene.
+    /// Tinted Liquid Glass for a player's clock, in the stone's color.
+    /// Light stones use a strong tint to preserve their material color over
+    /// the scene; dark ones retain enough pigment for light clock text.
     func clockGlassTint(_ color: StoneColor) -> Color {
-        color == .black ? Color(themeHex: 0x3B2585).opacity(0.47) : Color(themeHex: 0xFBF1EC).opacity(0.95)
+        switch self {
+        case .standard: .clear
+        case .nebulaPearl:
+            color == .black ? Color(themeHex: 0x3B2585).opacity(0.47) : Color(themeHex: 0xFBF1EC).opacity(0.95)
+        case .rakedGarden:
+            color == .black ? Color(themeHex: 0x4B263D).opacity(0.84) : Color(themeHex: 0xD6E9A3).opacity(0.72)
+        }
     }
 
-    /// Tinted Liquid Glass for a player chip. The dark chip stays dark enough
-    /// for OGS's blue and supporter name colors.
+    /// Tinted Liquid Glass for a player chip, using the same stone family
+    /// as its clock.
     func identityGlassTint(_ color: StoneColor) -> Color {
-        color == .black ? Color(themeHex: 0x241858).opacity(0.51) : Color(themeHex: 0xF8EFEB).opacity(0.93)
+        switch self {
+        case .standard: .clear
+        case .nebulaPearl:
+            color == .black ? Color(themeHex: 0x241858).opacity(0.51) : Color(themeHex: 0xF8EFEB).opacity(0.93)
+        case .rakedGarden:
+            color == .black ? Color(themeHex: 0x4B263D).opacity(0.86) : Color(themeHex: 0xE6F2C4).opacity(0.78)
+        }
     }
 
     /// The main action's tint; nil keeps the app's accent.
@@ -169,7 +255,13 @@ extension SurroundTheme {
         case .standard: nil
         // Deep violet: white text at about 8:1, and close to the violet clock.
         case .nebulaPearl: Color(themeHex: 0x4E36B0)
+        case .rakedGarden: Color(themeHex: 0xA2402A)
         }
+    }
+
+    /// Glass pigment is independent of the opaque accessibility fill.
+    var actionGlassTint: Color? {
+        self == .rakedGarden ? actionTint?.opacity(0.88) : actionTint
     }
 
 
@@ -178,6 +270,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
+        case .rakedGarden: Color(themeHex: 0xDEDCC1)
         }
     }
 }
@@ -191,6 +284,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemTeal)
         // The chat highlight's cyan: the one cool accent among the violets.
         case .nebulaPearl: Color(themeHex: 0x6FD6FF)
+        case .rakedGarden: Color(themeHex: 0x28684D)
         }
     }
 
@@ -200,15 +294,17 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
+        case .rakedGarden: Color(themeHex: 0x9B532B)
         }
     }
 
-    /// A dark keyline between a tree mark and its stone, so a light mark
-    /// stays distinct from a pearl's edge; nil lets the mark touch the stone.
+    /// A contrasting keyline between a tree mark and its stone; nil lets
+    /// the mark touch the stone.
     var treeMarkKeyline: Color? {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0x0B0E22)
+        case .rakedGarden: Color(themeHex: 0xFFF9E8)
         }
     }
 
@@ -217,6 +313,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(scheme == .dark ? .systemGray6 : .systemGray4)
         case .nebulaPearl: Color(themeHex: 0xC9CFEA).opacity(0.2)
+        case .rakedGarden: Color(themeHex: 0x736550).opacity(0.25)
         }
     }
 
@@ -225,6 +322,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemTeal)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
+        case .rakedGarden: Color(themeHex: 0x28684D)
         }
     }
 
@@ -234,6 +332,7 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
+        case .rakedGarden: nil
         }
     }
 
@@ -242,6 +341,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
+        case .rakedGarden: Color(themeHex: 0x9B532B)
         }
     }
 
@@ -250,6 +350,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
+        case .rakedGarden: Color(themeHex: 0xD7CEBA)
         }
     }
 }
@@ -286,6 +387,13 @@ extension SurroundTheme {
             return [.init(color: Color(themeHex: 0xD9CCE6), location: 0),
                     .init(color: Color(themeHex: 0xF1EAEE), location: 0.35),
                     .init(color: Color(themeHex: 0xF8F1E8), location: 1)]
+        case .rakedGarden:
+            if color == .black {
+                return [.init(color: Color(themeHex: 0x6A3F5C), location: 0),
+                        .init(color: Color(themeHex: 0x22101C), location: 1)]
+            }
+            return [.init(color: Color(themeHex: 0xBFDD7A), location: 0),
+                    .init(color: Color(themeHex: 0xE6F2C4), location: 1)]
         }
     }
 
@@ -294,6 +402,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
+        case .rakedGarden: color == .black ? Color(themeHex: 0x3A1E31) : Color(themeHex: 0xD6E9A3)
         }
     }
 
@@ -301,6 +410,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? .white : Color(white: scheme == .dark ? 19 / 255 : 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
+        case .rakedGarden: color == .black ? Color(themeHex: 0xFFF9E8) : Color(themeHex: 0x2B2621)
         }
     }
 
@@ -309,6 +419,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
+        case .rakedGarden: color == .black ? Color(themeHex: 0xF3CE7A) : Color(themeHex: 0x8A3421)
         }
     }
 
@@ -320,6 +431,9 @@ extension SurroundTheme {
                 ? Color(red: 125 / 255, green: 122 / 255, blue: 1)
                 : Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
+        // The lantern glow stays bright; the sharper outline needs a deeper
+        // amber to remain visible against the pale jade clock.
+        case .rakedGarden: Color(themeHex: 0x9B6423)
         }
     }
 
@@ -328,6 +442,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0xB7A4FF)
+        case .rakedGarden: Color(themeHex: 0xD6A03C)
         }
     }
 
@@ -336,6 +451,9 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0x6A4FD6)
+        // Maple carries the badge's white text at over 6:1. Lantern amber
+        // remains the turn glow; it is too light for white status text.
+        case .rakedGarden: Color(themeHex: 0xA2402A)
         }
     }
 
@@ -349,6 +467,10 @@ extension SurroundTheme {
             color == .black
                 ? [Color(themeHex: 0x3E2B78), Color(themeHex: 0x160F33)]
                 : [Color(themeHex: 0xE6DCEB), Color(themeHex: 0xF8F3EC)]
+        case .rakedGarden:
+            color == .black
+                ? [Color(themeHex: 0x6A3F5C), Color(themeHex: 0x22101C)]
+                : [Color(themeHex: 0xBFDD7A), Color(themeHex: 0xE6F2C4)]
         }
     }
 
@@ -356,6 +478,10 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? Color.white.opacity(0.15) : Color.black.opacity(0.12)
         case .nebulaPearl: color == .black ? Color.white.opacity(0.18) : Color.white.opacity(0.5)
+        case .rakedGarden:
+            color == .black
+                ? Color(themeHex: 0xD6B8BD).opacity(0.3)
+                : Color(themeHex: 0x52632D).opacity(0.4)
         }
     }
 
@@ -363,6 +489,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? .white : Color(white: 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
+        case .rakedGarden: color == .black ? Color(themeHex: 0xFFF9E8) : Color(themeHex: 0x2B2621)
         }
     }
 
@@ -372,7 +499,31 @@ extension SurroundTheme {
             color == .black ? Color(white: 174 / 255) : Color(red: 108 / 255, green: 108 / 255, blue: 112 / 255)
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0xC9BEEB) : Color(themeHex: 0x5E5670)
+        case .rakedGarden:
+            color == .black ? Color(themeHex: 0xE0D1D5) : Color(themeHex: 0x505A39)
         }
+    }
+
+    /// Garden keeps OGS's role hues while adapting their lightness to the
+    /// basalt or jade chip. Other themes retain their existing role colors.
+    func identityRoleColor(for player: OGSUser, on color: StoneColor) -> Color? {
+        guard self == .rakedGarden else { return nil }
+        let darkSurface = color == .black
+        // Match OGSUser.uiColor's priority, including lightweight ui_class
+        // payloads: moderator/admin, professional, supporter, then bot.
+        if player.isOGSModerator || player.isOGSAdmin {
+            return Color(themeHex: darkSurface ? 0xDDC4F4 : 0x633889)
+        }
+        if player.isOGSProfessional {
+            return Color(themeHex: darkSurface ? 0xBCE6B3 : 0x245925)
+        }
+        if player.isOGSSupporter {
+            return Color(themeHex: darkSurface ? 0xF3D69A : 0x854416)
+        }
+        if player.isBot == true || player.uiClass?.contains("bot") == true {
+            return identitySecondary(color)
+        }
+        return Color(themeHex: darkSurface ? 0xB5D7FF : 0x20518B)
     }
 }
 
@@ -412,6 +563,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.surroundTheme, theme)
             .environment(\.boardAppearance, theme.board)
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
+            .foregroundColor(theme == .rakedGarden ? theme.foreground : nil)
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -528,11 +680,223 @@ struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
 
     var body: some View {
-        if theme.hasScene {
-            NebulaPearlScene()
-        } else {
+        switch theme {
+        case .standard:
             theme.pageBackground
+        case .nebulaPearl:
+            NebulaPearlScene()
+        case .rakedGarden:
+            RakedGardenScene()
         }
+    }
+}
+
+/// Foliage sits above its cast shadow and the game, independently of panels.
+/// System chrome and presented sheets remain above this scene layer.
+struct GameDetailSceneForeground: View {
+    @Environment(\.surroundTheme) private var theme
+    var hasTopEdgeClocks = false
+
+    var body: some View {
+        Group {
+            if theme == .rakedGarden {
+                GeometryReader { geometry in
+                    RakedGardenForegroundContent(size: geometry.size,
+                                                 hasTopEdgeClocks: hasTopEdgeClocks).equatable()
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct RakedGardenForegroundContent: View, Equatable {
+    let size: CGSize
+    let hasTopEdgeClocks: Bool
+
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    var body: some View {
+        let layout = RakedGardenSceneLayout(size: size, usesLegacyChrome: usesLegacyChrome,
+                                           hasTopEdgeClocks: hasTopEdgeClocks)
+        ZStack {
+            RakedGardenMapleShadow(size: size).equatable()
+            Image("RakedGardenMaple")
+                .resizable()
+                .frame(width: layout.maple.width, height: layout.maple.height)
+                .position(x: layout.maple.midX, y: layout.maple.midY)
+                // Fade the foliage beneath system chrome without putting
+                // a pale scrim over the game content below it.
+                .mask {
+                    VStack(spacing: 0) {
+                        LinearGradient(stops: [
+                            .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
+                            .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.74),
+                                  location: usesLegacyChrome ? 0.62 : 0.5),
+                            .init(color: .white, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                        .frame(height: layout.topFadeHeight)
+                        Color.white
+                    }
+                }
+        }
+        .frame(width: layout.size.width, height: layout.size.height)
+        .clipped()
+    }
+}
+
+/// The upper-right canopy casts farther down and left than its visible
+/// foliage. Its bounded projection reaches the upper board on a phone.
+struct RakedGardenShadowLayout: Equatable {
+    let size: CGSize
+    let canopy: CGRect
+    let blurRadius: CGFloat
+
+    init(size: CGSize) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        let shortSide = min(width, height)
+        let side = min(840, shortSide * 1.3)
+        canopy = CGRect(x: width - side * 0.86, y: shortSide * 0.08,
+                        width: side, height: side)
+        blurRadius = min(5, shortSide * 0.008)
+    }
+}
+
+/// Blur only this static alpha silhouette, never the game beneath it.
+/// The size-only leaf stays unchanged during moves, scrolling and ticks.
+private struct RakedGardenMapleShadow: View, Equatable {
+    let size: CGSize
+
+    var body: some View {
+        let layout = RakedGardenShadowLayout(size: size)
+        Image("RakedGardenMaple")
+            .renderingMode(.template)
+            .resizable()
+            .foregroundStyle(Color(themeHex: 0x342F29))
+            .frame(width: layout.canopy.width, height: layout.canopy.height)
+            .blur(radius: layout.blurRadius)
+            .opacity(0.18)
+            .position(x: layout.canopy.midX, y: layout.canopy.midY)
+            .frame(width: layout.size.width, height: layout.size.height)
+            .clipped()
+    }
+}
+
+/// The scene's accents follow its outer edges, independently of the sand
+/// crop. Continuous sizing avoids an artwork swap during window resizing.
+struct RakedGardenSceneLayout: Equatable {
+    let size: CGSize
+    let rocks: CGRect
+    let upperRocks: CGRect
+    let maple: CGRect
+    let topFadeHeight: CGFloat
+    let bottomFadeHeight: CGFloat
+
+    init(size: CGSize, usesLegacyChrome: Bool = false, hasTopEdgeClocks: Bool = false) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        self.size = CGSize(width: width, height: height)
+        let shortSide = min(width, height)
+        // Shallow phone windows need less vertical decoration. This changes
+        // smoothly with the aspect ratio, with no portrait/landscape branch.
+        let wide = min(1, max(0, width / max(1, height) - 1))
+        let rockSide = min(440, shortSide * 0.62 * (1 - 0.2 * wide))
+        let upperRockSide = min(240, shortSide * 0.46 * (1 - 0.2 * wide))
+        let mapleSide = min(300, shortSide * 0.50 * (1 - 0.2 * wide))
+        rocks = CGRect(x: -rockSide * 0.30, y: height - rockSide * 0.75,
+                       width: rockSide, height: rockSide)
+        upperRocks = CGRect(x: -upperRockSide * 0.30, y: -upperRockSide * 0.56,
+                            width: upperRockSide, height: upperRockSide)
+        // Real leaves may overlap a panel edge, but stop above clock digits.
+        // Legacy phone clocks sit higher, below their shorter navigation bar.
+        let mapleHeightLimit: CGFloat = usesLegacyChrome || hasTopEdgeClocks ? 100 : 160
+        let mapleVisibleHeight = min(mapleSide * 0.84, mapleHeightLimit)
+        maple = CGRect(x: width - mapleSide * 0.68, y: mapleVisibleHeight - mapleSide,
+                       width: mapleSide, height: mapleSide)
+        topFadeHeight = min(92, height * 0.16)
+        bottomFadeHeight = min(96, height * 0.16)
+    }
+}
+
+/// One garden across the whole Game Detail surface, including divided
+/// layouts. The playable board keeps its separate quiet sand texture.
+private struct RakedGardenScene: View {
+    var body: some View {
+        GeometryReader { geometry in
+            RakedGardenSceneContent(size: geometry.size).equatable()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Only container resizing updates the composition; moves and clock ticks
+/// do not reconstruct its fixed image layers.
+private struct RakedGardenSceneContent: View, Equatable {
+    let size: CGSize
+    private static let sand = Color(themeHex: 0xEFEAE1)
+
+    private var topFade: Gradient {
+        if #available(iOS 26.0, *) {
+            return Gradient(colors: [Self.sand.opacity(0.82), Self.sand.opacity(0.26), .clear])
+        }
+        // Earlier toolbars have no glass backing. Keep their icons on quiet
+        // sand while preserving the foliage below the navigation controls.
+        return Gradient(stops: [
+            .init(color: Self.sand.opacity(0.92), location: 0),
+            .init(color: Self.sand.opacity(0.92), location: 0.62),
+            .init(color: .clear, location: 1)
+        ])
+    }
+
+    private var bottomFade: Gradient {
+        if #available(iOS 26.0, *) {
+            return Gradient(colors: [.clear, Self.sand.opacity(0.24), Self.sand.opacity(0.78)])
+        }
+        return Gradient(stops: [
+            .init(color: .clear, location: 0),
+            .init(color: Self.sand.opacity(0.90), location: 0.55),
+            .init(color: Self.sand.opacity(0.94), location: 1)
+        ])
+    }
+
+    var body: some View {
+        let layout = RakedGardenSceneLayout(size: size)
+        ZStack {
+            Self.sand
+            Image("RakedGardenSand")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: layout.size.width, height: layout.size.height)
+                .clipped()
+            Image("RakedGardenRocks")
+                .resizable()
+                .frame(width: layout.rocks.width, height: layout.rocks.height)
+                .position(x: layout.rocks.midX, y: layout.rocks.midY)
+            Image("RakedGardenRocks")
+                .resizable()
+                .frame(width: layout.upperRocks.width, height: layout.upperRocks.height)
+                .position(x: layout.upperRocks.midX, y: layout.upperRocks.midY)
+            // Pale support stays local to the chrome instead of washing
+            // out the rock and foliage silhouettes across the whole scene.
+            VStack(spacing: 0) {
+                LinearGradient(gradient: topFade,
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: layout.topFadeHeight)
+                Spacer(minLength: 0)
+                LinearGradient(gradient: bottomFade,
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: layout.bottomFadeHeight)
+            }
+        }
+        .frame(width: layout.size.width, height: layout.size.height)
+        .clipped()
     }
 }
 

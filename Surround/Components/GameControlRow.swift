@@ -74,6 +74,7 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
     /// kept its tint, so a disabled Accept looked active).
     var disabled = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.surroundTheme) private var theme
 
     private var prominentFill: Color {
@@ -82,16 +83,24 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if reduceTransparency {
+        if reduceTransparency || (theme == .rakedGarden && contrast == .increased) {
             content.background(prominent ? prominentFill : Color(uiColor: .secondarySystemGroupedBackground), in: shape)
         } else if #available(iOS 26, *) {
             if prominent {
-                content.glassEffect(.regular.tint(prominentFill).interactive(interactive && !disabled), in: shape)
+                content.glassEffect(.regular.tint(disabled ? prominentFill : (theme.actionGlassTint ?? prominentFill))
+                    .interactive(interactive && !disabled), in: shape)
             } else {
                 content.glassEffect(.clear.interactive(interactive), in: shape)
             }
         } else if prominent {
-            content.background(prominentFill, in: shape)
+            if theme == .rakedGarden && !disabled {
+                content.background {
+                    shape.fill(.regularMaterial)
+                        .overlay { shape.fill(prominentFill.opacity(0.92)) }
+                }
+            } else {
+                content.background(prominentFill, in: shape)
+            }
         } else {
             content.background(.thinMaterial, in: shape)
         }

@@ -20,6 +20,17 @@ enum StoneRemovalOption: Int {
     case toggleSinglePoint
 }
 
+/// Rebuild the batched geometry only when the grid itself changes, rather
+/// than on every move, clock tick or crosshair update in the parent board.
+private struct RaggedGobanGrid: View, Equatable {
+    var geometry: RaggedGridGeometry
+    var color: Color
+
+    var body: some View {
+        geometry.path.fill(color)
+    }
+}
+
 struct Goban: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.boardAppearance) private var appearance
@@ -74,24 +85,32 @@ struct Goban: View {
                             .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
                     }
                 }
-                Path { path in
-                    for i in 1..<height-1 {
-                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
-                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
+                if appearance.gridStyle.usesRaggedEdges(at: size) {
+                    RaggedGobanGrid(
+                        geometry: RaggedGridGeometry(width: width, height: height,
+                                                     cellSize: size, lineScale: appearance.gridLineScale),
+                        color: appearance.gridColor
+                    ).equatable()
+                } else {
+                    Path { path in
+                        for i in 1..<height-1 {
+                            path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
+                            path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(i) + 0.5) * size))
+                        }
+                        for i in 1..<width-1 {
+                            path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
+                            path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                        }
                     }
-                    for i in 1..<width-1 {
-                        path.move(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: size / 2))
-                        path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
-                    }
+                    .stroke(appearance.gridColor, lineWidth: size < 10 ? 1 / displayScale : 0.5 * appearance.gridLineScale)
+                    Path { path in
+                        path.move(to: CGPoint(x: size / 2, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                        path.addLine(to: CGPoint(x: size / 2, y: (CGFloat(height) - 0.5) * size))
+                        path.closeSubpath()
+                    }.stroke(appearance.gridColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
                 }
-                .stroke(appearance.gridColor, lineWidth: size < 10 ? 1 / displayScale : 0.5 * appearance.gridLineScale)
-                Path { path in
-                    path.move(to: CGPoint(x: size / 2, y: size / 2))
-                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
-                    path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: (CGFloat(height) - 0.5) * size))
-                    path.addLine(to: CGPoint(x: size / 2, y: (CGFloat(height) - 0.5) * size))
-                    path.closeSubpath()
-                }.stroke(appearance.gridColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
                 if starPoints.count > 0 {
                     Path { path in
                         for starPoint in starPoints {
@@ -279,11 +298,12 @@ private struct ImageStone {
 
 /// Rendered stones in one Canvas, so a full board is a few dozen image draws
 /// rather than a view per stone. One blurred layer holds every contact
-/// shadow, under all stones, lit from the upper left like the images.
+/// shadow, under all stones, following the images' key-light direction.
 private struct ImageStoneCanvas: View {
     var stones: [ImageStone]
     var images: StoneImages?
     var cellSize: CGFloat
+    var lightDirection: StoneLightDirection
     private let overhang: CGFloat = 6
 
     var body: some View {
@@ -293,7 +313,7 @@ private struct ImageStoneCanvas: View {
             let black = images.black.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
             let white = images.white.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
 
-            let offset = CGSize(width: cellSize * 0.03, height: cellSize * 0.06)
+            let offset = CGSize(width: lightDirection.shadowXSign * cellSize * 0.03, height: cellSize * 0.06)
             context.drawLayer { shadows in
                 shadows.addFilter(.blur(radius: max(1, cellSize * 0.06)))
                 var path = Path()
@@ -348,6 +368,7 @@ struct Stones: View {
         let blackEstimatedScore = CGMutablePath()
 
         let drawsShadow = usesDetailedStoneRendering(at: size)
+        let shadowXSign = appearance.stoneLightDirection.shadowXSign
         let shadowOffset: CGFloat = size > 30 ? 2 : 1
         let stoneImages = drawsShadow ? appearance.stoneImages : nil
         var imageStones = [ImageStone]()
@@ -449,7 +470,8 @@ struct Stones: View {
             if !drawsPaths { return AnyShapeStyle(Color.clear) }
             return drawsShadow
                 ? AnyShapeStyle(palette.highlight
-                    .shadow(.inner(color: palette.shade, radius: size / 4, x: -size / 2.5, y: -size / 2.5)))
+                    .shadow(.inner(color: palette.shade, radius: size / 4,
+                                   x: -shadowXSign * size / 2.5, y: -size / 2.5)))
                 : AnyShapeStyle(palette.flat)
         }
         // Edges are always present and only change color, for the same reason.
@@ -459,15 +481,16 @@ struct Stones: View {
         return ZStack {
             ForEach(whitePaths.indices, id: \.self) { index in
                 Path(whitePaths[index]).fill(fill(white))
-                .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
+                .shadow(color: dropShadow, radius: 2, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
             Path(whiteLivingPath).stroke(edge(white), lineWidth: 0.5)
             ForEach(blackPaths.indices, id: \.self) { index in
                 Path(blackPaths[index]).fill(fill(black))
-                .shadow(color: dropShadow, radius: 2, x: shadowOffset, y: shadowOffset)
+                .shadow(color: dropShadow, radius: 2, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
             Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
-            ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size)
+            ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
+                             lightDirection: appearance.stoneLightDirection)
             
             if boardPosition.removedStones != nil {
                 Path(whiteCapturedPath).fill(drawsPaths ? white.flat : .clear).opacity(0.5)
@@ -1002,7 +1025,7 @@ struct BoardView: View {
                         .overlay {
                             if let texture = appearance.boardTexture {
                                 let paint = ImagePaint(image: Image(uiImage: texture.image),
-                                                       scale: texture.tileSize / max(1, texture.image.size.width))
+                                                       scale: texture.paintScale(in: geometry.size))
                                 Rectangle().fill(paint)
                                     .overlay {
                                         if appearance.boardBevel {

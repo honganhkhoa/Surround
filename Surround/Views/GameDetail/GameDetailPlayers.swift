@@ -415,7 +415,8 @@ private struct GameDetailClockCard: View {
                 .frame(height: style == .inline ? max(34, height - 10) : height)
                 .background { surface }
                 .overlay { clockOutline }
-                .modifier(GameDetailClearGlass(shape: shape, enabled: !reduceTransparency,
+                .modifier(GameDetailClearGlass(shape: shape,
+                                               enabled: !reduceTransparency && (theme != .rakedGarden || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -545,6 +546,12 @@ private struct GameDetailClockCard: View {
         } else {
             shape.fill(LinearGradient(stops: theme.clockSurfaceStops(color, scheme: colorScheme),
                                       startPoint: .top, endPoint: .bottom))
+                .opacity(theme == .rakedGarden && style != .inline ? (color == .black ? 0.94 : 0.90) : 1)
+                .background {
+                    if theme == .rakedGarden && style != .inline {
+                        shape.fill(.regularMaterial)
+                    }
+                }
         }
     }
 
@@ -1099,6 +1106,9 @@ struct GameDetailPlayerIdentity: View {
 
     private func roleColor(_ player: OGSUser?) -> Color {
         guard let player else { return secondaryColor }
+        if let roleColor = theme.identityRoleColor(for: player, on: color) {
+            return roleColor
+        }
         if color == .white, !player.isOGSModerator, !player.isOGSAdmin {
             if player.isOGSProfessional { return Color(red: 15 / 255, green: 107 / 255, blue: 51 / 255) }
             if player.isOGSSupporter { return Color(red: 153 / 255, green: 71 / 255, blue: 8 / 255) }
@@ -1133,8 +1143,16 @@ struct GameDetailPlayerIdentity: View {
                alignment: isBottomRightPlayer ? .bottom : .top)
         .background {
             if !showsThemeGlass {
+                let translucentGarden = theme == .rakedGarden && !navigationHeader
+                    && !reduceTransparency && contrast != .increased
                 RoundedRectangle(cornerRadius: chipCornerRadius)
                     .fill(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom))
+                    .opacity(translucentGarden ? (color == .black ? 0.94 : 0.90) : 1)
+                    .background {
+                        if translucentGarden {
+                            RoundedRectangle(cornerRadius: chipCornerRadius).fill(.regularMaterial)
+                        }
+                    }
                     .overlay {
                         RoundedRectangle(cornerRadius: chipCornerRadius)
                             .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
