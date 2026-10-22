@@ -37,6 +37,8 @@ struct SurroundApp: App {
                 .isClearingAppStoreScreenshotWidgetFixture
             {
                 EmptyView()
+            } else if let cellSize = BoardMarkerAuditContract.cellSize {
+                BoardMarkerAuditView(cellSize: cellSize)
             } else {
                 appContent
             }

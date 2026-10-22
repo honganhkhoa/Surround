@@ -30,6 +30,7 @@
 		2BD98F4D00EE4081AF3AF851 /* FinishedGamePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */; };
 		2C140ECF70E64EA99531999F /* GameDetailInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */; };
 		2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */; };
+		7E1A2B3C4D5E6F7081920B1B /* BoardMarkerAuditHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */; };
 		3753FB40BEEC4990A677F1F5 /* GameDetailInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28F685884334E3EA7C2DDD6 /* GameDetailInteraction.swift */; };
 		38CA9CF98683472A84F0BE22 /* PrivateMessageSendSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */; };
 		3A28708B37954FC78203C96A /* OGSGameCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */; };
@@ -521,6 +522,7 @@
 		78AD67CC3FD0008F9B719227 /* SurroundBetaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SurroundBetaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		78D0AC1C5BE94978AB949160 /* GameControlStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlStateTests.swift; sourceTree = "<group>"; };
 		7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLayoutUITestHarness.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardMarkerAuditHarness.swift; sourceTree = "<group>"; };
 		86971D4A49F43DD2EDD4BFE4 /* OGSBetaGamePlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSBetaGamePlayTests.swift; sourceTree = "<group>"; };
 		88F725E2E619447A97D9A8BB /* OGSGameCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSGameCompatibilityTests.swift; sourceTree = "<group>"; };
 		8A27E6D2340D4D2D9F824D6A /* PrivateMessageSendSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessageSendSession.swift; sourceTree = "<group>"; };
@@ -814,6 +816,7 @@
 			isa = PBXGroup;
 			children = (
 				7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */,
+				7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */,
 				AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */,
 				AE3100083A00000000000008 /* OGSService+Fixtures.swift */,
 				AE3100043A00000000000004 /* SurroundUITestContract.swift */,
@@ -1571,6 +1574,7 @@
 				DD3754945BD4410D94211589 /* MessagesFriendsView.swift in Sources */,
 				E2E175CF0BB4463E8E450CBF /* MessagesFoldLayout.swift in Sources */,
 				2EF4B2A77DEA455E8A8CE345 /* GameLayoutUITestHarness.swift in Sources */,
+				7E1A2B3C4D5E6F7081920B1B /* BoardMarkerAuditHarness.swift in Sources */,
 				3753FB40BEEC4990A677F1F5 /* GameDetailInteraction.swift in Sources */,
 				BC8346B3A100495EB9BAA832 /* GameControlState.swift in Sources */,
 				B6F7514611BD405D81540CA9 /* ChatSessionState.swift in Sources */,

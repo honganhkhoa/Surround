@@ -108,7 +108,12 @@ struct BoardReflection: Equatable {
     var glintDensity: Double
 }
 
-/// Image stones replace drawn ones only where their detail can be seen.
+/// Boards and stones show detail only where it can be seen. Below a 14 pt
+/// cell they are solid colors: the flat board color, a straight grid, and
+/// flat stones with an optional solid outline; no images, textures,
+/// gradients, reflections, bevels, shadows or tints. Detailed layers stay
+/// mounted and only change color or opacity at the threshold, so a resizing
+/// board never fades between two renderings.
 func usesDetailedStoneRendering(at size: CGFloat) -> Bool {
     size >= 14
 }
@@ -117,7 +122,7 @@ enum BoardGridStyle: Equatable {
     case straight, ragged
 
     func usesRaggedEdges(at cellSize: CGFloat) -> Bool {
-        self == .ragged && cellSize >= 10
+        self == .ragged && usesDetailedStoneRendering(at: cellSize)
     }
 }
 
@@ -205,6 +210,9 @@ struct RaggedGridGeometry: Equatable {
 /// A theme supplies its own; everything else keeps `.standard`.
 struct BoardAppearance: Equatable {
     var boardColor: Color
+    /// The solid board below the detail threshold, matching the detailed
+    /// surface's overall tone; nil uses `boardColor`.
+    var compactBoardColor: Color? = nil
     /// A thin edge around the board surface.
     var boardEdge: Color? = nil
     var boardTexture: BoardTexture? = nil
@@ -268,17 +276,26 @@ struct BoardAppearance: Equatable {
             shade: Color(red: 0.8, green: 0.8, blue: 0.8),
             flat: .white,
             outline: .gray,
-            lastMove: .gray,
+            // Dark enough to read on white stones at thumbnail sizes too.
+            lastMove: Color(white: 0.3),
             label: .black
         ),
         emptyPointMarker: .black,
-        markOutline: .gray,
-        dameColor: Color(UIColor.systemIndigo),
-        highlightColor: Color(.systemBlue)
+        markOutline: Color(white: 0.3),
+        // Fixed, deeper versions of indigo and blue that read on the wood;
+        // a white casing carries the highlight over black stones.
+        dameColor: Color(red: 0.27, green: 0.22, blue: 0.66),
+        highlightColor: Color(red: 0, green: 0.3, blue: 0.85),
+        highlightCasing: .white
     )
 
     func stones(_ color: StoneColor) -> StonePalette {
         color == .black ? black : white
+    }
+
+    /// The board's color under its detail, or alone below the threshold.
+    func surfaceColor(detailed: Bool) -> Color {
+        detailed ? boardColor : compactBoardColor ?? boardColor
     }
 }
 
@@ -318,8 +335,10 @@ struct Stone: View {
                             .shadow(color: .black.opacity(0.35), radius: shadowRadius,
                                     x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                     } else {
+                        // Small stones stay flat, as on small boards.
+                        let detailed = shadowRadius > 0 && usesDetailedStoneRendering(at: size)
                         ZStack {
-                            if shadowRadius > 0 {
+                            if detailed {
                                 Path(path).fill(
                                     palette.highlight
                                         .shadow(.inner(color: palette.shade, radius: size / 4,
@@ -328,7 +347,7 @@ struct Stone: View {
                             } else {
                                 Circle().fill(palette.flat)
                             }
-                            if let edge = palette.outline ?? palette.rim {
+                            if let edge = detailed ? palette.outline ?? palette.rim : palette.outline {
                                 Circle().stroke(edge, lineWidth: 0.5)
                             }
                         }

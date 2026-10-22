@@ -11,7 +11,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(board.black.flat, .black)
         XCTAssertEqual(board.white.flat, .white)
         XCTAssertEqual(board.black.lastMove, .white)
-        XCTAssertEqual(board.white.lastMove, .gray)
+        XCTAssertEqual(board.white.lastMove, Color(white: 0.3))
         XCTAssertNil(board.boardEdge)
         XCTAssertEqual(board.stoneLightDirection.shadowXSign, 1)
     }
@@ -493,9 +493,10 @@ final class SurroundThemeTests: XCTestCase {
         for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio] {
             XCTAssertFalse(theme.board.gridStyle.usesRaggedEdges(at: 48))
         }
+        // Small boards are solid: the scratched grid starts at the detail threshold.
         let style = SurroundTheme.rakedGarden.board.gridStyle
-        XCTAssertFalse(style.usesRaggedEdges(at: 9.99))
-        XCTAssertTrue(style.usesRaggedEdges(at: 10))
+        XCTAssertFalse(style.usesRaggedEdges(at: 13.99))
+        XCTAssertTrue(style.usesRaggedEdges(at: 14))
         XCTAssertTrue(style.usesRaggedEdges(at: 48))
         XCTAssertTrue(RaggedGridGeometry(width: 19, height: 19, cellSize: 9.99, lineScale: 1.6).path.isEmpty)
     }
@@ -735,6 +736,58 @@ final class SurroundThemeTests: XCTestCase {
             }
         }
         return result
+    }
+
+    /// Every theme and appearance, as small boards draw them: solid colors
+    /// only. Stones stand out by fill or by outline; markers read on the
+    /// flat stone or board beneath them, or carry a contrasting casing.
+    func testSmallBoardsStaySolidAndTheirMarkersReadable() throws {
+        let cases: [(String, SurroundTheme, UIUserInterfaceStyle)] = [
+            ("standard light", .standard, .light), ("standard dark", .standard, .dark),
+            ("nebula", .nebulaPearl, .dark), ("garden day", .rakedGarden, .light),
+            ("garden night", .rakedGarden, .dark), ("studio", .surroundStudio, .light),
+        ]
+        for (name, theme, style) in cases {
+            let board = theme.board(for: style == .dark ? .dark : .light)
+            let surface = board.surfaceColor(detailed: false)
+            func ratio(_ a: Color, _ b: Color) -> Double { contrast(over(a, b, style), b, style: style) }
+            var report = [String]()
+            func check(_ label: String, _ value: Double, _ minimum: Double) {
+                report.append(String(format: "%@ %.1f", label, value))
+                XCTAssertGreaterThanOrEqual(value, minimum, "\(name): \(label)")
+            }
+            for (color, stone) in [("black", board.black), ("white", board.white)] {
+                let fill = ratio(stone.flat, surface)
+                let outline = stone.outline.map { max(ratio($0, surface), ratio($0, stone.flat)) } ?? 0
+                check("\(color) stone", max(fill, outline), 3)
+                check("\(color) last move", ratio(stone.lastMove, stone.flat), 3)
+                check("\(color) label", ratio(stone.label, stone.flat), 4.5)
+                check("\(color) territory", max(ratio(stone.territoryMark, surface), ratio(board.markOutline, surface)), 3)
+            }
+            check("empty-point mark", ratio(board.emptyPointMarker, surface), 4.5)
+            check("dame", ratio(board.dameColor, surface), 3)
+            check("grid", ratio(board.gridColor, surface), 3)
+            check("coordinates", ratio(board.coordinateColor, surface), 4.5)
+            check("highlight on board", ratio(board.highlightColor, surface), 3)
+            for (color, stone) in [("black", board.black), ("white", board.white)] {
+                let bare = ratio(board.highlightColor, stone.flat)
+                let cased = board.highlightCasing.map { ratio($0, stone.flat) } ?? 0
+                check("highlight on \(color)", max(bare, cased), 3)
+            }
+            if let outline = board.removedStoneOutline { check("dead outline", ratio(outline, surface), 3) }
+            print("[SmallBoardAudit] \(name): " + report.joined(separator: ", "))
+        }
+    }
+
+    /// A translucent color as it appears over an opaque one.
+    private func over(_ top: Color, _ bottom: Color, _ style: UIUserInterfaceStyle) -> Color {
+        let traits = UITraitCollection(userInterfaceStyle: style)
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(top).resolvedColor(with: traits).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(bottom).resolvedColor(with: traits).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return Color(.sRGB, red: Double(r1 * a1 + r2 * (1 - a1)), green: Double(g1 * a1 + g2 * (1 - a1)),
+                     blue: Double(b1 * a1 + b2 * (1 - a1)), opacity: 1)
     }
 
     private func contrast(_ first: Color, _ second: Color, style: UIUserInterfaceStyle = .light) -> Double {

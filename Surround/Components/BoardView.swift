@@ -590,7 +590,7 @@ struct Stones: View {
             }
         }
         
-        let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1 : 0.5)
+        let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1.5 : 0.75)
         let undoMarkerCoordinates = undoRequestCoordinates.filter { coordinate in
             guard coordinate.count == 2 else {
                 return false
@@ -886,7 +886,7 @@ struct BoardMarkupOverlay: View {
                     ZStack {
                         if boardPosition[point.row, point.column] == .empty {
                             Circle()
-                                .fill(emptyPointBackground)
+                                .fill(emptyPointBackground(cellSize: size))
                                 .frame(width: size * 0.62, height: size * 0.62)
                         }
                         ForEach(BoardMarkShape.allCases, id: \.self) { shape in
@@ -926,9 +926,9 @@ struct BoardMarkupOverlay: View {
         .accessibilityHidden(true)
     }
 
-    private var emptyPointBackground: Color {
+    private func emptyPointBackground(cellSize: CGFloat) -> Color {
         widgetRenderingMode == .fullColor
-            ? appearance.boardColor
+            ? appearance.surfaceColor(detailed: usesDetailedStoneRendering(at: cellSize))
             : Color.white.opacity(0.8)
     }
 
@@ -1058,6 +1058,7 @@ private struct BoardMarkupEditingOverlay: View {
 
 struct BoardView: View {
     @Environment(\.boardAppearance) private var appearance
+    @Environment(\.displayScale) private var displayScale
     var widgetRenderingMode: WidgetRenderingMode = .fullColor
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
@@ -1173,9 +1174,17 @@ struct BoardView: View {
         let width: CGFloat = CGFloat(boardPosition.width)
         let height: CGFloat = CGFloat(boardPosition.height)
         return GeometryReader { geometry in
+            // The grid's cell, as Goban and Stones size it. Below the detail
+            // threshold the surface is its solid color alone; its layers stay
+            // in place, hidden, so a resizing board does not fade between two.
+            let gridSide = showsCoordinate
+                ? min(geometry.size.width * width / (width + 1), geometry.size.height * height / (height + 1))
+                : min(geometry.size.width, geometry.size.height)
+            let detailed = usesDetailedStoneRendering(
+                at: floor(gridSide / max(width, height) * displayScale) / displayScale)
             ZStack(alignment: .center) {
                 if widgetRenderingMode == .fullColor {
-                    appearance.boardColor
+                    appearance.surfaceColor(detailed: detailed)
                         .overlay {
                             if let texture = appearance.boardTexture {
                                 BoardTextureImage(texture: texture, lifted: false, boardSize: geometry.size)
@@ -1199,11 +1208,13 @@ struct BoardView: View {
                                                 }
                                         }
                                     }
+                                    .opacity(detailed ? 1 : 0)
                             }
                         }
                         .overlay {
                             if let reflection = appearance.boardReflection {
                                 BoardReflectionView(reflection: reflection)
+                                    .opacity(detailed ? 1 : 0)
                             }
                         }
                         .cornerRadius(cornerRadius)
@@ -1215,6 +1226,7 @@ struct BoardView: View {
                                 if appearance.boardBevel {
                                     BoardBorder(start: .white.opacity(0.18), middle: .clear,
                                                 end: .black.opacity(0.45), width: 3)
+                                        .opacity(detailed ? 1 : 0)
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -1223,8 +1235,8 @@ struct BoardView: View {
                         // are not drawn offscreen to find their outline.
                         .background {
                             RoundedRectangle(cornerRadius: cornerRadius)
-                                .fill(appearance.boardColor)
-                                .shadow(color: .black.opacity(appearance.boardBevel ? 0.55 : 0.33),
+                                .fill(appearance.surfaceColor(detailed: detailed))
+                                .shadow(color: .black.opacity(detailed ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
                                         radius: appearance.boardBevel ? 10 : 2,
                                         y: appearance.boardBevel ? 6 : 0)
                         }

@@ -88,6 +88,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             let silver = Color(themeHex: 0xC9CFEA)
             return BoardAppearance(
                 boardColor: Color(themeHex: 0x191C34),
+                // Small boards are solid: a midnight close to the lit surface,
+                // dark enough for violet stones to stand out by their fill.
+                compactBoardColor: Color(themeHex: 0x1E2240),
                 boardEdge: Color(themeHex: 0x8E97C8).opacity(0.3),
                 boardTexture: NebulaPearlAssets.board,
                 boardBevel: true,
@@ -107,8 +110,10 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 black: StonePalette(
                     highlight: Color(themeHex: 0x9A78D2),
                     shade: Color(themeHex: 0x2A1650),
-                    flat: Color(themeHex: 0x5F3F94),
-                    outline: Color(themeHex: 0xC4B3E0).opacity(0.85),
+                    // Small stones are a lighter violet with a dark keyline, so
+                    // a white last-move ring is not mistaken for a light rim.
+                    flat: Color(themeHex: 0x7C5EC4),
+                    outline: Color(themeHex: 0x141731),
                     rim: Color(themeHex: 0xB8A2E6).opacity(0.5),
                     lastMove: .white,
                     label: .white,
@@ -120,6 +125,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     highlight: Color(themeHex: 0xFFFCF7),
                     shade: Color(themeHex: 0xC9B6D9),
                     flat: Color(themeHex: 0xEEE4DC),
+                    outline: Color(themeHex: 0x141731),
                     lastMove: Color(themeHex: 0x3A2785),
                     label: Color(themeHex: 0x241D33)
                 ),
@@ -127,6 +133,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 markOutline: .gray,
                 dameColor: Color(themeHex: 0xF3C7A4),
                 highlightColor: Color(themeHex: 0x6FD6FF),
+                // The cyan disappears on pearl without a dark edge.
+                highlightCasing: Color(themeHex: 0x141731),
                 // Mint, coral and cyan stay clear of the violet stones and,
                 // a little heavier, of the bright silver grid.
                 crosshair: .init(valid: Color(themeHex: 0x7FE3A8),
@@ -178,6 +186,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 markOutline: Color(themeHex: 0x62533F),
                 dameColor: Color(themeHex: 0x8D4E2C),
                 highlightColor: Color(themeHex: 0x285E6E),
+                // Dark teal needs a light edge over basalt stones.
+                highlightCasing: Color(themeHex: 0xFFF9E8),
                 crosshair: .init(valid: Color(themeHex: 0x28684D),
                                  invalid: Color(themeHex: 0x9B3437),
                                  removal: Color(themeHex: 0x285E6E)),
@@ -225,6 +235,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 markOutline: Color(themeHex: 0x64543B),
                 dameColor: Color(themeHex: 0x80511F),
                 highlightColor: Color(themeHex: 0x2A5C68),
+                // Dark teal needs a light edge over slate stones.
+                highlightCasing: Color(themeHex: 0xFFF9ED),
                 crosshair: .init(valid: Color(themeHex: 0x3D634B),
                                  invalid: Color(themeHex: 0x963C32),
                                  removal: Color(themeHex: 0x2A5C68)),
