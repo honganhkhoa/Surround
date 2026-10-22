@@ -22,12 +22,16 @@ enum StoneRemovalOption: Int {
 
 /// Rebuild the batched geometry only when the grid itself changes, rather
 /// than on every move, clock tick or crosshair update in the parent board.
+/// The Canvas rasterizes it in the app: as a filled shape, its thousands of
+/// edge points made the render server redraw it on every frame of a resize.
 private struct RaggedGobanGrid: View, Equatable {
     var geometry: RaggedGridGeometry
     var color: Color
 
     var body: some View {
-        geometry.path.fill(color)
+        Canvas { context, _ in
+            context.fill(geometry.path, with: .color(color))
+        }
     }
 }
 

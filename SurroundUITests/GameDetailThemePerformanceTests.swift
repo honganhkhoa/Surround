@@ -6,7 +6,9 @@ import UIKit
 /// TEST_RUNNER_SURROUND_THEME_PERFORMANCE=1 and choose the theme with
 /// TEST_RUNNER_SURROUND_PERFORMANCE_THEME (`standard`, the default, or
 /// `nebulaPearl`, `rakedGarden` or `surroundStudio`). Standard runs in dark
-/// mode; each scene theme chooses its own appearance.
+/// mode, or light as `standardLight` to compare light scene themes fairly;
+/// each scene theme chooses its own appearance, and `rakedGardenNight` fixes
+/// Raked Garden in dark mode.
 ///
 /// Taps go to coordinates resolved before measuring, so XCUITest's element
 /// queries stay out of the measured blocks as far as possible. Each block
@@ -138,8 +140,12 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
                          SurroundUITestContract.compatibilitySceneLaunchArgument,
                          SurroundUITestContract.CompatibilityScene.home.rawValue,
                          SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, "1"]
-        if theme == "standard" {
-            arguments += [SurroundUITestContract.appearanceLaunchArgument, "dark"]
+        if theme == "standard" || theme == "standardLight" {
+            arguments += [SurroundUITestContract.appearanceLaunchArgument,
+                          theme == "standard" ? "dark" : "light"]
+        } else if theme == "rakedGardenNight" {
+            arguments += [SurroundUITestContract.themeLaunchArgument, "rakedGarden",
+                          SurroundUITestContract.appearanceLaunchArgument, "dark"]
         } else {
             arguments += [SurroundUITestContract.themeLaunchArgument, theme]
         }
