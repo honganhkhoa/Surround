@@ -19,7 +19,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                             largeText: Bool = false, players: String? = nil,
                             clock: String? = nil, socketDown: Bool = false,
                             theme: String? = nil,
-                            appearance: SurroundUITestContract.Appearance? = nil) -> XCUIApplication {
+                            appearance: SurroundUITestContract.Appearance? = nil,
+                            opensGame: Bool = true) -> XCUIApplication {
         var arguments = [SurroundUITestContract.compatibilityScreenshotLaunchArgument,
                          SurroundUITestContract.emptyMessagesLaunchArgument,
                          SurroundUITestContract.compatibilitySceneLaunchArgument,
@@ -50,7 +51,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                             orientation: portrait ? .portrait : .landscapeLeft)
         element(ID.screenHome, in: app)
         restoreFullWindow(in: app)
-        openDesignGame(in: app)
+        if opensGame { openDesignGame(in: app) }
         return app
     }
 
@@ -234,9 +235,10 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         let device = XCUIDevice.shared
         let originalAppearance = device.appearance
         let originalOrientation = device.orientation
-        var activeApp: XCUIApplication?
-        defer {
-            activeApp?.terminate()
+        // A teardown block still runs when the first failure stops the test,
+        // where a `defer` would not, so a failed run cannot leave the device
+        // dark. It runs after the launched apps' own termination blocks.
+        addTeardownBlock {
             device.appearance = originalAppearance
             device.orientation = originalOrientation
         }
@@ -259,7 +261,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             let board = element(ID.gameBoard, in: app)
             var brightness: Double?
             let rendered = pollUntil(timeout: 12) {
-                brightness = self.gardenBoardBrightness(board)
+                brightness = self.meanBrightness(board)
                 guard let brightness else { return false }
                 // Broad bands distinguish warm day sand from moonlit sand;
                 // they tolerate stones, shadows, grain and native raster scale.
@@ -288,9 +290,26 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertEqual(clockValues(in: app), clocks)
         }
 
+        // The getter reports a request even when the Simulator never applies
+        // it, as throughout a newly created device's first boot. Home follows
+        // the system without a theme, so a live change there first separates
+        // a device that ignores requests from a scene that ignores the change.
         requestAppearance(.light)
+        let home = launchGame(artboard: 17, theme: "rakedGarden", opensGame: false)
+        let homeScreen = element(ID.screenHome, in: home)
+        let homeDay = meanBrightness(homeScreen) ?? .nan
+        let deviceAdvice = "If Home also stays unchanged, the Simulator did not apply the request; reboot it and rerun"
+        requestAppearance(.dark)
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            self.meanBrightness(homeScreen).map { homeDay - $0 > 0.2 } == true
+        }, "Home must follow the device into dark appearance. \(deviceAdvice)")
+        requestAppearance(.light)
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            self.meanBrightness(homeScreen).map { abs($0 - homeDay) < 0.1 } == true
+        }, "Home must follow the device back to light appearance. \(deviceAdvice)")
+        home.terminate()
+
         let play = launchGame(artboard: 17, theme: "rakedGarden")
-        activeApp = play
         setSidebarCollapsed(true, in: play)
         let playBoard = element(ID.gameBoard, in: play)
         let position = playBoard.value as? String
@@ -329,7 +348,6 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         // This fixture starts on the marked three-move analysis branch.
         // The subsequent night-to-day change must not rebuild its session.
         let analysis = launchGame(artboard: 26, portrait: true, theme: "rakedGarden")
-        activeApp = analysis
         setSidebarCollapsed(true, in: analysis)
         let analysisBoard = element(ID.gameBoard, in: analysis)
         let variation = analysisBoard.value as? String
@@ -363,8 +381,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
 
     /// Measure rendered pixels rather than trusting a device setter or a
     /// capture's name. A small sRGB buffer keeps this check scale independent.
-    private func gardenBoardBrightness(_ board: XCUIElement) -> Double? {
-        guard let image = board.screenshot().image.cgImage,
+    private func meanBrightness(_ element: XCUIElement) -> Double? {
+        guard let image = element.screenshot().image.cgImage,
               let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         let size = 64
         var pixels = [UInt8](repeating: 0, count: size * size * 4)
@@ -380,8 +398,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         guard drawn else { return nil }
         var sum = 0.0
         var count = 0
-        // Exclude the outer margin; average many intersections so one stone,
-        // a last-move ring or a local cast shadow cannot decide the result.
+        // Exclude the outer margin; average a wide area so one stone, a
+        // last-move ring or a local cast shadow cannot decide the result.
         for y in 6..<58 {
             for x in 6..<58 {
                 let index = (y * size + x) * 4
