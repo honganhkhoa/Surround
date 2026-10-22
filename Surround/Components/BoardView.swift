@@ -333,19 +333,22 @@ private struct BoardTextureImage: View {
 
     var body: some View {
         let image = BoardTextureImages.image(for: texture, lifted: lifted)
-        switch texture.mapping {
-        case .tiled:
-            Image(uiImage: image).resizable(resizingMode: .tile)
-        case .board:
-            let scale = texture.paintScale(in: boardSize)
-            Color.clear
-                .overlay(alignment: .topLeading) {
-                    Image(uiImage: image).resizable()
-                        .frame(width: texture.image.size.width * scale,
-                               height: texture.image.size.height * scale)
-                }
-                .clipped()
+        Group {
+            switch texture.mapping {
+            case .tiled:
+                Image(uiImage: image).resizable(resizingMode: .tile)
+            case .board:
+                let scale = texture.paintScale(in: boardSize)
+                Color.clear
+                    .overlay(alignment: .topLeading) {
+                        Image(uiImage: image).resizable()
+                            .frame(width: texture.image.size.width * scale,
+                                   height: texture.image.size.height * scale)
+                    }
+                    .clipped()
+            }
         }
+        .colorMultiply(texture.tint)
     }
 }
 
@@ -475,6 +478,9 @@ private struct ImageStoneCanvas: View {
                                              width: side, height: side))
             }
         }
+        // Tint only the rendered stones and their black contact shadows;
+        // move numbers, territory and interaction marks remain independent.
+        .colorMultiply(images?.tint ?? .white)
         // Room for the edge stones' shadows.
         .padding(-overhang)
         .allowsHitTesting(false)
@@ -840,6 +846,10 @@ struct CoordinateHighlightOverlay: View {
         }
         
         return ZStack {
+            if let casing = appearance.highlightCasing {
+                Path(highlightedCoordinatesPath)
+                    .stroke(casing, lineWidth: highlightWidth + 2)
+            }
             Path(highlightedCoordinatesPath)
                 .stroke(appearance.highlightColor, lineWidth: highlightWidth)
         }.frame(width: size * CGFloat(width), height: size * CGFloat(height))

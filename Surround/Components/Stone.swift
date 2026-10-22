@@ -38,6 +38,8 @@ struct StoneImages: Equatable {
     var black: [UIImage]
     var white: [UIImage]
     var footprint: CGFloat = 0.94
+    /// Scene lighting applied to the artwork, independently of game marks.
+    var tint: Color = .white
 
     func variants(_ color: StoneColor) -> [UIImage] {
         color == .black ? black : white
@@ -73,6 +75,9 @@ struct BoardTexture: Equatable {
     /// The tile's width in points; unused for a board-wide composition.
     var tileSize: CGFloat = 320
     var mapping: Mapping = .tiled
+    /// Applied after image preparation, so changing appearance reuses the
+    /// original texture and its cached margin without baking in old traits.
+    var tint: Color = .white
 
     func paintScale(in size: CGSize) -> CGFloat {
         switch mapping {
@@ -125,7 +130,9 @@ struct RaggedGridGeometry: Equatable {
     var lineScale: CGFloat
 
     static let samplesPerCell = 20
-    static let edgeVariation: CGFloat = 0.18
+    // Keep edge variation visible after native 2x/3x antialiasing; smaller
+    // offsets make the scratched outline look straight at ordinary sizes.
+    static let edgeVariation: CGFloat = 0.38
 
     var path: Path {
         guard width >= 2, height >= 2, cellSize >= 10,
@@ -223,6 +230,8 @@ struct BoardAppearance: Equatable {
     var dameColor: Color
     /// Coordinates highlighted from chat.
     var highlightColor: Color
+    /// Contrasting edge for coordinate highlights over dark stones.
+    var highlightCasing: Color? = nil
     /// The crosshair under a finger: a legal point, an illegal one, or
     /// stone removal. It runs beneath the stones.
     var crosshair = CrosshairColors()
@@ -303,6 +312,7 @@ struct Stone: View {
                        let image = images.variants(color!).first {
                         Image(uiImage: image)
                             .resizable()
+                            .colorMultiply(images.tint)
                             .frame(width: size / images.footprint, height: size / images.footprint)
                             .frame(width: size, height: size)
                             .shadow(color: .black.opacity(0.35), radius: shadowRadius,

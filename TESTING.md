@@ -405,13 +405,22 @@ Tool tests use mocked HTTP responses. Never supply production credentials to an 
 
 The manual Game Detail artboard suites opt in with `TEST_RUNNER_SURROUND_ARTBOARD_AUDIT=1`. Their compatibility-mode launches use `--surround-game-detail-design-artboard <1...91>` to select matching players, turns, board positions, clocks, chat, teams, and scoring data. These fixtures use the ordinary Home-to-game navigation route so native navigation controls appear in the captures. The design flag requires both offline UI-testing and compatibility-screenshot mode; App Store screenshot launches reject it and retain their original fixture contract.
 
-`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl. Scene themes choose their own appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
+`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl. Garden follows the device appearance; Nebula remains dark. Pass `--surround-ui-appearance light` or `--surround-ui-appearance dark` for deterministic Garden fixtures, or omit it to test live device-appearance changes. The existing Garden daytime audits explicitly select light appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
 
 - `GameDetailIPadArtboardAuditTests/testRakedGardenThemeOrientations` captures Play through native landscape/portrait rotation and Home after Back; `testRakedGardenThemePanels` captures Chat, Analyze and Zen in both orientations.
 - `ArtboardPhoneAuditTests/testRakedGardenThemeStates` captures Play, Chat, Analyze and Zen in both full-size phone orientations; `testRakedGardenThemeScoring` captures stone removal and score details. Run `testRakedGardenThemeSmallPhone` on an SE-size simulator for the smaller Play, Analyze and scoring fixtures.
 - `GameDetailDuoArtboardAuditTests/testRakedGardenThemeStates` checks the pose selected with `TEST_RUNNER_SURROUND_DUO_POSE=closed-portrait|closed-landscape|book-wide|open-wide|book-tall`. Set the physical Simulator pose first. The test uses the existing geometry and selected-branch assertions and does not change the fold pose; verify the active-display host captures for Book/Open.
 
 Theme attachments have a `raked-garden` suffix so visual review can distinguish them from standard-theme artboards. A passing geometry audit still requires visual inspection of textures, controls, stones, small board marks and score overlays.
+
+Garden additionally has four night/appearance selectors (prefix with `SurroundUITests/` for `-only-testing:`):
+
+- `ArtboardPhoneAuditTests/testRakedGardenNightThemeStates`: fixed dark Play, Chat, Analyze and Zen in both full-size phone orientations.
+- `ArtboardPhoneAuditTests/testRakedGardenNightThemeScoring`: fixed dark stone removal and score details.
+- `ArtboardPhoneAuditTests/testRakedGardenNightThemeSmallPhone`: fixed dark SE-size Play, Analyze and scoring.
+- `GameDetailIPadArtboardAuditTests/testRakedGardenThemeAppearanceContinuity`: no fixed appearance override. Keeps Play mounted through day-to-night and native rotation, then retains the selected Analyze branch through night-to-day and returns to Home. It checks the device appearance getter and rendered board brightness as well as position, clocks, selection and board geometry, then restores the original device appearance/orientation.
+
+Night phone attachments use `raked-garden-night`; the iPad continuity attachments identify day/night explicitly. Inspect the actual rendered transition after caches are warm, not only attachment names or state assertions. Nominal palette tests do not measure composited glass, every texture pixel, or native antialiasing. These four methods do not add a Duo fold audit.
 
 `--surround-game-detail-socket-down` (Debug, same compatibility-mode requirement) opens the design fixture with the WebSocket status `.reconnecting` and ticks the design game's clock locally each second, as the service's timer can while disconnected. The connection tests use it to check where the app's connection banner shows, that the running clock's Reconnecting… badge stands in for it, and that every clock keeps the value from the disconnect.
 

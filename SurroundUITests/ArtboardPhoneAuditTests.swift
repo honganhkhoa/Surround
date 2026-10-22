@@ -28,7 +28,8 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         dark: Bool = false,
         socketDown: Bool = false,
         hidesRank: Bool = false,
-        theme: String? = nil
+        theme: String? = nil,
+        appearance: SurroundUITestContract.Appearance? = nil
     ) -> XCUIApplication {
         let usesHome = fromMainNavigation
         var arguments = [
@@ -50,9 +51,11 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             arguments += ["-UIPreferredContentSizeCategoryName", textSize.rawValue]
         }
         if let theme {
-            // Scene themes choose their own window appearance.
             arguments += [SurroundUITestContract.themeLaunchArgument, theme]
-        } else if dark {
+        }
+        if let appearance {
+            arguments += [SurroundUITestContract.appearanceLaunchArgument, appearance.rawValue]
+        } else if theme == nil && dark {
             arguments += [SurroundUITestContract.appearanceLaunchArgument, "dark"]
         }
         if socketDown {
@@ -83,6 +86,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             routeNote = "Standalone clock-reference scene \(scene.rawValue)."
         }
         if let theme { routeNote += " Theme: \(theme)." }
+        if let appearance { routeNote += " Appearance: \(appearance.rawValue)." }
         element(ID.gameBoard, in: app)
         return app
     }
@@ -453,6 +457,17 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     /// standard board. The existing captures also check panel separation and
     /// the usable landscape board size.
     func testRakedGardenThemeStates() throws {
+        try auditThemeStates(theme: "rakedGarden", title: "Raked Garden", suffix: "-raked-garden",
+                             appearance: .light)
+    }
+
+    func testRakedGardenNightThemeStates() throws {
+        try auditThemeStates(theme: "rakedGarden", title: "Raked Garden at night",
+                             suffix: "-raked-garden-night", appearance: .dark)
+    }
+
+    private func auditThemeStates(theme: String, title: String, suffix: String,
+                                  appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "The compact theme audit requires an iPhone.")
         defer { XCUIDevice.shared.orientation = .portrait }
@@ -463,7 +478,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             (.zenMode, 36, 37, "zen"),
         ]
         for (scene, portrait, landscape, state) in scenes {
-            let app = launch(scene, artboard: portrait, theme: "rakedGarden")
+            let app = launch(scene, artboard: portrait, theme: theme, appearance: appearance)
             if state == "chat" { startChat(in: app, typing: false) }
             if state == "analyze" {
                 XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
@@ -473,35 +488,59 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             let board = element(ID.gameBoard, in: app)
             let value = board.value as? String
             XCTAssertNotNil(value, "The audit records an identifiable board position")
-            capture(portrait, app: app, note: "Raked Garden \(state), portrait.",
-                    suffix: "-raked-garden")
+            capture(portrait, app: app, note: "\(title) \(state), portrait.",
+                    suffix: suffix)
             rotate(.landscapeLeft, app: app)
             XCTAssertEqual(board.value as? String, value, "Rotation retains the displayed position")
             if state == "analyze" { assertSelectedBranchVisible(["lj", "lk", "mk"], in: app) }
             if state == "zen" { element(ID.gameZenExit, in: app, matching: .button) }
-            capture(landscape, app: app, note: "Raked Garden \(state), native landscape.",
-                    suffix: "-raked-garden")
+            capture(landscape, app: app, note: "\(title) \(state), native landscape.",
+                    suffix: suffix)
             app.terminate()
         }
     }
 
     func testRakedGardenThemeScoring() throws {
+        try auditThemeScoring(theme: "rakedGarden", title: "Raked Garden", suffix: "-raked-garden",
+                              appearance: .light)
+    }
+
+    func testRakedGardenNightThemeScoring() throws {
+        try auditThemeScoring(theme: "rakedGarden", title: "Raked Garden at night",
+                              suffix: "-raked-garden-night", appearance: .dark)
+    }
+
+    private func auditThemeScoring(theme: String, title: String, suffix: String,
+                                   appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "The compact scoring audit requires an iPhone.")
-        let app = launch(artboard: 64, theme: "rakedGarden")
+        let app = launch(artboard: 64, theme: theme, appearance: appearance)
         defer { app.terminate() }
         XCTAssertTrue(app.buttons["Accept"].firstMatch.waitForExistence(timeout: 5),
                       "The theme retains the stone-removal action")
-        capture(64, app: app, note: "Raked Garden removed-stone marks and scoring overlays.",
-                suffix: "-raked-garden")
+        XCTAssertTrue(app.buttons["Accept"].firstMatch.isEnabled,
+                      "The connected scoring fixture keeps Accept usable")
+        capture(64, app: app, note: "\(title) removed-stone marks and scoring overlays.",
+                suffix: suffix)
         tap("game.clock.black", in: app)
-        capture(65, app: app, note: "Raked Garden score details.",
-                suffix: "-raked-garden")
+        capture(65, app: app, note: "\(title) score details.",
+                suffix: suffix)
     }
 
     /// Use the small-phone fixtures on an SE-size simulator; unlike the
     /// full-size portrait analysis artboard, these do not require four rows.
     func testRakedGardenThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "rakedGarden", title: "Raked Garden", suffix: "-raked-garden",
+                                 appearance: .light)
+    }
+
+    func testRakedGardenNightThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "rakedGarden", title: "Raked Garden at night",
+                                 suffix: "-raked-garden-night", appearance: .dark)
+    }
+
+    private func auditThemeSmallPhone(theme: String, title: String, suffix: String,
+                                      appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "The small-phone theme audit requires an iPhone.")
         for (scene, number, state) in [
@@ -509,10 +548,15 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             (.gameAnalysis, 82, "analyze"),
             (.activeGameBoard, 83, "scoring"),
         ] {
-            let app = launch(scene, artboard: number, theme: "rakedGarden")
+            let app = launch(scene, artboard: number, theme: theme, appearance: appearance)
             if scene == .gameAnalysis { assertSelectedBranchVisible(["lj", "lk", "mk"], in: app) }
-            capture(number, app: app, note: "Raked Garden small-phone \(state).",
-                    suffix: "-raked-garden")
+            if state == "scoring" {
+                let accept = app.buttons["Accept"].firstMatch
+                XCTAssertTrue(accept.waitForExistence(timeout: 5))
+                XCTAssertTrue(accept.isEnabled, "The smaller scoring fixture keeps Accept usable")
+            }
+            capture(number, app: app, note: "\(title) small-phone \(state).",
+                    suffix: suffix)
             app.terminate()
         }
     }

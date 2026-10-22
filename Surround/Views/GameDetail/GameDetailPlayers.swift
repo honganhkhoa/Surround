@@ -339,8 +339,7 @@ private struct GameDetailClockCard: View {
     }
     private var accent: Color {
         if state.suddenDeath {
-            return color == .white ? Color(red: 0.75, green: 0.10, blue: 0.07)
-                : Color(red: 1, green: 0.34, blue: 0.30)
+            return theme.clockSuddenDeathAccent(color, scheme: colorScheme)
         }
         return theme.clockAccent(color)
     }

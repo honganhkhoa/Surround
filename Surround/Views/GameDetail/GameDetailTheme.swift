@@ -28,13 +28,52 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// A scene theme fixes Game Detail's appearance; nil follows the system.
+    /// Fixed scenes choose an appearance; Garden and standard follow the system.
     var colorScheme: ColorScheme? {
         switch self {
-        case .standard: nil
+        case .standard, .rakedGarden: nil
         case .nebulaPearl: .dark
-        case .rakedGarden: .light
         }
+    }
+
+    /// Resolve image grading alongside the board palette. The image references
+    /// stay cached, so an appearance change does not decode or regenerate art.
+    func board(for scheme: ColorScheme) -> BoardAppearance {
+        guard self == .rakedGarden, scheme == .dark else { return board }
+        var night = board
+        night.boardColor = Color(themeHex: 0x7F8586)
+        night.boardEdge = Color(themeHex: 0xA2B2AD).opacity(0.45)
+        night.boardTexture?.tint = Color(themeHex: 0x909FB0)
+        night.stoneImages?.tint = Color(themeHex: 0xDEE7F2)
+        night.gridColor = Color(themeHex: 0x26322F)
+        night.coordinateColor = Color(themeHex: 0x111B21)
+        night.black = StonePalette(
+            highlight: Color(themeHex: 0x5C4256), shade: Color(themeHex: 0x171620),
+            flat: Color(themeHex: 0x30232F), outline: Color(themeHex: 0x171620),
+            rim: Color(themeHex: 0xA991A5).opacity(0.5),
+            lastMove: Color(themeHex: 0xF3EFDF), label: Color(themeHex: 0xF3EFDF),
+            territory: Color(themeHex: 0x211B24)
+        )
+        night.white = StonePalette(
+            highlight: Color(themeHex: 0xDCE7AD), shade: Color(themeHex: 0x6C863E),
+            flat: Color(themeHex: 0xAEC46B), outline: Color(themeHex: 0x23311E),
+            rim: Color(themeHex: 0x23311E).opacity(0.7),
+            lastMove: Color(themeHex: 0x182612), label: Color(themeHex: 0x182612),
+            territory: Color(themeHex: 0xF0F3B4)
+        )
+        night.emptyPointMarker = Color(themeHex: 0x111B21)
+        night.markOutline = Color(themeHex: 0x152328)
+        night.dameColor = Color(themeHex: 0x3C2710)
+        night.highlightColor = Color(themeHex: 0x102A3A)
+        night.highlightCasing = Color(themeHex: 0xF2F0DF)
+        night.crosshair = .init(valid: Color(themeHex: 0x102F23),
+                               invalid: Color(themeHex: 0x4C1119),
+                               removal: Color(themeHex: 0x102A3A))
+        night.removeMark = Color(themeHex: 0x4C1119)
+        night.restoreMark = Color(themeHex: 0x102F23)
+        night.removalMarkCasing = Color(themeHex: 0xF2F0DF)
+        night.removedStoneOutline = Color(themeHex: 0x152328)
+        return night
     }
 
     var board: BoardAppearance {
@@ -177,6 +216,57 @@ private enum RakedGardenAssets {
     static let board = UIImage(named: "RakedGardenBoard").map { BoardTexture(image: $0, mapping: .board) }
 }
 
+/// Static providers retain value identity through clock ticks and resizing.
+/// Light values are the accepted daytime design; only Dark Mode resolves
+/// the cooler night pigment. UIKit supplies the traits at render time.
+private enum RakedGardenColors {
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        })
+    }
+
+    static let page = adaptive(0xEFEAE1, 0x0E191F)
+    static let panel = adaptive(0xF7F4EE, 0x17272D)
+    static let foreground = adaptive(0x2B2621, 0xE7E9DE)
+    static let panelBorder = adaptive(0x89785D, 0x8EAAA0)
+    static let blackGlass = adaptive(0x4B263D, 0x2B2534)
+    static let whiteGlass = adaptive(0xD6E9A3, 0xA4B68E)
+    static let maple = adaptive(0xA2402A, 0x8F4436)
+    static let chatBubble = adaptive(0xDEDCC1, 0x273A3F)
+    static let selection = adaptive(0x28684D, 0xA7D3B7)
+    static let conditional = adaptive(0x9B532B, 0xE5BB76)
+    static let cream = adaptive(0xFFF9E8, 0xE9E8E0)
+    static let keyline = adaptive(0xFFF9E8, 0x14232A)
+    static let treeGuide = adaptive(0x736550, 0x9DADAC)
+    static let idle = adaptive(0xD7CEBA, 0x2A3B40)
+    static let blackSurfaceTop = adaptive(0x6A3F5C, 0x3D3044)
+    static let blackSurfaceBottom = adaptive(0x22101C, 0x171621)
+    static let whiteSurfaceTop = adaptive(0xBFDD7A, 0x96AA82)
+    static let whiteSurfaceBottom = adaptive(0xE6F2C4, 0xB2C498)
+    static let blackSolid = adaptive(0x3A1E31, 0x24202D)
+    static let whiteForeground = adaptive(0x2B2621, 0x14241C)
+    static let blackAccent = adaptive(0xF3CE7A, 0xEACB8B)
+    static let whiteAccent = adaptive(0x8A3421, 0x4C2C1A)
+    static let turnOutline = adaptive(0x9B6423, 0xD6A03C)
+    static let turnGlow = adaptive(0xD6A03C, 0xE3BE70)
+    static let blackBorder = adaptive(0xD6B8BD, 0xAF9DB8)
+    static let whiteBorder = adaptive(0x52632D, 0x3B5137)
+    static let blackSecondary = adaptive(0xE0D1D5, 0xD4CBD7)
+    static let whiteSecondary = adaptive(0x505A39, 0x273923)
+    static let darkModerator = adaptive(0xDDC4F4, 0xDDC4F4)
+    static let lightModerator = adaptive(0x633889, 0x442557)
+    static let darkProfessional = adaptive(0xBCE6B3, 0xBCE6B3)
+    static let lightProfessional = adaptive(0x245925, 0x163B23)
+    static let darkSupporter = adaptive(0xF3D69A, 0xF3D69A)
+    static let lightSupporter = adaptive(0x854416, 0x593012)
+    static let darkOrdinary = adaptive(0xB5D7FF, 0xB5D7FF)
+    static let lightOrdinary = adaptive(0x20518B, 0x123752)
+}
+
 // MARK: - Game Detail surfaces
 
 extension SurroundTheme {
@@ -185,7 +275,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
-        case .rakedGarden: Color(themeHex: 0xEFEAE1)
+        case .rakedGarden: RakedGardenColors.page
         }
     }
 
@@ -193,14 +283,14 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
-        case .rakedGarden: Color(themeHex: 0xF7F4EE)
+        case .rakedGarden: RakedGardenColors.panel
         }
     }
 
     var foreground: Color {
         switch self {
         case .standard, .nebulaPearl: .primary
-        case .rakedGarden: Color(themeHex: 0x2B2621)
+        case .rakedGarden: RakedGardenColors.foreground
         }
     }
 
@@ -213,7 +303,7 @@ extension SurroundTheme {
                     : UIColor.black.withAlphaComponent(0.12)
             })
         case .nebulaPearl: Color.white.opacity(0.14)
-        case .rakedGarden: Color(themeHex: 0x89785D).opacity(0.28)
+        case .rakedGarden: RakedGardenColors.panelBorder.opacity(0.28)
         }
     }
 
@@ -233,7 +323,7 @@ extension SurroundTheme {
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0x3B2585).opacity(0.47) : Color(themeHex: 0xFBF1EC).opacity(0.95)
         case .rakedGarden:
-            color == .black ? Color(themeHex: 0x4B263D).opacity(0.84) : Color(themeHex: 0xD6E9A3).opacity(0.72)
+            color == .black ? RakedGardenColors.blackGlass.opacity(0.84) : RakedGardenColors.whiteGlass.opacity(0.72)
         }
     }
 
@@ -245,7 +335,7 @@ extension SurroundTheme {
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0x241858).opacity(0.51) : Color(themeHex: 0xF8EFEB).opacity(0.93)
         case .rakedGarden:
-            color == .black ? Color(themeHex: 0x4B263D).opacity(0.86) : Color(themeHex: 0xE6F2C4).opacity(0.78)
+            color == .black ? RakedGardenColors.blackGlass.opacity(0.86) : RakedGardenColors.whiteSurfaceBottom.opacity(0.78)
         }
     }
 
@@ -255,7 +345,7 @@ extension SurroundTheme {
         case .standard: nil
         // Deep violet: white text at about 8:1, and close to the violet clock.
         case .nebulaPearl: Color(themeHex: 0x4E36B0)
-        case .rakedGarden: Color(themeHex: 0xA2402A)
+        case .rakedGarden: RakedGardenColors.maple
         }
     }
 
@@ -270,7 +360,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
-        case .rakedGarden: Color(themeHex: 0xDEDCC1)
+        case .rakedGarden: RakedGardenColors.chatBubble
         }
     }
 }
@@ -284,7 +374,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemTeal)
         // The chat highlight's cyan: the one cool accent among the violets.
         case .nebulaPearl: Color(themeHex: 0x6FD6FF)
-        case .rakedGarden: Color(themeHex: 0x28684D)
+        case .rakedGarden: RakedGardenColors.selection
         }
     }
 
@@ -294,7 +384,7 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
-        case .rakedGarden: Color(themeHex: 0x9B532B)
+        case .rakedGarden: RakedGardenColors.conditional
         }
     }
 
@@ -304,7 +394,7 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0x0B0E22)
-        case .rakedGarden: Color(themeHex: 0xFFF9E8)
+        case .rakedGarden: RakedGardenColors.keyline
         }
     }
 
@@ -313,7 +403,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(scheme == .dark ? .systemGray6 : .systemGray4)
         case .nebulaPearl: Color(themeHex: 0xC9CFEA).opacity(0.2)
-        case .rakedGarden: Color(themeHex: 0x736550).opacity(0.25)
+        case .rakedGarden: RakedGardenColors.treeGuide.opacity(0.25)
         }
     }
 
@@ -322,7 +412,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemTeal)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
-        case .rakedGarden: Color(themeHex: 0x28684D)
+        case .rakedGarden: RakedGardenColors.selection
         }
     }
 
@@ -341,7 +431,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
-        case .rakedGarden: Color(themeHex: 0x9B532B)
+        case .rakedGarden: RakedGardenColors.conditional
         }
     }
 
@@ -350,7 +440,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
-        case .rakedGarden: Color(themeHex: 0xD7CEBA)
+        case .rakedGarden: RakedGardenColors.idle
         }
     }
 }
@@ -389,11 +479,11 @@ extension SurroundTheme {
                     .init(color: Color(themeHex: 0xF8F1E8), location: 1)]
         case .rakedGarden:
             if color == .black {
-                return [.init(color: Color(themeHex: 0x6A3F5C), location: 0),
-                        .init(color: Color(themeHex: 0x22101C), location: 1)]
+                return [.init(color: RakedGardenColors.blackSurfaceTop, location: 0),
+                        .init(color: RakedGardenColors.blackSurfaceBottom, location: 1)]
             }
-            return [.init(color: Color(themeHex: 0xBFDD7A), location: 0),
-                    .init(color: Color(themeHex: 0xE6F2C4), location: 1)]
+            return [.init(color: RakedGardenColors.whiteSurfaceTop, location: 0),
+                    .init(color: RakedGardenColors.whiteSurfaceBottom, location: 1)]
         }
     }
 
@@ -402,7 +492,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
-        case .rakedGarden: color == .black ? Color(themeHex: 0x3A1E31) : Color(themeHex: 0xD6E9A3)
+        case .rakedGarden: color == .black ? RakedGardenColors.blackSolid : RakedGardenColors.whiteGlass
         }
     }
 
@@ -410,7 +500,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? .white : Color(white: scheme == .dark ? 19 / 255 : 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
-        case .rakedGarden: color == .black ? Color(themeHex: 0xFFF9E8) : Color(themeHex: 0x2B2621)
+        case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
         }
     }
 
@@ -419,8 +509,18 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
-        case .rakedGarden: color == .black ? Color(themeHex: 0xF3CE7A) : Color(themeHex: 0x8A3421)
+        case .rakedGarden: color == .black ? RakedGardenColors.blackAccent : RakedGardenColors.whiteAccent
         }
+    }
+
+    /// Keep the existing warning red on every daytime/other-theme clock.
+    /// Night jade needs a deeper red, while basalt needs a brighter coral.
+    func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .rakedGarden, scheme == .dark {
+            return Color(themeHex: color == .white ? 0x6B2024 : 0xFF8277)
+        }
+        return color == .white ? Color(red: 0.75, green: 0.10, blue: 0.07)
+            : Color(red: 1, green: 0.34, blue: 0.30)
     }
 
     /// The running clock's outline outside sudden death.
@@ -431,9 +531,9 @@ extension SurroundTheme {
                 ? Color(red: 125 / 255, green: 122 / 255, blue: 1)
                 : Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
-        // The lantern glow stays bright; the sharper outline needs a deeper
-        // amber to remain visible against the pale jade clock.
-        case .rakedGarden: Color(themeHex: 0x9B6423)
+        // Daytime uses a deeper amber edge against pale jade; night uses
+        // brighter lantern light against the surrounding dark garden.
+        case .rakedGarden: RakedGardenColors.turnOutline
         }
     }
 
@@ -442,7 +542,7 @@ extension SurroundTheme {
         switch self {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0xB7A4FF)
-        case .rakedGarden: Color(themeHex: 0xD6A03C)
+        case .rakedGarden: RakedGardenColors.turnGlow
         }
     }
 
@@ -453,7 +553,7 @@ extension SurroundTheme {
         case .nebulaPearl: Color(themeHex: 0x6A4FD6)
         // Maple carries the badge's white text at over 6:1. Lantern amber
         // remains the turn glow; it is too light for white status text.
-        case .rakedGarden: Color(themeHex: 0xA2402A)
+        case .rakedGarden: RakedGardenColors.maple
         }
     }
 
@@ -469,8 +569,8 @@ extension SurroundTheme {
                 : [Color(themeHex: 0xE6DCEB), Color(themeHex: 0xF8F3EC)]
         case .rakedGarden:
             color == .black
-                ? [Color(themeHex: 0x6A3F5C), Color(themeHex: 0x22101C)]
-                : [Color(themeHex: 0xBFDD7A), Color(themeHex: 0xE6F2C4)]
+                ? [RakedGardenColors.blackSurfaceTop, RakedGardenColors.blackSurfaceBottom]
+                : [RakedGardenColors.whiteSurfaceTop, RakedGardenColors.whiteSurfaceBottom]
         }
     }
 
@@ -480,8 +580,8 @@ extension SurroundTheme {
         case .nebulaPearl: color == .black ? Color.white.opacity(0.18) : Color.white.opacity(0.5)
         case .rakedGarden:
             color == .black
-                ? Color(themeHex: 0xD6B8BD).opacity(0.3)
-                : Color(themeHex: 0x52632D).opacity(0.4)
+                ? RakedGardenColors.blackBorder.opacity(0.3)
+                : RakedGardenColors.whiteBorder.opacity(0.4)
         }
     }
 
@@ -489,7 +589,7 @@ extension SurroundTheme {
         switch self {
         case .standard: color == .black ? .white : Color(white: 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
-        case .rakedGarden: color == .black ? Color(themeHex: 0xFFF9E8) : Color(themeHex: 0x2B2621)
+        case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
         }
     }
 
@@ -500,7 +600,7 @@ extension SurroundTheme {
         case .nebulaPearl:
             color == .black ? Color(themeHex: 0xC9BEEB) : Color(themeHex: 0x5E5670)
         case .rakedGarden:
-            color == .black ? Color(themeHex: 0xE0D1D5) : Color(themeHex: 0x505A39)
+            color == .black ? RakedGardenColors.blackSecondary : RakedGardenColors.whiteSecondary
         }
     }
 
@@ -512,18 +612,19 @@ extension SurroundTheme {
         // Match OGSUser.uiColor's priority, including lightweight ui_class
         // payloads: moderator/admin, professional, supporter, then bot.
         if player.isOGSModerator || player.isOGSAdmin {
-            return Color(themeHex: darkSurface ? 0xDDC4F4 : 0x633889)
+            return darkSurface ? RakedGardenColors.darkModerator : RakedGardenColors.lightModerator
         }
         if player.isOGSProfessional {
-            return Color(themeHex: darkSurface ? 0xBCE6B3 : 0x245925)
+            return darkSurface ? RakedGardenColors.darkProfessional : RakedGardenColors.lightProfessional
         }
         if player.isOGSSupporter {
-            return Color(themeHex: darkSurface ? 0xF3D69A : 0x854416)
+            return darkSurface ? RakedGardenColors.darkSupporter : RakedGardenColors.lightSupporter
         }
         if player.isBot == true || player.uiClass?.contains("bot") == true {
             return identitySecondary(color)
         }
-        return Color(themeHex: darkSurface ? 0xB5D7FF : 0x20518B)
+        return darkSurface ? RakedGardenColors.darkOrdinary : RakedGardenColors.lightOrdinary
+
     }
 }
 
@@ -561,7 +662,7 @@ private struct GameDetailThemeModifier: ViewModifier {
         // view's identity between themes.
         content
             .environment(\.surroundTheme, theme)
-            .environment(\.boardAppearance, theme.board)
+            .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme == .rakedGarden ? theme.foreground : nil)
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
@@ -678,6 +779,7 @@ struct GameDetailSurfaceStyle: ShapeStyle {
 /// The page behind Game Detail: the theme's scene, or its plain color.
 struct GameDetailBackdrop: View {
     @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         switch theme {
@@ -686,7 +788,7 @@ struct GameDetailBackdrop: View {
         case .nebulaPearl:
             NebulaPearlScene()
         case .rakedGarden:
-            RakedGardenScene()
+            RakedGardenScene(scheme: colorScheme)
         }
     }
 }
@@ -695,13 +797,14 @@ struct GameDetailBackdrop: View {
 /// System chrome and presented sheets remain above this scene layer.
 struct GameDetailSceneForeground: View {
     @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     var hasTopEdgeClocks = false
 
     var body: some View {
         Group {
             if theme == .rakedGarden {
                 GeometryReader { geometry in
-                    RakedGardenForegroundContent(size: geometry.size,
+                    RakedGardenForegroundContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
                 }
             }
@@ -713,6 +816,7 @@ struct GameDetailSceneForeground: View {
 
 private struct RakedGardenForegroundContent: View, Equatable {
     let size: CGSize
+    let scheme: ColorScheme
     let hasTopEdgeClocks: Bool
 
     private var usesLegacyChrome: Bool {
@@ -724,9 +828,10 @@ private struct RakedGardenForegroundContent: View, Equatable {
         let layout = RakedGardenSceneLayout(size: size, usesLegacyChrome: usesLegacyChrome,
                                            hasTopEdgeClocks: hasTopEdgeClocks)
         ZStack {
-            RakedGardenMapleShadow(size: size).equatable()
+            RakedGardenMapleShadow(size: size, scheme: scheme).equatable()
             Image("RakedGardenMaple")
                 .resizable()
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x8292AC) : .white)
                 .frame(width: layout.maple.width, height: layout.maple.height)
                 .position(x: layout.maple.midX, y: layout.maple.midY)
                 // Fade the foliage beneath system chrome without putting
@@ -769,16 +874,17 @@ struct RakedGardenShadowLayout: Equatable {
 }
 
 /// Blur only this static alpha silhouette, never the game beneath it.
-/// The size-only leaf stays unchanged during moves, scrolling and ticks.
+/// Only size or appearance updates this leaf, not moves, scrolling or ticks.
 private struct RakedGardenMapleShadow: View, Equatable {
     let size: CGSize
+    let scheme: ColorScheme
 
     var body: some View {
         let layout = RakedGardenShadowLayout(size: size)
         Image("RakedGardenMaple")
             .renderingMode(.template)
             .resizable()
-            .foregroundStyle(Color(themeHex: 0x342F29))
+            .foregroundStyle(Color(themeHex: scheme == .dark ? 0x09131A : 0x342F29))
             .frame(width: layout.canopy.width, height: layout.canopy.height)
             .blur(radius: layout.blurRadius)
             .opacity(0.18)
@@ -827,64 +933,77 @@ struct RakedGardenSceneLayout: Equatable {
 /// One garden across the whole Game Detail surface, including divided
 /// layouts. The playable board keeps its separate quiet sand texture.
 private struct RakedGardenScene: View {
+    let scheme: ColorScheme
+
     var body: some View {
         GeometryReader { geometry in
-            RakedGardenSceneContent(size: geometry.size).equatable()
+            RakedGardenSceneContent(size: geometry.size, scheme: scheme).equatable()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 }
 
-/// Only container resizing updates the composition; moves and clock ticks
-/// do not reconstruct its fixed image layers.
+/// Only container size or appearance updates the composition; moves and
+/// clock ticks do not reconstruct its fixed image layers.
 private struct RakedGardenSceneContent: View, Equatable {
     let size: CGSize
-    private static let sand = Color(themeHex: 0xEFEAE1)
+    let scheme: ColorScheme
+    private var sand: Color { Color(themeHex: scheme == .dark ? 0x0E191F : 0xEFEAE1) }
 
     private var topFade: Gradient {
         if #available(iOS 26.0, *) {
-            return Gradient(colors: [Self.sand.opacity(0.82), Self.sand.opacity(0.26), .clear])
+            return Gradient(colors: [sand.opacity(0.82), sand.opacity(0.26), .clear])
         }
         // Earlier toolbars have no glass backing. Keep their icons on quiet
         // sand while preserving the foliage below the navigation controls.
         return Gradient(stops: [
-            .init(color: Self.sand.opacity(0.92), location: 0),
-            .init(color: Self.sand.opacity(0.92), location: 0.62),
+            .init(color: sand.opacity(0.92), location: 0),
+            .init(color: sand.opacity(0.92), location: 0.62),
             .init(color: .clear, location: 1)
         ])
     }
 
     private var bottomFade: Gradient {
         if #available(iOS 26.0, *) {
-            return Gradient(colors: [.clear, Self.sand.opacity(0.24), Self.sand.opacity(0.78)])
+            return Gradient(colors: [.clear, sand.opacity(0.24), sand.opacity(0.78)])
         }
         return Gradient(stops: [
             .init(color: .clear, location: 0),
-            .init(color: Self.sand.opacity(0.90), location: 0.55),
-            .init(color: Self.sand.opacity(0.94), location: 1)
+            .init(color: sand.opacity(0.90), location: 0.55),
+            .init(color: sand.opacity(0.94), location: 1)
         ])
     }
 
     var body: some View {
         let layout = RakedGardenSceneLayout(size: size)
         ZStack {
-            Self.sand
+            sand
             Image("RakedGardenSand")
                 .resizable()
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x364B60) : .white)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: layout.size.width, height: layout.size.height)
                 .clipped()
+            // Moonlight belongs to the garden artwork behind the game,
+            // never to text, stones, marks or the whole app compositing group.
+            RadialGradient(colors: [Color(themeHex: 0xB8D9E8).opacity(0.16),
+                                    Color(themeHex: 0x769AAD).opacity(0.05), .clear],
+                           center: .topTrailing, startRadius: 0,
+                           endRadius: max(1, max(layout.size.width, layout.size.height) * 0.8))
+                .opacity(scheme == .dark ? 1 : 0)
             Image("RakedGardenRocks")
                 .resizable()
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x566C83) : .white)
                 .frame(width: layout.rocks.width, height: layout.rocks.height)
                 .position(x: layout.rocks.midX, y: layout.rocks.midY)
             Image("RakedGardenRocks")
                 .resizable()
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x566C83) : .white)
                 .frame(width: layout.upperRocks.width, height: layout.upperRocks.height)
                 .position(x: layout.upperRocks.midX, y: layout.upperRocks.midY)
-            // Pale support stays local to the chrome instead of washing
-            // out the rock and foliage silhouettes across the whole scene.
+            // Appearance-matched support stays local to the chrome, leaving
+            // the rock and foliage silhouettes visible in either light.
             VStack(spacing: 0) {
                 LinearGradient(gradient: topFade,
                                startPoint: .top, endPoint: .bottom)

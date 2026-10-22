@@ -18,17 +18,20 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     private func launchGame(artboard: Int, dark: Bool = false, portrait: Bool = false,
                             largeText: Bool = false, players: String? = nil,
                             clock: String? = nil, socketDown: Bool = false,
-                            theme: String? = nil) -> XCUIApplication {
+                            theme: String? = nil,
+                            appearance: SurroundUITestContract.Appearance? = nil) -> XCUIApplication {
         var arguments = [SurroundUITestContract.compatibilityScreenshotLaunchArgument,
                          SurroundUITestContract.emptyMessagesLaunchArgument,
                          SurroundUITestContract.compatibilitySceneLaunchArgument,
                          SurroundUITestContract.CompatibilityScene.home.rawValue,
                          SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, String(artboard),
         ]
-        // A theme decides its own appearance.
         if let theme {
             arguments += [SurroundUITestContract.themeLaunchArgument, theme]
-        } else {
+        }
+        if let appearance {
+            arguments += [SurroundUITestContract.appearanceLaunchArgument, appearance.rawValue]
+        } else if theme == nil {
             arguments += [SurroundUITestContract.appearanceLaunchArgument, dark ? "dark" : "light"]
         }
         if largeText {
@@ -221,7 +224,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testRakedGardenThemeOrientations() {
-        let app = launchGame(artboard: 17, theme: "rakedGarden")
+        let app = launchGame(artboard: 17, theme: "rakedGarden", appearance: .light)
         defer {
             XCUIDevice.shared.orientation = .landscapeLeft
             app.terminate()
@@ -253,6 +256,171 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         keepScreenshot("raked-garden-ipad-home-after-back", in: app)
     }
 
+    /// Use the real device appearance, without a fixed launch override, so
+    /// both transitions happen while the existing Game Detail stays mounted.
+    func testRakedGardenThemeAppearanceContinuity() {
+        let device = XCUIDevice.shared
+        let originalAppearance = device.appearance
+        let originalOrientation = device.orientation
+        var activeApp: XCUIApplication?
+        defer {
+            activeApp?.terminate()
+            device.appearance = originalAppearance
+            device.orientation = originalOrientation
+        }
+
+        func requestAppearance(_ appearance: XCUIDevice.Appearance) {
+            device.appearance = appearance
+            let applied = pollUntil(timeout: 10) { device.appearance == appearance }
+            print("[GardenAppearance] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue)")
+            XCTAssertTrue(applied, "The device appearance getter must confirm the requested style")
+        }
+
+        @discardableResult
+        func assertRenderedAppearance(_ appearance: XCUIDevice.Appearance, in app: XCUIApplication,
+                                      dayBrightness: Double? = nil) -> Double {
+            XCTAssertFalse(app.launchArguments.contains(SurroundUITestContract.appearanceLaunchArgument),
+                           "The continuity audit must not pin the app's fixture appearance")
+            XCTAssertFalse(app.launchArguments.contains("-AppleInterfaceStyle"))
+            XCTAssertEqual(device.appearance, appearance,
+                           "Launching or rotating must not reset the requested device appearance")
+            let board = element(ID.gameBoard, in: app)
+            var brightness: Double?
+            let rendered = pollUntil(timeout: 12) {
+                brightness = self.gardenBoardBrightness(board)
+                guard let brightness else { return false }
+                // Broad bands distinguish warm day sand from moonlit sand;
+                // they tolerate stones, shadows, grain and native raster scale.
+                if appearance == .light { return brightness > 0.72 }
+                return brightness < 0.63 && dayBrightness.map { $0 - brightness > 0.16 } != false
+            }
+            print("[GardenAppearance] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue) boardBrightness=\(brightness.map(String.init(describing:)) ?? "unavailable")")
+            if !rendered {
+                keepScreenshot("raked-garden-appearance-not-applied-\(appearance.rawValue)", in: app)
+            }
+            XCTAssertTrue(rendered,
+                          "The rendered board must reach the requested appearance, not only preserve game state")
+            return brightness ?? .nan
+        }
+
+        func assertState(_ position: String?, clocks: [String], in app: XCUIApplication) {
+            let board = element(ID.gameBoard, in: app)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let window = app.windows.firstMatch.frame
+                return abs(board.frame.width - board.frame.height) < 1
+                    && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+                    && board.value as? String == position
+                    && self.clockValues(in: app) == clocks
+            }, "Appearance and rotation retain the square board, position and clock values")
+            XCTAssertEqual(board.value as? String, position)
+            XCTAssertEqual(clockValues(in: app), clocks)
+        }
+
+        requestAppearance(.light)
+        let play = launchGame(artboard: 17, theme: "rakedGarden")
+        activeApp = play
+        setSidebarCollapsed(true, in: play)
+        let playBoard = element(ID.gameBoard, in: play)
+        let position = playBoard.value as? String
+        let playClocks = clockValues(in: play)
+        XCTAssertEqual(position, "position:38:kj")
+        XCTAssertFalse(playClocks.isEmpty)
+        XCTAssertFalse(playClocks.contains(""), "Clock continuity needs identifiable clock values")
+        assertState(position, clocks: playClocks, in: play)
+        let dayBrightness = assertRenderedAppearance(.light, in: play)
+        let dayFrame = playBoard.frame
+        capture(17, "Raked Garden day Play", in: play,
+                suffix: "-raked-garden-day-landscape")
+
+        requestAppearance(.dark)
+        assertRenderedAppearance(.dark, in: play, dayBrightness: dayBrightness)
+        assertState(position, clocks: playClocks, in: play)
+        XCTAssertEqual(playBoard.frame.minX, dayFrame.minX, accuracy: 1)
+        XCTAssertEqual(playBoard.frame.minY, dayFrame.minY, accuracy: 1)
+        XCTAssertEqual(playBoard.frame.width, dayFrame.width, accuracy: 1,
+                       "Switching to night changes materials, not board geometry")
+        capture(17, "Raked Garden night Play", in: play,
+                note: "Same game after a live device-appearance change.",
+                suffix: "-raked-garden-night-landscape")
+
+        device.orientation = .portrait
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            play.windows.firstMatch.frame.height > play.windows.firstMatch.frame.width
+        })
+        assertRenderedAppearance(.dark, in: play, dayBrightness: dayBrightness)
+        assertState(position, clocks: playClocks, in: play)
+        capture(17, "Raked Garden night Play", in: play,
+                note: "Same game after native rotation.",
+                suffix: "-raked-garden-night-portrait")
+        play.terminate()
+
+        // This fixture starts on the marked three-move analysis branch.
+        // The subsequent night-to-day change must not rebuild its session.
+        let analysis = launchGame(artboard: 26, portrait: true, theme: "rakedGarden")
+        activeApp = analysis
+        setSidebarCollapsed(true, in: analysis)
+        let analysisBoard = element(ID.gameBoard, in: analysis)
+        let variation = analysisBoard.value as? String
+        let analysisClocks = clockValues(in: analysis)
+        XCTAssertEqual(variation, "variation:38:lj-lk-mk")
+        XCTAssertFalse(analysisClocks.isEmpty)
+        XCTAssertFalse(analysisClocks.contains(""))
+        let selected = element(ID.gameAnalysisPosition(baseMoveNumber: 38,
+                                                        movePath: ["lj", "lk", "mk"]), in: analysis)
+        for appearance in [XCUIDevice.Appearance.dark, .light] {
+            requestAppearance(appearance)
+            assertRenderedAppearance(appearance, in: analysis, dayBrightness: dayBrightness)
+            assertState(variation, clocks: analysisClocks, in: analysis)
+            XCTAssertTrue(selected.isSelected, "Appearance changes retain the selected branch")
+            let viewport = assertAuditAnalysisTreeAxis(vertical: false, in: analysis)
+            XCTAssertTrue(viewport.insetBy(dx: -1, dy: -1)
+                .contains(selected.frame.insetBy(dx: -3, dy: -3)),
+                          "The selected analysis stone and ring stay in the visible tree")
+            let name = appearance == .dark ? "night" : "day"
+            capture(26, "Raked Garden \(name) Analyze", in: analysis,
+                    note: "Selected variation retained through a live appearance change.",
+                    suffix: "-raked-garden-\(name)-analyze")
+        }
+
+        tap(analysis.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: analysis)
+        element(ID.screenHome, in: analysis)
+        XCTAssertFalse(analysis.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch.exists,
+                       "Back leaves Game Detail and its appearance scope")
+        keepScreenshot("raked-garden-ipad-day-home-after-night", in: analysis)
+    }
+
+    /// Measure rendered pixels rather than trusting a device setter or a
+    /// capture's name. A small sRGB buffer keeps this check scale independent.
+    private func gardenBoardBrightness(_ board: XCUIElement) -> Double? {
+        guard let image = board.screenshot().image.cgImage,
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let size = 64
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        let drawn = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: size, height: size,
+                                          bitsPerComponent: 8, bytesPerRow: size * 4,
+                                          space: colorSpace,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                                            | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+            return true
+        }
+        guard drawn else { return nil }
+        var sum = 0.0
+        var count = 0
+        // Exclude the outer margin; average many intersections so one stone,
+        // a last-move ring or a local cast shadow cannot decide the result.
+        for y in 6..<58 {
+            for x in 6..<58 {
+                let index = (y * size + x) * 4
+                sum += (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1])
+                        + 0.0722 * Double(pixels[index + 2])) / 255
+                count += 1
+            }
+        }
+        return sum / Double(count)
+    }
+
     func testRakedGardenThemePanels() {
         defer { XCUIDevice.shared.orientation = .landscapeLeft }
         for (number, portrait, state) in [
@@ -260,7 +428,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             (24, false, "analyze"), (26, true, "analyze"),
             (38, false, "zen"), (40, true, "zen"),
         ] {
-            let app = launchGame(artboard: number, portrait: portrait, theme: "rakedGarden")
+            let app = launchGame(artboard: number, portrait: portrait, theme: "rakedGarden",
+                                 appearance: .light)
             setSidebarCollapsed(true, in: app)
             auditChat(state == "chat", in: app)
             if state == "chat" {

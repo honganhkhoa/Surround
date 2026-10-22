@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import CoreGraphics
 
 final class SurroundThemeTests: XCTestCase {
     func testStandardThemeKeepsTheOriginalBoard() {
@@ -20,7 +21,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertFalse(SurroundTheme.standard.hasScene)
         XCTAssertEqual(SurroundTheme.nebulaPearl.colorScheme, .dark)
         XCTAssertTrue(SurroundTheme.nebulaPearl.hasScene)
-        XCTAssertEqual(SurroundTheme.rakedGarden.colorScheme, .light)
+        XCTAssertNil(SurroundTheme.rakedGarden.colorScheme)
         XCTAssertTrue(SurroundTheme.rakedGarden.hasScene)
     }
 
@@ -136,6 +137,130 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge), 4.5)
     }
 
+    func testGardenNightModePreservesTheDayBoardAndOtherThemes() {
+        let theme = SurroundTheme.rakedGarden
+        XCTAssertEqual(theme.board, theme.board(for: .light))
+        XCTAssertNotEqual(theme.board.boardColor, theme.board(for: .dark).boardColor)
+        XCTAssertEqual(StoneImages(black: [], white: []).tint, .white,
+                       "Existing rendered-stone callers must keep their original colors")
+        for other: SurroundTheme in [.standard, .nebulaPearl] {
+            for scheme: ColorScheme in [.light, .dark] {
+                XCTAssertEqual(other.board(for: scheme), other.board)
+            }
+        }
+    }
+
+    /// These are nominal opaque palette checks. Native captures separately
+    /// verify the graded texture, rendered stones and translucent controls.
+    func testGardenNightStonesGridAndMarksRemainReadable() throws {
+        let board = SurroundTheme.rakedGarden.board(for: .dark)
+        XCTAssertGreaterThan(contrast(board.black.flat, board.boardColor, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(board.white.flat, board.black.flat, style: .dark), 4.5)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(board.white.outline), board.boardColor, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(board.gridColor, board.boardColor, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(board.coordinateColor, board.boardColor, style: .dark), 4.5)
+        XCTAssertGreaterThan(contrast(board.emptyPointMarker, board.boardColor, style: .dark), 4.5)
+        let highlightCasing = try XCTUnwrap(board.highlightCasing)
+        XCTAssertGreaterThan(contrast(highlightCasing, board.black.flat, style: .dark), 3)
+        for surface in [board.boardColor, board.white.flat, highlightCasing] {
+            XCTAssertGreaterThan(contrast(board.highlightColor, surface, style: .dark), 3)
+        }
+        for stone in [board.black, board.white] {
+            XCTAssertGreaterThan(contrast(stone.lastMove, stone.flat, style: .dark), 4.5)
+            XCTAssertGreaterThan(contrast(stone.label, stone.flat, style: .dark), 4.5)
+            XCTAssertGreaterThan(contrast(stone.territoryMark, board.boardColor, style: .dark), 3)
+        }
+        XCTAssertGreaterThan(contrast(board.black.territoryMark, board.white.territoryMark, style: .dark), 3)
+        for mark in [board.removeMark, board.restoreMark, board.crosshair.valid,
+                     board.crosshair.invalid, board.crosshair.removal] {
+            XCTAssertGreaterThan(contrast(mark, board.boardColor, style: .dark), 3)
+        }
+        let casing = try XCTUnwrap(board.removalMarkCasing)
+        XCTAssertGreaterThan(contrast(board.removeMark, casing, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(board.restoreMark, casing, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(board.removedStoneOutline), board.boardColor, style: .dark), 3)
+    }
+
+    func testGardenNightAnalysisMarksRemainReadable() throws {
+        let theme = SurroundTheme.rakedGarden
+        let keyline = try XCTUnwrap(theme.treeMarkKeyline)
+        XCTAssertGreaterThan(contrast(theme.selectionMark, theme.panel, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(theme.selectionMark, keyline, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(theme.conditionalMark), keyline, style: .dark), 3)
+        XCTAssertGreaterThan(contrast(theme.userTurnMark, theme.idleGameMark(scheme: .dark), style: .dark), 3)
+    }
+
+    func testGardenNightControlFallbacksKeepReadableTextAndRoles() throws {
+        let theme = SurroundTheme.rakedGarden
+        XCTAssertGreaterThan(contrast(theme.foreground, theme.pageBackground, style: .dark), 4.5)
+        XCTAssertGreaterThan(contrast(theme.foreground, theme.panel, style: .dark), 4.5)
+        let players = [
+            OGSUser(username: "ordinary", id: 1),
+            OGSUser(username: "moderator", id: 2, isModerator: true),
+            OGSUser(username: "admin", id: 3, isSuperuser: true),
+            OGSUser(username: "professional", id: 4, professional: true),
+            OGSUser(username: "supporter", id: 5, supporter: true),
+            OGSUser(username: "bot", id: 6, isBot: true),
+        ]
+        for color: StoneColor in [.black, .white] {
+            let foreground = theme.clockForeground(color, scheme: .dark)
+            let surfaces = [theme.clockSolidSurface(color)]
+                + theme.clockSurfaceStops(color, scheme: .dark).map(\.color)
+            for surface in surfaces {
+                XCTAssertGreaterThan(contrast(foreground, surface, style: .dark), 4.5)
+                XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: .dark), 4.5)
+                XCTAssertGreaterThanOrEqual(
+                    contrast(theme.clockSuddenDeathAccent(color, scheme: .dark), surface, style: .dark), 4.5)
+            }
+            for surface in theme.identityChipColors(color) {
+                XCTAssertGreaterThan(contrast(theme.identityForeground(color), surface, style: .dark), 4.5)
+                XCTAssertGreaterThan(contrast(theme.identitySecondary(color), surface, style: .dark), 4.5)
+                for player in players {
+                    let roleColor = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
+                    XCTAssertGreaterThan(contrast(roleColor, surface, style: .dark), 4.5,
+                                         "\(player.username) must read on the \(color) night identity")
+                }
+            }
+        }
+        XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: .dark), 4.5)
+        XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: .dark), 4.5)
+    }
+
+    func testGardenAdaptiveColorsFollowRepeatedTraitChanges() {
+        let theme = SurroundTheme.rakedGarden
+        // Keep the same Color values alive while resolving both directions;
+        // dynamic providers must not freeze the first trait collection seen.
+        for color in [theme.pageBackground, theme.panel, theme.foreground] {
+            let day = luminance(color, style: .light)
+            let night = luminance(color, style: .dark)
+            XCTAssertGreaterThan(abs(day - night), 0.1)
+            for style: UIUserInterfaceStyle in [.dark, .light, .dark, .light] {
+                XCTAssertEqual(luminance(color, style: style), style == .dark ? night : day,
+                               accuracy: 0.000001)
+            }
+        }
+        XCTAssertLessThan(luminance(theme.pageBackground, style: .dark),
+                          luminance(theme.pageBackground, style: .light))
+    }
+
+    func testGardenNightModeKeepsRaggedGridGeometryAndStoneLighting() {
+        let day = SurroundTheme.rakedGarden.board(for: .light)
+        let night = SurroundTheme.rakedGarden.board(for: .dark)
+        XCTAssertEqual(day.gridStyle, .ragged)
+        XCTAssertEqual(night.gridStyle, day.gridStyle)
+        XCTAssertEqual(night.gridLineScale, day.gridLineScale)
+        XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
+        for cell: CGFloat in [9.99, 19.5, 21, 48] {
+            XCTAssertEqual(night.gridStyle.usesRaggedEdges(at: cell),
+                           day.gridStyle.usesRaggedEdges(at: cell))
+            let dayPath = RaggedGridGeometry(width: 19, height: 13, cellSize: cell,
+                                            lineScale: day.gridLineScale).path
+            let nightPath = RaggedGridGeometry(width: 19, height: 13, cellSize: cell,
+                                              lineScale: night.gridLineScale).path
+            XCTAssertEqual(polygons(in: nightPath), polygons(in: dayPath))
+        }
+    }
+
     /// Role names and avatar outlines use OGS colors rather than the
     /// ordinary identity foreground, so each role needs its own contrast.
     func testGardenIdentityRoleColorsRemainReadable() throws {
@@ -193,6 +318,7 @@ final class SurroundThemeTests: XCTestCase {
     func testTiledBoardTextureKeepsItsPointSizeAsTheBoardResizes() {
         let image = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 100)).image { _ in }
         let texture = BoardTexture(image: image, tileSize: 320)
+        XCTAssertEqual(texture.tint, .white, "Existing board textures must remain ungraded by default")
         for size in [CGSize(width: 150, height: 150), CGSize(width: 1024, height: 1024)] {
             XCTAssertEqual(texture.paintScale(in: size), 1.6, accuracy: 0.0001)
         }
@@ -278,7 +404,9 @@ final class SurroundThemeTests: XCTestCase {
         for (original, enlarged) in zip(first, resized) where original.count > 4 {
             // Ignore the rectangular spine; inspect the actual filled
             // edge outline without reproducing its sampling algorithm.
-            let horizontal = original.map(\.x).max()! - original.map(\.x).min()! > 2
+            let spanX = original.map(\.x).max()! - original.map(\.x).min()!
+            let spanY = original.map(\.y).max()! - original.map(\.y).min()!
+            let horizontal = spanX > spanY
             let across = original.map { horizontal ? $0.y : $0.x }
             let center = (across.min()! + across.max()!) / 2
             let line = Int((center / small.cellSize - 0.5).rounded())
@@ -286,7 +414,7 @@ final class SurroundThemeTests: XCTestCase {
             let outer = line == 0 || line == (horizontal ? small.height : small.width) - 1
             let nominalHalfWidth: CGFloat = outer ? 0.8 : 0.4
             let distances = across.map { abs($0 - center) }
-            XCTAssertLessThanOrEqual(distances.max()!, nominalHalfWidth + 0.180001)
+            XCTAssertLessThanOrEqual(distances.max()!, nominalHalfWidth + 0.380001)
             XCTAssertGreaterThanOrEqual(distances.min()!, 0.249999)
             XCTAssertGreaterThan(distances.max()! - distances.min()!, 0.1,
                                  "Edges should vary visibly while retaining a solid center")
@@ -471,19 +599,112 @@ final class SurroundThemeTests: XCTestCase {
         return result
     }
 
-    private func contrast(_ first: Color, _ second: Color) -> Double {
-        let a = luminance(first), b = luminance(second)
+    private func contrast(_ first: Color, _ second: Color, style: UIUserInterfaceStyle = .light) -> Double {
+        let a = luminance(first, style: style), b = luminance(second, style: style)
         return (max(a, b) + 0.05) / (min(a, b) + 0.05)
     }
 
-    /// WCAG relative luminance from the color's sRGB components.
-    private func luminance(_ color: Color) -> Double {
+    /// Resolve explicitly so existing daytime tests never depend on the
+    /// simulator's appearance or whichever dynamic color was used first.
+    private func luminance(_ color: Color, style: UIUserInterfaceStyle = .light) -> Double {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        XCTAssertTrue(UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha))
+        let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+        XCTAssertTrue(resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha))
         let linear = { (value: CGFloat) -> Double in
             let v = Double(value)
             return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
         }
         return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
+}
+
+extension SurroundThemeTests {
+    func testGardenRaggedEdgesSurviveNativeRasterization() throws {
+        let cases: [(cell: CGFloat, scale: CGFloat)] = [(19.5, 2), (21, 3), (48, 2)]
+        for (cell, scale) in cases {
+            let geometry = RaggedGridGeometry(width: 9, height: 9, cellSize: cell,
+                                              lineScale: SurroundTheme.rakedGarden.board.gridLineScale)
+            // Constant-width strips prove that antialiasing and pixel phase
+            // alone cannot satisfy the visible-variation requirement.
+            var straight = Path()
+            for line in [2, 6] {
+                let center = (CGFloat(line) + 0.5) * cell
+                straight.addRect(CGRect(x: cell / 2, y: center - 0.4,
+                                        width: 8 * cell, height: 0.8))
+                straight.addRect(CGRect(x: center - 0.4, y: cell / 2,
+                                        width: 0.8, height: 8 * cell))
+            }
+            for phase: CGFloat in [0, 0.25] {
+                let actual = try gridRaster(geometry.path, cell: cell, scale: scale, phase: phase)
+                let control = try gridRaster(straight, cell: cell, scale: scale, phase: phase)
+                for vertical in [false, true] {
+                    for line in [2, 6] {
+                        let widths = gridInkWidths(actual, cell: cell, scale: scale, phase: phase,
+                                                   line: line, vertical: vertical)
+                        let controlWidths = gridInkWidths(control, cell: cell, scale: scale, phase: phase,
+                                                          line: line, vertical: vertical)
+                        XCTAssertGreaterThan(widths.count, 100)
+                        let spread = gridWidthSpread(widths) / Double(scale)
+                        let controlSpread = gridWidthSpread(controlWidths) / Double(scale)
+                        let sample = "cell=\(cell), scale=\(scale), phase=\(phase), "
+                            + "\(vertical ? "vertical" : "horizontal") line=\(line), spread=\(spread) pt"
+                        print("Ragged grid raster: \(sample)")
+                        // At least 1 native pixel at 2x / 1.5 pixels at 3x
+                        // between ordinary thin and thick portions, not an
+                        // isolated extremum. Expectation is an output contract,
+                        // independent of the generator's amplitude or hash.
+                        XCTAssertGreaterThanOrEqual(spread, 0.5, sample)
+                        XCTAssertLessThanOrEqual(controlSpread, 0.02,
+                                                 "Straight control must stay straight: \(sample)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func gridRaster(_ path: Path, cell: CGFloat, scale: CGFloat, phase: CGFloat) throws
+        -> (pixels: [UInt8], side: Int) {
+        let side = Int(ceil((9 * cell + 1) * scale))
+        var pixels = [UInt8](repeating: 255, count: side * side)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: side, height: side,
+                                                 bitsPerComponent: 8, bytesPerRow: side,
+                                                 space: CGColorSpaceCreateDeviceGray(),
+                                                 bitmapInfo: CGImageAlphaInfo.none.rawValue))
+            context.setShouldAntialias(true)
+            context.setAllowsAntialiasing(true)
+            context.scaleBy(x: scale, y: scale)
+            context.translateBy(x: phase, y: phase)
+            context.setFillColor(gray: 0, alpha: 1)
+            context.addPath(path.cgPath)
+            context.fillPath() // Nonzero fill, as in the production Path.fill.
+        }
+        return (pixels, side)
+    }
+
+    private func gridInkWidths(_ raster: (pixels: [UInt8], side: Int), cell: CGFloat,
+                               scale: CGFloat, phase: CGFloat, line: Int, vertical: Bool) -> [Double] {
+        let center = (CGFloat(line) + 0.5) * cell + phase
+        let across = Int(floor((center - 2) * scale))..<Int(ceil((center + 2) * scale))
+        return (0..<raster.side).compactMap { along in
+            let position = (CGFloat(along) + 0.5) / scale - phase
+            guard position > cell / 2 + 2, position < 8.5 * cell - 2 else { return nil }
+            let nearestCrossing = ((position / cell - 0.5).rounded() + 0.5) * cell
+            guard abs(position - nearestCrossing) > 2 else { return nil }
+            // Integrated coverage counts antialiased edge pixels fractionally;
+            // thresholding to black/white would hide subpixel edge differences.
+            return across.reduce(0.0) { coverage, perpendicular in
+                let x = vertical ? perpendicular : along
+                let y = vertical ? along : perpendicular
+                return coverage + Double(255 - Int(raster.pixels[y * raster.side + x])) / 255
+            }
+        }
+    }
+
+    private func gridWidthSpread(_ widths: [Double]) -> Double {
+        guard !widths.isEmpty else { return 0 }
+        let sorted = widths.sorted()
+        return sorted[Int(Double(sorted.count - 1) * 0.9)]
+            - sorted[Int(Double(sorted.count - 1) * 0.1)]
     }
 }
