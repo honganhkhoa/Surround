@@ -83,7 +83,7 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if reduceTransparency || (theme == .rakedGarden && contrast == .increased) {
+        if reduceTransparency || (theme.usesLightSceneSurfaces && contrast == .increased) {
             content.background(prominent ? prominentFill : Color(uiColor: .secondarySystemGroupedBackground), in: shape)
         } else if #available(iOS 26, *) {
             if prominent {
@@ -93,7 +93,7 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
                 content.glassEffect(.clear.interactive(interactive), in: shape)
             }
         } else if prominent {
-            if theme == .rakedGarden && !disabled {
+            if theme.usesLightSceneSurfaces && !disabled {
                 content.background {
                     shape.fill(.regularMaterial)
                         .overlay { shape.fill(prominentFill.opacity(0.92)) }

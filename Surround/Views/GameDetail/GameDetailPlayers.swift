@@ -415,7 +415,7 @@ private struct GameDetailClockCard: View {
                 .background { surface }
                 .overlay { clockOutline }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: !reduceTransparency && (theme != .rakedGarden || contrast != .increased),
+                                               enabled: !reduceTransparency && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -545,9 +545,9 @@ private struct GameDetailClockCard: View {
         } else {
             shape.fill(LinearGradient(stops: theme.clockSurfaceStops(color, scheme: colorScheme),
                                       startPoint: .top, endPoint: .bottom))
-                .opacity(theme == .rakedGarden && style != .inline ? (color == .black ? 0.94 : 0.90) : 1)
+                .opacity(theme.usesLightSceneSurfaces && style != .inline ? (color == .black ? 0.94 : 0.90) : 1)
                 .background {
-                    if theme == .rakedGarden && style != .inline {
+                    if theme.usesLightSceneSurfaces && style != .inline {
                         shape.fill(.regularMaterial)
                     }
                 }
@@ -1142,13 +1142,13 @@ struct GameDetailPlayerIdentity: View {
                alignment: isBottomRightPlayer ? .bottom : .top)
         .background {
             if !showsThemeGlass {
-                let translucentGarden = theme == .rakedGarden && !navigationHeader
+                let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader
                     && !reduceTransparency && contrast != .increased
                 RoundedRectangle(cornerRadius: chipCornerRadius)
                     .fill(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom))
-                    .opacity(translucentGarden ? (color == .black ? 0.94 : 0.90) : 1)
+                    .opacity(translucentScene ? (color == .black ? 0.94 : 0.90) : 1)
                     .background {
-                        if translucentGarden {
+                        if translucentScene {
                             RoundedRectangle(cornerRadius: chipCornerRadius).fill(.regularMaterial)
                         }
                     }

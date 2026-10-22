@@ -505,31 +505,39 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
     /// Run once per operator-selected physical pose. Reuse the ordinary
     /// artboard assertions for clock targets, fold panes and native chrome.
     func testRakedGardenThemeStates() {
-        var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, theme: "rakedGarden")
-        capture(pose.playArtboard, in: app, suffix: "-raked-garden")
+        auditThemeStates(theme: "rakedGarden", suffix: "-raked-garden")
+    }
+
+    func testSurroundStudioThemeStates() {
+        auditThemeStates(theme: "surroundStudio", suffix: "-surround-studio")
+    }
+
+    private func auditThemeStates(theme: String, suffix: String) {
+        var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, theme: theme)
+        capture(pose.playArtboard, in: app, suffix: suffix)
         app.terminate()
 
         if let number = pose.playChatArtboard {
-            app = launchScene(.activeGameBoard, artboard: number, theme: "rakedGarden")
+            app = launchScene(.activeGameBoard, artboard: number, theme: theme)
             openAuditChat(in: app)
             XCTAssertFalse(app.descendants(matching: .any)
                 .matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists,
                            "Chat remains the only open panel")
-            capture(number, in: app, suffix: "-raked-garden")
+            capture(number, in: app, suffix: suffix)
             app.terminate()
         }
 
-        app = launchScene(.gameAnalysis, artboard: pose.analyzeArtboard, theme: "rakedGarden")
+        app = launchScene(.gameAnalysis, artboard: pose.analyzeArtboard, theme: theme)
         XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
                        "Analyze remains the only open panel")
         XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, "variation:38:lj-lk-mk")
         assertSelectedAuditBranchVisible(in: app)
-        capture(pose.analyzeArtboard, in: app, suffix: "-raked-garden")
+        capture(pose.analyzeArtboard, in: app, suffix: suffix)
         app.terminate()
 
-        app = launchScene(.zenMode, artboard: pose.zenArtboard, theme: "rakedGarden")
+        app = launchScene(.zenMode, artboard: pose.zenArtboard, theme: theme)
         element(ID.gameZenExit, in: app, matching: .button)
-        capture(pose.zenArtboard, in: app, suffix: "-raked-garden")
+        capture(pose.zenArtboard, in: app, suffix: suffix)
         app.terminate()
     }
 

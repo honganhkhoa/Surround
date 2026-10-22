@@ -5,7 +5,8 @@ import UIKit
 /// journeys, so runs under different themes can be compared. Set
 /// TEST_RUNNER_SURROUND_THEME_PERFORMANCE=1 and choose the theme with
 /// TEST_RUNNER_SURROUND_PERFORMANCE_THEME (`standard`, the default, or
-/// `nebulaPearl`). The standard theme runs in dark mode, like scene themes.
+/// `nebulaPearl`, `rakedGarden` or `surroundStudio`). Standard runs in dark
+/// mode; each scene theme chooses its own appearance.
 ///
 /// Taps go to coordinates resolved before measuring, so XCUITest's element
 /// queries stay out of the measured blocks as far as possible. Each block

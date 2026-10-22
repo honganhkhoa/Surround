@@ -23,6 +23,8 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(SurroundTheme.nebulaPearl.hasScene)
         XCTAssertNil(SurroundTheme.rakedGarden.colorScheme)
         XCTAssertTrue(SurroundTheme.rakedGarden.hasScene)
+        XCTAssertEqual(SurroundTheme.surroundStudio.colorScheme, .light)
+        XCTAssertTrue(SurroundTheme.surroundStudio.hasScene)
     }
 
     func testAnUnknownStoredThemeFallsBackToStandard() {
@@ -31,9 +33,11 @@ final class SurroundThemeTests: XCTestCase {
         #if DEBUG
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
+        XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .surroundStudio)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .standard)
         #endif
     }
 
@@ -143,7 +147,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertNotEqual(theme.board.boardColor, theme.board(for: .dark).boardColor)
         XCTAssertEqual(StoneImages(black: [], white: []).tint, .white,
                        "Existing rendered-stone callers must keep their original colors")
-        for other: SurroundTheme in [.standard, .nebulaPearl] {
+        for other: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio] {
             for scheme: ColorScheme in [.light, .dark] {
                 XCTAssertEqual(other.board(for: scheme), other.board)
             }
@@ -263,8 +267,7 @@ final class SurroundThemeTests: XCTestCase {
 
     /// Role names and avatar outlines use OGS colors rather than the
     /// ordinary identity foreground, so each role needs its own contrast.
-    func testGardenIdentityRoleColorsRemainReadable() throws {
-        let theme = SurroundTheme.rakedGarden
+    func testLightSceneIdentityRoleColorsRemainReadable() throws {
         let players = [
             OGSUser(username: "ordinary", id: 1),
             OGSUser(username: "moderator", id: 2, isModerator: true),
@@ -273,12 +276,14 @@ final class SurroundThemeTests: XCTestCase {
             OGSUser(username: "supporter", id: 5, supporter: true),
             OGSUser(username: "bot", id: 6, isBot: true),
         ]
-        for player in players {
-            for color: StoneColor in [.black, .white] {
-                let foreground = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
-                for surface in theme.identityChipColors(color) {
-                    XCTAssertGreaterThan(contrast(foreground, surface), 4.5,
-                                         "\(player.username) must read on the \(color) identity")
+        for theme: SurroundTheme in [.rakedGarden, .surroundStudio] {
+            for player in players {
+                for color: StoneColor in [.black, .white] {
+                    let foreground = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
+                    for surface in theme.identityChipColors(color) {
+                        XCTAssertGreaterThan(contrast(foreground, surface), 4.5,
+                                             "\(player.username) must read on the \(color) \(theme) identity")
+                    }
                 }
             }
         }
@@ -311,6 +316,139 @@ final class SurroundThemeTests: XCTestCase {
         for theme: SurroundTheme in [.standard, .nebulaPearl] {
             for color: StoneColor in [.black, .white] {
                 XCTAssertNil(theme.identityRoleColor(for: player, on: color))
+            }
+        }
+    }
+
+    /// Cream clamshell needs a contour against golden kaya in thumbnails;
+    /// actual moves and scoring marks must remain stronger than the texture.
+    func testStudioStonesAndNativeMarksRemainReadable() throws {
+        let theme = SurroundTheme.surroundStudio, board = theme.board
+        XCTAssertEqual(board.stoneLightDirection, .upperLeft)
+        XCTAssertEqual(board.gridStyle, .straight)
+        XCTAssertTrue(board.boardBevel)
+        XCTAssertGreaterThan(contrast(board.black.flat, board.boardColor), 7)
+        XCTAssertGreaterThan(contrast(board.white.flat, board.black.flat), 7)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(board.white.outline), board.boardColor), 3)
+        XCTAssertGreaterThan(contrast(board.gridColor, board.boardColor), 3)
+        XCTAssertGreaterThan(contrast(board.coordinateColor, board.boardColor), 4.5)
+        for stone in [board.black, board.white] {
+            XCTAssertGreaterThan(contrast(stone.lastMove, stone.flat), 4.5)
+            XCTAssertGreaterThan(contrast(stone.label, stone.flat), 4.5)
+            XCTAssertGreaterThan(contrast(stone.territoryMark, board.boardColor), 3)
+        }
+        XCTAssertGreaterThan(contrast(board.black.territoryMark, board.white.territoryMark), 2)
+        let keyline = try XCTUnwrap(theme.treeMarkKeyline)
+        XCTAssertGreaterThan(contrast(theme.selectionMark, theme.panel), 3)
+        XCTAssertGreaterThan(contrast(theme.selectionMark, keyline), 3)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(theme.conditionalMark), keyline), 3)
+        XCTAssertGreaterThan(contrast(theme.userTurnMark, theme.idleGameMark(scheme: .light)), 3)
+        for mark in [board.removeMark, board.restoreMark, board.crosshair.valid,
+                     board.crosshair.invalid, board.crosshair.removal] {
+            XCTAssertGreaterThan(contrast(mark, board.boardColor), 3)
+        }
+        let casing = try XCTUnwrap(board.removalMarkCasing)
+        XCTAssertGreaterThan(contrast(board.removeMark, casing), 3)
+        XCTAssertGreaterThan(contrast(board.restoreMark, casing), 3)
+        XCTAssertGreaterThan(contrast(try XCTUnwrap(board.removedStoneOutline), board.boardColor), 3)
+    }
+
+    func testStudioControlFallbacksKeepReadableText() throws {
+        let theme = SurroundTheme.surroundStudio
+        XCTAssertGreaterThan(contrast(theme.foreground, theme.pageBackground), 7)
+        XCTAssertGreaterThan(contrast(theme.foreground, theme.panel), 7)
+        for color: StoneColor in [.black, .white] {
+            let foreground = theme.clockForeground(color, scheme: .light)
+            XCTAssertGreaterThan(contrast(foreground, theme.clockSolidSurface(color)), 4.5)
+            for stop in theme.clockSurfaceStops(color, scheme: .light) {
+                XCTAssertGreaterThan(contrast(foreground, stop.color), 4.5)
+                XCTAssertGreaterThan(contrast(theme.clockAccent(color), stop.color), 4.5)
+            }
+            for surface in theme.identityChipColors(color) {
+                XCTAssertGreaterThan(contrast(theme.identityForeground(color), surface), 4.5)
+                XCTAssertGreaterThan(contrast(theme.identitySecondary(color), surface), 4.5)
+            }
+        }
+        XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint)), 4.5)
+        XCTAssertGreaterThan(contrast(.white, theme.statusBadge), 4.5)
+    }
+
+    /// Catch a missing catalog entry, flattened decoration transparency,
+    /// opaque stone padding or mismatched stone diameter.
+    func testStudioAssetsKeepSeparateBoardAndEqualAlphaStoneFootprints() throws {
+        // This target runs in xctest, with the catalog in the test bundle;
+        // the runtime theme correctly loads its images from the app bundle.
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        func image(named name: String) throws -> UIImage {
+            try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+        }
+        let side = 128
+        func rgbaPixels(for source: CGImage) throws -> [UInt8] {
+            var pixels = [UInt8](repeating: 0, count: side * side * 4)
+            try pixels.withUnsafeMutableBytes { buffer in
+                let context = try XCTUnwrap(CGContext(data: buffer.baseAddress,
+                    width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                context.draw(source, in: CGRect(x: 0, y: 0, width: side, height: side))
+            }
+            return pixels
+        }
+        _ = try image(named: "SurroundStudioBoard")
+        _ = try image(named: "SurroundStudioScene")
+        for name in ["SurroundStudioFoliage", "SurroundStudioVase"] {
+            let source = try XCTUnwrap(image(named: name).cgImage, name)
+            let pixels = try rgbaPixels(for: source)
+            let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
+            XCTAssertTrue(alpha.contains(0), "\(name) leaves the room visible around its artwork")
+            XCTAssertTrue(alpha.contains { $0 > 250 }, "\(name) contains visible artwork")
+        }
+        let stones = try StoneImages(
+            black: (0..<4).map { try image(named: "SurroundStudioSlate\($0)") },
+            white: (0..<4).map { try image(named: "SurroundStudioClamshell\($0)") }
+        )
+        var footprints: [Int] = []
+        for image in stones.black + stones.white {
+            let source = try XCTUnwrap(image.cgImage)
+            XCTAssertEqual(source.width, source.height)
+            XCTAssertGreaterThanOrEqual(source.width, 256)
+            let pixels = try rgbaPixels(for: source)
+            func alpha(_ x: Int, _ y: Int) -> UInt8 { pixels[(y * side + x) * 4 + 3] }
+            XCTAssertEqual(alpha(0, 0), 0)
+            XCTAssertEqual(alpha(side - 1, side - 1), 0)
+            XCTAssertEqual(alpha(0, side / 2), 0)
+            XCTAssertEqual(alpha(side - 1, side / 2), 0)
+            XCTAssertGreaterThan(alpha(side / 2, side / 2), 250)
+            let diameter = (0..<side).filter { alpha($0, side / 2) > 127 }.count
+            XCTAssertEqual(CGFloat(diameter) / CGFloat(side), stones.footprint, accuracy: 0.02)
+            footprints.append(diameter)
+        }
+        XCTAssertLessThanOrEqual(try XCTUnwrap(footprints.max()) - XCTUnwrap(footprints.min()), 1,
+                                 "Slate and shell use equal diameters across every variant")
+    }
+
+    func testStudioFoliageKeepsNaturalScaleAndReservesChrome() {
+        for size in [CGSize(width: 375, height: 548), CGSize(width: 375, height: 667),
+                     CGSize(width: 402, height: 874),
+                     CGSize(width: 874, height: 402), CGSize(width: 820, height: 1180),
+                     CGSize(width: 1180, height: 820)] {
+            let layout = SurroundStudioDecorationLayout(size: size)
+            let folded = SurroundStudioDecorationLayout(size: size, hasTopEdgeClocks: true)
+            let legacy = SurroundStudioDecorationLayout(size: size, usesLegacyChrome: true)
+            XCTAssertEqual(layout.foliage.size, folded.foliage.size)
+            XCTAssertEqual(layout.foliage.size, legacy.foliage.size,
+                           "Chrome clearance must not miniaturize the leaves")
+            XCTAssertLessThanOrEqual(layout.foliage.maxY, 128)
+            XCTAssertLessThanOrEqual(folded.foliage.maxY, 88)
+            XCTAssertLessThanOrEqual(legacy.foliage.maxY, 80,
+                                    "Legacy Analyze move numbers begin just below the shorter navigation bar")
+            if size.width > size.height && size.height < 430 {
+                XCTAssertLessThanOrEqual(layout.foliage.maxY, 84,
+                                        "The fixed canopy clears the landscape Chat board's upper grid")
+            }
+            if size.width < size.height && size.height < 600 {
+                XCTAssertLessThanOrEqual(layout.foliage.maxY, 75,
+                                        "Small floating windows keep their upper clock cards clear")
             }
         }
     }
@@ -352,7 +490,7 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testRaggedGridIsGardenOnlyAndFallsBackOnSmallBoards() {
-        for theme: SurroundTheme in [.standard, .nebulaPearl] {
+        for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio] {
             XCTAssertFalse(theme.board.gridStyle.usesRaggedEdges(at: 48))
         }
         let style = SurroundTheme.rakedGarden.board.gridStyle

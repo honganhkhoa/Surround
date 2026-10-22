@@ -466,6 +466,52 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                              suffix: "-raked-garden-night", appearance: .dark)
     }
 
+    func testSurroundStudioThemeControlStates() throws {
+        for number in [78, 79] {
+            let urgent = launch(artboard: number, clock: "sudden-death",
+                                fromMainNavigation: false, theme: "surroundStudio")
+            let clock = element(number == 78 ? "game.clock.black" : "game.clock.white", in: urgent)
+            XCTAssertTrue((clock.value as? String)?.contains("Sudden death") == true,
+                          "The clock reference must exercise the final period warning")
+            capture(number, app: urgent, note: "Studio urgent clock text over tinted glass.",
+                    suffix: "-surround-studio-urgent")
+            urgent.terminate()
+        }
+        let disconnected = launch(artboard: 64, socketDown: true, theme: "surroundStudio")
+        defer { disconnected.terminate() }
+        let accept = disconnected.buttons["Accept"].firstMatch
+        XCTAssertTrue(accept.waitForExistence(timeout: 5))
+        XCTAssertFalse(accept.isEnabled, "Disconnected scoring keeps Accept disabled")
+        capture(64, app: disconnected, note: "Studio disconnected scoring; disabled Accept remains distinct.",
+                suffix: "-surround-studio-disabled")
+    }
+
+    func testSurroundStudioThemeStates() throws {
+        try auditThemeStates(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+    }
+
+    func testSurroundStudioThemePanelTransitions() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The compact theme transition audit requires an iPhone.")
+        let app = launch(artboard: 1, theme: "surroundStudio")
+        defer {
+            XCUIDevice.shared.orientation = .portrait
+            app.terminate()
+        }
+        let board = element(ID.gameBoard, in: app)
+        let value = board.value as? String
+        for portrait in [true, false] {
+            rotate(portrait ? .portrait : .landscapeLeft, app: app)
+            XCTAssertEqual(board.value as? String, value, "Rotation retains the same game position")
+            let orientation = portrait ? "portrait" : "landscape"
+            auditStudioPanelTransitions(in: app) { step in
+                self.capture(portrait ? 1 : 2, app: app,
+                             note: "Surround Studio \(orientation), \(step). Same session; compare fixed decoration across panel transitions.",
+                             suffix: "-surround-studio-transition-\(orientation)-\(step)")
+            }
+        }
+    }
+
     private func auditThemeStates(theme: String, title: String, suffix: String,
                                   appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
@@ -510,6 +556,10 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                               suffix: "-raked-garden-night", appearance: .dark)
     }
 
+    func testSurroundStudioThemeScoring() throws {
+        try auditThemeScoring(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+    }
+
     private func auditThemeScoring(theme: String, title: String, suffix: String,
                                    appearance: SurroundUITestContract.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
@@ -537,6 +587,10 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     func testRakedGardenNightThemeSmallPhone() throws {
         try auditThemeSmallPhone(theme: "rakedGarden", title: "Raked Garden at night",
                                  suffix: "-raked-garden-night", appearance: .dark)
+    }
+
+    func testSurroundStudioThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
     }
 
     private func auditThemeSmallPhone(theme: String, title: String, suffix: String,

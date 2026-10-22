@@ -6,6 +6,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case standard
     case nebulaPearl
     case rakedGarden
+    case surroundStudio
 
     var id: Self { self }
 
@@ -25,6 +26,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .standard: "Surround"
         case .nebulaPearl: "Nebula & Pearl"
         case .rakedGarden: "Raked Garden"
+        case .surroundStudio: "Surround Studio"
         }
     }
 
@@ -33,6 +35,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .standard, .rakedGarden: nil
         case .nebulaPearl: .dark
+        case .surroundStudio: .light
         }
     }
 
@@ -184,6 +187,53 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 removalMarkCasing: Color(themeHex: 0xFFF9E8),
                 removedStoneOutline: Color(themeHex: 0x62533F)
             )
+        case .surroundStudio:
+            return BoardAppearance(
+                boardColor: Color(themeHex: 0xE3AF69),
+                boardEdge: Color(themeHex: 0x79522F).opacity(0.65),
+                boardTexture: SurroundStudioAssets.board,
+                boardBevel: true,
+                // The kaya grain stays quiet; exact charcoal lines and all
+                // game marks are drawn above it by the shared native board.
+                gridLineScale: 1.2,
+                stoneImages: SurroundStudioAssets.stones,
+                stoneLightDirection: .upperLeft,
+                gridColor: Color(themeHex: 0x3E382E),
+                coordinateColor: Color(themeHex: 0x4B3D2C),
+                black: StonePalette(
+                    highlight: Color(themeHex: 0x6C7070),
+                    shade: Color(themeHex: 0x1D2223),
+                    flat: Color(themeHex: 0x282D2E),
+                    outline: Color(themeHex: 0x1C2021),
+                    rim: Color(themeHex: 0x7C8280).opacity(0.4),
+                    lastMove: Color(themeHex: 0xFFF9ED),
+                    label: Color(themeHex: 0xFFF9ED)
+                ),
+                white: StonePalette(
+                    highlight: Color(themeHex: 0xFFFDF5),
+                    shade: Color(themeHex: 0xD7CDBA),
+                    flat: Color(themeHex: 0xF4EDDE),
+                    outline: Color(themeHex: 0x6B5C45),
+                    rim: Color(themeHex: 0x776B58).opacity(0.5),
+                    lastMove: Color(themeHex: 0x343B38),
+                    label: Color(themeHex: 0x303631),
+                    // A darker warm mark remains distinct from kaya where
+                    // a clamshell-colored territory square would disappear.
+                    territory: Color(themeHex: 0x736044)
+                ),
+                emptyPointMarker: Color(themeHex: 0x282D2E),
+                markOutline: Color(themeHex: 0x64543B),
+                dameColor: Color(themeHex: 0x80511F),
+                highlightColor: Color(themeHex: 0x2A5C68),
+                crosshair: .init(valid: Color(themeHex: 0x3D634B),
+                                 invalid: Color(themeHex: 0x963C32),
+                                 removal: Color(themeHex: 0x2A5C68)),
+                crosshairWidth: 1.5,
+                removeMark: Color(themeHex: 0x963C32),
+                restoreMark: Color(themeHex: 0x3D634B),
+                removalMarkCasing: Color(themeHex: 0xFFF9ED),
+                removedStoneOutline: Color(themeHex: 0x64543B)
+            )
         }
     }
 }
@@ -214,6 +264,18 @@ private enum RakedGardenAssets {
     /// One quiet sand field scales with the board; fine grain naturally
     /// softens in thumbnails while the native grid retains its contrast.
     static let board = UIImage(named: "RakedGardenBoard").map { BoardTexture(image: $0, mapping: .board) }
+}
+
+private enum SurroundStudioAssets {
+    static let stones: StoneImages? = {
+        let black = (0..<4).compactMap { UIImage(named: "SurroundStudioSlate\($0)") }
+        let white = (0..<4).compactMap { UIImage(named: "SurroundStudioClamshell\($0)") }
+        guard black.count == 4, white.count == 4 else { return nil }
+        return StoneImages(black: black, white: white)
+    }()
+
+    /// One continuous kaya surface; the grain follows the board at every size.
+    static let board = UIImage(named: "SurroundStudioBoard").map { BoardTexture(image: $0, mapping: .board) }
 }
 
 /// Static providers retain value identity through clock ticks and resizing.
@@ -276,6 +338,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
         case .rakedGarden: RakedGardenColors.page
+        case .surroundStudio: Color(themeHex: 0xE8DDC7)
         }
     }
 
@@ -284,6 +347,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
         case .rakedGarden: RakedGardenColors.panel
+        case .surroundStudio: Color(themeHex: 0xF7F2E8)
         }
     }
 
@@ -291,6 +355,7 @@ extension SurroundTheme {
         switch self {
         case .standard, .nebulaPearl: .primary
         case .rakedGarden: RakedGardenColors.foreground
+        case .surroundStudio: Color(themeHex: 0x303631)
         }
     }
 
@@ -304,6 +369,7 @@ extension SurroundTheme {
             })
         case .nebulaPearl: Color.white.opacity(0.14)
         case .rakedGarden: RakedGardenColors.panelBorder.opacity(0.28)
+        case .surroundStudio: Color(themeHex: 0x78684F).opacity(0.28)
         }
     }
 
@@ -313,6 +379,10 @@ extension SurroundTheme {
     /// Clocks, player chips and the main action are tinted Liquid Glass,
     /// letting the scene show through; other themes keep solid surfaces.
     var usesGlassControls: Bool { self != .standard }
+
+    /// The natural scenes use their own foregrounds, translucent pigment
+    /// on older systems, and opaque controls under Increase Contrast.
+    var usesLightSceneSurfaces: Bool { self == .rakedGarden || self == .surroundStudio }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
@@ -324,6 +394,8 @@ extension SurroundTheme {
             color == .black ? Color(themeHex: 0x3B2585).opacity(0.47) : Color(themeHex: 0xFBF1EC).opacity(0.95)
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackGlass.opacity(0.84) : RakedGardenColors.whiteGlass.opacity(0.72)
+        case .surroundStudio:
+            color == .black ? Color(themeHex: 0x303735).opacity(0.82) : Color(themeHex: 0xF3EBDD).opacity(0.84)
         }
     }
 
@@ -336,6 +408,8 @@ extension SurroundTheme {
             color == .black ? Color(themeHex: 0x241858).opacity(0.51) : Color(themeHex: 0xF8EFEB).opacity(0.93)
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackGlass.opacity(0.86) : RakedGardenColors.whiteSurfaceBottom.opacity(0.78)
+        case .surroundStudio:
+            color == .black ? Color(themeHex: 0x303735).opacity(0.86) : Color(themeHex: 0xF7F0E2).opacity(0.90)
         }
     }
 
@@ -346,12 +420,17 @@ extension SurroundTheme {
         // Deep violet: white text at about 8:1, and close to the violet clock.
         case .nebulaPearl: Color(themeHex: 0x4E36B0)
         case .rakedGarden: RakedGardenColors.maple
+        case .surroundStudio: Color(themeHex: 0x3D634B)
         }
     }
 
     /// Glass pigment is independent of the opaque accessibility fill.
     var actionGlassTint: Color? {
-        self == .rakedGarden ? actionTint?.opacity(0.88) : actionTint
+        switch self {
+        case .surroundStudio: actionTint?.opacity(0.86)
+        case .rakedGarden: actionTint?.opacity(0.88)
+        default: actionTint
+        }
     }
 
 
@@ -361,6 +440,7 @@ extension SurroundTheme {
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
         case .rakedGarden: RakedGardenColors.chatBubble
+        case .surroundStudio: Color(themeHex: 0xDDDCCB)
         }
     }
 }
@@ -375,6 +455,7 @@ extension SurroundTheme {
         // The chat highlight's cyan: the one cool accent among the violets.
         case .nebulaPearl: Color(themeHex: 0x6FD6FF)
         case .rakedGarden: RakedGardenColors.selection
+        case .surroundStudio: Color(themeHex: 0x3D634B)
         }
     }
 
@@ -385,6 +466,7 @@ extension SurroundTheme {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
         case .rakedGarden: RakedGardenColors.conditional
+        case .surroundStudio: Color(themeHex: 0x8A531D)
         }
     }
 
@@ -395,6 +477,7 @@ extension SurroundTheme {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0x0B0E22)
         case .rakedGarden: RakedGardenColors.keyline
+        case .surroundStudio: Color(themeHex: 0xFFF9ED)
         }
     }
 
@@ -404,6 +487,7 @@ extension SurroundTheme {
         case .standard: Color(scheme == .dark ? .systemGray6 : .systemGray4)
         case .nebulaPearl: Color(themeHex: 0xC9CFEA).opacity(0.2)
         case .rakedGarden: RakedGardenColors.treeGuide.opacity(0.25)
+        case .surroundStudio: Color(themeHex: 0x78684F).opacity(0.24)
         }
     }
 
@@ -413,6 +497,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemTeal)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
         case .rakedGarden: RakedGardenColors.selection
+        case .surroundStudio: Color(themeHex: 0x3D634B)
         }
     }
 
@@ -422,7 +507,7 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden: nil
+        case .rakedGarden, .surroundStudio: nil
         }
     }
 
@@ -432,6 +517,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
         case .rakedGarden: RakedGardenColors.conditional
+        case .surroundStudio: Color(themeHex: 0x8A531D)
         }
     }
 
@@ -441,6 +527,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
         case .rakedGarden: RakedGardenColors.idle
+        case .surroundStudio: Color(themeHex: 0xD8CEBB)
         }
     }
 }
@@ -484,6 +571,13 @@ extension SurroundTheme {
             }
             return [.init(color: RakedGardenColors.whiteSurfaceTop, location: 0),
                     .init(color: RakedGardenColors.whiteSurfaceBottom, location: 1)]
+        case .surroundStudio:
+            if color == .black {
+                return [.init(color: Color(themeHex: 0x3E4745), location: 0),
+                        .init(color: Color(themeHex: 0x202624), location: 1)]
+            }
+            return [.init(color: Color(themeHex: 0xE5DCCA), location: 0),
+                    .init(color: Color(themeHex: 0xFFF9ED), location: 1)]
         }
     }
 
@@ -493,6 +587,7 @@ extension SurroundTheme {
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
         case .rakedGarden: color == .black ? RakedGardenColors.blackSolid : RakedGardenColors.whiteGlass
+        case .surroundStudio: color == .black ? Color(themeHex: 0x282F2C) : Color(themeHex: 0xF3EBDD)
         }
     }
 
@@ -501,6 +596,7 @@ extension SurroundTheme {
         case .standard: color == .black ? .white : Color(white: scheme == .dark ? 19 / 255 : 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
+        case .surroundStudio: color == .black ? Color(themeHex: 0xFFF9ED) : Color(themeHex: 0x303631)
         }
     }
 
@@ -510,6 +606,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
         case .rakedGarden: color == .black ? RakedGardenColors.blackAccent : RakedGardenColors.whiteAccent
+        case .surroundStudio: color == .black ? Color(themeHex: 0xC6D5BD) : Color(themeHex: 0x3D634B)
         }
     }
 
@@ -534,6 +631,7 @@ extension SurroundTheme {
         // Daytime uses a deeper amber edge against pale jade; night uses
         // brighter lantern light against the surrounding dark garden.
         case .rakedGarden: RakedGardenColors.turnOutline
+        case .surroundStudio: Color(themeHex: 0x688360)
         }
     }
 
@@ -543,6 +641,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0xB7A4FF)
         case .rakedGarden: RakedGardenColors.turnGlow
+        case .surroundStudio: Color(themeHex: 0xA0B78F)
         }
     }
 
@@ -554,6 +653,7 @@ extension SurroundTheme {
         // Maple carries the badge's white text at over 6:1. Lantern amber
         // remains the turn glow; it is too light for white status text.
         case .rakedGarden: RakedGardenColors.maple
+        case .surroundStudio: Color(themeHex: 0x3D634B)
         }
     }
 
@@ -571,6 +671,10 @@ extension SurroundTheme {
             color == .black
                 ? [RakedGardenColors.blackSurfaceTop, RakedGardenColors.blackSurfaceBottom]
                 : [RakedGardenColors.whiteSurfaceTop, RakedGardenColors.whiteSurfaceBottom]
+        case .surroundStudio:
+            color == .black
+                ? [Color(themeHex: 0x3E4745), Color(themeHex: 0x202624)]
+                : [Color(themeHex: 0xE5DCCA), Color(themeHex: 0xFFF9ED)]
         }
     }
 
@@ -582,6 +686,10 @@ extension SurroundTheme {
             color == .black
                 ? RakedGardenColors.blackBorder.opacity(0.3)
                 : RakedGardenColors.whiteBorder.opacity(0.4)
+        case .surroundStudio:
+            color == .black
+                ? Color(themeHex: 0xB7BDAF).opacity(0.3)
+                : Color(themeHex: 0x78684F).opacity(0.35)
         }
     }
 
@@ -590,6 +698,7 @@ extension SurroundTheme {
         case .standard: color == .black ? .white : Color(white: 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
+        case .surroundStudio: color == .black ? Color(themeHex: 0xFFF9ED) : Color(themeHex: 0x303631)
         }
     }
 
@@ -601,30 +710,46 @@ extension SurroundTheme {
             color == .black ? Color(themeHex: 0xC9BEEB) : Color(themeHex: 0x5E5670)
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackSecondary : RakedGardenColors.whiteSecondary
+        case .surroundStudio:
+            color == .black ? Color(themeHex: 0xD8D8CB) : Color(themeHex: 0x5B6155)
         }
     }
 
-    /// Garden keeps OGS's role hues while adapting their lightness to the
-    /// basalt or jade chip. Other themes retain their existing role colors.
+    /// The natural themes keep OGS's role hues while adapting their
+    /// lightness to the dark or pale chip.
     func identityRoleColor(for player: OGSUser, on color: StoneColor) -> Color? {
-        guard self == .rakedGarden else { return nil }
+        guard usesLightSceneSurfaces else { return nil }
         let darkSurface = color == .black
+        if self == .rakedGarden {
+            if player.isOGSModerator || player.isOGSAdmin {
+                return darkSurface ? RakedGardenColors.darkModerator : RakedGardenColors.lightModerator
+            }
+            if player.isOGSProfessional {
+                return darkSurface ? RakedGardenColors.darkProfessional : RakedGardenColors.lightProfessional
+            }
+            if player.isOGSSupporter {
+                return darkSurface ? RakedGardenColors.darkSupporter : RakedGardenColors.lightSupporter
+            }
+            if player.isBot == true || player.uiClass?.contains("bot") == true {
+                return identitySecondary(color)
+            }
+            return darkSurface ? RakedGardenColors.darkOrdinary : RakedGardenColors.lightOrdinary
+        }
         // Match OGSUser.uiColor's priority, including lightweight ui_class
         // payloads: moderator/admin, professional, supporter, then bot.
         if player.isOGSModerator || player.isOGSAdmin {
-            return darkSurface ? RakedGardenColors.darkModerator : RakedGardenColors.lightModerator
+            return Color(themeHex: darkSurface ? 0xDDC4F4 : 0x633889)
         }
         if player.isOGSProfessional {
-            return darkSurface ? RakedGardenColors.darkProfessional : RakedGardenColors.lightProfessional
+            return Color(themeHex: darkSurface ? 0xBCE6B3 : 0x245925)
         }
         if player.isOGSSupporter {
-            return darkSurface ? RakedGardenColors.darkSupporter : RakedGardenColors.lightSupporter
+            return Color(themeHex: darkSurface ? 0xF3D69A : 0x854416)
         }
         if player.isBot == true || player.uiClass?.contains("bot") == true {
             return identitySecondary(color)
         }
-        return darkSurface ? RakedGardenColors.darkOrdinary : RakedGardenColors.lightOrdinary
-
+        return Color(themeHex: darkSurface ? 0xB5D7FF : 0x20518B)
     }
 }
 
@@ -664,7 +789,7 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.surroundTheme, theme)
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
-            .foregroundColor(theme == .rakedGarden ? theme.foreground : nil)
+            .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
@@ -789,7 +914,78 @@ struct GameDetailBackdrop: View {
             NebulaPearlScene()
         case .rakedGarden:
             RakedGardenScene(scheme: colorScheme)
+        case .surroundStudio:
+            SurroundStudioScene()
         }
+    }
+}
+
+/// A single overhead room across Game Detail, including divided displays.
+/// Architecture and the six-mat floor share one uniform image scale.
+/// The board keeps its own square geometry and independent kaya surface.
+private struct SurroundStudioScene: View {
+    var body: some View {
+        GeometryReader { geometry in
+            SurroundStudioSceneContent(size: geometry.size).equatable()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The room and its decorations depend only on the viewport. Opening a
+/// panel never rearranges the room. Top-leading alignment retains timber.
+private struct SurroundStudioSceneContent: View, Equatable {
+    let size: CGSize
+    private static let ivory = Color(themeHex: 0xE8DDC7)
+
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    /// Short landscape windows place the unbacked navigation title over
+    /// the shoji rail. Keep an ivory plateau behind that band, blending the
+    /// adjustment continuously away as the window becomes taller or square.
+    private var shortWideChromeWeight: CGFloat {
+        min(1, max(0, (size.width - size.height) / 160))
+            * min(1, max(0, (600 - size.height) / 120))
+    }
+
+    private var topFadeHeight: CGFloat {
+        let ordinaryHeight = min(110, size.height * 0.18)
+        return ordinaryHeight + (max(100, ordinaryHeight) - ordinaryHeight) * shortWideChromeWeight
+    }
+
+    var body: some View {
+        ZStack {
+            Self.ivory
+            Image("SurroundStudioScene")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .clipped()
+            // Support native bars locally, leaving the room and board free
+            // of a global scrim. Older toolbars have no glass of their own.
+            VStack(spacing: 0) {
+                LinearGradient(stops: [
+                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.94 : 0.82), location: 0),
+                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.92
+                        : 0.24 + 0.58 * Double(shortWideChromeWeight)), location: 0.55),
+                    .init(color: .clear, location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: topFadeHeight)
+                Spacer(minLength: 0)
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.90 : 0.24), location: 0.55),
+                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.94 : 0.78), location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(96, size.height * 0.16))
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
 }
 
@@ -807,10 +1003,77 @@ struct GameDetailSceneForeground: View {
                     RakedGardenForegroundContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
                 }
+            } else if theme == .surroundStudio {
+                GeometryReader { geometry in
+                    SurroundStudioFoliageContent(size: geometry.size,
+                                                 hasTopEdgeClocks: hasTopEdgeClocks).equatable()
+                }
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Like Raked Garden, the canopy follows the viewport independently of game
+/// panels, keeping its natural leaf scale through mode and orientation changes.
+struct SurroundStudioDecorationLayout: Equatable {
+    let foliage: CGRect
+
+    init(size: CGSize, usesLegacyChrome: Bool = false, hasTopEdgeClocks: Bool = false) {
+        let width = size.width.isFinite ? max(0, size.width) : 0
+        let height = size.height.isFinite ? max(0, size.height) : 0
+        let shortSide = min(width, height)
+        let tileSide = min(260, max(176, shortSide * 0.5))
+        let roomy = min(1, max(0, (shortSide - 430) / 250))
+        let portrait = min(1, max(0, (height / max(1, width) - 1) * 2))
+        // A conservative, fixed top reach keeps
+        // the foreground clear of clocks and panel text through mode changes.
+        let foliageSide = tileSide * 1.5
+        let heightLimit: CGFloat = usesLegacyChrome ? 80 : hasTopEdgeClocks ? 88 : 128 - 18 * roomy
+        // Phone landscape can place a board under this corner. Reserve that
+        // clearance in every mode so opening Chat cannot move the canopy.
+        let shallowLandscape = min(1, max(0, width / max(1, height) - 1)) * (1 - roomy)
+        // A small floating portrait window also puts its clock cards close
+        // to the title bar, even though it has a portrait aspect ratio.
+        let shortPortrait = portrait * min(1, max(0, (700 - height) / 152))
+        let visibleHeight = min(heightLimit, 128 - 44 * shallowLandscape - 58 * shortPortrait)
+        foliage = CGRect(x: width - foliageSide * 0.66 + 12 * roomy, y: visibleHeight - foliageSide,
+                         width: foliageSide, height: foliageSide)
+    }
+}
+
+private struct SurroundStudioFoliageContent: View, Equatable {
+    let size: CGSize
+    let hasTopEdgeClocks: Bool
+
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    var body: some View {
+        let layout = SurroundStudioDecorationLayout(size: size,
+                                                    usesLegacyChrome: usesLegacyChrome,
+                                                    hasTopEdgeClocks: hasTopEdgeClocks)
+        Image("SurroundStudioFoliage")
+            .resizable()
+            .frame(width: layout.foliage.width, height: layout.foliage.height)
+            .shadow(color: Color(themeHex: 0x342F21).opacity(0.16), radius: 3, x: 3, y: 5)
+            .position(x: layout.foliage.midX, y: layout.foliage.midY)
+            .frame(width: size.width, height: size.height)
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(stops: [
+                        .init(color: .white.opacity(usesLegacyChrome ? 0.08 : 0.18), location: 0),
+                        .init(color: .white.opacity(usesLegacyChrome ? 0.12 : 0.65), location: 0.55),
+                        .init(color: .white, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: usesLegacyChrome ? 80 : 100)
+                    Color.white
+                }
+            }
+            .clipped()
     }
 }
 

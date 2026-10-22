@@ -224,36 +224,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testRakedGardenThemeOrientations() {
-        let app = launchGame(artboard: 17, theme: "rakedGarden", appearance: .light)
-        defer {
-            XCUIDevice.shared.orientation = .landscapeLeft
-            app.terminate()
-        }
-        setSidebarCollapsed(true, in: app)
-        let board = element(ID.gameBoard, in: app)
-        let value = board.value as? String
-        XCTAssertNotNil(value, "The audit records an identifiable board position")
-        for portrait in [false, true] {
-            XCUIDevice.shared.orientation = portrait ? .portrait : .landscapeLeft
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                let window = app.windows.firstMatch.frame
-                return (window.height > window.width) == portrait
-                    && abs(board.frame.width - board.frame.height) < 1
-                    && window.insetBy(dx: -1, dy: -1).contains(board.frame)
-            }, "The square themed board fits the active window after rotation")
-            XCTAssertEqual(board.value as? String, value, "Rotation retains the displayed position")
-            capture(17, "Raked Garden Play", in: app,
-                    note: "The same game is retained through native rotation.",
-                    suffix: portrait ? "-raked-garden-portrait" : "-raked-garden-landscape")
-        }
-        XCUIDevice.shared.orientation = .landscapeLeft
-        XCTAssertTrue(pollUntil(timeout: 10) {
-            let window = app.windows.firstMatch.frame
-            return window.width > window.height
-        })
-        tap(app.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: app)
-        element(ID.screenHome, in: app)
-        keepScreenshot("raked-garden-ipad-home-after-back", in: app)
+        auditThemeOrientations(theme: "rakedGarden", title: "Raked Garden", suffix: "-raked-garden",
+                               appearance: .light)
     }
 
     /// Use the real device appearance, without a fixed launch override, so
@@ -421,15 +393,88 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         return sum / Double(count)
     }
 
+    func testSurroundStudioThemeOrientations() {
+        auditThemeOrientations(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+    }
+
+    private func auditThemeOrientations(theme: String, title: String, suffix: String,
+                                        appearance: SurroundUITestContract.Appearance? = nil) {
+        let app = launchGame(artboard: 17, theme: theme, appearance: appearance)
+        defer {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            app.terminate()
+        }
+        setSidebarCollapsed(true, in: app)
+        let board = element(ID.gameBoard, in: app)
+        let value = board.value as? String
+        XCTAssertNotNil(value, "The audit records an identifiable board position")
+        for portrait in [false, true] {
+            XCUIDevice.shared.orientation = portrait ? .portrait : .landscapeLeft
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let window = app.windows.firstMatch.frame
+                return (window.height > window.width) == portrait
+                    && abs(board.frame.width - board.frame.height) < 1
+                    && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+            }, "The square themed board fits the active window after rotation")
+            XCTAssertEqual(board.value as? String, value, "Rotation retains the displayed position")
+            capture(17, "\(title) Play", in: app,
+                    note: "The same game is retained through native rotation.",
+                    suffix: portrait ? "\(suffix)-portrait" : "\(suffix)-landscape")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height
+        })
+        tap(app.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: app)
+        element(ID.screenHome, in: app)
+        keepScreenshot("\(suffix.dropFirst())-ipad-home-after-back", in: app)
+    }
+
     func testRakedGardenThemePanels() {
+        auditThemePanels(theme: "rakedGarden", title: "Raked Garden", suffix: "-raked-garden",
+                         appearance: .light)
+    }
+
+    func testSurroundStudioThemePanels() {
+        auditThemePanels(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+    }
+
+    func testSurroundStudioThemePanelTransitions() {
+        let app = launchGame(artboard: 17, portrait: true, theme: "surroundStudio")
+        defer {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            app.terminate()
+        }
+        setSidebarCollapsed(true, in: app)
+        let board = element(ID.gameBoard, in: app)
+        let value = board.value as? String
+        for portrait in [true, false] {
+            XCUIDevice.shared.orientation = portrait ? .portrait : .landscapeLeft
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let window = app.windows.firstMatch.frame
+                return (window.height > window.width) == portrait
+            })
+            XCTAssertEqual(board.value as? String, value, "Rotation retains the same game position")
+            let orientation = portrait ? "portrait" : "landscape"
+            auditStudioPanelTransitions(in: app) { step in
+                self.capture(17, "Surround Studio \(orientation), \(step)", in: app,
+                             note: "Same session; compare fixed decoration across panel transitions.",
+                             suffix: "-surround-studio-transition-\(orientation)-\(step)")
+            }
+        }
+    }
+
+    private func auditThemePanels(theme: String, title: String, suffix: String,
+                                  appearance: SurroundUITestContract.Appearance? = nil) {
         defer { XCUIDevice.shared.orientation = .landscapeLeft }
         for (number, portrait, state) in [
             (3, false, "chat"), (14, true, "chat"),
             (24, false, "analyze"), (26, true, "analyze"),
             (38, false, "zen"), (40, true, "zen"),
         ] {
-            let app = launchGame(artboard: number, portrait: portrait, theme: "rakedGarden",
-                                 appearance: .light)
+            let app = launchGame(artboard: number, portrait: portrait, theme: theme,
+                                 appearance: appearance)
             setSidebarCollapsed(true, in: app)
             auditChat(state == "chat", in: app)
             if state == "chat" {
@@ -442,7 +487,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                 auditToolbarAction(ID.gameZenEnter, label: "Zen mode", in: app)
                 assertZenHidesChrome(in: app)
             }
-            capture(number, "Raked Garden \(state)", in: app, suffix: "-raked-garden")
+            capture(number, "\(title) \(state)", in: app, suffix: suffix)
             app.terminate()
         }
     }
@@ -1171,7 +1216,15 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testNarrowNativeWindowArtboard() {
-        let app = launchGame(artboard: 84, portrait: true)
+        auditNarrowNativeWindowArtboard()
+    }
+
+    func testSurroundStudioThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "surroundStudio", suffix: "-surround-studio")
+    }
+
+    private func auditNarrowNativeWindowArtboard(theme: String? = nil, suffix: String = "") {
+        let app = launchGame(artboard: 84, portrait: true, theme: theme)
         setSidebarCollapsed(true, in: app)
         // iPadOS 26 exposes its native resize grabber at the lower-right corner.
         // This is a real windowing gesture, never an injected SwiftUI viewport.
@@ -1201,7 +1254,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         }
         let after = window.frame
         capture(84, "Native iPad minimum window, 375 × 548", in: app,
-                note: "Requested native 375 × 548 viewport by resize grabber. Before: \(before); after: \(after).")
+                note: "Requested native 375 × 548 viewport by resize grabber. Before: \(before); after: \(after).",
+                suffix: suffix)
         XCTAssertEqual(after.width, 375, accuracy: 1, "Capture the design's actual native window width")
         XCTAssertEqual(after.height, 548, accuracy: 1, "Capture the design's actual native window height")
     }
@@ -1229,6 +1283,47 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
 // Inspect rendered nodes instead of trusting the layout's orientation flag. A
 // Book-tall tree can be taller than it is wide and must still flow horizontally.
 extension SurroundJourneyUITestCase {
+    /// Keep one live fixture through real toolbar toggles so scene movement
+    /// remains visible in the captures instead of being hidden by relaunches.
+    func auditStudioPanelTransitions(in app: XCUIApplication, capture: (String) -> Void) {
+        typealias ID = SurroundUITestContract.AccessibilityID
+        let board = element(ID.gameBoard, in: app)
+        let value = board.value as? String
+        XCTAssertNotNil(value, "The transition audit records an identifiable game position")
+        let chat = app.scrollViews[ID.gameChatLog].firstMatch
+        let controls = app.descendants(matching: .any)
+            .matching(identifier: ID.gameAnalyzeControlBar).firstMatch
+
+        func record(_ step: String, chatVisible: Bool = false, analyzing: Bool = false) {
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let window = app.windows.firstMatch.frame
+                return chat.exists == chatVisible && controls.exists == analyzing
+                    && abs(board.frame.width - board.frame.height) < 1
+                    && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+            }, "\(step): only the requested panel is visible and the square board fits")
+            XCTAssertEqual(board.value as? String, value,
+                           "\(step): toggling a panel preserves the displayed position")
+            if chatVisible {
+                element(ID.gameChatInput, in: app, matching: .textField)
+            } else {
+                XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
+            }
+            Thread.sleep(forTimeInterval: 0.7)
+            capture(step)
+        }
+
+        record("01-play")
+        setGameChatVisible(true, in: app)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        record("02-chat", chatVisible: true)
+        setGameChatVisible(false, in: app)
+        record("03-play-after-chat")
+        setGameAnalyzing(true, in: app)
+        record("04-analyze", analyzing: true)
+        setGameAnalyzing(false, in: app)
+        record("05-play-after-analyze")
+    }
+
     /// Names survive xcresult attachment export and join to the design matrix.
     /// The host records build/device UUID provenance separately in the run ledger.
     func recordArtboardCapture(_ number: Int, screenshotName: String,
