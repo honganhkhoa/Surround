@@ -3,6 +3,242 @@ import SwiftUI
 import CoreGraphics
 
 final class SurroundThemeTests: XCTestCase {
+    func testBoardDepthIsLimitedToNebulaAndBothStudioAppearances() throws {
+        for theme: SurroundTheme in [.standard, .rakedGarden] {
+            for scheme: ColorScheme in [.light, .dark] {
+                XCTAssertNil(theme.board(for: scheme).boardDepth)
+            }
+        }
+        let nebula = try XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth)
+        let day = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
+        let night = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)
+        for depth in [nebula, day, night] {
+            XCTAssertGreaterThan(depth.thicknessRatio, 0)
+            XCTAssertGreaterThan(depth.maximumThickness, 0)
+        }
+        XCTAssertEqual(day.thicknessRatio, night.thicknessRatio,
+                       "Changing appearance must not move the playing surface")
+        XCTAssertEqual(day.maximumThickness, night.maximumThickness)
+        XCTAssertNotEqual(day.upperFace, night.upperFace)
+        XCTAssertNotEqual(day.lowerFace, night.lowerFace)
+    }
+
+    /// Compact boards keep their exact slot, including rectangular previews;
+    /// disabling depth for a widget must preserve that footprint at any size.
+    func testBoardDepthKeepsCompactAndDisabledFootprintsUnchanged() {
+        let depths: [BoardDepth?] = [nil, SurroundTheme.nebulaPearl.board.boardDepth,
+                                    SurroundTheme.surroundStudio.board(for: .light).boardDepth,
+                                    SurroundTheme.surroundStudio.board(for: .dark).boardDepth]
+        for depth in depths {
+            for boardSize in [9, 13, 19] {
+                for coordinates in [false, true] {
+                    let count = boardSize + (coordinates ? 1 : 0)
+                    for scale: CGFloat in [2, 3] {
+                        let cells: [CGFloat] = depth == nil ? [0, 7, 13, 14, 20, 40, 64]
+                            : [0, 7, 13, 14 - 1 / scale, 14]
+                        for cell in cells {
+                            let side = cell * CGFloat(count)
+                            for size in [CGSize(width: side, height: side),
+                                         CGSize(width: side, height: side + 28)] {
+                                let layout = BoardDepthGeometry(containerSize: size, boardWidth: boardSize,
+                                                                boardHeight: boardSize, showsCoordinates: coordinates,
+                                                                displayScale: scale, depth: depth)
+                                XCTAssertEqual(layout.thickness, 0)
+                                XCTAssertEqual(layout.cornerRadius, 0)
+                                XCTAssertEqual(layout.shadowRadius, 0)
+                                XCTAssertEqual(layout.shadowOffset, 0)
+                                XCTAssertEqual(layout.faceRect, CGRect(origin: .zero, size: size),
+                                               "A flat board must not shrink or shift its grid")
+                                let flat = BoardDepthGeometry(containerSize: size, boardWidth: boardSize,
+                                                              boardHeight: boardSize, showsCoordinates: coordinates,
+                                                              displayScale: scale, depth: nil)
+                                XCTAssertEqual(layout.cellSize, flat.cellSize)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The wall and its shadow fade stay inside the board's clipped slot.
+    /// Corner rounding must preserve the stones at outer intersections.
+    /// Check every native-pixel step, coordinate margin and detail cutoff.
+    func testBoardDepthFitsPhoneAndTabletSlotsWithoutLosingDetailedCells() throws {
+        let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)]
+        for depth in depths {
+            for boardSize in [9, 13, 19] {
+                for coordinates in [false, true] {
+                    let count = boardSize + (coordinates ? 1 : 0)
+                    for scale: CGFloat in [2, 3] {
+                        for pixels in Int(7 * scale)...Int(64 * scale) {
+                            let side = CGFloat(pixels) / scale * CGFloat(count)
+                            let layout = BoardDepthGeometry(containerSize: CGSize(width: side, height: side),
+                                                            boardWidth: boardSize, boardHeight: boardSize,
+                                                            showsCoordinates: coordinates, displayScale: scale, depth: depth)
+                            let detail = "board=\(boardSize), coordinates=\(coordinates), pixels=\(pixels), scale=\(scale)"
+                            let face = layout.faceRect
+                            for value in [face.minX, face.minY, face.width, face.height,
+                                          layout.thickness, layout.cellSize, layout.cornerRadius,
+                                          layout.shadowRadius, layout.shadowOffset] {
+                                XCTAssertTrue(value.isFinite, detail)
+                                XCTAssertGreaterThanOrEqual(value, 0, detail)
+                            }
+                            XCTAssertEqual(face.width, face.height, accuracy: 0.000001, detail)
+                            XCTAssertEqual(face.midX, side / 2, accuracy: 0.000001, detail)
+                            XCTAssertLessThanOrEqual(face.maxX, side + 0.000001, detail)
+                            XCTAssertLessThanOrEqual(face.maxY + layout.thickness, side + 0.000001, detail)
+                            XCTAssertLessThanOrEqual(layout.thickness, depth.maximumThickness, detail)
+                            XCTAssertLessThanOrEqual(layout.cornerRadius, layout.cellSize / 2,
+                                                    "Keep an edge stone's complete silhouette: \(detail)")
+                            assertBoardShadowFits(layout, in: CGSize(width: side, height: side), detail: detail)
+                            XCTAssertEqual(layout.cellSize * scale, (layout.cellSize * scale).rounded(),
+                                           accuracy: 0.000001, detail)
+                            if layout.thickness > 0 {
+                                XCTAssertGreaterThanOrEqual(layout.cellSize, 14,
+                                                            "Depth must not turn detailed stones flat: \(detail)")
+                                XCTAssertGreaterThan(layout.cornerRadius, 0, detail)
+                                XCTAssertGreaterThan(layout.shadowRadius, 0, detail)
+                            }
+                            if CGFloat(pixels) / scale >= 20 {
+                                XCTAssertGreaterThan(layout.thickness, 0, detail)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Depth grows continuously out of the flat board rather than inserting
+    /// a fixed inset on the frame where detailed rendering becomes active.
+    func testBoardDepthStartsContinuouslyAtTheDetailThreshold() throws {
+        let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth)]
+        let epsilon: CGFloat = 0.0001
+        for depth in depths {
+            for count in [9, 10, 13, 14, 19, 20] {
+                for scale: CGFloat in [2, 3] {
+                    let side = CGFloat(count) * 14
+                    let before = BoardDepthGeometry(containerSize: CGSize(width: side - epsilon, height: side - epsilon),
+                                                    boardWidth: count, boardHeight: count, showsCoordinates: false,
+                                                    displayScale: scale, depth: depth)
+                    let at = BoardDepthGeometry(containerSize: CGSize(width: side, height: side),
+                                                boardWidth: count, boardHeight: count, showsCoordinates: false,
+                                                displayScale: scale, depth: depth)
+                    let after = BoardDepthGeometry(containerSize: CGSize(width: side + epsilon, height: side + epsilon),
+                                                   boardWidth: count, boardHeight: count, showsCoordinates: false,
+                                                   displayScale: scale, depth: depth)
+                    XCTAssertEqual(before.thickness, 0)
+                    XCTAssertEqual(at.thickness, 0)
+                    XCTAssertGreaterThan(after.thickness, 0)
+                    XCTAssertLessThan(after.thickness, epsilon)
+                    for (beforeValue, atValue, afterValue) in [
+                        (before.cornerRadius, at.cornerRadius, after.cornerRadius),
+                        (before.shadowRadius, at.shadowRadius, after.shadowRadius),
+                        (before.shadowOffset, at.shadowOffset, after.shadowOffset)
+                    ] {
+                        XCTAssertEqual(beforeValue, 0)
+                        XCTAssertEqual(atValue, 0)
+                        XCTAssertGreaterThan(afterValue, 0)
+                        XCTAssertLessThan(afterValue, epsilon,
+                                          "Rounding and shadow must grow continuously with depth")
+                    }
+                    XCTAssertLessThan(abs(after.faceRect.width - at.faceRect.width), epsilon * 2)
+                    XCTAssertLessThan(abs(after.faceRect.minX - at.faceRect.minX), epsilon)
+                    XCTAssertLessThan(abs(after.faceRect.minY - at.faceRect.minY), epsilon)
+                    XCTAssertGreaterThanOrEqual(after.cellSize, 14)
+                }
+            }
+        }
+    }
+
+    /// A rectangular board's shorter coordinate gutter can make its cells
+    /// compact even when dividing the slot by the longer dimension suggests
+    /// detail. Such boards must not shrink to reserve an invisible sidewall.
+    func testRectangularCoordinateBoardsKeepTheirCompactFootprint() throws {
+        let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board.boardDepth)]
+        let cases: [(Int, Int, CGFloat)] = [(9, 19, 285), (9, 19, 290),
+                                          (19, 9, 285), (19, 9, 290), (13, 19, 285)]
+        for depth in depths {
+            for (width, height, side) in cases {
+                for scale: CGFloat in [2, 3] {
+                    let size = CGSize(width: side, height: side)
+                    let layout = BoardDepthGeometry(containerSize: size, boardWidth: width, boardHeight: height,
+                                                    showsCoordinates: true, displayScale: scale, depth: depth)
+                    let grid = boardGridSize(containerSize: layout.faceRect.size, boardWidth: width,
+                                             boardHeight: height, showsCoordinates: true)
+                    let renderedCell = floor(min(grid.width, grid.height) / CGFloat(max(width, height)) * scale) / scale
+                    XCTAssertLessThan(renderedCell, 14)
+                    XCTAssertEqual(layout.cellSize, renderedCell)
+                    XCTAssertEqual(layout.thickness, 0)
+                    XCTAssertEqual(layout.cornerRadius, 0)
+                    XCTAssertEqual(layout.shadowRadius, 0)
+                    XCTAssertEqual(layout.shadowOffset, 0)
+                    XCTAssertEqual(layout.faceRect, CGRect(origin: .zero, size: size),
+                                   "Compact \(width)×\(height) coordinates must retain their original grid")
+                }
+            }
+        }
+    }
+
+    /// Match the grid the renderer actually receives, including rectangular
+    /// boards and nonsquare layout proposals, before deciding to show depth.
+    func testBoardDepthCellSizeMatchesTheRenderedGridForRectangularBoards() throws {
+        let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)]
+        let sizes = [CGSize(width: 290, height: 290), CGSize(width: 400, height: 400),
+                     CGSize(width: 600, height: 600), CGSize(width: 390, height: 844),
+                     CGSize(width: 844, height: 390)]
+        for depth in depths {
+            for (width, height) in [(9, 19), (19, 9), (13, 19), (19, 13)] {
+                for size in sizes {
+                    for coordinates in [false, true] {
+                        for scale: CGFloat in [2, 3] {
+                            let layout = BoardDepthGeometry(containerSize: size, boardWidth: width, boardHeight: height,
+                                                            showsCoordinates: coordinates, displayScale: scale, depth: depth)
+                            let grid = boardGridSize(containerSize: layout.faceRect.size, boardWidth: width,
+                                                     boardHeight: height, showsCoordinates: coordinates)
+                            let renderedCell = floor(min(grid.width, grid.height) / CGFloat(max(width, height)) * scale) / scale
+                            XCTAssertEqual(layout.cellSize, renderedCell,
+                                           "\(width)×\(height), slot=\(size), coordinates=\(coordinates), scale=\(scale)")
+                            if layout.thickness > 0 {
+                                XCTAssertGreaterThanOrEqual(renderedCell, 14,
+                                                            "Depth must never reserve space for a compact rendered grid")
+                            }
+                            XCTAssertGreaterThanOrEqual(layout.faceRect.minX, 0)
+                            XCTAssertGreaterThanOrEqual(layout.faceRect.minY, 0)
+                            XCTAssertLessThanOrEqual(layout.faceRect.maxX, size.width + 0.000001)
+                            XCTAssertLessThanOrEqual(layout.faceRect.maxY + layout.thickness, size.height + 0.000001)
+                            XCTAssertLessThanOrEqual(layout.cornerRadius, renderedCell / 2)
+                            assertBoardShadowFits(layout, in: size,
+                                                  detail: "\(width)×\(height), slot=\(size), coordinates=\(coordinates)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The board slot clips its contents. Reserve the visible shadow fade
+    /// around the entire slab, including its downward offset, rather than
+    /// checking only that the solid face fits.
+    private func assertBoardShadowFits(_ layout: BoardDepthGeometry, in size: CGSize, detail: String,
+                                      file: StaticString = #filePath, line: UInt = #line) {
+        let slab = CGRect(x: layout.faceRect.minX, y: layout.faceRect.minY,
+                          width: layout.faceRect.width, height: layout.faceRect.height + layout.thickness)
+        let shadowBounds = slab.offsetBy(dx: 0, dy: layout.shadowOffset)
+            .insetBy(dx: -3 * layout.shadowRadius, dy: -3 * layout.shadowRadius)
+        XCTAssertGreaterThanOrEqual(shadowBounds.minX, -0.000001, detail, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(shadowBounds.minY, -0.000001, detail, file: file, line: line)
+        XCTAssertLessThanOrEqual(shadowBounds.maxX, size.width + 0.000001, detail, file: file, line: line)
+        XCTAssertLessThanOrEqual(shadowBounds.maxY, size.height + 0.000001, detail, file: file, line: line)
+    }
+
     /// A last-move ring must leave the stone's color and an open center
     /// visible at phone sizes, including either side of the former 20 pt jump.
     func testPhoneLastMoveRingsPreserveTheStoneFace() {

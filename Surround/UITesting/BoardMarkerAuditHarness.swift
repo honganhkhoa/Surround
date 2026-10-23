@@ -56,6 +56,12 @@ private struct MarkerAuditSample: Identifiable {
     /// Points that carry the sample's main mark, for artwork-variant provenance.
     var targets: [[Int]] = []
     var notes = ""
+
+    @MainActor
+    func containerSize(for cellSize: CGFloat) -> CGSize {
+        let side = cellSize * CGFloat(MarkerAuditFixtures.boardSize + (coordinates ? 1 : 0))
+        return CGSize(width: side, height: side)
+    }
 }
 
 @MainActor
@@ -357,11 +363,11 @@ private struct MarkerAuditSampleView: View {
     }
 
     var body: some View {
-        let side = cellSize * CGFloat(MarkerAuditFixtures.boardSize + (sample.coordinates ? 1 : 0))
+        let size = sample.containerSize(for: cellSize)
         VStack(alignment: .leading, spacing: 4) {
             Text(sample.title).font(.caption2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             if showsIdentifier { Text(sample.id).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary) }
-            board.frame(width: side, height: side)
+            board.frame(width: size.width, height: size.height)
         }
     }
 }
@@ -565,15 +571,29 @@ private enum MarkerAuditExporter {
         let theme: String
         let appearance: String
         let requestedCellSize: Double
+        /// Representative first sample; mixed panels use `sampleGeometries`.
         let actualCellSize: Double
         let displayScale: Double
         let rendererScale: Double
         let pixelWidth: Int
         let pixelHeight: Int
         let sampleIDs: [String]
+        let sampleGeometries: [SampleGeometryRecord]
+    }
+    private struct SampleGeometryRecord: Encodable {
+        let sampleID: String
+        let containerWidth: Double
+        let containerHeight: Double
+        let actualCellSize: Double
+        /// Point coordinates relative to this sample's board container.
+        let faceOriginX: Double
+        let faceOriginY: Double
+        let faceWidth: Double
+        let faceHeight: Double
+        let depthThickness: Double
     }
     private struct Manifest: Encodable {
-        var schemaVersion = 1
+        var schemaVersion = 2
         let runID: String
         let startedAt: String
         var completedAt: String? = nil
@@ -600,7 +620,7 @@ private enum MarkerAuditExporter {
         let error: String?
     }
     private struct FailedManifest: Encodable {
-        let schemaVersion = 1
+        let schemaVersion = 2
         let runID: String
         let state = "error"
         let error: String
@@ -667,13 +687,17 @@ private enum MarkerAuditExporter {
                                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
                                 return (cgImage.width, cgImage.height)
                             }
+                            let sampleGeometries = samples.map {
+                                geometryRecord($0, appearance: appearance, cellSize: size, scale: scale)
+                            }
                             manifest!.panels.append(PanelRecord(file: "\(runID)/\(name)", theme: appearance.theme.rawValue,
                                                                appearance: appearance.scheme == .dark ? "dark" : "light",
                                                                requestedCellSize: Double(size),
-                                                               actualCellSize: Double(floor(size * scale) / scale),
+                                                               actualCellSize: sampleGeometries[0].actualCellSize,
                                                                displayScale: Double(scale), rendererScale: Double(scale),
                                                                pixelWidth: dimensions.0, pixelHeight: dimensions.1,
-                                                               sampleIDs: samples.map(\.id)))
+                                                               sampleIDs: samples.map(\.id),
+                                                               sampleGeometries: sampleGeometries))
                             try write(Progress(state: "rendering", runID: runID, completedPanels: count + 1, totalPanels: total,
                                                currentPanel: name, error: nil), to: root.appendingPathComponent("progress.json"))
                             await Task.yield()
@@ -710,6 +734,22 @@ private enum MarkerAuditExporter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(value).write(to: url, options: .atomic)
+    }
+
+    private static func geometryRecord(_ sample: MarkerAuditSample, appearance: MarkerAuditAppearance,
+                                       cellSize: CGFloat, scale: CGFloat) -> SampleGeometryRecord {
+        let size = sample.containerSize(for: cellSize)
+        let geometry = BoardDepthGeometry(
+            containerSize: size,
+            boardWidth: sample.position.width, boardHeight: sample.position.height, showsCoordinates: sample.coordinates,
+            displayScale: scale,
+            depth: sample.renderingMode == .fullColor ? appearance.theme.board(for: appearance.scheme).boardDepth : nil)
+        return SampleGeometryRecord(sampleID: sample.id,
+                                    containerWidth: Double(size.width), containerHeight: Double(size.height),
+                                    actualCellSize: Double(geometry.cellSize),
+                                    faceOriginX: Double(geometry.faceRect.minX), faceOriginY: Double(geometry.faceRect.minY),
+                                    faceWidth: Double(geometry.faceRect.width), faceHeight: Double(geometry.faceRect.height),
+                                    depthThickness: Double(geometry.thickness))
     }
 
     private static func record(_ sample: MarkerAuditSample) -> SampleRecord {

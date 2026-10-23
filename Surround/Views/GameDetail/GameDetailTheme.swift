@@ -48,6 +48,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             // texture, tint or bevel. Shared rendering retains the 14 pt cutoff.
             night.compactBoardColor = Color(themeHex: 0xA58A5A)
             night.boardEdge = Color(themeHex: 0xC6BA9C).opacity(0.65)
+            night.boardDepth = BoardDepth(
+                upperFace: Color(themeHex: 0x756043), lowerFace: Color(themeHex: 0x423623),
+                highlight: Color(themeHex: 0xD8C6A3).opacity(0.3),
+                shade: Color(themeHex: 0x30271E).opacity(0.7), shadow: .black.opacity(0.4),
+                thicknessRatio: 0.012, maximumThickness: 8)
             night.boardTexture?.tint = Color(themeHex: 0xB2B6C1)
             // Keep slate neutral and shell ivory: the warm kaya and the
             // moonlit room must not give the stones a green-blue cast.
@@ -134,6 +139,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 boardEdge: Color(themeHex: 0x8E97C8).opacity(0.3),
                 boardTexture: NebulaPearlAssets.board,
                 boardBevel: true,
+                boardDepth: BoardDepth(
+                    upperFace: Color(themeHex: 0x252D4D), lowerFace: Color(themeHex: 0x090E20),
+                    highlight: Color(themeHex: 0xBEC9EF).opacity(0.38),
+                    shade: Color(themeHex: 0x080C1C).opacity(0.8), shadow: .black.opacity(0.5),
+                    thicknessRatio: 0.009, maximumThickness: 6),
                 // The concept's board catches the scene's light from the upper
                 // left. It lightens most of the surface, brightest in that
                 // corner, which also sets the dark glass off as a shape.
@@ -244,6 +254,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 boardEdge: Color(themeHex: 0x79522F).opacity(0.65),
                 boardTexture: SurroundStudioAssets.board,
                 boardBevel: true,
+                boardDepth: BoardDepth(
+                    upperFace: Color(themeHex: 0xBA803D), lowerFace: Color(themeHex: 0x79491F),
+                    highlight: Color(themeHex: 0xFFE0A6).opacity(0.45),
+                    shade: Color(themeHex: 0x65401F).opacity(0.7), shadow: Color(themeHex: 0x342316).opacity(0.35),
+                    thicknessRatio: 0.012, maximumThickness: 8),
                 // The kaya grain stays quiet; exact charcoal lines and all
                 // game marks are drawn above it by the shared native board.
                 gridLineScale: 1.2,

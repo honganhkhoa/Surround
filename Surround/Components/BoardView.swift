@@ -447,18 +447,45 @@ private enum BoardTextureImages {
     }
 }
 
-/// A border inside the board drawn as four edge strips, its colors running
-/// from the top-left corner through the middle to the bottom-right one like
-/// a diagonal gradient across the square board. A stroked outline, above all
-/// a gradient one, is redrawn across the whole board on every frame of a
-/// resize; strips cost only their own area.
+/// The top-left quarter of a rounded bevel, rotated for the other corners.
+private struct BoardBorderCorner: Shape {
+    let width: CGFloat
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        guard radius > 0, width > 0 else { return Path() }
+        let center = CGPoint(x: radius, y: radius)
+        var path = Path()
+        path.addArc(center: center, radius: radius,
+                    startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        path.addLine(to: CGPoint(x: side, y: 0))
+        path.addLine(to: CGPoint(x: side, y: width))
+        path.addLine(to: CGPoint(x: radius, y: width))
+        path.addArc(center: center, radius: max(0, radius - width),
+                    startAngle: .degrees(270), endAngle: .degrees(180), clockwise: true)
+        path.addLine(to: CGPoint(x: width, y: side))
+        path.addLine(to: CGPoint(x: 0, y: side))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Narrow strips and corner patches keep the bevel's rendering work near
+/// the edges, instead of redrawing a board-sized gradient stroke on resize.
 private struct BoardBorder: View {
     let start: Color
     let middle: Color
     let end: Color
     let width: CGFloat
+    var cornerRadius: CGFloat = 0
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
+        // Give each patch a whole-pixel frame, with short straight arms from
+        // its true radius to the strips. Fractional frames can round their
+        // joins differently; overlapping them would double translucent colors.
+        let patchSide = ceil(cornerRadius * displayScale) / displayScale
         ZStack {
             VStack(spacing: 0) {
                 LinearGradient(colors: [start, middle], startPoint: .leading, endPoint: .trailing)
@@ -467,8 +494,8 @@ private struct BoardBorder: View {
                 LinearGradient(colors: [middle, end], startPoint: .leading, endPoint: .trailing)
                     .frame(height: width)
             }
-            // The sides stop at the top and bottom strips, so the corners are
-            // not covered twice.
+            .padding(.horizontal, patchSide)
+            // Square bevels still stop at the top and bottom strips.
             HStack(spacing: 0) {
                 LinearGradient(colors: [start, middle], startPoint: .top, endPoint: .bottom)
                     .frame(width: width)
@@ -476,9 +503,60 @@ private struct BoardBorder: View {
                 LinearGradient(colors: [middle, end], startPoint: .top, endPoint: .bottom)
                     .frame(width: width)
             }
-            .padding(.vertical, width)
+            .padding(.vertical, max(width, patchSide))
+            // Small quarter rings join the strips without rasterizing a
+            // board-sized gradient stroke each time the board resizes.
+            BoardBorderCorner(width: width, radius: cornerRadius).fill(start)
+                .frame(width: patchSide, height: patchSide)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            BoardBorderCorner(width: width, radius: cornerRadius).fill(middle)
+                .frame(width: patchSide, height: patchSide).rotationEffect(.degrees(90))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            BoardBorderCorner(width: width, radius: cornerRadius).fill(middle)
+                .frame(width: patchSide, height: patchSide).rotationEffect(.degrees(-90))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            BoardBorderCorner(width: width, radius: cornerRadius).fill(end)
+                .frame(width: patchSide, height: patchSide).rotationEffect(.degrees(180))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// A shallow material face below the board, contained in its layout slot.
+/// Only this simple silhouette casts a shadow; the stones are never flattened
+/// into an offscreen image to obtain a board-shaped shadow.
+private struct BoardDepthView: View {
+    let material: BoardDepth
+    let thickness: CGFloat
+    let cornerRadius: CGFloat
+    let shadowRadius: CGFloat
+    let shadowOffset: CGFloat
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        GeometryReader { geometry in
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .circular)
+            ZStack(alignment: .bottom) {
+                shape.fill(material.upperFace)
+                LinearGradient(colors: [material.upperFace, material.lowerFace],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .frame(height: thickness + 1 / displayScale)
+            }
+            .overlay {
+                BoardBorder(start: .clear, middle: material.shade.opacity(0.15),
+                            end: material.shade.opacity(0.6),
+                            width: min(1 / displayScale, thickness * 0.2), cornerRadius: cornerRadius)
+            }
+            .clipShape(shape)
+            .background {
+                shape.fill(material.lowerFace)
+                    .shadow(color: material.shadow, radius: shadowRadius, y: shadowOffset)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height + thickness)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -1319,18 +1397,18 @@ struct BoardView: View {
         })
     }
     
-    var body: some View {
+    private func boardFace(in geometry: GeometryProxy, depthGeometry: BoardDepthGeometry) -> some View {
         let width: CGFloat = CGFloat(boardPosition.width)
         let height: CGFloat = CGFloat(boardPosition.height)
-        return GeometryReader { geometry in
+        return Group {
             // The grid's cell, as Goban and Stones size it. Below the detail
             // threshold the surface is its solid color alone; its layers stay
             // in place, hidden, so a resizing board does not fade between two.
-            let gridSide = showsCoordinate
-                ? min(geometry.size.width * width / (width + 1), geometry.size.height * height / (height + 1))
-                : min(geometry.size.width, geometry.size.height)
+            let gridSize = boardGridSize(containerSize: geometry.size, boardWidth: boardPosition.width,
+                                         boardHeight: boardPosition.height, showsCoordinates: showsCoordinate)
             let detailed = usesDetailedStoneRendering(
-                at: floor(gridSide / max(width, height) * displayScale) / displayScale)
+                at: floor(min(gridSize.width, gridSize.height) / max(width, height) * displayScale) / displayScale)
+            let faceRadius = max(cornerRadius, detailed ? depthGeometry.cornerRadius : 0)
             ZStack(alignment: .center) {
                 if widgetRenderingMode == .fullColor {
                     appearance.surfaceColor(detailed: detailed)
@@ -1366,42 +1444,71 @@ struct BoardView: View {
                                     .opacity(detailed ? 1 : 0)
                             }
                         }
-                        .cornerRadius(cornerRadius)
+                        .clipShape(RoundedRectangle(cornerRadius: faceRadius, style: .circular))
                         .overlay {
                             ZStack {
                                 if let edge = appearance.boardEdge {
                                     BoardBorder(start: edge, middle: edge, end: edge, width: 1)
+                                        .opacity(detailed && appearance.boardDepth != nil ? 0 : 1)
                                 }
                                 if appearance.boardBevel {
-                                    BoardBorder(start: .white.opacity(0.18), middle: .clear,
-                                                end: .black.opacity(0.45), width: 3)
+                                    BoardBorder(start: appearance.boardDepth?.highlight ?? .white.opacity(0.18), middle: .clear,
+                                                end: appearance.boardDepth?.shade ?? .black.opacity(0.45),
+                                                width: appearance.boardDepth == nil ? 3 : min(2, depthGeometry.thickness * 0.35),
+                                                cornerRadius: appearance.boardDepth == nil ? 0 : faceRadius)
                                         .opacity(detailed ? 1 : 0)
                                 }
                             }
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                            .clipShape(RoundedRectangle(cornerRadius: faceRadius, style: .circular))
                         }
                         // The board's shape casts the shadow, so the layers above
                         // are not drawn offscreen to find their outline.
                         .background {
-                            RoundedRectangle(cornerRadius: cornerRadius)
-                                .fill(appearance.surfaceColor(detailed: detailed))
-                                .shadow(color: .black.opacity(detailed ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
-                                        radius: appearance.boardBevel ? 10 : 2,
-                                        y: appearance.boardBevel ? 6 : 0)
+                            if let depth = appearance.boardDepth {
+                                ZStack {
+                                    // Retain the solid backing at fractional-pixel
+                                    // compact edges, where the face is antialiased.
+                                    RoundedRectangle(cornerRadius: cornerRadius)
+                                        .fill(appearance.surfaceColor(detailed: detailed))
+                                        .opacity(detailed ? 0 : 1)
+                                    BoardDepthView(material: depth, thickness: depthGeometry.thickness,
+                                                   cornerRadius: faceRadius, shadowRadius: depthGeometry.shadowRadius,
+                                                   shadowOffset: depthGeometry.shadowOffset)
+                                        .opacity(detailed ? 1 : 0)
+                                }
+                            } else {
+                                RoundedRectangle(cornerRadius: cornerRadius)
+                                    .fill(appearance.surfaceColor(detailed: detailed))
+                                    .shadow(color: .black.opacity(detailed ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
+                                            radius: appearance.boardBevel ? 10 : 2,
+                                            y: appearance.boardBevel ? 6 : 0)
+                            }
                         }
                 } else {
                     Color.white.cornerRadius(cornerRadius).opacity(0.5)
                 }
                 gobanAndStones
-                    .frame(
-                        width: showsCoordinate ? geometry.size.width * width / (width + 1) : geometry.size.width,
-                        height: showsCoordinate ? geometry.size.width * height / (height + 1) : geometry.size.height
-                    )
+                    .frame(width: gridSize.width, height: gridSize.height)
                     .offset(
                         x: showsCoordinate ? geometry.size.width / (width + 1) / 2 : 0,
                         y: showsCoordinate ? geometry.size.height / (height + 1) / 2 : 0
                     )
             }
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let layout = BoardDepthGeometry(
+                containerSize: geometry.size,
+                boardWidth: boardPosition.width, boardHeight: boardPosition.height, showsCoordinates: showsCoordinate,
+                displayScale: displayScale,
+                depth: widgetRenderingMode == .fullColor ? appearance.boardDepth : nil)
+            GeometryReader { faceGeometry in
+                boardFace(in: faceGeometry, depthGeometry: layout)
+            }
+            .frame(width: layout.faceRect.width, height: layout.faceRect.height)
+            .position(x: layout.faceRect.midX, y: layout.faceRect.midY)
         }
         .onChange(of: boardTool.wrappedValue) { _, _ in
             hoveredPoint = nil

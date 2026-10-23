@@ -118,6 +118,72 @@ struct BoardReflection: Equatable {
     var glintDensity: Double
 }
 
+/// The material visible on a board's lower face, below the playing surface.
+struct BoardDepth: Equatable {
+    var upperFace: Color
+    var lowerFace: Color
+    var highlight: Color
+    var shade: Color
+    var shadow: Color
+    var thicknessRatio: CGFloat
+    var maximumThickness: CGFloat
+}
+
+/// Match the board's existing coordinate gutters, including rectangular boards.
+/// Layout, detail eligibility and depth must all measure this same grid frame.
+func boardGridSize(containerSize: CGSize, boardWidth: Int, boardHeight: Int, showsCoordinates: Bool) -> CGSize {
+    guard showsCoordinates else { return containerSize }
+    let width = CGFloat(max(1, boardWidth))
+    let height = CGFloat(max(1, boardHeight))
+    return CGSize(width: containerSize.width * width / (width + 1),
+                  height: containerSize.width * height / (height + 1))
+}
+
+/// Fit a square-on board and its shallow sidewall into the same layout slot.
+/// All drawing and hit testing use `faceRect`; only decoration uses the depth.
+struct BoardDepthGeometry: Equatable {
+    let faceRect: CGRect
+    let thickness: CGFloat
+    let cellSize: CGFloat
+    let cornerRadius: CGFloat
+    let shadowRadius: CGFloat
+    let shadowOffset: CGFloat
+
+    init(containerSize: CGSize, boardWidth: Int, boardHeight: Int, showsCoordinates: Bool,
+         displayScale: CGFloat, depth: BoardDepth?) {
+        let grid = boardGridSize(containerSize: containerSize, boardWidth: boardWidth,
+                                 boardHeight: boardHeight, showsCoordinates: showsCoordinates)
+        self.init(containerSize: containerSize,
+                  proposedCellSize: min(grid.width, grid.height) / CGFloat(max(1, max(boardWidth, boardHeight))),
+                  displayScale: displayScale, depth: depth)
+    }
+
+    private init(containerSize: CGSize, proposedCellSize: CGFloat, displayScale: CGFloat, depth: BoardDepth?) {
+        let side = min(containerSize.width, containerSize.height)
+        let scale = max(1, displayScale)
+        let proposedCell = max(0, proposedCellSize)
+        // Grow out of the flat footprint continuously. At the cutoff there
+        // is no inset, so fitting depth cannot push a detailed cell below it.
+        let growth = min(1, max(0, (proposedCell - 14) / 4))
+        let thickness = depth.map { min($0.maximumThickness, max(0, side) * $0.thicknessRatio) * growth } ?? 0
+        // Reserve three blur radii around the slab. Moving the face upward
+        // by the shadow offset leaves the full fade below its lower edge.
+        let shadowRadius = thickness * 0.3
+        let shadowOffset = thickness * 0.2
+        let reserve = thickness + 6 * shadowRadius
+        let factor = side > 0 ? max(0, 1 - reserve / side) : 1
+        let faceSize = CGSize(width: containerSize.width * factor, height: containerSize.height * factor)
+        self.faceRect = CGRect(x: (containerSize.width - faceSize.width) / 2,
+                               y: (containerSize.height - faceSize.height - thickness) / 2 - shadowOffset,
+                               width: faceSize.width, height: faceSize.height)
+        self.thickness = thickness
+        self.cellSize = floor(proposedCell * factor * scale) / scale
+        self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
+        self.shadowRadius = shadowRadius
+        self.shadowOffset = shadowOffset
+    }
+}
+
 /// Boards and stones show detail only where it can be seen. Below a 14 pt
 /// cell they are solid colors: the flat board color, a straight grid, and
 /// flat stones with an optional solid outline; no images, textures,
@@ -297,6 +363,7 @@ struct BoardAppearance: Equatable {
     var boardTexture: BoardTexture? = nil
     /// A raised slab: light on the top-left edge, shade on the bottom-right.
     var boardBevel = false
+    var boardDepth: BoardDepth? = nil
     var boardReflection: BoardReflection? = nil
     /// Scales the grid's line widths on detailed boards.
     var gridLineScale: CGFloat = 1

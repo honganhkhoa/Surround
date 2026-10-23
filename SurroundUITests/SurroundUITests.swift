@@ -4613,6 +4613,95 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testThemedBoardDepthKeepsMovesAligned() {
+        let appearances = [
+            (theme: "nebulaPearl", appearance: "dark"),
+            (theme: "surroundStudio", appearance: "light"),
+            (theme: "surroundStudio", appearance: "dark"),
+        ]
+        #if targetEnvironment(macCatalyst)
+        let orientations: [(name: String, value: UIDeviceOrientation)] = [("window", .unknown)]
+        #else
+        let orientations: [(name: String, value: UIDeviceOrientation)] = [
+            ("portrait", .portrait), ("landscape", .landscapeLeft),
+        ]
+        defer { XCUIDevice.shared.orientation = .landscapeLeft }
+        #endif
+
+        for appearance in appearances {
+            let app = launchApp(additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.gameAnalysis.rawValue,
+                SurroundUITestContract.themeLaunchArgument, appearance.theme,
+                SurroundUITestContract.appearanceLaunchArgument, appearance.appearance,
+            ], orientation: orientations[0].value)
+            let board = element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+            let baseline = "position:46:fl"
+
+            for orientation in orientations {
+                let name = "\(appearance.theme)-\(appearance.appearance)-\(orientation.name)"
+                XCTContext.runActivity(named: name) { _ in
+                    #if !targetEnvironment(macCatalyst)
+                    XCUIDevice.shared.orientation = orientation.value
+                    XCTAssertTrue(pollUntil(timeout: 10) {
+                        orientation.value == .portrait
+                            ? app.frame.height > app.frame.width
+                            : app.frame.width > app.frame.height
+                    }, "The window must adopt \(orientation.name) before checking board taps.")
+                    #endif
+                    XCTAssertTrue(waitForValue(baseline, in: board, timeout: 10))
+                    var previousFrame: CGRect?
+                    var stableFrames = 0
+                    XCTAssertTrue(pollUntil(timeout: 10) {
+                        let frame = board.frame
+                        guard frame.width > 1 && frame.height > 1 else { return false }
+                        stableFrames = frame == previousFrame ? stableFrames + 1 : 1
+                        previousFrame = frame
+                        return stableFrames >= 3
+                    }, "The board must settle before checking its inset playing face.")
+
+                    // A19, K10 and T1 are empty at move 46 in copperKoiOpening.
+                    // Probe inside the first/last cells of the inset face.
+                    // The outer slot also contains the noninteractive slab
+                    // and shadow, so its extreme corners are not grid points.
+                    for point in [
+                        (name: "A19", offset: CGFloat(0.05), move: "aa"),
+                        (name: "K10", offset: CGFloat(0.5), move: "jj"),
+                        (name: "T1", offset: CGFloat(0.95), move: "ss"),
+                    ] {
+                        board.coordinate(withNormalizedOffset: CGVector(dx: point.offset, dy: point.offset)).tap()
+                        XCTAssertTrue(waitForValue("variation:46:\(point.move)", in: board, timeout: 5),
+                                      "\(name): tapping \(point.name) must select that intersection.")
+                        tap(SurroundUITestContract.AccessibilityID.gameAnalyzePrevious, in: app, matching: .button)
+                        XCTAssertTrue(waitForValue(baseline, in: board, timeout: 5))
+                    }
+
+                    let controlBar = element(SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar, in: app)
+                    let appFrame = app.frame
+                    let controlBarFrame = controlBar.frame
+                    let outsidePoint = CGPoint(x: controlBarFrame.midX, y: controlBarFrame.midY)
+                    XCTAssertTrue(controlBarFrame.width > 0 && controlBarFrame.height > 0)
+                    XCTAssertTrue(appFrame.contains(outsidePoint))
+                    XCTAssertFalse(board.frame.contains(outsidePoint))
+                    let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(
+                        CGVector(dx: outsidePoint.x - appFrame.minX, dy: outsidePoint.y - appFrame.minY))
+                    let center = board.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                    center.press(forDuration: 0.1, thenDragTo: outside)
+                    XCTAssertEqual(board.value as? String, baseline,
+                                   "\(name): releasing outside the inset board must cancel the move.")
+                    center.tap()
+                    XCTAssertTrue(waitForValue("variation:46:jj", in: board, timeout: 5),
+                                  "Cancelling a drag must leave the themed board ready for a quick tap.")
+                    keepScreenshot("Board depth aligned — \(name)", in: app)
+                    tap(SurroundUITestContract.AccessibilityID.gameAnalyzePrevious, in: app, matching: .button)
+                    XCTAssertTrue(waitForValue(baseline, in: board, timeout: 5))
+                }
+            }
+            app.terminate()
+        }
+    }
+
     func testAnalyzeBoardMarkerMenuPlacesAndTogglesSequentialLetters() {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
