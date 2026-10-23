@@ -23,7 +23,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(SurroundTheme.nebulaPearl.hasScene)
         XCTAssertNil(SurroundTheme.rakedGarden.colorScheme)
         XCTAssertTrue(SurroundTheme.rakedGarden.hasScene)
-        XCTAssertEqual(SurroundTheme.surroundStudio.colorScheme, .light)
+        XCTAssertNil(SurroundTheme.surroundStudio.colorScheme)
         XCTAssertTrue(SurroundTheme.surroundStudio.hasScene)
     }
 
@@ -147,7 +147,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertNotEqual(theme.board.boardColor, theme.board(for: .dark).boardColor)
         XCTAssertEqual(StoneImages(black: [], white: []).tint, .white,
                        "Existing rendered-stone callers must keep their original colors")
-        for other: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio] {
+        for other: SurroundTheme in [.standard, .nebulaPearl] {
             for scheme: ColorScheme in [.light, .dark] {
                 XCTAssertEqual(other.board(for: scheme), other.board)
             }
@@ -157,7 +157,15 @@ final class SurroundThemeTests: XCTestCase {
     /// These are nominal opaque palette checks. Native captures separately
     /// verify the graded texture, rendered stones and translucent controls.
     func testGardenNightStonesGridAndMarksRemainReadable() throws {
-        let board = SurroundTheme.rakedGarden.board(for: .dark)
+        try assertNightStonesGridAndMarksRemainReadable(.rakedGarden)
+    }
+
+    func testStudioNightStonesGridAndMarksRemainReadable() throws {
+        try assertNightStonesGridAndMarksRemainReadable(.surroundStudio)
+    }
+
+    private func assertNightStonesGridAndMarksRemainReadable(_ theme: SurroundTheme) throws {
+        let board = theme.board(for: .dark)
         XCTAssertGreaterThan(contrast(board.black.flat, board.boardColor, style: .dark), 3)
         XCTAssertGreaterThan(contrast(board.white.flat, board.black.flat, style: .dark), 4.5)
         XCTAssertGreaterThan(contrast(try XCTUnwrap(board.white.outline), board.boardColor, style: .dark), 3)
@@ -186,7 +194,14 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testGardenNightAnalysisMarksRemainReadable() throws {
-        let theme = SurroundTheme.rakedGarden
+        try assertNightAnalysisMarksRemainReadable(.rakedGarden)
+    }
+
+    func testStudioNightAnalysisMarksRemainReadable() throws {
+        try assertNightAnalysisMarksRemainReadable(.surroundStudio)
+    }
+
+    private func assertNightAnalysisMarksRemainReadable(_ theme: SurroundTheme) throws {
         let keyline = try XCTUnwrap(theme.treeMarkKeyline)
         XCTAssertGreaterThan(contrast(theme.selectionMark, theme.panel, style: .dark), 3)
         XCTAssertGreaterThan(contrast(theme.selectionMark, keyline, style: .dark), 3)
@@ -195,7 +210,14 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testGardenNightControlFallbacksKeepReadableTextAndRoles() throws {
-        let theme = SurroundTheme.rakedGarden
+        try assertNightControlFallbacksKeepReadableTextAndRoles(.rakedGarden)
+    }
+
+    func testStudioNightControlFallbacksKeepReadableTextAndRoles() throws {
+        try assertNightControlFallbacksKeepReadableTextAndRoles(.surroundStudio)
+    }
+
+    private func assertNightControlFallbacksKeepReadableTextAndRoles(_ theme: SurroundTheme) throws {
         XCTAssertGreaterThan(contrast(theme.foreground, theme.pageBackground, style: .dark), 4.5)
         XCTAssertGreaterThan(contrast(theme.foreground, theme.panel, style: .dark), 4.5)
         let players = [
@@ -215,6 +237,16 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: .dark), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: .dark), surface, style: .dark), 4.5)
+                if theme == .surroundStudio {
+                    for (state, accent) in [
+                        ("Accepted", theme.clockAgreementAccent(color, scheme: .dark)),
+                        ("Disconnected", theme.clockDisconnectedAccent(color, scheme: .dark)),
+                        ("Undo", theme.clockUndoAccent(color, scheme: .dark)),
+                    ] {
+                        XCTAssertGreaterThanOrEqual(contrast(accent, surface, style: .dark), 4.5,
+                                                   "\(state) text must read on every \(color) clock surface")
+                    }
+                }
             }
             for surface in theme.identityChipColors(color) {
                 XCTAssertGreaterThan(contrast(theme.identityForeground(color), surface, style: .dark), 4.5)
@@ -228,10 +260,38 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: .dark), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: .dark), 4.5)
+        if theme == .surroundStudio {
+            XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: .dark), style: .dark), 4.5,
+                                       "The Undo badge keeps its white text readable")
+            XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: .dark), style: .dark), 4.5,
+                                       "The urgent clock badge keeps its white text readable")
+        }
     }
 
     func testGardenAdaptiveColorsFollowRepeatedTraitChanges() {
-        let theme = SurroundTheme.rakedGarden
+        assertAdaptiveColorsFollowRepeatedTraitChanges(.rakedGarden)
+    }
+
+    func testStudioAdaptiveColorsFollowRepeatedTraitChanges() {
+        assertAdaptiveColorsFollowRepeatedTraitChanges(.surroundStudio)
+        let theme = SurroundTheme.surroundStudio
+        // The same cached UIKit providers back clocks and player chips when
+        // the mounted game changes appearance; resolve them without rebuilding.
+        let surfaces = [theme.clockSolidSurface(.white)] + theme.identityChipColors(.white)
+        for surface in surfaces {
+            let provider = UIColor(surface)
+            let day = luminance(surface, style: .light)
+            let night = luminance(surface, style: .dark)
+            XCTAssertLessThan(night, day, "Night subdues the pale controls")
+            for style: UIUserInterfaceStyle in [.dark, .light, .dark, .light] {
+                let resolved = provider.resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+                XCTAssertEqual(luminance(Color(uiColor: resolved)), style == .dark ? night : day,
+                               accuracy: 0.000001)
+            }
+        }
+    }
+
+    private func assertAdaptiveColorsFollowRepeatedTraitChanges(_ theme: SurroundTheme) {
         // Keep the same Color values alive while resolving both directions;
         // dynamic providers must not freeze the first trait collection seen.
         for color in [theme.pageBackground, theme.panel, theme.foreground] {
@@ -318,6 +378,20 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertNil(theme.identityRoleColor(for: player, on: color))
             }
         }
+    }
+
+    func testStudioNightModePreservesTheDayBoardAndGeometry() {
+        let theme = SurroundTheme.surroundStudio
+        let day = theme.board(for: .light)
+        let night = theme.board(for: .dark)
+        XCTAssertEqual(theme.board, day)
+        XCTAssertEqual(day.boardColor, Color(themeHex: 0xE3AF69), "Daytime keeps its golden kaya palette")
+        XCTAssertNotEqual(day.boardColor, night.boardColor)
+        XCTAssertLessThan(luminance(night.boardColor, style: .dark), luminance(day.boardColor))
+        XCTAssertEqual(night.gridStyle, day.gridStyle)
+        XCTAssertEqual(night.gridLineScale, day.gridLineScale)
+        XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
+        XCTAssertEqual(night.boardBevel, day.boardBevel)
     }
 
     /// Cream clamshell needs a contour against golden kaya in thumbnails;
@@ -745,7 +819,8 @@ final class SurroundThemeTests: XCTestCase {
         let cases: [(String, SurroundTheme, UIUserInterfaceStyle)] = [
             ("standard light", .standard, .light), ("standard dark", .standard, .dark),
             ("nebula", .nebulaPearl, .dark), ("garden day", .rakedGarden, .light),
-            ("garden night", .rakedGarden, .dark), ("studio", .surroundStudio, .light),
+            ("garden night", .rakedGarden, .dark), ("studio day", .surroundStudio, .light),
+            ("studio night", .surroundStudio, .dark),
         ]
         for (name, theme, style) in cases {
             let board = theme.board(for: style == .dark ? .dark : .light)

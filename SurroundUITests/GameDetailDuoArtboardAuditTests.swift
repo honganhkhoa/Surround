@@ -91,7 +91,8 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         ]
         if let theme {
             app.launchArguments += [SurroundUITestContract.themeLaunchArgument, theme]
-        } else if let appearance {
+        }
+        if let appearance {
             app.launchArguments += [SurroundUITestContract.appearanceLaunchArgument, appearance]
         }
         if let clock {
@@ -509,16 +510,16 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeStates() {
-        auditThemeStates(theme: "surroundStudio", suffix: "-surround-studio")
+        auditThemeStates(theme: "surroundStudio", suffix: "-surround-studio", appearance: "light")
     }
 
-    private func auditThemeStates(theme: String, suffix: String) {
-        var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, theme: theme)
+    private func auditThemeStates(theme: String, suffix: String, appearance: String? = nil) {
+        var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, appearance: appearance, theme: theme)
         capture(pose.playArtboard, in: app, suffix: suffix)
         app.terminate()
 
         if let number = pose.playChatArtboard {
-            app = launchScene(.activeGameBoard, artboard: number, theme: theme)
+            app = launchScene(.activeGameBoard, artboard: number, appearance: appearance, theme: theme)
             openAuditChat(in: app)
             XCTAssertFalse(app.descendants(matching: .any)
                 .matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists,
@@ -527,7 +528,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             app.terminate()
         }
 
-        app = launchScene(.gameAnalysis, artboard: pose.analyzeArtboard, theme: theme)
+        app = launchScene(.gameAnalysis, artboard: pose.analyzeArtboard, appearance: appearance, theme: theme)
         XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
                        "Analyze remains the only open panel")
         XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, "variation:38:lj-lk-mk")
@@ -535,7 +536,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         capture(pose.analyzeArtboard, in: app, suffix: suffix)
         app.terminate()
 
-        app = launchScene(.zenMode, artboard: pose.zenArtboard, theme: theme)
+        app = launchScene(.zenMode, artboard: pose.zenArtboard, appearance: appearance, theme: theme)
         element(ID.gameZenExit, in: app, matching: .button)
         capture(pose.zenArtboard, in: app, suffix: suffix)
         app.terminate()

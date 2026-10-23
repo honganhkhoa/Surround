@@ -39,6 +39,7 @@ struct SurroundApp: App {
                 EmptyView()
             } else if let cellSize = BoardMarkerAuditContract.cellSize {
                 BoardMarkerAuditView(cellSize: cellSize)
+                    .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
             } else {
                 appContent
             }

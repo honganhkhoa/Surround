@@ -467,33 +467,119 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeControlStates() throws {
+        auditStudioControlStates(appearance: .light, suffix: "-surround-studio")
+    }
+
+    func testSurroundStudioNightThemeControlStates() throws {
+        auditStudioControlStates(appearance: .dark, suffix: "-surround-studio-night")
+    }
+
+    func testSurroundStudioNightBoardMarkerGallery() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The marker gallery audit requires a full-size phone in portrait.")
+        for cellSize in [20, 13, 7] {
+            let app = launchApp(additionalLaunchArguments: [
+                "--surround-board-marker-audit", String(cellSize),
+                SurroundUITestContract.themeLaunchArgument, "surroundStudio",
+                SurroundUITestContract.appearanceLaunchArgument, "dark",
+            ], orientation: .portrait)
+            let gallery = element("uitest.boardMarkerAudit", in: app)
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            XCTAssertTrue(gallery.isHittable, "The offline marker gallery is visible")
+            let window = app.windows.firstMatch.frame
+            for title in ["Last move · black", "Last move · white", "Pending · black", "Pending · white",
+                          "Markup", "Variation", "Score · dame · dead", "Chat highlight · undo"] {
+                let label = app.staticTexts[title].firstMatch
+                XCTAssertTrue(label.waitForExistence(timeout: 5), "The gallery includes \(title)")
+                XCTAssertTrue(window.contains(label.frame), "All marker samples fit the full-size phone capture")
+            }
+            let firstLabel = app.staticTexts["Last move · black"].firstMatch.frame
+            // The trailing 16pt gallery padding is outside every sample.
+            // Keep this patch above the home indicator and below the content.
+            let pagePatch = CGRect(x: window.maxX - 14, y: window.maxY - 50, width: 8, height: 8)
+            // Each sample is a 7×7 board, four points below its existing title.
+            // Sample the inner six cells to exclude its bevel and cast shadow.
+            let cell = CGFloat(cellSize)
+            let boardPatch = CGRect(x: firstLabel.minX + cell / 2,
+                                    y: firstLabel.maxY + 4 + cell / 2,
+                                    width: cell * 6, height: cell * 6)
+            var pageBrightness: Double?
+            var boardBrightness: Double?
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                guard let image = app.screenshot().image.cgImage else { return false }
+                pageBrightness = self.markerGalleryBrightness(in: pagePatch, image: image, frame: app.frame)
+                boardBrightness = self.markerGalleryBrightness(in: boardPatch, image: image, frame: app.frame)
+                guard let pageBrightness, let boardBrightness else { return false }
+                return pageBrightness < 0.25 && (0.30...0.60).contains(boardBrightness)
+            }, "The rendered gallery must show Studio's dark page and night board, not only accept a dark launch flag")
+            print("[StudioMarkerGallery] cell=\(cellSize) pageBrightness=\(String(describing: pageBrightness)) boardBrightness=\(String(describing: boardBrightness))")
+            keepScreenshot("surround-studio-night-markers-\(cellSize)pt", in: app)
+            app.terminate()
+        }
+    }
+
+    private func markerGalleryBrightness(in region: CGRect, image: CGImage, frame: CGRect) -> Double? {
+        guard frame.width > 0, frame.height > 0, frame.contains(region),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let scaleX = CGFloat(image.width) / frame.width
+        let scaleY = CGFloat(image.height) / frame.height
+        let pixelsRect = CGRect(x: (region.minX - frame.minX) * scaleX,
+                                y: (region.minY - frame.minY) * scaleY,
+                                width: region.width * scaleX, height: region.height * scaleY)
+        guard let sample = image.cropping(to: pixelsRect) else { return nil }
+        let side = 32
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: side, height: side,
+                                          bitsPerComponent: 8, bytesPerRow: side * 4,
+                                          space: colorSpace,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                                            | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+            context.draw(sample, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        let sum = stride(from: 0, to: pixels.count, by: 4).reduce(0.0) { total, index in
+            total + (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1])
+                + 0.0722 * Double(pixels[index + 2])) / 255
+        }
+        return sum / Double(side * side)
+    }
+
+    private func auditStudioControlStates(appearance: SurroundUITestContract.Appearance, suffix: String) {
         for number in [78, 79] {
             let urgent = launch(artboard: number, clock: "sudden-death",
-                                fromMainNavigation: false, theme: "surroundStudio")
+                                fromMainNavigation: false, theme: "surroundStudio", appearance: appearance)
             let clock = element(number == 78 ? "game.clock.black" : "game.clock.white", in: urgent)
             XCTAssertTrue((clock.value as? String)?.contains("Sudden death") == true,
                           "The clock reference must exercise the final period warning")
             capture(number, app: urgent, note: "Studio urgent clock text over tinted glass.",
-                    suffix: "-surround-studio-urgent")
+                    suffix: "\(suffix)-urgent")
             urgent.terminate()
         }
-        let disconnected = launch(artboard: 64, socketDown: true, theme: "surroundStudio")
+        let disconnected = launch(artboard: 64, socketDown: true, theme: "surroundStudio", appearance: appearance)
         defer { disconnected.terminate() }
         let accept = disconnected.buttons["Accept"].firstMatch
         XCTAssertTrue(accept.waitForExistence(timeout: 5))
         XCTAssertFalse(accept.isEnabled, "Disconnected scoring keeps Accept disabled")
         capture(64, app: disconnected, note: "Studio disconnected scoring; disabled Accept remains distinct.",
-                suffix: "-surround-studio-disabled")
+                suffix: "\(suffix)-disabled")
     }
 
     func testSurroundStudioThemeStates() throws {
-        try auditThemeStates(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+        try auditThemeStates(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
+                             appearance: .light)
+    }
+
+    func testSurroundStudioNightThemeStates() throws {
+        try auditThemeStates(theme: "surroundStudio", title: "Surround Studio at night",
+                             suffix: "-surround-studio-night", appearance: .dark)
     }
 
     func testSurroundStudioThemePanelTransitions() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "The compact theme transition audit requires an iPhone.")
-        let app = launch(artboard: 1, theme: "surroundStudio")
+        let app = launch(artboard: 1, theme: "surroundStudio", appearance: .light)
         defer {
             XCUIDevice.shared.orientation = .portrait
             app.terminate()
@@ -557,7 +643,13 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeScoring() throws {
-        try auditThemeScoring(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+        try auditThemeScoring(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
+                              appearance: .light)
+    }
+
+    func testSurroundStudioNightThemeScoring() throws {
+        try auditThemeScoring(theme: "surroundStudio", title: "Surround Studio at night",
+                              suffix: "-surround-studio-night", appearance: .dark)
     }
 
     private func auditThemeScoring(theme: String, title: String, suffix: String,
@@ -590,7 +682,13 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeSmallPhone() throws {
-        try auditThemeSmallPhone(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+        try auditThemeSmallPhone(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
+                                 appearance: .light)
+    }
+
+    func testSurroundStudioNightThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "surroundStudio", title: "Surround Studio at night",
+                                 suffix: "-surround-studio-night", appearance: .dark)
     }
 
     private func auditThemeSmallPhone(theme: String, title: String, suffix: String,

@@ -232,6 +232,20 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     /// Use the real device appearance, without a fixed launch override, so
     /// both transitions happen while the existing Game Detail stays mounted.
     func testRakedGardenThemeAppearanceContinuity() {
+        auditThemeAppearanceContinuity(theme: "rakedGarden", title: "Raked Garden", suffix: "raked-garden",
+                                       dayBoardMinimum: 0.72, nightBoardMaximum: 0.63, minimumBoardDrop: 0.16)
+    }
+
+    func testSurroundStudioThemeAppearanceContinuity() {
+        auditThemeAppearanceContinuity(theme: "surroundStudio", title: "Surround Studio", suffix: "surround-studio",
+                                       dayBoardMinimum: 0.60, nightBoardMaximum: 0.57, minimumBoardDrop: 0.12,
+                                       capturesPanelTransitions: true)
+    }
+
+    private func auditThemeAppearanceContinuity(theme: String, title: String, suffix: String,
+                                                dayBoardMinimum: Double, nightBoardMaximum: Double,
+                                                minimumBoardDrop: Double,
+                                                capturesPanelTransitions: Bool = false) {
         let device = XCUIDevice.shared
         let originalAppearance = device.appearance
         let originalOrientation = device.orientation
@@ -246,7 +260,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         func requestAppearance(_ appearance: XCUIDevice.Appearance) {
             device.appearance = appearance
             let applied = pollUntil(timeout: 10) { device.appearance == appearance }
-            print("[GardenAppearance] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue)")
+            print("[ThemeAppearance \(theme)] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue)")
             XCTAssertTrue(applied, "The device appearance getter must confirm the requested style")
         }
 
@@ -258,19 +272,22 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertFalse(app.launchArguments.contains("-AppleInterfaceStyle"))
             XCTAssertEqual(device.appearance, appearance,
                            "Launching or rotating must not reset the requested device appearance")
+            app.activate()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10),
+                          "Appearance evidence must come from the foreground app")
             let board = element(ID.gameBoard, in: app)
             var brightness: Double?
             let rendered = pollUntil(timeout: 12) {
                 brightness = self.meanBrightness(board)
                 guard let brightness else { return false }
-                // Broad bands distinguish warm day sand from moonlit sand;
+                // Broad bands distinguish day material from its night grade;
                 // they tolerate stones, shadows, grain and native raster scale.
-                if appearance == .light { return brightness > 0.72 }
-                return brightness < 0.63 && dayBrightness.map { $0 - brightness > 0.16 } != false
+                if appearance == .light { return brightness > dayBoardMinimum }
+                return brightness < nightBoardMaximum && dayBrightness.map { $0 - brightness > minimumBoardDrop } != false
             }
-            print("[GardenAppearance] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue) boardBrightness=\(brightness.map(String.init(describing:)) ?? "unavailable")")
+            print("[ThemeAppearance \(theme)] requested=\(appearance.rawValue) observed=\(device.appearance.rawValue) boardBrightness=\(brightness.map(String.init(describing:)) ?? "unavailable")")
             if !rendered {
-                keepScreenshot("raked-garden-appearance-not-applied-\(appearance.rawValue)", in: app)
+                keepScreenshot("\(suffix)-appearance-not-applied-\(appearance.rawValue)", in: app)
             }
             XCTAssertTrue(rendered,
                           "The rendered board must reach the requested appearance, not only preserve game state")
@@ -295,7 +312,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         // the system without a theme, so a live change there first separates
         // a device that ignores requests from a scene that ignores the change.
         requestAppearance(.light)
-        let home = launchGame(artboard: 17, theme: "rakedGarden", opensGame: false)
+        let home = launchGame(artboard: 17, theme: theme, opensGame: false)
         let homeScreen = element(ID.screenHome, in: home)
         let homeDay = meanBrightness(homeScreen) ?? .nan
         let deviceAdvice = "If Home also stays unchanged, the Simulator did not apply the request; reboot it and rerun"
@@ -309,7 +326,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         }, "Home must follow the device back to light appearance. \(deviceAdvice)")
         home.terminate()
 
-        let play = launchGame(artboard: 17, theme: "rakedGarden")
+        let play = launchGame(artboard: 17, theme: theme)
         setSidebarCollapsed(true, in: play)
         let playBoard = element(ID.gameBoard, in: play)
         let position = playBoard.value as? String
@@ -320,8 +337,17 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         assertState(position, clocks: playClocks, in: play)
         let dayBrightness = assertRenderedAppearance(.light, in: play)
         let dayFrame = playBoard.frame
-        capture(17, "Raked Garden day Play", in: play,
-                suffix: "-raked-garden-day-landscape")
+        if capturesPanelTransitions {
+            auditStudioPanelTransitions(in: play) { step in
+                self.capture(17, "\(title) day \(step)", in: play,
+                             note: "Same game and appearance through native panel toggles.",
+                             suffix: "-\(suffix)-day-landscape-transition-\(step)")
+            }
+            assertState(position, clocks: playClocks, in: play)
+        } else {
+            capture(17, "\(title) day Play", in: play,
+                    suffix: "-\(suffix)-day-landscape")
+        }
 
         requestAppearance(.dark)
         assertRenderedAppearance(.dark, in: play, dayBrightness: dayBrightness)
@@ -330,9 +356,18 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         XCTAssertEqual(playBoard.frame.minY, dayFrame.minY, accuracy: 1)
         XCTAssertEqual(playBoard.frame.width, dayFrame.width, accuracy: 1,
                        "Switching to night changes materials, not board geometry")
-        capture(17, "Raked Garden night Play", in: play,
-                note: "Same game after a live device-appearance change.",
-                suffix: "-raked-garden-night-landscape")
+        if capturesPanelTransitions {
+            auditStudioPanelTransitions(in: play) { step in
+                self.capture(17, "\(title) night \(step)", in: play,
+                             note: "Same game after a live appearance change and native panel toggles.",
+                             suffix: "-\(suffix)-night-landscape-transition-\(step)")
+            }
+            assertState(position, clocks: playClocks, in: play)
+        } else {
+            capture(17, "\(title) night Play", in: play,
+                    note: "Same game after a live device-appearance change.",
+                    suffix: "-\(suffix)-night-landscape")
+        }
 
         device.orientation = .portrait
         XCTAssertTrue(pollUntil(timeout: 10) {
@@ -340,14 +375,14 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         })
         assertRenderedAppearance(.dark, in: play, dayBrightness: dayBrightness)
         assertState(position, clocks: playClocks, in: play)
-        capture(17, "Raked Garden night Play", in: play,
+        capture(17, "\(title) night Play", in: play,
                 note: "Same game after native rotation.",
-                suffix: "-raked-garden-night-portrait")
+                suffix: "-\(suffix)-night-portrait")
         play.terminate()
 
         // This fixture starts on the marked three-move analysis branch.
         // The subsequent night-to-day change must not rebuild its session.
-        let analysis = launchGame(artboard: 26, portrait: true, theme: "rakedGarden")
+        let analysis = launchGame(artboard: 26, portrait: true, theme: theme)
         setSidebarCollapsed(true, in: analysis)
         let analysisBoard = element(ID.gameBoard, in: analysis)
         let variation = analysisBoard.value as? String
@@ -367,16 +402,16 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                 .contains(selected.frame.insetBy(dx: -3, dy: -3)),
                           "The selected analysis stone and ring stay in the visible tree")
             let name = appearance == .dark ? "night" : "day"
-            capture(26, "Raked Garden \(name) Analyze", in: analysis,
+            capture(26, "\(title) \(name) Analyze", in: analysis,
                     note: "Selected variation retained through a live appearance change.",
-                    suffix: "-raked-garden-\(name)-analyze")
+                    suffix: "-\(suffix)-\(name)-analyze")
         }
 
         tap(analysis.navigationBars.buttons.element(boundBy: 0), description: "Go back to Home", in: analysis)
         element(ID.screenHome, in: analysis)
         XCTAssertFalse(analysis.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch.exists,
                        "Back leaves Game Detail and its appearance scope")
-        keepScreenshot("raked-garden-ipad-day-home-after-night", in: analysis)
+        keepScreenshot("\(suffix)-ipad-day-home-after-night", in: analysis)
     }
 
     /// Measure rendered pixels rather than trusting a device setter or a
@@ -412,7 +447,8 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeOrientations() {
-        auditThemeOrientations(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+        auditThemeOrientations(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
+                               appearance: .light)
     }
 
     private func auditThemeOrientations(theme: String, title: String, suffix: String,
@@ -455,11 +491,12 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemePanels() {
-        auditThemePanels(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+        auditThemePanels(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
+                         appearance: .light)
     }
 
     func testSurroundStudioThemePanelTransitions() {
-        let app = launchGame(artboard: 17, portrait: true, theme: "surroundStudio")
+        let app = launchGame(artboard: 17, portrait: true, theme: "surroundStudio", appearance: .light)
         defer {
             XCUIDevice.shared.orientation = .landscapeLeft
             app.terminate()
@@ -1238,11 +1275,12 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
     }
 
     func testSurroundStudioThemeNarrowWindow() {
-        auditNarrowNativeWindowArtboard(theme: "surroundStudio", suffix: "-surround-studio")
+        auditNarrowNativeWindowArtboard(theme: "surroundStudio", suffix: "-surround-studio", appearance: .light)
     }
 
-    private func auditNarrowNativeWindowArtboard(theme: String? = nil, suffix: String = "") {
-        let app = launchGame(artboard: 84, portrait: true, theme: theme)
+    private func auditNarrowNativeWindowArtboard(theme: String? = nil, suffix: String = "",
+                                                 appearance: SurroundUITestContract.Appearance? = nil) {
+        let app = launchGame(artboard: 84, portrait: true, theme: theme, appearance: appearance)
         setSidebarCollapsed(true, in: app)
         // iPadOS 26 exposes its native resize grabber at the lower-right corner.
         // This is a real windowing gesture, never an injected SwiftUI viewport.

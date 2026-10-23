@@ -383,19 +383,26 @@ private struct GameDetailClockCard: View {
     }
     private var badgeBackground: Color {
         if state.reconnecting { return theme.statusBadge }
-        if state.ownsUndoRequest { return Color(red: 196 / 255, green: 106 / 255, blue: 0) }
+        if state.ownsUndoRequest { return theme.clockUndoBadge(scheme: colorScheme) }
         if state.passed || (state.notStarted && !state.firstMoveDeadline) {
             return Color(uiColor: .systemGray)
         }
-        return state.suddenDeath ? Color.red : theme.statusBadge
+        return state.suddenDeath ? theme.clockSuddenDeathBadge(scheme: colorScheme) : theme.statusBadge
     }
     private var agreementColor: Color {
-        color == .black ? Color(red: 125 / 255, green: 210 / 255, blue: 141 / 255)
-            : Color(red: 30 / 255, green: 122 / 255, blue: 52 / 255)
+        theme.clockAgreementAccent(color, scheme: colorScheme)
     }
     private var disconnectedColor: Color {
-        color == .black ? Color(red: 1, green: 159 / 255, blue: 10 / 255)
-            : Color(red: 160 / 255, green: 72 / 255, blue: 0)
+        theme.clockDisconnectedAccent(color, scheme: colorScheme)
+    }
+    private var inlineStatusForeground: Color {
+        guard state.ownsUndoRequest else { return foreground }
+        if state.reconnecting {
+            // Reconnecting has replaced the undo label; its badge pigment
+            // is too dark to serve as text on a night slate clock.
+            return theme == .surroundStudio && colorScheme == .dark ? foreground : badgeBackground
+        }
+        return theme.clockUndoAccent(color, scheme: colorScheme)
     }
 
     var body: some View {
@@ -503,7 +510,7 @@ private struct GameDetailClockCard: View {
                     if hasUndoMenu { Image(systemName: "chevron.down").font(.system(size: 8 * scale)) }
                 }
                 .font(.system(size: 12 * scale, weight: .semibold))
-                .foregroundStyle(state.ownsUndoRequest ? badgeBackground : foreground)
+                .foregroundStyle(inlineStatusForeground)
                 .lineLimit(1).minimumScaleFactor(0.7)
             } else {
             HStack(spacing: 3) {

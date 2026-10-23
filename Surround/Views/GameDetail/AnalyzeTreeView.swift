@@ -16,6 +16,7 @@ struct AnalyzeTreeSlice: View {
 
     @Environment(\.surroundTheme) private var theme
     @Environment(\.boardAppearance) private var appearance
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var moveTree: MoveTree
     var lastMoveNumber: Int
     @Binding var selectedPosition: BoardPosition?
@@ -130,6 +131,10 @@ struct AnalyzeTreeSlice: View {
                         } else if lastMoveNumber == 0 {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))
+                                // The night page foreground is light, while
+                                // this small root icon sits on warm kaya.
+                                .foregroundColor(theme == .surroundStudio && colorScheme == .dark
+                                    ? appearance.emptyPointMarker : nil)
                                 .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {
                                     self.selectedPosition = position

@@ -30,18 +30,58 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fixed scenes choose an appearance; Garden and standard follow the system.
+    /// Natural scenes and standard follow the system; Nebula stays dark.
     var colorScheme: ColorScheme? {
         switch self {
-        case .standard, .rakedGarden: nil
+        case .standard, .rakedGarden, .surroundStudio: nil
         case .nebulaPearl: .dark
-        case .surroundStudio: .light
         }
     }
 
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .surroundStudio, scheme == .dark {
+            var night = board
+            night.boardColor = Color(themeHex: 0xA58A5A)
+            // Compact boards use this solid pigment, without the detailed
+            // texture, tint or bevel. Shared rendering retains the 14 pt cutoff.
+            night.compactBoardColor = Color(themeHex: 0xA58A5A)
+            night.boardEdge = Color(themeHex: 0xC6BA9C).opacity(0.65)
+            night.boardTexture?.tint = Color(themeHex: 0xB2B6C1)
+            // Keep slate neutral and shell ivory: the warm kaya and the
+            // moonlit room must not give the stones a green-blue cast.
+            night.stoneImages?.tint = Color(themeHex: 0xE4E5E6)
+            night.gridColor = Color(themeHex: 0x30383C)
+            night.coordinateColor = Color(themeHex: 0x171E22)
+            night.black = StonePalette(
+                highlight: Color(themeHex: 0x5C6265), shade: Color(themeHex: 0x151B1F),
+                flat: Color(themeHex: 0x22282B), outline: Color(themeHex: 0x12171A),
+                rim: Color(themeHex: 0x85929A).opacity(0.4),
+                lastMove: Color(themeHex: 0xF4F0E6), label: Color(themeHex: 0xF4F0E6),
+                territory: Color(themeHex: 0x181D20)
+            )
+            night.white = StonePalette(
+                highlight: Color(themeHex: 0xEAE9E1), shade: Color(themeHex: 0xA9A596),
+                flat: Color(themeHex: 0xDCDACF), outline: Color(themeHex: 0x30383C),
+                rim: Color(themeHex: 0x566068).opacity(0.5),
+                lastMove: Color(themeHex: 0x222C30), label: Color(themeHex: 0x222C30),
+                territory: Color(themeHex: 0xFFF9ED)
+            )
+            night.emptyPointMarker = Color(themeHex: 0x171E22)
+            night.markOutline = Color(themeHex: 0x30383C)
+            night.dameColor = Color(themeHex: 0x50351D)
+            night.highlightColor = Color(themeHex: 0x193D4A)
+            night.highlightCasing = Color(themeHex: 0xF4F0E6)
+            night.crosshair = .init(valid: Color(themeHex: 0x253D31),
+                                   invalid: Color(themeHex: 0x5E2828),
+                                   removal: Color(themeHex: 0x193D4A))
+            night.removeMark = Color(themeHex: 0x5E2828)
+            night.restoreMark = Color(themeHex: 0x253D31)
+            night.removalMarkCasing = Color(themeHex: 0xF4F0E6)
+            night.removedStoneOutline = Color(themeHex: 0x30383C)
+            return night
+        }
         guard self == .rakedGarden, scheme == .dark else { return board }
         var night = board
         night.boardColor = Color(themeHex: 0x7F8586)
@@ -341,6 +381,57 @@ private enum RakedGardenColors {
     static let lightOrdinary = adaptive(0x20518B, 0x123752)
 }
 
+/// Day pigments remain exact; static trait providers resolve the studio's
+/// cool charcoal and subdued ivory surfaces without recreating image assets.
+private enum SurroundStudioColors {
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        })
+    }
+
+    static let page = adaptive(0xE8DDC7, 0x121B24)
+    static let panel = adaptive(0xF7F2E8, 0x1C2932)
+    static let foreground = adaptive(0x303631, 0xE7E7DD)
+    static let panelBorder = adaptive(0x78684F, 0x9BA7A8)
+    static let blackGlass = adaptive(0x303735, 0x252D35)
+    static let whiteGlass = adaptive(0xF3EBDD, 0xCECEC3)
+    static let whiteIdentityGlass = adaptive(0xF7F0E2, 0xD5D4C8)
+    static let action = adaptive(0x3D634B, 0x3E6659)
+    static let chatBubble = adaptive(0xDDDCCB, 0x2D3B43)
+    static let selection = adaptive(0x3D634B, 0xB4CFBC)
+    static let conditional = adaptive(0x8A531D, 0xE4BD82)
+    static let cream = adaptive(0xFFF9ED, 0xF0EEE5)
+    static let keyline = adaptive(0xFFF9ED, 0x17222B)
+    static let treeGuide = adaptive(0x78684F, 0xA7AAA1)
+    static let idle = adaptive(0xD8CEBB, 0x303E47)
+    static let blackSurfaceTop = adaptive(0x3E4745, 0x343F47)
+    static let blackSurfaceBottom = adaptive(0x202624, 0x171F27)
+    static let whiteSurfaceTop = adaptive(0xE5DCCA, 0xBDBFB7)
+    static let whiteSurfaceBottom = adaptive(0xFFF9ED, 0xD8D8CE)
+    static let blackSolid = adaptive(0x282F2C, 0x222D34)
+    static let whiteForeground = adaptive(0x303631, 0x222C30)
+    static let blackAccent = adaptive(0xC6D5BD, 0xD1DABB)
+    static let whiteAccent = adaptive(0x3D634B, 0x294839)
+    static let turnOutline = adaptive(0x688360, 0xA9C7AC)
+    static let turnGlow = adaptive(0xA0B78F, 0xA7C3B1)
+    static let blackBorder = adaptive(0xB7BDAF, 0x9AA7AC)
+    static let whiteBorder = adaptive(0x78684F, 0x566064)
+    static let blackSecondary = adaptive(0xD8D8CB, 0xCFD4D0)
+    static let whiteSecondary = adaptive(0x5B6155, 0x3B4444)
+    static let darkModerator = adaptive(0xDDC4F4, 0xDDC4F4)
+    static let lightModerator = adaptive(0x633889, 0x4E2D67)
+    static let darkProfessional = adaptive(0xBCE6B3, 0xBCE6B3)
+    static let lightProfessional = adaptive(0x245925, 0x1E472C)
+    static let darkSupporter = adaptive(0xF3D69A, 0xF3D69A)
+    static let lightSupporter = adaptive(0x854416, 0x633818)
+    static let darkOrdinary = adaptive(0xB5D7FF, 0xB5D7FF)
+    static let lightOrdinary = adaptive(0x20518B, 0x1C3D62)
+}
+
 // MARK: - Game Detail surfaces
 
 extension SurroundTheme {
@@ -350,7 +441,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x070A1C)
         case .rakedGarden: RakedGardenColors.page
-        case .surroundStudio: Color(themeHex: 0xE8DDC7)
+        case .surroundStudio: SurroundStudioColors.page
         }
     }
 
@@ -359,7 +450,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .secondarySystemGroupedBackground)
         case .nebulaPearl: Color(themeHex: 0x141938)
         case .rakedGarden: RakedGardenColors.panel
-        case .surroundStudio: Color(themeHex: 0xF7F2E8)
+        case .surroundStudio: SurroundStudioColors.panel
         }
     }
 
@@ -367,7 +458,7 @@ extension SurroundTheme {
         switch self {
         case .standard, .nebulaPearl: .primary
         case .rakedGarden: RakedGardenColors.foreground
-        case .surroundStudio: Color(themeHex: 0x303631)
+        case .surroundStudio: SurroundStudioColors.foreground
         }
     }
 
@@ -381,7 +472,7 @@ extension SurroundTheme {
             })
         case .nebulaPearl: Color.white.opacity(0.14)
         case .rakedGarden: RakedGardenColors.panelBorder.opacity(0.28)
-        case .surroundStudio: Color(themeHex: 0x78684F).opacity(0.28)
+        case .surroundStudio: SurroundStudioColors.panelBorder.opacity(0.28)
         }
     }
 
@@ -407,7 +498,7 @@ extension SurroundTheme {
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackGlass.opacity(0.84) : RakedGardenColors.whiteGlass.opacity(0.72)
         case .surroundStudio:
-            color == .black ? Color(themeHex: 0x303735).opacity(0.82) : Color(themeHex: 0xF3EBDD).opacity(0.84)
+            color == .black ? SurroundStudioColors.blackGlass.opacity(0.82) : SurroundStudioColors.whiteGlass.opacity(0.84)
         }
     }
 
@@ -421,7 +512,7 @@ extension SurroundTheme {
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackGlass.opacity(0.86) : RakedGardenColors.whiteSurfaceBottom.opacity(0.78)
         case .surroundStudio:
-            color == .black ? Color(themeHex: 0x303735).opacity(0.86) : Color(themeHex: 0xF7F0E2).opacity(0.90)
+            color == .black ? SurroundStudioColors.blackGlass.opacity(0.86) : SurroundStudioColors.whiteIdentityGlass.opacity(0.90)
         }
     }
 
@@ -432,7 +523,7 @@ extension SurroundTheme {
         // Deep violet: white text at about 8:1, and close to the violet clock.
         case .nebulaPearl: Color(themeHex: 0x4E36B0)
         case .rakedGarden: RakedGardenColors.maple
-        case .surroundStudio: Color(themeHex: 0x3D634B)
+        case .surroundStudio: SurroundStudioColors.action
         }
     }
 
@@ -452,7 +543,7 @@ extension SurroundTheme {
         case .standard: Color(.systemGray4)
         case .nebulaPearl: Color(themeHex: 0x2C2F5E)
         case .rakedGarden: RakedGardenColors.chatBubble
-        case .surroundStudio: Color(themeHex: 0xDDDCCB)
+        case .surroundStudio: SurroundStudioColors.chatBubble
         }
     }
 }
@@ -467,7 +558,7 @@ extension SurroundTheme {
         // The chat highlight's cyan: the one cool accent among the violets.
         case .nebulaPearl: Color(themeHex: 0x6FD6FF)
         case .rakedGarden: RakedGardenColors.selection
-        case .surroundStudio: Color(themeHex: 0x3D634B)
+        case .surroundStudio: SurroundStudioColors.selection
         }
     }
 
@@ -478,7 +569,7 @@ extension SurroundTheme {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xE0A86A)
         case .rakedGarden: RakedGardenColors.conditional
-        case .surroundStudio: Color(themeHex: 0x8A531D)
+        case .surroundStudio: SurroundStudioColors.conditional
         }
     }
 
@@ -489,7 +580,7 @@ extension SurroundTheme {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0x0B0E22)
         case .rakedGarden: RakedGardenColors.keyline
-        case .surroundStudio: Color(themeHex: 0xFFF9ED)
+        case .surroundStudio: SurroundStudioColors.keyline
         }
     }
 
@@ -499,7 +590,7 @@ extension SurroundTheme {
         case .standard: Color(scheme == .dark ? .systemGray6 : .systemGray4)
         case .nebulaPearl: Color(themeHex: 0xC9CFEA).opacity(0.2)
         case .rakedGarden: RakedGardenColors.treeGuide.opacity(0.25)
-        case .surroundStudio: Color(themeHex: 0x78684F).opacity(0.24)
+        case .surroundStudio: SurroundStudioColors.treeGuide.opacity(0.24)
         }
     }
 
@@ -509,7 +600,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemTeal)
         case .nebulaPearl: Color(themeHex: 0xC8B8FF)
         case .rakedGarden: RakedGardenColors.selection
-        case .surroundStudio: Color(themeHex: 0x3D634B)
+        case .surroundStudio: SurroundStudioColors.selection
         }
     }
 
@@ -529,7 +620,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemOrange)
         case .nebulaPearl: Color(themeHex: 0xF2B279)
         case .rakedGarden: RakedGardenColors.conditional
-        case .surroundStudio: Color(themeHex: 0x8A531D)
+        case .surroundStudio: SurroundStudioColors.conditional
         }
     }
 
@@ -539,7 +630,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: scheme == .dark ? .systemGray5 : .systemBackground)
         case .nebulaPearl: Color(themeHex: 0x2A2F55)
         case .rakedGarden: RakedGardenColors.idle
-        case .surroundStudio: Color(themeHex: 0xD8CEBB)
+        case .surroundStudio: SurroundStudioColors.idle
         }
     }
 }
@@ -585,11 +676,11 @@ extension SurroundTheme {
                     .init(color: RakedGardenColors.whiteSurfaceBottom, location: 1)]
         case .surroundStudio:
             if color == .black {
-                return [.init(color: Color(themeHex: 0x3E4745), location: 0),
-                        .init(color: Color(themeHex: 0x202624), location: 1)]
+                return [.init(color: SurroundStudioColors.blackSurfaceTop, location: 0),
+                        .init(color: SurroundStudioColors.blackSurfaceBottom, location: 1)]
             }
-            return [.init(color: Color(themeHex: 0xE5DCCA), location: 0),
-                    .init(color: Color(themeHex: 0xFFF9ED), location: 1)]
+            return [.init(color: SurroundStudioColors.whiteSurfaceTop, location: 0),
+                    .init(color: SurroundStudioColors.whiteSurfaceBottom, location: 1)]
         }
     }
 
@@ -599,7 +690,7 @@ extension SurroundTheme {
         case .standard: color == .black ? Color(white: 0.06) : Color(white: 0.98)
         case .nebulaPearl: color == .black ? Color(themeHex: 0x1C1240) : Color(themeHex: 0xF6F0EA)
         case .rakedGarden: color == .black ? RakedGardenColors.blackSolid : RakedGardenColors.whiteGlass
-        case .surroundStudio: color == .black ? Color(themeHex: 0x282F2C) : Color(themeHex: 0xF3EBDD)
+        case .surroundStudio: color == .black ? SurroundStudioColors.blackSolid : SurroundStudioColors.whiteGlass
         }
     }
 
@@ -608,7 +699,7 @@ extension SurroundTheme {
         case .standard: color == .black ? .white : Color(white: scheme == .dark ? 19 / 255 : 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
-        case .surroundStudio: color == .black ? Color(themeHex: 0xFFF9ED) : Color(themeHex: 0x303631)
+        case .surroundStudio: color == .black ? SurroundStudioColors.cream : SurroundStudioColors.whiteForeground
         }
     }
 
@@ -618,18 +709,63 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: color == .black ? Color(themeHex: 0xCDBEFF) : Color(themeHex: 0x5B3FC4)
         case .rakedGarden: color == .black ? RakedGardenColors.blackAccent : RakedGardenColors.whiteAccent
-        case .surroundStudio: color == .black ? Color(themeHex: 0xC6D5BD) : Color(themeHex: 0x3D634B)
+        case .surroundStudio: color == .black ? SurroundStudioColors.blackAccent : SurroundStudioColors.whiteAccent
         }
     }
 
     /// Keep the existing warning red on every daytime/other-theme clock.
-    /// Night jade needs a deeper red, while basalt needs a brighter coral.
+    /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
         if self == .rakedGarden, scheme == .dark {
             return Color(themeHex: color == .white ? 0x6B2024 : 0xFF8277)
         }
+        if self == .surroundStudio, scheme == .dark {
+            return Color(themeHex: color == .white ? 0x7D2D2D : 0xFF9787)
+        }
         return color == .white ? Color(red: 0.75, green: 0.10, blue: 0.07)
             : Color(red: 1, green: 0.34, blue: 0.30)
+    }
+
+    /// The warning badge uses a solid pigment beneath its white text.
+    func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
+        if self == .surroundStudio, scheme == .dark {
+            return Color(themeHex: 0x8B3434)
+        }
+        return .red
+    }
+
+    /// Scoring acceptance remains green, with a deeper pigment on night ivory.
+    func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .surroundStudio, scheme == .dark, color == .white {
+            return Color(themeHex: 0x244B2F)
+        }
+        return color == .black ? Color(red: 125 / 255, green: 210 / 255, blue: 141 / 255)
+            : Color(red: 30 / 255, green: 122 / 255, blue: 52 / 255)
+    }
+
+    /// The auto-resign countdown and disconnected label share an amber accent.
+    func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .surroundStudio, scheme == .dark, color == .white {
+            return Color(themeHex: 0x6C3D15)
+        }
+        return color == .black ? Color(red: 1, green: 159 / 255, blue: 10 / 255)
+            : Color(red: 160 / 255, green: 72 / 255, blue: 0)
+    }
+
+    /// Inline undo text sits directly on the player's clock, without a badge.
+    func clockUndoAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .surroundStudio, scheme == .dark {
+            return Color(themeHex: color == .black ? 0xE8C186 : 0x6C3D15)
+        }
+        return Color(red: 196 / 255, green: 106 / 255, blue: 0)
+    }
+
+    /// The full undo badge needs its own darker amber beneath white text.
+    func clockUndoBadge(scheme: ColorScheme) -> Color {
+        if self == .surroundStudio, scheme == .dark {
+            return Color(themeHex: 0x835122)
+        }
+        return Color(red: 196 / 255, green: 106 / 255, blue: 0)
     }
 
     /// The running clock's outline outside sudden death.
@@ -643,7 +779,7 @@ extension SurroundTheme {
         // Daytime uses a deeper amber edge against pale jade; night uses
         // brighter lantern light against the surrounding dark garden.
         case .rakedGarden: RakedGardenColors.turnOutline
-        case .surroundStudio: Color(themeHex: 0x688360)
+        case .surroundStudio: SurroundStudioColors.turnOutline
         }
     }
 
@@ -653,7 +789,7 @@ extension SurroundTheme {
         case .standard: Color(uiColor: .systemIndigo)
         case .nebulaPearl: Color(themeHex: 0xB7A4FF)
         case .rakedGarden: RakedGardenColors.turnGlow
-        case .surroundStudio: Color(themeHex: 0xA0B78F)
+        case .surroundStudio: SurroundStudioColors.turnGlow
         }
     }
 
@@ -665,7 +801,7 @@ extension SurroundTheme {
         // Maple carries the badge's white text at over 6:1. Lantern amber
         // remains the turn glow; it is too light for white status text.
         case .rakedGarden: RakedGardenColors.maple
-        case .surroundStudio: Color(themeHex: 0x3D634B)
+        case .surroundStudio: SurroundStudioColors.action
         }
     }
 
@@ -685,8 +821,8 @@ extension SurroundTheme {
                 : [RakedGardenColors.whiteSurfaceTop, RakedGardenColors.whiteSurfaceBottom]
         case .surroundStudio:
             color == .black
-                ? [Color(themeHex: 0x3E4745), Color(themeHex: 0x202624)]
-                : [Color(themeHex: 0xE5DCCA), Color(themeHex: 0xFFF9ED)]
+                ? [SurroundStudioColors.blackSurfaceTop, SurroundStudioColors.blackSurfaceBottom]
+                : [SurroundStudioColors.whiteSurfaceTop, SurroundStudioColors.whiteSurfaceBottom]
         }
     }
 
@@ -700,8 +836,8 @@ extension SurroundTheme {
                 : RakedGardenColors.whiteBorder.opacity(0.4)
         case .surroundStudio:
             color == .black
-                ? Color(themeHex: 0xB7BDAF).opacity(0.3)
-                : Color(themeHex: 0x78684F).opacity(0.35)
+                ? SurroundStudioColors.blackBorder.opacity(0.3)
+                : SurroundStudioColors.whiteBorder.opacity(0.35)
         }
     }
 
@@ -710,7 +846,7 @@ extension SurroundTheme {
         case .standard: color == .black ? .white : Color(white: 32 / 255)
         case .nebulaPearl: color == .black ? .white : Color(themeHex: 0x241D33)
         case .rakedGarden: color == .black ? RakedGardenColors.cream : RakedGardenColors.whiteForeground
-        case .surroundStudio: color == .black ? Color(themeHex: 0xFFF9ED) : Color(themeHex: 0x303631)
+        case .surroundStudio: color == .black ? SurroundStudioColors.cream : SurroundStudioColors.whiteForeground
         }
     }
 
@@ -723,7 +859,7 @@ extension SurroundTheme {
         case .rakedGarden:
             color == .black ? RakedGardenColors.blackSecondary : RakedGardenColors.whiteSecondary
         case .surroundStudio:
-            color == .black ? Color(themeHex: 0xD8D8CB) : Color(themeHex: 0x5B6155)
+            color == .black ? SurroundStudioColors.blackSecondary : SurroundStudioColors.whiteSecondary
         }
     }
 
@@ -750,18 +886,18 @@ extension SurroundTheme {
         // Match OGSUser.uiColor's priority, including lightweight ui_class
         // payloads: moderator/admin, professional, supporter, then bot.
         if player.isOGSModerator || player.isOGSAdmin {
-            return Color(themeHex: darkSurface ? 0xDDC4F4 : 0x633889)
+            return darkSurface ? SurroundStudioColors.darkModerator : SurroundStudioColors.lightModerator
         }
         if player.isOGSProfessional {
-            return Color(themeHex: darkSurface ? 0xBCE6B3 : 0x245925)
+            return darkSurface ? SurroundStudioColors.darkProfessional : SurroundStudioColors.lightProfessional
         }
         if player.isOGSSupporter {
-            return Color(themeHex: darkSurface ? 0xF3D69A : 0x854416)
+            return darkSurface ? SurroundStudioColors.darkSupporter : SurroundStudioColors.lightSupporter
         }
         if player.isBot == true || player.uiClass?.contains("bot") == true {
             return identitySecondary(color)
         }
-        return Color(themeHex: darkSurface ? 0xB5D7FF : 0x20518B)
+        return darkSurface ? SurroundStudioColors.darkOrdinary : SurroundStudioColors.lightOrdinary
     }
 }
 
@@ -927,7 +1063,7 @@ struct GameDetailBackdrop: View {
         case .rakedGarden:
             RakedGardenScene(scheme: colorScheme)
         case .surroundStudio:
-            SurroundStudioScene()
+            SurroundStudioScene(scheme: colorScheme)
         }
     }
 }
@@ -936,9 +1072,11 @@ struct GameDetailBackdrop: View {
 /// Architecture and the six-mat floor share one uniform image scale.
 /// The board keeps its own square geometry and independent kaya surface.
 private struct SurroundStudioScene: View {
+    let scheme: ColorScheme
+
     var body: some View {
         GeometryReader { geometry in
-            SurroundStudioSceneContent(size: geometry.size).equatable()
+            SurroundStudioSceneContent(size: geometry.size, scheme: scheme).equatable()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -949,7 +1087,11 @@ private struct SurroundStudioScene: View {
 /// panel never rearranges the room. Top-leading alignment retains timber.
 private struct SurroundStudioSceneContent: View, Equatable {
     let size: CGSize
-    private static let ivory = Color(themeHex: 0xE8DDC7)
+    let scheme: ColorScheme
+
+    private var chrome: Color {
+        Color(themeHex: scheme == .dark ? 0x121B24 : 0xE8DDC7)
+    }
 
     private var usesLegacyChrome: Bool {
         if #available(iOS 26.0, *) { return false }
@@ -957,7 +1099,7 @@ private struct SurroundStudioSceneContent: View, Equatable {
     }
 
     /// Short landscape windows place the unbacked navigation title over
-    /// the shoji rail. Keep an ivory plateau behind that band, blending the
+    /// the shoji rail. Keep a quiet plateau behind that band, blending the
     /// adjustment continuously away as the window becomes taller or square.
     private var shortWideChromeWeight: CGFloat {
         min(1, max(0, (size.width - size.height) / 160))
@@ -971,18 +1113,22 @@ private struct SurroundStudioSceneContent: View, Equatable {
 
     var body: some View {
         ZStack {
-            Self.ivory
+            chrome
             Image("SurroundStudioScene")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                // The same shoji light and mat seams become moonlit. Grade
+                // the artwork only, keeping the kaya and native UI independent.
+                .saturation(scheme == .dark ? 0.28 : 1)
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x495C7C) : .white)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .clipped()
             // Support native bars locally, leaving the room and board free
             // of a global scrim. Older toolbars have no glass of their own.
             VStack(spacing: 0) {
                 LinearGradient(stops: [
-                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.94 : 0.82), location: 0),
-                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.92
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.82), location: 0),
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.92
                         : 0.24 + 0.58 * Double(shortWideChromeWeight)), location: 0.55),
                     .init(color: .clear, location: 1)
                 ], startPoint: .top, endPoint: .bottom)
@@ -990,8 +1136,8 @@ private struct SurroundStudioSceneContent: View, Equatable {
                 Spacer(minLength: 0)
                 LinearGradient(stops: [
                     .init(color: .clear, location: 0),
-                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.90 : 0.24), location: 0.55),
-                    .init(color: Self.ivory.opacity(usesLegacyChrome ? 0.94 : 0.78), location: 1)
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.24), location: 0.55),
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.78), location: 1)
                 ], startPoint: .top, endPoint: .bottom)
                 .frame(height: min(96, size.height * 0.16))
             }
@@ -1017,7 +1163,7 @@ struct GameDetailSceneForeground: View {
                 }
             } else if theme == .surroundStudio {
                 GeometryReader { geometry in
-                    SurroundStudioFoliageContent(size: geometry.size,
+                    SurroundStudioFoliageContent(size: geometry.size, scheme: colorScheme,
                                                  hasTopEdgeClocks: hasTopEdgeClocks).equatable()
                 }
             }
@@ -1057,6 +1203,7 @@ struct SurroundStudioDecorationLayout: Equatable {
 
 private struct SurroundStudioFoliageContent: View, Equatable {
     let size: CGSize
+    let scheme: ColorScheme
     let hasTopEdgeClocks: Bool
 
     private var usesLegacyChrome: Bool {
@@ -1070,8 +1217,11 @@ private struct SurroundStudioFoliageContent: View, Equatable {
                                                     hasTopEdgeClocks: hasTopEdgeClocks)
         Image("SurroundStudioFoliage")
             .resizable()
+            .saturation(scheme == .dark ? 0.42 : 1)
+            .colorMultiply(scheme == .dark ? Color(themeHex: 0x6C7D99) : .white)
             .frame(width: layout.foliage.width, height: layout.foliage.height)
-            .shadow(color: Color(themeHex: 0x342F21).opacity(0.16), radius: 3, x: 3, y: 5)
+            .shadow(color: Color(themeHex: scheme == .dark ? 0x070D16 : 0x342F21)
+                .opacity(scheme == .dark ? 0.3 : 0.16), radius: 3, x: 3, y: 5)
             .position(x: layout.foliage.midX, y: layout.foliage.midY)
             .frame(width: size.width, height: size.height)
             .mask {

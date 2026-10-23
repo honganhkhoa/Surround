@@ -405,7 +405,7 @@ Tool tests use mocked HTTP responses. Never supply production credentials to an 
 
 The manual Game Detail artboard suites opt in with `TEST_RUNNER_SURROUND_ARTBOARD_AUDIT=1`. Their compatibility-mode launches use `--surround-game-detail-design-artboard <1...91>` to select matching players, turns, board positions, clocks, chat, teams, and scoring data. These fixtures use the ordinary Home-to-game navigation route so native navigation controls appear in the captures. The design flag requires both offline UI-testing and compatibility-screenshot mode; App Store screenshot launches reject it and retain their original fixture contract.
 
-`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl and `surroundStudio` selects Surround Studio. Garden follows the device appearance; Nebula remains dark and Studio remains light. Pass `--surround-ui-appearance light` or `--surround-ui-appearance dark` for deterministic Garden fixtures, or omit it to test live device-appearance changes. The existing Garden daytime audits explicitly select light appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
+`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl and `surroundStudio` selects Surround Studio. Garden and Studio follow the device appearance; Nebula remains dark. Pass `--surround-ui-appearance light` or `--surround-ui-appearance dark` for deterministic Garden or Studio fixtures, or omit it to test live device-appearance changes. Their daytime phone and iPad audits explicitly select light appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
 
 - `GameDetailIPadArtboardAuditTests/testRakedGardenThemeOrientations` captures Play through native landscape/portrait rotation and Home after Back; `testRakedGardenThemePanels` captures Chat, Analyze and Zen in both orientations.
 - `ArtboardPhoneAuditTests/testRakedGardenThemeStates` captures Play, Chat, Analyze and Zen in both full-size phone orientations; `testRakedGardenThemeScoring` captures stone removal and score details. Run `testRakedGardenThemeSmallPhone` on an SE-size simulator for the smaller Play, Analyze and scoring fixtures.
@@ -413,14 +413,25 @@ The manual Game Detail artboard suites opt in with `TEST_RUNNER_SURROUND_ARTBOAR
 
 Each Raked Garden audit above also has a `testSurroundStudioTheme…` counterpart that reuses the same geometry and continuity checks with Surround Studio. Theme attachments have a `raked-garden` or `surround-studio` suffix so visual review can distinguish them from standard-theme artboards. A passing geometry audit still requires visual inspection of textures, controls, stones, small board marks and score overlays.
 
-Garden additionally has four night/appearance selectors (prefix with `SurroundUITests/` for `-only-testing:`):
+Garden additionally has these night/appearance selectors (prefix with `SurroundUITests/` for `-only-testing:`):
 
 - `ArtboardPhoneAuditTests/testRakedGardenNightThemeStates`: fixed dark Play, Chat, Analyze and Zen in both full-size phone orientations.
 - `ArtboardPhoneAuditTests/testRakedGardenNightThemeScoring`: fixed dark stone removal and score details.
 - `ArtboardPhoneAuditTests/testRakedGardenNightThemeSmallPhone`: fixed dark SE-size Play, Analyze and scoring.
 - `GameDetailIPadArtboardAuditTests/testRakedGardenThemeAppearanceContinuity`: no fixed appearance override. Keeps Play mounted through day-to-night and native rotation, then retains the selected Analyze branch through night-to-day and returns to Home. It first confirms that Home follows a live appearance change, then checks rendered board brightness as well as position, clocks, selection and board geometry, and restores the original device appearance/orientation even after a failure. `XCUIDevice.appearance` reports a requested style even when the Simulator does not apply it: throughout a newly created device's first boot (seen on iOS 26.5 and 27.2), every request times out and Home stays unchanged. Boot such a device once and restart it before running this audit.
 
-Night phone attachments use `raked-garden-night`; the iPad continuity attachments identify day/night explicitly. Inspect the actual rendered transition after caches are warm, not only attachment names or state assertions. Nominal palette tests do not measure composited glass, every texture pixel, or native antialiasing. These four methods do not add Studio counterparts or a Duo fold audit.
+Studio uses the same bounded fixture routes, with these additional selectors:
+
+- `ArtboardPhoneAuditTests/testSurroundStudioNightThemeStates`: eight fixed-dark captures covering Play, Chat, Analyze and Zen in both full-size phone orientations.
+- `ArtboardPhoneAuditTests/testSurroundStudioNightThemeScoring`: two fixed-dark captures for stone removal and score details.
+- `ArtboardPhoneAuditTests/testSurroundStudioNightThemeSmallPhone`: three fixed-dark SE-size captures for Play, Analyze and scoring.
+- `ArtboardPhoneAuditTests/testSurroundStudioNightThemeControlStates`: three fixed-dark captures for both urgent clocks and disconnected scoring with disabled Accept.
+- `ArtboardPhoneAuditTests/testSurroundStudioNightBoardMarkerGallery`: three fixed-dark offline gallery captures at 20, 13 and 7 pt cells on a full-size phone in portrait. The same marker samples cover detailed stones and both compact solid-board sizes. Pixel assertions verify that both page and board actually use the dark palette.
+- `GameDetailIPadArtboardAuditTests/testSurroundStudioThemeAppearanceContinuity`: no fixed appearance override. Reuses the Garden device getter, Home, rendered-brightness and game-state checks. Keeps one Play game mounted through five panel states in day and five in night, rotates it in night, then retains a selected Analyze branch through night-to-day and returns to Home. Fourteen captures cover the sequence. The app must be foreground for the rendered-board checks; teardown restores the original device appearance and orientation.
+
+Night phone attachments use `raked-garden-night` or `surround-studio-night`; iPad continuity attachments identify day/night explicitly. Inspect the actual rendered transition after caches are warm, not only attachment names or state assertions. Nominal palette tests do not measure composited glass, every texture pixel, or native antialiasing. Night selectors do not change the physical Duo pose.
+
+Check the executed test count as well as the exit status. On the iOS 18.6 SE runtime, the Studio small-phone selector without parentheses returned success with zero tests. The quoted argument `'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testSurroundStudioNightThemeSmallPhone()'` selected and passed the test.
 
 `ArtboardPhoneAuditTests/testSurroundStudioThemeControlStates` captures sudden-death clock text and disconnected scoring with a disabled Accept button. Inspect urgency text against tinted controls and the disabled action alongside the enabled scoring audit.
 
