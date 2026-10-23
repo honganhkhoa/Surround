@@ -433,6 +433,23 @@ Night phone attachments use `raked-garden-night` or `surround-studio-night`; iPa
 
 Check the executed test count as well as the exit status. On the iOS 18.6 SE runtime, the Studio small-phone selector without parentheses returned success with zero tests. The quoted argument `'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testSurroundStudioNightThemeSmallPhone()'` selected and passed the test.
 
+### Board marker matrix
+
+The Debug-only offline marker gallery launches with `--surround-ui-testing --surround-board-marker-audit 20`. Combine it with the theme and appearance arguments above. Use `--surround-board-marker-panel core-1` to show one export panel on the device, or `--surround-board-marker-sample variation-empty` for one board. These selectors preserve the device's native display scale; oversized boards should be checked on an iPad rather than scaled to fit a phone.
+
+`--surround-ui-testing --surround-board-marker-export` renders the same board views with SwiftUI `ImageRenderer`, covering every supported theme/appearance at 2× and 3× and cell sizes 7, 10, 13, 14, 17, 20, 24, 30, 40 and 64 pt. The samples include both stone colors, empty and removed points, all artwork variants, last/pending/undo indicators, chat highlights, legal/illegal/removal crosshairs, removal/restore marks, scoring/estimates/dame, all annotation shapes, one-to-three-digit labels, overlaps, corners and coordinate labels. Filter a run with comma-separated values:
+
+```text
+--surround-board-marker-export-sizes 13,14,20,40
+--surround-board-marker-export-scales 2,3
+--surround-board-marker-export-themes standard,nebulaPearl,rakedGarden,surroundStudio
+--surround-board-marker-export-groups core,interaction,estimate,labels,overlap,edges,variants,widget
+```
+
+Exports live in the app's `Documents/BoardMarkerAudit/` directory. Each export deletes the previous run folders before it starts, so copy a run out of the app container to keep it. `progress.json` reports completion or failure; `manifest.json` records the exact samples, requested and pixel-aligned cell sizes, appearance, scale, artwork variants, PNG dimensions and run folder. Keep the manifest with the PNGs. Inspect native phone and tablet screenshots as well: offscreen fixtures exercise drawing, not gesture behavior, every continuous board size, or the system's final widget compositing. At thumbnail sizes, long labels cannot retain full-size legibility within one intersection.
+
+`SurroundThemeTests` checks compact-board contrast, status/score casing, marker proportions and artwork centering. `BoardPositionTests` checks annotation/automatic-indicator priority and restoration after transient pending/undo states. These complement visual inspection; palette contrast alone does not test detailed reflections or pixel rasterization.
+
 `ArtboardPhoneAuditTests/testSurroundStudioThemeControlStates` captures sudden-death clock text and disconnected scoring with a disabled Accept button. Inspect urgency text against tinted controls and the disabled action alongside the enabled scoring audit.
 
 `ArtboardPhoneAuditTests/testSurroundStudioThemePanelTransitions` and `GameDetailIPadArtboardAuditTests/testSurroundStudioThemePanelTransitions` keep one Studio game open while toggling Play → Chat → Play → Analyze → Play in each orientation. They check panel visibility and board continuity and retain ten captures per device. Compare the decorations across each sequence: their size and position must remain fixed while panels pass over the background artwork.

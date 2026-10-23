@@ -3,6 +3,133 @@ import SwiftUI
 import CoreGraphics
 
 final class SurroundThemeTests: XCTestCase {
+    /// A last-move ring must leave the stone's color and an open center
+    /// visible at phone sizes, including either side of the former 20 pt jump.
+    func testPhoneLastMoveRingsPreserveTheStoneFace() {
+        for cellSize: CGFloat in [14, 17, 19.667, 20, 20.333, 24, 30] {
+            let marker = StoneMarkerGeometry(cellSize: cellSize)
+            let outerDiameter = marker.ringDiameter + marker.lineWidth
+            let innerDiameter = marker.ringDiameter - marker.lineWidth
+            let ringAreaFraction = (outerDiameter * outerDiameter - innerDiameter * innerDiameter)
+                / (marker.stoneDiameter * marker.stoneDiameter)
+            XCTAssertLessThan(ringAreaFraction, 0.15, "cell=\(cellSize): the ring must not wash out the stone")
+            XCTAssertGreaterThan(innerDiameter, marker.stoneDiameter * 0.2,
+                                 "cell=\(cellSize): retain a clearly open center")
+            XCTAssertLessThan(outerDiameter, marker.stoneDiameter,
+                              "cell=\(cellSize): keep the ring separate from the stone's rim")
+        }
+        let before = StoneMarkerGeometry(cellSize: 19.667)
+        let atThreshold = StoneMarkerGeometry(cellSize: 20)
+        let after = StoneMarkerGeometry(cellSize: 20.333)
+        XCTAssertLessThan(abs(atThreshold.lineWidth - before.lineWidth), 0.03,
+                          "Resizing through 20 pt must not visibly change the marker weight")
+        XCTAssertLessThan(abs(after.lineWidth - atThreshold.lineWidth), 0.03,
+                          "Resizing through 20 pt must not visibly change the marker weight")
+    }
+
+    /// Cover each native-pixel cell step, not just whole point sizes. All
+    /// centered marks must leave part of the stone face and its rim exposed;
+    /// diagonal removal strokes and square corners are the widest cases.
+    func testMarkerGeometryFitsPhoneAndTabletStoneFacesAtBothDisplayScales() {
+        for scale: CGFloat in [2, 3] {
+            for pixels in Int(7 * scale)...Int(64 * scale) {
+                let cell = CGFloat(pixels) / scale
+                let marker = StoneMarkerGeometry(cellSize: cell)
+                let shapeCasing = usesDetailedStoneRendering(at: cell) ? marker.casingWidth : 0
+                let restoreWidth = marker.restoreLineWidth(displayScale: scale)
+                let restoreCasing = marker.restoreCasingWidth(displayScale: scale)
+                let availableRadius = marker.stoneDiameter / 2 - 0.5 / scale
+                let samples: [(String, CGFloat)] = [
+                    ("last move", marker.ringDiameter / 2 + marker.lineWidth / 2 + shapeCasing),
+                    ("pending", marker.pendingDiameter / 2 + marker.lineWidth / 2 + shapeCasing),
+                    ("square", marker.shapeDiameter / sqrt(2) + marker.lineWidth / 2 + shapeCasing),
+                    ("removal", marker.actionDiameter / sqrt(2) + marker.actionLineWidth / 2 + marker.casingWidth),
+                    ("restore", marker.actionDiameter / 2 + restoreWidth / 2 + restoreCasing),
+                ]
+                for (name, radius) in samples {
+                    XCTAssertLessThanOrEqual(radius, availableRadius,
+                                            "\(name), cell=\(cell), scale=\(scale): keep the rim visible")
+                }
+                XCTAssertGreaterThanOrEqual((marker.ringDiameter - marker.lineWidth) * scale, 2,
+                                            "cell=\(cell), scale=\(scale): preserve an open ring center")
+                // An axis-aligned plus centered between pixels needs a
+                // two-pixel core and a separate casing pixel on either side.
+                // A thinner core blends with its casing at 7 pt on 2x screens.
+                XCTAssertGreaterThanOrEqual(restoreWidth * scale, 2,
+                                            "cell=\(cell), scale=\(scale): restore core must survive pixel phase")
+                XCTAssertGreaterThanOrEqual(restoreCasing * scale, 1,
+                                            "cell=\(cell), scale=\(scale): restore casing must remain distinct")
+                for width in [marker.lineWidth,
+                              marker.actionLineWidth, marker.scoreLineWidth] {
+                    XCTAssertGreaterThanOrEqual(width * scale, 1,
+                                                "cell=\(cell), scale=\(scale): marks need at least a native pixel")
+                }
+            }
+        }
+    }
+
+    /// Crossing a rendering or historical stroke breakpoint must not make
+    /// an interaction mark suddenly bold while a board is being resized.
+    func testMarkerStrokeWeightsDoNotJumpAtSizeThresholds() {
+        for scale: CGFloat in [2, 3] {
+            for threshold: CGFloat in [10, 14, 20, 30] {
+                let before = StoneMarkerGeometry(cellSize: threshold - 1 / scale)
+                let after = StoneMarkerGeometry(cellSize: threshold)
+                let samples = [
+                    ("last move", before.lineWidth, after.lineWidth),
+                    ("action", before.actionLineWidth, after.actionLineWidth),
+                    ("restore", before.restoreLineWidth(displayScale: scale), after.restoreLineWidth(displayScale: scale)),
+                    ("restore casing", before.restoreCasingWidth(displayScale: scale), after.restoreCasingWidth(displayScale: scale)),
+                    ("casing", before.casingWidth, after.casingWidth),
+                    ("score", before.scoreLineWidth, after.scoreLineWidth),
+                ]
+                for (name, first, second) in samples {
+                    XCTAssertLessThan(abs(second - first) * scale, 0.1,
+                                      "\(name), threshold=\(threshold), scale=\(scale): avoid a visible stroke step")
+                }
+            }
+        }
+    }
+
+    /// Markers are centered on intersections, so every image variant must
+    /// put its opaque stone silhouette at that same center, excluding shadows.
+    func testThemeStoneArtworkStaysCenteredUnderMarkers() throws {
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        let families = ["NebulaPearlGlass", "NebulaPearlPearl", "RakedGardenBasalt",
+                        "RakedGardenJade", "SurroundStudioSlate", "SurroundStudioClamshell"]
+        let side = 128
+        for family in families {
+            for variant in 0..<4 {
+                let name = "\(family)\(variant)"
+                let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+                let source = try XCTUnwrap(image.cgImage, name)
+                let pixels = try rgbaPixels(for: source, side: side)
+                var alphaSum = 0.0, weightedX = 0.0, weightedY = 0.0
+                var minX = side, minY = side, maxX = -1, maxY = -1
+                for y in 0..<side {
+                    for x in 0..<side {
+                        let alpha = Double(pixels[(y * side + x) * 4 + 3])
+                        alphaSum += alpha
+                        weightedX += (Double(x) + 0.5) * alpha
+                        weightedY += (Double(y) + 0.5) * alpha
+                        if alpha > 127 {
+                            minX = min(minX, x)
+                            minY = min(minY, y)
+                            maxX = max(maxX, x)
+                            maxY = max(maxY, y)
+                        }
+                    }
+                }
+                XCTAssertGreaterThan(alphaSum, 0, name)
+                guard alphaSum > 0 else { continue }
+                XCTAssertEqual(weightedX / alphaSum, Double(side) / 2, accuracy: 0.25, name)
+                XCTAssertEqual(weightedY / alphaSum, Double(side) / 2, accuracy: 0.25, name)
+                XCTAssertLessThanOrEqual(abs(minX - (side - 1 - maxX)), 1, name)
+                XCTAssertLessThanOrEqual(abs(minY - (side - 1 - maxY)), 1, name)
+            }
+        }
+    }
+
     func testStandardThemeKeepsTheOriginalBoard() {
         let board = SurroundTheme.standard.board
         XCTAssertEqual(board, BoardAppearance.standard)
@@ -457,22 +584,11 @@ final class SurroundThemeTests: XCTestCase {
             try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
         }
         let side = 128
-        func rgbaPixels(for source: CGImage) throws -> [UInt8] {
-            var pixels = [UInt8](repeating: 0, count: side * side * 4)
-            try pixels.withUnsafeMutableBytes { buffer in
-                let context = try XCTUnwrap(CGContext(data: buffer.baseAddress,
-                    width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                    space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-                context.draw(source, in: CGRect(x: 0, y: 0, width: side, height: side))
-            }
-            return pixels
-        }
         _ = try image(named: "SurroundStudioBoard")
         _ = try image(named: "SurroundStudioScene")
         for name in ["SurroundStudioFoliage", "SurroundStudioVase"] {
             let source = try XCTUnwrap(image(named: name).cgImage, name)
-            let pixels = try rgbaPixels(for: source)
+            let pixels = try rgbaPixels(for: source, side: side)
             let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
             XCTAssertTrue(alpha.contains(0), "\(name) leaves the room visible around its artwork")
             XCTAssertTrue(alpha.contains { $0 > 250 }, "\(name) contains visible artwork")
@@ -486,7 +602,7 @@ final class SurroundThemeTests: XCTestCase {
             let source = try XCTUnwrap(image.cgImage)
             XCTAssertEqual(source.width, source.height)
             XCTAssertGreaterThanOrEqual(source.width, 256)
-            let pixels = try rgbaPixels(for: source)
+            let pixels = try rgbaPixels(for: source, side: side)
             func alpha(_ x: Int, _ y: Int) -> UInt8 { pixels[(y * side + x) * 4 + 3] }
             XCTAssertEqual(alpha(0, 0), 0)
             XCTAssertEqual(alpha(side - 1, side - 1), 0)
@@ -852,6 +968,108 @@ final class SurroundThemeTests: XCTestCase {
             if let outline = board.removedStoneOutline { check("dead outline", ratio(outline, surface), 3) }
             print("[SmallBoardAudit] \(name): " + report.joined(separator: ", "))
         }
+    }
+
+    /// Crosshairs run over the board between stones. Resolve both system
+    /// appearances explicitly: UIKit's bright semantic colors can disappear
+    /// against the Standard board even when they read on a black stone.
+    func testCrosshairsRemainReadableInEveryThemeAndAppearance() {
+        for theme in SurroundTheme.allCases {
+            for style: UIUserInterfaceStyle in [.light, .dark] {
+                let board = theme.board(for: style == .dark ? .dark : .light)
+                let surface = board.surfaceColor(detailed: false)
+                for (state, color) in [("legal", board.crosshair.valid),
+                                       ("illegal", board.crosshair.invalid),
+                                       ("removal", board.crosshair.removal)] {
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(over(color, surface, style), surface, style: style), 3,
+                        "\(theme.rawValue) \(style): \(state) crosshair on board"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Restore marks sit on half-faded stones. Test their composited colors,
+    /// including translucent casings, instead of comparing unblended RGBs.
+    /// Both actions must stay distinct on either stone while a group changes
+    /// between living and removed states.
+    func testRemovalAndRestoreMarksRemainReadableOnLivingAndFadedStones() {
+        for theme in SurroundTheme.allCases {
+            for style: UIUserInterfaceStyle in [.light, .dark] {
+                let board = theme.board(for: style == .dark ? .dark : .light)
+                let surface = board.surfaceColor(detailed: false)
+                for stoneColor: StoneColor in [.black, .white] {
+                    let stone = board.stones(stoneColor)
+                    let fadedStone = over(stone.flat.opacity(0.5), surface, style)
+                    for (state, background) in [("living", stone.flat), ("removed", fadedStone)] {
+                        for (action, color) in [("remove", board.removeMark), ("restore", board.restoreMark)] {
+                            let sample = "\(theme.rawValue) \(style): \(action) on \(state) \(stoneColor)"
+                            let bareMark = over(color, background, style)
+                            if let casing = board.removalMarkCasing {
+                                let visibleCasing = over(casing, background, style)
+                                let visibleMark = over(color, visibleCasing, style)
+                                XCTAssertGreaterThanOrEqual(
+                                    max(contrast(visibleMark, background, style: style),
+                                        contrast(visibleCasing, background, style: style)), 3,
+                                    "\(sample): mark or casing must separate from the stone"
+                                )
+                                XCTAssertGreaterThanOrEqual(
+                                    contrast(visibleMark, visibleCasing, style: style), 3,
+                                    "\(sample): preserve the colored action inside its casing"
+                                )
+                            } else {
+                                XCTAssertGreaterThanOrEqual(
+                                    contrast(bareMark, background, style: style), 3, sample
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// An estimate may assign either owner to an empty point or to either
+    /// player's stone. A common board-colored outline is not sufficient on
+    /// black stones, where the black ownership fill can also disappear.
+    func testScoreAndEstimateSquaresRemainReadableOnEveryUnderlyingPoint() {
+        for theme in SurroundTheme.allCases {
+            for style: UIUserInterfaceStyle in [.light, .dark] {
+                let board = theme.board(for: style == .dark ? .dark : .light)
+                let surface = board.surfaceColor(detailed: false)
+                let backgrounds: [(String, StoneColor?, Color)] = [
+                    ("empty", nil, surface),
+                    ("black", .black, board.black.flat),
+                    ("white", .white, board.white.flat),
+                    ("removed black", .black, over(board.black.flat.opacity(0.5), surface, style)),
+                    ("removed white", .white, over(board.white.flat.opacity(0.5), surface, style)),
+                ]
+                for owner: StoneColor in [.black, .white] {
+                    for (point, stoneColor, background) in backgrounds {
+                        let fill = over(board.stones(owner).territoryMark, background, style)
+                        let outline = over(board.scoreMarkOutline(on: stoneColor), background, style)
+                        XCTAssertGreaterThanOrEqual(
+                            max(contrast(fill, background, style: style),
+                                contrast(outline, background, style: style)), 3,
+                            "\(theme.rawValue) \(style): \(owner) ownership on \(point)"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func rgbaPixels(for source: CGImage, side: Int) throws -> [UInt8] {
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        try pixels.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(data: buffer.baseAddress,
+                width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(source, in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+        return pixels
     }
 
     /// A translucent color as it appears over an opaque one.

@@ -20,6 +20,28 @@ enum StoneRemovalOption: Int {
     case toggleSinglePoint
 }
 
+#if DEBUG
+/// Draw the production interaction layers deterministically in the audit.
+/// Gestures and game state continue to use their normal bindings.
+struct BoardMarkerAuditState {
+    var highlightedRow = -1
+    var highlightedColumn = -1
+    var hoverValid: Bool? = nil
+    var removalPoints = Set<[Int]>()
+}
+
+private struct BoardMarkerAuditStateKey: EnvironmentKey {
+    static let defaultValue: BoardMarkerAuditState? = nil
+}
+
+extension EnvironmentValues {
+    var boardMarkerAuditState: BoardMarkerAuditState? {
+        get { self[BoardMarkerAuditStateKey.self] }
+        set { self[BoardMarkerAuditStateKey.self] = newValue }
+    }
+}
+#endif
+
 /// Rebuild the batched geometry only when the grid itself changes, rather
 /// than on every move, clock tick or crosshair update in the parent board.
 /// The Canvas rasterizes it in the app: as a filled shape, its thousands of
@@ -38,6 +60,9 @@ private struct RaggedGobanGrid: View, Equatable {
 struct Goban: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.boardAppearance) private var appearance
+    #if DEBUG
+    @Environment(\.boardMarkerAuditState) private var markerAuditState
+    #endif
     var geometry: GeometryProxy
     var width: Int
     var height: Int
@@ -57,6 +82,15 @@ struct Goban: View {
     
     var body: some View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
+        #if DEBUG
+        let drawnRow = markerAuditState?.highlightedRow ?? highlightedRow
+        let drawnColumn = markerAuditState?.highlightedColumn ?? highlightedColumn
+        let drawnHoverValid = markerAuditState.map { $0.hoverValid } ?? isHoveredPointValid
+        #else
+        let drawnRow = highlightedRow
+        let drawnColumn = highlightedColumn
+        let drawnHoverValid = isHoveredPointValid
+        #endif
         var starPoints = [[CGFloat]]()
         if size > 10 {
             if height == 19 && width == 19 {
@@ -69,7 +103,7 @@ struct Goban: View {
         }
         let highlightColor = stoneRemovable
             ? appearance.crosshair.removal
-            : (isHoveredPointValid ?? false) ? appearance.crosshair.valid : appearance.crosshair.invalid
+            : (drawnHoverValid ?? false) ? appearance.crosshair.valid : appearance.crosshair.invalid
         let coordinates = "ABCDEFGHJKLMNOPQRSTUVWXYZ".map { String($0) }
         return Group {
             ZStack {
@@ -124,13 +158,13 @@ struct Goban: View {
                         }
                     }.fill(appearance.gridColor)
                 }
-                if highlightedColumn >= 0 && highlightedColumn < width && highlightedRow >= 0 && highlightedRow < height {
+                if drawnColumn >= 0 && drawnColumn < width && drawnRow >= 0 && drawnRow < height {
                     Path { path in
-                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(highlightedRow) + 0.5) * size))
-                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(highlightedRow) + 0.5) * size))
+                        path.move(to: CGPoint(x: size / 2, y: (CGFloat(drawnRow) + 0.5) * size))
+                        path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y:(CGFloat(drawnRow) + 0.5) * size))
 
-                        path.move(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: size / 2))
-                        path.addLine(to: CGPoint(x: (CGFloat(highlightedColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
+                        path.move(to: CGPoint(x: (CGFloat(drawnColumn) + 0.5) * size, y: size / 2))
+                        path.addLine(to: CGPoint(x: (CGFloat(drawnColumn) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                     }
                     .stroke(highlightColor, lineWidth: appearance.crosshairWidth)
                 }
@@ -187,22 +221,34 @@ struct VariationNumberings: View {
     @Environment(\.boardAppearance) private var appearance
     var variation: Variation
     var cellSize: CGFloat
+    var policy = BoardPointIndicatorPolicy(markups: [:])
     
     var body: some View {
-        let labels = Array(variation.nonDuplicatingMoveCoordinatesByLabel.keys)
+        let labels = variation.nonDuplicatingMoveCoordinatesByLabel.keys.sorted()
+        let marker = StoneMarkerGeometry(cellSize: cellSize)
         
         return ZStack {
             ForEach(labels, id: \.self) { label -> AnyView in
-                if let coordinate = variation.nonDuplicatingMoveCoordinatesByLabel[label] {
-                    let stoneColor: StoneColor = variation.position[coordinate] == .hasStone(.black) ? .black : .white
-                    let labelSize = cellSize >= 14 ? cellSize / 1.5 : cellSize
+                if let coordinate = variation.nonDuplicatingMoveCoordinatesByLabel[label],
+                   policy.showsVariationNumber(at: BoardPoint(row: coordinate[0], column: coordinate[1])) {
+                    let stoneColor: StoneColor? = {
+                        if case .hasStone(let color) = variation.position[coordinate] { return color }
+                        return nil
+                    }()
+                    let detailed = usesDetailedStoneRendering(at: cellSize)
                     return AnyView(
-                        Text(verbatim: "\(label)")
-                            .font(.system(size: labelSize))
-                            .bold()
-                            .foregroundColor(appearance.stones(stoneColor).label)
-                            .minimumScaleFactor(0.2)
-                            .frame(width: labelSize, height: labelSize)
+                        StoneMarkerText(text: "\(label)", fontSize: cellSize * 0.62,
+                                        foreground: stoneColor.map { appearance.stones($0).label } ?? appearance.emptyPointMarker,
+                                        casing: detailed ? appearance.textCasing(on: stoneColor) : nil,
+                                        casingWidth: marker.casingWidth)
+                            .equatable()
+                            .frame(width: marker.stoneDiameter * 0.78, height: marker.stoneDiameter * 0.78)
+                            .background {
+                                if stoneColor == nil {
+                                    Circle().fill(appearance.surfaceColor(detailed: detailed))
+                                        .frame(width: marker.stoneDiameter * 0.88, height: marker.stoneDiameter * 0.88)
+                                }
+                            }
                             .position(
                                 x: (CGFloat(coordinate[1]) + 0.5) * cellSize,
                                 y: (CGFloat(coordinate[0]) + 0.5) * cellSize
@@ -463,12 +509,17 @@ private struct ImageStoneCanvas: View {
             let black = images.black.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
             let white = images.white.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
 
+            // Long casts shift the apparent center of a tiny stone. Keep
+            // phone-size shadows close to its footprint; larger boards
+            // retain the theme's full raised profile and light direction.
+            let shadowScale = min(1, max(0.35, (cellSize - 10) / 30))
+
             if shadowStyle == .raised {
                 // A full-footprint cast stays visible against wood grain at
                 // phone size. Cap its spread so larger boards do not float.
-                drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)),
-                           x: min(2, max(0.8, cellSize * 0.035)),
-                           y: min(3, max(1.6, cellSize * 0.065)),
+                drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)) * shadowScale,
+                           x: min(2, max(0.8, cellSize * 0.035)) * shadowScale,
+                           y: min(3, max(1.6, cellSize * 0.065)) * shadowScale,
                            inset: 0, opacity: 0.34)
                 // The tighter edge keeps the curved stone grounded; the
                 // cast above is softer than the default contact-only shadow.
@@ -476,8 +527,8 @@ private struct ImageStoneCanvas: View {
                            x: min(0.5, cellSize * 0.01), y: min(0.8, cellSize * 0.02),
                            inset: 0.2, opacity: 0.32)
             } else {
-                drawShadow(in: context, radius: max(1, cellSize * 0.06),
-                           x: cellSize * 0.03, y: cellSize * 0.06,
+                drawShadow(in: context, radius: max(0.6, cellSize * 0.06 * shadowScale),
+                           x: cellSize * 0.03 * shadowScale, y: cellSize * 0.06 * shadowScale,
                            inset: 0.5, opacity: 0.5)
             }
 
@@ -523,8 +574,8 @@ struct Stones: View {
     @ObservedObject var boardPosition: BoardPosition
     var variation: Variation?
     var geometry: GeometryProxy
-    var isLastMovePending = false
-    var undoRequestCoordinates: [[Int]] = []
+    /// Which status indicators to draw, shared with the annotation overlay.
+    var indicators: BoardIndicatorPlan
 
     var body: some View {
         let width = boardPosition.width
@@ -541,15 +592,20 @@ struct Stones: View {
         let dameIndicator = CGMutablePath()
         let whiteEstimatedScore = CGMutablePath()
         let blackEstimatedScore = CGMutablePath()
+        let scoresOnBlackStones = CGMutablePath()
+        let scoresOnWhiteStones = CGMutablePath()
 
         let drawsShadow = usesDetailedStoneRendering(at: size)
         let shadowXSign = appearance.stoneLightDirection.shadowXSign
-        let shadowOffset: CGFloat = size > 30 ? 2 : 1
+        let shadowScale = min(1, max(0.35, (size - 10) / 30))
+        let shadowOffset = min(2, max(1, size / 30)) * shadowScale
         let stoneImages = drawsShadow ? appearance.stoneImages : nil
         var imageStones = [ImageStone]()
         
         let whitePaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
         let blackPaths = [CGMutablePath(), CGMutablePath(), CGMutablePath(), CGMutablePath()]
+
+        let scoreHiddenPoints = Set(indicators.undoPoints.map { [$0.row, $0.column] })
 
         for row in 0..<height {
             for column in 0..<width {
@@ -584,6 +640,9 @@ struct Stones: View {
                     }
                     
                 }
+                // An active undo request must stay readable over a score estimate.
+                // The estimate data remains intact and returns when the request ends.
+                if scoreHiddenPoints.contains([row, column]) { continue }
                 let scoringRectSize = max(size / 3, 2)
                 let scoringRectPadding = (size - scoringRectSize) / 2
                 let scoringRect = CGRect(
@@ -612,24 +671,14 @@ struct Stones: View {
                         }
                     }
                 }
+                if boardPosition.hasOwnershipMark(atRow: row, column: column),
+                   case .hasStone(let color) = boardPosition[row, column] {
+                    (color == .black ? scoresOnBlackStones : scoresOnWhiteStones).addRect(scoringRect)
+                }
             }
         }
         
-        let lastMoveIndicatorWidth: CGFloat = size >= 20 ? 2 : (size > 10 ? 1.5 : 0.75)
-        let undoMarkerCoordinates = undoRequestCoordinates.filter { coordinate in
-            guard coordinate.count == 2 else {
-                return false
-            }
-            let row = coordinate[0]
-            let column = coordinate[1]
-            guard row >= 0, row < height, column >= 0, column < width else {
-                return false
-            }
-            if case .hasStone = boardPosition[row, column] {
-                return true
-            }
-            return false
-        }
+        let marker = StoneMarkerGeometry(cellSize: size)
         
         // One structure at every size: shaded stones and the small flat ones
         // differ only in style. Switching views at the 14 pt threshold (or
@@ -656,12 +705,12 @@ struct Stones: View {
         return ZStack {
             ForEach(whitePaths.indices, id: \.self) { index in
                 Path(whitePaths[index]).fill(fill(white))
-                .shadow(color: dropShadow, radius: 2, x: shadowXSign * shadowOffset, y: shadowOffset)
+                .shadow(color: dropShadow, radius: 2 * shadowScale, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
             Path(whiteLivingPath).stroke(edge(white), lineWidth: 0.5)
             ForEach(blackPaths.indices, id: \.self) { index in
                 Path(blackPaths[index]).fill(fill(black))
-                .shadow(color: dropShadow, radius: 2, x: shadowXSign * shadowOffset, y: shadowOffset)
+                .shadow(color: dropShadow, radius: 2 * shadowScale, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
             Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
             ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
@@ -680,45 +729,52 @@ struct Stones: View {
             }
 
             if indicatorMode == .variationNumberings, let variation {
-                VariationNumberings(variation: variation, cellSize: size)
-            } else if case .placeStone(let lastRow, let lastColumn) = boardPosition.lastMove {
+                VariationNumberings(variation: variation, cellSize: size, policy: indicators.policy)
+            } else if let lastMove = indicators.lastMove {
+                let lastRow = lastMove.point.row
+                let lastColumn = lastMove.point.column
                 if case .hasStone(let lastColor) = boardPosition[lastRow, lastColumn] {
-                    if boardPosition.estimatedScores == nil
-                        && !undoMarkerCoordinates.contains([lastRow, lastColumn]) {
-                        if isLastMovePending {
-                            Path { path in
-                                let centerX = CGFloat(lastColumn) * size + size / 2
-                                let centerY = CGFloat(lastRow) * size + size / 2
-                                path.move(to: CGPoint(x: centerX - size / 4, y: centerY))
-                                path.addLine(to: CGPoint(x: centerX + size / 4, y: centerY))
-                                path.move(to: CGPoint(x: centerX, y: centerY - size / 4))
-                                path.addLine(to: CGPoint(x: centerX, y: centerY + size / 4))
-                            }
-                            .stroke(appearance.stones(lastColor).lastMove, lineWidth: lastMoveIndicatorWidth)
+                    let palette = appearance.stones(lastColor)
+                    let mark = Path { path in
+                        let center = CGPoint(x: (CGFloat(lastColumn) + 0.5) * size,
+                                             y: (CGFloat(lastRow) + 0.5) * size)
+                        if lastMove.pending {
+                            let radius = marker.pendingDiameter / 2
+                            path.move(to: CGPoint(x: center.x - radius, y: center.y))
+                            path.addLine(to: CGPoint(x: center.x + radius, y: center.y))
+                            path.move(to: CGPoint(x: center.x, y: center.y - radius))
+                            path.addLine(to: CGPoint(x: center.x, y: center.y + radius))
                         } else {
-                            Path { path in
-                                path.addEllipse(in: CGRect(
-                                                    x: CGFloat(lastColumn) * size + size / 4,
-                                                    y: CGFloat(lastRow) * size + size / 4,
-                                                    width: size / 2,
-                                                    height: size / 2))
-                            }
-                            .stroke(appearance.stones(lastColor).lastMove, lineWidth: lastMoveIndicatorWidth)
+                            let radius = marker.ringDiameter / 2
+                            path.addEllipse(in: CGRect(x: center.x - radius, y: center.y - radius,
+                                                       width: radius * 2, height: radius * 2))
                         }
                     }
+                    // A solid, symmetric keyline, never an offset glow. Only
+                    // themes with a casing draw it; it stays in place, clear,
+                    // below the detail threshold.
+                    if let casing = palette.detailedMarkerCasing {
+                        mark.stroke(drawsShadow ? casing : .clear,
+                                    style: StrokeStyle(lineWidth: marker.lineWidth + 2 * marker.casingWidth,
+                                                       lineCap: .round, lineJoin: .round))
+                    }
+                    mark.stroke(palette.lastMove,
+                                style: StrokeStyle(lineWidth: marker.lineWidth,
+                                                   lineCap: .round, lineJoin: .round))
                 }
             }
 
             if indicatorMode == .positionIndicators {
-                ForEach(Array(undoMarkerCoordinates.enumerated()), id: \.offset) { _, coordinate in
-                    let row = coordinate[0]
-                    let column = coordinate[1]
+                ForEach(Array(indicators.undoPoints.enumerated()), id: \.offset) { _, point in
+                    let row = point.row
+                    let column = point.column
                     if case .hasStone(let stoneColor) = boardPosition[row, column] {
-                        Text(verbatim: "↶")
-                            .font(.system(size: size * 0.65, weight: .bold))
-                            .foregroundColor(appearance.stones(stoneColor).label)
-                            .minimumScaleFactor(0.2)
-                            .frame(width: size, height: size)
+                        StoneMarkerText(text: "", systemImage: "arrow.uturn.backward", fontSize: size * 0.55,
+                                        foreground: appearance.stones(stoneColor).label,
+                                        casing: drawsShadow ? appearance.textCasing(on: stoneColor) : nil,
+                                        casingWidth: marker.casingWidth)
+                            .equatable()
+                            .frame(width: marker.stoneDiameter * 0.8, height: marker.stoneDiameter * 0.8)
                             .position(
                                 x: (CGFloat(column) + 0.5) * size,
                                 y: (CGFloat(row) + 0.5) * size
@@ -730,7 +786,7 @@ struct Stones: View {
             }
             
             if boardPosition.gameScores != nil {
-                Path(dameIndicator).stroke(appearance.dameColor, lineWidth: lastMoveIndicatorWidth)
+                Path(dameIndicator).stroke(appearance.dameColor, lineWidth: marker.lineWidth)
                 Path(whiteScoreIndicator).fill(white.territoryMark)
                 Path(whiteScoreIndicator).stroke(appearance.markOutline, lineWidth: 0.5)
                 Path(blackScoreIndicator).fill(black.territoryMark)
@@ -743,6 +799,8 @@ struct Stones: View {
                 Path(blackEstimatedScore).fill(black.territoryMark)
                 Path(blackEstimatedScore).stroke(appearance.markOutline, lineWidth: 0.5)
             }
+            Path(scoresOnBlackStones).stroke(appearance.scoreMarkOutline(on: .black), lineWidth: marker.scoreLineWidth)
+            Path(scoresOnWhiteStones).stroke(appearance.scoreMarkOutline(on: .white), lineWidth: marker.scoreLineWidth)
         }
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
     }
@@ -751,6 +809,9 @@ struct Stones: View {
 struct StoneRemovalOverlay: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.boardAppearance) private var appearance
+    #if DEBUG
+    @Environment(\.boardMarkerAuditState) private var markerAuditState
+    #endif
     @ObservedObject var boardPosition: BoardPosition
     var stoneRemovalOption = StoneRemovalOption.toggleGroup
     var geometry: GeometryProxy
@@ -763,15 +824,21 @@ struct StoneRemovalOverlay: View {
         let width = boardPosition.width
         let height = boardPosition.height
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
+        let marker = StoneMarkerGeometry(cellSize: size)
 
         let toBeRemovedPath = CGMutablePath()
         let toBeAddedPath = CGMutablePath()
         
-        for point in hoveredGroup {
+        #if DEBUG
+        let drawnGroup = markerAuditState?.removalPoints ?? hoveredGroup
+        #else
+        let drawnGroup = hoveredGroup
+        #endif
+        for point in drawnGroup {
             let row = point[0]
             let column = point[1]
             
-            let indicatorRectSize = max(size / 2, 3)
+            let indicatorRectSize = marker.actionDiameter
             let indicatorRectPadding = (size - indicatorRectSize) / 2
             let indicatorRect = CGRect(
                 x: CGFloat(column) * size + indicatorRectPadding,
@@ -791,16 +858,19 @@ struct StoneRemovalOverlay: View {
                 toBeRemovedPath.addLine(to: CGPoint(x: indicatorRect.maxX, y: indicatorRect.maxY))
             }
         }
-        let indicatorWidth: CGFloat = size >= 20 ? 2.5 : (size > 10 ? 2 : 1)
+        let indicatorWidth = marker.actionLineWidth
         
         let casing = appearance.removalMarkCasing ?? .clear
-        let casingStyle = StrokeStyle(lineWidth: indicatorWidth + 2, lineCap: .round)
+        let casingStyle = StrokeStyle(lineWidth: indicatorWidth + 2 * marker.casingWidth, lineCap: .round)
+        let markStyle = StrokeStyle(lineWidth: indicatorWidth, lineCap: .round)
+        let restoreWidth = marker.restoreLineWidth(displayScale: displayScale)
+        let restoreCasing = marker.restoreCasingWidth(displayScale: displayScale)
         return ZStack {
             Color.clear
             Path(toBeRemovedPath).stroke(casing, style: casingStyle)
-            Path(toBeAddedPath).stroke(casing, style: casingStyle)
-            Path(toBeRemovedPath).stroke(appearance.removeMark, lineWidth: indicatorWidth)
-            Path(toBeAddedPath).stroke(appearance.restoreMark, lineWidth: indicatorWidth)
+            Path(toBeAddedPath).stroke(casing, style: StrokeStyle(lineWidth: restoreWidth + 2 * restoreCasing, lineCap: .round))
+            Path(toBeRemovedPath).stroke(appearance.removeMark, style: markStyle)
+            Path(toBeAddedPath).stroke(appearance.restoreMark, style: StrokeStyle(lineWidth: restoreWidth, lineCap: .round))
         }
         .frame(width: size * CGFloat(width), height: size * CGFloat(height))
         .contentShape(Rectangle())
@@ -855,13 +925,16 @@ struct CoordinateHighlightOverlay: View {
                 
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
         let highlightedCoordinatesPath = CGMutablePath()
-        let highlightWidth: CGFloat = size >= 20 ? 3 : (size > 10 ? 2 : 1)
+        let marker = StoneMarkerGeometry(cellSize: size)
+        let highlightWidth = marker.actionLineWidth
 
         for coordinate in highlightCoordinates {
             let row = boardPosition.height - coordinate[0] - 1
             let column = coordinate[1]
 
-            let highlightRectSize = size / 1.5
+            // Corner brackets identify the point while keeping its center
+            // clear for move numbers, annotations and an undo request.
+            let highlightRectSize = max(1, size - highlightWidth - 2 * marker.casingWidth - 1 / displayScale)
             let highlightRectPadding = (size - highlightRectSize) / 2
             let highlightRect = CGRect(
                 x: CGFloat(column) * size + highlightRectPadding,
@@ -869,19 +942,26 @@ struct CoordinateHighlightOverlay: View {
                 width: highlightRectSize,
                 height: highlightRectSize)
             
-            highlightedCoordinatesPath.move(to: CGPoint(x: highlightRect.midX, y: highlightRect.minY))
-            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX - highlightRect.width * 0.433, y: highlightRect.maxY - highlightRect.height / 4))
-            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX + highlightRect.width * 0.433, y: highlightRect.maxY - highlightRect.height / 4))
-            highlightedCoordinatesPath.addLine(to: CGPoint(x: highlightRect.midX, y: highlightRect.minY))
+            let arm = highlightRectSize * 0.23
+            for (x, y, dx, dy) in [(highlightRect.minX, highlightRect.minY, CGFloat(1), CGFloat(1)),
+                                   (highlightRect.maxX, highlightRect.minY, -1, 1),
+                                   (highlightRect.minX, highlightRect.maxY, 1, -1),
+                                   (highlightRect.maxX, highlightRect.maxY, -1, -1)] {
+                highlightedCoordinatesPath.move(to: CGPoint(x: x, y: y + dy * arm))
+                highlightedCoordinatesPath.addLine(to: CGPoint(x: x, y: y))
+                highlightedCoordinatesPath.addLine(to: CGPoint(x: x + dx * arm, y: y))
+            }
         }
         
         return ZStack {
             if let casing = appearance.highlightCasing {
                 Path(highlightedCoordinatesPath)
-                    .stroke(casing, lineWidth: highlightWidth + 2)
+                    .stroke(casing, style: StrokeStyle(lineWidth: highlightWidth + 2 * marker.casingWidth,
+                                                       lineCap: .round, lineJoin: .round))
             }
             Path(highlightedCoordinatesPath)
-                .stroke(appearance.highlightColor, lineWidth: highlightWidth)
+                .stroke(appearance.highlightColor, style: StrokeStyle(lineWidth: highlightWidth,
+                                                                      lineCap: .round, lineJoin: .round))
         }.frame(width: size * CGFloat(width), height: size * CGFloat(height))
     }
 }
@@ -900,6 +980,7 @@ struct BoardMarkupOverlay: View {
             boardSize: max(boardPosition.width, boardPosition.height),
             displayScale: displayScale
         )
+        let marker = StoneMarkerGeometry(cellSize: size)
 
         ZStack {
             ForEach(markups.keys.sorted(), id: \.self) { point in
@@ -907,34 +988,44 @@ struct BoardMarkupOverlay: View {
                    point.row < boardPosition.height,
                    point.column >= 0,
                    point.column < boardPosition.width,
-                   let markup = markups[point] {
+                   let markup = markups[point], markup.isVisible {
                     let foreground = markerColor(at: point)
                     ZStack {
                         if boardPosition[point.row, point.column] == .empty {
                             Circle()
                                 .fill(emptyPointBackground(cellSize: size))
-                                .frame(width: size * 0.62, height: size * 0.62)
+                                .frame(width: markup.label?.isEmpty == false ? marker.stoneDiameter * 0.88 : size * 0.62,
+                                       height: markup.label?.isEmpty == false ? marker.stoneDiameter * 0.88 : size * 0.62)
                         }
+                        let casing = markerCasing(at: point, cellSize: size)
                         ForEach(BoardMarkShape.allCases, id: \.self) { shape in
                             if markup.shapes.contains(shape) {
+                                if let casing {
+                                    BoardMarkShapeView(shape: shape)
+                                        .stroke(casing,
+                                                style: StrokeStyle(
+                                                    lineWidth: max(1 / displayScale, marker.lineWidth) + 2 * marker.casingWidth,
+                                                    lineCap: .round, lineJoin: .round))
+                                        .frame(width: marker.shapeDiameter, height: marker.shapeDiameter)
+                                }
                                 BoardMarkShapeView(shape: shape)
                                     .stroke(
                                         foreground,
                                         style: StrokeStyle(
-                                            lineWidth: max(1 / displayScale, size * 0.09),
+                                            lineWidth: max(1 / displayScale, marker.lineWidth),
                                             lineCap: .round,
                                             lineJoin: .round
                                         )
                                     )
-                                    .frame(width: size * 0.58, height: size * 0.58)
+                                    .frame(width: marker.shapeDiameter, height: marker.shapeDiameter)
                             }
                         }
                         if let label = markup.label {
-                            Text(verbatim: label)
-                                .font(.system(size: size * 0.55, weight: .bold))
-                                .minimumScaleFactor(0.35)
-                                .foregroundStyle(foreground)
-                                .frame(width: size * 0.75, height: size * 0.75)
+                            StoneMarkerText(text: label, fontSize: size * 0.55, foreground: foreground,
+                                            casing: textCasing(at: point, cellSize: size),
+                                            casingWidth: marker.casingWidth)
+                                .equatable()
+                                .frame(width: marker.stoneDiameter * 0.78, height: marker.stoneDiameter * 0.78)
                         }
                     }
                     .position(
@@ -958,6 +1049,20 @@ struct BoardMarkupOverlay: View {
             : Color.white.opacity(0.8)
     }
 
+    /// A shape's casing, only on stones whose theme defines one. It stays in
+    /// place, clear, below the detail threshold, so resizing never swaps views.
+    private func markerCasing(at point: BoardPoint, cellSize: CGFloat) -> Color? {
+        guard case .hasStone(let color) = boardPosition[point.row, point.column],
+              let casing = appearance.stones(color).detailedMarkerCasing else { return nil }
+        return usesDetailedStoneRendering(at: cellSize) ? casing : .clear
+    }
+
+    private func textCasing(at point: BoardPoint, cellSize: CGFloat) -> Color? {
+        guard usesDetailedStoneRendering(at: cellSize),
+              case .hasStone(let color) = boardPosition[point.row, point.column] else { return nil }
+        return appearance.textCasing(on: color)
+    }
+
     private func markerColor(at point: BoardPoint) -> Color {
         if case .hasStone(let color) = boardPosition[point.row, point.column] {
             return appearance.stones(color).label
@@ -974,8 +1079,9 @@ private struct BoardMarkShapeView: Shape {
         switch shape {
         case .triangle:
             path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            // Equilateral and centered by its centroid, like the other marks.
+            path.addLine(to: CGPoint(x: rect.midX + rect.width * 0.433, y: rect.midY + rect.height / 4))
+            path.addLine(to: CGPoint(x: rect.midX - rect.width * 0.433, y: rect.midY + rect.height / 4))
             path.closeSubpath()
         case .square:
             path.addRect(rect)
@@ -1105,6 +1211,18 @@ struct BoardView: View {
     var undoRequestCoordinates: [[Int]] = []
     var boardTool: Binding<AnalyzeBoardTool> = .constant(.moves)
     var markups: Binding<BoardMarkups> = .constant([:])
+    #if DEBUG
+    var markerAuditState: BoardMarkerAuditState? = nil
+    #endif
+
+    @ViewBuilder
+    private func withMarkerAudit<Content: View>(_ content: Content) -> some View {
+        #if DEBUG
+        content.environment(\.boardMarkerAuditState, markerAuditState)
+        #else
+        content
+        #endif
+    }
     
     private func selectPoint(_ point: [Int]?) -> Bool {
         guard let point,
@@ -1125,7 +1243,13 @@ struct BoardView: View {
     var gobanAndStones: some View {
         let displayedPosition = (newMove.wrappedValue != nil && newPosition.wrappedValue != nil) ?
             newPosition.wrappedValue! : boardPosition
-        return GeometryReader { boardGeometry in
+        // One plan for the stones and the overlay: a status indicator and an
+        // annotation never both claim, or both leave empty, the same point.
+        let indicators = BoardIndicatorPlan(
+            position: displayedPosition, variation: variation, markups: markups.wrappedValue,
+            undoRequestCoordinates: undoRequestCoordinates,
+            isLastMovePending: newMove.wrappedValue != nil, showsLastMove: !stoneRemovable)
+        return withMarkerAudit(GeometryReader { boardGeometry in
             ZStack(alignment: .center) {
                 Goban(
                     geometry: boardGeometry,
@@ -1160,12 +1284,11 @@ struct BoardView: View {
                     boardPosition: displayedPosition,
                     variation: variation,
                     geometry: boardGeometry,
-                    isLastMovePending: newMove.wrappedValue != nil,
-                    undoRequestCoordinates: undoRequestCoordinates
+                    indicators: indicators
                 )
                 BoardMarkupOverlay(
-                    boardPosition: boardPosition,
-                    markups: markups.wrappedValue,
+                    boardPosition: displayedPosition,
+                    markups: indicators.visibleMarkups,
                     geometry: boardGeometry,
                     widgetRenderingMode: widgetRenderingMode
                 )
@@ -1193,7 +1316,7 @@ struct BoardView: View {
                     )
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).aspectRatio(1, contentMode: .fit)
-        }
+        })
     }
     
     var body: some View {

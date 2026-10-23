@@ -158,7 +158,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     lastMove: .white,
                     label: .white,
                     // Lighter than the stones, so territory stands out on indigo.
-                    territory: Color(themeHex: 0x9C80FF)
+                    territory: Color(themeHex: 0x9C80FF),
+                    detailedMarkerCasing: Color(themeHex: 0x1B122C)
                 ),
                 // Moon pearl: ivory with a lilac shade.
                 white: StonePalette(

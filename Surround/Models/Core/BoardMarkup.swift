@@ -35,6 +35,12 @@ struct BoardMarkup: Equatable {
     var isEmpty: Bool {
         label == nil && shapes.isEmpty
     }
+
+    /// Whether the board draws anything for it. An empty label draws
+    /// nothing, so it neither shows a mark nor hides automatic indicators.
+    var isVisible: Bool {
+        label?.isEmpty == false || !shapes.isEmpty
+    }
 }
 
 typealias BoardMarkups = [BoardPoint: BoardMarkup]

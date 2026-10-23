@@ -249,6 +249,192 @@ class BoardPositionTests: XCTestCase {
         )
     }
 
+    func testExplicitMarkupReplacesAutomaticIndicatorsOnlyAtItsPoint() {
+        let markedPoint = BoardPoint(row: 1, column: 1)
+        let otherPoint = BoardPoint(row: 1, column: 2)
+        let annotations = [BoardMarkup(label: "A"), BoardMarkup(label: "100")]
+            + BoardMarkShape.allCases.map { BoardMarkup(shapes: [$0]) }
+
+        for markup in annotations {
+            let policy = BoardPointIndicatorPolicy(markups: [markedPoint: markup])
+            XCTAssertFalse(policy.showsLastMove(at: markedPoint, pending: false))
+            XCTAssertFalse(policy.showsVariationNumber(at: markedPoint))
+            XCTAssertTrue(policy.showsLastMove(at: otherPoint, pending: false))
+            XCTAssertTrue(policy.showsVariationNumber(at: otherPoint))
+        }
+    }
+
+    /// The last-move ring yields only to a square drawn on its own point:
+    /// territory scoring leaves a finished game's last stone unmarked, area
+    /// scoring and estimates cover it, and dame never draws a square.
+    func testOwnershipMarksFollowTheSquaresScoringDraws() {
+        let position = BoardPosition(width: 5, height: 5)
+        position.putStone(row: 1, column: 1, color: .black)
+        position.putStone(row: 3, column: 3, color: .white)
+        func score(_ points: Set<[Int]>) -> PlayerScore {
+            PlayerScore(handicap: 0, komi: 0, scoringPositions: points, stones: 0, territory: 0, prisoners: 0, total: 0)
+        }
+        position.removedStones = [[2, 2]]
+        position.gameScores = GameScores(black: score([[0, 0], [2, 2]]), white: score([[4, 4]]))
+        XCTAssertFalse(position.hasOwnershipMark(atRow: 1, column: 1), "Territory scoring leaves stones unmarked")
+        XCTAssertFalse(position.hasOwnershipMark(atRow: 3, column: 3))
+        XCTAssertTrue(position.hasOwnershipMark(atRow: 0, column: 0))
+        XCTAssertTrue(position.hasOwnershipMark(atRow: 4, column: 4))
+        XCTAssertFalse(position.hasOwnershipMark(atRow: 2, column: 2), "Dame is drawn as an outline, not a square")
+        XCTAssertFalse(position.hasOwnershipMark(atRow: -1, column: 0))
+        XCTAssertFalse(position.hasOwnershipMark(atRow: 0, column: 5))
+
+        position.gameScores = GameScores(black: score([[1, 1]]), white: score([]))
+        XCTAssertTrue(position.hasOwnershipMark(atRow: 1, column: 1), "Area scoring covers the stone")
+
+        position.gameScores = nil
+        var estimate = Array(repeating: Array(repeating: PointState.empty, count: 5), count: 5)
+        estimate[3][3] = .hasStone(.white)
+        position.estimatedScores = estimate
+        XCTAssertTrue(position.hasOwnershipMark(atRow: 3, column: 3))
+        XCTAssertFalse(position.hasOwnershipMark(atRow: 1, column: 1), "An unestimated stone keeps its ring")
+    }
+
+    /// One rule decides whether a markup draws anything, for the overlay and
+    /// for automatic indicators alike.
+    /// The stones and the annotation overlay share one plan, so each status
+    /// point shows exactly one indicator: the ring, a pending cross, an undo
+    /// glyph or the annotation.
+    func testIndicatorPlanGivesEachStatusPointOneIndicator() throws {
+        let base = BoardPosition(width: 5, height: 5)
+        let played = try base.makeMove(move: .placeStone(2, 2))
+        let lastPoint = BoardPoint(row: 2, column: 2)
+        let other = BoardPoint(row: 0, column: 0)
+        let marks: BoardMarkups = [lastPoint: BoardMarkup(label: "A"), other: BoardMarkup(shapes: [.circle])]
+
+        // The ring alone, and an annotation in its place.
+        var plan = BoardIndicatorPlan(position: played, variation: nil, markups: [:])
+        XCTAssertEqual(plan.lastMove, BoardIndicatorPlan.LastMove(point: lastPoint, pending: false))
+        plan = BoardIndicatorPlan(position: played, variation: nil, markups: marks)
+        XCTAssertNil(plan.lastMove)
+        XCTAssertEqual(plan.visibleMarkups, marks)
+
+        // A pending cross takes the point; its annotation waits.
+        plan = BoardIndicatorPlan(position: played, variation: nil, markups: marks, isLastMovePending: true)
+        XCTAssertEqual(plan.lastMove, BoardIndicatorPlan.LastMove(point: lastPoint, pending: true))
+        XCTAssertEqual(plan.visibleMarkups, [other: BoardMarkup(shapes: [.circle])])
+
+        // An undo glyph replaces both the ring and the annotation.
+        plan = BoardIndicatorPlan(position: played, variation: nil, markups: marks,
+                                  undoRequestCoordinates: [[2, 2]])
+        XCTAssertEqual(plan.undoPoints, [lastPoint])
+        XCTAssertNil(plan.lastMove)
+        XCTAssertEqual(plan.visibleMarkups, [other: BoardMarkup(shapes: [.circle])])
+
+        // An ownership square covers the point; with no cross drawn, the
+        // annotation stays.
+        var estimate = Array(repeating: Array(repeating: PointState.empty, count: 5), count: 5)
+        estimate[2][2] = .hasStone(.black)
+        played.estimatedScores = estimate
+        plan = BoardIndicatorPlan(position: played, variation: nil, markups: marks, isLastMovePending: true)
+        XCTAssertNil(plan.lastMove)
+        XCTAssertEqual(plan.visibleMarkups, marks)
+        played.estimatedScores = nil
+
+        // Stone removal draws no ring.
+        plan = BoardIndicatorPlan(position: played, variation: nil, markups: [:], showsLastMove: false)
+        XCTAssertNil(plan.lastMove)
+    }
+
+    func testIndicatorPlanKeepsOnlyUndoRequestsOnStones() throws {
+        let position = try BoardPosition(width: 5, height: 5).makeMove(move: .placeStone(1, 1))
+        let plan = BoardIndicatorPlan(position: position, variation: nil, markups: [:],
+                                      undoRequestCoordinates: [[1, 1], [0, 0], [5, 0], [0, -1], [1]])
+        XCTAssertEqual(plan.undoPoints, [BoardPoint(row: 1, column: 1)])
+    }
+
+    /// A variation numbers its own moves: no status indicators, every annotation.
+    func testIndicatorPlanLeavesVariationsToTheirNumbers() throws {
+        let base = BoardPosition(width: 5, height: 5)
+        let variation = try Variation(basePosition: base, moves: [.placeStone(2, 2), .placeStone(2, 3)])
+        let marks: BoardMarkups = [BoardPoint(row: 2, column: 3): BoardMarkup(label: "A")]
+        let plan = BoardIndicatorPlan(position: variation.position, variation: variation, markups: marks,
+                                      undoRequestCoordinates: [[2, 2]], isLastMovePending: true)
+        XCTAssertNil(plan.lastMove)
+        XCTAssertTrue(plan.undoPoints.isEmpty)
+        XCTAssertEqual(plan.visibleMarkups, marks)
+        XCTAssertFalse(plan.policy.showsVariationNumber(at: BoardPoint(row: 2, column: 3)))
+        XCTAssertTrue(plan.policy.showsVariationNumber(at: BoardPoint(row: 2, column: 2)))
+    }
+
+    func testMarkupVisibilityIgnoresEmptyLabels() {
+        XCTAssertFalse(BoardMarkup().isVisible)
+        XCTAssertFalse(BoardMarkup(label: "").isVisible)
+        XCTAssertTrue(BoardMarkup(label: "A").isVisible)
+        XCTAssertTrue(BoardMarkup(shapes: [.circle]).isVisible)
+        XCTAssertTrue(BoardMarkup(label: "", shapes: [.cross]).isVisible)
+    }
+
+    func testInvisibleMarkupKeepsAutomaticIndicatorsVisible() {
+        let point = BoardPoint(row: 1, column: 1)
+        let markups: [BoardMarkups] = [
+            [:],
+            [point: BoardMarkup()],
+            [point: BoardMarkup(label: "")]
+        ]
+
+        for marks in markups {
+            let policy = BoardPointIndicatorPolicy(markups: marks)
+            XCTAssertTrue(policy.showsLastMove(at: point, pending: false))
+            XCTAssertTrue(policy.showsVariationNumber(at: point))
+        }
+    }
+
+    func testPendingMoveIndicatorRemainsVisibleOverExplicitMarkup() {
+        let point = BoardPoint(row: 1, column: 1)
+        let annotations = [
+            BoardMarkup(label: "A"),
+            BoardMarkup(shapes: [.cross]),
+            BoardMarkup(label: "A", shapes: [.circle, .triangle])
+        ]
+
+        for markup in annotations {
+            let policy = BoardPointIndicatorPolicy(markups: [point: markup])
+            XCTAssertTrue(policy.showsLastMove(at: point, pending: true))
+            XCTAssertFalse(policy.showsLastMove(at: point, pending: false))
+        }
+    }
+
+    func testPendingMoveTemporarilyHidesOnlyItsAnnotation() {
+        let pendingPoint = BoardPoint(row: 1, column: 1)
+        let otherPoint = BoardPoint(row: 1, column: 2)
+        let marks: BoardMarkups = [
+            pendingPoint: BoardMarkup(label: "A", shapes: [.circle]),
+            otherPoint: BoardMarkup(label: "B")
+        ]
+        let policy = BoardPointIndicatorPolicy(markups: marks)
+
+        XCTAssertFalse(policy.showsMarkup(at: pendingPoint, pendingMove: pendingPoint))
+        XCTAssertTrue(policy.showsMarkup(at: otherPoint, pendingMove: pendingPoint))
+        XCTAssertTrue(policy.showsMarkup(at: pendingPoint))
+        XCTAssertEqual(policy.markups, marks)
+    }
+
+    func testUndoIndicatorsTemporarilyHideOnlyTheirAnnotations() {
+        let firstUndoPoint = BoardPoint(row: 1, column: 1)
+        let secondUndoPoint = BoardPoint(row: 1, column: 2)
+        let otherPoint = BoardPoint(row: 2, column: 2)
+        let marks: BoardMarkups = [
+            firstUndoPoint: BoardMarkup(label: "A"),
+            secondUndoPoint: BoardMarkup(shapes: [.triangle]),
+            otherPoint: BoardMarkup(label: "B")
+        ]
+        let policy = BoardPointIndicatorPolicy(markups: marks)
+        let undoPoints: Set<BoardPoint> = [firstUndoPoint, secondUndoPoint]
+
+        XCTAssertFalse(policy.showsMarkup(at: firstUndoPoint, undoPoints: undoPoints))
+        XCTAssertFalse(policy.showsMarkup(at: secondUndoPoint, undoPoints: undoPoints))
+        XCTAssertTrue(policy.showsMarkup(at: otherPoint, undoPoints: undoPoints))
+        XCTAssertTrue(policy.showsMarkup(at: firstUndoPoint))
+        XCTAssertTrue(policy.showsMarkup(at: secondUndoPoint))
+        XCTAssertEqual(policy.markups, marks)
+    }
+
     func testBoardMarkupSequencesUseTheCurrentNode() {
         var markups = BoardMarkups()
         XCTAssertEqual(markups.nextBoardLetter, "A")

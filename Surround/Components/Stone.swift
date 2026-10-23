@@ -25,6 +25,9 @@ struct StonePalette: Equatable {
     var label: Color
     /// Territory and estimate squares, when `flat` is too close to the board.
     var territory: Color? = nil
+    /// A narrow, centered edge keeps marks separate from image reflections.
+    /// Small solid stones use the palette alone.
+    var detailedMarkerCasing: Color? = nil
 
     var territoryMark: Color { territory ?? flat }
 }
@@ -123,6 +126,75 @@ struct BoardReflection: Equatable {
 /// board never fades between two renderings.
 func usesDetailedStoneRendering(at size: CGFloat) -> Bool {
     size >= 14
+}
+
+/// Marks fit the stone face, leaving its material and rim visible on phones.
+/// Their center remains the grid intersection, independent of cast shadows.
+struct StoneMarkerGeometry {
+    var cellSize: CGFloat
+
+    var stoneDiameter: CGFloat { cellSize - (cellSize < 10 ? 0 : 2) }
+    var ringDiameter: CGFloat { stoneDiameter * 0.4 }
+    var pendingDiameter: CGFloat { stoneDiameter * 0.48 }
+    var shapeDiameter: CGFloat { stoneDiameter * 0.52 }
+    /// Rings, pending crosses, annotation shapes and dame share one weight.
+    var lineWidth: CGFloat { min(1.75, max(0.5, cellSize * 0.055)) }
+    var actionDiameter: CGFloat { stoneDiameter * 0.5 }
+    var actionLineWidth: CGFloat { min(2, max(0.6, cellSize * 0.065)) }
+    var casingWidth: CGFloat { min(0.6, max(0.25, cellSize * 0.02)) }
+    var scoreLineWidth: CGFloat { min(1.25, max(0.5, cellSize * 0.035)) }
+
+    // Axis-aligned plus signs straddle pixel boundaries. Keep a solid core
+    // and a distinct casing even on the smallest 2× thumbnails.
+    func restoreLineWidth(displayScale: CGFloat) -> CGFloat {
+        max(actionLineWidth, 2 / displayScale)
+    }
+
+    func restoreCasingWidth(displayScale: CGFloat) -> CGFloat {
+        max(casingWidth, 1 / displayScale)
+    }
+}
+
+/// Fit a single line to its point and outline the glyphs symmetrically.
+/// Reusing one resolved glyph run avoids eight separate text layouts and
+/// keeps the casing sharp, with no blur or directional shadow. Equatable, so
+/// with `.equatable()` an unchanged label is not redrawn on board updates;
+/// the casing pass runs only when a casing is given.
+struct StoneMarkerText: View, Equatable {
+    var text: String
+    var systemImage: String? = nil
+    var fontSize: CGFloat
+    var foreground: Color
+    var casing: Color? = nil
+    var casingWidth: CGFloat = 0.4
+
+    var body: some View {
+        Canvas(rendersAsynchronously: false) { context, size in
+            let line = text.components(separatedBy: .newlines).joined(separator: " ")
+            let content = systemImage.map { Text(Image(systemName: $0)) } ?? Text(verbatim: line)
+            var glyphs = context.resolve(content.font(.system(size: fontSize, weight: .bold)))
+            let measured = glyphs.measure(in: CGSize(width: max(1, fontSize * CGFloat(line.count + 1)),
+                                                    height: max(1, fontSize * 2)))
+            let inset = casing == nil ? CGFloat.zero : casingWidth
+            let scale = min(1, max(0.01, min((size.width - inset * 2) / max(1, measured.width),
+                                            (size.height - inset * 2) / max(1, measured.height))))
+            context.scaleBy(x: scale, y: scale)
+            let center = CGPoint(x: size.width / (2 * scale), y: size.height / (2 * scale))
+            if let casing {
+                glyphs.shading = .color(casing)
+                let distance = casingWidth / scale
+                for step in 0..<8 {
+                    let angle = Double(step) * .pi / 4
+                    context.draw(glyphs, at: CGPoint(x: center.x + cos(angle) * distance,
+                                                    y: center.y + sin(angle) * distance))
+                }
+            }
+            glyphs.shading = .color(foreground)
+            context.draw(glyphs, at: center)
+        }
+        .accessibilityLabel(Text(verbatim: text))
+        .allowsHitTesting(false)
+    }
 }
 
 enum BoardGridStyle: Equatable {
@@ -294,11 +366,30 @@ struct BoardAppearance: Equatable {
         // a white casing carries the highlight over black stones.
         dameColor: Color(red: 0.27, green: 0.22, blue: 0.66),
         highlightColor: Color(red: 0, green: 0.3, blue: 0.85),
-        highlightCasing: .white
+        highlightCasing: .white,
+        crosshair: .init(valid: Color(red: 0.157, green: 0.408, blue: 0.302),
+                         invalid: Color(red: 0.608, green: 0.204, blue: 0.216),
+                         removal: Color(red: 0.157, green: 0.369, blue: 0.431)),
+        crosshairWidth: 1.5,
+        removeMark: Color(red: 0.608, green: 0.204, blue: 0.216),
+        restoreMark: Color(red: 0.157, green: 0.408, blue: 0.302),
+        removalMarkCasing: .white
     )
 
     func stones(_ color: StoneColor) -> StonePalette {
         color == .black ? black : white
+    }
+
+    /// Territory can cover a stone of the same color. Its contour must
+    /// contrast with that stone instead of using the board's outline.
+    func scoreMarkOutline(on stone: StoneColor?) -> Color {
+        stone.map { stones($0).label } ?? markOutline
+    }
+
+    func textCasing(on stone: StoneColor?) -> Color? {
+        guard let stone else { return nil }
+        let palette = stones(stone)
+        return palette.detailedMarkerCasing ?? (stone == .black ? palette.shade : palette.highlight)
     }
 
     /// The board's color under its detail, or alone below the threshold.

@@ -650,3 +650,21 @@ class BoardPosition: ObservableObject {
         }
     }
 }
+
+extension BoardPosition {
+    /// Whether scoring draws an ownership square at a point: a scored or
+    /// estimated owner. Dame marks only empty removed points, never a square.
+    func hasOwnershipMark(atRow row: Int, column: Int) -> Bool {
+        guard row >= 0, row < height, column >= 0, column < width else { return false }
+        if let scores = gameScores,
+           !(self[row, column] == .empty && (removedStones?.contains([row, column]) ?? false)),
+           scores.black.scoringPositions.contains([row, column])
+            || scores.white.scoringPositions.contains([row, column]) {
+            return true
+        }
+        if let estimate = estimatedScores, case .hasStone = estimate[row][column] {
+            return true
+        }
+        return false
+    }
+}
