@@ -517,6 +517,14 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "surroundStudio", suffix: "-surround-studio", appearance: "light")
     }
 
+    func testFeltMeadowThemeStates() {
+        auditThemeStates(theme: "feltMeadow", suffix: "-felt-meadow", appearance: "light")
+    }
+
+    func testFeltMeadowNightThemeStates() {
+        auditThemeStates(theme: "feltMeadow", suffix: "-felt-meadow-night", appearance: "dark")
+    }
+
     private func auditThemeStates(theme: String, suffix: String, appearance: String? = nil) {
         var app = launchScene(.activeGameBoard, artboard: pose.playArtboard, appearance: appearance, theme: theme)
         capture(pose.playArtboard, in: app, suffix: suffix)

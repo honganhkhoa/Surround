@@ -273,10 +273,96 @@ struct StoneMarkerText: View, Equatable {
 }
 
 enum BoardGridStyle: Equatable {
-    case straight, ragged
+    case straight, ragged, stitched
 
     func usesRaggedEdges(at cellSize: CGFloat) -> Bool {
         self == .ragged && usesDetailedStoneRendering(at: cellSize)
+    }
+
+    func usesStitches(at cellSize: CGFloat) -> Bool {
+        self == .stitched && usesDetailedStoneRendering(at: cellSize)
+    }
+
+    func usesPaddedCells(at cellSize: CGFloat) -> Bool {
+        self == .stitched && usesDetailedStoneRendering(at: cellSize)
+    }
+}
+
+/// Relief belongs to the spaces between intersections, not to a fixed image
+/// of a 19×19 board. Goban supplies its pixel-rounded cell size, including on
+/// rectangular boards and boards with coordinate gutters.
+struct FeltGridGeometry: Equatable {
+    var width: Int
+    var height: Int
+    var cellSize: CGFloat
+
+    private var isValid: Bool {
+        width >= 2 && height >= 2 && cellSize.isFinite && cellSize > 0
+    }
+
+    var gridRect: CGRect {
+        guard isValid else { return .zero }
+        return CGRect(x: cellSize / 2, y: cellSize / 2,
+                      width: CGFloat(width - 1) * cellSize, height: CGFloat(height - 1) * cellSize)
+    }
+
+    var seamWidth: CGFloat { isValid ? cellSize * 0.07 : 0 }
+    var cellCornerRadius: CGFloat { isValid ? cellSize * 0.14 : 0 }
+
+    var cellRects: [CGRect] {
+        guard isValid else { return [] }
+        return (0..<(height - 1)).flatMap { row in
+            (0..<(width - 1)).map { column in
+                CGRect(x: (CGFloat(column) + 0.5) * cellSize,
+                       y: (CGFloat(row) + 0.5) * cellSize,
+                       width: cellSize, height: cellSize)
+                    .insetBy(dx: seamWidth / 2, dy: seamWidth / 2)
+            }
+        }
+    }
+
+    var path: Path {
+        var result = Path()
+        for rect in cellRects {
+            result.addRoundedRect(in: rect, cornerSize: CGSize(width: cellCornerRadius, height: cellCornerRadius))
+        }
+        return result
+    }
+}
+
+/// A short running stitch in each seam. Gentle variations belong to the
+/// row/column, so resizing never reseeds the thread or moves an intersection.
+struct StitchedGridGeometry: Equatable {
+    var width: Int
+    var height: Int
+    var cellSize: CGFloat
+
+    var path: Path {
+        guard width >= 2, height >= 2, cellSize > 0, cellSize.isFinite else { return Path() }
+        var result = Path()
+        for row in 0..<height {
+            let y = (CGFloat(row) + 0.5) * cellSize
+            for column in 0..<(width - 1) {
+                let seed = (row * 17 + column * 11) % 7
+                let center = (CGFloat(column) + 1 + CGFloat(seed - 3) * 0.018) * cellSize
+                let length = (0.14 + CGFloat(seed % 3) * 0.025) * cellSize
+                result.move(to: CGPoint(x: center - length / 2, y: y))
+                result.addQuadCurve(to: CGPoint(x: center + length / 2, y: y),
+                                    control: CGPoint(x: center, y: y - cellSize * 0.035))
+            }
+        }
+        for column in 0..<width {
+            let x = (CGFloat(column) + 0.5) * cellSize
+            for row in 0..<(height - 1) {
+                let seed = (column * 13 + row * 19) % 7
+                let center = (CGFloat(row) + 1 + CGFloat(seed - 3) * 0.018) * cellSize
+                let length = (0.14 + CGFloat(seed % 3) * 0.025) * cellSize
+                result.move(to: CGPoint(x: x, y: center - length / 2))
+                result.addQuadCurve(to: CGPoint(x: x, y: center + length / 2),
+                                    control: CGPoint(x: x - cellSize * 0.035, y: center))
+            }
+        }
+        return result
     }
 }
 
@@ -376,8 +462,9 @@ struct BoardAppearance: Equatable {
     var boardReflection: BoardReflection? = nil
     /// Scales the grid's line widths on detailed boards.
     var gridLineScale: CGFloat = 1
-    /// Roughens only the line edges; intersections stay on the same grid.
+    /// Detailed grid treatment; intersections stay on the same grid.
     var gridStyle: BoardGridStyle = .straight
+    var gridStitchColor: Color = .clear
     /// Rendered stones for detailed sizes; the palettes still draw small
     /// boards, widgets and markers.
     var stoneImages: StoneImages? = nil

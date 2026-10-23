@@ -5,6 +5,9 @@
 //  Debug-only, offline board-marker fixtures and native SwiftUI image export.
 //  The ordinary gallery keeps --surround-board-marker-audit <cell points>.
 //  Add --surround-board-marker-export to render the configured audit matrix.
+//  Opt in to full board sizes with --surround-board-marker-export-groups board-sizes
+//  and e.g. --surround-board-marker-export-sizes 13,14,40. Individual samples
+//  are also selectable with --surround-board-marker-sample board-19x9-coordinates.
 //
 
 import SwiftUI
@@ -59,7 +62,21 @@ private struct MarkerAuditSample: Identifiable {
 
     @MainActor
     func containerSize(for cellSize: CGFloat) -> CGSize {
-        let side = cellSize * CGFloat(MarkerAuditFixtures.boardSize + (coordinates ? 1 : 0))
+        let gutter = coordinates ? 1 : 0
+        if position.width == position.height {
+            let side = cellSize * CGFloat(position.width + gutter)
+            return CGSize(width: side, height: side)
+        }
+        // BoardView uses min(boardGridSize.width, boardGridSize.height) /
+        // max(boardWidth, boardHeight), and both coordinate-grid dimensions
+        // derive from container.width. A rectangular slot would therefore
+        // shrink the requested cell size. Give the unchanged renderer a
+        // square slot large enough for its limiting coordinate fraction.
+        let width = CGFloat(position.width), height = CGFloat(position.height)
+        let coordinateFraction = coordinates ? min(width / (width + 1), height / (height + 1)) : 1
+        // Avoid a division roundoff falling one physical pixel below a
+        // requested threshold. This increment is far smaller than one pixel.
+        let side = (cellSize * max(width, height) / coordinateFraction).nextUp
         return CGSize(width: side, height: side)
     }
 }
@@ -76,6 +93,11 @@ private enum MarkerAuditFixtures {
         }
         return groups.flatMap { group in
             let members = selected.filter { $0.group == group }
+            // Large and rectangular boards retain their actual cell size in a
+            // single-sample panel instead of sharing a clipped 7×7 tile.
+            if group == "board-sizes" {
+                return members.enumerated().map { ("\(group)-\($0.offset + 1)", [$0.element]) }
+            }
             return stride(from: 0, to: members.count, by: 4).map { start in
                 ("\(group)-\(start / 4 + 1)", Array(members.dropFirst(start).prefix(4)))
             }
@@ -343,6 +365,38 @@ private enum MarkerAuditFixtures {
         }
         return samples
     }()
+
+    /// Explicitly selected full-board material/geometry fixtures. Keep these
+    /// out of the ordinary marker gallery and default export matrix.
+    static let boardSizeSamples: [MarkerAuditSample] = {
+        [(9, 9), (13, 13), (19, 19), (25, 25), (9, 19), (19, 9)].flatMap { width, height in
+            [false, true].map { coordinates in
+                let center = [height / 2, width / 2]
+                let white = [2, 2]
+                let empty = [height / 2, width / 2 + 2]
+                let position = BoardPosition(width: width, height: height)
+                position[center] = .hasStone(.black)
+                position[[0, 0]] = .hasStone(.black)
+                position[white] = .hasStone(.white)
+                position[[height - 1, width - 1]] = .hasStone(.white)
+                position.lastMove = .placeStone(center[0], center[1])
+                position.lastMoveColor = .black
+                let markups: BoardMarkups = [
+                    BoardPoint(row: white[0], column: white[1]): BoardMarkup(shapes: [.triangle]),
+                    BoardPoint(row: empty[0], column: empty[1]): BoardMarkup(shapes: [.square]),
+                ]
+                return MarkerAuditSample(
+                    id: "board-\(width)x\(height)\(coordinates ? "-coordinates" : "")",
+                    group: "board-sizes",
+                    title: "\(width)×\(height) · coordinates \(coordinates ? "on" : "off")",
+                    position: position, markups: markups, coordinates: coordinates,
+                    targets: [center, white, empty, [0, 0], [height - 1, width - 1]],
+                    notes: "Width × height; centered last-move stone, white triangle, empty-point square and opposite-corner stones check intersection alignment and edge clipping. Native cell size is not scaled to fit.")
+            }
+        }
+    }()
+
+    static var selectableSamples: [MarkerAuditSample] { samples + boardSizeSamples }
 }
 
 @MainActor
@@ -381,10 +435,10 @@ struct BoardMarkerAuditView: View {
 
     private var selection: (id: String, samples: [MarkerAuditSample])? {
         if let id = BoardMarkerAuditContract.argumentValue(BoardMarkerAuditContract.sampleArgument) {
-            return (id, MarkerAuditFixtures.samples.filter { $0.id == id })
+            return (id, MarkerAuditFixtures.selectableSamples.filter { $0.id == id })
         }
         if let id = BoardMarkerAuditContract.argumentValue(BoardMarkerAuditContract.panelArgument) {
-            return (id, MarkerAuditFixtures.panels(for: MarkerAuditFixtures.samples).first { $0.id == id }?.samples ?? [])
+            return (id, MarkerAuditFixtures.panels(for: MarkerAuditFixtures.selectableSamples).first { $0.id == id }?.samples ?? [])
         }
         return nil
     }
@@ -436,12 +490,13 @@ private struct MarkerAuditCalibrationPanel: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let boardWidth = cellSize * CGFloat(MarkerAuditFixtures.boardSize + (samples.contains { $0.coordinates } ? 1 : 0))
+            let boardWidth = samples.map { $0.containerSize(for: cellSize).width }.max() ?? 0
+            let boardHeight = samples.map { $0.containerSize(for: cellSize).height }.max() ?? 0
             let columns = samples.count > 1 && geometry.size.width >= boardWidth * 2 + 52 ? 2 : 1
             let tileWidth = max(boardWidth, (geometry.size.width - 32 - CGFloat(columns - 1) * 20) / CGFloat(columns))
             let rows = (samples.count + columns - 1) / columns
             let exceedsScreen = boardWidth > geometry.size.width - 32
-                || CGFloat(rows) * (boardWidth + 64) + 80 > geometry.size.height
+                || CGFloat(rows) * (boardHeight + 64) + 80 > geometry.size.height
             VStack(alignment: .leading, spacing: 12) {
                 Text("\(theme.rawValue)-\(scheme == .dark ? "dark" : "light") · \(cellSize.formatted()) pt · device \(Int(displayScale))×")
                     .font(.caption.monospaced())
@@ -487,15 +542,18 @@ private struct MarkerAuditPanel: View {
     let scale: CGFloat
     let panelID: String
 
-    private var tileWidth: CGFloat { max(200, cellSize * 8) + 24 }
+    private var columns: Int { samples.first?.group == "board-sizes" ? 1 : 2 }
+    private var tileWidth: CGFloat {
+        max(max(200, cellSize * 8), samples.map { $0.containerSize(for: cellSize).width }.max() ?? 0) + 24
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("\(appearance.id) · \(cellSize.formatted()) pt · \(Int(scale))× · \(panelID)")
                 .font(.system(size: 14, weight: .semibold))
             VStack(alignment: .leading, spacing: 20) {
-                ForEach(0..<(samples.count + 1) / 2, id: \.self) { row in
+                ForEach(0..<(samples.count + columns - 1) / columns, id: \.self) { row in
                     HStack(alignment: .top, spacing: 20) {
-                        ForEach(Array(samples.dropFirst(row * 2).prefix(2))) { sample in
+                        ForEach(Array(samples.dropFirst(row * columns).prefix(columns))) { sample in
                             MarkerAuditSampleView(sample: sample, cellSize: cellSize, showsIdentifier: true)
                                 .frame(width: tileWidth, alignment: .topLeading)
                         }
@@ -504,7 +562,7 @@ private struct MarkerAuditPanel: View {
             }
         }
         .padding(40)
-        .frame(width: 2 * tileWidth + 100, alignment: .topLeading)
+        .frame(width: CGFloat(columns) * tileWidth + CGFloat(columns - 1) * 20 + 80, alignment: .topLeading)
         .background(appearance.theme.pageBackground)
         .environment(\.surroundTheme, appearance.theme)
         .environment(\.boardAppearance, appearance.theme.board(for: appearance.scheme))
@@ -544,7 +602,7 @@ private enum MarkerAuditExporter {
                 guard !appearances.isEmpty else { throw ExportError.invalidConfiguration("No matching themes") }
             }
             if let selected = values("groups") {
-                samples = samples.filter { selected.contains($0.group) }
+                samples = MarkerAuditFixtures.selectableSamples.filter { selected.contains($0.group) }
                 guard !samples.isEmpty else { throw ExportError.invalidConfiguration("No matching groups") }
             }
         }
@@ -561,7 +619,10 @@ private enum MarkerAuditExporter {
         let group: String
         let title: String
         let notes: String
-        let boardSize: Int
+        /// Retained for square-board consumers; absent for rectangular boards.
+        let boardSize: Int?
+        let boardWidth: Int
+        let boardHeight: Int
         let coordinates: Bool
         let renderingMode: String
         let targets: [TargetRecord]
@@ -593,7 +654,7 @@ private enum MarkerAuditExporter {
         let depthThickness: Double
     }
     private struct Manifest: Encodable {
-        var schemaVersion = 2
+        var schemaVersion = 3
         let runID: String
         let startedAt: String
         var completedAt: String? = nil
@@ -608,7 +669,7 @@ private enum MarkerAuditExporter {
             "Representative sizes, not the continuous set of all possible dimensions.",
             "Draw-only interaction state; no claim about gesture behavior or legality validation.",
             "Widget samples exercise renderer branches, not final system widget compositing.",
-            "7×7 fixtures; real phone/tablet boards and window resize require separate native screenshots.",
+            "Default marker fixtures are 7×7; full board sizes require the opt-in board-sizes group. Real layouts and window resize require separate native screenshots.",
         ]
     }
     private struct Progress: Encodable {
@@ -620,7 +681,7 @@ private enum MarkerAuditExporter {
         let error: String?
     }
     private struct FailedManifest: Encodable {
-        let schemaVersion = 2
+        let schemaVersion = 3
         let runID: String
         let state = "error"
         let error: String
@@ -756,7 +817,8 @@ private enum MarkerAuditExporter {
         let position = sample.pending?.position ?? sample.position
         let points = sample.targets.isEmpty ? sample.markups.keys.sorted().map { [$0.row, $0.column] } : sample.targets
         return SampleRecord(id: sample.id, group: sample.group, title: sample.title, notes: sample.notes,
-                            boardSize: MarkerAuditFixtures.boardSize, coordinates: sample.coordinates,
+                            boardSize: position.width == position.height ? position.width : nil,
+                            boardWidth: position.width, boardHeight: position.height, coordinates: sample.coordinates,
                             renderingMode: sample.renderingModeName, targets: points.map { point in
             let color: String
             let variant: Int?

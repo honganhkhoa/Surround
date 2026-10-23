@@ -720,6 +720,9 @@ struct GameDetailView: View {
                     }
                 }
             }
+            // Settings retain the app's accent even when legacy game bars
+            // use the meadow foreground for their unbacked controls.
+            .modifier(GameDetailLegacyTint(color: .accentColor))
         }
         // Catalyst keeps this useful as the Mac window title in Zen mode.
         .navigationTitle(navigationTitle)
@@ -963,6 +966,7 @@ extension EnvironmentValues {
 /// Navigation owns these items, including their Liquid Glass, safe-area insets,
 /// native vertical placement, and overflow. Game content never imitates a bar.
 private struct GameToolbarLayout: ViewModifier {
+    @Environment(\.surroundTheme) private var theme
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
     @Environment(\.iPadTabContext) private var iPadTabContext
@@ -1099,6 +1103,8 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
+        .modifier(GameDetailLegacyTint(color: theme == .feltMeadow && !analyzingIsPresented
+            ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
                 ? SurroundUITestContract.AccessibilityID.gameDisplayModePicker + ".analyze"
@@ -1425,13 +1431,14 @@ private struct GameToolbarChatButton: View {
     let unreadCount: Int
     let action: () -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surroundTheme) private var theme
 
     // Selected matches the native selected toggles beside it (Analyze): a
     // solid accent capsule with a white glyph, or a black one in dark mode.
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return .accentColor
+        return theme == .feltMeadow ? theme.foreground : .accentColor
     }
 
     var body: some View {

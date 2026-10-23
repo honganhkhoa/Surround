@@ -57,6 +57,87 @@ private struct RaggedGobanGrid: View, Equatable {
     }
 }
 
+private struct StitchedGobanGrid: View, Equatable {
+    var geometry: StitchedGridGeometry
+    var color: Color
+
+    var body: some View {
+        Canvas { context, _ in
+            context.stroke(geometry.path, with: .color(color),
+                           style: StrokeStyle(lineWidth: min(1.15, geometry.cellSize * 0.028),
+                                              lineCap: .round))
+        }
+    }
+}
+
+/// Transparent relief over the wool image: one Canvas, without a separate
+/// view, blur or offscreen shadow for every square. Geometry is independent
+/// of the game state, so clocks and moves do not rebuild the felt surface.
+private struct PaddedFeltGrid: View, Equatable {
+    var geometry: FeltGridGeometry
+    var shade: Color
+
+    var body: some View {
+        Canvas { context, _ in
+            let cells = geometry.cellRects
+            let radius = geometry.cellCornerRadius
+            var edges = Path()
+            for (index, rect) in cells.enumerated() {
+                let cell = Path(roundedRect: rect, cornerRadius: radius)
+                edges.addPath(cell)
+                // A small, stable difference in loft keeps the wool handmade.
+                let loft = 0.92 + Double((index * 13 + index / max(1, geometry.width - 1) * 7) % 5) * 0.04
+                context.fill(cell, with: .linearGradient(Gradient(stops: [
+                    .init(color: .white.opacity(0.19 * loft), location: 0),
+                    .init(color: .white.opacity(0.045 * loft), location: 0.22),
+                    .init(color: .clear, location: 0.48),
+                    .init(color: shade.opacity(0.08 * loft), location: 0.74),
+                    .init(color: shade.opacity(0.34 * loft), location: 1)
+                ]), startPoint: CGPoint(x: rect.midX, y: rect.minY),
+                   endPoint: CGPoint(x: rect.midX, y: rect.maxY)))
+                context.fill(cell, with: .linearGradient(Gradient(stops: [
+                    .init(color: .white.opacity(0.11), location: 0),
+                    .init(color: .clear, location: 0.28),
+                    .init(color: .clear, location: 0.65),
+                    .init(color: shade.opacity(0.22), location: 1)
+                ]), startPoint: CGPoint(x: rect.minX, y: rect.midY),
+                   endPoint: CGPoint(x: rect.maxX, y: rect.midY)))
+            }
+            // Batched, translucent edges sink into the seam; the rounded
+            // corners leave a small dark recess at each playing intersection.
+            context.stroke(edges, with: .color(shade.opacity(0.16)),
+                           lineWidth: geometry.cellSize * 0.035)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Soft textile binding sits inside the existing board slot, including its
+/// coordinate gutter. It never changes the playable surface's dimensions.
+private struct FeltBoardRim: View, Equatable {
+    var cellSize: CGFloat
+    var cornerRadius: CGFloat
+    var shade: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let width = min(7, cellSize * 0.16)
+            let bounds = CGRect(origin: .zero, size: size)
+            let outer = Path(roundedRect: bounds.insetBy(dx: width / 2, dy: width / 2),
+                             cornerRadius: max(0, cornerRadius - width / 2))
+            context.stroke(outer, with: .linearGradient(Gradient(colors: [
+                .white.opacity(0.25), .white.opacity(0.04), shade.opacity(0.42)
+            ]), startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height)), lineWidth: width)
+            let inner = Path(roundedRect: bounds.insetBy(dx: width, dy: width),
+                             cornerRadius: max(0, cornerRadius - width))
+            context.stroke(inner, with: .color(shade.opacity(0.12)), lineWidth: width * 0.45)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct Goban: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.boardAppearance) private var appearance
@@ -82,6 +163,8 @@ struct Goban: View {
     
     var body: some View {
         let size = stoneSize(geometry: geometry, boardSize: max(width, height), displayScale: displayScale)
+        let padded = appearance.gridStyle.usesPaddedCells(at: size)
+        let lineColor = appearance.gridColor.opacity(padded ? 0.6 : 1)
         #if DEBUG
         let drawnRow = markerAuditState?.highlightedRow ?? highlightedRow
         let drawnColumn = markerAuditState?.highlightedColumn ?? highlightedColumn
@@ -123,13 +206,25 @@ struct Goban: View {
                             .position(x: -0.5 * size, y: (CGFloat(row) + 0.5) * size)
                     }
                 }
-                if appearance.gridStyle.usesRaggedEdges(at: size) {
+                // Keep detail layers mounted across the threshold. A board
+                // resizing through 14 pt switches pigment without a cross-fade.
+                if appearance.gridStyle == .stitched {
+                    PaddedFeltGrid(geometry: FeltGridGeometry(width: width, height: height, cellSize: size),
+                                   shade: appearance.gridColor)
+                        .equatable()
+                        .opacity(padded ? 1 : 0)
+                        .animation(nil, value: padded)
+                }
+                if appearance.gridStyle == .ragged {
                     RaggedGobanGrid(
                         geometry: RaggedGridGeometry(width: width, height: height,
                                                      cellSize: size, lineScale: appearance.gridLineScale),
                         color: appearance.gridColor
                     ).equatable()
-                } else {
+                        .opacity(appearance.gridStyle.usesRaggedEdges(at: size) ? 1 : 0)
+                        .animation(nil, value: appearance.gridStyle.usesRaggedEdges(at: size))
+                }
+                Group {
                     Path { path in
                         for i in 1..<height-1 {
                             path.move(to: CGPoint(x: size / 2, y: (CGFloat(i) + 0.5) * size))
@@ -140,14 +235,26 @@ struct Goban: View {
                             path.addLine(to: CGPoint(x: (CGFloat(i) + 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                         }
                     }
-                    .stroke(appearance.gridColor, lineWidth: size < 10 ? 1 / displayScale : 0.5 * appearance.gridLineScale)
+                    .stroke(lineColor, lineWidth: size < 10 ? 1 / displayScale : 0.5 * appearance.gridLineScale)
                     Path { path in
                         path.move(to: CGPoint(x: size / 2, y: size / 2))
                         path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: size / 2))
                         path.addLine(to: CGPoint(x: (CGFloat(width) - 0.5) * size, y: (CGFloat(height) - 0.5) * size))
                         path.addLine(to: CGPoint(x: size / 2, y: (CGFloat(height) - 0.5) * size))
                         path.closeSubpath()
-                    }.stroke(appearance.gridColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
+                    }.stroke(lineColor, lineWidth: size < 10 ? 0.5 : appearance.gridLineScale)
+                }
+                .opacity(appearance.gridStyle.usesRaggedEdges(at: size) ? 0 : 1)
+                .animation(nil, value: appearance.gridStyle.usesRaggedEdges(at: size))
+                .animation(nil, value: padded)
+                if appearance.gridStyle == .stitched {
+                    StitchedGobanGrid(
+                        geometry: StitchedGridGeometry(width: width, height: height, cellSize: size),
+                        color: appearance.gridStitchColor
+                    ).equatable()
+                        .opacity(appearance.gridStyle.usesStitches(at: size) ? 1 : 0)
+                        .animation(nil, value: appearance.gridStyle.usesStitches(at: size))
+                        .allowsHitTesting(false)
                 }
                 if starPoints.count > 0 {
                     Path { path in
@@ -1432,9 +1539,11 @@ struct BoardView: View {
             // in place, hidden, so a resizing board does not fade between two.
             let gridSize = boardGridSize(containerSize: geometry.size, boardWidth: boardPosition.width,
                                          boardHeight: boardPosition.height, showsCoordinates: showsCoordinate)
-            let detailed = usesDetailedStoneRendering(
-                at: floor(min(gridSize.width, gridSize.height) / max(width, height) * displayScale) / displayScale)
-            let faceRadius = max(cornerRadius, detailed ? depthGeometry.cornerRadius : 0)
+            let cellSize = floor(min(gridSize.width, gridSize.height) / max(width, height) * displayScale) / displayScale
+            let detailed = usesDetailedStoneRendering(at: cellSize)
+            let padded = appearance.gridStyle.usesPaddedCells(at: cellSize)
+            let feltRadius = padded ? min(12, cellSize * 0.24) : 0
+            let faceRadius = max(cornerRadius, detailed ? max(depthGeometry.cornerRadius, feltRadius) : 0)
             ZStack(alignment: .center) {
                 if widgetRenderingMode == .fullColor {
                     appearance.surfaceColor(detailed: detailed)
@@ -1475,7 +1584,13 @@ struct BoardView: View {
                             ZStack {
                                 if let edge = appearance.boardEdge {
                                     BoardBorder(start: edge, middle: edge, end: edge, width: 1)
-                                        .opacity(detailed && appearance.boardDepth != nil ? 0 : 1)
+                                        .opacity(detailed && (appearance.boardDepth != nil || padded) ? 0 : 1)
+                                }
+                                if appearance.gridStyle == .stitched {
+                                    FeltBoardRim(cellSize: cellSize, cornerRadius: faceRadius, shade: appearance.gridColor)
+                                        .equatable()
+                                        .opacity(padded ? 1 : 0)
+                                        .animation(nil, value: padded)
                                 }
                                 if appearance.boardBevel {
                                     Group {
@@ -1511,13 +1626,14 @@ struct BoardView: View {
                                         .opacity(detailed ? 1 : 0)
                                 }
                             } else {
-                                RoundedRectangle(cornerRadius: cornerRadius)
+                                RoundedRectangle(cornerRadius: faceRadius)
                                     .fill(appearance.surfaceColor(detailed: detailed))
                                     .shadow(color: .black.opacity(detailed ? (appearance.boardBevel ? 0.55 : 0.33) : 0),
                                             radius: appearance.boardBevel ? 10 : 2,
                                             y: appearance.boardBevel ? 6 : 0)
                             }
                         }
+                        .animation(nil, value: padded)
                 } else {
                     Color.white.cornerRadius(cornerRadius).opacity(0.5)
                 }

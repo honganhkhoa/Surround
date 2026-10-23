@@ -399,8 +399,9 @@ private struct GameDetailClockCard: View {
         guard state.ownsUndoRequest else { return foreground }
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
-            // is too dark to serve as text on a night slate clock.
-            return theme == .surroundStudio && colorScheme == .dark ? foreground : badgeBackground
+            // is too dark as text on night slate or charcoal felt clocks.
+            return theme == .feltMeadow || (theme == .surroundStudio && colorScheme == .dark)
+                ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)
     }
@@ -1483,6 +1484,26 @@ private struct GameDetailOpaquePopover: ViewModifier {
     }
 }
 
+/// Preserve the other themes' hierarchical secondary style, while Meadow's
+/// opaque detail panels use a contrast-checked secondary pigment.
+private struct GameDetailSecondaryText: ViewModifier {
+    @Environment(\.surroundTheme) private var theme
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if theme == .feltMeadow {
+            content.foregroundStyle(theme.detailSecondaryForeground)
+        } else {
+            content.foregroundStyle(.secondary)
+        }
+    }
+}
+
+private extension View {
+    func gameDetailSecondaryText() -> some View {
+        modifier(GameDetailSecondaryText())
+    }
+}
+
 private struct GameDetailTeamDetails: View {
     @ObservedObject var game: Game
     let color: StoneColor
@@ -1495,7 +1516,7 @@ private struct GameDetailTeamDetails: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(verbatim: GameDetailTeamRows.title(game: game, color: color)).font(.headline)
                 Spacer(minLength: 0)
-                Text("Turn order").font(.caption).foregroundStyle(.secondary)
+                Text("Turn order").font(.caption).gameDetailSecondaryText()
             }
             .padding(.bottom, 8)
             Divider()
@@ -1515,6 +1536,7 @@ private struct GameDetailTeamDetails: View {
 /// and you marked You (one "You · next" pill when you are next). A finished
 /// game has no next player. Shared by the team popover and game details.
 private struct GameDetailTeamRows: View {
+    @Environment(\.surroundTheme) private var theme
     @ObservedObject var game: Game
     let color: StoneColor
     var onSelect: ((OGSUser) -> Void)?
@@ -1537,7 +1559,7 @@ private struct GameDetailTeamRows: View {
                 } label: {
                     HStack(spacing: 10) {
                         Text(verbatim: String(index + 1))
-                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            .font(.caption.monospacedDigit()).gameDetailSecondaryText()
                             .frame(minWidth: 18)
                         ZStack(alignment: .bottomTrailing) {
                             GameDetailAvatar(player: player, size: 32)
@@ -1550,7 +1572,7 @@ private struct GameDetailTeamRows: View {
                         }
                         (Text(verbatim: player.username).fontWeight(.semibold)
                             .foregroundColor(gameDetailProfileColor(player, dark: colorScheme == .dark))
-                            + Text(verbatim: hidesRank ? "" : " [\(player.formattedRank)]").foregroundColor(.secondary))
+                            + Text(verbatim: hidesRank ? "" : " [\(player.formattedRank)]").foregroundColor(theme.detailSecondaryForeground))
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 4)
@@ -1573,7 +1595,7 @@ private struct GameDetailTeamRows: View {
 
     private func teamBadge(_ title: LocalizedStringKey, prominent: Bool) -> some View {
         Text(title).font(.caption2.bold())
-            .foregroundStyle(prominent ? Color.accentColor : .secondary)
+            .foregroundStyle(prominent ? Color.accentColor : theme.detailSecondaryForeground)
             .padding(.horizontal, 6).padding(.vertical, 3)
             .background(prominent ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.1), in: Capsule())
     }
@@ -1618,6 +1640,7 @@ struct GameDetailInformationCard: View {
 }
 
 private struct GameDetailInformationContent: View {
+    @Environment(\.surroundTheme) private var theme
     @ObservedObject var game: Game
     var columns = false
     var showsClocks = false
@@ -1659,7 +1682,7 @@ private struct GameDetailInformationContent: View {
                     if color != firstColor { Divider() }
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(verbatim: GameDetailTeamRows.title(game: game, color: color))
-                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            .font(.caption.weight(.semibold)).gameDetailSecondaryText()
                         Spacer(minLength: 0)
                         if showsClocks { clockReadout(color) }
                     }
@@ -1699,7 +1722,7 @@ private struct GameDetailInformationContent: View {
                 .font(.subheadline)
                 data.timeControl.system.descriptionText
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .gameDetailSecondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -1713,7 +1736,7 @@ private struct GameDetailInformationContent: View {
                 let classification = data.ranked ? String(localized: "Ranked") : String(localized: "Unranked")
                 let speed = data.timeControl.speed?.localizedString().localizedCapitalized
                 Text(verbatim: [classification, "\(data.width)×\(data.height)", speed].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).gameDetailSecondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -1737,13 +1760,13 @@ private struct GameDetailInformationContent: View {
                 VStack(alignment: .leading, spacing: 4) {
                     (Text(verbatim: player?.username ?? "—")
                         .foregroundColor(gameDetailProfileColor(player, dark: colorScheme == .dark))
-                        + Text(verbatim: !hidesRank ? " [\(player?.formattedRank ?? "—")]" : "").foregroundColor(.secondary))
+                        + Text(verbatim: !hidesRank ? " [\(player?.formattedRank ?? "—")]" : "").foregroundColor(theme.detailSecondaryForeground))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if showsClocks { clockReadout(color) }
                 }
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).gameDetailSecondaryText()
             }
             .frame(minHeight: 44).contentShape(Rectangle())
         }
@@ -1760,19 +1783,19 @@ private struct GameDetailInformationContent: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if state.isFinished {
                 Text(verbatim: state.resultTitle).font(.subheadline)
-                Text(verbatim: state.resultDetail).font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: state.resultDetail).font(.caption).gameDetailSecondaryText()
             } else if state.isScoring {
                 Text(verbatim: state.scoreText).font(.subheadline)
                 Text(state.accepted ? "Accepted" : "Not accepted")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).gameDetailSecondaryText()
             } else if let deadline = state.autoResign {
                 Text(verbatim: timeString(timeLeft: deadline)).font(.subheadline.monospacedDigit())
-                Text("Disconnected").font(.caption).foregroundStyle(.secondary)
+                Text("Disconnected").font(.caption).gameDetailSecondaryText()
             } else if state.canShowTimer {
                 TimerView(timeControl: state.valueTimeControl, clock: state.valueClock,
                           player: color, mainFont: .subheadline.monospacedDigit(), subFont: .caption)
                 Text(verbatim: state.paused ? state.pauseReason : state.timeDetail)
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).gameDetailSecondaryText()
             } else {
                 Text(verbatim: state.unavailableTimeText).font(.subheadline)
             }
@@ -1785,7 +1808,7 @@ private struct GameDetailInformationContent: View {
 
     private func metadataRow(_ title: LocalizedStringKey, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text(title).foregroundStyle(.secondary)
+            Text(title).gameDetailSecondaryText()
             Spacer(minLength: 0)
             Text(verbatim: value).multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1797,7 +1820,7 @@ private struct GameDetailInformationContent: View {
         let white = GameDetailClockState(game: game, color: .white).score
         return VStack(alignment: .leading, spacing: 8) {
             Text(game.gamePhase == .finished ? "Final score" : "Provisional score")
-                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold)).gameDetailSecondaryText()
             if game.gamePhase == .finished { Text(verbatim: game.status).font(.subheadline) }
             // A resignation or timeout has no score; show no table of dashes.
             if black != nil || white != nil {
@@ -1806,7 +1829,7 @@ private struct GameDetailInformationContent: View {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     Text("Black")
                     Text("White")
-                }.font(.caption).foregroundStyle(.secondary)
+                }.font(.caption).gameDetailSecondaryText()
                 if let data = game.gameData {
                     if data.scoreTerritory { scoreRow("Territory", black: black.map { String($0.territory) }, white: white.map { String($0.territory) }) }
                     if data.scoreStones { scoreRow("Stones", black: black.map { String($0.stones) }, white: white.map { String($0.stones) }) }

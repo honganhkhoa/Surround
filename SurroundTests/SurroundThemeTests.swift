@@ -4,7 +4,7 @@ import CoreGraphics
 
 final class SurroundThemeTests: XCTestCase {
     func testBoardDepthKeepsThePlayingSurfaceStableAcrossAppearance() throws {
-        for theme: SurroundTheme in [.standard, .rakedGarden] {
+        for theme: SurroundTheme in [.standard, .rakedGarden, .feltMeadow] {
             for scheme: ColorScheme in [.light, .dark] {
                 XCTAssertNil(theme.board(for: scheme).boardDepth)
             }
@@ -342,36 +342,38 @@ final class SurroundThemeTests: XCTestCase {
         let families = ["NebulaPearlGlass", "NebulaPearlPearl", "RakedGardenBasalt",
                         "RakedGardenJade", "SurroundStudioSlate", "SurroundStudioClamshell",
                         "FrostPineMidnight", "FrostPinePale"]
+        let names = families.flatMap { family in (0..<4).map { "\(family)\($0)" } }
+            + ["FeltMeadowBlackStone", "FeltMeadowWhiteStone"]
         let side = 128
-        for family in families {
-            for variant in 0..<4 {
-                let name = "\(family)\(variant)"
-                let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
-                let source = try XCTUnwrap(image.cgImage, name)
-                let pixels = try rgbaPixels(for: source, side: side)
-                var alphaSum = 0.0, weightedX = 0.0, weightedY = 0.0
-                var minX = side, minY = side, maxX = -1, maxY = -1
-                for y in 0..<side {
-                    for x in 0..<side {
-                        let alpha = Double(pixels[(y * side + x) * 4 + 3])
-                        alphaSum += alpha
-                        weightedX += (Double(x) + 0.5) * alpha
-                        weightedY += (Double(y) + 0.5) * alpha
-                        if alpha > 127 {
-                            minX = min(minX, x)
-                            minY = min(minY, y)
-                            maxX = max(maxX, x)
-                            maxY = max(maxY, y)
-                        }
+        for name in names {
+            let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+            let source = try XCTUnwrap(image.cgImage, name)
+            let pixels = try rgbaPixels(for: source, side: side)
+            var alphaSum = 0.0, weightedX = 0.0, weightedY = 0.0
+            var minX = side, minY = side, maxX = -1, maxY = -1
+            for y in 0..<side {
+                for x in 0..<side {
+                    let alpha = Double(pixels[(y * side + x) * 4 + 3])
+                    alphaSum += alpha
+                    weightedX += (Double(x) + 0.5) * alpha
+                    weightedY += (Double(y) + 0.5) * alpha
+                    if alpha > 127 {
+                        minX = min(minX, x)
+                        minY = min(minY, y)
+                        maxX = max(maxX, x)
+                        maxY = max(maxY, y)
                     }
                 }
-                XCTAssertGreaterThan(alphaSum, 0, name)
-                guard alphaSum > 0 else { continue }
-                XCTAssertEqual(weightedX / alphaSum, Double(side) / 2, accuracy: 0.25, name)
-                XCTAssertEqual(weightedY / alphaSum, Double(side) / 2, accuracy: 0.25, name)
-                XCTAssertLessThanOrEqual(abs(minX - (side - 1 - maxX)), 1, name)
-                XCTAssertLessThanOrEqual(abs(minY - (side - 1 - maxY)), 1, name)
             }
+            XCTAssertGreaterThan(alphaSum, 0, name)
+            guard alphaSum > 0 else { continue }
+            XCTAssertEqual(weightedX / alphaSum, Double(side) / 2, accuracy: 0.25, name)
+            XCTAssertEqual(weightedY / alphaSum, Double(side) / 2, accuracy: 0.25, name)
+            // Handmade wool tufts may extend farther on one side while the
+            // stone's visible mass stays centered under its markers.
+            let marginTolerance = name.hasPrefix("FeltMeadow") ? 3 : 1
+            XCTAssertLessThanOrEqual(abs(minX - (side - 1 - maxX)), marginTolerance, name)
+            XCTAssertLessThanOrEqual(abs(minY - (side - 1 - maxY)), marginTolerance, name)
         }
     }
 
@@ -537,6 +539,8 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(SurroundTheme.surroundStudio.hasScene)
         XCTAssertNil(SurroundTheme.frostPine.colorScheme)
         XCTAssertTrue(SurroundTheme.frostPine.hasScene)
+        XCTAssertNil(SurroundTheme.feltMeadow.colorScheme)
+        XCTAssertTrue(SurroundTheme.feltMeadow.hasScene)
     }
 
     func testAnUnknownStoredThemeFallsBackToStandard() {
@@ -547,11 +551,13 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
         XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .surroundStudio)
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .frostPine)
+        XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .feltMeadow)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .standard)
         #endif
     }
 
@@ -715,6 +721,19 @@ final class SurroundThemeTests: XCTestCase {
         try assertNightAnalysisMarksRemainReadable(.surroundStudio)
     }
 
+    func testFeltMeadowNightAnalysisMarksRemainReadable() throws {
+        try assertNightAnalysisMarksRemainReadable(.feltMeadow)
+    }
+
+    func testFeltMeadowDayAnalysisMarksRemainReadable() throws {
+        let theme = SurroundTheme.feltMeadow
+        let keyline = try XCTUnwrap(theme.treeMarkKeyline)
+        XCTAssertGreaterThanOrEqual(contrast(theme.selectionMark, theme.panel), 3)
+        XCTAssertGreaterThanOrEqual(contrast(theme.selectionMark, keyline), 3)
+        XCTAssertGreaterThanOrEqual(contrast(try XCTUnwrap(theme.conditionalMark), keyline), 3)
+        XCTAssertGreaterThanOrEqual(contrast(theme.userTurnMark, theme.idleGameMark(scheme: .light)), 3)
+    }
+
     private func assertNightAnalysisMarksRemainReadable(_ theme: SurroundTheme) throws {
         let keyline = try XCTUnwrap(theme.treeMarkKeyline)
         XCTAssertGreaterThan(contrast(theme.selectionMark, theme.panel, style: .dark), 3)
@@ -729,6 +748,10 @@ final class SurroundThemeTests: XCTestCase {
 
     func testStudioNightControlFallbacksKeepReadableTextAndRoles() throws {
         try assertNightControlFallbacksKeepReadableTextAndRoles(.surroundStudio)
+    }
+
+    func testFeltMeadowNightControlFallbacksKeepReadableTextAndRoles() throws {
+        try assertNightControlFallbacksKeepReadableTextAndRoles(.feltMeadow)
     }
 
     private func assertNightControlFallbacksKeepReadableTextAndRoles(_ theme: SurroundTheme) throws {
@@ -751,7 +774,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: .dark), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: .dark), surface, style: .dark), 4.5)
-                if theme == .surroundStudio {
+                if theme == .surroundStudio || theme == .feltMeadow {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: .dark)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: .dark)),
@@ -774,7 +797,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: .dark), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: .dark), 4.5)
-        if theme == .surroundStudio {
+        if theme == .surroundStudio || theme == .feltMeadow {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: .dark), style: .dark), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: .dark), style: .dark), 4.5,
@@ -784,6 +807,10 @@ final class SurroundThemeTests: XCTestCase {
 
     func testGardenAdaptiveColorsFollowRepeatedTraitChanges() {
         assertAdaptiveColorsFollowRepeatedTraitChanges(.rakedGarden)
+    }
+
+    func testFeltMeadowAdaptiveColorsFollowRepeatedTraitChanges() {
+        assertAdaptiveColorsFollowRepeatedTraitChanges(.feltMeadow)
     }
 
     func testStudioAdaptiveColorsFollowRepeatedTraitChanges() {
@@ -850,7 +877,7 @@ final class SurroundThemeTests: XCTestCase {
             OGSUser(username: "supporter", id: 5, supporter: true),
             OGSUser(username: "bot", id: 6, isBot: true),
         ]
-        for theme: SurroundTheme in [.rakedGarden, .surroundStudio] {
+        for theme: SurroundTheme in [.rakedGarden, .surroundStudio, .feltMeadow] {
             for player in players {
                 for color: StoneColor in [.black, .white] {
                     let foreground = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
@@ -906,6 +933,51 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(night.gridLineScale, day.gridLineScale)
         XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
         XCTAssertEqual(night.boardBevel, day.boardBevel)
+    }
+
+    func testFeltMeadowKeepsBoardGeometryAcrossAppearances() {
+        let theme = SurroundTheme.feltMeadow
+        let day = theme.board(for: .light), night = theme.board(for: .dark)
+        XCTAssertEqual(theme.board, day)
+        XCTAssertEqual(day.gridStyle, .stitched)
+        XCTAssertEqual(night.gridStyle, day.gridStyle)
+        XCTAssertEqual(night.gridLineScale, day.gridLineScale)
+        XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
+        XCTAssertEqual(night.boardBevel, day.boardBevel)
+        XCTAssertNil(day.boardDepth)
+        XCTAssertNil(night.boardDepth)
+        XCTAssertNotEqual(day.boardColor, night.boardColor)
+        XCTAssertLessThan(luminance(night.boardColor, style: .dark), luminance(day.boardColor))
+    }
+
+    func testFeltMeadowControlFallbacksKeepReadableText() throws {
+        let theme = SurroundTheme.feltMeadow
+        XCTAssertGreaterThanOrEqual(contrast(theme.foreground, theme.pageBackground), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(theme.foreground, theme.panel), 4.5)
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            XCTAssertGreaterThanOrEqual(contrast(theme.detailSecondaryForeground, theme.panel, style: style), 4.5,
+                                       "Secondary details remain readable on the themed panel in both appearances")
+        }
+        for color: StoneColor in [.black, .white] {
+            let foreground = theme.clockForeground(color, scheme: .light)
+            for surface in [theme.clockSolidSurface(color)] + theme.clockSurfaceStops(color, scheme: .light).map(\.color) {
+                XCTAssertGreaterThanOrEqual(contrast(foreground, surface), 4.5)
+                for accent in [theme.clockAccent(color), theme.clockSuddenDeathAccent(color, scheme: .light),
+                               theme.clockAgreementAccent(color, scheme: .light),
+                               theme.clockDisconnectedAccent(color, scheme: .light),
+                               theme.clockUndoAccent(color, scheme: .light)] {
+                    XCTAssertGreaterThanOrEqual(contrast(accent, surface), 4.5)
+                }
+            }
+            for surface in theme.identityChipColors(color) {
+                XCTAssertGreaterThanOrEqual(contrast(theme.identityForeground(color), surface), 4.5)
+                XCTAssertGreaterThanOrEqual(contrast(theme.identitySecondary(color), surface), 4.5)
+            }
+        }
+        for surface in [try XCTUnwrap(theme.actionTint), theme.statusBadge,
+                        theme.clockUndoBadge(scheme: .light), theme.clockSuddenDeathBadge(scheme: .light)] {
+            XCTAssertGreaterThanOrEqual(contrast(.white, surface), 4.5)
+        }
     }
 
     /// Cream clamshell needs a contour against golden kaya in thumbnails;
@@ -984,6 +1056,30 @@ final class SurroundThemeTests: XCTestCase {
             black: (0..<4).map { try image(named: "SurroundStudioSlate\($0)") },
             white: (0..<4).map { try image(named: "SurroundStudioClamshell\($0)") }
         )
+        try assertEqualAlphaStoneFootprints(stones)
+    }
+
+    func testFeltMeadowAssetsKeepSeparateBoardAndEqualAlphaStoneFootprints() throws {
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        func image(named name: String) throws -> UIImage {
+            try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+        }
+        _ = try image(named: "FeltMeadowScene")
+        _ = try image(named: "FeltMeadowBoard")
+        // The processor holds the longest opaque extent at 0.94; natural
+        // tufts can leave the center-line body slightly narrower. Preserve
+        // that silhouette rather than stretch or mask it into a circle.
+        try assertEqualAlphaStoneFootprints(StoneImages(
+            black: [try image(named: "FeltMeadowBlackStone")],
+            white: [try image(named: "FeltMeadowWhiteStone")]
+        ), diameterTolerance: 0.04, maximumDiameterDifference: 5, minimumExtentRatio: 0.92)
+    }
+
+    private func assertEqualAlphaStoneFootprints(_ stones: StoneImages,
+                                                diameterTolerance: CGFloat = 0.02,
+                                                maximumDiameterDifference: Int = 1,
+                                                minimumExtentRatio: CGFloat? = nil) throws {
+        let side = 128
         var footprints: [Int] = []
         for image in stones.black + stones.white {
             let source = try XCTUnwrap(image.cgImage)
@@ -997,11 +1093,30 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertEqual(alpha(side - 1, side / 2), 0)
             XCTAssertGreaterThan(alpha(side / 2, side / 2), 250)
             let diameter = (0..<side).filter { alpha($0, side / 2) > 127 }.count
-            XCTAssertEqual(CGFloat(diameter) / CGFloat(side), stones.footprint, accuracy: 0.02)
+            XCTAssertEqual(CGFloat(diameter) / CGFloat(side), stones.footprint, accuracy: diameterTolerance)
             footprints.append(diameter)
+            if let minimumExtentRatio {
+                var minX = side, minY = side, maxX = -1, maxY = -1
+                for y in 0..<side {
+                    for x in 0..<side where alpha(x, y) > 127 {
+                        minX = min(minX, x); minY = min(minY, y)
+                        maxX = max(maxX, x); maxY = max(maxY, y)
+                    }
+                }
+                let width = CGFloat(maxX - minX + 1), height = CGFloat(maxY - minY + 1)
+                let longest = max(width, height)
+                XCTAssertGreaterThan(longest, 0)
+                if longest > 0 {
+                    // Natural edge variation must still fit the intended
+                    // cell silhouette without becoming an elongated stone.
+                    XCTAssertEqual(longest / CGFloat(side), stones.footprint, accuracy: 0.02)
+                    XCTAssertGreaterThanOrEqual(min(width, height) / longest, minimumExtentRatio)
+                }
+            }
         }
-        XCTAssertLessThanOrEqual(try XCTUnwrap(footprints.max()) - XCTUnwrap(footprints.min()), 1,
-                                 "Slate and shell use equal diameters across every variant")
+        XCTAssertLessThanOrEqual(try XCTUnwrap(footprints.max()) - XCTUnwrap(footprints.min()),
+                                 maximumDiameterDifference,
+                                 "Both stone colors keep comparable diameters across every variant")
     }
 
     func testStudioFoliageKeepsNaturalScaleAndReservesChrome() {
@@ -1067,7 +1182,7 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testRaggedGridIsGardenOnlyAndFallsBackOnSmallBoards() {
-        for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio, .frostPine] {
+        for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio, .frostPine, .feltMeadow] {
             XCTAssertFalse(theme.board.gridStyle.usesRaggedEdges(at: 48))
         }
         // Small boards are solid: the scratched grid starts at the detail threshold.
@@ -1076,6 +1191,220 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(style.usesRaggedEdges(at: 14))
         XCTAssertTrue(style.usesRaggedEdges(at: 48))
         XCTAssertTrue(RaggedGridGeometry(width: 19, height: 19, cellSize: 9.99, lineScale: 1.6).path.isEmpty)
+    }
+
+    func testStitchedGridIsMeadowOnlyAndFallsBackOnSmallBoards() {
+        for theme in SurroundTheme.allCases {
+            for scheme: ColorScheme in [.light, .dark] {
+                let style = theme.board(for: scheme).gridStyle
+                for cell: CGFloat in [0, 7, 13, 13.99] {
+                    XCTAssertFalse(style.usesStitches(at: cell), "Small boards retain only their straight grid")
+                    XCTAssertFalse(style.usesPaddedCells(at: cell), "Small boards never draw padded-cell shading")
+                }
+                for cell: CGFloat in [14, 20, 48] {
+                    XCTAssertEqual(style.usesStitches(at: cell), theme == .feltMeadow)
+                    XCTAssertEqual(style.usesPaddedCells(at: cell), theme == .feltMeadow)
+                }
+            }
+        }
+    }
+
+    func testFeltPaddedCellsLeaveEveryPlayingIntersectionAndSeamClear() {
+        for (width, height) in [(2, 3), (3, 2), (9, 9), (13, 13), (19, 19), (25, 25), (9, 19), (19, 9)] {
+            // Compact geometry remains valid while its detail layer is hidden;
+            // crossing 14 pt must not reconstruct or shift the playing grid.
+            for cell: CGFloat in [7, 13.99, 14, 20, 30, 48, 64] {
+                let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
+                let cells = geometry.cellRects, path = geometry.path
+                let gridRect = CGRect(x: cell / 2, y: cell / 2,
+                                      width: CGFloat(width - 1) * cell, height: CGFloat(height - 1) * cell)
+                XCTAssertEqual(geometry.gridRect, gridRect)
+                XCTAssertEqual(cells.count, (width - 1) * (height - 1))
+                XCTAssertGreaterThan(geometry.seamWidth, 0)
+                XCTAssertLessThan(geometry.seamWidth, cell / 4)
+                XCTAssertGreaterThan(geometry.cellCornerRadius, 0)
+                var cellCenters = Set<[Int]>()
+                for rect in cells {
+                    XCTAssertTrue(gridRect.contains(rect), "Padding stays within the original grid footprint")
+                    XCTAssertGreaterThan(rect.width, 0)
+                    XCTAssertGreaterThan(rect.height, 0)
+                    XCTAssertEqual(rect.width + geometry.seamWidth, cell, accuracy: 0.000001)
+                    XCTAssertEqual(rect.height + geometry.seamWidth, cell, accuracy: 0.000001)
+                    XCTAssertLessThanOrEqual(geometry.cellCornerRadius, min(rect.width, rect.height) / 2)
+                    let column = rect.midX / cell, row = rect.midY / cell
+                    XCTAssertEqual(column, column.rounded(), accuracy: 0.000001)
+                    XCTAssertEqual(row, row.rounded(), accuracy: 0.000001)
+                    XCTAssertTrue((1..<width).contains(Int(column.rounded())))
+                    XCTAssertTrue((1..<height).contains(Int(row.rounded())))
+                    cellCenters.insert([Int(row.rounded()), Int(column.rounded())])
+                    XCTAssertTrue(path.contains(CGPoint(x: rect.midX, y: rect.midY)),
+                                  "Every interval contains its padded center")
+                }
+                XCTAssertEqual(cellCenters.count, (width - 1) * (height - 1), "No interval is missing or duplicated")
+                XCTAssertTrue(gridRect.insetBy(dx: -0.001, dy: -0.001).contains(path.boundingRect))
+                for row in 0..<height {
+                    for column in 0..<width {
+                        let intersection = CGPoint(x: (CGFloat(column) + 0.5) * cell,
+                                                   y: (CGFloat(row) + 0.5) * cell)
+                        XCTAssertFalse(path.contains(intersection),
+                                       "A padded face must not cover a move's intersection")
+                        if column < width - 1 {
+                            XCTAssertFalse(path.contains(CGPoint(x: intersection.x + cell / 2,
+                                                                         y: intersection.y)))
+                        }
+                        if row < height - 1 {
+                            XCTAssertFalse(path.contains(CGPoint(x: intersection.x,
+                                                                         y: intersection.y + cell / 2)))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testFeltPaddedCellsCoverEverySupportedBoardDimension() {
+        let cell: CGFloat = 20
+        for width in 2...25 {
+            for height in 2...25 {
+                let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
+                let cells = geometry.cellRects
+                let expectedGrid = CGRect(x: cell / 2, y: cell / 2,
+                                          width: CGFloat(width - 1) * cell, height: CGFloat(height - 1) * cell)
+                XCTAssertEqual(geometry.gridRect, expectedGrid, "\(width)×\(height)")
+                XCTAssertEqual(cells.count, (width - 1) * (height - 1), "\(width)×\(height)")
+                XCTAssertTrue(cells.allSatisfy(expectedGrid.contains), "Every \(width)×\(height) padded cell fits")
+                let stitches = StitchedGridGeometry(width: width, height: height, cellSize: cell).path
+                let board = CGRect(x: 0, y: 0, width: CGFloat(width) * cell, height: CGFloat(height) * cell)
+                XCTAssertFalse(stitches.isEmpty)
+                XCTAssertTrue(board.contains(stitches.boundingRect), "\(width)×\(height) thread fits the board")
+            }
+        }
+    }
+
+    func testFeltPaddedCellsResizeContinuouslyWithoutChangingNormalizedGeometry() {
+        for (width, height) in [(2, 3), (3, 2), (9, 9), (19, 13), (13, 19), (25, 25)] {
+            let reference = FeltGridGeometry(width: width, height: height, cellSize: 20)
+            let referencePath = normalizedPathCoordinates(reference.path, cellSize: 20)
+            for cell: CGFloat in [7, 13.99, 14, 14.01, 20, 30, 48, 64] {
+                let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
+                XCTAssertEqual(geometry.seamWidth / cell, reference.seamWidth / 20, accuracy: 0.000001)
+                XCTAssertEqual(geometry.cellCornerRadius / cell, reference.cellCornerRadius / 20, accuracy: 0.000001)
+                let coordinates = normalizedPathCoordinates(geometry.path, cellSize: cell)
+                XCTAssertEqual(coordinates.count, referencePath.count, "Resizing retains the same mounted padded cells")
+                for (actual, expected) in zip(coordinates, referencePath) {
+                    XCTAssertEqual(actual, expected, accuracy: 0.00001)
+                }
+            }
+        }
+    }
+
+    func testFeltPaddedCellsHaveSafeGeometryForInvalidLayoutSlots() {
+        let invalid = [(0, 19, CGFloat(20)), (1, 19, 20), (19, 0, 20), (19, 1, 20),
+                       (-1, 19, 20), (19, -1, 20), (19, 19, 0), (19, 19, -1),
+                       (19, 19, .infinity), (19, 19, .nan)]
+        for (width, height, cell) in invalid {
+            let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
+            XCTAssertEqual(geometry.gridRect, .zero)
+            XCTAssertTrue(geometry.cellRects.isEmpty)
+            XCTAssertTrue(geometry.path.isEmpty)
+            XCTAssertEqual(geometry.cellCornerRadius, 0)
+            XCTAssertEqual(geometry.seamWidth, 0)
+        }
+    }
+
+    func testStitchedGridStaysWithinSeamsWithoutMovingPlayingIntersections() {
+        for (width, height) in [(2, 3), (3, 2), (9, 19), (19, 9), (13, 13), (19, 19), (25, 25)] {
+            for cell: CGFloat in [7, 13.99, 14, 20, 48] {
+                let path = StitchedGridGeometry(width: width, height: height, cellSize: cell).path
+                let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
+                let playingArea = CGRect(x: 0, y: 0, width: CGFloat(width) * cell, height: CGFloat(height) * cell)
+                XCTAssertFalse(path.isEmpty)
+                // Path stores coordinates at float precision on Simulator.
+                // This remains far below a native display pixel at fractional sizes.
+                XCTAssertTrue(playingArea.insetBy(dx: -0.001, dy: -0.001).contains(path.boundingRect),
+                              "Thread must not extend into coordinate gutters or alter the board footprint")
+                var previous: CGPoint?
+                var curves = 0
+                func checkSegment(to end: CGPoint, controls: [CGPoint] = []) {
+                    guard let start = previous else { return XCTFail("A stitch has a starting point") }
+                    let points = [start, end] + controls
+                    let horizontal = abs(end.x - start.x) >= abs(end.y - start.y)
+                    let across = points.map { horizontal ? $0.y : $0.x }
+                    let along = points.map { horizontal ? $0.x : $0.y }
+                    let axisIndex = ((horizontal ? start.y : start.x) / cell - 0.5).rounded()
+                    XCTAssertTrue((0..<(horizontal ? height : width)).contains(Int(axisIndex)))
+                    let axis = (axisIndex + 0.5) * cell
+                    for coordinate in across {
+                        XCTAssertLessThanOrEqual(abs(coordinate - axis), geometry.seamWidth / 2 + 0.001,
+                                                 "Curved thread stays inside a seam on the original grid axis")
+                    }
+                    let midpoint = ((horizontal ? start.x + end.x : start.y + end.y) / 2) / cell
+                    let interval = floor(midpoint - 0.5)
+                    XCTAssertTrue((0..<(horizontal ? width - 1 : height - 1)).contains(Int(interval)))
+                    for coordinate in along {
+                        XCTAssertGreaterThanOrEqual(coordinate, (interval + 0.5) * cell - 0.001)
+                        XCTAssertLessThanOrEqual(coordinate, (interval + 1.5) * cell + 0.001)
+                    }
+                    XCTAssertLessThan(hypot(end.x - start.x, end.y - start.y), cell,
+                                      "Each stitch leaves room around both adjacent playing intersections")
+                    previous = end
+                }
+                path.forEach { element in
+                    switch element {
+                    case .move(to: let point): previous = point
+                    case .line(to: let point): checkSegment(to: point)
+                    case .quadCurve(to: let point, control: let control):
+                        curves += 1
+                        checkSegment(to: point, controls: [control])
+                    case .curve(to: let point, control1: let first, control2: let second):
+                        curves += 1
+                        checkSegment(to: point, controls: [first, second])
+                    default: XCTFail("A thread is an open segment within one grid interval")
+                    }
+                }
+                XCTAssertGreaterThan(curves, 0, "The soft running thread retains its gentle curvature")
+            }
+        }
+        for size in [0, 1] {
+            XCTAssertTrue(StitchedGridGeometry(width: size, height: 19, cellSize: 20).path.isEmpty)
+            XCTAssertTrue(StitchedGridGeometry(width: 19, height: size, cellSize: 20).path.isEmpty)
+        }
+        for cell: CGFloat in [0, -1, .infinity, .nan] {
+            XCTAssertTrue(StitchedGridGeometry(width: 19, height: 19, cellSize: cell).path.isEmpty)
+        }
+    }
+
+    func testFeltStitchesKeepTheirShapeDuringContinuousResizing() {
+        for (width, height) in [(2, 3), (3, 2), (9, 9), (19, 13), (13, 19), (25, 25)] {
+            let reference = normalizedPathCoordinates(
+                StitchedGridGeometry(width: width, height: height, cellSize: 20).path, cellSize: 20)
+            for cell: CGFloat in [7, 13.99, 14, 14.01, 20, 30, 48, 64] {
+                let coordinates = normalizedPathCoordinates(
+                    StitchedGridGeometry(width: width, height: height, cellSize: cell).path, cellSize: cell)
+                XCTAssertEqual(coordinates.count, reference.count)
+                for (actual, expected) in zip(coordinates, reference) {
+                    XCTAssertEqual(actual, expected, accuracy: 0.00001,
+                                   "Changing size cannot reseed the stitch variation or move its grid interval")
+                }
+            }
+        }
+    }
+
+    private func normalizedPathCoordinates(_ path: Path, cellSize: CGFloat) -> [CGFloat] {
+        var coordinates = [CGFloat]()
+        func append(_ point: CGPoint) { coordinates += [point.x / cellSize, point.y / cellSize] }
+        path.forEach { element in
+            switch element {
+            case .move(to: let point): coordinates.append(0); append(point)
+            case .line(to: let point): coordinates.append(1); append(point)
+            case .quadCurve(to: let point, control: let control):
+                coordinates.append(2); append(point); append(control)
+            case .curve(to: let point, control1: let first, control2: let second):
+                coordinates.append(3); append(point); append(first); append(second)
+            case .closeSubpath: coordinates.append(4)
+            }
+        }
+        return coordinates
     }
 
     func testRaggedGridKeepsEveryIntersectionAndContinuousStraightSpines() {
@@ -1325,6 +1654,7 @@ final class SurroundThemeTests: XCTestCase {
             ("garden night", .rakedGarden, .dark), ("studio day", .surroundStudio, .light),
             ("studio night", .surroundStudio, .dark),
             ("frost day", .frostPine, .light), ("frost night", .frostPine, .dark),
+            ("felt meadow day", .feltMeadow, .light), ("felt meadow night", .feltMeadow, .dark),
         ]
         for (name, theme, style) in cases {
             let board = theme.board(for: style == .dark ? .dark : .light)

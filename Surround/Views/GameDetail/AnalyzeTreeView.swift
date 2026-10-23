@@ -106,6 +106,14 @@ struct AnalyzeTreeSlice: View {
                             
                             Stone(color: lastMoveColor, shadowRadius: 2)
                                 .frame(width: 30, height: 30)
+                                .overlay {
+                                    // The charcoal wool needs a quiet edge on
+                                    // the night panel, independently of marks.
+                                    if theme == .feltMeadow, colorScheme == .dark, lastMoveColor == .black {
+                                        Circle().strokeBorder(appearance.white.flat.opacity(0.55), lineWidth: 0.75)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
                                 .position(point(15, CGFloat(level) * 40 + 15))
                                 .onTapGesture {
                                     self.selectedPosition = position
@@ -131,9 +139,9 @@ struct AnalyzeTreeSlice: View {
                         } else if lastMoveNumber == 0 {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))
-                                // The night page foreground is light, while
-                                // this small root icon sits on warm kaya.
-                                .foregroundColor(theme == .surroundStudio && colorScheme == .dark
+                                // The board's label pigment keeps this icon
+                                // readable on night kaya and olive felt.
+                                .foregroundColor(theme == .feltMeadow || (theme == .surroundStudio && colorScheme == .dark)
                                     ? appearance.emptyPointMarker : nil)
                                 .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {

@@ -475,6 +475,15 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                                appearance: .light)
     }
 
+    func testFeltMeadowThemeOrientations() {
+        auditThemeOrientations(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow", appearance: .light)
+    }
+
+    func testFeltMeadowNightThemeOrientations() {
+        auditThemeOrientations(theme: "feltMeadow", title: "Felt Meadow at night", suffix: "-felt-meadow-night",
+                               appearance: .dark)
+    }
+
     private func auditThemeOrientations(theme: String, title: String, suffix: String,
                                         appearance: SurroundUITestContract.Appearance? = nil) {
         let app = launchGame(artboard: 17, theme: theme, appearance: appearance)
@@ -519,8 +528,25 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
                          appearance: .light)
     }
 
+    func testFeltMeadowThemePanels() {
+        auditThemePanels(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow", appearance: .light)
+    }
+
+    func testFeltMeadowNightThemePanels() {
+        auditThemePanels(theme: "feltMeadow", title: "Felt Meadow at night", suffix: "-felt-meadow-night",
+                         appearance: .dark)
+    }
+
     func testSurroundStudioThemePanelTransitions() {
-        let app = launchGame(artboard: 17, portrait: true, theme: "surroundStudio", appearance: .light)
+        auditThemePanelTransitions(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
+    }
+
+    func testFeltMeadowThemePanelTransitions() {
+        auditThemePanelTransitions(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow")
+    }
+
+    private func auditThemePanelTransitions(theme: String, title: String, suffix: String) {
+        let app = launchGame(artboard: 17, portrait: true, theme: theme, appearance: .light)
         defer {
             XCUIDevice.shared.orientation = .landscapeLeft
             app.terminate()
@@ -537,9 +563,9 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertEqual(board.value as? String, value, "Rotation retains the same game position")
             let orientation = portrait ? "portrait" : "landscape"
             auditStudioPanelTransitions(in: app) { step in
-                self.capture(17, "Surround Studio \(orientation), \(step)", in: app,
+                self.capture(17, "\(title) \(orientation), \(step)", in: app,
                              note: "Same session; compare fixed decoration across panel transitions.",
-                             suffix: "-surround-studio-transition-\(orientation)-\(step)")
+                             suffix: "\(suffix)-transition-\(orientation)-\(step)")
             }
         }
     }
@@ -1300,6 +1326,10 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
 
     func testSurroundStudioThemeNarrowWindow() {
         auditNarrowNativeWindowArtboard(theme: "surroundStudio", suffix: "-surround-studio", appearance: .light)
+    }
+
+    func testFeltMeadowThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "feltMeadow", suffix: "-felt-meadow", appearance: .light)
     }
 
     private func auditNarrowNativeWindowArtboard(theme: String? = nil, suffix: String = "",

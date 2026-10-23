@@ -176,6 +176,7 @@ struct GameControlRow: View {
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
+    @Environment(\.surroundTheme) private var theme
     #if DEBUG
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var gameThemeID = SurroundTheme.standard.rawValue
@@ -360,7 +361,7 @@ struct GameControlRow: View {
                 .labelStyle(.iconOnly)
                 .font(.system(size: 18 * metrics.moreButtonDiameter / GameControlRowMetrics.moreDiameter,
                               weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(theme == .feltMeadow ? theme.foreground : Color.accentColor)
                 .frame(width: metrics.moreButtonDiameter, height: metrics.moreButtonDiameter)
                 .contentShape(Circle())
                 .modifier(GameControlGlass(shape: Circle()))

@@ -405,13 +405,13 @@ Tool tests use mocked HTTP responses. Never supply production credentials to an 
 
 The manual Game Detail artboard suites opt in with `TEST_RUNNER_SURROUND_ARTBOARD_AUDIT=1`. Their compatibility-mode launches use `--surround-game-detail-design-artboard <1...91>` to select matching players, turns, board positions, clocks, chat, teams, and scoring data. These fixtures use the ordinary Home-to-game navigation route so native navigation controls appear in the captures. The design flag requires both offline UI-testing and compatibility-screenshot mode; App Store screenshot launches reject it and retain their original fixture contract.
 
-`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl and `surroundStudio` selects Surround Studio. Garden and Studio follow the device appearance; Nebula remains dark. Pass `--surround-ui-appearance light` or `--surround-ui-appearance dark` for deterministic Garden or Studio fixtures, or omit it to test live device-appearance changes. Their daytime phone and iPad audits explicitly select light appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
+`--surround-ui-theme rakedGarden` selects the Debug-only Raked Garden theme in the isolated offline preferences suite; `nebulaPearl` selects Nebula & Pearl, `surroundStudio` selects Surround Studio, and `feltMeadow` selects Felt Meadow. Garden, Studio and Meadow follow the device appearance; Nebula remains dark. Pass `--surround-ui-appearance light` or `--surround-ui-appearance dark` for deterministic adaptive-theme fixtures, or omit it to test live device-appearance changes. Their daytime phone and iPad audits explicitly select light appearance. Focused theme audits keep the same artboard fixtures and Home-to-game route:
 
 - `GameDetailIPadArtboardAuditTests/testRakedGardenThemeOrientations` captures Play through native landscape/portrait rotation and Home after Back; `testRakedGardenThemePanels` captures Chat, Analyze and Zen in both orientations.
 - `ArtboardPhoneAuditTests/testRakedGardenThemeStates` captures Play, Chat, Analyze and Zen in both full-size phone orientations; `testRakedGardenThemeScoring` captures stone removal and score details. Run `testRakedGardenThemeSmallPhone` on an SE-size simulator for the smaller Play, Analyze and scoring fixtures.
 - `GameDetailDuoArtboardAuditTests/testRakedGardenThemeStates` checks the pose selected with `TEST_RUNNER_SURROUND_DUO_POSE=closed-portrait|closed-landscape|book-wide|open-wide|book-tall`. Set the physical Simulator pose first. The test uses the existing geometry and selected-branch assertions and does not change the fold pose; verify the active-display host captures for Book/Open.
 
-Each Raked Garden audit above also has a `testSurroundStudioTheme…` counterpart that reuses the same geometry and continuity checks with Surround Studio. Theme attachments have a `raked-garden` or `surround-studio` suffix so visual review can distinguish them from standard-theme artboards. A passing geometry audit still requires visual inspection of textures, controls, stones, small board marks and score overlays.
+Each Raked Garden audit above also has `testSurroundStudioTheme…` and `testFeltMeadowTheme…` counterparts that reuse the same geometry and continuity checks. Theme attachments have a `raked-garden`, `surround-studio` or `felt-meadow` suffix so visual review can distinguish them from standard-theme artboards. A passing geometry audit still requires visual inspection of textures, controls, stones, small board marks and score overlays.
 
 Frost & Pine uses the same opt-in audits with `--surround-ui-theme frostPine`: `ArtboardPhoneAuditTests/testFrostPineThemeStates`, `testFrostPineThemeScoring`, and `testFrostPineThemeSmallPhone`, plus their `testFrostPineNightTheme…` counterparts. `testFrostPineBoardMarkerGallery` captures 20, 13 and 7 pt cells in both appearances. iPad has `testFrostPineThemeOrientations`, `testFrostPineThemePanels`, their night counterparts, and `testFrostPineThemeNarrowWindow`. Duo has `testFrostPineThemeStates` using the same operator-selected physical pose contract. Attachments use `frost-pine` suffixes. Inspect pale ice boundaries, native markers and fixed scene anchors as well as geometry and retained state. `SurroundUITests/testFrostPineBoardDepthKeepsMovesAligned` uses the shared board-depth interaction audit for Frost & Pine in both appearances.
 
@@ -428,12 +428,24 @@ Studio uses the same bounded fixture routes, with these additional selectors:
 - `ArtboardPhoneAuditTests/testSurroundStudioNightThemeScoring`: two fixed-dark captures for stone removal and score details.
 - `ArtboardPhoneAuditTests/testSurroundStudioNightThemeSmallPhone`: three fixed-dark SE-size captures for Play, Analyze and scoring.
 - `ArtboardPhoneAuditTests/testSurroundStudioNightThemeControlStates`: three fixed-dark captures for both urgent clocks and disconnected scoring with disabled Accept.
-- `ArtboardPhoneAuditTests/testSurroundStudioNightBoardMarkerGallery`: three fixed-dark offline gallery captures at 20, 13 and 7 pt cells on a full-size phone in portrait. The same marker samples cover detailed stones and both compact solid-board sizes. Pixel assertions verify that both page and board actually use the dark palette.
+- `ArtboardPhoneAuditTests/testSurroundStudioNightBoardMarkerGallery`: twelve fixed-dark offline gallery captures (four core/interaction panels at each of 20, 13 and 7 pt cells) on a full-size phone in portrait. The same marker samples cover detailed stones and both compact solid-board sizes. Pixel assertions verify that both page and board actually use the dark palette.
 - `GameDetailIPadArtboardAuditTests/testSurroundStudioThemeAppearanceContinuity`: no fixed appearance override. Reuses the Garden device getter, Home, rendered-brightness and game-state checks. Keeps one Play game mounted through five panel states in day and five in night, rotates it in night, then retains a selected Analyze branch through night-to-day and returns to Home. Fourteen captures cover the sequence. The app must be foreground for the rendered-board checks; teardown restores the original device appearance and orientation.
 
 Night phone attachments use `raked-garden-night` or `surround-studio-night`; iPad continuity attachments identify day/night explicitly. Inspect the actual rendered transition after caches are warm, not only attachment names or state assertions. Nominal palette tests do not measure composited glass, every texture pixel, or native antialiasing. Night selectors do not change the physical Duo pose.
 
 Check the executed test count as well as the exit status. On the iOS 18.6 SE runtime, the Studio small-phone selector without parentheses returned success with zero tests. The quoted argument `'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testSurroundStudioNightThemeSmallPhone()'` selected and passed the test.
+
+Felt Meadow uses the same fixture helpers. Its phone selectors are `testFeltMeadowThemeStates`, `testFeltMeadowThemeScoring`, `testFeltMeadowThemeSmallPhone`, and `testFeltMeadowThemeControlStates`; each also has a `testFeltMeadowNight…` counterpart. `testFeltMeadowBoardMarkerGallery` and `testFeltMeadowNightBoardMarkerGallery` capture 20, 13 and 7 pt cells and check the rendered page/board palette. The iPad suite adds day/night `testFeltMeadowThemeOrientations` and `testFeltMeadowThemePanels`, plus `testFeltMeadowThemeNarrowWindow` for the native 375 × 548 window. Both phone and iPad expose `testFeltMeadowThemePanelTransitions`; Duo exposes day/night `testFeltMeadowThemeStates` for the selected physical pose. Day/night unit coverage in `SurroundThemeTests` checks compact marker contrast, control roles, artwork alpha footprints and stitched-grid bounds; the stitch overlay is detailed-only at cells of 14 pt and above.
+
+For a focused full-size phone run, add these selectors to the normal UI-test command with `TEST_RUNNER_SURROUND_ARTBOARD_AUDIT=1`:
+
+```sh
+'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowThemeStates()' \
+'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowThemeScoring()' \
+'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowNightThemeStates()' \
+'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowBoardMarkerGallery()' \
+'-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowNightBoardMarkerGallery()'
+```
 
 ### Board marker matrix
 
@@ -444,11 +456,15 @@ The Debug-only offline marker gallery launches with `--surround-ui-testing --sur
 ```text
 --surround-board-marker-export-sizes 13,14,20,40
 --surround-board-marker-export-scales 2,3
---surround-board-marker-export-themes standard,nebulaPearl,rakedGarden,surroundStudio
+--surround-board-marker-export-themes standard,nebulaPearl,rakedGarden,surroundStudio,feltMeadow
 --surround-board-marker-export-groups core,interaction,estimate,labels,overlap,edges,variants,widget
 ```
 
 Exports live in the app's `Documents/BoardMarkerAudit/` directory. Each export deletes the previous run folders before it starts, so copy a run out of the app container to keep it. `progress.json` reports completion or failure; `manifest.json` records the exact samples, requested and pixel-aligned cell sizes, appearance, scale, artwork variants, PNG dimensions and run folder. Schema 2 adds `sampleGeometries`: each sample's inset face bounds, actual cell size and depth. Use these for mixed panels; the panel's `actualCellSize` represents its first sample. Keep the manifest with the PNGs. Inspect native phone and tablet screenshots as well: offscreen fixtures exercise drawing, not gesture behavior, every continuous board size, or the system's final widget compositing. At thumbnail sizes, long labels cannot retain full-size legibility within one intersection.
+
+Opt in to `--surround-board-marker-export-groups board-sizes` for 9×9, 13×13, 19×19, 25×25, 9×19 and 19×9 boards, each with coordinates on/off. Each panel contains one board with corner stones, a centered last-move stone and marks on white/empty points. Use sizes `13,14,40` to compare compact, threshold and large detailed rendering. These samples are excluded from the default gallery/export; `--surround-board-marker-sample board-19x9-coordinates` selects one on screen. Schema 3 adds explicit `boardWidth` and `boardHeight` and retains `boardSize` for square samples. The manifest's actual cell size remains authoritative.
+
+Felt Meadow's padded cells, recessed seams, running stitches and textile rim follow the existing grid and face bounds without changing tap coordinates. `SurroundThemeTests` covers all width/height combinations from 2 through 25, normalized resize geometry and the 14 pt detail cutoff. Native phone/iPad/Duo artboard audits above check the shared rendering in Play, Analyze, Chat, Zen and scoring layouts; inspect their screenshots as well as their geometry assertions.
 
 `SurroundThemeTests` checks compact-board contrast, status/score casing, marker proportions and artwork centering. `BoardPositionTests` checks annotation/automatic-indicator priority and restoration after transient pending/undo states. These complement visual inspection; palette contrast alone does not test detailed reflections or pixel rasterization.
 
