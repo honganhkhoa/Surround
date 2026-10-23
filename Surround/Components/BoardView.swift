@@ -444,14 +444,17 @@ private struct ImageStone {
 }
 
 /// Rendered stones in one Canvas, so a full board is a few dozen image draws
-/// rather than a view per stone. One blurred layer holds every contact
-/// shadow, under all stones, following the images' key-light direction.
+/// rather than a view per stone. Shadows are batched below all stones,
+/// following the images' key-light direction.
 private struct ImageStoneCanvas: View {
     var stones: [ImageStone]
     var images: StoneImages?
     var cellSize: CGFloat
     var lightDirection: StoneLightDirection
-    private let overhang: CGFloat = 6
+    var shadowStyle: ImageStoneShadowStyle
+    // The raised profile is capped at a 3 pt blur and 3 pt offset; allow
+    // three blur radii beyond that offset, including edge intersections.
+    private var overhang: CGFloat { shadowStyle == .raised ? 12 : 6 }
 
     var body: some View {
         Canvas(rendersAsynchronously: false) { context, _ in
@@ -460,14 +463,22 @@ private struct ImageStoneCanvas: View {
             let black = images.black.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
             let white = images.white.map { context.resolve(Image(uiImage: $0).interpolation(.high)) }
 
-            let offset = CGSize(width: lightDirection.shadowXSign * cellSize * 0.03, height: cellSize * 0.06)
-            context.drawLayer { shadows in
-                shadows.addFilter(.blur(radius: max(1, cellSize * 0.06)))
-                var path = Path()
-                for stone in stones where !stone.isRemoved {
-                    path.addEllipse(in: stone.rect.offsetBy(dx: offset.width, dy: offset.height).insetBy(dx: 0.5, dy: 0.5))
-                }
-                shadows.fill(path, with: .color(.black.opacity(0.5)))
+            if shadowStyle == .raised {
+                // A full-footprint cast stays visible against wood grain at
+                // phone size. Cap its spread so larger boards do not float.
+                drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)),
+                           x: min(2, max(0.8, cellSize * 0.035)),
+                           y: min(3, max(1.6, cellSize * 0.065)),
+                           inset: 0, opacity: 0.34)
+                // The tighter edge keeps the curved stone grounded; the
+                // cast above is softer than the default contact-only shadow.
+                drawShadow(in: context, radius: min(1, max(0.45, cellSize * 0.02)),
+                           x: min(0.5, cellSize * 0.01), y: min(0.8, cellSize * 0.02),
+                           inset: 0.2, opacity: 0.32)
+            } else {
+                drawShadow(in: context, radius: max(1, cellSize * 0.06),
+                           x: cellSize * 0.03, y: cellSize * 0.06,
+                           inset: 0.5, opacity: 0.5)
             }
 
             for stone in stones {
@@ -489,6 +500,20 @@ private struct ImageStoneCanvas: View {
         .padding(-overhang)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func drawShadow(in context: GraphicsContext, radius: CGFloat,
+                            x: CGFloat, y: CGFloat, inset: CGFloat, opacity: Double) {
+        context.drawLayer { shadows in
+            shadows.addFilter(.blur(radius: radius))
+            var path = Path()
+            for stone in stones where !stone.isRemoved {
+                path.addEllipse(in: stone.rect
+                    .offsetBy(dx: lightDirection.shadowXSign * x, dy: y)
+                    .insetBy(dx: inset, dy: inset))
+            }
+            shadows.fill(path, with: .color(.black.opacity(opacity)))
+        }
     }
 }
 
@@ -640,7 +665,8 @@ struct Stones: View {
             }
             Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
             ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
-                             lightDirection: appearance.stoneLightDirection)
+                             lightDirection: appearance.stoneLightDirection,
+                             shadowStyle: appearance.imageStoneShadow)
             
             if boardPosition.removedStones != nil {
                 Path(whiteCapturedPath).fill(drawsPaths ? white.flat : .clear).opacity(0.5)

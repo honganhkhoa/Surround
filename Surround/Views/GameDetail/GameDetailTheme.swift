@@ -248,6 +248,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 gridLineScale: 1.2,
                 stoneImages: SurroundStudioAssets.stones,
                 stoneLightDirection: .upperLeft,
+                imageStoneShadow: .raised,
                 gridColor: Color(themeHex: 0x3E382E),
                 coordinateColor: Color(themeHex: 0x4B3D2C),
                 black: StonePalette(

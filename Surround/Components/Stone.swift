@@ -64,6 +64,13 @@ enum StoneLightDirection: Equatable {
     var shadowXSign: CGFloat { self == .upperLeft ? 1 : -1 }
 }
 
+/// Detailed image stones can use a broader cast shadow over textured boards.
+/// This does not affect standalone stones or the solid small-board rendering.
+enum ImageStoneShadowStyle: Equatable {
+    case contact
+    case raised
+}
+
 /// A board surface, either a seamless fixed-size tile or one composition
 /// scaled to cover the entire board without repeating within its bounds.
 struct BoardTexture: Equatable {
@@ -227,6 +234,7 @@ struct BoardAppearance: Equatable {
     /// boards, widgets and markers.
     var stoneImages: StoneImages? = nil
     var stoneLightDirection: StoneLightDirection = .upperLeft
+    var imageStoneShadow: ImageStoneShadowStyle = .contact
     var gridColor: Color
     var coordinateColor: Color
     var black: StonePalette
