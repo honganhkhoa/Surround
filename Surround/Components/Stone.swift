@@ -120,6 +120,10 @@ struct BoardReflection: Equatable {
 
 /// The material visible on a board's lower face, below the playing surface.
 struct BoardDepth: Equatable {
+    enum EdgeStyle: Equatable {
+        case cut, frosted
+    }
+
     var upperFace: Color
     var lowerFace: Color
     var highlight: Color
@@ -127,6 +131,7 @@ struct BoardDepth: Equatable {
     var shadow: Color
     var thicknessRatio: CGFloat
     var maximumThickness: CGFloat
+    var edgeStyle: EdgeStyle = .cut
 }
 
 /// Match the board's existing coordinate gutters, including rectangular boards.
@@ -178,7 +183,11 @@ struct BoardDepthGeometry: Equatable {
                                width: faceSize.width, height: faceSize.height)
         self.thickness = thickness
         self.cellSize = floor(proposedCell * factor * scale) / scale
-        self.cornerRadius = min(thickness * 0.65, self.cellSize / 4)
+        // Soft ice rounds within the half-cell margin; this changes only
+        // the slab silhouette, never the grid frame or interaction geometry.
+        self.cornerRadius = depth?.edgeStyle == .frosted
+            ? min(thickness * 2.8, self.cellSize * 0.45)
+            : min(thickness * 0.65, self.cellSize / 4)
         self.shadowRadius = shadowRadius
         self.shadowOffset = shadowOffset
     }

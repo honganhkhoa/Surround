@@ -509,6 +509,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemeStates(theme: "rakedGarden", suffix: "-raked-garden")
     }
 
+    func testFrostPineThemeStates() {
+        auditThemeStates(theme: "frostPine", suffix: "-frost-pine", appearance: "light")
+    }
+
     func testSurroundStudioThemeStates() {
         auditThemeStates(theme: "surroundStudio", suffix: "-surround-studio", appearance: "light")
     }

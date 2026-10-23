@@ -566,6 +566,64 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                 suffix: "\(suffix)-disabled")
     }
 
+    func testFrostPineBoardMarkerGallery() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "The marker gallery audit requires a full-size phone.")
+        for appearance in ["light", "dark"] {
+            for cellSize in [20, 13, 7] {
+                for (panel, titles) in [
+                    ("core-1", ["Last move · black", "Last move · white", "Pending · black", "Pending · white"]),
+                    ("core-2", ["Markup · empty / black / white", "Variation · 1–6", "Score · dame · dead", "Chat highlight · undo"]),
+                ] {
+                    let app = launchApp(additionalLaunchArguments: [
+                        "--surround-board-marker-audit", String(cellSize),
+                        "--surround-board-marker-panel", panel,
+                        SurroundUITestContract.themeLaunchArgument, "frostPine",
+                        SurroundUITestContract.appearanceLaunchArgument, appearance,
+                    ], orientation: .portrait)
+                    XCTAssertTrue(element("uitest.boardMarkerAudit", in: app).isHittable)
+                    for title in titles {
+                        let label = app.staticTexts[title].firstMatch
+                        XCTAssertTrue(label.waitForExistence(timeout: 5))
+                        XCTAssertTrue(app.windows.firstMatch.frame.contains(label.frame))
+                    }
+                    keepScreenshot("frost-pine-\(appearance)-markers-\(cellSize)pt-\(panel)", in: app)
+                    app.terminate()
+                }
+            }
+        }
+    }
+
+    func testFrostPineThemeStates() throws {
+        try auditThemeStates(theme: "frostPine", title: "Frost & Pine",
+                             suffix: "-frost-pine", appearance: .light)
+    }
+
+    func testFrostPineNightThemeStates() throws {
+        try auditThemeStates(theme: "frostPine", title: "Frost & Pine at night",
+                             suffix: "-frost-pine-night", appearance: .dark)
+    }
+
+    func testFrostPineThemeScoring() throws {
+        try auditThemeScoring(theme: "frostPine", title: "Frost & Pine",
+                             suffix: "-frost-pine", appearance: .light)
+    }
+
+    func testFrostPineNightThemeScoring() throws {
+        try auditThemeScoring(theme: "frostPine", title: "Frost & Pine at night",
+                             suffix: "-frost-pine-night", appearance: .dark)
+    }
+
+    func testFrostPineThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "frostPine", title: "Frost & Pine",
+                             suffix: "-frost-pine", appearance: .light)
+    }
+
+    func testFrostPineNightThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "frostPine", title: "Frost & Pine at night",
+                             suffix: "-frost-pine-night", appearance: .dark)
+    }
+
     func testSurroundStudioThemeStates() throws {
         try auditThemeStates(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
                              appearance: .light)

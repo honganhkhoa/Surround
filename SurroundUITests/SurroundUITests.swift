@@ -4614,11 +4614,21 @@ final class SurroundUITests: SurroundJourneyUITestCase {
     }
 
     func testThemedBoardDepthKeepsMovesAligned() {
-        let appearances = [
+        auditThemedBoardDepth(appearances: [
             (theme: "nebulaPearl", appearance: "dark"),
             (theme: "surroundStudio", appearance: "light"),
             (theme: "surroundStudio", appearance: "dark"),
-        ]
+        ])
+    }
+
+    func testFrostPineBoardDepthKeepsMovesAligned() {
+        auditThemedBoardDepth(appearances: [
+            (theme: "frostPine", appearance: "light"),
+            (theme: "frostPine", appearance: "dark"),
+        ])
+    }
+
+    private func auditThemedBoardDepth(appearances: [(theme: String, appearance: String)]) {
         #if targetEnvironment(macCatalyst)
         let orientations: [(name: String, value: UIDeviceOrientation)] = [("window", .unknown)]
         #else

@@ -3,7 +3,7 @@ import SwiftUI
 import CoreGraphics
 
 final class SurroundThemeTests: XCTestCase {
-    func testBoardDepthIsLimitedToNebulaAndBothStudioAppearances() throws {
+    func testBoardDepthKeepsThePlayingSurfaceStableAcrossAppearance() throws {
         for theme: SurroundTheme in [.standard, .rakedGarden] {
             for scheme: ColorScheme in [.light, .dark] {
                 XCTAssertNil(theme.board(for: scheme).boardDepth)
@@ -12,7 +12,9 @@ final class SurroundThemeTests: XCTestCase {
         let nebula = try XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth)
         let day = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
         let night = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)
-        for depth in [nebula, day, night] {
+        let frostDay = try XCTUnwrap(SurroundTheme.frostPine.board(for: .light).boardDepth)
+        let frostNight = try XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth)
+        for depth in [nebula, day, night, frostDay, frostNight] {
             XCTAssertGreaterThan(depth.thicknessRatio, 0)
             XCTAssertGreaterThan(depth.maximumThickness, 0)
         }
@@ -21,6 +23,8 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(day.maximumThickness, night.maximumThickness)
         XCTAssertNotEqual(day.upperFace, night.upperFace)
         XCTAssertNotEqual(day.lowerFace, night.lowerFace)
+        XCTAssertEqual(frostDay.thicknessRatio, frostNight.thicknessRatio)
+        XCTAssertEqual(frostDay.maximumThickness, frostNight.maximumThickness)
     }
 
     /// Compact boards keep their exact slot, including rectangular previews;
@@ -28,7 +32,9 @@ final class SurroundThemeTests: XCTestCase {
     func testBoardDepthKeepsCompactAndDisabledFootprintsUnchanged() {
         let depths: [BoardDepth?] = [nil, SurroundTheme.nebulaPearl.board.boardDepth,
                                     SurroundTheme.surroundStudio.board(for: .light).boardDepth,
-                                    SurroundTheme.surroundStudio.board(for: .dark).boardDepth]
+                                    SurroundTheme.surroundStudio.board(for: .dark).boardDepth,
+                                    SurroundTheme.frostPine.board(for: .light).boardDepth,
+                                    SurroundTheme.frostPine.board(for: .dark).boardDepth]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -67,7 +73,9 @@ final class SurroundThemeTests: XCTestCase {
     func testBoardDepthFitsPhoneAndTabletSlotsWithoutLosingDetailedCells() throws {
         let depths = try [XCTUnwrap(SurroundTheme.nebulaPearl.board.boardDepth),
                           XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth),
-                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth)]
+                          XCTUnwrap(SurroundTheme.surroundStudio.board(for: .dark).boardDepth),
+                          XCTUnwrap(SurroundTheme.frostPine.board(for: .light).boardDepth),
+                          XCTUnwrap(SurroundTheme.frostPine.board(for: .dark).boardDepth)]
         for depth in depths {
             for boardSize in [9, 13, 19] {
                 for coordinates in [false, true] {
@@ -332,7 +340,8 @@ final class SurroundThemeTests: XCTestCase {
     func testThemeStoneArtworkStaysCenteredUnderMarkers() throws {
         let bundle = Bundle(for: SurroundThemeTests.self)
         let families = ["NebulaPearlGlass", "NebulaPearlPearl", "RakedGardenBasalt",
-                        "RakedGardenJade", "SurroundStudioSlate", "SurroundStudioClamshell"]
+                        "RakedGardenJade", "SurroundStudioSlate", "SurroundStudioClamshell",
+                        "FrostPineMidnight", "FrostPinePale"]
         let side = 128
         for family in families {
             for variant in 0..<4 {
@@ -366,6 +375,144 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    func testFrostPineSceneFitsEveryViewportWithoutMovingForPanels() {
+        let sizes = [CGSize(width: 375, height: 548), CGSize(width: 375, height: 667),
+                     CGSize(width: 402, height: 874), CGSize(width: 874, height: 402),
+                     CGSize(width: 820, height: 1180), CGSize(width: 1180, height: 820),
+                     CGSize(width: 2500, height: 1500)]
+        for size in sizes {
+            let layout = FrostPineDecorationLayout(size: size)
+            let bounds = CGRect(origin: .zero, size: size).insetBy(dx: -0.01, dy: -0.01)
+            for rect in [layout.pine, layout.pinecone, layout.twig] {
+                XCTAssertTrue(bounds.contains(rect), "Keep accents in their viewport, beneath game UI")
+                XCTAssertEqual(rect.width, rect.height)
+            }
+            let resized = FrostPineDecorationLayout(size: CGSize(width: size.width + 1, height: size.height))
+            for (before, after) in zip([layout.pine, layout.pinecone, layout.twig],
+                                       [resized.pine, resized.pinecone, resized.twig]) {
+                XCTAssertLessThanOrEqual(abs(before.minX - after.minX), 1.5)
+                XCTAssertLessThanOrEqual(abs(before.minY - after.minY), 1.5)
+                XCTAssertLessThanOrEqual(abs(before.width - after.width), 1.5)
+            }
+        }
+        for size in [CGSize.zero, CGSize(width: CGFloat.infinity, height: 500),
+                     CGSize(width: 400, height: CGFloat.nan), CGSize(width: -1, height: 500)] {
+            let layout = FrostPineDecorationLayout(size: size)
+            for rect in [layout.pine, layout.pinecone, layout.twig] {
+                XCTAssertTrue([rect.minX, rect.minY, rect.width, rect.height].allSatisfy { $0.isFinite })
+                XCTAssertGreaterThanOrEqual(rect.width, 0)
+            }
+        }
+    }
+
+    func testFrostPineAppearanceAndAnalysisStayReadable() throws {
+        assertAdaptiveColorsFollowRepeatedTraitChanges(.frostPine)
+        try assertNightAnalysisMarksRemainReadable(.frostPine)
+    }
+
+    func testFrostedBoardRimDoesNotMoveThePlayingSurface() throws {
+        for scheme: ColorScheme in [.light, .dark] {
+            let frost = try XCTUnwrap(SurroundTheme.frostPine.board(for: scheme).boardDepth)
+            var cut = frost
+            cut.edgeStyle = .cut
+            for cell: CGFloat in [7, 13, 14, 15, 18, 20, 32, 48] {
+                for coordinates in [false, true] {
+                    let side = cell * (coordinates ? 20 : 19)
+                    func geometry(_ depth: BoardDepth) -> BoardDepthGeometry {
+                        BoardDepthGeometry(containerSize: CGSize(width: side, height: side),
+                                           boardWidth: 19, boardHeight: 19, showsCoordinates: coordinates,
+                                           displayScale: 3, depth: depth)
+                    }
+                    let soft = geometry(frost)
+                    let original = geometry(cut)
+                    XCTAssertEqual(soft.faceRect, original.faceRect)
+                    XCTAssertEqual(soft.cellSize, original.cellSize)
+                    XCTAssertEqual(soft.thickness, original.thickness)
+                    XCTAssertLessThanOrEqual(soft.cornerRadius, soft.cellSize / 2)
+                    if cell > 14 {
+                        XCTAssertGreaterThan(soft.cornerRadius, original.cornerRadius)
+                    } else {
+                        XCTAssertEqual(soft.cornerRadius, 0)
+                    }
+                }
+            }
+        }
+    }
+
+    func testFrostPineControlsAndRolesStayReadableInBothAppearances() throws {
+        let theme = SurroundTheme.frostPine
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "professional", id: 3, professional: true),
+                       OGSUser(username: "supporter", id: 4, supporter: true),
+                       OGSUser(username: "bot", id: 5, isBot: true)]
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            let scheme: ColorScheme = style == .dark ? .dark : .light
+            for surface in [theme.pageBackground, theme.panel, theme.chatBubble] {
+                XCTAssertGreaterThanOrEqual(contrast(theme.foreground, surface, style: style), 4.5)
+            }
+            for color: StoneColor in [.black, .white] {
+                let surfaces = [theme.clockSolidSurface(color)]
+                    + theme.clockSurfaceStops(color, scheme: scheme).map(\.color)
+                for surface in surfaces {
+                    for text in [theme.clockForeground(color, scheme: scheme), theme.clockAccent(color),
+                                 theme.clockSuddenDeathAccent(color, scheme: scheme),
+                                 theme.clockAgreementAccent(color, scheme: scheme),
+                                 theme.clockDisconnectedAccent(color, scheme: scheme),
+                                 theme.clockUndoAccent(color, scheme: scheme)] {
+                        XCTAssertGreaterThanOrEqual(contrast(text, surface, style: style), 4.5)
+                    }
+                }
+                for surface in theme.identityChipColors(color) {
+                    for text in [theme.identityForeground(color), theme.identitySecondary(color)] {
+                        XCTAssertGreaterThanOrEqual(contrast(text, surface, style: style), 4.5)
+                    }
+                    for player in players {
+                        let role = try XCTUnwrap(theme.identityRoleColor(for: player, on: color))
+                        XCTAssertGreaterThanOrEqual(contrast(role, surface, style: style), 4.5,
+                                                   "Frost & Pine role: \(player.username)")
+                    }
+                }
+            }
+            for fill in [try XCTUnwrap(theme.actionTint), theme.statusBadge,
+                         theme.clockUndoBadge(scheme: scheme), theme.clockSuddenDeathBadge(scheme: scheme)] {
+                XCTAssertGreaterThanOrEqual(contrast(.white, fill, style: style), 4.5)
+            }
+        }
+    }
+
+    func testFrostPineAssetsPreserveIceSilhouettesAndSeparateSceneLayers() throws {
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        func image(_ name: String) throws -> CGImage {
+            let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+            return try XCTUnwrap(image.cgImage, name)
+        }
+        for name in ["FrostPineSnow", "FrostPineBoard"] {
+            let pixels = try rgbaPixels(for: image(name), side: 128)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 }, name)
+        }
+        for name in ["FrostPinePine", "FrostPinePinecone", "FrostPineTwig"] {
+            let pixels = try rgbaPixels(for: image(name), side: 128)
+            let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
+            XCTAssertTrue(alpha.contains(0), "\(name) keeps a transparent exterior")
+            XCTAssertTrue(alpha.contains { $0 > 250 }, "\(name) retains its subject")
+        }
+        var diameters: [Int] = []
+        for family in ["FrostPineMidnight", "FrostPinePale"] {
+            for variant in 0..<4 {
+                let pixels = try rgbaPixels(for: image("\(family)\(variant)"), side: 128)
+                let alpha = { (x: Int, y: Int) in pixels[(y * 128 + x) * 4 + 3] }
+                XCTAssertEqual(alpha(0, 0), 0)
+                XCTAssertEqual(alpha(127, 64), 0)
+                XCTAssertEqual(alpha(64, 64), 255, "Ice translucency must not reveal the grid through a stone")
+                let diameter = (0..<128).filter { alpha($0, 64) > 127 }.count
+                XCTAssertEqual(Double(diameter) / 128, 0.94, accuracy: 0.02)
+                diameters.append(diameter)
+            }
+        }
+        XCTAssertLessThanOrEqual(try XCTUnwrap(diameters.max()) - XCTUnwrap(diameters.min()), 1)
+    }
+
     func testStandardThemeKeepsTheOriginalBoard() {
         let board = SurroundTheme.standard.board
         XCTAssertEqual(board, BoardAppearance.standard)
@@ -388,6 +535,8 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertTrue(SurroundTheme.rakedGarden.hasScene)
         XCTAssertNil(SurroundTheme.surroundStudio.colorScheme)
         XCTAssertTrue(SurroundTheme.surroundStudio.hasScene)
+        XCTAssertNil(SurroundTheme.frostPine.colorScheme)
+        XCTAssertTrue(SurroundTheme.frostPine.hasScene)
     }
 
     func testAnUnknownStoredThemeFallsBackToStandard() {
@@ -397,10 +546,12 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
         XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .surroundStudio)
+        XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .frostPine)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .standard)
         #endif
     }
 
@@ -916,7 +1067,7 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testRaggedGridIsGardenOnlyAndFallsBackOnSmallBoards() {
-        for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio] {
+        for theme: SurroundTheme in [.standard, .nebulaPearl, .surroundStudio, .frostPine] {
             XCTAssertFalse(theme.board.gridStyle.usesRaggedEdges(at: 48))
         }
         // Small boards are solid: the scratched grid starts at the detail threshold.
@@ -1173,6 +1324,7 @@ final class SurroundThemeTests: XCTestCase {
             ("nebula", .nebulaPearl, .dark), ("garden day", .rakedGarden, .light),
             ("garden night", .rakedGarden, .dark), ("studio day", .surroundStudio, .light),
             ("studio night", .surroundStudio, .dark),
+            ("frost day", .frostPine, .light), ("frost night", .frostPine, .dark),
         ]
         for (name, theme, style) in cases {
             let board = theme.board(for: style == .dark ? .dark : .light)

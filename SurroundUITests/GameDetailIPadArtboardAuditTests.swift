@@ -446,6 +446,30 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         return sum / Double(count)
     }
 
+    func testFrostPineThemeOrientations() {
+        auditThemeOrientations(theme: "frostPine", title: "Frost & Pine",
+                         suffix: "-frost-pine", appearance: .light)
+    }
+
+    func testFrostPineNightThemeOrientations() {
+        auditThemeOrientations(theme: "frostPine", title: "Frost & Pine at night",
+                         suffix: "-frost-pine-night", appearance: .dark)
+    }
+
+    func testFrostPineThemePanels() {
+        auditThemePanels(theme: "frostPine", title: "Frost & Pine",
+                         suffix: "-frost-pine", appearance: .light)
+    }
+
+    func testFrostPineNightThemePanels() {
+        auditThemePanels(theme: "frostPine", title: "Frost & Pine at night",
+                         suffix: "-frost-pine-night", appearance: .dark)
+    }
+
+    func testFrostPineThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "frostPine", suffix: "-frost-pine", appearance: .light)
+    }
+
     func testSurroundStudioThemeOrientations() {
         auditThemeOrientations(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio",
                                appearance: .light)

@@ -560,6 +560,32 @@ private struct BoardDepthView: View {
     }
 }
 
+/// Rime scatters light across a soft lip instead of forming a hard metallic
+/// bevel. Thin nested edge strips stay beneath the grid and do not require a
+/// board-sized blur or offscreen rendering when the board resizes.
+private struct FrostedBoardEdge: View {
+    let material: BoardDepth
+    let cellSize: CGFloat
+    let thickness: CGFloat
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack {
+            BoardBorder(start: material.highlight.opacity(0.20),
+                        middle: material.highlight.opacity(0.10), end: material.highlight.opacity(0.17),
+                        width: min(6, min(cellSize * 0.26, thickness * 1.6)), cornerRadius: cornerRadius)
+            BoardBorder(start: material.highlight.opacity(0.36),
+                        middle: material.highlight.opacity(0.18), end: material.highlight.opacity(0.28),
+                        width: min(3, min(cellSize * 0.13, thickness * 0.8)), cornerRadius: cornerRadius)
+            BoardBorder(start: material.highlight,
+                        middle: material.highlight.opacity(0.50), end: material.highlight.opacity(0.72),
+                        width: min(1, min(cellSize * 0.045, thickness * 0.3)), cornerRadius: cornerRadius)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ImageStone {
     var rect: CGRect
     var color: StoneColor
@@ -1452,11 +1478,19 @@ struct BoardView: View {
                                         .opacity(detailed && appearance.boardDepth != nil ? 0 : 1)
                                 }
                                 if appearance.boardBevel {
-                                    BoardBorder(start: appearance.boardDepth?.highlight ?? .white.opacity(0.18), middle: .clear,
-                                                end: appearance.boardDepth?.shade ?? .black.opacity(0.45),
-                                                width: appearance.boardDepth == nil ? 3 : min(2, depthGeometry.thickness * 0.35),
-                                                cornerRadius: appearance.boardDepth == nil ? 0 : faceRadius)
-                                        .opacity(detailed ? 1 : 0)
+                                    Group {
+                                        if let depth = appearance.boardDepth, depth.edgeStyle == .frosted {
+                                            FrostedBoardEdge(material: depth, cellSize: depthGeometry.cellSize,
+                                                             thickness: depthGeometry.thickness,
+                                                             cornerRadius: faceRadius)
+                                        } else {
+                                            BoardBorder(start: appearance.boardDepth?.highlight ?? .white.opacity(0.18), middle: .clear,
+                                                        end: appearance.boardDepth?.shade ?? .black.opacity(0.45),
+                                                        width: appearance.boardDepth == nil ? 3 : min(2, depthGeometry.thickness * 0.35),
+                                                        cornerRadius: appearance.boardDepth == nil ? 0 : faceRadius)
+                                        }
+                                    }
+                                    .opacity(detailed ? 1 : 0)
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: faceRadius, style: .circular))

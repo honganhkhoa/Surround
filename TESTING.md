@@ -413,6 +413,8 @@ The manual Game Detail artboard suites opt in with `TEST_RUNNER_SURROUND_ARTBOAR
 
 Each Raked Garden audit above also has a `testSurroundStudioTheme…` counterpart that reuses the same geometry and continuity checks with Surround Studio. Theme attachments have a `raked-garden` or `surround-studio` suffix so visual review can distinguish them from standard-theme artboards. A passing geometry audit still requires visual inspection of textures, controls, stones, small board marks and score overlays.
 
+Frost & Pine uses the same opt-in audits with `--surround-ui-theme frostPine`: `ArtboardPhoneAuditTests/testFrostPineThemeStates`, `testFrostPineThemeScoring`, and `testFrostPineThemeSmallPhone`, plus their `testFrostPineNightTheme…` counterparts. `testFrostPineBoardMarkerGallery` captures 20, 13 and 7 pt cells in both appearances. iPad has `testFrostPineThemeOrientations`, `testFrostPineThemePanels`, their night counterparts, and `testFrostPineThemeNarrowWindow`. Duo has `testFrostPineThemeStates` using the same operator-selected physical pose contract. Attachments use `frost-pine` suffixes. Inspect pale ice boundaries, native markers and fixed scene anchors as well as geometry and retained state. `SurroundUITests/testFrostPineBoardDepthKeepsMovesAligned` uses the shared board-depth interaction audit for Frost & Pine in both appearances.
+
 Garden additionally has these night/appearance selectors (prefix with `SurroundUITests/` for `-only-testing:`):
 
 - `ArtboardPhoneAuditTests/testRakedGardenNightThemeStates`: fixed dark Play, Chat, Analyze and Zen in both full-size phone orientations.
