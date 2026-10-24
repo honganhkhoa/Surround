@@ -1275,6 +1275,10 @@ final class SurroundThemeTests: XCTestCase {
             for cell: CGFloat in [7, 13.99, 14, 20, 30, 48, 64] {
                 let geometry = FeltGridGeometry(width: width, height: height, cellSize: cell)
                 let cells = geometry.cellRects, path = geometry.path
+                // Hit-test with Core Graphics. On iOS 26 and earlier, SwiftUI's
+                // Path.contains counts a seam point as inside when it lies on
+                // the line through the cells' subpath start points.
+                let shape = path.cgPath
                 let gridRect = CGRect(x: cell / 2, y: cell / 2,
                                       width: CGFloat(width - 1) * cell, height: CGFloat(height - 1) * cell)
                 XCTAssertEqual(geometry.gridRect, gridRect)
@@ -1296,7 +1300,7 @@ final class SurroundThemeTests: XCTestCase {
                     XCTAssertTrue((1..<width).contains(Int(column.rounded())))
                     XCTAssertTrue((1..<height).contains(Int(row.rounded())))
                     cellCenters.insert([Int(row.rounded()), Int(column.rounded())])
-                    XCTAssertTrue(path.contains(CGPoint(x: rect.midX, y: rect.midY)),
+                    XCTAssertTrue(shape.contains(CGPoint(x: rect.midX, y: rect.midY)),
                                   "Every interval contains its padded center")
                 }
                 XCTAssertEqual(cellCenters.count, (width - 1) * (height - 1), "No interval is missing or duplicated")
@@ -1305,15 +1309,15 @@ final class SurroundThemeTests: XCTestCase {
                     for column in 0..<width {
                         let intersection = CGPoint(x: (CGFloat(column) + 0.5) * cell,
                                                    y: (CGFloat(row) + 0.5) * cell)
-                        XCTAssertFalse(path.contains(intersection),
+                        XCTAssertFalse(shape.contains(intersection),
                                        "A padded face must not cover a move's intersection")
                         if column < width - 1 {
-                            XCTAssertFalse(path.contains(CGPoint(x: intersection.x + cell / 2,
-                                                                         y: intersection.y)))
+                            XCTAssertFalse(shape.contains(CGPoint(x: intersection.x + cell / 2,
+                                                                  y: intersection.y)))
                         }
                         if row < height - 1 {
-                            XCTAssertFalse(path.contains(CGPoint(x: intersection.x,
-                                                                         y: intersection.y + cell / 2)))
+                            XCTAssertFalse(shape.contains(CGPoint(x: intersection.x,
+                                                                  y: intersection.y + cell / 2)))
                         }
                     }
                 }
@@ -1594,12 +1598,18 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     func testGardenSceneCompositionDoesNotJumpDuringContinuousResizing() {
-        let sweeps = [
-            (300...1600).map { CGSize(width: CGFloat($0), height: 600) },
-            (300...1600).map { CGSize(width: 900, height: CGFloat($0)) },
-            (250...1000).map { CGSize(width: CGFloat($0), height: CGFloat($0)) },
-        ]
-        for sizes in sweeps {
+        // Typed, separate sweeps: this three-sweep literal of untyped map
+        // closures is too complex for the Xcode 26.6 type checker.
+        let widths: [CGSize] = (300...1600).map { (width: Int) in
+            CGSize(width: CGFloat(width), height: 600)
+        }
+        let heights: [CGSize] = (300...1600).map { (height: Int) in
+            CGSize(width: 900, height: CGFloat(height))
+        }
+        let squares: [CGSize] = (250...1000).map { (side: Int) in
+            CGSize(width: CGFloat(side), height: CGFloat(side))
+        }
+        for sizes in [widths, heights, squares] {
             let layouts = sizes.map { RakedGardenSceneLayout(size: $0) }
             for (before, after) in zip(layouts, layouts.dropFirst()) {
                 for (a, b) in zip(sceneMetrics(before), sceneMetrics(after)) {

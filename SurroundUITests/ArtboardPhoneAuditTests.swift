@@ -592,9 +592,12 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             return true
         }
         guard drawn else { return nil }
-        let sum = stride(from: 0, to: pixels.count, by: 4).reduce(0.0) { total, index in
-            total + (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1])
-                + 0.0722 * Double(pixels[index + 2])) / 255
+        // A loop, not a single-expression reduce: Xcode 26 cannot type-check
+        // the reduce closure in reasonable time.
+        var sum = 0.0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            sum += (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1])
+                    + 0.0722 * Double(pixels[index + 2])) / 255
         }
         return sum / Double(side * side)
     }

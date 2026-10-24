@@ -85,8 +85,7 @@ private struct PaddedFeltGrid: View, Equatable {
             for (index, rect) in cells.enumerated() {
                 let cell = Path(roundedRect: rect, cornerRadius: radius)
                 edges.addPath(cell)
-                // A small, stable difference in loft keeps the wool handmade.
-                let loft = 0.92 + Double((index * 13 + index / max(1, geometry.width - 1) * 7) % 5) * 0.04
+                let loft = cellLoft(at: index)
                 context.fill(cell, with: .linearGradient(Gradient(stops: [
                     .init(color: .white.opacity(0.19 * loft), location: 0),
                     .init(color: .white.opacity(0.045 * loft), location: 0.22),
@@ -110,6 +109,14 @@ private struct PaddedFeltGrid: View, Equatable {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// A small, stable difference in loft keeps the wool handmade. Typed
+    /// steps outside the Canvas closure keep Xcode 26.6 able to type-check it.
+    private func cellLoft(at index: Int) -> Double {
+        let row: Int = index / max(1, geometry.width - 1)
+        let variation: Int = (index * 13 + row * 7) % 5
+        return 0.92 + Double(variation) * 0.04
     }
 }
 
@@ -924,9 +931,15 @@ struct Stones: View {
                 .shadow(color: dropShadow, radius: 2 * shadowScale, x: shadowXSign * shadowOffset, y: shadowOffset)
             }
             Path(blackLivingPath).stroke(edge(black), lineWidth: drawsShadow ? 0.75 : 0.5)
-            ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
-                             lightDirection: appearance.stoneLightDirection,
-                             shadowStyle: appearance.imageStoneShadow)
+            // The Canvas overhangs the board for edge shadows, and that
+            // overhang widens the board's accessibility frame. Mount it only
+            // for themes with image stones; the choice follows the theme, not
+            // the cell size, so a resizing board never mounts or removes it.
+            if appearance.stoneImages != nil {
+                ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
+                                 lightDirection: appearance.stoneLightDirection,
+                                 shadowStyle: appearance.imageStoneShadow)
+            }
             
             if boardPosition.removedStones != nil {
                 Path(whiteCapturedPath).fill(drawsPaths ? white.flat : .clear).opacity(0.5)
