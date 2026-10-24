@@ -423,7 +423,8 @@ private struct GameDetailClockCard: View {
                 .background { surface }
                 .overlay { clockOutline }
                 .modifier(GameDetailClearGlass(shape: shape,
-                                               enabled: !reduceTransparency && (!theme.usesLightSceneSurfaces || contrast != .increased),
+                                               enabled: theme != .feltMeadow && !reduceTransparency
+                                                   && (!theme.usesLightSceneSurfaces || contrast != .increased),
                                                tint: showsThemeGlass ? theme.clockGlassTint(color) : nil))
                 .frame(height: height)
                 .contentShape(Rectangle())
@@ -546,7 +547,9 @@ private struct GameDetailClockCard: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if showsThemeGlass {
+        if theme == .feltMeadow {
+            FeltControlSurface(color: color, shape: shape)
+        } else if showsThemeGlass {
             Color.clear
         } else if reduceTransparency || contrast == .increased {
             shape.fill(theme.clockSolidSurface(color))
@@ -1139,7 +1142,13 @@ struct GameDetailPlayerIdentity: View {
                                                        padding: columnPadding)) : nil,
                alignment: isBottomRightPlayer ? .bottom : .top)
         .background {
-            if !showsThemeGlass {
+            if theme == .feltMeadow {
+                FeltControlSurface(color: color, shape: RoundedRectangle(cornerRadius: chipCornerRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: chipCornerRadius)
+                            .strokeBorder(theme.identityChipBorder(color), lineWidth: 1)
+                    }
+            } else if !showsThemeGlass {
                 let translucentScene = theme.usesLightSceneSurfaces && !navigationHeader
                     && !reduceTransparency && contrast != .increased
                 RoundedRectangle(cornerRadius: chipCornerRadius)

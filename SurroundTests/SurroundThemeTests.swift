@@ -1039,6 +1039,90 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testFeltControlMaterialKeepsTextReadableAcrossSizesAndAppearances() throws {
+        let theme = SurroundTheme.feltMeadow
+        let linear = (0...255).map { byte -> Double in
+            let value = Double(byte) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "professional", id: 3, professional: true),
+                       OGSUser(username: "supporter", id: 4, supporter: true)]
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            for color: StoneColor in [.black, .white] {
+                let foregrounds = [theme.clockForeground(color, scheme: scheme), theme.identitySecondary(color),
+                                   theme.clockAccent(color), theme.clockSuddenDeathAccent(color, scheme: scheme),
+                                   theme.clockAgreementAccent(color, scheme: scheme),
+                                   theme.clockDisconnectedAccent(color, scheme: scheme),
+                                   theme.clockUndoAccent(color, scheme: scheme)]
+                    + players.map { theme.roleColor(for: $0, on: color) }
+                for size in [CGSize(width: 140, height: 28), CGSize(width: 320, height: 34),
+                             CGSize(width: 190, height: 96), CGSize(width: 126, height: 140)] {
+                    for fallback in [false, true] {
+                        let view = FeltControlMaterial(color: color, shape: RoundedRectangle(cornerRadius: 9),
+                                                       colorScheme: scheme, showsTexture: !fallback)
+                            .frame(width: size.width, height: size.height)
+                            .environment(\.colorScheme, scheme)
+                        let renderer = ImageRenderer(content: view)
+                        renderer.scale = 3
+                        let rendered = try XCTUnwrap(renderer.cgImage)
+                        // Text is inset by at least 8 pt. Include every fiber
+                        // beneath it; the rounded padded edge contains no text.
+                        let interior = try XCTUnwrap(rendered.cropping(to: CGRect(
+                            x: 18, y: 18, width: rendered.width - 36, height: rendered.height - 36)))
+                        var pixels = [UInt8](repeating: 0, count: interior.width * interior.height * 4)
+                        try pixels.withUnsafeMutableBytes { bytes in
+                            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress,
+                                width: interior.width, height: interior.height, bitsPerComponent: 8,
+                                bytesPerRow: interior.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                            context.draw(interior, in: CGRect(x: 0, y: 0, width: interior.width, height: interior.height))
+                        }
+                        XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                                      "Cloth must remain opaque")
+                        var minimum = Double.infinity, maximum = 0.0
+                        var luminances = [Double]()
+                        luminances.reserveCapacity(pixels.count / 4)
+                        for offset in stride(from: 0, to: pixels.count, by: 4) {
+                            let value = 0.2126 * linear[Int(pixels[offset])]
+                                + 0.7152 * linear[Int(pixels[offset + 1])]
+                                + 0.0722 * linear[Int(pixels[offset + 2])]
+                            minimum = min(minimum, value)
+                            maximum = max(maximum, value)
+                            luminances.append(value)
+                        }
+                        let description = "\(scheme) \(color) \(size), fallback=\(fallback)"
+                        for ink in foregrounds {
+                            let value = luminance(ink, style: style)
+                            for surface in [minimum, maximum] {
+                                XCTAssertGreaterThanOrEqual((max(value, surface) + 0.05)
+                                    / (min(value, surface) + 0.05), 4.5, description)
+                            }
+                        }
+                        if !fallback {
+                            XCTAssertGreaterThan(maximum - minimum, 0.003,
+                                                 "The wool must remain visible: \(description)")
+                            // A few isolated pixels can satisfy the full range
+                            // while most of the material still looks flat.
+                            // Compare broad light/dark fiber populations instead.
+                            luminances.sort()
+                            let tenth = luminances[(luminances.count - 1) / 10]
+                            let ninetieth = luminances[(luminances.count - 1) * 9 / 10]
+                            XCTAssertGreaterThanOrEqual((ninetieth + 0.05) / (tenth + 0.05), 1.12,
+                                                        "The wool needs visible fiber contrast: \(description)")
+                        } else {
+                            XCTAssertLessThan(maximum - minimum, 0.001,
+                                              "Accessibility fallback stays solid: \(description)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Cream clamshell needs a contour against golden kaya in thumbnails;
     /// actual moves and scoring marks must remain stronger than the texture.
     func testStudioStonesAndNativeMarksRemainReadable() throws {

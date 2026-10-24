@@ -806,7 +806,7 @@ extension SurroundTheme {
 
     /// Clocks, player chips and the main action are tinted Liquid Glass,
     /// letting the scene show through; other themes keep solid surfaces.
-    var usesGlassControls: Bool { self != .standard }
+    var usesGlassControls: Bool { self != .standard && self != .feltMeadow }
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.

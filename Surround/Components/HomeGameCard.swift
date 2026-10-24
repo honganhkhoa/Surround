@@ -225,8 +225,14 @@ struct HomeClockChip<Leading: View>: View {
         .foregroundStyle(theme.identityForeground(color))
         .padding(.horizontal, size.padding)
         .frame(minHeight: size.minHeight)
-        .background(LinearGradient(colors: theme.identityChipColors(color), startPoint: .top, endPoint: .bottom),
-                    in: shape)
+        .background {
+            if theme == .feltMeadow {
+                FeltControlSurface(color: color, shape: shape)
+            } else {
+                shape.fill(LinearGradient(colors: theme.identityChipColors(color),
+                                          startPoint: .top, endPoint: .bottom))
+            }
+        }
         .overlay { ring }
     }
 

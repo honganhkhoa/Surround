@@ -709,6 +709,108 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                                 suffix: "-felt-meadow-night")
     }
 
+    func testFeltMeadowHomeCompact() {
+        auditFeltMeadowHome(appearance: .light, large: false)
+    }
+
+    func testFeltMeadowNightHomeCompact() {
+        auditFeltMeadowHome(appearance: .dark, large: false)
+    }
+
+    func testFeltMeadowHomeLarge() {
+        auditFeltMeadowHome(appearance: .light, large: true)
+    }
+
+    func testFeltMeadowNightHomeLarge() {
+        auditFeltMeadowHome(appearance: .dark, large: true)
+    }
+
+    private func auditFeltMeadowHome(appearance: SurroundUITestContract.Appearance, large: Bool) {
+        // Plain offline Home retains the state fixtures and the ordinary
+        // display-mode menu; compatibility scenes have a different game list.
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.homeStatesLaunchArgument,
+            SurroundUITestContract.themeLaunchArgument, "feltMeadow",
+            SurroundUITestContract.appearanceLaunchArgument, appearance.rawValue,
+        ], orientation: .portrait)
+        defer { app.terminate() }
+        let home = element(ID.screenHome, in: app, matching: .scrollView)
+        let mode = large ? "Large" : "Compact"
+        let picker = element(ID.homeDisplayMode, in: app, matching: .button)
+        // Toolbar menus do not consistently expose SwiftUI accessibilityValue
+        // through XCTest. Select explicitly and verify the resulting board size.
+        tap(picker, description: "Choose Home display mode", in: app)
+        let choice = app.buttons.matching(NSPredicate(format: "label == %@", mode)).firstMatch
+        tap(choice, description: "Show \(mode) Home games", in: app)
+
+        let states: [(Int, String, [String])] = [
+            (SurroundUITestContract.homeStatesLowTimeGameID, "low-time", ["Your move", "Low on time"]),
+            (SurroundUITestContract.homeStatesPausedGameID, "paused", ["Your move", "Paused"]),
+            (SurroundUITestContract.homeStatesStoneRemovalGameID, "scoring", ["Stone removal"]),
+            (SurroundUITestContract.homeStatesUnknownClockGameID, "unknown-clock", ["Your move", "—"]),
+        ]
+        for (gameID, state, labels) in states {
+            let board = elementAfterScrolling(ID.homeGame(gameID), in: app, within: home, matching: .button)
+            XCTAssertTrue(pollUntil(timeout: 5) {
+                large ? board.frame.width >= 266 : abs(board.frame.width - 120) <= 1
+            }, "Home applies \(mode) display mode to the rendered board")
+            revealHomeAuditCard(board, large: large, in: home, app: app)
+            XCTAssertEqual(board.frame.width, board.frame.height, accuracy: 1)
+            if large {
+                XCTAssertGreaterThanOrEqual(board.frame.width, 266,
+                                            "Large Home tiles retain detailed board rendering")
+            } else {
+                XCTAssertEqual(board.frame.width, 120, accuracy: 1,
+                               "Compact Home rows retain their solid 120 pt boards")
+            }
+            for label in labels {
+                XCTAssertTrue(board.label.contains(label), "The \(state) fixture exposes \(label)")
+            }
+            let name = "felt-meadow-home-\(appearance.rawValue)-\(mode.lowercased())-\(state)"
+            let evidence = XCTAttachment(string: """
+            Appearance: \(appearance.rawValue)
+            Display mode: \(mode), verified by board geometry
+            Menu accessibility value: \(picker.value ?? "absent")
+            Fixture: \(gameID) (\(state))
+            Board: \(board.frame)
+            Accessible state: \(board.label)
+            """)
+            evidence.name = name + "-state"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            keepScreenshot(name, in: app)
+        }
+    }
+
+    private func revealHomeAuditCard(_ board: XCUIElement, large: Bool,
+                                     in home: XCUIElement, app: XCUIApplication) {
+        func viewport() -> CGRect {
+            var frame = home.frame.intersection(app.frame)
+            let navigation = app.navigationBars.firstMatch
+            let tabs = app.tabBars.firstMatch
+            let top = navigation.exists ? max(frame.minY, navigation.frame.maxY) : frame.minY
+            let bottom = tabs.exists ? min(frame.maxY, tabs.frame.minY) : frame.maxY - 34
+            frame.origin.y = top + 8
+            frame.size.height = max(0, bottom - top - 16)
+            return frame
+        }
+        func cardFrame() -> CGRect {
+            // Large chips sit above and below the board; Compact chips share
+            // its row. Capture the complete surfaces, not just a tappable stone.
+            board.frame.insetBy(dx: 0, dy: large ? -46 : -10)
+        }
+        for _ in 0..<12 {
+            let visible = viewport()
+            if board.isHittable && visible.contains(cardFrame()) { return }
+            guard dragScrollView(home, axis: .vertical, targetFrame: cardFrame(),
+                                 containerFrame: visible, interactionPoint: CGVector(dx: 0.5, dy: 0.5),
+                                 dragStartPoint: CGPoint(x: visible.midX, y: visible.midY),
+                                 dragVelocity: .slow, dragHoldDuration: 0.2) else { break }
+        }
+        XCTAssertTrue(board.isHittable && viewport().contains(cardFrame()),
+                      "The Home board and both clock chips must be fully visible for the material audit")
+    }
+
     func testSurroundStudioThemePanelTransitions() throws {
         try auditThemePanelTransitions(theme: "surroundStudio", title: "Surround Studio", suffix: "-surround-studio")
     }

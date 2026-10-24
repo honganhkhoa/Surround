@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FC2410010000000000000003 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
+		FC2410010000000000000001 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
 		9A4452C3CF1040DEB2F1B612 /* GameDetailDesignFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */; };
 		E7B75B1A24C841E8AD7DB50C /* SurroundUITestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3100043A00000000000004 /* SurroundUITestContract.swift */; };
 		34BE4DBE8768431EB8AF87F4 /* GameControlRowMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */; };
@@ -503,6 +505,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FC2410010000000000000002 /* FeltControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltControlSurface.swift; sourceTree = "<group>"; };
 		0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDesignFixtureTests.swift; sourceTree = "<group>"; };
 		87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRowMetricsTests.swift; sourceTree = "<group>"; };
 		466027D4E066495A9A16693D /* ArtboardPhoneAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtboardPhoneAuditTests.swift; sourceTree = "<group>"; };
@@ -1100,6 +1103,7 @@
 				BC042B2A24AB2DD00050B2D1 /* GameCell.swift */,
 				BCFA11510000000000000005 /* HistoryGameCell.swift */,
 				BCFA11510000000000000007 /* HomeGameCard.swift */,
+				FC2410010000000000000002 /* FeltControlSurface.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
@@ -1615,6 +1619,7 @@
 				BCFA11510000000000000002 /* GameHistoryView.swift in Sources */,
 				BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */,
 				BCFA11510000000000000008 /* HomeGameCard.swift in Sources */,
+				FC2410010000000000000001 /* FeltControlSurface.swift in Sources */,
 				BCFA1151000000000000000A /* HomeRules.swift in Sources */,
 				BC33384B250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift in Sources */,
 				BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */,
@@ -1721,6 +1726,7 @@
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
 				33D3DFBAA384CA900DFCD5B9 /* GameDetailTheme.swift in Sources */,
+				FC2410010000000000000003 /* FeltControlSurface.swift in Sources */,
 				794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */,
 				8B5F21EBE5A5494DBCB11929 /* ChatSessionStateTests.swift in Sources */,
 				2C140ECF70E64EA99531999F /* GameDetailInteraction.swift in Sources */,
