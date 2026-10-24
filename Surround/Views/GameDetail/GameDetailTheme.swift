@@ -61,7 +61,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.gridColor = Color(themeHex: 0x253E4C)
             night.coordinateColor = Color(themeHex: 0x172E3C)
             night.black.flat = Color(themeHex: 0x102E43)
-            night.white.flat = Color(themeHex: 0xBED7E7)
+            // Bright enough to stand apart from the night board's slate.
+            night.white.flat = Color(themeHex: 0xE4EFF6)
             night.white.outline = Color(themeHex: 0x2C4C61)
             night.emptyPointMarker = Color(themeHex: 0x172E3C)
             night.markOutline = Color(themeHex: 0x253E4C)
@@ -414,7 +415,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .frostPine:
             return BoardAppearance(
                 boardColor: Color(themeHex: 0xDDE2E3),
-                compactBoardColor: Color(themeHex: 0xDDE2E3),
+                // Small boards take the frosted board's lower face, so the
+                // flat ice stones read brighter than the board, not darker.
+                compactBoardColor: Color(themeHex: 0xB3C4CE),
                 boardEdge: Color(themeHex: 0xF6FCFF).opacity(0.85),
                 boardTexture: FrostPineAssets.board,
                 boardBevel: true,
@@ -443,7 +446,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 ),
                 white: StonePalette(
                     highlight: Color(themeHex: 0xF1FAFF), shade: Color(themeHex: 0x8AB2D0),
-                    flat: Color(themeHex: 0xB7D3E8), outline: Color(themeHex: 0x426478),
+                    flat: Color(themeHex: 0xF1FAFF), outline: Color(themeHex: 0x426478),
                     rim: Color(themeHex: 0x426478).opacity(0.7),
                     lastMove: Color(themeHex: 0x193C50), label: Color(themeHex: 0x193C50),
                     // Pale ownership uses the slate outline on empty ice;
