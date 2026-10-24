@@ -5977,6 +5977,95 @@ final class OGSServiceEventTests: XCTestCase {
         )
     }
 
+    // MARK: - Challenge send holds
+
+    private func seekGraphHoldService() -> (OGSService, FakeWebsocket) {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        service.user = OGSUser(username: "current", id: 1, rank: 25)
+        return (service, socket)
+    }
+
+    private func seekGraphDisconnects(_ socket: FakeWebsocket) -> Int {
+        socket.emissions.filter { $0.command == "seek_graph/disconnect" }.count
+    }
+
+    func testSendHoldKeepsTheSeekGraphUntilItsOpenChallengeArrives() {
+        let (service, socket) = seekGraphHoldService()
+        let hold = SeekGraphSendHold(service: service)
+        XCTAssertTrue(socket.emissions.contains { $0.command == "seek_graph/connect" })
+        service.onSeekGraphEvent(data: [])
+
+        hold.challengeSent(id: 21, isOpen: true)
+        XCTAssertTrue(hold.isHeld, "The request returned before the seek graph showed the challenge.")
+        XCTAssertEqual(seekGraphDisconnects(socket), 0)
+
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 21, challengerID: 1)])
+        drainMainQueue()
+        XCTAssertFalse(hold.isHeld)
+        XCTAssertNotNil(service.openChallengeSentById[21])
+        XCTAssertEqual(seekGraphDisconnects(socket), 0,
+                       "The service keeps the seek graph for the challenge it now tracks.")
+    }
+
+    func testSendHoldSeesAChallengeAddedAndRemovedBeforeTheResponse() {
+        let (service, socket) = seekGraphHoldService()
+        let hold = SeekGraphSendHold(service: service)
+        service.onSeekGraphEvent(data: [])
+        service.onSeekGraphEvent(data: [seekGraphChallengePayload(id: 22, challengerID: 1)])
+        service.onSeekGraphEvent(data: [["challenge_id": 22, "delete": 1]])
+        XCTAssertTrue(hold.isHeld)
+
+        hold.challengeSent(id: 22, isOpen: true)
+        XCTAssertFalse(hold.isHeld, "A challenge already gone must not leave the hold waiting.")
+        XCTAssertEqual(seekGraphDisconnects(socket), 1)
+    }
+
+    func testSendHoldReleasesForAHostedRengoChallenge() {
+        let (service, _) = seekGraphHoldService()
+        let hold = SeekGraphSendHold(service: service)
+        service.onSeekGraphEvent(data: [])
+        var rengo = seekGraphChallengePayload(id: 23, challengerID: 1)
+        rengo["rengo"] = true
+        rengo["rengo_participants"] = [1]
+        service.onSeekGraphEvent(data: [rengo])
+        XCTAssertNotNil(service.hostingRengoChallengeById[23])
+
+        hold.challengeSent(id: 23, isOpen: true)
+        XCTAssertFalse(hold.isHeld, "Rengo challenges arrive among those hosted, not those sent.")
+    }
+
+    func testSendHoldReleasesForDirectChallengesFailuresAndAccountChanges() {
+        let (service, socket) = seekGraphHoldService()
+        let direct = SeekGraphSendHold(service: service)
+        direct.challengeSent(id: 24, isOpen: false)
+        XCTAssertFalse(direct.isHeld, "A direct challenge never appears in the seek graph.")
+
+        let failed = SeekGraphSendHold(service: service)
+        let pending = SeekGraphSendHold(service: service)
+        service.onSeekGraphEvent(data: [])
+        failed.release()
+        XCTAssertTrue(pending.isHeld)
+        let disconnectsWhilePending = seekGraphDisconnects(socket)
+
+        service.user = OGSUser(username: "other", id: 2, rank: 25)
+        XCTAssertFalse(pending.isHeld, "A send belongs to the account that made it.")
+        XCTAssertGreaterThan(seekGraphDisconnects(socket), disconnectsWhilePending,
+                             "Releasing the last hold releases the seek graph.")
+    }
+
+    func testSendHoldsEndAfterTheirTimeout() {
+        let (service, _) = seekGraphHoldService()
+        let hold = SeekGraphSendHold(service: service, timeout: 0.05)
+        hold.challengeSent(id: 25, isOpen: true)
+        let expired = expectation(description: "hold times out")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            XCTAssertFalse(hold.isHeld)
+            expired.fulfill()
+        }
+        wait(for: [expired], timeout: 2)
+    }
+
     private func activitySnapshot(
         availableEntries: [OGSAutomatchAvailableEntry] = [],
         popularity: OGSQuickMatchPopularityStats = .empty

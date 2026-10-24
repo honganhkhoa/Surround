@@ -821,7 +821,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(history, description: "See the player's complete game history", in: app)
         element(SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
         let generalFirst = element(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[0]), in: app)
-        XCTAssertTrue(generalFirst.label.contains("Loss"), "General history must use CopperKoi's result, not the viewer's win.")
+        XCTAssertTrue(generalFirst.label.contains("Lost"), "General history must use CopperKoi's result, not the viewer's win.")
         XCTAssertTrue(generalFirst.label.contains("You"), "The signed-in player must use the You identity in another player's history.")
         XCTAssertFalse(generalFirst.label.contains("JuniperStone"), "The self-opponent row should not replace You with the signed-in username.")
         elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs.last!), in: app)
@@ -833,7 +833,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(headToHeadHistory, description: "Open history against this player", in: app)
         element(SurroundUITestContract.AccessibilityID.screenProfileGameHistory, in: app)
         let filteredFirst = element(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs[0]), in: app)
-        XCTAssertTrue(filteredFirst.label.contains("Win"), "Head-to-head history must agree with the viewer's record.")
+        XCTAssertTrue(filteredFirst.label.contains("Won"), "Head-to-head history must agree with the viewer's record.")
         XCTAssertTrue(filteredFirst.label.contains("CopperKoi"))
         elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(historyIDs.last!), in: app)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
@@ -853,12 +853,12 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let previewFailed = NSPredicate(format: "label CONTAINS %@", "Board unavailable")
         expectation(for: previewFailed, evaluatedWith: first)
         waitForExpectations(timeout: 10)
-        XCTAssertTrue(first.label.contains("Loss"))
-        XCTAssertTrue(first.label.contains("Resignation"))
+        XCTAssertTrue(first.label.contains("Lost"))
+        XCTAssertTrue(first.label.contains("by resignation"))
         XCTAssertTrue(first.label.contains("Board unavailable"),
                       "The row must distinguish a missing replay from an empty final board.")
         let second = revealProfileControl(secondID, in: app)
-        XCTAssertTrue(second.label.contains("Win"))
+        XCTAssertTrue(second.label.contains("Won"))
         XCTAssertFalse(second.label.contains("Board unavailable"))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
             SurroundUITestContract.AccessibilityID.gameHistoryError).firstMatch.exists,
@@ -868,7 +868,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(revealProfileControl(SurroundUITestContract.AccessibilityID.profileHeadToHeadHistory, in: app),
             description: "Open head-to-head history with one unavailable replay", in: app)
         let filtered = element(firstID, in: app)
-        XCTAssertTrue(filtered.label.contains("Win"), "The listing keeps the viewer's head-to-head perspective.")
+        XCTAssertTrue(filtered.label.contains("Won"), "The listing keeps the viewer's head-to-head perspective.")
         XCTAssertTrue(filtered.label.contains("CopperKoi"))
         XCTAssertTrue(filtered.label.contains("Board unavailable"))
         elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(ids.last!), in: app)
@@ -880,7 +880,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app),
             description: "Reopen general history after preview demand was cancelled", in: app)
         let reopened = element(firstID, in: app)
-        XCTAssertTrue(reopened.label.contains("Loss"))
+        XCTAssertTrue(reopened.label.contains("Lost"))
         XCTAssertTrue(reopened.label.contains("Board unavailable"))
         elementAfterScrolling(SurroundUITestContract.AccessibilityID.profileHistoryGame(ids.last!), in: app)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier:

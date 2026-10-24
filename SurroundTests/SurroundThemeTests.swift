@@ -483,6 +483,65 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    /// Home wears the theme Game Detail shows: its ink and names on panels,
+    /// its clock chips with the low-time red, and New game's white on the
+    /// action color. Names and clock times are 14 pt or larger and semibold,
+    /// so they need 3:1, as icons do; smaller labels need 4.5:1. Chip text
+    /// sits at the chip's middle, so it is checked against that blend.
+    func testHomeSurfacesStayReadableInEveryTheme() {
+        let players = [OGSUser(username: "ordinary", id: 1),
+                       OGSUser(username: "moderator", id: 2, isModerator: true),
+                       OGSUser(username: "professional", id: 3, professional: true),
+                       OGSUser(username: "supporter", id: 4, supporter: true),
+                       OGSUser(username: "bot", id: 5, isBot: true)]
+        for theme in SurroundTheme.allCases {
+            let styles: [UIUserInterfaceStyle] = theme.colorScheme == .dark ? [.dark] : [.light, .dark]
+            for style in styles {
+                let scheme: ColorScheme = style == .dark ? .dark : .light
+                let panelSurface: StoneColor = style == .dark ? .black : .white
+                XCTAssertGreaterThanOrEqual(contrast(theme.foreground, theme.panel, style: style), 4.5,
+                                            "\(theme) ink on its panel")
+                for player in players {
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(theme.roleColor(for: player, on: panelSurface), theme.panel, style: style), 3,
+                        "\(theme) \(player.username) on its \(style == .dark ? "night" : "day") panel")
+                }
+                for color: StoneColor in [.black, .white] {
+                    let stops = theme.identityChipColors(color)
+                    let chip = midpoint(stops[0], stops[stops.count - 1], style: style)
+                    let name = "\(theme) \(color) chip, \(style == .dark ? "night" : "day")"
+                    XCTAssertGreaterThanOrEqual(contrast(theme.identityForeground(color), chip, style: style), 4.5, name)
+                    XCTAssertGreaterThanOrEqual(contrast(theme.identitySecondary(color), chip, style: style), 4.5, name)
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), chip, style: style), 3,
+                        "\(name): low time")
+                    XCTAssertGreaterThanOrEqual(contrast(theme.homeChipAccent(color), chip, style: style), 3,
+                                                "\(name): hourglass")
+                    // Standard and Nebula keep OGS's role hues on chips, as
+                    // Game Detail does; the scene themes bring their own.
+                    if theme.usesLightSceneSurfaces {
+                        for player in players {
+                            XCTAssertGreaterThanOrEqual(
+                                contrast(theme.roleColor(for: player, on: color), chip, style: style), 3,
+                                "\(name): \(player.username)")
+                        }
+                    }
+                }
+                XCTAssertGreaterThanOrEqual(contrast(.white, theme.homeActionFill, style: style), 4.5,
+                                            "\(theme) New game")
+            }
+        }
+    }
+
+    private func midpoint(_ first: Color, _ second: Color, style: UIUserInterfaceStyle) -> Color {
+        let traits = UITraitCollection(userInterfaceStyle: style)
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(first).resolvedColor(with: traits).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(second).resolvedColor(with: traits).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return Color(.sRGB, red: Double(r1 + r2) / 2, green: Double(g1 + g2) / 2, blue: Double(b1 + b2) / 2)
+    }
+
     func testFrostPineAssetsPreserveIceSilhouettesAndSeparateSceneLayers() throws {
         let bundle = Bundle(for: SurroundThemeTests.self)
         func image(_ name: String) throws -> CGImage {

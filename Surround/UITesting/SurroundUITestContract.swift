@@ -99,6 +99,11 @@ enum SurroundUITestContract {
         "--surround-compact-game-layout"
     static let homeBoardAlignmentLaunchArgument =
         "--surround-home-board-alignment"
+    /// Adds Home rows in states the plain fixture lacks: low time, paused,
+    /// stone removal, no speed tag, and an unknown clock.
+    static let homeStatesLaunchArgument = "--surround-home-states"
+    /// No active games, one finished game: Home's empty message with history.
+    static let homeFinishedOnlyLaunchArgument = "--surround-home-finished-only"
     static let widgetDeepLinkRoutingLaunchArgument =
         "--surround-widget-deep-link-routing"
     static let liveGameBannerNavigationLaunchArgument =
@@ -151,6 +156,13 @@ enum SurroundUITestContract {
     static let widgetRoutingMissingGameID = 999_999_999
     static let widgetRoutingRESTDelayNanoseconds: UInt64 = 1_000_000_000
     static let homeHistoryRetryFixtureGameID = 18_759_438
+    static let homeStatesLowTimeGameID = 91_003_001
+    static let homeStatesPausedGameID = 91_003_002
+    static let homeStatesStoneRemovalGameID = 91_003_003
+    static let homeStatesNoSpeedGameID = 91_003_004
+    static let homeStatesUnknownClockGameID = 91_003_005
+    static let homeStatesUnknownClockScoringGameID = 91_003_006
+    static let homeFinishedOnlyHistoryGameID = 91_003_007
     static let screenshotNextGameID = 18_759_438
     static let screenshotPrimaryGameID = 68_301_595
     static let conditionalMovesFixtureGameID = 62_050_416
@@ -439,6 +451,20 @@ enum SurroundUITestContract {
             )
     }
 
+    static var simulatesHomeStates: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                homeStatesLaunchArgument
+            )
+    }
+
+    static var simulatesHomeFinishedOnly: Bool {
+        isEnabled
+            && ProcessInfo.processInfo.arguments.contains(
+                homeFinishedOnlyLaunchArgument
+            )
+    }
+
     static var simulatesWidgetDeepLinkRouting: Bool {
         isEnabled
             && ProcessInfo.processInfo.arguments.contains(
@@ -616,6 +642,8 @@ enum SurroundUITestContract {
     static let appearanceOverride: Appearance? = nil
     static let holdsQuickMatchAcknowledgements = false
     static let simulatesHomeBoardAlignment = false
+    static let simulatesHomeStates = false
+    static let simulatesHomeFinishedOnly = false
     static let simulatesWidgetDeepLinkRouting = false
     static let compatibilityWidgetFixtureGameCount =
         compatibilityWidgetGameCount
@@ -862,10 +890,22 @@ enum SurroundUITestContract {
         static let gameHistoryEmpty = "gameHistory.empty"
 
         static let homeNewGame = "home.newGame"
+        static let homeDisplayMode = "home.displayMode"
+        static let homeFirstRun = "home.firstRun"
+        static let homeSkeleton = "home.skeleton"
+        /// Home sections: live, userTurn, opponentTurn and history.
+        static func homeSection(_ id: String) -> String {
+            "home.section.\(id)"
+        }
         static let newGameClose = "newGame.close"
         static let liveGameBanner = "notification.liveGame"
         static let connectionBanner = "notification.connection"
         static let homePreferredSettings = "home.preferredSettings"
+        static let homePreferredSettingsEdit = "home.preferredSettings.edit"
+        static let homePreferredSettingsAdd = "home.preferredSettings.add"
+        static func homePreferredSetting(_ index: Int) -> String {
+            "home.preferredSettings.setting.\(index)"
+        }
 
         static let quickMatchScroll = "quickMatch.scroll"
         static let quickMatchRecap = "quickMatch.recap"

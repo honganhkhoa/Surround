@@ -395,6 +395,12 @@
 		BCF3A3FB25F23182000A2948 /* PrivateMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */; };
 		BCFA11510000000000000002 /* GameHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000001 /* GameHistoryView.swift */; };
 		BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000005 /* HistoryGameCell.swift */; };
+		BCFA11510000000000000008 /* HomeGameCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000007 /* HomeGameCard.swift */; };
+		BCFA1151000000000000000A /* HomeRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000009 /* HomeRules.swift */; };
+		BCFA1151000000000000000B /* HomeRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA11510000000000000009 /* HomeRules.swift */; };
+		BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA1151000000000000000C /* HomeRulesTests.swift */; };
+		BCFA1151000000000000000F /* SeekGraphSendHold.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA1151000000000000000E /* SeekGraphSendHold.swift */; };
+		BCFA11510000000000000010 /* SeekGraphSendHold.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFA1151000000000000000E /* SeekGraphSendHold.swift */; };
 		BCFF01F42705813200B09B0B /* UserDefaults+SurroundModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC042B3D24AB2DD00050B2D1 /* UserDefaults+SurroundModels.swift */; };
 		C0D100022026082900000002 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
 		C0D100032026082900000003 /* CorrespondenceWidgetGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */; };
@@ -711,6 +717,10 @@
 		BCF3A3FA25F23182000A2948 /* PrivateMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateMessagesView.swift; sourceTree = "<group>"; };
 		BCFA11510000000000000001 /* GameHistoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameHistoryView.swift; sourceTree = "<group>"; };
 		BCFA11510000000000000005 /* HistoryGameCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HistoryGameCell.swift; sourceTree = "<group>"; };
+		BCFA11510000000000000007 /* HomeGameCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeGameCard.swift; sourceTree = "<group>"; };
+		BCFA11510000000000000009 /* HomeRules.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeRules.swift; sourceTree = "<group>"; };
+		BCFA1151000000000000000C /* HomeRulesTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeRulesTests.swift; sourceTree = "<group>"; };
+		BCFA1151000000000000000E /* SeekGraphSendHold.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SeekGraphSendHold.swift; sourceTree = "<group>"; };
 		C0D100012026082900000001 /* CorrespondenceWidgetGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayout.swift; sourceTree = "<group>"; };
 		C0D100042026082900000004 /* CorrespondenceWidgetGridLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrespondenceWidgetGridLayoutTests.swift; sourceTree = "<group>"; };
 		C0D100062026082900000006 /* AppRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteTests.swift; sourceTree = "<group>"; };
@@ -907,6 +917,7 @@
 			children = (
 				E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */,
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
+				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
 				38FC39EF8A664FC6865B488D /* GameDetailLayoutTests.swift */,
@@ -988,6 +999,7 @@
 				BCFA11510000000000000001 /* GameHistoryView.swift */,
 				AE6000063B00000000000006 /* GameHistoryPaginationState.swift */,
 				BC55D2D524B81E90003E20E7 /* HomeView.swift */,
+				BCFA11510000000000000009 /* HomeRules.swift */,
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
 				AA1500022026091500000002 /* PlayerProfileView.swift */,
@@ -1087,6 +1099,7 @@
 				8C96A63686294F338D527DD2 /* GameControlRowMetrics.swift */,
 				BC042B2A24AB2DD00050B2D1 /* GameCell.swift */,
 				BCFA11510000000000000005 /* HistoryGameCell.swift */,
+				BCFA11510000000000000007 /* HomeGameCard.swift */,
 				BC0F1C512527290900E3E66B /* ChallengeCell.swift */,
 				BC5EEBF6259C42EC00675761 /* ChatLine.swift */,
 				BC5EEC5D25A41D7900675761 /* ChatLog.swift */,
@@ -1108,6 +1121,7 @@
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
+				BCFA1151000000000000000E /* SeekGraphSendHold.swift */,
 				686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */,
 				BCACD3E129DEC06D00655D8B /* OGSWebsocket.swift */,
 				BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */,
@@ -1600,6 +1614,8 @@
 				BC042B4B24AB2DD10050B2D1 /* PublicGamesList.swift in Sources */,
 				BCFA11510000000000000002 /* GameHistoryView.swift in Sources */,
 				BCFA11510000000000000006 /* HistoryGameCell.swift in Sources */,
+				BCFA11510000000000000008 /* HomeGameCard.swift in Sources */,
+				BCFA1151000000000000000A /* HomeRules.swift in Sources */,
 				BC33384B250B6F410002F4D8 /* AppStoreScreenshotAvatar.swift in Sources */,
 				BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */,
 				BC5EEC29259D851B00675761 /* Variation.swift in Sources */,
@@ -1649,6 +1665,7 @@
 				AA1600122026091600000002 /* StackRouter.swift in Sources */,
 				BC3CD7DE25EF56AE00C931EB /* PrivateMessageLog.swift in Sources */,
 				BC042B5724AB2DD10050B2D1 /* OGSService.swift in Sources */,
+				BCFA1151000000000000000F /* SeekGraphSendHold.swift in Sources */,
 				AA1500102026091500000000 /* OGSPlayerProfile.swift in Sources */,
 				4FE5842749544ABF9C79D912 /* OGSFriendship.swift in Sources */,
 				BC92008225CE5BF600C14433 /* UserSelectionView.swift in Sources */,
@@ -1700,6 +1717,8 @@
 				DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */,
 				D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */,
 				96BD71A30B7D334BB8E64426 /* SurroundThemeTests.swift in Sources */,
+				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
+				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
 				33D3DFBAA384CA900DFCD5B9 /* GameDetailTheme.swift in Sources */,
 				794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */,
@@ -1757,6 +1776,7 @@
 				BC042B0524AB2CFA0050B2D1 /* SurroundTests.swift in Sources */,
 				BC3037F62692D03300181570 /* MoveTree.swift in Sources */,
 				BC8CE88D2657B33200E4BE1A /* OGSService.swift in Sources */,
+				BCFA11510000000000000010 /* SeekGraphSendHold.swift in Sources */,
 				AA1500102026091500000003 /* OGSPlayerProfile.swift in Sources */,
 				F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */,
 				BC8CE87F2657B1B100E4BE1A /* GameTests.swift in Sources */,

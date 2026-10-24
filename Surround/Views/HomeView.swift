@@ -12,10 +12,9 @@ import Combine
 /// A game can briefly exist in both an active projection and finished history
 /// while the server-side transition is settling; those rows must not share a
 /// SwiftUI identity inside the same lazy grid.
-private struct HomeGameRow: Identifiable {
+private struct HomeGameEntry: Identifiable {
     enum Context: Hashable {
         case live
-        case unclassified
         case userTurn
         case opponentTurn
         case history
@@ -43,7 +42,6 @@ private enum RecentFinishedGamesLoadState: Equatable {
 
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.tabBarPlacement) private var tabBarPlacement
     @Environment(\.iPadTabContext) private var iPadTabContext
@@ -55,6 +53,9 @@ struct HomeView: View {
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    /// Home wears the theme Game Detail shows.
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
     
     @State var displayMode: GameCell.CellDisplayMode
 
@@ -68,6 +69,12 @@ struct HomeView: View {
     @State private var hasSimulatedRecentFinishedGamesFailure = false
     @StateObject private var historyPreviewLoader = FinishedGamePreviewLoader()
     @State private var isVisible = false
+    /// Home's own width: beside the sidebar wherever one is shown.
+    @State private var width: CGFloat = 0
+    @EnvironmentObject private var stackRouter: StackRouter
+    /// Saved setups being sent from the star menu, one request each.
+    @State private var preferredSettingRequests: [OGSChallengeTemplate: AnyCancellable] = [:]
+    @State private var preferredSettingsStartsWithNewSetting = false
     
     init(previewGames: [Game] = []) {
         _recentFinishedGames = State(initialValue: previewGames)
@@ -91,23 +98,6 @@ struct HomeView: View {
         #else
         _displayMode = State(initialValue: .full)
         #endif
-    }
-
-    func sectionHeader(title: String) -> some View {
-        sectionHeader(title: title, trailing: { EmptyView() })
-    }
-
-    func sectionHeader<Trailing: View>(title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack {
-            Text(title)
-                .font(Font.title3.bold())
-            Spacer()
-            trailing()
-        }
-        .padding([.vertical], 5)
-        .padding([.horizontal])
-        .frame(maxWidth: .infinity)
-        .background(Color(UIColor.systemGray3).shadow(radius: 2))
     }
 
     func showGameDetail(game: Game, showsCarousel: Bool = true) {
@@ -224,257 +214,334 @@ struct HomeView: View {
         recentFinishedGames = []
         loadRecentFinishedGames()
     }
-    
-    var activeGamesView: some View {
-        let noItem = 
-            ogs.challengesReceived.count +
-            ogs.liveGames.count +
-            ogs.unclassifiedActiveGames.count +
-            ogs.sortedActiveCorrespondenceGamesOnUserTurn.count +
-            ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0
-        let isLoading = noItem && ogs.isLoadingOverview
-        return Group {
-            ScrollView {
-                if isLoading {
-                    ProgressView()
-                } else {
-                    if ogs.waitingGames > 0 {
-                        Button(action: { nav.main.showWaitingGames = true }) {
-                            HStack(spacing: 6) {
-                                Text(
-                                    ogs.waitingGames == 1
-                                        ? String(localized: "Searching for a game")
-                                        : String(localized: "Searching for \(ogs.waitingGames) games")
-                                )
-                                Image(systemName: "chevron.forward")
-                                Spacer()
-                                Group {
-                                    if reduceMotion {
-                                        Image(systemName: "hourglass")
-                                    } else {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    }
-                                }
-                                .accessibilityHidden(true)
-                            }
-                            .font(.subheadline.bold())
-                            .foregroundStyle(.white)
-                            .frame(minHeight: 44)
-                            .padding(.horizontal)
-                            .background(Color(.systemIndigo))
-                        }
-                    }
-                    if ogs.pendingRengoGames > 0 {
-                        Button(action: { nav.main.showWaitingGames = true }) {
-                            HStack {
-                                HStack {
-                                    Text("\(ogs.pendingRengoGames) pending Rengo games ", comment: "HomeView - vary for plural")
-                                        .font(.subheadline)
-                                        .bold()
-                                        .foregroundColor(.white)
-                                    Spacer().frame(width: 10)
-                                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    Spacer()
-                                }
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .background(Color(.systemPurple))
-                            }
-                        }
-                    }
-                    HStack {
-                        Button(action: { nav.home.showingNewGameView = true }) {
-                            HStack {
-                                Label("New game", systemImage: "plus.app.fill")
-                                    .font(.body.bold())
-                            }.padding()
-                            Spacer()
-                        }
-                        .accessibilityIdentifier(
-                            SurroundUITestContract.AccessibilityID.homeNewGame
-                        )
-                        Button("Preferred Settings", systemImage: "star.square.on.square") {
-                            nav.home.showingPreferredSettings = true
-                        }
-                        .accessibilityIdentifier(
-                            SurroundUITestContract.AccessibilityID.homePreferredSettings
-                        )
-                        .labelStyle(.iconOnly)
-                        .font(.body.bold())
-                        .padding()
-                        .padding(.leading, 10)
-                        .tint(.mint)
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), alignment: .top)], pinnedViews: [.sectionHeaders]) {
-                        if ogs.challengesReceived.count > 0 {
-                            Section(header: sectionHeader(title: String(localized: "Challenges received", comment: "Homeview"))) {
-                                ForEach(ogs.challengesReceived) { challenge in
-                                    ChallengeCell(challenge: challenge)
-                                        .padding()
-                                        .background(Color(UIColor.systemBackground).shadow(radius: 2))
-                                        .padding(.vertical, 5)
-                                        .padding(.horizontal)
-                                }
-                            }
-                        }
-                        if ogs.liveGames.count > 0 {
-                            Section(header: sectionHeader(title: String(localized: "Live games", comment: "Homeview"))) {
-                                ForEach(
-                                    ogs.liveGames.map { HomeGameRow(game: $0, context: .live) }
-                                ) { row in
-                                    GameCell(
-                                        game: row.game,
-                                        displayMode: displayMode,
-                                        opensGame: {
-                                            showGameDetail(game: row.game)
-                                        },
-                                        showsConditionalMoves: true,
-                                        navigationAccessibilityIdentifier:
-                                            SurroundUITestContract
-                                                .AccessibilityID.homeGame(row.game)
-                                    )
-                                    .padding(.vertical, displayMode == .full ? nil : 0)
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        if !ogs.unclassifiedActiveGames.isEmpty {
-                            Section(header: sectionHeader(title: String(localized: "Active games"))) {
-                                ForEach(
-                                    ogs.unclassifiedActiveGames.map {
-                                        HomeGameRow(game: $0, context: .unclassified)
-                                    }
-                                ) { row in
-                                    GameCell(
-                                        game: row.game,
-                                        displayMode: displayMode,
-                                        opensGame: {
-                                            showGameDetail(game: row.game)
-                                        },
-                                        showsConditionalMoves: true,
-                                        navigationAccessibilityIdentifier:
-                                            SurroundUITestContract
-                                                .AccessibilityID.homeGame(row.game)
-                                    )
-                                    .padding(.vertical, displayMode == .full ? nil : 0)
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        Section(header: sectionHeader(title: String(localized: "Your move", comment: "Homeview"))) {
-                            ForEach(
-                                ogs.sortedActiveCorrespondenceGamesOnUserTurn.map {
-                                    HomeGameRow(game: $0, context: .userTurn)
-                                }
-                            ) { row in
-                                GameCell(
-                                    game: row.game,
-                                    displayMode: displayMode,
-                                    opensGame: {
-                                        showGameDetail(game: row.game)
-                                    },
-                                    showsConditionalMoves: true,
-                                    navigationAccessibilityIdentifier:
-                                        SurroundUITestContract
-                                            .AccessibilityID.homeGame(row.game)
-                                )
-                                .padding(.vertical, displayMode == .full ? nil : 0)
-                                .padding(.horizontal)
-                            }
-                            if ogs.sortedActiveCorrespondenceGamesOnUserTurn.count == 0 {
-                                Text("No correspondence games on your turn")
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 30)
-                            }
-                        }
-                        Section(header: sectionHeader(title: String(localized: "Waiting for opponents/teammates", comment: "Homeview"))) {
-                            ForEach(
-                                ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.map {
-                                    HomeGameRow(game: $0, context: .opponentTurn)
-                                }
-                            ) { row in
-                                GameCell(
-                                    game: row.game,
-                                    displayMode: displayMode,
-                                    opensGame: {
-                                        showGameDetail(game: row.game)
-                                    },
-                                    showsConditionalMoves: true,
-                                    navigationAccessibilityIdentifier:
-                                        SurroundUITestContract
-                                            .AccessibilityID.homeGame(row.game)
-                                )
-                                .padding(.vertical, displayMode == .full ? nil : 0)
-                                .padding(.horizontal)
-                            }
-                            if ogs.sortedActiveCorrespondenceGamesNotOnUserTurn.count == 0 {
-                                Text("No correspondence games on your opponents' turn")
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 30)
-                            }
-                        }
-                        Section(header: sectionHeader(title: String(localized: "Game history", comment: "Homeview"))) {
-                            ForEach(
-                                recentFinishedGames.map {
-                                    HomeGameRow(game: $0, context: .history)
-                                }
-                            ) { row in
-                                HistoryGameCell(game: row.game, retryPreview: {
-                                    historyPreviewLoader.retry(game: row.game, using: ogs)
-                                }) {
-                                    showGameDetail(game: row.game, showsCarousel: false)
-                                }
-                                .accessibilityIdentifier(
-                                    SurroundUITestContract.AccessibilityID.homeHistoryGame(row.game)
-                                )
-                                .padding(.horizontal)
-                                .historyPreviewDemand(for: row.game, loader: historyPreviewLoader, using: ogs,
-                                                      query: ogs.user?.id, screenIsVisible: isVisible)
-                            }
-                            if let recentFinishedGamesStatus {
-                                GameHistoryLoadStatusView(
-                                    status: recentFinishedGamesStatus,
-                                    accessibilityIdentifiers: .init(
-                                        loading: SurroundUITestContract
-                                            .AccessibilityID.homeHistoryLoading,
-                                        error: SurroundUITestContract
-                                            .AccessibilityID.homeHistoryError,
-                                        retry: SurroundUITestContract
-                                            .AccessibilityID.homeHistoryRetry,
-                                        empty: SurroundUITestContract
-                                            .AccessibilityID.homeHistoryEmpty
-                                    ),
-                                    emptyVerticalPadding: 30,
-                                    retry: loadRecentFinishedGames
-                                )
-                            }
-                            Button(action: { nav.home.showingGameHistory = true }) {
-                                HStack {
-                                    Spacer()
-                                    Text("View full history", comment: "Homeview")
-                                        .font(.body.bold())
-                                    Image(systemName: "chevron.right")
-                                    Spacer()
-                                }
-                                .padding(.vertical, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .accessibilityIdentifier(
-                                SurroundUITestContract.AccessibilityID.homeHistoryViewAll
-                            )
-                            .buttonStyle(.plain)
-                            .foregroundColor(.accentColor)
-                            .padding(.horizontal)
-                            .padding(.bottom, 8)
-                        }
-                        Spacer()
-                    }
-                    .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
+
+    // MARK: - Sections
+
+    private var bandColumns: Int { HomeLayout.compactColumns(for: width) }
+    /// Section bands: full-width headers with one card per game.
+    private var usesBands: Bool { bandColumns > 1 }
+    private var margin: CGFloat { usesBands ? HomeLayout.bandMargin : HomeLayout.listMargin }
+
+    /// Games whose clock gives no speed are listed by turn, after the timed
+    /// ones, so no game ever drops out of Home. A turn includes accepting
+    /// stone removal, as in the correspondence sections.
+    private var userTurnGames: [Game] {
+        ogs.sortedActiveCorrespondenceGamesOnUserTurn + ogs.unclassifiedActiveGames.filter { ogs.isOnUserTurn(game: $0) }
+    }
+
+    private var opponentTurnGames: [Game] {
+        ogs.sortedActiveCorrespondenceGamesNotOnUserTurn + ogs.unclassifiedActiveGames.filter { !ogs.isOnUserTurn(game: $0) }
+    }
+
+    private var hasActiveItems: Bool {
+        !ogs.challengesReceived.isEmpty || !ogs.liveGames.isEmpty
+            || !userTurnGames.isEmpty || !opponentTurnGames.isEmpty
+    }
+
+    private func sectionHeader<Trailing: View>(
+        _ title: String, count: Int? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(verbatim: title)
+                    .font(.title3.bold())
+                if let count {
+                    Text(verbatim: count.formatted())
+                        .modifier(HomeSecondaryText())
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            trailing()
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 18)
+        .padding(.bottom, 8)
+    }
+
+    /// One section's games: a grouped panel in one column, or a card per
+    /// game in bands. Large mode always gives each tile its own card.
+    @ViewBuilder
+    private func gameGrid<Item: Identifiable, Cell: View>(
+        _ items: [Item], large: Bool = false, @ViewBuilder cell: @escaping (Item, Bool) -> Cell
+    ) -> some View {
+        let columns = large ? HomeLayout.largeColumns(for: width, margin: margin) : bandColumns
+        let gridItems = Array(repeating: GridItem(.flexible(), spacing: HomeLayout.columnSpacing, alignment: .top),
+                              count: columns)
+        if columns == 1 && !large {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    cell(item, index > 0)
+                }
+            }
+            .modifier(HomeCard())
+        } else {
+            LazyVGrid(columns: gridItems, spacing: HomeLayout.rowSpacing) {
+                ForEach(items) { item in
+                    cell(item, false)
+                        .modifier(HomeCard())
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gameCell(_ entry: HomeGameEntry, showsSeparator: Bool) -> some View {
+        let identifier = SurroundUITestContract.AccessibilityID.homeGame(entry.game)
+        if displayMode == .full {
+            HomeGameTile(game: entry.game, opensGame: { showGameDetail(game: entry.game) },
+                         navigationAccessibilityIdentifier: identifier)
+        } else {
+            HomeGameRow(game: entry.game, opensGame: { showGameDetail(game: entry.game) },
+                        navigationAccessibilityIdentifier: identifier, showsSeparator: showsSeparator)
+        }
+    }
+
+    /// A section of active games; Your move and Their move keep their
+    /// heading with a note when they are empty, so the two read as a pair.
+    @ViewBuilder
+    private func gameSection(
+        _ title: String, games: [Game], context: HomeGameEntry.Context, emptyText: String? = nil
+    ) -> some View {
+        if !games.isEmpty || emptyText != nil {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionHeader(title, count: games.isEmpty ? nil : games.count)
+                if games.isEmpty, let emptyText {
+                    Text(verbatim: emptyText)
+                        .font(.subheadline)
+                        .modifier(HomeSecondaryText())
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal)
+                        .padding(.vertical, 28)
+                        .modifier(HomeCard())
+                } else {
+                    gameGrid(games.map { HomeGameEntry(game: $0, context: context) },
+                             large: displayMode == .full) { entry, separated in
+                        gameCell(entry, showsSeparator: separated)
+                    }
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeSection(context.sectionID))
+        }
+    }
+
+    /// Quick Match searches and pending Rengo games share one card.
+    @ViewBuilder
+    private var searchingCard: some View {
+        if ogs.waitingGames > 0 || ogs.pendingRengoGames > 0 {
+            Button(action: { nav.main.showWaitingGames = true }) {
+                HStack(spacing: 12) {
+                    Group {
+                        if reduceMotion {
+                            Image(systemName: "hourglass")
+                        } else {
+                            ProgressView()
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if ogs.waitingGames > 0 {
+                            Text(
+                                ogs.waitingGames == 1
+                                    ? String(localized: "Searching for a game")
+                                    : String(localized: "Searching for \(ogs.waitingGames) games")
+                            )
+                            .font(.subheadline.bold())
+                        }
+                        if ogs.pendingRengoGames > 0 {
+                            Text("\(ogs.pendingRengoGames) pending Rengo games ", comment: "HomeView - vary for plural")
+                                .font(.subheadline)
+                                .modifier(HomeSecondaryText())
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.forward")
+                        .font(.footnote.bold())
+                        .modifier(HomeSecondaryText())
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(minHeight: 52)
+                .contentShape(Rectangle())
+                .modifier(HomeCard())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+        }
+    }
+
+    /// The first load: placeholder rows where the games will be.
+    private var firstLoadView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(String(localized: "Your move", comment: "Game\nHomeview"))
+                .redacted(reason: .placeholder)
+            gameGrid((0..<3).map { HomeSkeletonEntry(id: $0) }) { _, separated in
+                HomeSkeletonRow(showsSeparator: separated)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading your games", comment: "Homeview - VoiceOver: Home is loading for the first time"))
+        .accessibilityAddTraits(.updatesFrequently)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeSkeleton)
+    }
+
+    /// No active games: one message and one way to start.
+    private var firstRunView: some View {
+        VStack(spacing: 10) {
+            Text("No active games")
+                .font(.title2.bold())
+            Text("Start a game, and it will show up here.", comment: "Homeview - first run, when the user has no active games")
+                .modifier(HomeSecondaryText())
+                .multilineTextAlignment(.center)
+            Button(action: { nav.home.showingNewGameView = true }) {
+                Label("New game", systemImage: "plus")
+                    .font(.body.weight(.semibold))
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(HomeActionButtonStyle())
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.top, 72)
+        .padding(.bottom, 24)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeFirstRun)
+    }
+
+    private var challengesSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(String(localized: "Challenges received", comment: "Homeview"),
+                          count: ogs.challengesReceived.count)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HomeLayout.columnSpacing, alignment: .top),
+                                     count: bandColumns),
+                      spacing: HomeLayout.rowSpacing) {
+                ForEach(ogs.challengesReceived) { challenge in
+                    ChallengeCell(challenge: challenge)
+                        .padding()
+                        .modifier(HomeCard())
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(String(localized: "Game history", comment: "Homeview")) {
+                Button(action: { nav.home.showingGameHistory = true }) {
+                    HStack(spacing: 4) {
+                        Text("View full history", comment: "Homeview")
+                        Image(systemName: "chevron.forward")
+                            .font(.footnote.bold())
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .modifier(HomeActionText())
+                .accessibilityIdentifier(
+                    SurroundUITestContract.AccessibilityID.homeHistoryViewAll
+                )
+            }
+            if !recentFinishedGames.isEmpty {
+                gameGrid(recentFinishedGames.map { HomeGameEntry(game: $0, context: .history) }) { entry, separated in
+                    HistoryGameCell(game: entry.game, inCard: true, showsSeparator: separated, retryPreview: {
+                        historyPreviewLoader.retry(game: entry.game, using: ogs)
+                    }) {
+                        showGameDetail(game: entry.game, showsCarousel: false)
+                    }
+                    .accessibilityIdentifier(
+                        SurroundUITestContract.AccessibilityID.homeHistoryGame(entry.game)
+                    )
+                    .historyPreviewDemand(for: entry.game, loader: historyPreviewLoader, using: ogs,
+                                          query: ogs.user?.id, screenIsVisible: isVisible)
+                }
+            }
+            if let recentFinishedGamesStatus {
+                GameHistoryLoadStatusView(
+                    status: recentFinishedGamesStatus,
+                    accessibilityIdentifiers: .init(
+                        loading: SurroundUITestContract
+                            .AccessibilityID.homeHistoryLoading,
+                        error: SurroundUITestContract
+                            .AccessibilityID.homeHistoryError,
+                        retry: SurroundUITestContract
+                            .AccessibilityID.homeHistoryRetry,
+                        empty: SurroundUITestContract
+                            .AccessibilityID.homeHistoryEmpty
+                    ),
+                    emptyVerticalPadding: 30,
+                    retry: loadRecentFinishedGames
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .modifier(HomeCard())
+                .padding(.top, recentFinishedGames.isEmpty ? 0 : HomeLayout.rowSpacing)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeSection("history"))
+    }
+
+    var activeGamesView: some View {
+        let isFirstLoad = !hasActiveItems && ogs.isLoadingOverview
+        let isFirstRun = !hasActiveItems && !ogs.isLoadingOverview
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                searchingCard
+                if isFirstLoad {
+                    firstLoadView
+                } else if isFirstRun {
+                    firstRunView
+                    // A new account has no history, so it sees only the
+                    // message. One whose last game just ended keeps its
+                    // recent results and the way to its full history.
+                    if !recentFinishedGames.isEmpty || recentFinishedLoadState == .failed {
+                        historySection
+                    }
+                } else {
+                    if !ogs.challengesReceived.isEmpty {
+                        challengesSection
+                    }
+                    gameSection(String(localized: "Live games", comment: "Homeview"),
+                                games: ogs.liveGames, context: .live)
+                    gameSection(String(localized: "Your move", comment: "Game\nHomeview"),
+                                games: userTurnGames, context: .userTurn,
+                                emptyText: String(localized: "No correspondence games on your turn"))
+                    gameSection(String(localized: "Their move"),
+                                games: opponentTurnGames, context: .opponentTurn,
+                                emptyText: String(localized: "No correspondence games on your opponents' turn"))
+                    historySection
+                }
+            }
+            .padding(.horizontal, margin)
+            .padding(.bottom, 24)
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            width = newWidth
+        }
+        .refreshable { await refresh() }
+        // The scene stays put behind the scrolling games.
+        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
+    }
+
+    /// Pull to refresh: the overview, then the history preview.
+    private func refresh() async {
+        loadRecentFinishedGames()
+        guard allowsRemoteActivity, ogs.isLoggedIn else { return }
+        ogs.loadOverview()
+        for await loading in ogs.$isLoadingOverview.values where !loading {
+            break
         }
     }
 
@@ -611,14 +678,157 @@ struct HomeView: View {
         #endif
     }
 
-    private var displayModePickerToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+    // MARK: - Header
+
+    private var displayModeMenu: some View {
+        Menu {
             Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
                 Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
                 Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
             }
-            .fixedSize()
-            .pickerStyle(SegmentedPickerStyle())
+            .pickerStyle(.inline)
+        } label: {
+            Label("Display mode",
+                  systemImage: displayMode == .compact ? "square.fill.text.grid.1x2" : "rectangle.grid.1x2")
+                .labelStyle(.iconOnly)
+        }
+        .accessibilityValue(displayMode == .compact ? Text("Compact") : Text("Large"))
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeDisplayMode)
+    }
+
+    private var displayModeToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            displayModeMenu
+        }
+    }
+
+    /// New game with your preferred settings beside it, in the action color.
+    private var newGameCapsule: some View {
+        HomeNewGameCapsule(
+            showsPreferredSettingsTitle: showsPreferredSettingsTitle,
+            newGame: { nav.home.showingNewGameView = true }
+        ) {
+            preferredSettingsMenu
+        }
+    }
+
+    /// The star's menu (canvas "New game and Preferred settings"): each saved
+    /// setup offers the same two actions as its card in Preferred Settings,
+    /// and the last item opens the editor. With none saved, it says what they
+    /// are and offers to add one.
+    @ViewBuilder
+    private var preferredSettingsMenu: some View {
+        let settings = ogs.remoteSettings[.preferredGameSettings] ?? []
+        if settings.isEmpty {
+            Section {
+                Button(action: { openPreferredSettings(creatingNewSetting: true) }) {
+                    Label {
+                        Text("Add a preferred setting…", comment: "Homeview - star menu item that opens the new preferred setting form")
+                    } icon: {
+                        Image(systemName: "plus")
+                    }
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homePreferredSettingsAdd)
+            } header: {
+                // The sentence Preferred Settings shows when it is empty. Menu
+                // items stop at three lines; the header keeps all of it.
+                Text("No preferred settings yet", comment: "Homeview - star menu header when no preferred settings are saved")
+                    + Text(verbatim: "\n")
+                    + Text("Add your preferred game settings to create a game with the exact settings you want faster.")
+            }
+        } else {
+            Section {
+                ForEach(Array(settings.enumerated()), id: \.offset) { index, setting in
+                    Menu {
+                        Button("Create open challenge", systemImage: "person.2") {
+                            sendPreferredSetting(setting, to: nil)
+                        }
+                        .disabled(preferredSettingRequests[setting] != nil)
+                        if !setting.rengo {
+                            Button {
+                                let submit = preferredSettingSubmission(for: setting)
+                                stackRouter.openSavedSettingsOpponentPicker { submit($0) }
+                            } label: {
+                                Label {
+                                    Text("Select your opponent…", comment: "Homeview - star menu: challenge a chosen player with this preferred setting")
+                                } icon: {
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                }
+                            }
+                            .disabled(preferredSettingRequests[setting] != nil)
+                        }
+                    } label: {
+                        Text(verbatim: preferredSettingTitle(setting))
+                        Text(verbatim: preferredSettingDetail(setting))
+                    }
+                    .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homePreferredSetting(index))
+                }
+            } header: {
+                Text("Start from a preferred setting", comment: "Homeview - star menu header above the saved preferred settings")
+            }
+            Section {
+                Button(action: { openPreferredSettings(creatingNewSetting: false) }) {
+                    Label {
+                        Text("Edit Preferred Settings…", comment: "Homeview - star menu item that opens the preferred settings editor")
+                    } icon: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                }
+                .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit)
+            }
+        }
+    }
+
+    private func openPreferredSettings(creatingNewSetting: Bool) {
+        preferredSettingsStartsWithNewSetting = creatingNewSetting
+        nav.home.showingPreferredSettings = true
+    }
+
+    private func preferredSettingSubmission(for setting: OGSChallengeTemplate) -> (OGSUser?) -> Void {
+        // A sent challenge shows up in Home's searching card; nothing to close.
+        preferredSettingChallengeSubmission(for: setting, using: ogs, requests: $preferredSettingRequests) {}
+    }
+
+    private func sendPreferredSetting(_ setting: OGSChallengeTemplate, to opponent: OGSUser?) {
+        preferredSettingSubmission(for: setting)(opponent)
+    }
+
+    /// "19×19 · Correspondence", as the canvas names a saved setup.
+    private func preferredSettingTitle(_ setting: OGSChallengeTemplate) -> String {
+        let size = "\(setting.game.width)×\(setting.game.height)"
+        let speed: String? = switch setting.game.timeControl.speed {
+        case .correspondence?: String(localized: "Correspondence")
+        case .live?: String(localized: "Live")
+        case .rapid?: String(localized: "Rapid", comment: "Name of the OGS Rapid game-speed category, between Blitz and Live.")
+        case .blitz?: String(localized: "Blitz")
+        case nil: nil
+        }
+        return [size, speed].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// "Ranked · 3d + 1d up to 7d": what Preferred Settings' cards show.
+    private func preferredSettingDetail(_ setting: OGSChallengeTemplate) -> String {
+        let ranked = setting.game.ranked
+            ? String(localized: "Ranked", comment: "ChallengeCell rank status")
+            : String(localized: "Unranked", comment: "ChallengeCell rank status")
+        let time = setting.game.timeControl.system.shortDescription
+        return time.isEmpty ? ranked : "\(ranked) · \(time)"
+    }
+
+    /// Wide bands spell out Preferred Settings, but only where the bar has
+    /// room: beside a shown sidebar, not iPadOS's top tab bar.
+    private var showsPreferredSettingsTitle: Bool {
+        guard horizontalSizeClass == .regular, usesBands else { return false }
+        #if targetEnvironment(macCatalyst)
+        return true
+        #else
+        return iPadTabContext?.sidebarVisible == true
+        #endif
+    }
+
+    private var newGameToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            newGameCapsule
         }
     }
 
@@ -706,11 +916,12 @@ struct HomeView: View {
                     }
                 }
                 if #available(iOS 26.0, *) {
-                    // The segmented picker already provides its own background.
-                    displayModePickerToolbarItem.sharedBackgroundVisibility(.hidden)
+                    // The capsule draws its own action-colored surface.
+                    newGameToolbarItem.sharedBackgroundVisibility(.hidden)
                 } else {
-                    displayModePickerToolbarItem
+                    newGameToolbarItem
                 }
+                displayModeToolbarItem
             }
         }
         .overlay {
@@ -798,6 +1009,7 @@ struct HomeView: View {
             nav.handle(route: route)
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
+        .surroundTheme(SurroundTheme.current(storedID: gameThemeID))
         .sheet(isPresented: $nav.home.showingNewGameView) {
             AppNavigationStack {
                 NewGameView(newGameOption: initialNewGameOption)
@@ -827,7 +1039,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: $nav.home.showingPreferredSettings) {
             AppNavigationStack {
-                PreferredSettingsView()
+                PreferredSettingsView(startsCreatingNewSetting: preferredSettingsStartsWithNewSetting)
                     .navigationTitle("Preferred Settings")
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -872,6 +1084,84 @@ struct HomeView: View {
                 || recentFinishedLoadState == .loading
                 || recentFinishedLoadState == .failed
         ))
+    }
+}
+
+private extension HomeGameEntry.Context {
+    var sectionID: String {
+        switch self {
+        case .live: "live"
+        case .userTurn: "userTurn"
+        case .opponentTurn: "opponentTurn"
+        case .history: "history"
+        }
+    }
+}
+
+private struct HomeSkeletonEntry: Identifiable {
+    let id: Int
+}
+
+/// New game with its star menu in one action-colored capsule. A view of its
+/// own, so the toolbar hosts it whole instead of splitting its Menu out into
+/// separate bar buttons.
+private struct HomeNewGameCapsule<MenuContent: View>: View {
+    let showsPreferredSettingsTitle: Bool
+    let newGame: () -> Void
+    @ViewBuilder let menuContent: () -> MenuContent
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: newGame) {
+                Label("New game", systemImage: "plus")
+                    .labelStyle(.titleAndIcon)
+                    .padding(.leading, 13)
+                    .padding(.trailing, 11)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.homeNewGame
+            )
+            Rectangle()
+                .fill(.white.opacity(0.45))
+                .frame(width: 1, height: 22)
+                .accessibilityHidden(true)
+            Menu {
+                menuContent()
+            } label: {
+                Label("Preferred Settings", systemImage: "star.square.on.square")
+                    .labelStyle(PreferredSettingsLabelStyle(showsTitle: showsPreferredSettingsTitle))
+                    .padding(.horizontal, 11)
+                    .frame(minWidth: 44, minHeight: 40)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .accessibilityIdentifier(
+                SurroundUITestContract.AccessibilityID.homePreferredSettings
+            )
+        }
+        .font(.body.weight(.semibold))
+        .lineLimit(1)
+        .fixedSize()
+        .buttonStyle(.plain)
+        .modifier(HomeActionSurface())
+    }
+}
+
+/// Wide layouts spell out Preferred Settings; narrow ones keep the star.
+private struct PreferredSettingsLabelStyle: LabelStyle {
+    let showsTitle: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if showsTitle {
+            HStack(spacing: 6) {
+                configuration.icon
+                configuration.title
+            }
+        } else {
+            configuration.icon
+        }
     }
 }
 

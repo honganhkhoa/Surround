@@ -3634,15 +3634,23 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 "The no-plan game must wrap below the planned games."
             )
         }
-        XCTAssertLessThan(
+        // Large tiles put the user's clock below the board whichever color
+        // they play, and the plan button rides in that chip.
+        XCTAssertGreaterThan(
             topPlanButton.frame.midY,
-            topBoardFrame.minY,
-            "The Black user's conditional-plan button must be above its board."
+            topBoardFrame.maxY,
+            "The Black user's conditional-plan button must sit in their chip below the board."
         )
         XCTAssertGreaterThan(
             bottomPlanButton.frame.midY,
             bottomBoardFrame.maxY,
-            "The White user's conditional-plan button must be below its board."
+            "The White user's conditional-plan button must sit in their chip below the board."
+        )
+        XCTAssertEqual(
+            topPlanButton.frame.midY,
+            bottomPlanButton.frame.midY,
+            accuracy: 1,
+            "Neighboring tiles keep their chips level."
         )
         keepScreenshot("home-board-alignment-\(idiom)", in: app)
 
@@ -3655,6 +3663,129 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 .firstMatch.exists,
             "The third fixture must exercise a game without a saved plan."
         )
+    }
+
+    /// New game's star opens the saved setups: each one starts a challenge
+    /// with the same actions as its card, and the last item opens the editor.
+    func testPreferredSettingsMenuStartsFromSavedSetups() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
+        func menuItem(_ identifier: String, label: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label BEGINSWITH %@", identifier, label
+            )).firstMatch
+        }
+
+        tap(SurroundUITestContract.AccessibilityID.homePreferredSettings, in: app)
+        let setup = menuItem(SurroundUITestContract.AccessibilityID.homePreferredSetting(0), label: "9×9")
+        XCTAssertTrue(setup.waitForExistence(timeout: 10), "The menu lists the saved setups.")
+        tap(setup, description: "Open the first saved setup", in: app)
+        XCTAssertTrue(app.buttons["Create open challenge"].firstMatch.waitForExistence(timeout: 10))
+        let chooseOpponent = app.buttons["Select your opponent…"].firstMatch
+        XCTAssertTrue(chooseOpponent.waitForExistence(timeout: 10))
+        tap(chooseOpponent, description: "Choose an opponent for the saved setup", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        keepScreenshot("home-preferred-settings-picker", in: app)
+        let back = app.navigationBars.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@", "BackButton", "Back"
+        )).firstMatch
+        tap(back.exists ? back : app.navigationBars.buttons.firstMatch,
+            description: "Return to Home without choosing", in: app)
+        element(SurroundUITestContract.AccessibilityID.homeNewGame, in: app, matching: .button)
+
+        tap(SurroundUITestContract.AccessibilityID.homePreferredSettings, in: app)
+        let edit = menuItem(SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit,
+                            label: "Edit Preferred Settings")
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        tap(edit, description: "Open the Preferred Settings editor", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenPreferredSettings, in: app)
+        element(SurroundUITestContract.AccessibilityID.preferredSetting(0), in: app)
+    }
+
+    /// With no active games, Home shows its message but keeps an existing
+    /// player's recent results and the way to their full history.
+    func testHomeKeepsHistoryWhenNoActiveGamesRemain() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.homeFinishedOnlyLaunchArgument,
+        ])
+        element(SurroundUITestContract.AccessibilityID.homeFirstRun, in: app)
+        _ = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeHistoryGame(
+                SurroundUITestContract.homeFinishedOnlyHistoryGameID
+            ),
+            in: app
+        )
+        element(SurroundUITestContract.AccessibilityID.homeHistoryViewAll, in: app)
+    }
+
+    /// A game in stone removal waits on the user until they accept, even when
+    /// OGS gives its clock no speed, so Home lists it under Your move.
+    func testHomeListsUnclassifiedScoringUnderYourMove() {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.homeStatesLaunchArgument,
+        ])
+        let scoring = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(
+                SurroundUITestContract.homeStatesUnknownClockScoringGameID
+            ),
+            in: app,
+            matching: .button
+        )
+        let yourMove = app.descendants(matching: .any).matching(
+            identifier: SurroundUITestContract.AccessibilityID.homeSection("userTurn")
+        ).firstMatch
+        XCTAssertTrue(
+            yourMove.descendants(matching: .button).matching(identifier: scoring.identifier).firstMatch.exists,
+            "Scoring that awaits the user's acceptance belongs under Your move."
+        )
+    }
+
+    /// Home's layout rule (canvas "Home Redesign", Direction C): the phone's
+    /// Compact rows keep 120 pt boards in one grouped list; a wide iPad puts
+    /// Large tiles side by side and never shrinks a board below 266 pt.
+    func testHomeLayoutKeepsBoardSizesAcrossWidths() {
+        #if targetEnvironment(macCatalyst)
+        let isPhone = false
+        #else
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        #endif
+        let app = launchApp(
+            additionalLaunchArguments: [
+                SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+                SurroundUITestContract.compatibilitySceneLaunchArgument,
+                SurroundUITestContract.CompatibilityScene.home.rawValue,
+            ],
+            orientation: isPhone ? .portrait : .landscapeRight
+        )
+        let first = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(SurroundUITestContract.screenshotNextGameID),
+            in: app,
+            matching: .button
+        )
+        let second = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeGame(SurroundUITestContract.compatibilityWidgetGameID),
+            in: app,
+            matching: .button
+        )
+        if isPhone {
+            for board in [first, second] {
+                XCTAssertEqual(board.frame.width, 120, accuracy: 1, "Compact rows keep the 120 pt board.")
+            }
+            XCTAssertEqual(first.frame.minX, second.frame.minX, accuracy: 1,
+                           "The phone lists a section's games in one column.")
+        } else {
+            for board in [first, second] {
+                XCTAssertGreaterThanOrEqual(board.frame.width, 266,
+                                            "Large tiles keep boards at the detailed size.")
+            }
+            XCTAssertEqual(first.frame.minY, second.frame.minY, accuracy: 1,
+                           "A wide Home bands a section's tiles side by side.")
+            XCTAssertNotEqual(first.frame.minX, second.frame.minX, accuracy: 1)
+        }
+        keepScreenshot("home-layout-\(isPhone ? "iphone" : "ipad")", in: app)
     }
 
     func testConditionalVariationsOpenAndJumpToAnalyze() {

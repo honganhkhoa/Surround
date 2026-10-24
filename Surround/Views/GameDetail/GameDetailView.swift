@@ -839,7 +839,7 @@ struct GameDetailView: View {
             .environment(\.gameDetailNotificationContextID, notificationContextID)
             // A departing screen gives the window back at once, so the
             // screen sliding in already has its own appearance.
-            .gameDetailTheme(SurroundTheme.current(storedID: gameThemeID),
+            .surroundTheme(SurroundTheme.current(storedID: gameThemeID),
                              ownsWindow: self.currentGame != nil)
         )
     }

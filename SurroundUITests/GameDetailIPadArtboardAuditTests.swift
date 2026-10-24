@@ -308,9 +308,10 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         }
 
         // The getter reports a request even when the Simulator never applies
-        // it, as throughout a newly created device's first boot. Home follows
-        // the system without a theme, so a live change there first separates
-        // a device that ignores requests from a scene that ignores the change.
+        // it, as throughout a newly created device's first boot. Home wears
+        // the same theme, whose day and night scenes follow the system, so a
+        // live change there first separates a device that ignores requests
+        // from a scene that ignores the change.
         requestAppearance(.light)
         let home = launchGame(artboard: 17, theme: theme, opensGame: false)
         let homeScreen = element(ID.screenHome, in: home)

@@ -21,10 +21,14 @@ struct PreferredSettingsView: View {
     @State var settingBeingEdited: OGSChallengeTemplate?
     @State var creatingNewPreferredSetting = false
 
+    /// `startsCreatingNewSetting` opens straight on the new-setting form, as
+    /// Home's "Add a preferred setting…" does.
     init(
-        preferredSettingsOverride: [OGSChallengeTemplate]? = nil
+        preferredSettingsOverride: [OGSChallengeTemplate]? = nil,
+        startsCreatingNewSetting: Bool = false
     ) {
         self.preferredSettingsOverride = preferredSettingsOverride
+        _creatingNewPreferredSetting = State(initialValue: startsCreatingNewSetting)
     }
     
     var cardBackground: some View {
@@ -176,21 +180,11 @@ struct PreferredSettingsView: View {
     }
 
     private func challengeSubmission(for setting: OGSChallengeTemplate) -> (OGSUser?) -> Void {
-        // The stack retains this callback while the picker is open. Capture
-        // only its dependencies, avoiding a cycle through this view's router.
-        let service = ogs
         let appNavigation = nav
-        let requests = $openChallengeCancellableBySetting
-        return { opponent in
-            guard requests.wrappedValue[setting] == nil else { return }
-            requests.wrappedValue[setting] = service.sendChallenge(opponent: opponent, challenge: setting).sink(
-                receiveCompletion: { _ in
-                    requests.wrappedValue.removeValue(forKey: setting)
-                },
-                receiveValue: { _ in
-                    appNavigation.home.showingPreferredSettings = false
-                }
-            )
+        return preferredSettingChallengeSubmission(
+            for: setting, using: ogs, requests: $openChallengeCancellableBySetting
+        ) {
+            appNavigation.home.showingPreferredSettings = false
         }
     }
 
@@ -236,6 +230,35 @@ struct PreferredSettingsView: View {
                     }
                 }
             }
+    }
+}
+
+/// Sends a saved setting as a challenge, open or to one opponent, at most
+/// one request per setting at a time. Each send holds the seek graph until
+/// its challenge shows up there (see `SeekGraphSendHold`). The stack retains
+/// the result while an opponent picker is open, so it captures only its
+/// dependencies.
+func preferredSettingChallengeSubmission(
+    for setting: OGSChallengeTemplate,
+    using service: OGSService,
+    requests: Binding<[OGSChallengeTemplate: AnyCancellable]>,
+    onSent: @escaping () -> Void
+) -> (OGSUser?) -> Void {
+    return { opponent in
+        guard requests.wrappedValue[setting] == nil else { return }
+        let hold = SeekGraphSendHold(service: service)
+        requests.wrappedValue[setting] = service.sendChallenge(opponent: opponent, challenge: setting)
+            .handleEvents(receiveCancel: { hold.release() })
+            .sink(
+                receiveCompletion: { completion in
+                    requests.wrappedValue.removeValue(forKey: setting)
+                    if case .failure = completion { hold.release() }
+                },
+                receiveValue: { challengeID in
+                    hold.challengeSent(id: challengeID, isOpen: opponent == nil)
+                    onSent()
+                }
+            )
     }
 }
 

@@ -5415,12 +5415,14 @@ class OGSService: ObservableObject {
         }
     }
     
-    func sendChallenge(opponent: OGSUser?, challenge: OGSChallengeTemplate) -> AnyPublisher<Void, Error> {
+    /// Publishes the new challenge's id, which an open challenge also carries
+    /// once it arrives through the seek graph.
+    func sendChallenge(opponent: OGSUser?, challenge: OGSChallengeTemplate) -> AnyPublisher<Int, Error> {
         var challenge = challenge
         if !challenge.useCustomKomi {
             challenge.game.komi = nil
         }
-        return Future<Void, Error> { promise in
+        return Future<Int, Error> { promise in
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
             var url = "\(self.ogsRoot)/api/v1/challenges"
@@ -5439,12 +5441,8 @@ class OGSService: ObservableObject {
                     case .success(let data):
                         if let result = data as? [String: Any] {
                             if result["status"] as? String == "ok" {
-                                if let _ = result["challenge"] as? Int, let _ = result["game"] as? Int {
-//                                    var challenge = challenge
-//                                    challenge.id = challengeId
-//                                    challenge.game.id = gameId
-//                                    promise(.success(challenge))
-                                    promise(.success(()))
+                                if let challengeID = result["challenge"] as? Int, let _ = result["game"] as? Int {
+                                    promise(.success(challengeID))
                                     if opponent == nil && !self.sendingKeepAliveSignal {
                                         self.sendingKeepAliveSignal = true
                                         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .seconds(1))) {

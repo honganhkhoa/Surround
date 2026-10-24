@@ -2170,7 +2170,9 @@ extension OGSService {
             state.socketStatus = .connected
             state.isLoadingOverview = false
 
-            state.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
+            if !SurroundUITestContract.simulatesHomeFinishedOnly {
+                state.activeGames[SurroundUITestContract.fixtureGameID] = fixtureGame
+            }
 
             if SurroundUITestContract.simulatesLiveGameBannerNavigation {
                 for gameID in SurroundUITestContract.liveBannerCorrespondenceGameIDs {
@@ -2224,6 +2226,99 @@ extension OGSService {
                 state.activeGames[
                     SurroundUITestContract.widgetRoutingSecondGameID
                 ] = replacementGame
+            }
+
+            if SurroundUITestContract.simulatesHomeStates {
+                // Home rows in states the plain fixture lacks. The user plays
+                // White; clocks count down from launch.
+                func makeHomeStateGame(
+                    _ gameID: Int,
+                    system: TimeControlSystem,
+                    tagsSpeed: Bool = true,
+                    userToMove: Bool,
+                    userTime: Double,
+                    opponentTime: Double,
+                    pauseControlJSON: String? = nil,
+                    phase: OGSGamePhase = .play
+                ) -> Game {
+                    var gameData = fixtureGame.gameData!
+                    gameData.gameId = gameID
+                    var timeControl = system.timeControlObject
+                    if !tagsSpeed {
+                        timeControl.codingData.speed = nil
+                    }
+                    gameData.timeControl = timeControl
+                    gameData.phase = phase
+                    let toMove: StoneColor = userToMove ? .white : .black
+                    gameData.clock.currentPlayerColor = toMove
+                    gameData.clock.currentPlayerId = toMove == .white
+                        ? gameData.players.white.id : gameData.players.black.id
+                    gameData.clock.whiteTime = ThinkingTime(thinkingTime: userTime, thinkingTimeLeft: userTime)
+                    gameData.clock.blackTime = ThinkingTime(thinkingTime: opponentTime, thinkingTimeLeft: opponentTime)
+                    let now = Date().timeIntervalSince1970 * 1_000
+                    let remaining = userToMove ? userTime : opponentTime
+                    gameData.clock.lastMoveTime = now
+                    gameData.clock.expiration = now + remaining * 1_000
+                    gameData.clock.timeUntilExpiration = remaining
+                    gameData.clock.pausedTime = nil
+                    gameData.clock.started = true
+                    gameData.pauseControl = pauseControlJSON.map {
+                        try! JSONDecoder().decode(OGSPauseControl.self, from: Data($0.utf8))
+                    }
+                    gameData.clock.pauseControl = gameData.pauseControl
+                    let game = Game(ogsGame: gameData)
+                    game.ogsRawData = [:]
+                    return game
+                }
+
+                let correspondence = TimeControlSystem.Fischer(
+                    initialTime: 3 * 86_400, timeIncrement: 86_400, maxTime: 7 * 86_400
+                )
+                for game in [
+                    makeHomeStateGame(SurroundUITestContract.homeStatesLowTimeGameID,
+                                      system: correspondence, userToMove: true,
+                                      userTime: 22_320, opponentTime: 410_400),
+                    makeHomeStateGame(SurroundUITestContract.homeStatesPausedGameID,
+                                      system: correspondence, userToMove: true,
+                                      userTime: 190_020, opponentTime: 301_380,
+                                      pauseControlJSON: #"{"weekend": true}"#),
+                    makeHomeStateGame(SurroundUITestContract.homeStatesStoneRemovalGameID,
+                                      system: correspondence, userToMove: false,
+                                      userTime: 160_440, opponentTime: 98_220,
+                                      phase: .stoneRemoval),
+                    makeHomeStateGame(SurroundUITestContract.homeStatesNoSpeedGameID,
+                                      system: .Simple(perMove: 2 * 86_400), tagsSpeed: false,
+                                      userToMove: false, userTime: 120_660, opponentTime: 90_180),
+                    makeHomeStateGame(SurroundUITestContract.homeStatesUnknownClockGameID,
+                                      system: .Unknown("future-clock"),
+                                      userToMove: true, userTime: 86_400, opponentTime: 86_400),
+                    // Scoring waits on the user's acceptance whoever's clock
+                    // ran last, so Home lists it under Your move.
+                    makeHomeStateGame(SurroundUITestContract.homeStatesUnknownClockScoringGameID,
+                                      system: .Unknown("future-clock"),
+                                      userToMove: false, userTime: 86_400, opponentTime: 86_400,
+                                      phase: .stoneRemoval),
+                ] {
+                    state.activeGames[game.ogsID!] = game
+                }
+            }
+
+            if SurroundUITestContract.simulatesHomeFinishedOnly {
+                guard var historyData = TestData.Scored19x19Korean.gameData else {
+                    preconditionFailure("The bundled history fixture must contain game data.")
+                }
+                historyData.gameId = SurroundUITestContract.homeFinishedOnlyHistoryGameID
+                historyData.phase = .finished
+                if var playerPool = historyData.playerPool {
+                    playerPool[historyData.players.white.id] = nil
+                    playerPool[fixtureUser.id] = fixtureUser
+                    historyData.playerPool = playerPool
+                }
+                historyData.players.white = fixtureUser
+                historyData.whitePlayerId = fixtureUser.id
+                let historyGame = Game(ogsGame: historyData)
+                historyGame.ogsRawData = [:]
+                state.finishedGamesSnapshot = [historyGame]
             }
 
             let publicGame = makeGeneratedGame(

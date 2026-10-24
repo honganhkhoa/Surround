@@ -1113,17 +1113,7 @@ struct GameDetailPlayerIdentity: View {
 
     private func roleColor(_ player: OGSUser?) -> Color {
         guard let player else { return secondaryColor }
-        if let roleColor = theme.identityRoleColor(for: player, on: color) {
-            return roleColor
-        }
-        if color == .white, !player.isOGSModerator, !player.isOGSAdmin {
-            if player.isOGSProfessional { return Color(red: 15 / 255, green: 107 / 255, blue: 51 / 255) }
-            if player.isOGSSupporter { return Color(red: 153 / 255, green: 71 / 255, blue: 8 / 255) }
-        }
-        // The side's surface decides the role variant even in the opposite
-        // system appearance, just as a white stone remains white in Dark Mode.
-        let traits = UITraitCollection(userInterfaceStyle: color == .black ? .dark : .light)
-        return Color(uiColor: UIColor(player.uiColor).resolvedColor(with: traits))
+        return theme.roleColor(for: player, on: color)
     }
 
     var body: some View {
@@ -1481,26 +1471,6 @@ private struct GameDetailOpaquePopover: ViewModifier {
         .presentationCompactAdaptation(.popover)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
-    }
-}
-
-/// Preserve the other themes' hierarchical secondary style, while Meadow's
-/// opaque detail panels use a contrast-checked secondary pigment.
-private struct GameDetailSecondaryText: ViewModifier {
-    @Environment(\.surroundTheme) private var theme
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if theme == .feltMeadow {
-            content.foregroundStyle(theme.detailSecondaryForeground)
-        } else {
-            content.foregroundStyle(.secondary)
-        }
-    }
-}
-
-private extension View {
-    func gameDetailSecondaryText() -> some View {
-        modifier(GameDetailSecondaryText())
     }
 }
 

@@ -467,7 +467,7 @@ struct BoardMarkerAuditView: View {
             }
         }
         .background(theme.pageBackground)
-        .gameDetailTheme(theme)
+        .surroundTheme(theme)
         .accessibilityIdentifier("uitest.boardMarkerAudit")
         .task {
             guard BoardMarkerAuditContract.exportsImages, !exportStarted else { return }

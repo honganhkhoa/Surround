@@ -22,72 +22,74 @@ struct WelcomeView: View {
         self.animatesPublicGameChanges = animatesPublicGameChanges
     }
     
+    private func accountLink<Label: View>(path: String, @ViewBuilder label: () -> Label) -> some View {
+        AppNavigationLink(
+            destination: OGSBrowserView(
+                initialURL: URL(string: "\(OGSService.ogsRoot)/\(path)")!,
+                showsURLBar: true
+            )
+            .navigationBarTitleDisplayMode(.inline)
+        ) {
+            label()
+                .font(.body.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .padding(.horizontal)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Signed out, Home says what Surround is, offers both ways in, and
+    /// shows games being played now as Large tiles (canvas "Home Redesign").
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 10) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS).")
-                    .leadingAlignedInScrollView()
-                Text("To start playing:")
-                    .leadingAlignedInScrollView()
-                AppNavigationLink(
-                    destination: OGSBrowserView(
-                        initialURL: URL(string: "\(OGSService.ogsRoot)/sign-in")!,
-                        showsURLBar: true
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                ) {
-                    Text("Sign in to your OGS account")
-                        .foregroundColor(.white)
-                        .bold()
-                        .frame(maxWidth: 400)
-                        .padding(.vertical)
-                        .background(Color(.systemIndigo).cornerRadius(10))
-                        .padding(.horizontal)
+                    .font(.callout)
+                    .padding(.horizontal, 4)
+                VStack(spacing: 10) {
+                    accountLink(path: "sign-in") {
+                        Text("Sign in to your OGS account")
+                    }
+                    .modifier(HomeActionSurface())
+                    accountLink(path: "register") {
+                        Text("Register an OGS account")
+                            .modifier(HomeActionText())
+                    }
+                    .modifier(HomeCard(cornerRadius: 25))
                 }
-                Text("or")
-                AppNavigationLink(
-                    destination: OGSBrowserView(
-                        initialURL: URL(string: "\(OGSService.ogsRoot)/register")!,
-                        showsURLBar: true
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                ) {
-                    Text("Register an OGS account")
-                        .foregroundColor(.white)
-                        .bold()
-                        .frame(maxWidth: 400)
-                        .padding(.vertical)
-                        .background(Color(.systemIndigo).cornerRadius(10))
-                        .padding(.horizontal)
-                }
+                .frame(maxWidth: 420)
+                .padding(.top, 18)
                 if let liveGames = ogs.sitewiseLiveGamesCount, let correspondenceGames = ogs.sitewiseCorrespondenceGamesCount {
-                    (Text(.init(localized: "**\(correspondenceGames) correspondence games** and **\(liveGames) live games** are being played right now.")))
-                        .leadingAlignedInScrollView()
+                    Text(.init(localized: "**\(correspondenceGames) correspondence games** and **\(liveGames) live games** are being played right now."))
+                        .font(.subheadline)
+                        .modifier(HomeSecondaryText())
+                        .padding(.horizontal, 4)
+                        .padding(.top, 18)
                 }
             }
-            .frame(maxWidth: 600)
+            .frame(maxWidth: 600, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
-            .padding(.top)
+            .padding(.top, 12)
             if publicGames.count > 0 {
-                GeometryReader { geometry in
-                    if geometry.size.height > 200 {
-                        ScrollView(.horizontal) {
-                            LazyHGrid(rows: [GridItem(.adaptive(minimum: 300), spacing: 15)], spacing: 15) {
-                                ForEach(publicGames) { game in
-                                    BoardView(boardPosition: game.currentPosition)
-                                        .aspectRatio(contentMode: .fit)
-                                }
-                            }
-                            .padding()
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(publicGames) { game in
+                            HomeGameTile(game: game)
+                                .frame(width: HomeGameTile.minimumWidth + 4)
+                                .modifier(HomeCard(cornerRadius: 20))
                         }
-                    } else {
-                        Spacer()
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
-            } else {
-                Spacer()
+                .scrollIndicators(.hidden)
+                .accessibilityLabel(Text("Games being played now", comment: "Welcome - VoiceOver: the public games shown when signed out"))
             }
         }
+        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
         .onAppear {
             #if DEBUG && MAIN_APP
             if SurroundUITestContract.isEnabled {

@@ -297,8 +297,13 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         homeApp.terminate()
 
         let preferredSettingsApp = launchApp()
+        // The star opens a menu of saved setups; its last item is the editor.
         tap(
             SurroundUITestContract.AccessibilityID.homePreferredSettings,
+            in: preferredSettingsApp
+        )
+        tap(
+            SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit,
             in: preferredSettingsApp
         )
         element(
@@ -853,11 +858,14 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
 
         // Prove the complete lazy history grid was populated, then return to
         // the top so 02-active-games keeps the active sections and the first
-        // history rows in the curated composition.
+        // history rows in the curated composition. New game stays in the
+        // toolbar, so the first Your move game marks the top instead.
         let topAnchor = app
             .descendants(matching: .any)
             .matching(
-                identifier: SurroundUITestContract.AccessibilityID.homeNewGame
+                identifier: SurroundUITestContract.AccessibilityID.homeGame(
+                    SurroundUITestContract.screenshotNextGameID
+                )
             )
             .firstMatch
         for _ in 0..<12 where !topAnchor.isHittable {

@@ -86,9 +86,15 @@ struct ConditionalMovesButton: View {
     var context: ConditionalMovesPresentationContext
     var usesClearGlass = false
     var usesToolbarStyle = false
+    /// Home's line under a name: the envelope, then "Conditional moves set".
+    var usesHomeLineStyle = false
+    var showsHomeLineTitle = true
+    /// The envelope's color on a clock chip; the theme's conditional color otherwise.
+    var homeIconColor: Color? = nil
     var onSelect: ((ConditionalMoveBranch) -> Void)?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.surroundTheme) private var theme
     @State private var isPresented = false
     @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 17
 
@@ -100,12 +106,29 @@ struct ConditionalMovesButton: View {
         Button {
             isPresented = true
         } label: {
-            Image(systemName: "envelope.and.arrow.trianglehead.branch")
-                .font(usesToolbarStyle ? nil : context == .gameDetail ? .system(size: 14)
-                      : usesClearGlass ? .system(size: min(iconSize, 24)) : nil)
+            if usesHomeLineStyle {
+                HStack(spacing: 4) {
+                    Image(systemName: "envelope.and.arrow.trianglehead.branch")
+                        .font(.system(size: 12))
+                        .foregroundStyle(homeIconColor ?? theme.conditionalMark ?? .conditionalMoveHighlight)
+                    if showsHomeLineTitle {
+                        Text(HomeGameNote.conditionalMoves.text)
+                            .lineLimit(1)
+                            .modifier(HomeSecondaryText())
+                    }
+                }
+                .font(.footnote)
+                .frame(minHeight: 24)
+                .contentShape(Rectangle())
+            } else {
+                Image(systemName: "envelope.and.arrow.trianglehead.branch")
+                    .font(usesToolbarStyle ? nil : context == .gameDetail ? .system(size: 14)
+                          : usesClearGlass ? .system(size: min(iconSize, 24)) : nil)
+            }
         }
         .modifier(ConditionalMoveButtonSurface(usesClearGlass: usesClearGlass,
-                                              usesToolbarStyle: usesToolbarStyle))
+                                              usesToolbarStyle: usesToolbarStyle,
+                                              usesHomeLineStyle: usesHomeLineStyle))
         .accessibilityLabel(Text("Conditional moves"))
         .accessibilityIdentifier(context.buttonAccessibilityIdentifier)
         .popover(isPresented: $isPresented) {
@@ -133,9 +156,12 @@ struct ConditionalMovesButton: View {
 private struct ConditionalMoveButtonSurface: ViewModifier {
     var usesClearGlass: Bool
     var usesToolbarStyle: Bool
+    var usesHomeLineStyle = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ViewBuilder func body(content: Content) -> some View {
-        if usesToolbarStyle {
+        if usesHomeLineStyle {
+            content.buttonStyle(.plain)
+        } else if usesToolbarStyle {
             content.buttonStyle(.plain).tint(Color.conditionalMoveHighlight)
                 .foregroundStyle(Color.conditionalMoveHighlight)
         } else if usesClearGlass, #available(iOS 26, *), !reduceTransparency {

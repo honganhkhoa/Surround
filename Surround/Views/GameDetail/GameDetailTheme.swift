@@ -1355,6 +1355,37 @@ extension SurroundTheme {
         }
         return darkSurface ? SurroundStudioColors.darkOrdinary : SurroundStudioColors.lightOrdinary
     }
+
+    /// The running hourglass on a Home clock chip. Standard's indigo is too
+    /// dark for its black chip, so Home uses the canvas's lighter indigo there.
+    func homeChipAccent(_ color: StoneColor) -> Color {
+        guard self == .standard else { return clockAccent(color) }
+        return color == .black
+            ? Color(red: 165 / 255, green: 163 / 255, blue: 1)
+            : Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
+    }
+
+    /// Home's New game fill. Standard deepens the app's indigo so the white
+    /// title stays readable in both appearances.
+    var homeActionFill: Color {
+        actionTint ?? Color(red: 80 / 255, green: 78 / 255, blue: 206 / 255)
+    }
+
+    /// A player's name color on a dark or light surface: the theme's role
+    /// hues where it has them, otherwise OGS's, in the surface's variant.
+    func roleColor(for player: OGSUser, on surface: StoneColor) -> Color {
+        if let roleColor = identityRoleColor(for: player, on: surface) {
+            return roleColor
+        }
+        if surface == .white, !player.isOGSModerator, !player.isOGSAdmin {
+            if player.isOGSProfessional { return Color(red: 15 / 255, green: 107 / 255, blue: 51 / 255) }
+            if player.isOGSSupporter { return Color(red: 153 / 255, green: 71 / 255, blue: 8 / 255) }
+        }
+        // The surface decides the role variant even in the opposite system
+        // appearance, just as a white stone remains white in Dark Mode.
+        let traits = UITraitCollection(userInterfaceStyle: surface == .black ? .dark : .light)
+        return Color(uiColor: UIColor(player.uiColor).resolvedColor(with: traits))
+    }
 }
 
 // MARK: - Environment
@@ -1371,10 +1402,10 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// Applies a theme to Game Detail: its surfaces, board and appearance.
-    /// `ownsWindow` lets a screen that is leaving keep its look without
-    /// holding the window's appearance.
-    func gameDetailTheme(_ theme: SurroundTheme, ownsWindow: Bool = true) -> some View {
+    /// Applies a theme to a screen that wears it (Game Detail and Home): its
+    /// surfaces, board and appearance. `ownsWindow` lets a screen that is
+    /// leaving keep its look without holding the window's appearance.
+    func surroundTheme(_ theme: SurroundTheme, ownsWindow: Bool = true) -> some View {
         modifier(GameDetailThemeModifier(theme: theme, ownsWindow: ownsWindow))
     }
 }
@@ -1516,6 +1547,26 @@ struct GameDetailSurfaceStyle: ShapeStyle {
         case .panel: theme.panel
         case .panelBorder: theme.panelBorder
         }
+    }
+}
+
+/// Preserve the other themes' hierarchical secondary style, while Meadow's
+/// opaque detail panels use a contrast-checked secondary pigment.
+struct GameDetailSecondaryText: ViewModifier {
+    @Environment(\.surroundTheme) private var theme
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if theme == .feltMeadow {
+            content.foregroundStyle(theme.detailSecondaryForeground)
+        } else {
+            content.foregroundStyle(.secondary)
+        }
+    }
+}
+
+extension View {
+    func gameDetailSecondaryText() -> some View {
+        modifier(GameDetailSecondaryText())
     }
 }
 
