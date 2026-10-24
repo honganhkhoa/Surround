@@ -14,7 +14,7 @@ final class ProfileBiographyBrowserServer: @unchecked Sendable {
     private let listener: NWListener
     private let ready = XCTestExpectation(description: "Loopback biography server ready")
     private let requested = XCTestExpectation(description: "Safari requested the biography page")
-    // Mutable state is confined to queue; async test methods take short snapshots.
+    // Mutable state is confined to queue; test methods take short snapshots.
     private var started = false
     private var readyReported = false
     private var readinessFailure: String?
@@ -55,13 +55,14 @@ final class ProfileBiographyBrowserServer: @unchecked Sendable {
         }
     }
 
-    func start(in test: XCTestCase, timeout: TimeInterval = 3) async throws -> URL {
+    func start(timeout: TimeInterval = 3) throws -> URL {
         queue.async { [self] in
             guard !started else { return }
             started = true
             listener.start(queue: queue)
         }
-        await test.fulfillment(of: [ready], timeout: timeout)
+        // Callbacks run on queue, so a blocking wait cannot deadlock them.
+        _ = XCTWaiter.wait(for: [ready], timeout: timeout)
         return try queue.sync {
             guard readinessFailure == nil, readyReported, let port = listener.port,
                   let url = URL(string: "http://127.0.0.1:\(port.rawValue)\(Self.requestTarget)#local-proof") else {
@@ -71,8 +72,10 @@ final class ProfileBiographyBrowserServer: @unchecked Sendable {
         }
     }
 
-    func waitForRequest(in test: XCTestCase, timeout: TimeInterval = 5) async throws -> String {
-        await test.fulfillment(of: [requested], timeout: timeout)
+    /// A cold SafariViewService on a CI simulator can take more than seven
+    /// seconds after the tap to request the page.
+    func waitForRequest(timeout: TimeInterval = 30) throws -> String {
+        _ = XCTWaiter.wait(for: [requested], timeout: timeout)
         return try queue.sync {
             guard let receivedTarget else {
                 throw failure("Safari did not request the local biography page within the request timeout.")

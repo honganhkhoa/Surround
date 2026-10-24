@@ -180,13 +180,16 @@ private struct OfflineUITestRootView: View {
     }
 }
 
-/// Reports UIKit session identities, rather than counting accessibility windows.
-/// This probe exists only in the opt-in offline root.
+/// Reports UIKit session identities, rather than counting accessibility windows,
+/// and how often the scene entered the background. This probe exists only in
+/// the opt-in offline root.
 private struct SceneActivationUITestProbe: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView { ProbeView() }
     func updateUIView(_ uiView: UIView, context: Context) {}
 
     private final class ProbeView: UIView {
+        private var backgroundEntries = 0
+
         init() {
             super.init(frame: .zero)
             isAccessibilityElement = true
@@ -207,6 +210,7 @@ private struct SceneActivationUITestProbe: UIViewRepresentable {
 
         @objc private func scenePhaseChanged(_ notification: Notification) {
             guard notification.object as? UIScene === window?.windowScene else { return }
+            if notification.name == UIScene.didEnterBackgroundNotification { backgroundEntries += 1 }
             DispatchQueue.main.async { [weak self] in self?.updateSnapshot() }
         }
 
@@ -217,6 +221,7 @@ private struct SceneActivationUITestProbe: UIViewRepresentable {
                 "sessionIDs": UIApplication.shared.openSessions
                     .filter { $0.role == .windowApplication }.map(\.persistentIdentifier).sorted(),
                 "isActive": scene.activationState == .foregroundActive,
+                "backgroundEntries": backgroundEntries,
                 "supportsMultipleScenes": UIApplication.shared.supportsMultipleScenes,
             ]
             guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return }

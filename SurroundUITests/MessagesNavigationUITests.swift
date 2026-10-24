@@ -949,9 +949,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         enterDraft(draft, in: composer, app: app)
         let sceneProbe = app.descendants(matching: .any).matching(identifier: "test.sceneActivation").firstMatch
         XCTAssertTrue(sceneProbe.waitForExistence(timeout: 10))
-        let original = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
-        let sessionID = try XCTUnwrap(original?["sessionID"] as? String)
-        let sessionIDs = try XCTUnwrap(original?["sessionIDs"] as? [String])
+        let original = try sceneProbeValue(sceneProbe)
+        let sessionID = try XCTUnwrap(original["sessionID"] as? String)
+        let sessionIDs = try XCTUnwrap(original["sessionIDs"] as? [String])
 
         func assertLatestMessageIsReadable() {
             let transcript = app.scrollViews.matching(identifier: SurroundUITestContract.AccessibilityID.profileConversation)
@@ -965,17 +965,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertLatestMessageIsReadable()
         keepScreenshot("Messages before background return", in: app)
         for cycle in 1...3 {
-            XCUIDevice.shared.press(.home)
-            if !app.wait(for: .runningBackground, timeout: 3) {
-                XCUIApplication(bundleIdentifier: "com.apple.springboard").activate()
-            }
-            XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
-            app.activate()
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-            XCTAssertTrue(waitForCondition { (sceneProbe.value as? String)?.contains("\"isActive\":true") == true })
-            let returned = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
-            XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
-            XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
+            let returned = try returnThroughHomeScreen(app, probe: sceneProbe, step: "Background return \(cycle)")
+            XCTAssertEqual(returned["sessionID"] as? String, sessionID)
+            XCTAssertEqual(returned["sessionIDs"] as? [String], sessionIDs)
             assertLatestMessageIsReadable()
             assertKeyboardHiddenComposerMatchesBaseline()
             keepScreenshot("Messages after background return \(cycle)", in: app)
@@ -1015,17 +1007,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         // Two repeats keep this bounded on Duo, where native idle waits after
         // an interactive keyboard dismissal can each consume a full minute.
         for cycle in 1...2 {
-            XCUIDevice.shared.press(.home)
-            if !app.wait(for: .runningBackground, timeout: 3) {
-                XCUIApplication(bundleIdentifier: "com.apple.springboard").activate()
-            }
-            XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
-            app.activate()
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-            XCTAssertTrue(waitForCondition { (sceneProbe.value as? String)?.contains("\"isActive\":true") == true })
-            let returned = try JSONSerialization.jsonObject(with: Data((sceneProbe.value as? String ?? "").utf8)) as? [String: Any]
-            XCTAssertEqual(returned?["sessionID"] as? String, sessionID)
-            XCTAssertEqual(returned?["sessionIDs"] as? [String], sessionIDs)
+            let returned = try returnThroughHomeScreen(app, probe: sceneProbe, step: "Older-message background return \(cycle)")
+            XCTAssertEqual(returned["sessionID"] as? String, sessionID)
+            XCTAssertEqual(returned["sessionIDs"] as? [String], sessionIDs)
             XCTAssertTrue(waitForCondition {
                 history.isHittable && readableViewport().contains(history.frame)
             }, "The exact older message must remain fully readable without another scroll gesture.")
@@ -1036,6 +1020,58 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
         #endif
     }
+
+    #if !targetEnvironment(macCatalyst)
+    private func sceneProbeValue(_ probe: XCUIElement) throws -> [String: Any] {
+        let json = Data((probe.value as? String ?? "").utf8)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: json) as? [String: Any],
+                             "The scene probe must report JSON.")
+    }
+
+    /// Sends the app to the Home Screen and back, proven by its own scene
+    /// probe: one more background entry and an active scene again. On iPadOS
+    /// 18, RunningBoard can keep reporting the app as foreground after the
+    /// Home Screen is up, so XCUIApplication.state only paces the soft waits.
+    private func returnThroughHomeScreen(_ app: XCUIApplication, probe: XCUIElement,
+                                         step: String) throws -> [String: Any] {
+        let entries = try XCTUnwrap(sceneProbeValue(probe)["backgroundEntries"] as? Int,
+                                    "The scene probe must count background entries.")
+        XCUIDevice.shared.press(.home)
+        var observedBackground = app.wait(for: .runningBackground, timeout: 4)
+        if !observedBackground {
+            keepScreenshot("\(step): Home pressed, XCUIApplication.state \(app.state.rawValue)", in: app)
+            // Some Duo runtimes do not deliver the injected Home button.
+            XCUIApplication(bundleIdentifier: "com.apple.springboard").activate()
+            observedBackground = app.wait(for: .runningBackground, timeout: 6)
+        }
+        app.activate()
+        var returned = [String: Any]()
+        let reactivated = waitForCondition(timeout: 20) {
+            // Read without assertions: a recorded failure would end the test
+            // even when the next poll would succeed.
+            guard probe.exists, let text = probe.value as? String,
+                  let value = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] else {
+                return false
+            }
+            returned = value
+            return value["backgroundEntries"] as? Int == entries + 1 && value["isActive"] as? Bool == true
+        }
+        if !reactivated, !observedBackground, returned["backgroundEntries"] as? Int == entries + 1 {
+            if #unavailable(iOS 26) {
+                keepScreenshot("\(step): no reactivation after an unobserved background", in: app)
+                throw XCTSkip("\(step): the scene entered the background, but XCTest never saw the app leave the"
+                    + " foreground and it did not become active again. This is the iPadOS 18 RunningBoard stall,"
+                    + " not a scene defect. Last probe: \(returned).")
+            }
+        }
+        XCTAssertTrue(reactivated, "\(step): the scene must enter the background once and become active again."
+            + " XCUIApplication.state \(app.state.rawValue), background observed: \(observedBackground),"
+            + " last probe: \(returned).")
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10),
+                      "\(step): XCUIApplication.state \(app.state.rawValue) after the scene became active.")
+        return returned
+    }
+    #endif
 
     func testPlayerSearchEmptyStateStaysAboveSoftwareKeyboard() throws {
         #if targetEnvironment(macCatalyst)
@@ -1388,11 +1424,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     }
 
     #if !targetEnvironment(macCatalyst)
-    @MainActor
-    func testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft() async throws {
+    func testProfileBiographyExternalBrowserBackPreservesReadingContextAndDraft() throws {
         let server = try ProfileBiographyBrowserServer()
         addTeardownBlock { server.stop() }
-        let url = try await server.start(in: self)
+        let url = try server.start()
         let app = launchMessages(additionalLaunchArguments: [SurroundUITestContract.profileBiographyLaunchArgument],
                                  launchEnvironment: ["SURROUND_UI_BIOGRAPHY_BROWSER_URL": url.absoluteString])
         let wide = usesColumns(in: app)
@@ -1407,12 +1442,13 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let sourceLink = biographyLink("Open local biography page", in: app)
         let sourceY = sourceLink.frame.minY
         tap(sourceLink, description: "Open the test-owned biography page in Safari", in: app)
-        let requestedTarget = try await server.waitForRequest(in: self)
+        let requestedTarget = try server.waitForRequest()
         XCTAssertEqual(requestedTarget, ProfileBiographyBrowserServer.requestTarget,
                        "Safari must retain the authored path and query; fragments stay in the browser.")
+        // The cold view service that delayed the request can also delay the page.
         let marker = app.webViews.staticTexts[ProfileBiographyBrowserServer.pageMarker].firstMatch
-        XCTAssertTrue(marker.waitForExistence(timeout: 10), "Safari must display the actual loopback page.")
-        XCTAssertTrue(waitUntilHittable(marker, timeout: 10))
+        XCTAssertTrue(marker.waitForExistence(timeout: 30), "Safari must display the actual loopback page.")
+        XCTAssertTrue(waitUntilHittable(marker, timeout: 30))
         keepScreenshot("Profile biography – local page in Safari", in: app)
         var close: XCUIElement?
         XCTAssertTrue(waitForCondition {
@@ -1422,6 +1458,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }, "Safari must expose its system dismissal control.")
         guard let close else { return }
         tap(close, description: "Return from Safari to About", in: app)
+        // Safari's own controls can outlive its sheet briefly; navigating
+        // before its page leaves could tap Safari's Back instead of the app's.
+        XCTAssertTrue(waitForCondition(timeout: 30) { !marker.exists }, "Closing Safari must remove its page.")
         element(SurroundUITestContract.AccessibilityID.screenPlayerAbout, in: app)
         let restoredLink = biographyWebView(in: app).links["Open local biography page"].firstMatch
         XCTAssertTrue(waitUntilHittable(restoredLink, timeout: 10))
@@ -2429,8 +2468,15 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     }
 
     private func visibleBack(from title: String, in app: XCUIApplication) -> XCUIElement? {
-        let identified = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "BackButton", "Back"))
-            .allElementsBoundByIndex.first(where: { $0.isHittable })
+        let backControl = NSPredicate(format: "identifier == %@ OR label == %@", "BackButton", "Back")
+        // Prefer the titled bar's own Back over any other in the app, such as
+        // one a just-dismissed Safari view leaves behind.
+        if app.navigationBars[title].exists,
+           let own = app.navigationBars[title].buttons.matching(backControl)
+            .allElementsBoundByIndex.first(where: { $0.isHittable }) {
+            return own
+        }
+        let identified = app.buttons.matching(backControl).allElementsBoundByIndex.first(where: { $0.isHittable })
         if let identified { return identified }
         let buttons = app.navigationBars[title].exists ? app.navigationBars[title].buttons : app.navigationBars.buttons
         let named = buttons.matching(NSPredicate(format: "label IN %@", ["Messages", "hakhoa", "khoahong", "CopperKoi", "BambooPath", "About", "Profile", "Game"] + SurroundUITestContract.friendshipFixtureRequestUsernames))
@@ -2463,12 +2509,17 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             }
         case SurroundUITestContract.AccessibilityID.screenPlayerProfile:
             let about = query(SurroundUITestContract.AccessibilityID.profileAbout, in: app)
+            let message = query(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
+            let edit = query(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
+            // The pop can still be settling; wait for the profile's own
+            // controls before choosing which one proves it is usable.
+            XCTAssertTrue(waitForCondition { (about.exists && about.isHittable) || message.exists || edit.exists },
+                          "Back from \(title) must reach a profile; none of its About, Message or Edit controls appeared.")
             if about.exists && about.isHittable {
                 // About was opened from this retained row. At accessibility
                 // sizes the profile actions can be below its viewport.
                 usable = about
             } else {
-                let message = query(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
                 usable = message.exists ? visibleElement(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
                     : visibleElement(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
             }
