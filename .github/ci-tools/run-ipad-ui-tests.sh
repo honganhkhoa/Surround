@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   echo "Usage:" >&2
   echo "  $0 derived-data-path <simulator UDID>" >&2
-  echo "  $0 <build|preflight|main|profile|messages|composer|continuity> <simulator UDID> <result label>" >&2
+  echo "  $0 <build|preflight|main|main-1|main-2|profile|profile-1|profile-2|messages|messages-1|messages-2|composer|continuity> <simulator UDID> <result label>" >&2
 }
 
 if (( $# == 0 )); then
@@ -20,14 +20,14 @@ case "$phase" in
       exit 64
     fi
     ;;
-  build|preflight|main|profile|messages|composer|continuity)
+  build|preflight|main|main-1|main-2|profile|profile-1|profile-2|messages|messages-1|messages-2|composer|continuity)
     if (( $# != 3 )); then
       usage
       exit 64
     fi
     ;;
   *)
-    echo "Expected phase derived-data-path, build, preflight, main, profile, messages, composer, or continuity; received: $phase" >&2
+    echo "Expected phase derived-data-path, build, preflight, main, main-1, main-2, profile, profile-1, profile-2, messages, messages-1, messages-2, composer, or continuity; received: $phase" >&2
     exit 64
     ;;
 esac
@@ -69,6 +69,9 @@ readonly messages_test_case="${test_target}/${messages_test_class}"
 readonly continuity_test_class="GameContinuityUITests"
 readonly continuity_test_source="SurroundUITests/${continuity_test_class}.swift"
 readonly continuity_test_case="${test_target}/${continuity_test_class}"
+readonly localization_test_class="LocalizationUITests"
+readonly localization_test_source="SurroundUITests/${localization_test_class}.swift"
+readonly localization_test_case="${test_target}/${localization_test_class}"
 readonly keyboard_preflight_test_name="testKeyboardPreflightSupportsComposerInput"
 
 # These tests intentionally focus a chat composer or exercise layout while that
@@ -93,7 +96,7 @@ readonly composer_test_names=(
 # exits successfully after running zero tests. Keep the isolation manifest tied
 # to its Swift declarations so a rename cannot silently move a composer test
 # into main, or leave the profile, Messages, or continuity phase empty.
-for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}" "${messages_test_class}:${messages_test_source}" "${continuity_test_class}:${continuity_test_source}"; do
+for class_and_source in "${test_class}:${test_source}" "${profile_test_class}:${profile_test_source}" "${messages_test_class}:${messages_test_source}" "${continuity_test_class}:${continuity_test_source}" "${localization_test_class}:${localization_test_source}"; do
   class_name="${class_and_source%%:*}"
   class_source="${class_and_source#*:}"
   test_class_count="$(
@@ -131,6 +134,43 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
+# The main, profile, and Messages phases each outgrew one CI step, so CI runs
+# each in two parts. Part 2 runs every second test declaration of the phase's
+# class (the SurroundUITests class for main, less the tests main skips); part
+# 1 runs the rest of the phase by skipping exactly those, so a test this scan
+# misses still runs in part 1. Alternating declarations keeps the profile and
+# Messages parts balanced as tests are added. Main's other classes stay in
+# part 1, so main's part 2 also takes the whole, slow LocalizationUITests class.
+second_part_test_names() {
+  grep -Eo "^[[:space:]]*func[[:space:]]+test[[:alnum:]_]*[[:space:]]*\\([[:space:]]*\\)" "$1" \
+    | sed -E 's/^[[:space:]]*func[[:space:]]+//; s/[[:space:]]*\([[:space:]]*\)$//' \
+    | awk 'NR % 2 == 0'
+}
+
+is_excluded_from_main() {
+  local excluded_name
+  for excluded_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
+    if [[ "$1" == "$excluded_name" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+select_main_tests() {
+  selection_arguments=(
+    "-only-testing:${test_target}"
+    "-skip-testing:${test_case}/${keyboard_preflight_test_name}"
+    "-skip-testing:${profile_test_case}"
+    "-skip-testing:${messages_test_case}"
+    "-skip-testing:${continuity_test_case}"
+  )
+  local composer_test_name
+  for composer_test_name in "${composer_test_names[@]}"; do
+    selection_arguments+=("-skip-testing:${test_case}/${composer_test_name}")
+  done
+}
+
 common_arguments=(
   -scheme Surround
   -project Surround.xcodeproj
@@ -163,16 +203,7 @@ case "$phase" in
 
   main)
     mkdir -p TestResults
-    selection_arguments=(
-      "-only-testing:${test_target}"
-      "-skip-testing:${test_case}/${keyboard_preflight_test_name}"
-      "-skip-testing:${profile_test_case}"
-      "-skip-testing:${messages_test_case}"
-      "-skip-testing:${continuity_test_case}"
-    )
-    for test_name in "${composer_test_names[@]}"; do
-      selection_arguments+=("-skip-testing:${test_case}/${test_name}")
-    done
+    select_main_tests
 
     echo "Running the main iPad UI suite without profile, Messages, composer, or continuity tests."
     xcodebuild test-without-building \
@@ -196,6 +227,70 @@ case "$phase" in
       -maximum-test-execution-time-allowance 900 \
       -resultBundlePath \
       "TestResults/SurroundUITests-${result_label}-Profile.xcresult"
+    ;;
+
+  main-1|main-2|profile-1|profile-2|messages-1|messages-2)
+    mkdir -p TestResults
+    part="${phase##*-}"
+    case "$phase" in
+      main-*)
+        part_test_case="$test_case"
+        part_test_source="$test_source"
+        part_result_name="Main"
+        ;;
+      profile-*)
+        part_test_case="$profile_test_case"
+        part_test_source="$profile_test_source"
+        part_result_name="Profile"
+        ;;
+      *)
+        part_test_case="$messages_test_case"
+        part_test_source="$messages_test_source"
+        part_result_name="Messages"
+        ;;
+    esac
+    second_part_names=()
+    while IFS= read -r test_name; do
+      if [[ "$phase" == main-* ]] && is_excluded_from_main "$test_name"; then
+        continue
+      fi
+      second_part_names+=("$test_name")
+    done < <(second_part_test_names "$part_test_source")
+    if (( ${#second_part_names[@]} == 0 )); then
+      echo "Expected at least two test declarations in ${part_test_source} to run it in two parts." >&2
+      exit 1
+    fi
+    if [[ "$part" == "1" ]]; then
+      if [[ "$phase" == main-* ]]; then
+        select_main_tests
+      else
+        selection_arguments=("-only-testing:${part_test_case}")
+      fi
+      for test_name in "${second_part_names[@]}"; do
+        selection_arguments+=("-skip-testing:${part_test_case}/${test_name}")
+      done
+      if [[ "$phase" == main-* ]]; then
+        selection_arguments+=("-skip-testing:${localization_test_case}")
+      fi
+    else
+      selection_arguments=()
+      for test_name in "${second_part_names[@]}"; do
+        selection_arguments+=("-only-testing:${part_test_case}/${test_name}")
+      done
+      if [[ "$phase" == main-* ]]; then
+        selection_arguments+=("-only-testing:${localization_test_case}")
+      fi
+    fi
+
+    echo "Running part ${part} of 2 of the iPad ${part_result_name} UI tests."
+    xcodebuild test-without-building \
+      "${common_arguments[@]}" \
+      "${selection_arguments[@]}" \
+      -test-timeouts-enabled YES \
+      -default-test-execution-time-allowance 900 \
+      -maximum-test-execution-time-allowance 900 \
+      -resultBundlePath \
+      "TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult"
     ;;
 
   messages)

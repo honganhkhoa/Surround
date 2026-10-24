@@ -325,8 +325,16 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             )
             XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed,
                            "Done must dismiss the account sheet.")
-            XCTAssertTrue(element(destinationID, in: app).isHittable,
-                          "Done must reveal the previously selected primary tab.")
+            element(destinationID, in: app)
+            // A screen's identifier also marks containers inside it, and the
+            // first match need not be in front: on iPadOS 18, Home's first
+            // match is a container its scroll view covers.
+            let destinations = app.descendants(matching: .any).matching(identifier: destinationID)
+            let revealed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                destinations.allElementsBoundByIndex.contains { $0.isHittable }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [revealed], timeout: 10), .completed,
+                           "Done must reveal the previously selected primary tab.")
             assertAccountTabsAbsent()
         }
 
@@ -335,6 +343,21 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             return cells.first(where: { $0.isHittable })
                 ?? app.descendants(matching: .any).matching(identifier: identifier)
                     .allElementsBoundByIndex.first(where: { $0.elementType != .staticText && $0.isHittable })
+        }
+
+        // The order check only needs each original row to exist. On an
+        // 11-inch iPad in landscape, the docked software keyboard from the
+        // draft covers the sidebar's last rows, so accept a row cell that the
+        // on-screen keyboard overlaps; a row that is missing, or not hittable
+        // while clear of the keyboard, still fails.
+        func sidebarRow(_ identifier: String) -> XCUIElement? {
+            if let row = visibleSidebarRow(identifier) { return row }
+            let keyboard = app.keyboards.firstMatch
+            guard softwareKeyboardIsVisible(keyboard, in: app) else { return nil }
+            let keyboardFrame = keyboard.frame.intersection(app.frame)
+            return app.cells.matching(identifier: identifier).allElementsBoundByIndex.first {
+                !$0.frame.isEmpty && $0.frame.intersects(keyboardFrame)
+            }
         }
 
         func openSidebarAccountSheet(_ identifier: String, title: String) {
@@ -349,11 +372,11 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
                            "The native \(title) sidebar row must remain available.")
             guard let entry,
-                  let messages = visibleSidebarRow(id.navigationMessages),
-                  let profile = visibleSidebarRow(id.navigationProfile),
-                  let settings = visibleSidebarRow(id.navigationSettings),
-                  let about = visibleSidebarRow(id.navigationAbout),
-                  let web = visibleSidebarRow(id.navigationBrowser) else {
+                  let messages = sidebarRow(id.navigationMessages),
+                  let profile = sidebarRow(id.navigationProfile),
+                  let settings = sidebarRow(id.navigationSettings),
+                  let about = sidebarRow(id.navigationAbout),
+                  let web = sidebarRow(id.navigationBrowser) else {
                 return XCTFail("Expected the original native sidebar rows.")
             }
             let surround = app.staticTexts["Surround"].firstMatch

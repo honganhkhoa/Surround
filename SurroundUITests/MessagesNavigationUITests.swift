@@ -402,50 +402,25 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
         let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
         let pane = wide ? element("messages.detailPane", in: app) : app.windows.firstMatch
-        let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertFalse(keyboard.exists, "The initial latest witness must precede keyboard focus.")
-        let letterKey = keyboard.keys.matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "The initial latest witness must precede keyboard focus.")
 
-        func assertLatestIsReadable(_ checkpoint: String, requiresSoftwareKeyboard: Bool,
-                                    requiresKeyboardAbsent: Bool = false) {
-            let readable = waitForCondition {
-                let window = app.windows.firstMatch.frame
-                let composerFrame = composer.frame
-                guard !window.isEmpty, !window.isNull, composer.exists, composer.isHittable,
-                      !composerFrame.isEmpty, !composerFrame.isNull, window.contains(composerFrame) else { return false }
-                if requiresSoftwareKeyboard {
-                    // A visible letter key distinguishes a full software keyboard
-                    // from a hardware-keyboard accessory bar.
-                    guard keyboard.exists, letterKey.exists, letterKey.isHittable else { return false }
-                    let keyboardFrame = keyboard.frame
-                    let keyFrame = letterKey.frame
-                    guard !keyboardFrame.isEmpty, !keyboardFrame.isNull,
-                          !keyFrame.isEmpty, !keyFrame.isNull,
-                          window.contains(keyboardFrame), keyboardFrame.contains(keyFrame),
-                          composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
-                } else if requiresKeyboardAbsent && keyboard.exists { return false }
-                guard latest.exists, latest.isHittable else { return false }
-                let latestFrame = latest.frame
-                let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
-                return !viewport.isEmpty && !viewport.isNull && !latestFrame.isEmpty && !latestFrame.isNull
-                    && viewport.contains(latestFrame)
-            }
-            keepScreenshot(checkpoint, in: app)
-            XCTAssertTrue(readable, "\(checkpoint): the exact latest message and composer must fit the same unobscured viewport without a repair gesture.")
+        func assertLatestIsReadable(_ checkpoint: String, keyboard requirement: ConversationKeyboard) {
+            assertConversationReadable(["Offline message from hakhoa"], transcript: transcript, composer: composer,
+                                       pane: pane, keyboard: requirement, checkpoint: checkpoint,
+                                       expectation: "the exact latest message and composer must fit the same unobscured viewport without a repair gesture.",
+                                       in: app)
         }
-        assertLatestIsReadable("Messages before draft typing", requiresSoftwareKeyboard: false,
-                               requiresKeyboardAbsent: true)
+        assertLatestIsReadable("Messages before draft typing", keyboard: .absent)
         let draft = "Unsent through software keyboard transition"
         tap(composer, description: "Focus the private-message draft", in: app)
         composer.typeText(String(draft.prefix(1)))
         XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: 10))
         // The first typeText call can show only the hardware-keyboard accessory.
         // Keep the first-character readability check before completing the draft.
-        assertLatestIsReadable("Messages after first draft character", requiresSoftwareKeyboard: false)
+        assertLatestIsReadable("Messages after first draft character", keyboard: .any)
         composer.typeText(String(draft.dropFirst()))
         XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
-        assertLatestIsReadable("Messages after complete draft with full software keyboard", requiresSoftwareKeyboard: true)
+        assertLatestIsReadable("Messages after complete draft with full software keyboard", keyboard: .fullSoftware)
         #endif
     }
 
@@ -498,14 +473,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let pane = wide ? element("messages.detailPane", in: app) : app.windows.firstMatch
         let draft = "Unsent short conversation draft"
         enterDraft(draft, in: composer, app: app)
-        let initialLatest = transcript.staticTexts.matching(NSPredicate(
-            format: "label == %@", SurroundUITestContract.messagesShortHistoryLatestText)).firstMatch
-        assertMessagesReadableWithSoftwareKeyboard([initialLatest], transcript: transcript,
-            composer: composer, pane: pane, draft: draft,
+        assertMessagesReadableWithSoftwareKeyboard([SurroundUITestContract.messagesShortHistoryLatestText],
+            transcript: transcript, composer: composer, pane: pane, draft: draft,
             checkpoint: "Short history follows latest before incoming replay", in: app)
-        let latest = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
-        assertMessagesReadableWithSoftwareKeyboard([latest], transcript: transcript,
-            composer: composer, pane: pane, draft: draft,
+        _ = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
+        assertMessagesReadableWithSoftwareKeyboard([SurroundUITestContract.messagesIncomingLatestText],
+            transcript: transcript, composer: composer, pane: pane, draft: draft,
             checkpoint: "Short history follows incoming replies without a repair gesture", in: app)
         #endif
     }
@@ -533,19 +506,19 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let pane = element("messages.detailPane", in: app)
         let draft = "Unsent draft through rotation"
         enterDraft(draft, in: composer, app: app)
-        let latest = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
+        _ = releaseMessagesReplayAndAssertDelivery(transcript: transcript, in: app)
         let oldest = transcript.staticTexts["Hello"].firstMatch
         // The endpoint witnesses prove that all four ordered messages fit before
         // rotation; this specifically covers fitting content becoming scrollable.
-        assertMessagesReadableWithSoftwareKeyboard([oldest, latest], transcript: transcript,
-            composer: composer, pane: pane, draft: draft,
+        assertMessagesReadableWithSoftwareKeyboard(["Hello", SurroundUITestContract.messagesIncomingLatestText],
+            transcript: transcript, composer: composer, pane: pane, draft: draft,
             checkpoint: "Short history fits portrait above the full software keyboard", in: app)
         let portraitViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
 
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(waitForCondition { app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height })
-        assertMessagesReadableWithSoftwareKeyboard([latest], transcript: transcript,
-            composer: composer, pane: pane, draft: draft,
+        assertMessagesReadableWithSoftwareKeyboard([SurroundUITestContract.messagesIncomingLatestText],
+            transcript: transcript, composer: composer, pane: pane, draft: draft,
             checkpoint: "Rotation retains latest with keyboard and draft without a repair gesture", in: app)
         let landscapeViewport = transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
         XCTAssertLessThan(landscapeViewport.height, portraitViewport.height)
@@ -554,29 +527,13 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         #endif
     }
 
-    private func assertMessagesReadableWithSoftwareKeyboard(_ messages: [XCUIElement],
+    private func assertMessagesReadableWithSoftwareKeyboard(_ messageLabels: [String],
         transcript: XCUIElement, composer: XCUIElement, pane: XCUIElement, draft: String,
         checkpoint: String, in app: XCUIApplication) {
-        let keyboard = app.keyboards.firstMatch
-        let letterKey = keyboard.keys.matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
-        let readable = waitForCondition {
-            guard composer.exists, composer.isHittable, (composer.value as? String) == draft,
-                  keyboard.exists, letterKey.exists, letterKey.isHittable else { return false }
-            let window = app.windows.firstMatch.frame
-            let keyboardFrame = keyboard.frame
-            let composerFrame = composer.frame
-            guard !window.isEmpty, !keyboardFrame.isEmpty, !composerFrame.isEmpty,
-                  window.contains(composerFrame), window.contains(keyboardFrame),
-                  keyboardFrame.contains(letterKey.frame),
-                  composerFrame.maxY <= keyboardFrame.minY + 1 else { return false }
-            let viewport = self.transcriptViewport(transcript, above: composer, within: pane.frame, in: app)
-            return !viewport.isEmpty && messages.allSatisfy {
-                $0.exists && $0.isHittable && !$0.frame.isEmpty && viewport.contains($0.frame)
-            }
-        }
-        keepScreenshot(checkpoint, in: app)
-        XCTAssertTrue(readable,
-                      "\(checkpoint): the entire message must be readable above the composer with the exact draft and a full software letter keyboard retained.")
+        assertConversationReadable(messageLabels, transcript: transcript, composer: composer, pane: pane,
+                                   keyboard: .fullSoftware, draft: draft, checkpoint: checkpoint,
+                                   expectation: "the entire message must be readable above the composer with the exact draft and a full software letter keyboard retained.",
+                                   in: app)
     }
 
     private func releaseMessagesReplay(in app: XCUIApplication) {
@@ -2082,25 +2039,35 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     }
 
     private func messagesViewport(_ bounds: CGRect, in app: XCUIApplication) -> CGRect {
-        let bounds = bounds.intersection(app.windows.firstMatch.frame).intersection(app.frame)
+        let composers = app.textFields.matching(identifier: SurroundUITestContract.AccessibilityID.privateMessageComposer)
+        return messagesViewport(bounds, window: app.windows.firstMatch.frame, application: app.frame,
+                                navigationBars: app.navigationBars.allElementsBoundByIndex.map { $0.frame },
+                                tabBars: app.tabBars.allElementsBoundByIndex.map { $0.frame },
+                                keyboards: app.keyboards.allElementsBoundByIndex.map { $0.frame },
+                                composer: composers.allElementsBoundByIndex.first(where: { $0.isHittable })?.frame)
+    }
+
+    private func messagesViewport(_ bounds: CGRect, window: CGRect, application: CGRect,
+                                  navigationBars: [CGRect], tabBars: [CGRect], keyboards: [CGRect],
+                                  composer: CGRect?) -> CGRect {
+        let bounds = bounds.intersection(window).intersection(application)
         guard !bounds.isEmpty, !bounds.isNull, bounds.minX.isFinite, bounds.minY.isFinite,
               bounds.width.isFinite, bounds.height.isFinite else { return .zero }
         var top = bounds.minY
         var bottom = bounds.maxY
-        for bar in app.navigationBars.allElementsBoundByIndex where bar.frame.intersects(bounds) {
-            top = max(top, bar.frame.maxY)
+        for bar in navigationBars where bar.intersects(bounds) {
+            top = max(top, bar.maxY)
         }
-        for bar in app.tabBars.allElementsBoundByIndex where bar.frame.intersects(bounds) {
-            bottom = min(bottom, bar.frame.minY)
+        for bar in tabBars where bar.intersects(bounds) {
+            bottom = min(bottom, bar.minY)
         }
-        for keyboard in app.keyboards.allElementsBoundByIndex where keyboard.frame.intersects(bounds) {
-            bottom = min(bottom, keyboard.frame.minY)
+        for keyboard in keyboards where keyboard.intersects(bounds) {
+            bottom = min(bottom, keyboard.minY)
         }
         // Keyboard AX can omit the input-assistant strip. The visible peer
         // composer supplies a measured boundary for both Messages panes.
-        let composers = app.textFields.matching(identifier: SurroundUITestContract.AccessibilityID.privateMessageComposer)
-        if let composer = composers.allElementsBoundByIndex.first(where: { $0.isHittable }) {
-            bottom = min(bottom, composer.frame.minY)
+        if let composer {
+            bottom = min(bottom, composer.minY)
         }
         guard bottom > top + 24, bounds.width > 16 else { return .zero }
         return CGRect(x: bounds.minX, y: top, width: bounds.width, height: bottom - top)
@@ -2124,11 +2091,183 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let viewport = messagesViewport(transcript.frame.intersection(paneBounds), in: app)
         guard !viewport.isEmpty else { return .zero }
         let heading = query("messages.conversation.heading", in: app)
-        let top = heading.exists && heading.isHittable && heading.frame.intersects(paneBounds)
-            ? max(viewport.minY, heading.frame.maxY + 12) : viewport.minY
-        let bottom = min(viewport.maxY, composer.frame.minY - 12)
+        return transcriptViewport(viewport, heading: heading.exists && heading.isHittable ? heading.frame : nil,
+                                  composer: composer.frame, within: paneBounds)
+    }
+
+    private func transcriptViewport(_ viewport: CGRect, heading: CGRect?, composer: CGRect,
+                                    within paneBounds: CGRect) -> CGRect {
+        let top = heading.map { $0.intersects(paneBounds) ? max(viewport.minY, $0.maxY + 12) : viewport.minY }
+            ?? viewport.minY
+        let bottom = min(viewport.maxY, composer.minY - 12)
         return CGRect(x: viewport.minX, y: top, width: viewport.width,
                       height: max(0, bottom - top))
+    }
+
+    private enum ConversationKeyboard {
+        case any, absent, fullSoftware
+    }
+
+    /// One readability check's frames, read from immutable snapshots. With
+    /// the software keyboard up, every live query walks the transcript and
+    /// keyboard trees, and the 26 or so queries of one live check could
+    /// outlast its waiter on CI before a single evaluation finished. A few
+    /// snapshot round trips and live keyboard frames let the waiter poll
+    /// several times.
+    private struct ConversationReadability {
+        var window = CGRect.null
+        var keyboard: CGRect?
+        var letterKey: CGRect?
+        var composer = CGRect.null
+        var composerValue: String?
+        var viewport = CGRect.zero
+        var messages = [String: CGRect]()
+        /// The frames that bound the viewport, for failure messages.
+        var viewportInputs = ""
+
+        /// The first unmet condition, or nil when the messages are readable.
+        func problem(_ labels: [String], keyboard requirement: ConversationKeyboard, draft: String?) -> String? {
+            func usable(_ frame: CGRect) -> Bool { !frame.isEmpty && !frame.isNull }
+            guard usable(window) else { return "the window has no frame" }
+            guard usable(composer), window.contains(composer) else {
+                return "the composer \(composer) is outside the window \(window)"
+            }
+            if let draft, composerValue != draft {
+                return "the composer holds \(composerValue.map { "“\($0)”" } ?? "no value"), not the draft"
+            }
+            switch requirement {
+            case .any:
+                break
+            case .absent:
+                if let keyboard { return "a keyboard \(keyboard) is still present" }
+            case .fullSoftware:
+                // A visible letter key distinguishes a full software keyboard
+                // from a hardware-keyboard accessory bar.
+                guard let keyboard, let letterKey, usable(keyboard), usable(letterKey) else {
+                    return "no full software keyboard with a letter key is present"
+                }
+                guard window.contains(keyboard) else {
+                    return "the keyboard \(keyboard) is outside the window \(window)"
+                }
+                guard keyboard.contains(letterKey) else {
+                    return "the letter key \(letterKey) is outside the keyboard \(keyboard)"
+                }
+                guard composer.maxY <= keyboard.minY + 1 else {
+                    return "the composer \(composer) overlaps the keyboard \(keyboard)"
+                }
+            }
+            guard usable(viewport) else { return "the transcript has no readable viewport (\(viewportInputs))" }
+            for label in labels {
+                guard let frame = messages[label], usable(frame) else { return "“\(label)” is not in the transcript" }
+                guard viewport.contains(frame) else {
+                    return "“\(label)” \(frame) is outside the readable viewport \(viewport)"
+                }
+            }
+            return nil
+        }
+    }
+
+    private func conversationReadability(of labels: [String], transcript: XCUIElement, composer: XCUIElement,
+                                         pane: XCUIElement, keyboard requirement: ConversationKeyboard,
+                                         in app: XCUIApplication) -> ConversationReadability? {
+        guard let root = try? app.snapshot(), let transcriptRoot = try? transcript.snapshot(),
+              let composerSnapshot = try? composer.snapshot() else { return nil }
+        let paneBounds = pane.frame
+        func preorder(_ root: XCUIElementSnapshot) -> [XCUIElementSnapshot] {
+            var ordered = [XCUIElementSnapshot]()
+            var pending = [root]
+            while let snapshot = pending.popLast() {
+                ordered.append(snapshot)
+                pending.append(contentsOf: snapshot.children.reversed())
+            }
+            return ordered
+        }
+        let elements = preorder(root)
+        func frames(_ type: XCUIElement.ElementType) -> [CGRect] {
+            elements.filter { $0.elementType == type }.map { $0.frame }
+        }
+        var readability = ConversationReadability()
+        readability.window = root.children.first { $0.elementType == .window }?.frame ?? .null
+        readability.composer = composerSnapshot.frame
+        readability.composerValue = composerSnapshot.value as? String
+        // The keyboard lives in its own window, and in landscape its snapshot
+        // frames stay in that window's unrotated space. Read them live.
+        let keyboards = app.keyboards.allElementsBoundByIndex.map { $0.frame }
+        readability.keyboard = keyboards.first
+        if requirement == .fullSoftware, readability.keyboard != nil {
+            let letterKey = app.keyboards.firstMatch.keys
+                .matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
+            readability.letterKey = letterKey.exists ? letterKey.frame : nil
+        }
+        let messageTexts = preorder(transcriptRoot).filter { $0.elementType == .staticText }
+        for label in labels {
+            readability.messages[label] = messageTexts.first { $0.identifier == label || $0.label == label }?.frame
+        }
+        let bounds = transcriptRoot.frame.intersection(paneBounds)
+        readability.viewportInputs = "transcript in pane \(bounds), window \(readability.window), "
+            + "application \(root.frame), navigation bars \(frames(.navigationBar)), tab bars \(frames(.tabBar)), "
+            + "keyboards \(keyboards), composer \(composerSnapshot.frame)"
+        let viewport = messagesViewport(bounds, window: readability.window, application: root.frame,
+                                        navigationBars: frames(.navigationBar), tabBars: frames(.tabBar),
+                                        keyboards: keyboards, composer: composerSnapshot.frame)
+        guard !viewport.isEmpty else { return readability }
+        // The pane heading sits above the transcript, so its bound never
+        // exceeds the viewport's own inset; a visible center stands in for
+        // the live hit test.
+        let heading = elements.first { $0.identifier == "messages.conversation.heading" }?.frame
+        let visibleHeading = heading.flatMap { frame in
+            !frame.isEmpty && readability.window.contains(CGPoint(x: frame.midX, y: frame.midY)) ? frame : nil
+        }
+        readability.viewport = transcriptViewport(viewport, heading: visibleHeading,
+                                                  composer: composerSnapshot.frame, within: paneBounds)
+        return readability
+    }
+
+    /// Waits for the messages to fit the readable viewport, then waits for
+    /// the composer, the messages and, when a full software keyboard is
+    /// required, its letter key to accept touches while the messages still fit.
+    private func assertConversationReadable(_ labels: [String], transcript: XCUIElement, composer: XCUIElement,
+                                            pane: XCUIElement, keyboard requirement: ConversationKeyboard,
+                                            draft: String? = nil, checkpoint: String, expectation: String,
+                                            in app: XCUIApplication) {
+        let noEvaluation = "no evaluation completed"
+        var lastCheck = noEvaluation
+        func fits() -> Bool {
+            guard let readability = conversationReadability(of: labels, transcript: transcript, composer: composer,
+                                                            pane: pane, keyboard: requirement, in: app) else {
+                // A waiter interrupts the evaluation in flight at its
+                // deadline; keep the last complete result for the message.
+                if lastCheck == noEvaluation { lastCheck = "the accessibility snapshot was unavailable" }
+                return false
+            }
+            if let problem = readability.problem(labels, keyboard: requirement, draft: draft) {
+                lastCheck = problem
+                return false
+            }
+            lastCheck = "every condition held"
+            return true
+        }
+        let fitted = waitForCondition(timeout: 30) { fits() }
+        keepScreenshot(checkpoint, in: app)
+        XCTAssertTrue(fitted, "\(checkpoint): \(expectation) Last check: \(lastCheck).")
+        let messages = labels.map { label in
+            transcript.staticTexts.matching(NSPredicate(format: "identifier == %@ OR label == %@", label, label)).firstMatch
+        }
+        let letterKey = app.keyboards.firstMatch.keys
+            .matching(NSPredicate(format: "label == %@ OR label == %@", "u", "U")).firstMatch
+        let touchTargets = [("the composer", composer)] + zip(labels.map { "“\($0)”" }, messages).map { ($0, $1) }
+            + (requirement == .fullSoftware ? [("the letter key", letterKey)] : [])
+        lastCheck = noEvaluation
+        let touchable = waitForCondition(timeout: 30) {
+            if let blocked = touchTargets.first(where: { !$0.1.isHittable }) {
+                lastCheck = "\(blocked.0) did not accept touches"
+                return false
+            }
+            return fits()
+        }
+        XCTAssertTrue(touchable, "\(checkpoint): the composer, \(labels.map { "“\($0)”" }.joined(separator: ", "))"
+            + "\(requirement == .fullSoftware ? " and the letter key" : "") must accept touches while they fit."
+            + " Last check: \(lastCheck).")
     }
 
     private func dragMessagesViewport(_ viewport: CGRect, toward target: CGRect?,
@@ -2513,8 +2652,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForCondition { !alert.exists })
     }
 
-    private func waitForCondition(_ condition: @escaping () -> Bool) -> Bool {
+    private func waitForCondition(timeout: TimeInterval = 10, _ condition: @escaping () -> Bool) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
-        return XCTWaiter.wait(for: [expectation], timeout: 10) == .completed
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }

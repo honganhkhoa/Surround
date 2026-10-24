@@ -146,7 +146,7 @@ jobs:
 
   ipad-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 80
+    timeout-minutes: 135
 
     steps:
       - uses: actions/checkout@v4
@@ -159,6 +159,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Prefer an iPadOS 26 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -166,17 +167,26 @@ jobs:
 
       - name: Build iPad UI tests
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run main iPad UI tests
+      - name: Run main iPad UI tests, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh main \
+          .github/ci-tools/run-ipad-ui-tests.sh main-1 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run main iPad UI tests, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main-2 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad UI test results
@@ -190,7 +200,7 @@ jobs:
 
   ipad-messages-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 80
+    timeout-minutes: 135
 
     steps:
       - uses: actions/checkout@v4
@@ -203,6 +213,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Prefer an iPadOS 26 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -210,17 +221,26 @@ jobs:
 
       - name: Build iPad UI tests
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad Messages UI tests
+      - name: Run iPad Messages UI tests, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh messages \
+          .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad Messages UI tests, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad Messages UI test results
@@ -234,7 +254,7 @@ jobs:
 
   ipad-profile-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 80
+    timeout-minutes: 135
 
     steps:
       - uses: actions/checkout@v4
@@ -247,6 +267,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Prefer an iPadOS 26 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -254,17 +275,26 @@ jobs:
 
       - name: Build iPad UI tests
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad profile UI tests
+      - name: Run iPad profile UI tests, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh profile \
+          .github/ci-tools/run-ipad-ui-tests.sh profile-1 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad profile UI tests, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile-2 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad profile UI test results
@@ -280,7 +310,7 @@ jobs:
   # step also warms the UI build's derived data.
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 155
 
     steps:
       - uses: actions/checkout@v4
@@ -306,6 +336,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Run unit tests on iOS 18
+        timeout-minutes: 20
         shell: bash
         run: |
           set -o pipefail
@@ -323,6 +354,7 @@ jobs:
             -resultBundlePath TestResults/SurroundTests-iOS18.xcresult
 
       - name: Prefer an iPadOS 18 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -330,17 +362,26 @@ jobs:
 
       - name: Build iPad UI tests on iPadOS 18
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad profile UI tests on iPadOS 18
+      - name: Run iPad profile UI tests on iPadOS 18, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh profile \
+          .github/ci-tools/run-ipad-ui-tests.sh profile-1 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad profile UI tests on iPadOS 18, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile-2 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iOS 18 test results
@@ -354,7 +395,7 @@ jobs:
 
   minimum-ios-18-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 80
+    timeout-minutes: 135
 
     steps:
       - uses: actions/checkout@v4
@@ -373,6 +414,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Prefer an iPadOS 18 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -380,17 +422,26 @@ jobs:
 
       - name: Build iPad UI tests on iPadOS 18
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run main iPad UI tests on iPadOS 18
+      - name: Run main iPad UI tests on iPadOS 18, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh main \
+          .github/ci-tools/run-ipad-ui-tests.sh main-1 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run main iPad UI tests on iPadOS 18, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main-2 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iPadOS 18 UI test results
@@ -404,7 +455,7 @@ jobs:
 
   minimum-ios-18-messages-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 80
+    timeout-minutes: 135
 
     steps:
       - uses: actions/checkout@v4
@@ -423,6 +474,7 @@ jobs:
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
 
       - name: Prefer an iPadOS 18 hardware keyboard
+        timeout-minutes: 10
         shell: bash
         run: |
           .github/ci-tools/configure-ios-simulator-hardware-keyboard.sh \
@@ -430,17 +482,26 @@ jobs:
 
       - name: Build iPad UI tests on iPadOS 18
         id: ipad_ui_build
+        timeout-minutes: 20
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad Messages UI tests on iPadOS 18
+      - name: Run iPad Messages UI tests on iPadOS 18, part 1 of 2
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
-        timeout-minutes: 60
+        timeout-minutes: 50
         shell: bash
         run: |
-          .github/ci-tools/run-ipad-ui-tests.sh messages \
+          .github/ci-tools/run-ipad-ui-tests.sh messages-1 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad Messages UI tests on iPadOS 18, part 2 of 2
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh messages-2 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iPadOS 18 Messages UI test results
