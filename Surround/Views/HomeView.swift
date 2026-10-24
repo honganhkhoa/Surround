@@ -42,6 +42,7 @@ private enum RecentFinishedGamesLoadState: Equatable {
 
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.tabBarPlacement) private var tabBarPlacement
     @Environment(\.iPadTabContext) private var iPadTabContext
@@ -218,6 +219,7 @@ struct HomeView: View {
     // MARK: - Sections
 
     private var bandColumns: Int { HomeLayout.compactColumns(for: width) }
+    private var theme: SurroundTheme { SurroundTheme.current(storedID: gameThemeID) }
     /// Section bands: full-width headers with one card per game.
     private var usesBands: Bool { bandColumns > 1 }
     private var margin: CGFloat { usesBands ? HomeLayout.bandMargin : HomeLayout.listMargin }
@@ -241,7 +243,10 @@ struct HomeView: View {
     private func sectionHeader<Trailing: View>(
         _ title: String, count: Int? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }
     ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+        return layout {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(verbatim: title)
                     .font(.title3.bold())
@@ -252,8 +257,13 @@ struct HomeView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8)
+            // Headings scroll across the scene's brightest and darkest details.
+            .modifier(HomeSceneLegibility())
+            if !dynamicTypeSize.isAccessibilitySize {
+                Spacer(minLength: 8)
+            }
             trailing()
+                .modifier(HomeSceneLegibility())
         }
         .padding(.horizontal, 4)
         .padding(.top, 18)
@@ -392,11 +402,14 @@ struct HomeView: View {
     /// No active games: one message and one way to start.
     private var firstRunView: some View {
         VStack(spacing: 10) {
-            Text("No active games")
-                .font(.title2.bold())
-            Text("Start a game, and it will show up here.", comment: "Homeview - first run, when the user has no active games")
-                .modifier(HomeSecondaryText())
-                .multilineTextAlignment(.center)
+            VStack(spacing: 10) {
+                Text("No active games")
+                    .font(.title2.bold())
+                Text("Start a game, and it will show up here.", comment: "Homeview - first run, when the user has no active games")
+                    .modifier(HomeSecondaryText())
+                    .multilineTextAlignment(.center)
+            }
+            .modifier(HomeSceneLegibility())
             Button(action: { nav.home.showingNewGameView = true }) {
                 Label("New game", systemImage: "plus")
                     .font(.body.weight(.semibold))
@@ -532,7 +545,7 @@ struct HomeView: View {
         }
         .refreshable { await refresh() }
         // The scene stays put behind the scrolling games.
-        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
+        .background { HomeBackdrop() }
     }
 
     /// Pull to refresh: the overview, then the history preview.
@@ -1009,7 +1022,7 @@ struct HomeView: View {
             nav.handle(route: route)
         }
         .navigationTitle(ogs.isLoggedIn ? String(localized: "Active games") : String(localized: "Welcome"))
-        .surroundTheme(SurroundTheme.current(storedID: gameThemeID))
+        .surroundTheme(theme)
         .sheet(isPresented: $nav.home.showingNewGameView) {
             AppNavigationStack {
                 NewGameView(newGameOption: initialNewGameOption)
@@ -1100,6 +1113,65 @@ private extension HomeGameEntry.Context {
 
 private struct HomeSkeletonEntry: Identifiable {
     let id: Int
+}
+
+/// The scene behind Home, softened under the large title: a veil in the
+/// page color that fades out below it, as on the canvas, so the title reads
+/// while the art still shows through. Its height follows the title's safe
+/// area as it collapses and grows with Dynamic Type, without replacing the
+/// navigation bar's own appearance or scroll-edge effects.
+private struct HomeBackdrop: View {
+    @Environment(\.surroundTheme) private var theme
+    private let fadeLength: CGFloat = 72
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                GameDetailBackdrop().ignoresSafeArea(.container)
+                if theme.hasScene {
+                    let titleArea = geometry.safeAreaInsets.top
+                    let height = titleArea + fadeLength
+                    LinearGradient(
+                        stops: [
+                            .init(color: theme.pageBackground.opacity(0.82), location: 0),
+                            .init(color: theme.pageBackground.opacity(0.62), location: titleArea / height),
+                            .init(color: theme.pageBackground.opacity(0), location: 1),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea(.container, edges: .top)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Text set on a theme's scene rather than on a card: a thin halo in the
+/// page color edges the glyphs, and a feathered patch of it, sized to the
+/// words, quiets the art just behind them. It keeps text readable over the
+/// scene's brightest and darkest details without hiding the art. Plain
+/// pages need neither.
+struct HomeSceneLegibility: ViewModifier {
+    @Environment(\.surroundTheme) private var theme
+
+    func body(content: Content) -> some View {
+        if theme.hasScene {
+            content
+                .shadow(color: theme.pageBackground.opacity(0.9), radius: 1)
+                .background {
+                    Capsule()
+                        .fill(theme.pageBackground.opacity(0.65))
+                        .padding(-8)
+                        .blur(radius: 10)
+                }
+        } else {
+            content
+        }
+    }
 }
 
 /// New game with its star menu in one action-colored capsule. A view of its

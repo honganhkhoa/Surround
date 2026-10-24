@@ -48,6 +48,7 @@ struct WelcomeView: View {
                 Text("Surround is a client to play Go online with other players on the website Online-Go.com, also known as Online Go Server (OGS).")
                     .font(.callout)
                     .padding(.horizontal, 4)
+                    .modifier(HomeSceneLegibility())
                 VStack(spacing: 10) {
                     accountLink(path: "sign-in") {
                         Text("Sign in to your OGS account")
@@ -66,6 +67,7 @@ struct WelcomeView: View {
                         .font(.subheadline)
                         .modifier(HomeSecondaryText())
                         .padding(.horizontal, 4)
+                        .modifier(HomeSceneLegibility())
                         .padding(.top, 18)
                 }
             }
