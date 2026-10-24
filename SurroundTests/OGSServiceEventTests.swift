@@ -2912,6 +2912,75 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertTrue(service.sortedActiveCorrespondenceGames.isEmpty)
     }
 
+    func testKnownClockGamesWithoutSpeedAreClassifiedFromTheirClock() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket, installsObservers: false)
+        let fixture = try makeEmptyGameData(id: 100)
+        service.user = fixture.players.black
+
+        func overviewGame(
+            id: Int,
+            size: Int,
+            timeControl: [String: Any],
+            currentPlayerID: Int
+        ) throws -> [String: Any] {
+            var entry = try makeOverviewGameData(
+                id: id, speed: "live", currentPlayerID: currentPlayerID
+            )
+            var gameData = try XCTUnwrap(entry["json"] as? [String: Any])
+            gameData["width"] = size
+            gameData["height"] = size
+            gameData["time_control"] = timeControl
+            entry["width"] = size
+            entry["height"] = size
+            entry["json"] = gameData
+            return entry
+        }
+        // About 1581 s per move on 19×19, but 7018 s on 9×9.
+        let absolute: [String: Any] = [
+            "system": "absolute", "time_control": "absolute", "total_time": 200_000,
+        ]
+        let blitzFischer: [String: Any] = [
+            "system": "fischer", "time_control": "fischer",
+            "initial_time": 30, "time_increment": 5, "max_time": 60,
+        ]
+        let userID = fixture.players.black.id
+        let opponentID = fixture.players.white.id
+
+        service.processOverview(overview: [
+            "active_games": [
+                try overviewGame(id: 321, size: 19, timeControl: absolute, currentPlayerID: userID),
+                try overviewGame(id: 322, size: 9, timeControl: absolute, currentPlayerID: userID),
+                try overviewGame(id: 323, size: 19, timeControl: blitzFischer, currentPlayerID: opponentID),
+                try overviewGame(
+                    id: 324, size: 9,
+                    timeControl: ["system": "none", "time_control": "none"],
+                    currentPlayerID: opponentID
+                ),
+                try overviewGame(
+                    id: 325, size: 19,
+                    timeControl: blitzFischer.merging(["speed": "correspondence"]) { $1 },
+                    currentPlayerID: opponentID
+                ),
+                try overviewGame(
+                    id: 326, size: 19,
+                    timeControl: ["system": "future-clock", "time_control": "future-clock"],
+                    currentPlayerID: userID
+                ),
+            ],
+        ])
+
+        for id in [321, 322, 323, 324, 326] {
+            XCTAssertNil(service.activeGames[id]?.gameData?.timeControl.speed, "game \(id)")
+        }
+        XCTAssertEqual(Set(service.liveGames.compactMap(\.ogsID)), [321, 323])
+        XCTAssertEqual(service.sortedActiveCorrespondenceGamesOnUserTurn.compactMap(\.ogsID), [322])
+        XCTAssertEqual(
+            Set(service.sortedActiveCorrespondenceGamesNotOnUserTurn.compactMap(\.ogsID)), [324, 325]
+        )
+        XCTAssertEqual(service.unclassifiedActiveGames.compactMap(\.ogsID), [326])
+    }
+
     func testOverviewSortsTiedCorrespondenceGamesByGameID() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket, installsObservers: false)

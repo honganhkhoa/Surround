@@ -1270,15 +1270,22 @@ class OGSService: ObservableObject {
         var liveGames: [Game] = []
         var unclassifiedGames: [Game] = []
         for game in activeGames {
-            if game.gameData?.timeControl.speed == .correspondence {
+            guard let gameData = game.gameData else { continue }
+            // OGS sometimes omits the speed tag. Classify those games from
+            // their clock, as the web client does; only unknown clock
+            // systems stay unclassified.
+            let speed = gameData.timeControl.speed ?? gameData.timeControl.inferredSpeed(
+                boardWidth: gameData.width, boardHeight: gameData.height
+            )
+            if speed == .correspondence {
                 if isOnUserTurn(game: game) {
                     gamesOnUserTurn.append(game)
                 } else {
                     gamesOnOpponentTurn.append(game)
                 }
-            } else if game.gameData?.timeControl.speed?.isRealtime == true {
+            } else if speed?.isRealtime == true {
                 liveGames.append(game)
-            } else if game.gameData != nil, game.gameData?.timeControl.speed == nil {
+            } else {
                 unclassifiedGames.append(game)
             }
         }

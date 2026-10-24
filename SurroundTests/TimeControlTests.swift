@@ -306,6 +306,109 @@ final class TimeControlTests: XCTestCase {
         XCTAssertEqual(TimeControlSystem.Absolute(totalTime: 900).speed, .live)
     }
 
+    // A game lasts about 0.7·w·h moves, half per player: 126.5 per player on
+    // 19×19, 59 on 13×13 and 28.5 on 9×9. Averages round to whole seconds,
+    // halves up, before the 10 s and 3600 s thresholds apply.
+    private func assertInferredSpeed(
+        _ system: TimeControlSystem,
+        on size: Int,
+        _ expected: TimeControlSpeed?,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            system.timeControlObject.inferredSpeed(boardWidth: size, boardHeight: size),
+            expected,
+            "\(system) on \(size)×\(size)",
+            file: file,
+            line: line
+        )
+    }
+
+    func testMissingSpeedIsInferredFromClockAndBoardSize() throws {
+        let payload = #"{"time_control":"absolute","system":"absolute","total_time":200000,"pause_on_weekends":false}"#
+
+        let control = try decoder.decode(TimeControl.self, from: Data(payload.utf8))
+
+        XCTAssertNil(control.speed)
+        XCTAssertEqual(control.inferredSpeed(boardWidth: 19, boardHeight: 19), .live)
+        XCTAssertEqual(control.inferredSpeed(boardWidth: 9, boardHeight: 9), .correspondence)
+    }
+
+    func testInferredSpeedForFischer() {
+        assertInferredSpeed(.Fischer(initialTime: 1201, timeIncrement: 0, maxTime: 1201), on: 19, .blitz)
+        assertInferredSpeed(.Fischer(initialTime: 1202, timeIncrement: 0, maxTime: 1202), on: 19, .live)
+        assertInferredSpeed(.Fischer(initialTime: 270, timeIncrement: 0, maxTime: 270), on: 9, .blitz)
+        assertInferredSpeed(.Fischer(initialTime: 271, timeIncrement: 0, maxTime: 271), on: 9, .live)
+        assertInferredSpeed(.Fischer(initialTime: 300, timeIncrement: 5, maxTime: 600), on: 19, .blitz)
+        assertInferredSpeed(.Fischer(initialTime: 300, timeIncrement: 5, maxTime: 600), on: 9, .live)
+        assertInferredSpeed(.Fischer(initialTime: 0, timeIncrement: 0, maxTime: 0), on: 19, .correspondence)
+        assertInferredSpeed(
+            .Fischer(initialTime: 3 * 86400, timeIncrement: 86400, maxTime: 7 * 86400), on: 19, .correspondence
+        )
+    }
+
+    func testInferredSpeedForByoYomi() {
+        assertInferredSpeed(.ByoYomi(mainTime: 0, periods: 5, periodTime: 9), on: 19, .blitz)
+        assertInferredSpeed(.ByoYomi(mainTime: 0, periods: 5, periodTime: 10), on: 19, .live)
+        assertInferredSpeed(.ByoYomi(mainTime: 300, periods: 5, periodTime: 5), on: 19, .blitz)
+        assertInferredSpeed(.ByoYomi(mainTime: 300, periods: 5, periodTime: 5), on: 9, .live)
+        assertInferredSpeed(.ByoYomi(mainTime: 63, periods: 5, periodTime: 3600), on: 19, .live)
+        assertInferredSpeed(.ByoYomi(mainTime: 64, periods: 5, periodTime: 3600), on: 19, .correspondence)
+        assertInferredSpeed(.ByoYomi(mainTime: 14, periods: 5, periodTime: 3600), on: 9, .live)
+        assertInferredSpeed(.ByoYomi(mainTime: 15, periods: 5, periodTime: 3600), on: 9, .correspondence)
+    }
+
+    func testInferredSpeedForSimple() {
+        for size in [9, 19] {
+            assertInferredSpeed(.Simple(perMove: 0), on: size, .correspondence)
+            assertInferredSpeed(.Simple(perMove: 9), on: size, .blitz)
+            assertInferredSpeed(.Simple(perMove: 10), on: size, .live)
+            assertInferredSpeed(.Simple(perMove: 3600), on: size, .live)
+            assertInferredSpeed(.Simple(perMove: 3601), on: size, .correspondence)
+        }
+    }
+
+    func testInferredSpeedForCanadian() {
+        assertInferredSpeed(.Canadian(mainTime: 0, periodTime: 94, stonesPerPeriod: 10), on: 19, .blitz)
+        assertInferredSpeed(.Canadian(mainTime: 0, periodTime: 95, stonesPerPeriod: 10), on: 19, .live)
+        assertInferredSpeed(.Canadian(mainTime: 300, periodTime: 50, stonesPerPeriod: 10), on: 19, .blitz)
+        assertInferredSpeed(.Canadian(mainTime: 300, periodTime: 50, stonesPerPeriod: 10), on: 9, .live)
+        assertInferredSpeed(
+            .Canadian(mainTime: 7 * 86400, periodTime: 7 * 86400, stonesPerPeriod: 10), on: 9, .correspondence
+        )
+    }
+
+    func testInferredSpeedForAbsolute() {
+        assertInferredSpeed(.Absolute(totalTime: 1201), on: 19, .blitz)
+        assertInferredSpeed(.Absolute(totalTime: 1202), on: 19, .live)
+        assertInferredSpeed(.Absolute(totalTime: 455_463), on: 19, .live)
+        assertInferredSpeed(.Absolute(totalTime: 455_464), on: 19, .correspondence)
+        assertInferredSpeed(.Absolute(totalTime: 270), on: 9, .blitz)
+        assertInferredSpeed(.Absolute(totalTime: 271), on: 9, .live)
+        assertInferredSpeed(.Absolute(totalTime: 102_614), on: 9, .live)
+        assertInferredSpeed(.Absolute(totalTime: 102_615), on: 9, .correspondence)
+        assertInferredSpeed(.Absolute(totalTime: 560), on: 13, .blitz)
+        assertInferredSpeed(.Absolute(totalTime: 561), on: 13, .live)
+        assertInferredSpeed(.Absolute(totalTime: 0), on: 19, .correspondence)
+
+        // The fixed 90-move estimate behind `speed` calls this live.
+        XCTAssertEqual(TimeControlSystem.Absolute(totalTime: 900).speed, .live)
+        assertInferredSpeed(.Absolute(totalTime: 900), on: 19, .blitz)
+    }
+
+    func testInferredSpeedWithoutBoardSizeAssumesNinetyMovesPerPlayer() {
+        assertInferredSpeed(.Absolute(totalTime: 854), on: 0, .blitz)
+        assertInferredSpeed(.Absolute(totalTime: 855), on: 0, .live)
+    }
+
+    func testInferredSpeedForNoAndUnknownTimeControl() {
+        for size in [9, 19] {
+            assertInferredSpeed(.None, on: size, .correspondence)
+            assertInferredSpeed(.Unknown("future-clock"), on: size, nil)
+        }
+    }
+
     func testUnusualTimeControlBoundaries() {
         XCTAssertTrue(TimeControlSystem.Simple(perMove: 3).isUnusual)
         XCTAssertFalse(TimeControlSystem.Simple(perMove: 4).isUnusual)

@@ -165,17 +165,22 @@ enum TimeControlSystem: Hashable {
     }
 
     var averageSecondsPerMove: Double? {
+        averageSecondsPerMove(movesPerPlayer: 90)
+    }
+
+    /// Per-system formulas from Goban's `computeAverageMoveTime`.
+    private func averageSecondsPerMove(movesPerPlayer: Double) -> Double? {
         switch self {
         case .Fischer(let initialTime, let timeIncrement, _):
-            return Double(initialTime) / 90.0 + Double(timeIncrement)
+            return Double(initialTime) / movesPerPlayer + Double(timeIncrement)
         case .ByoYomi(let mainTime, _, let periodTime):
-            return Double(mainTime) / 90.0 + Double(periodTime)
+            return Double(mainTime) / movesPerPlayer + Double(periodTime)
         case .Simple(let perMove):
             return Double(perMove)
         case .Canadian(let mainTime, let periodTime, let stonesPerPeriod):
-            return Double(mainTime) / 90.0 + Double(periodTime) / Double(stonesPerPeriod)
+            return Double(mainTime) / movesPerPlayer + Double(periodTime) / Double(stonesPerPeriod)
         case .Absolute(let totalTime):
-            return Double(totalTime) / 90.0
+            return Double(totalTime) / movesPerPlayer
         case .None:
             return 0
         case .Unknown:
@@ -185,6 +190,21 @@ enum TimeControlSystem: Hashable {
 
     var speed: TimeControlSpeed? {
         guard let secondsPerMove = averageSecondsPerMove else { return nil }
+        return Self.speed(averageSecondsPerMove: secondsPerMove)
+    }
+
+    /// Mirrors the OGS web client's `classifyGameSpeed`: a game lasts about
+    /// 0.7·w·h moves, half of them per player, and Goban rounds the average
+    /// to whole seconds before classifying it.
+    func inferredSpeed(boardWidth: Int, boardHeight: Int) -> TimeControlSpeed? {
+        let movesPerPlayer = boardWidth > 0 && boardHeight > 0
+            ? (0.7 * Double(boardWidth) * Double(boardHeight)).rounded() / 2
+            : 90
+        guard let secondsPerMove = averageSecondsPerMove(movesPerPlayer: movesPerPlayer) else { return nil }
+        return Self.speed(averageSecondsPerMove: secondsPerMove.rounded())
+    }
+
+    private static func speed(averageSecondsPerMove secondsPerMove: Double) -> TimeControlSpeed {
         if secondsPerMove == 0 || secondsPerMove > 3600 {
             return .correspondence
         } else if secondsPerMove < 10 {
@@ -418,7 +438,13 @@ struct TimeControl: Codable, Equatable, Hashable {
         }
         return TimeControlSpeed(rawValue: wireSpeed) ?? system.speed
     }
-    
+
+    /// Classifies a game whose OGS payload omits the speed tag from its clock
+    /// and board size. Nil for clock systems the client does not know.
+    func inferredSpeed(boardWidth: Int, boardHeight: Int) -> TimeControlSpeed? {
+        system.inferredSpeed(boardWidth: boardWidth, boardHeight: boardHeight)
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         var encodableCodingData = codingData
