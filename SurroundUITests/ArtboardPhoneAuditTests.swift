@@ -482,6 +482,18 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                                          boardBrightnessBand: 0.30...0.60)
     }
 
+    func testNightGardenBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "nightGarden", appearance: .light,
+                                         suffix: "night-garden", pageBrightnessBand: 0.70...1,
+                                         boardBrightnessBand: 0.45...0.75)
+    }
+
+    func testNightGardenNightBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "nightGarden", appearance: .dark,
+                                         suffix: "night-garden-night", pageBrightnessBand: 0...0.25,
+                                         boardBrightnessBand: 0.35...0.65)
+    }
+
     func testFeltMeadowBoardMarkerGallery() throws {
         try auditThemeBoardMarkerGallery(theme: "feltMeadow", appearance: .light,
                                          suffix: "felt-meadow", pageBrightnessBand: 0.60...1,
@@ -691,6 +703,41 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                              suffix: "-surround-studio-night", appearance: .dark)
     }
 
+    func testNightGardenThemeStates() throws {
+        try auditThemeStates(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                             appearance: .light)
+    }
+
+    func testNightGardenThemeScoring() throws {
+        try auditThemeScoring(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                              appearance: .light)
+    }
+
+    func testNightGardenNightThemeScoring() throws {
+        try auditThemeScoring(theme: "nightGarden", title: "Night Garden in Dark Mode", suffix: "-night-garden-night",
+                              appearance: .dark)
+    }
+
+    func testNightGardenThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                                 appearance: .light)
+    }
+
+    func testNightGardenThemeControlStates() {
+        auditThemeControlStates(theme: "nightGarden", title: "Night Garden", appearance: .light,
+                                suffix: "-night-garden")
+    }
+
+    func testNightGardenThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                                       appearance: nil, deviceAppearance: .light)
+    }
+
+    func testNightGardenNightThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "nightGarden", title: "Night Garden in Dark Mode", suffix: "-night-garden-night",
+                                       appearance: nil, deviceAppearance: .dark)
+    }
+
     func testFeltMeadowThemeStates() throws {
         try auditThemeStates(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow", appearance: .light)
     }
@@ -820,10 +867,25 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         try auditThemePanelTransitions(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow")
     }
 
-    private func auditThemePanelTransitions(theme: String, title: String, suffix: String) throws {
+    private func auditThemePanelTransitions(theme: String, title: String, suffix: String,
+                                           appearance: SurroundUITestContract.Appearance? = .light,
+                                           deviceAppearance: XCUIDevice.Appearance? = nil) throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
                           "The compact theme transition audit requires an iPhone.")
-        let app = launch(artboard: 1, theme: theme, appearance: .light)
+        if let deviceAppearance {
+            let device = XCUIDevice.shared
+            let originalAppearance = device.appearance
+            addTeardownBlock { device.appearance = originalAppearance }
+            device.appearance = deviceAppearance
+            XCTAssertTrue(pollUntil(timeout: 10) { device.appearance == deviceAppearance },
+                          "Native toolbar evidence uses the requested device appearance")
+            XCTAssertNil(appearance, "A fixture override must not mask the device's native toolbar appearance")
+        }
+        let app = launch(artboard: 1, theme: theme, appearance: appearance)
+        if let deviceAppearance {
+            XCTAssertFalse(app.launchArguments.contains(SurroundUITestContract.appearanceLaunchArgument))
+            XCTAssertEqual(XCUIDevice.shared.appearance, deviceAppearance)
+        }
         defer {
             XCUIDevice.shared.orientation = .portrait
             app.terminate()
@@ -835,6 +897,23 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             XCTAssertEqual(board.value as? String, value, "Rotation retains the same game position")
             let orientation = portrait ? "portrait" : "landscape"
             auditStudioPanelTransitions(in: app) { step in
+                if portrait, let deviceAppearance, step == "02-chat" {
+                    // Check rendered pigment as well as the device getter in
+                    // portrait, before rotating the same session. Landscape
+                    // screenshot pixels carry orientation metadata; its full
+                    // interactions, geometry and native captures remain audited.
+                    // The trailing chat gutter avoids text and board artwork.
+                    let chat = app.scrollViews[ID.gameChatLog].firstMatch.frame
+                    let patch = CGRect(x: chat.maxX - 12, y: chat.midY, width: 6, height: 6)
+                    let band: ClosedRange<Double> = deviceAppearance == .light ? 0.70...1 : 0...0.35
+                    var observedBrightness: Double?
+                    XCTAssertTrue(self.pollUntil(timeout: 10) {
+                        guard let image = app.screenshot().image.cgImage else { return false }
+                        observedBrightness = self.markerGalleryBrightness(in: patch, image: image, frame: app.frame)
+                        guard let brightness = observedBrightness else { return false }
+                        return band.contains(brightness)
+                    }, "Chat must render the requested system palette while native toolbar controls remain usable; brightness=\(String(describing: observedBrightness)), expected=\(band), patch=\(patch), app=\(app.frame)")
+                }
                 self.capture(portrait ? 1 : 2, app: app,
                              note: "\(title) \(orientation), \(step). Same session; compare fixed decoration across panel transitions.",
                              suffix: "\(suffix)-transition-\(orientation)-\(step)")

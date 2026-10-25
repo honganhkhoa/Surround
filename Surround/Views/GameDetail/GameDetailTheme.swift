@@ -9,6 +9,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     case surroundStudio
     case frostPine
     case feltMeadow
+    case nightGarden
 
     var id: Self { self }
 
@@ -53,6 +54,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .surroundStudio: "Surround Studio"
         case .frostPine: "Frost & Pine"
         case .feltMeadow: "Felt Meadow"
+        case .nightGarden: "Night Garden"
         }
     }
 
@@ -61,10 +63,10 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// writes it from the app's own rendering.
     var previewImageName: String { "ThemePreview-\(rawValue)" }
 
-    /// Natural scenes and standard follow the system; Nebula stays dark.
+    /// Scene lighting follows the system; Nebula keeps its midnight palette.
     var colorScheme: ColorScheme? {
         switch self {
-        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow: nil
+        case .standard, .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden: nil
         case .nebulaPearl: .dark
         }
     }
@@ -72,6 +74,32 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
     /// Resolve image grading alongside the board palette. The image references
     /// stay cached, so an appearance change does not decode or regenerate art.
     func board(for scheme: ColorScheme) -> BoardAppearance {
+        if self == .nightGarden, scheme == .dark {
+            var night = board
+            night.boardColor = Color(themeHex: 0x83947E)
+            night.compactBoardColor = Color(themeHex: 0x83947E)
+            night.boardEdge = Color(themeHex: 0x4D513E).opacity(0.9)
+            night.boardTexture?.tint = Color(themeHex: 0xE1E6E2)
+            // Subdue the light without changing amethyst/champagne identity.
+            night.stoneImages?.tint = Color(themeHex: 0xE8E5E0)
+            night.gridColor = Color(themeHex: 0x112018)
+            night.coordinateColor = Color(themeHex: 0x112018)
+            night.black.flat = Color(themeHex: 0x361336)
+            night.white.flat = Color(themeHex: 0xE4D3B8)
+            night.white.outline = Color(themeHex: 0x3D3427)
+            night.white.territory = Color(themeHex: 0xE4D3B8)
+            night.emptyPointMarker = Color(themeHex: 0x112018)
+            night.markOutline = Color(themeHex: 0x112018)
+            night.dameColor = Color(themeHex: 0x503014)
+            night.highlightColor = Color(themeHex: 0x143848)
+            night.crosshair = .init(valid: Color(themeHex: 0x1A3B25),
+                                   invalid: Color(themeHex: 0x5D2032),
+                                   removal: Color(themeHex: 0x143848))
+            night.removeMark = Color(themeHex: 0x5D2032)
+            night.restoreMark = Color(themeHex: 0x1A3B25)
+            night.removedStoneOutline = Color(themeHex: 0x112018)
+            return night
+        }
         if self == .frostPine, scheme == .dark {
             var night = board
             night.boardColor = Color(themeHex: 0x9BAFB9)
@@ -441,6 +469,49 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 removalMarkCasing: Color(themeHex: 0xFFF9ED),
                 removedStoneOutline: Color(themeHex: 0x64543B)
             )
+        case .nightGarden:
+            return BoardAppearance(
+                boardColor: Color(themeHex: 0x98A78E),
+                compactBoardColor: Color(themeHex: 0x98A78E),
+                boardEdge: Color(themeHex: 0x645C40).opacity(0.85),
+                boardTexture: NightGardenAssets.board,
+                // A thin bronze contour holds the quiet glass, without a
+                // raised slab or lifted rim. The native grid stays exact.
+                gridLineScale: 1.1,
+                stoneImages: NightGardenAssets.stones,
+                stoneLightDirection: .upperLeft,
+                imageStoneShadow: .raised,
+                gridColor: Color(themeHex: 0x17251E),
+                coordinateColor: Color(themeHex: 0x17251E),
+                black: StonePalette(
+                    highlight: Color(themeHex: 0xA16998), shade: Color(themeHex: 0x210C2A),
+                    flat: Color(themeHex: 0x3E143E), outline: Color(themeHex: 0x210C2A),
+                    rim: Color(themeHex: 0xC49BB9).opacity(0.6),
+                    lastMove: Color(themeHex: 0xFFF1D7), label: Color(themeHex: 0xFFF1D7),
+                    detailedMarkerCasing: Color(themeHex: 0x170D1A)
+                ),
+                white: StonePalette(
+                    highlight: Color(themeHex: 0xFFF5E3), shade: Color(themeHex: 0xB08D62),
+                    flat: Color(themeHex: 0xF2DEC1), outline: Color(themeHex: 0x4D3C2A),
+                    rim: Color(themeHex: 0xFFF5E3).opacity(0.7),
+                    lastMove: Color(themeHex: 0x301A2A), label: Color(themeHex: 0x301A2A),
+                    territory: Color(themeHex: 0xF2DEC1),
+                    detailedMarkerCasing: Color(themeHex: 0xFFF1D7)
+                ),
+                emptyPointMarker: Color(themeHex: 0x17251E),
+                markOutline: Color(themeHex: 0x17251E),
+                dameColor: Color(themeHex: 0x633C15),
+                highlightColor: Color(themeHex: 0x18475E),
+                highlightCasing: Color(themeHex: 0xFFF1D7),
+                crosshair: .init(valid: Color(themeHex: 0x244A32),
+                                 invalid: Color(themeHex: 0x6B2639),
+                                 removal: Color(themeHex: 0x18475E)),
+                crosshairWidth: 1.5,
+                removeMark: Color(themeHex: 0x6B2639),
+                restoreMark: Color(themeHex: 0x244A32),
+                removalMarkCasing: Color(themeHex: 0xFFF1D7),
+                removedStoneOutline: Color(themeHex: 0x17251E)
+            )
         case .frostPine:
             return BoardAppearance(
                 boardColor: Color(themeHex: 0xDDE2E3),
@@ -500,6 +571,69 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         }
     }
+}
+
+/// Stained-glass artwork is separate from the native board and its grid.
+/// The crystal cutouts have transparent margins and a shared 0.94 footprint.
+private enum NightGardenAssets {
+    static let stones: StoneImages? = {
+        guard let black = UIImage(named: "NightGardenBlackStone"),
+              let white = UIImage(named: "NightGardenWhiteStone") else { return nil }
+        return StoneImages(black: [black], white: [white])
+    }()
+    static let board = UIImage(named: "NightGardenBoard").map { BoardTexture(image: $0, mapping: .board) }
+}
+
+/// The same garden in daylight and dimmed evening light. Cached providers
+/// preserve amethyst/champagne identity while surfaces and inks follow traits.
+private enum NightGardenColors {
+    private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        })
+    }
+
+    static let page = adaptive(0xE9E7D8, 0x0D1C1D)
+    static let panel = adaptive(0xF5F1E4, 0x1A2B2A)
+    static let foreground = adaptive(0x28362D, 0xF3EDDB)
+    static let detailSecondary = adaptive(0x53614F, 0xC3CBB6)
+    static let panelBorder = adaptive(0x69745A, 0xB9AD7C)
+    static let blackGlass = adaptive(0x3E143E, 0x311932)
+    static let whiteGlass = adaptive(0xF2DEC1, 0xD9C8AC)
+    static let whiteIdentityGlass = adaptive(0xF6E5CD, 0xDFCDB2)
+    static let action = adaptive(0x725035, 0x62402D)
+    static let chatBubble = adaptive(0xD9DECB, 0x2C4140)
+    static let selection = adaptive(0x285566, 0xA8D2DA)
+    static let conditional = adaptive(0x78501F, 0xF0CB8D)
+    static let cream = adaptive(0xFFF4DF, 0xF1E8DA)
+    static let keyline = adaptive(0xFFF4DF, 0x0D1C1D)
+    static let treeGuide = adaptive(0x69745A, 0xA7B8A2)
+    static let idle = adaptive(0xC9D1BE, 0x344841)
+    static let blackSurfaceTop = adaptive(0x5B3455, 0x442440)
+    static let blackSurfaceBottom = adaptive(0x331E35, 0x211422)
+    static let whiteSurfaceTop = adaptive(0xEAD5B6, 0xCBBBA3)
+    static let whiteSurfaceBottom = adaptive(0xFFF2D8, 0xE4D5BA)
+    static let blackSolid = adaptive(0x3E143E, 0x311932)
+    static let whiteForeground = adaptive(0x2B2028, 0x241D22)
+    static let blackAccent = adaptive(0xF3D39B, 0xE8C991)
+    static let whiteAccent = adaptive(0x5B3D1E, 0x4F351C)
+    static let turnOutline = adaptive(0x8A672A, 0xC5A467)
+    static let turnGlow = adaptive(0xB58D40, 0xD8BC7A)
+    static let blackBorder = adaptive(0xC3A1B9, 0xB99BB0)
+    static let whiteBorder = adaptive(0x6C573B, 0x5C4C35)
+    static let blackSecondary = adaptive(0xE2CADD, 0xDBC4D9)
+    static let whiteSecondary = adaptive(0x594739, 0x483B30)
+    static let darkModerator = adaptive(0xE2C2F6, 0xDEC0F2)
+    static let lightModerator = adaptive(0x653376, 0x542B63)
+    static let darkProfessional = adaptive(0xBDE5AD, 0xB4DBA7)
+    static let lightProfessional = adaptive(0x28502C, 0x214327)
+    static let darkSupporter = adaptive(0xF3D39B, 0xE8C991)
+    static let lightSupporter = adaptive(0x704216, 0x5A3516)
+    static let darkOrdinary = adaptive(0xBDDDF3, 0xB5D3E9)
+    static let lightOrdinary = adaptive(0x204962, 0x1B3D53)
 }
 
 /// Rendered with Blender; the scene scripts and asset notes are kept with the
@@ -798,6 +932,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.page
         case .frostPine: FrostPineColors.page
         case .feltMeadow: FeltMeadowColors.page
+        case .nightGarden: NightGardenColors.page
         }
     }
 
@@ -809,6 +944,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.panel
         case .frostPine: FrostPineColors.panel
         case .feltMeadow: FeltMeadowColors.panel
+        case .nightGarden: NightGardenColors.panel
         }
     }
 
@@ -819,13 +955,18 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.foreground
         case .frostPine: FrostPineColors.foreground
         case .feltMeadow: FeltMeadowColors.foreground
+        case .nightGarden: NightGardenColors.foreground
         }
     }
 
     /// Secondary information in opaque detail panels needs its own pigment;
     /// hierarchical opacity becomes too faint over the meadow's cream.
     var detailSecondaryForeground: Color {
-        self == .feltMeadow ? FeltMeadowColors.detailSecondary : .secondary
+        switch self {
+        case .feltMeadow: FeltMeadowColors.detailSecondary
+        case .nightGarden: NightGardenColors.detailSecondary
+        default: .secondary
+        }
     }
 
     var panelBorder: Color {
@@ -841,6 +982,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.panelBorder.opacity(0.28)
         case .frostPine: FrostPineColors.panelBorder.opacity(0.28)
         case .feltMeadow: FeltMeadowColors.panelBorder.opacity(0.28)
+        case .nightGarden: NightGardenColors.panelBorder.opacity(0.28)
         }
     }
 
@@ -853,7 +995,7 @@ extension SurroundTheme {
 
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
-    var usesLightSceneSurfaces: Bool { self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow }
+    var usesLightSceneSurfaces: Bool { self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden }
 
     /// Other themes retain their existing surfaces. Image identity remains
     /// stable through clock ticks; only its native grade follows appearance.
@@ -882,6 +1024,8 @@ extension SurroundTheme {
             color == .black ? FrostPineColors.blackGlass.opacity(0.82) : FrostPineColors.whiteGlass.opacity(0.84)
         case .feltMeadow:
             color == .black ? FeltMeadowColors.blackGlass.opacity(0.82) : FeltMeadowColors.whiteGlass.opacity(0.84)
+        case .nightGarden:
+            color == .black ? NightGardenColors.blackGlass.opacity(0.82) : NightGardenColors.whiteGlass.opacity(0.84)
         }
     }
 
@@ -900,6 +1044,8 @@ extension SurroundTheme {
             color == .black ? FrostPineColors.blackGlass.opacity(0.86) : FrostPineColors.whiteIdentityGlass.opacity(0.90)
         case .feltMeadow:
             color == .black ? FeltMeadowColors.blackGlass.opacity(0.86) : FeltMeadowColors.whiteIdentityGlass.opacity(0.90)
+        case .nightGarden:
+            color == .black ? NightGardenColors.blackGlass.opacity(0.86) : NightGardenColors.whiteIdentityGlass.opacity(0.90)
         }
     }
 
@@ -913,6 +1059,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.action
         case .frostPine: FrostPineColors.action
         case .feltMeadow: FeltMeadowColors.action
+        case .nightGarden: NightGardenColors.action
         }
     }
 
@@ -922,11 +1069,18 @@ extension SurroundTheme {
         case .surroundStudio: actionTint?.opacity(0.86)
         case .frostPine: actionTint?.opacity(0.86)
         case .feltMeadow: actionTint?.opacity(0.86)
+        case .nightGarden: actionTint?.opacity(0.86)
         case .rakedGarden: actionTint?.opacity(0.88)
         default: actionTint
         }
     }
 
+
+    /// Pond-blue coordinate links follow Night Garden's bubble appearance.
+    /// Other themes keep the existing system-indigo treatment.
+    var chatCoordinateForeground: Color {
+        self == .nightGarden ? NightGardenColors.selection : Color(uiColor: .systemIndigo)
+    }
 
     /// Main-channel chat bubbles.
     var chatBubble: Color {
@@ -937,6 +1091,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.chatBubble
         case .frostPine: FrostPineColors.chatBubble
         case .feltMeadow: FeltMeadowColors.chatBubble
+        case .nightGarden: NightGardenColors.chatBubble
         }
     }
 }
@@ -954,6 +1109,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.selection
         case .frostPine: FrostPineColors.selection
         case .feltMeadow: FeltMeadowColors.selection
+        case .nightGarden: NightGardenColors.selection
         }
     }
 
@@ -967,6 +1123,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.conditional
         case .frostPine: FrostPineColors.conditional
         case .feltMeadow: FeltMeadowColors.conditional
+        case .nightGarden: NightGardenColors.conditional
         }
     }
 
@@ -980,6 +1137,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.keyline
         case .frostPine: FrostPineColors.keyline
         case .feltMeadow: FeltMeadowColors.keyline
+        case .nightGarden: NightGardenColors.keyline
         }
     }
 
@@ -992,6 +1150,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.treeGuide.opacity(0.24)
         case .frostPine: FrostPineColors.treeGuide.opacity(0.24)
         case .feltMeadow: FeltMeadowColors.treeGuide.opacity(0.24)
+        case .nightGarden: NightGardenColors.treeGuide.opacity(0.24)
         }
     }
 
@@ -1004,6 +1163,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.selection
         case .frostPine: FrostPineColors.selection
         case .feltMeadow: FeltMeadowColors.selection
+        case .nightGarden: NightGardenColors.selection
         }
     }
 
@@ -1013,7 +1173,7 @@ extension SurroundTheme {
         switch self {
         case .standard: nil
         case .nebulaPearl: Color(themeHex: 0xB7A4FF).opacity(0.85)
-        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow: nil
+        case .rakedGarden, .surroundStudio, .frostPine, .feltMeadow, .nightGarden: nil
         }
     }
 
@@ -1026,6 +1186,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.conditional
         case .frostPine: FrostPineColors.conditional
         case .feltMeadow: FeltMeadowColors.conditional
+        case .nightGarden: NightGardenColors.conditional
         }
     }
 
@@ -1038,6 +1199,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.idle
         case .frostPine: FrostPineColors.idle
         case .feltMeadow: FeltMeadowColors.idle
+        case .nightGarden: NightGardenColors.idle
         }
     }
 }
@@ -1102,6 +1264,13 @@ extension SurroundTheme {
             }
             return [.init(color: FeltMeadowColors.whiteSurfaceTop, location: 0),
                     .init(color: FeltMeadowColors.whiteSurfaceBottom, location: 1)]
+        case .nightGarden:
+            if color == .black {
+                return [.init(color: NightGardenColors.blackSurfaceTop, location: 0),
+                        .init(color: NightGardenColors.blackSurfaceBottom, location: 1)]
+            }
+            return [.init(color: NightGardenColors.whiteSurfaceTop, location: 0),
+                    .init(color: NightGardenColors.whiteSurfaceBottom, location: 1)]
         }
     }
 
@@ -1114,6 +1283,7 @@ extension SurroundTheme {
         case .surroundStudio: color == .black ? SurroundStudioColors.blackSolid : SurroundStudioColors.whiteGlass
         case .frostPine: color == .black ? FrostPineColors.blackSolid : FrostPineColors.whiteGlass
         case .feltMeadow: color == .black ? FeltMeadowColors.blackSolid : FeltMeadowColors.whiteGlass
+        case .nightGarden: color == .black ? NightGardenColors.blackSolid : NightGardenColors.whiteGlass
         }
     }
 
@@ -1125,6 +1295,7 @@ extension SurroundTheme {
         case .surroundStudio: color == .black ? SurroundStudioColors.cream : SurroundStudioColors.whiteForeground
         case .frostPine: color == .black ? FrostPineColors.cream : FrostPineColors.whiteForeground
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
+        case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
         }
     }
 
@@ -1137,12 +1308,14 @@ extension SurroundTheme {
         case .surroundStudio: color == .black ? SurroundStudioColors.blackAccent : SurroundStudioColors.whiteAccent
         case .frostPine: color == .black ? FrostPineColors.blackAccent : FrostPineColors.whiteAccent
         case .feltMeadow: color == .black ? FeltMeadowColors.blackAccent : FeltMeadowColors.whiteAccent
+        case .nightGarden: color == .black ? NightGardenColors.blackAccent : NightGardenColors.whiteAccent
         }
     }
 
     /// Keep the existing warning red on every daytime/other-theme clock.
     /// Pale night clocks need deeper red; dark clocks use brighter coral.
     func clockSuddenDeathAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: color == .white ? 0x7D293B : 0xFFB5AF) }
         if self == .feltMeadow {
             return Color(themeHex: color == .white ? 0x7D2D2D : 0xFFADA1)
         }
@@ -1161,6 +1334,7 @@ extension SurroundTheme {
 
     /// The warning badge uses a solid pigment beneath its white text.
     func clockSuddenDeathBadge(scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: 0x8B3449) }
         if self == .frostPine { return Color(themeHex: 0x913748) }
         if self == .feltMeadow { return Color(themeHex: 0x8B3434) }
         if self == .surroundStudio, scheme == .dark {
@@ -1171,6 +1345,7 @@ extension SurroundTheme {
 
     /// Scoring acceptance remains green, with a deeper pigment on night ivory.
     func clockAgreementAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: color == .white ? 0x284B31 : 0xBDDEA9) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xBCE7B8 : 0x254C30)
         }
@@ -1186,6 +1361,7 @@ extension SurroundTheme {
 
     /// The auto-resign countdown and disconnected label share an amber accent.
     func clockDisconnectedAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1201,6 +1377,7 @@ extension SurroundTheme {
 
     /// Inline undo text sits directly on the player's clock, without a badge.
     func clockUndoAccent(_ color: StoneColor, scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: color == .white ? 0x633D15 : 0xF3D39B) }
         if self == .frostPine {
             return Color(themeHex: color == .black ? 0xF2D09C : 0x603814)
         }
@@ -1215,6 +1392,7 @@ extension SurroundTheme {
 
     /// The full undo badge needs its own darker amber beneath white text.
     func clockUndoBadge(scheme: ColorScheme) -> Color {
+        if self == .nightGarden { return Color(themeHex: 0x79501F) }
         if self == .frostPine { return Color(themeHex: 0x795022) }
         if self == .feltMeadow { return Color(themeHex: 0x73511E) }
         if self == .surroundStudio, scheme == .dark {
@@ -1237,6 +1415,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.turnOutline
         case .frostPine: FrostPineColors.turnOutline
         case .feltMeadow: FeltMeadowColors.turnOutline
+        case .nightGarden: NightGardenColors.turnOutline
         }
     }
 
@@ -1249,6 +1428,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.turnGlow
         case .frostPine: FrostPineColors.turnGlow
         case .feltMeadow: FeltMeadowColors.turnGlow
+        case .nightGarden: NightGardenColors.turnGlow
         }
     }
 
@@ -1263,6 +1443,7 @@ extension SurroundTheme {
         case .surroundStudio: SurroundStudioColors.action
         case .frostPine: FrostPineColors.action
         case .feltMeadow: FeltMeadowColors.action
+        case .nightGarden: NightGardenColors.action
         }
     }
 
@@ -1292,6 +1473,10 @@ extension SurroundTheme {
             color == .black
                 ? [FeltMeadowColors.blackSurfaceTop, FeltMeadowColors.blackSurfaceBottom]
                 : [FeltMeadowColors.whiteSurfaceTop, FeltMeadowColors.whiteSurfaceBottom]
+        case .nightGarden:
+            color == .black
+                ? [NightGardenColors.blackSurfaceTop, NightGardenColors.blackSurfaceBottom]
+                : [NightGardenColors.whiteSurfaceTop, NightGardenColors.whiteSurfaceBottom]
         }
     }
 
@@ -1315,6 +1500,10 @@ extension SurroundTheme {
             color == .black
                 ? FeltMeadowColors.blackBorder.opacity(0.3)
                 : FeltMeadowColors.whiteBorder.opacity(0.35)
+        case .nightGarden:
+            color == .black
+                ? NightGardenColors.blackBorder.opacity(0.3)
+                : NightGardenColors.whiteBorder.opacity(0.35)
         }
     }
 
@@ -1326,6 +1515,7 @@ extension SurroundTheme {
         case .surroundStudio: color == .black ? SurroundStudioColors.cream : SurroundStudioColors.whiteForeground
         case .frostPine: color == .black ? FrostPineColors.cream : FrostPineColors.whiteForeground
         case .feltMeadow: color == .black ? FeltMeadowColors.cream : FeltMeadowColors.whiteForeground
+        case .nightGarden: color == .black ? NightGardenColors.cream : NightGardenColors.whiteForeground
         }
     }
 
@@ -1343,6 +1533,8 @@ extension SurroundTheme {
             color == .black ? FrostPineColors.blackSecondary : FrostPineColors.whiteSecondary
         case .feltMeadow:
             color == .black ? FeltMeadowColors.blackSecondary : FeltMeadowColors.whiteSecondary
+        case .nightGarden:
+            color == .black ? NightGardenColors.blackSecondary : NightGardenColors.whiteSecondary
         }
     }
 
@@ -1396,6 +1588,21 @@ extension SurroundTheme {
             }
             return darkSurface ? FeltMeadowColors.darkOrdinary : FeltMeadowColors.lightOrdinary
         }
+        if self == .nightGarden {
+            if player.isOGSModerator || player.isOGSAdmin {
+                return darkSurface ? NightGardenColors.darkModerator : NightGardenColors.lightModerator
+            }
+            if player.isOGSProfessional {
+                return darkSurface ? NightGardenColors.darkProfessional : NightGardenColors.lightProfessional
+            }
+            if player.isOGSSupporter {
+                return darkSurface ? NightGardenColors.darkSupporter : NightGardenColors.lightSupporter
+            }
+            if player.isBot == true || player.uiClass?.contains("bot") == true {
+                return identitySecondary(color)
+            }
+            return darkSurface ? NightGardenColors.darkOrdinary : NightGardenColors.lightOrdinary
+        }
         // Match OGSUser.uiColor's priority, including lightweight ui_class
         // payloads: moderator/admin, professional, supporter, then bot.
         if player.isOGSModerator || player.isOGSAdmin {
@@ -1420,6 +1627,12 @@ extension SurroundTheme {
         return color == .black
             ? Color(red: 165 / 255, green: 163 / 255, blue: 1)
             : Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
+    }
+
+    /// Text links sit directly on Home's cards. Night Garden's bronze/lantern
+    /// ink follows the card, independently of its darker filled-button pigment.
+    var homeActionForeground: Color {
+        self == .nightGarden ? NightGardenColors.conditional : (actionTint ?? .accentColor)
     }
 
     /// Home's New game fill. Standard deepens the app's indigo so the white
@@ -1482,17 +1695,17 @@ private struct GameDetailThemeModifier: ViewModifier {
             .environment(\.boardAppearance, theme.board(for: theme.colorScheme ?? systemColorScheme))
             .environment(\.colorScheme, theme.colorScheme ?? systemColorScheme)
             .foregroundColor(theme.usesLightSceneSurfaces ? theme.foreground : nil)
-            .modifier(GameDetailLegacyTint(color: theme == .feltMeadow ? theme.foreground : .accentColor))
+            .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
     }
 }
 
 /// Earlier SwiftUI toolbar controls use the inherited tint for their unbacked
-/// symbols. This stays inside Game Detail and never changes UIKit appearance
-/// or the window tint. Modern glass keeps its existing styling.
+/// symbols. The tint stays scoped to SwiftUI content and never changes UIKit
+/// appearance or the window tint. Modern glass keeps its existing styling.
 struct GameDetailLegacyTint: ViewModifier {
-    let color: Color
+    let color: Color?
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
@@ -1607,13 +1820,13 @@ struct GameDetailSurfaceStyle: ShapeStyle {
     }
 }
 
-/// Preserve the other themes' hierarchical secondary style, while Meadow's
-/// opaque detail panels use a contrast-checked secondary pigment.
+/// Meadow and Night Garden use a contrast-checked pigment on detail panels.
+/// Other themes retain their hierarchical secondary style.
 struct GameDetailSecondaryText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     @ViewBuilder func body(content: Content) -> some View {
-        if theme == .feltMeadow {
+        if theme == .feltMeadow || theme == .nightGarden {
             content.foregroundStyle(theme.detailSecondaryForeground)
         } else {
             content.foregroundStyle(.secondary)
@@ -1646,9 +1859,71 @@ struct GameDetailBackdrop: View {
             SurroundStudioScene(scheme: colorScheme)
         case .feltMeadow:
             FeltMeadowScene(scheme: colorScheme)
+        case .nightGarden:
+            NightGardenScene(scheme: colorScheme)
         case .frostPine:
             FrostPineScene(scheme: colorScheme)
         }
+    }
+}
+
+/// One continuous garden, anchored to the viewport rather than the board.
+/// Panels and the keyboard never rescale or reposition its lantern and pond.
+private struct NightGardenScene: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            NightGardenSceneContent(size: geometry.size, scheme: scheme).equatable()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct NightGardenSceneContent: View, Equatable {
+    let size: CGSize
+    let scheme: ColorScheme
+
+    private var chrome: Color {
+        Color(themeHex: scheme == .dark ? 0x0D1C1D : 0xE9E7D8)
+    }
+
+    private var usesLegacyChrome: Bool {
+        if #available(iOS 26.0, *) { return false }
+        return true
+    }
+
+    var body: some View {
+        ZStack {
+            chrome
+            Image("NightGardenScene")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .saturation(scheme == .dark ? 0.72 : 1)
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x7C8C84) : .white)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .clipped()
+            // Pale ledges support dark Light Mode chrome; pond-dark ledges
+            // support the evening chrome. Both leave the central art exposed.
+            VStack(spacing: 0) {
+                LinearGradient(stops: [
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.98 : 0.97), location: 0),
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.94 : 0.90), location: 0.68),
+                    .init(color: .clear, location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(190, max(140, size.height * 0.22)))
+                Spacer(minLength: 0)
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.90 : 0.3), location: 0.5),
+                    .init(color: chrome.opacity(usesLegacyChrome ? 0.96 : 0.82), location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(96, size.height * 0.16))
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
 }
 

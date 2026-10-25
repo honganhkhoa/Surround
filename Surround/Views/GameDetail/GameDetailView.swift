@@ -1107,7 +1107,7 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
-        .modifier(GameDetailLegacyTint(color: theme == .feltMeadow && !analyzingIsPresented
+        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden) && !analyzingIsPresented
             ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
@@ -1442,7 +1442,7 @@ private struct GameToolbarChatButton: View {
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return theme == .feltMeadow ? theme.foreground : .accentColor
+        return (theme == .feltMeadow || theme == .nightGarden) ? theme.foreground : .accentColor
     }
 
     var body: some View {

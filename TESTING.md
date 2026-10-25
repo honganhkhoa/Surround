@@ -459,6 +459,8 @@ For a focused full-size phone run, add these selectors to the normal UI-test com
 '-only-testing:SurroundUITests/ArtboardPhoneAuditTests/testFeltMeadowNightBoardMarkerGallery()'
 ```
 
+Night Garden follows system appearance with `--surround-ui-theme nightGarden`. Use `--surround-ui-appearance light` or `dark` for deterministic captures. The Light board is finely etched sage glass with a thin bronze edge; Dark reduces the same scene, board and crystal lighting without changing their geometry. Its phone selectors are `testNightGardenThemeStates`, `testNightGardenThemeScoring`, `testNightGardenThemeControlStates`, `testNightGardenThemePanelTransitions`, and `testNightGardenBoardMarkerGallery` in `ArtboardPhoneAuditTests`. The scoring, transition and marker selectors also have `testNightGardenNight…` counterparts. The marker audit captures native 20, 13 and 7 pt cells in both appearances. Both phone panel-transition tests use the real device appearance, omit the fixture appearance override, and restore the previous appearance afterward. Run `testNightGardenThemeSmallPhone` separately on an SE-size simulator. `GameDetailIPadArtboardAuditTests` adds `testNightGardenThemeOrientations`, `testNightGardenThemePanels`, `testNightGardenThemePanelTransitions` and `testNightGardenThemeNarrowWindow`, plus Dark panel and transition counterparts. Run the narrow-window selector last, in a separate invocation, because iPadOS remembers window bounds. If restoration fails, restore Full Screen through the native window controls and rerun. `GameDetailDuoArtboardAuditTests/testNightGardenThemeStates` and `testNightGardenNightThemeStates` use the operator-selected physical pose, with the same prerequisite above. Attachments use `night-garden` and `night-garden-night` suffixes. Inspect scene anchors during panel transitions, crystal silhouettes, the thin edge, marker casings and solid compact boards. `SurroundThemeTests` covers both palettes, readable controls and role colors, Light/Dark scene grading, opaque scene/board assets, equal centered stone alpha footprints, and compact marker contrast for every registered theme.
+
 ### Board marker matrix
 
 The Debug-only offline marker gallery launches with `--surround-ui-testing --surround-board-marker-audit 20`. Combine it with the theme and appearance arguments above. Use `--surround-board-marker-panel core-1` to show one export panel on the device, or `--surround-board-marker-sample variation-empty` for one board. These selectors preserve the device's native display scale; oversized boards should be checked on an iPad rather than scaled to fit a phone.
@@ -468,7 +470,7 @@ The Debug-only offline marker gallery launches with `--surround-ui-testing --sur
 ```text
 --surround-board-marker-export-sizes 13,14,20,40
 --surround-board-marker-export-scales 2,3
---surround-board-marker-export-themes standard,nebulaPearl,rakedGarden,surroundStudio,feltMeadow
+--surround-board-marker-export-themes standard,nebulaPearl,rakedGarden,surroundStudio,feltMeadow,nightGarden
 --surround-board-marker-export-groups core,interaction,estimate,labels,overlap,edges,variants,widget
 ```
 

@@ -447,6 +447,35 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         return sum / Double(count)
     }
 
+    func testNightGardenThemeOrientations() {
+        auditThemeOrientations(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                               appearance: .light)
+    }
+
+    func testNightGardenThemePanels() {
+        auditThemePanels(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                         appearance: .light)
+    }
+
+    func testNightGardenThemePanelTransitions() {
+        auditThemePanelTransitions(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
+                                   appearance: .light)
+    }
+
+    func testNightGardenThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "nightGarden", suffix: "-night-garden", appearance: .light)
+    }
+
+    func testNightGardenNightThemePanels() {
+        auditThemePanels(theme: "nightGarden", title: "Night Garden in Dark Mode", suffix: "-night-garden-night",
+                         appearance: .dark)
+    }
+
+    func testNightGardenNightThemePanelTransitions() {
+        auditThemePanelTransitions(theme: "nightGarden", title: "Night Garden in Dark Mode", suffix: "-night-garden-night",
+                                   appearance: .dark)
+    }
+
     func testFrostPineThemeOrientations() {
         auditThemeOrientations(theme: "frostPine", title: "Frost & Pine",
                          suffix: "-frost-pine", appearance: .light)
@@ -546,8 +575,9 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         auditThemePanelTransitions(theme: "feltMeadow", title: "Felt Meadow", suffix: "-felt-meadow")
     }
 
-    private func auditThemePanelTransitions(theme: String, title: String, suffix: String) {
-        let app = launchGame(artboard: 17, portrait: true, theme: theme, appearance: .light)
+    private func auditThemePanelTransitions(theme: String, title: String, suffix: String,
+                                           appearance: SurroundUITestContract.Appearance = .light) {
+        let app = launchGame(artboard: 17, portrait: true, theme: theme, appearance: appearance)
         defer {
             XCUIDevice.shared.orientation = .landscapeLeft
             app.terminate()

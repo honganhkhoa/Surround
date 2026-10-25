@@ -558,12 +558,12 @@ struct HomeCard: ViewModifier {
     }
 }
 
-/// Links and small actions in the theme's action color.
+/// Links and small actions use a pigment readable on the theme's cards.
 struct HomeActionText: ViewModifier {
     @Environment(\.surroundTheme) private var theme
 
     func body(content: Content) -> some View {
-        content.foregroundStyle(theme.actionTint ?? .accentColor)
+        content.foregroundStyle(theme.homeActionForeground)
     }
 }
 

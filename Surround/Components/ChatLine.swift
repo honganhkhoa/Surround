@@ -85,7 +85,7 @@ struct ChatLine: View {
         for coordinateRange in coordinateRanges {
             result.append(AttributedString(String(body[index..<coordinateRange.lowerBound])))
             var highlighted = AttributedString(String(body[coordinateRange]))
-            highlighted.foregroundColor = Color(.systemIndigo)
+            highlighted.foregroundColor = theme.chatCoordinateForeground
             highlighted.font = .callout.bold()
             result.append(highlighted)
             index = coordinateRange.upperBound

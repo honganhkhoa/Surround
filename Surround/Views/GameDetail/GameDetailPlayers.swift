@@ -400,7 +400,7 @@ private struct GameDetailClockCard: View {
         if state.reconnecting {
             // Reconnecting has replaced the undo label; its badge pigment
             // is too dark as text on night slate or charcoal felt clocks.
-            return theme == .feltMeadow || (theme == .surroundStudio && colorScheme == .dark)
+            return theme == .feltMeadow || theme == .nightGarden || (theme == .surroundStudio && colorScheme == .dark)
                 ? foreground : badgeBackground
         }
         return theme.clockUndoAccent(color, scheme: colorScheme)

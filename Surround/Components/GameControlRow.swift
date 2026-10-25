@@ -90,7 +90,11 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
                 content.glassEffect(.regular.tint(disabled ? prominentFill : (theme.actionGlassTint ?? prominentFill))
                     .interactive(interactive && !disabled), in: shape)
             } else {
-                content.glassEffect(.clear.interactive(interactive), in: shape)
+                // The garden's petals can pass beneath More. Give its ink
+                // a stable surface that follows the current appearance.
+                content.glassEffect((theme == .nightGarden
+                    ? Glass.regular.tint(theme.panel.opacity(0.9)) : .clear)
+                    .interactive(interactive), in: shape)
             }
         } else if prominent {
             if theme.usesLightSceneSurfaces && !disabled {
@@ -177,6 +181,7 @@ struct GameControlRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var game: Game
     @ObservedObject var state: GameControlState
     var horizontal = true
@@ -196,6 +201,16 @@ struct GameControlRow: View {
 
     private var blocksGameActions: Bool {
         state.blocksGameActions || ogs.socketStatus != .connected
+    }
+
+    private var moreForeground: Color {
+        guard theme == .nightGarden else {
+            return theme == .feltMeadow ? theme.foreground : .accentColor
+        }
+        // Glass can choose its own content appearance over the garden. Keep
+        // the dots paired with the panel's palette through moves and rotation.
+        let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
+        return Color(uiColor: UIColor(theme.foreground).resolvedColor(with: traits))
     }
 
     private func performGameAction(_ action: () -> Void) {
@@ -344,7 +359,7 @@ struct GameControlRow: View {
                 .labelStyle(.iconOnly)
                 .font(.system(size: 18 * metrics.moreButtonDiameter / GameControlRowMetrics.moreDiameter,
                               weight: .semibold))
-                .foregroundStyle(theme == .feltMeadow ? theme.foreground : Color.accentColor)
+                .foregroundStyle(moreForeground)
                 .frame(width: metrics.moreButtonDiameter, height: metrics.moreButtonDiameter)
                 .contentShape(Circle())
                 .modifier(GameControlGlass(shape: Circle()))

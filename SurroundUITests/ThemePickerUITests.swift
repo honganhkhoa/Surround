@@ -65,7 +65,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     }
 
     /// The themes a Debug build offers, in the pickers' order.
-    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow"]
+    private let debugThemes = ["standard", "surroundStudio", "rakedGarden", "nebulaPearl", "frostPine", "feltMeadow", "nightGarden"]
 
     /// Every tile's preview keeps the full width of its column, whatever
     /// height the picker's host can give: a host shorter than the picker
@@ -177,6 +177,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         #if DEBUG
         XCTAssertTrue(themeOption("frostPine", in: app).exists, "Debug builds offer the unreleased themes.")
         XCTAssertTrue(themeOption("feltMeadow", in: app).exists, "Debug builds offer the unreleased themes.")
+        XCTAssertTrue(themeOption("nightGarden", in: app).exists, "Debug builds offer the unreleased themes.")
         #endif
 
         // Settings has one picker; its screen identifier spans several elements.

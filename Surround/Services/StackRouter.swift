@@ -680,6 +680,8 @@ extension EnvironmentValues {
 /// pushes use AppNavigationLink/appNavigationDestination for the same policy.
 struct AppNavigationStack<Content: View>: View {
     @EnvironmentObject private var nav: NavigationService
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
     @Environment(\.iPadTabContext) private var iPadTabContext
     #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0)
     @Environment(\.duoTabContext) private var duoTabContext
@@ -696,6 +698,21 @@ struct AppNavigationStack<Content: View>: View {
 
     @ViewBuilder var content: () -> Content
 
+    /// The native Back button belongs to this host, outside the destination's
+    /// tint scope. Only a loaded Night Garden game needs the legacy override.
+    private var legacyGameDetailTint: Color? {
+        let theme = SurroundTheme.current(storedID: gameThemeID)
+        guard theme == .nightGarden, let route = navigation.path.last else { return nil }
+        let hasLoadedGame: Bool = switch route {
+        case .homeGame: nav.home.activeGame != nil
+        case .historyGame: nav.gameHistory.activeGame != nil
+        case .publicGame: nav.publicGames.activeGame != nil
+        case .game(let gameID): navigation.games[gameID] != nil
+        default: false
+        }
+        return hasLoadedGame ? theme.foreground : nil
+    }
+
     var body: some View {
         NavigationStack(path: $navigation.path) {
             content()
@@ -707,6 +724,7 @@ struct AppNavigationStack<Content: View>: View {
                         .environment(\.owningStackRoute, route)
                 }
         }
+        .modifier(GameDetailLegacyTint(color: legacyGameDetailTint))
         .overlay(alignment: .bottom) {
             if navigation.isActive { FriendshipNoticeBanner() }
         }

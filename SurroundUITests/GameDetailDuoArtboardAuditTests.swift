@@ -505,6 +505,14 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
 
     /// Run once per operator-selected physical pose. Reuse the ordinary
     /// artboard assertions for clock targets, fold panes and native chrome.
+    func testNightGardenThemeStates() {
+        auditThemeStates(theme: "nightGarden", suffix: "-night-garden", appearance: "light")
+    }
+
+    func testNightGardenNightThemeStates() {
+        auditThemeStates(theme: "nightGarden", suffix: "-night-garden-night", appearance: "dark")
+    }
+
     func testRakedGardenThemeStates() {
         auditThemeStates(theme: "rakedGarden", suffix: "-raked-garden")
     }

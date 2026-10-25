@@ -140,8 +140,8 @@ struct AnalyzeTreeSlice: View {
                             Image(systemName: "squareshape.split.3x3")
 //                                .font(.system(size: 30))
                                 // The board's label pigment keeps this icon
-                                // readable on night kaya and olive felt.
-                                .foregroundColor(theme == .feltMeadow || (theme == .surroundStudio && colorScheme == .dark)
+                                // readable on night kaya, olive felt and sage glass.
+                                .foregroundColor(theme == .feltMeadow || theme == .nightGarden || (theme == .surroundStudio && colorScheme == .dark)
                                     ? appearance.emptyPointMarker : nil)
                                 .background(appearance.boardColor.cornerRadius(2))
                                 .onTapGesture {
