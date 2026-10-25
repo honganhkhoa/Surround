@@ -422,3 +422,13 @@ extension GameDetailClockState {
             && !isScoring && !isFinished && autoResign == nil && canShowTimer
     }
 }
+
+extension GameDetailClockState {
+    /// Countdowns whose text is the widest of each format a clock with this
+    /// maximum can show. The widest day form ("29 days 23h") is one second
+    /// under a whole-day maximum, which itself shows only "30 days".
+    static func widestCountdownSamples(maximumTime: Int) -> [Int] {
+        [0, 59, 3_599, min(maximumTime, 86_399), min(maximumTime, 172_799),
+         max(0, maximumTime - 1), maximumTime]
+    }
+}

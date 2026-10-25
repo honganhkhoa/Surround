@@ -183,11 +183,14 @@ struct GameDetailClockPair: View {
         }.max() ?? 0
     }
 
-    /// The width a two-line chip needs to keep its time, turn badge and komi
-    /// on one line, for the game's time system at this text size (rule 12:
-    /// the badge never truncates and both chips keep the same time size).
-    /// Chips narrower than this put the badge on its own row, both of them.
-    static func compactLineWidth(game: Game, scale: CGFloat) -> CGFloat {
+    private struct CompactChipParts {
+        let padding, countdown, badge, komi: CGFloat
+        var komiPart: CGFloat { komi > 0 ? 4 + komi : 0 }
+    }
+
+    /// The parts of a two-line chip at full size for the game's time system
+    /// and text size: its widest countdown, widest turn badge and komi.
+    private static func compactChipParts(game: Game, scale: CGFloat, spacious: Bool) -> CompactChipParts {
         func width(_ text: String, _ font: UIFont) -> CGFloat {
             text.isEmpty ? 0 : ceil((text as NSString).size(withAttributes: [.font: font]).width)
         }
@@ -200,8 +203,8 @@ struct GameDetailClockPair: View {
         case .Absolute(let total): maximumTime = total
         default: maximumTime = 0
         }
-        let timeFont = UIFont.monospacedDigitSystemFont(ofSize: 20 * scale, weight: .semibold)
-        let countdown = [0, 59, 3_599, min(maximumTime, 86_399), min(maximumTime, 172_799), maximumTime]
+        let timeFont = UIFont.monospacedDigitSystemFont(ofSize: (spacious ? 24 : 20) * scale, weight: .semibold)
+        let countdown = GameDetailClockState.widestCountdownSamples(maximumTime: maximumTime)
             .map { width(timeString(timeLeft: TimeInterval($0)), timeFont) }.max() ?? 0
         let badgeFont = UIFont.systemFont(ofSize: 12 * scale, weight: .semibold)
         let titles = [String(localized: "Your move", comment: "Game"), String(localized: "Their move"),
@@ -212,10 +215,28 @@ struct GameDetailClockPair: View {
         let hourglass: CGFloat = ceil(10 * scale)
         let badge: CGFloat = widestTitle + hourglass + 3 + 12
         let komi = game.gameData.map {
-            width(String(localized: "\(gameDetailPoints($0.komi)) komi"), UIFont.systemFont(ofSize: 11 * scale))
+            width(String(localized: "\(gameDetailPoints($0.komi)) komi"),
+                  UIFont.systemFont(ofSize: (spacious ? 13 : 11) * scale))
         } ?? 0
-        // 8 pt card padding per side and 4 pt between the parts.
-        return 16 + countdown + 4 + badge + (komi > 0 ? 4 + komi : 0)
+        // Card padding per side: 8 pt, or 14 pt on a spacious chip.
+        return CompactChipParts(padding: spacious ? 28 : 16, countdown: countdown, badge: badge, komi: komi)
+    }
+
+    /// The width a two-line chip needs to keep its time, turn badge and komi
+    /// on one line, for the game's time system at this text size (rule 12:
+    /// the badge never truncates and both chips keep the same time size).
+    /// Chips narrower than this put the badge on its own row, both of them.
+    static func compactLineWidth(game: Game, scale: CGFloat) -> CGFloat {
+        let parts = compactChipParts(game: game, scale: scale, spacious: false)
+        // 4 pt between the parts.
+        return parts.padding + parts.countdown + 4 + parts.badge + parts.komiPart
+    }
+
+    /// The width a narrow two-line chip needs at full size: its first row
+    /// holds the badge and White's komi, the second the time.
+    static func narrowChipWidth(game: Game, scale: CGFloat, spacious: Bool = false) -> CGFloat {
+        let parts = compactChipParts(game: game, scale: scale, spacious: spacious)
+        return parts.padding + max(parts.countdown, parts.badge + parts.komiPart)
     }
 
     var body: some View {
@@ -692,9 +713,7 @@ private struct GameDetailClockCard: View {
         let detailFont = UIFont.systemFont(ofSize: 11 * scale)
         let badgeFont = UIFont.systemFont(ofSize: 12 * scale, weight: .semibold)
         let maximumTime = reservation.maximumTime
-        let timeSamples = [0, 59, 3_599, min(maximumTime, 86_399),
-                           min(maximumTime, 172_799), maximumTime]
-        let countdownWidth = timeSamples.map {
+        let countdownWidth = GameDetailClockState.widestCountdownSamples(maximumTime: maximumTime).map {
             (timeString(timeLeft: TimeInterval($0)) as NSString).size(withAttributes: [.font: mainFont]).width
         }.max() ?? 0
         let detailWidth = reservation.labels.map {
@@ -812,9 +831,7 @@ private struct GameDetailClockCard: View {
             }.lineLimit(1).minimumScaleFactor(0.7)
         } else if let deadline = state.autoResign {
             VStack(alignment: alignment, spacing: 2) {
-                if style == .compact && narrowCompactCard {
-                    statusBadgeSlot.frame(height: 18 * scale, alignment: frameAlignment)
-                }
+                if style == .compact && narrowCompactCard { compactStatusRow }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Image(systemName: "bolt.slash")
                         .font(.system(size: (style == .full ? 18 : 12) * scale, weight: .semibold))
@@ -827,13 +844,9 @@ private struct GameDetailClockCard: View {
             }.lineLimit(1).minimumScaleFactor(0.7)
         } else if state.canShowTimer {
             VStack(alignment: alignment, spacing: 2) {
-                if style == .compact && narrowCompactCard {
-                    // Reserve this row on both clocks, even when this side has
-                    // no news, so a turn or undo request never shifts the time.
-                    statusBadgeSlot.frame(height: 18 * scale, alignment: frameAlignment)
-                }
+                if style == .compact && narrowCompactCard { compactStatusRow }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    if style == .compact && mirrored { compactKomi }
+                    if style == .compact && !narrowCompactCard && mirrored { compactKomi }
                     if style == .compact && !showsStatus && state.running {
                         Image(systemName: "hourglass")
                             .font(smallFont).foregroundStyle(accent)
@@ -846,7 +859,7 @@ private struct GameDetailClockCard: View {
                     if style == .compact && !narrowCompactCard {
                         statusBadgeSlot
                     }
-                    if style == .compact && !mirrored { compactKomi }
+                    if style == .compact && !narrowCompactCard && !mirrored { compactKomi }
                 }
                 if columnCard { komiHeader.font(detailFont).lineLimit(1) }
                 detailRow(state.paused ? state.pauseReason : (style == .full ? state.fullTimeDetail : state.timeDetail),
@@ -857,14 +870,25 @@ private struct GameDetailClockCard: View {
             .lineLimit(1)
         } else {
             VStack(alignment: alignment, spacing: 2) {
-                if style == .compact && narrowCompactCard {
-                    statusBadgeSlot.frame(height: 18 * scale, alignment: frameAlignment)
-                }
+                if style == .compact && narrowCompactCard { compactStatusRow }
                 Text(style == .full ? state.unavailableTimeText : state.compactUnavailableTimeText).font(.system(size: (style == .full ? 20 : 15) * scale))
                 if style == .compact && !narrowCompactCard { statusBadgeSlot }
                 detailRow("")
             }.lineLimit(1).minimumScaleFactor(0.7)
         }
+    }
+
+    /// A narrow chip's first row, laid out on both cards so the time and the
+    /// line under it never move when the turn passes (an empty badge alone
+    /// would not reserve it). As on a full card's header: White's komi on
+    /// the outer side, the badge on the inner (board) side.
+    private var compactStatusRow: some View {
+        HStack(spacing: 4) {
+            if mirrored { statusBadgeSlot } else { compactKomi }
+            Spacer(minLength: 0)
+            if mirrored { compactKomi } else { statusBadgeSlot }
+        }
+        .frame(height: 18 * scale)
     }
 
     private var scoreValue: Text {
@@ -1075,6 +1099,16 @@ struct GameDetailPlayerIdentity: View {
         return ceil(max(44, name.lineHeight + rank.lineHeight + 1) + 8)
     }
 
+    /// A row chip in a short column (iPhone landscape): its name may take
+    /// two lines, which the layout reserves.
+    static func twoLineRowHeight(dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        if dynamicTypeSize.isAccessibilitySize { return accessibilityRowHeight }
+        let traits = identityTraits(dynamicTypeSize)
+        let name = UIFont.preferredFont(forTextStyle: .callout, compatibleWith: traits)
+        let rank = UIFont.preferredFont(forTextStyle: .footnote, compatibleWith: traits)
+        return ceil(max(44, name.lineHeight * 2 + rank.lineHeight + 1) + 8)
+    }
+
     /// Reserve both permitted name lines, so long names cannot move the board.
     static func columnHeight(dynamicTypeSize: DynamicTypeSize,
                              avatarSize: CGFloat = 52, padding: CGFloat = 8) -> CGFloat {
@@ -1148,6 +1182,8 @@ struct GameDetailPlayerIdentity: View {
     /// v149: the column chip's second line (rank, Rengo's Next). The layout
     /// drops it on both chips when the cards wrap, or when it has nothing.
     var columnSecondLine = true
+    /// A row chip in a short column, whose name may take two lines.
+    var wrapsName = false
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.surroundTheme) private var theme
@@ -1252,7 +1288,9 @@ struct GameDetailPlayerIdentity: View {
                     .accessibilityLabel(Text(verbatim: "Identity name fit"))
                     .accessibilityIdentifier("game.identity.nameFit.\(color == .black ? "black" : "white")")
                     .accessibilityValue(Text(verbatim: String(format: "%@ shown=%.1f ideal=%.1f column=%.1f line2=%.1f chip=%.1f height=%.1f secondLine=%@",
-                        nameWidths.shown + 0.5 >= nameWidths.ideal ? "full" : "truncated",
+                        nameWidths.shown + 0.5 >= nameWidths.ideal ? "full"
+                            : (nameLines == 1 && nameWidths.shown + 0.5 >= nameWidths.ideal * Self.nameMinimumScale ? "scaled"
+                               : (nameLines == 2 && (nameWidths.shown + 0.5) * 2 >= nameWidths.ideal ? "wrapped" : "truncated")),
                         nameWidths.shown, nameWidths.ideal,
                         columnWidths.column, columnWidths.secondLine, columnWidths.chip, columnWidths.chipHeight,
                         Self.hasSecondLine(game: game, color: color, hidesRank: hidesRank)
@@ -1273,6 +1311,18 @@ struct GameDetailPlayerIdentity: View {
         if #available(iOS 26, *) { return true }
         return false
     }
+
+    private static let nameMinimumScale: CGFloat = 0.9
+
+    /// A name in a short column may break anywhere (canvas). A break
+    /// opportunity after every character keeps the system from hyphenating
+    /// a username, which would show a "-" that is not part of it.
+    private var displayedName: String {
+        let name = player?.username ?? "—"
+        guard wrapsName && !vertical else { return name }
+        return name.map(String.init).joined(separator: "\u{200B}")
+    }
+    private var nameLines: Int { (vertical && !compactColumn) || (wrapsName && !vertical) ? 2 : 1 }
 
     private var nameFont: Font {
         accessibleRow ? .system(size: 22, weight: .semibold)
@@ -1353,6 +1403,7 @@ struct GameDetailPlayerIdentity: View {
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(nameColor)
                     .lineLimit(1).truncationMode(.tail)
+                    .minimumScaleFactor(Self.nameMinimumScale)
                 if !hidesRank, let player {
                     Text(verbatim: player.formattedRank)
                         .font(.footnote).foregroundStyle(secondaryColor).fixedSize()
@@ -1371,11 +1422,18 @@ struct GameDetailPlayerIdentity: View {
 
     private var stackedIdentityText: some View {
         VStack(alignment: identityAlignment, spacing: 1) {
-            Text(verbatim: player?.username ?? "—")
+            Text(verbatim: displayedName)
                 .font(nameFont)
                 .foregroundStyle(nameColor)
-                .lineLimit(vertical && !compactColumn ? 2 : 1)
+                .lineLimit(nameLines)
                 .truncationMode(.tail)
+                // A one-line name in a full row gives a little size before
+                // it truncates; a two-line name wraps instead.
+                .minimumScaleFactor(nameLines == 1 ? Self.nameMinimumScale : 1)
+                // A short column reserves both lines; a stack must not
+                // offer this chip less height before it wraps.
+                .fixedSize(horizontal: false, vertical: wrapsName && !vertical)
+                .accessibilityLabel(Text(verbatim: player?.username ?? "—"))
                 .multilineTextAlignment(identityAlignment == .trailing ? .trailing : .leading)
                 #if DEBUG && MAIN_APP
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { nameWidths.shown = $0 }

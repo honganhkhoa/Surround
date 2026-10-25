@@ -62,6 +62,9 @@ struct GameDetailLayoutPlan {
     var spaciousCompactClocks = false
     /// Portrait chat columns put More under the action's trailing edge.
     var trailsMoreInColumn = false
+    /// Short columns (iPhone landscape): both chips may show a name on two
+    /// lines, and the layout reserves both lines.
+    var wrapsColumnNames = false
     /// Regular landscape: the chat preview bar shares the opponent's row above
     /// the board, beside the chip, so previewing never moves the board.
     var previewInOpponentRow = false
@@ -93,10 +96,13 @@ struct GameDetailLayoutPlan {
          division: CGRect? = nil, panelDivision: CGRect? = nil,
          usesVerticalToolbar: Bool = false, preview: Bool = false,
          zenBoardCenterY: CGFloat? = nil, identityRowHeight: CGFloat? = nil,
+         identityTwoLineRowHeight: CGFloat? = nil,
          identityColumnHeight: CGFloat? = nil,
          opponentSharesStatusWhenFolded: Bool = false,
          recoveryHeight: CGFloat = 0, fullClockFooterWidth: CGFloat = 0,
          compactClockLineWidth: CGFloat = 0,
+         narrowChipWidth: CGFloat = 0,
+         spaciousNarrowChipWidth: CGFloat = 0,
          compactColumnIdentityHeight: CGFloat? = nil,
          compactColumnIdentityShortHeight: CGFloat? = nil,
          columnDetail: GameDetailColumnDetailLayouts = .init(),
@@ -129,6 +135,13 @@ struct GameDetailLayoutPlan {
         let gap: CGFloat = 8
         let identityBoardGap: CGFloat = 4
         spaciousCompactClocks = !compact && zen && division == nil && panelDivision == nil
+        // Zen's two-line chips hug their content (canvas "Zen · iPhone"): the
+        // familiar width at least, wider where the game's longest countdown,
+        // badge and komi need it, never wider than the space they are offered.
+        let zenChipWidth = spaciousCompactClocks ? spaciousNarrowChipWidth : narrowChipWidth
+        func zenChipPairWidth(base: CGFloat, available: CGFloat) -> CGFloat {
+            min(available, max(base * clockScale, zenChipWidth * 2 + gap))
+        }
         let spaciousPortraitZen = spaciousCompactClocks && width <= height && !accessibility
         let fullClock = GameDetailClockStyle.full.cardHeight * fullClockScale
         let foldedClock = (accessibility || spaciousCompactClocks ? 76 : GameDetailClockStyle.compact.cardHeight) * clockScale
@@ -597,7 +610,12 @@ struct GameDetailLayoutPlan {
             verticalActions = !rowActions && !sideRowActions
             stackedClocks = true
             clockStyle = zen ? .compact : .full
-            var landscapeIdentityHeight = identityHeight
+            // Narrow side columns allow a name two lines (canvas). Reserve
+            // both on both chips, so a long name never moves anything.
+            let shortColumnIdentityHeight = compact && !zen && !accessibility && identityHeight > 0
+                ? max(identityHeight, identityTwoLineRowHeight ?? identityHeight) : identityHeight
+            wrapsColumnNames = shortColumnIdentityHeight > identityHeight
+            var landscapeIdentityHeight = shortColumnIdentityHeight
             if compact {
                 func fitsClockCards(_ cardHeight: CGFloat) -> Bool {
                     landscapeIdentityHeight + cardHeight * 2 + gap * 2 + outer * 2 <= height
@@ -607,6 +625,7 @@ struct GameDetailLayoutPlan {
                 if clockStyle == .inline && !fitsClockCards(inlineClock) {
                     landscapeIdentityHeight = 0
                     hidesOpponentIdentity = !hidesIdentity
+                    wrapsColumnNames = false
                 }
             }
             let ch = clockStyle == .full ? landscapeFullClock
@@ -632,20 +651,25 @@ struct GameDetailLayoutPlan {
                 frames[.board] = self[.board].offsetBy(dx: boardX - self[.board].minX, dy: 0)
             }
             let b = self[.board]
-            let clockX = spaciousWideZen ? 24 : (compactHorizontalZen || unfoldedHorizontalZen ? b.minX - boardGap - left : outer)
-            let clockWidth = spaciousWideZen ? max(0, b.minX - gap - clockX) : left
+            // Phone Zen's stacked chips grow from the board toward the window
+            // edge where the game's countdown needs it; the board stays put.
+            let zenColumn = compactHorizontalZen
+                ? min(max(left, zenChipWidth), max(left, b.minX - boardGap - outer)) : left
+            let clockX = spaciousWideZen ? 24 : (compactHorizontalZen || unfoldedHorizontalZen ? b.minX - boardGap - zenColumn : outer)
+            let clockWidth = spaciousWideZen ? max(0, b.minX - gap - clockX) : zenColumn
             frames[.opponent] = rect(outer, outer, left, landscapeIdentityHeight)
             let clockCenter = spaciousCompactClocks || trayFreeZenTop != nil ? b.midY : height / 2
             let clockY = zen ? max(outer, clockCenter - clockHeight / 2) : outer + landscapeIdentityHeight + gap
             frames[.clocks] = rect(clockX, clockY, clockWidth, clockHeight)
+            let cornerIdentityHeight = wrapsColumnNames ? shortColumnIdentityHeight : identityHeight
             let cornerHeight = (showsActions ? columnActionHeight : 0)
-                + (showsCornerIdentity ? gap + identityHeight : 0)
+                + (showsCornerIdentity ? gap + cornerIdentityHeight : 0)
             let surplusActionWidth = max(0, width - outer - b.maxX - boardGap)
             horizontalActionsInColumn = compact && !usesVerticalToolbar && !zen
                 && !accessibility && !rowActions && showsActions && actionSize.width <= surplusActionWidth
             if horizontalActionsInColumn {
                 let controlsHeight = max(44, actionSize.height)
-                let corner = controlsHeight + (showsCornerIdentity ? gap + identityHeight : 0)
+                let corner = controlsHeight + (showsCornerIdentity ? gap + cornerIdentityHeight : 0)
                 frames[.actions] = rect(b.maxX + boardGap, b.maxY - corner, surplusActionWidth, corner)
             } else if sideRowActions && !rowActions {
                 let actionX = b.maxX + boardGap
@@ -666,8 +690,10 @@ struct GameDetailLayoutPlan {
             var ch = clocksInHeader ? 0 : (clockStyle == .full
                 ? fullClockHeight(at: contentWidth - (compact ? 16 : 0))
                 : (clockStyle == .compact
-                   ? compactClockHeight(cardWidth: (min(contentWidth - (compact ? 16 : 0),
-                        (spaciousCompactClocks ? 360 : (zen ? (compact && !usesVerticalToolbar ? 282 : 320) : .infinity)) * clockScale) - gap) / 2)
+                   ? compactClockHeight(cardWidth: ((zen
+                        ? zenChipPairWidth(base: spaciousCompactClocks ? 360 : (compact && !usesVerticalToolbar ? 282 : 320),
+                                           available: contentWidth - (compact ? 16 : 0))
+                        : contentWidth - (compact ? 16 : 0)) - gap) / 2)
                    : inlineClock))
             let keepsFoldedOpponentRow = opponentSharesStatusWhenFolded && compact
                 && clockStyle == .compact && !zen && !chat && !analyze && !hidesIdentity
@@ -785,7 +811,8 @@ struct GameDetailLayoutPlan {
             let f = self[.clocks]
             let preferredWidth: CGFloat = spaciousCompactClocks ? 360
                 : (zen && compact && !usesVerticalToolbar ? 282 : 320)
-            let cw = min(f.width, preferredWidth * clockScale)
+            let cw = zen ? zenChipPairWidth(base: preferredWidth, available: f.width)
+                : min(f.width, preferredWidth * clockScale)
             frames[.clocks] = rect(f.midX - cw / 2, f.minY, cw, f.height)
         }
         // These decisions depend on the layout's width and the complete label

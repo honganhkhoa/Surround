@@ -17,6 +17,8 @@ final class GameDetailLayoutTests: XCTestCase {
                       zenBoardCenterY: CGFloat? = nil,
                       recoveryHeight: CGFloat = 0, fullClockFooterWidth: CGFloat = 0,
                       compactClockLineWidth: CGFloat = 0,
+                      narrowChipWidth: CGFloat = 0,
+                      identityTwoLineRowHeight: CGFloat? = nil,
                       chromeBandTop: CGFloat? = nil) -> GameDetailLayoutPlan {
         GameDetailLayoutPlan(size: size, compact: compact, zen: zen, analyze: analyze,
                              chat: chat, hidesBoard: hidesBoard, keyboard: keyboard,
@@ -25,10 +27,53 @@ final class GameDetailLayoutTests: XCTestCase {
                              division: division, panelDivision: panelDivision,
                              usesVerticalToolbar: usesVerticalToolbar, preview: preview,
                              zenBoardCenterY: zenBoardCenterY,
+                             identityTwoLineRowHeight: identityTwoLineRowHeight,
                              recoveryHeight: recoveryHeight,
                              fullClockFooterWidth: fullClockFooterWidth,
                              compactClockLineWidth: compactClockLineWidth,
+                             narrowChipWidth: narrowChipWidth,
                              chromeBandTop: chromeBandTop)
+    }
+
+    func testZenChipsGrowToTheirLongestCountdownWithinTheRow() {
+        // iPhone 15 Pro portrait: a 30-day clock with komi needs 178 pt cards.
+        let size = CGSize(width: 393, height: 700)
+        let short = plan(size, compact: true, zen: true)
+        XCTAssertEqual(short[.clocks].width, 282, accuracy: 0.5, "Short times keep the familiar pair.")
+        let long = plan(size, compact: true, zen: true, narrowChipWidth: 178)
+        XCTAssertEqual(long[.clocks].width, 178 * 2 + 8, accuracy: 0.5)
+        XCTAssertEqual(long[.clocks].midX, size.width / 2, accuracy: 0.5)
+        XCTAssertEqual(long[.board], short[.board], "Wider chips never move the board.")
+        let tooLong = plan(size, compact: true, zen: true, narrowChipWidth: 260)
+        XCTAssertLessThanOrEqual(tooLong[.clocks].width, size.width - 16 + 0.5)
+    }
+
+    func testShortColumnsReserveTwoNameLinesWithoutMovingTheBoard() {
+        // iPhone SE and iPhone 15 Pro landscape.
+        for size in [CGSize(width: 667, height: 375), CGSize(width: 734, height: 372)] {
+            let oneLine = plan(size, compact: true)
+            let twoLines = plan(size, compact: true, identityTwoLineRowHeight: 69)
+            XCTAssertFalse(oneLine.wrapsColumnNames)
+            XCTAssertTrue(twoLines.wrapsColumnNames, "\(size)")
+            XCTAssertEqual(twoLines[.opponent].height, 69, accuracy: 0.5)
+            XCTAssertEqual(twoLines[.board], oneLine[.board], "\(size): names never move the board")
+            XCTAssertLessThanOrEqual(twoLines[.actions].maxY, size.height)
+        }
+        // Zen hides the chips; it reserves nothing for them.
+        XCTAssertFalse(plan(CGSize(width: 667, height: 375), compact: true, zen: true,
+                            identityTwoLineRowHeight: 69).wrapsColumnNames)
+    }
+
+    func testLandscapeZenClockColumnGrowsOnlyIntoFreeSpace() {
+        // iPhone 15 Pro landscape inside its safe areas.
+        let size = CGSize(width: 734, height: 372)
+        let short = plan(size, compact: true, zen: true)
+        let long = plan(size, compact: true, zen: true, narrowChipWidth: 178)
+        XCTAssertEqual(long[.board], short[.board], "The board stays put.")
+        XCTAssertEqual(long[.clocks].maxX, short[.clocks].maxX, accuracy: 0.5, "The column keeps its board edge.")
+        XCTAssertGreaterThan(long[.clocks].width, short[.clocks].width)
+        XCTAssertGreaterThanOrEqual(long[.clocks].minX, 8 - 0.5, "Never past the margin.")
+        XCTAssertLessThanOrEqual(long[.clocks].width, 178 + 0.5)
     }
 
     func testBottomEdgeExtensionAllowsPhoneAndClosedDuoLandscape() {

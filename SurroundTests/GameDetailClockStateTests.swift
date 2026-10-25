@@ -445,4 +445,13 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertFalse(nav.visibleGameDetailShowsReconnectingBadge, "Without a rendered badge the banner shows")
         XCTAssertTrue(nav.gameDetailReconnectingBadges.isEmpty)
     }
+
+    func testWidestCountdownSamplesIncludeTheDayAndHourForm() {
+        // A 30-day clock shows "30 days" at its maximum, but "29 days 23h"
+        // one second under it: the samples must include the wider form.
+        let maximum = 2_592_000
+        let samples = GameDetailClockState.widestCountdownSamples(maximumTime: maximum)
+        XCTAssertTrue(samples.contains(maximum - 1))
+        XCTAssertGreaterThan(timeString(timeLeft: maximum - 1).count, timeString(timeLeft: maximum).count)
+    }
 }

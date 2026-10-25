@@ -761,8 +761,10 @@ struct SingleGameView: View {
         let layout = stacksCorner
             ? AnyLayout(VStackLayout(alignment: plan.horizontalActionsInColumn ? .leading : .trailing, spacing: 8))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
+        // A row hugs its content at the trailing edge. A leading Spacer would
+        // also take the stack's 10 pt spacing, which your name needs (iPhone
+        // 15 Pro: "Submit move" left it 105 of its 110 pt).
         return layout {
-            if !stacksCorner { Spacer(minLength: 0) }
             if !showsAnalysisPanel && !showsChatPreview {
                 GameControlRow(game: game, state: gameControlState,
                                horizontal: !plan.verticalActions || plan.horizontalActionsInColumn,
@@ -783,13 +785,15 @@ struct SingleGameView: View {
                                          columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
                                          columnPadding: columnStyle.padding,
                                          compactColumn: plan.compactColumnIdentity,
-                                         columnSecondLine: columnChipSecondLine(plan))
+                                         columnSecondLine: columnChipSecondLine(plan),
+                                         wrapsName: plan.wrapsColumnNames)
                     .frame(maxWidth: stacksCorner ? .infinity : nil,
                            alignment: stacksCorner && !plan.compactColumnIdentity ? .leading : .trailing)
                     .layoutPriority(stacksCorner ? 0 : 1)
             }
         }
-        .frame(maxHeight: stacksCorner ? .infinity : nil, alignment: .bottom)
+        .frame(maxWidth: stacksCorner ? nil : .infinity, maxHeight: stacksCorner ? .infinity : nil,
+               alignment: stacksCorner ? .bottom : .trailing)
     }
 
     /// Using the conversation keeps chat the open panel. A chat that is closing
@@ -930,6 +934,7 @@ struct SingleGameView: View {
             usesVerticalToolbar: isVerticalToolbar || verticalToolbarPose, preview: showsChatPreview,
             zenBoardCenterY: zenBoardCenterY,
             identityRowHeight: GameDetailPlayerIdentity.rowHeight(dynamicTypeSize: dynamicTypeSize),
+            identityTwoLineRowHeight: GameDetailPlayerIdentity.twoLineRowHeight(dynamicTypeSize: dynamicTypeSize),
             identityColumnHeight: GameDetailPlayerIdentity.columnHeight(
                 dynamicTypeSize: dynamicTypeSize, avatarSize: columnStyle.avatarSize,
                 padding: columnStyle.padding),
@@ -938,6 +943,9 @@ struct SingleGameView: View {
             recoveryHeight: recoveryHeight,
             fullClockFooterWidth: GameDetailClockPair.fullFooterWidth(game: game, scale: min(clockScale, 1.65)),
             compactClockLineWidth: GameDetailClockPair.compactLineWidth(game: game, scale: min(clockScale, 1.65)),
+            narrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65)),
+            spaciousNarrowChipWidth: GameDetailClockPair.narrowChipWidth(game: game, scale: min(clockScale, 1.65),
+                                                                         spacious: true),
             compactColumnIdentityHeight: GameDetailPlayerIdentity.compactColumnHeight(
                 dynamicTypeSize: dynamicTypeSize,
                 secondLine: GameDetailPlayerIdentity.columnChipsHaveSecondLine(game: game, hidesRank: hidesRank)),
@@ -1009,7 +1017,8 @@ struct SingleGameView: View {
                                              columnAvatarSize: plan.compactColumnIdentity ? 32 : columnStyle.avatarSize,
                                              columnPadding: columnStyle.padding,
                                              compactColumn: plan.compactColumnIdentity,
-                                             columnSecondLine: columnChipSecondLine(plan))
+                                             columnSecondLine: columnChipSecondLine(plan),
+                                             wrapsName: plan.wrapsColumnNames)
                         .layoutPriority(1)
                     if showsChatPreview && plan.previewInOpponentRow {
                         chatPreviewBar.frame(maxWidth: .infinity, maxHeight: .infinity)
