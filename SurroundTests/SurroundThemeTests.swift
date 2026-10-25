@@ -1255,6 +1255,177 @@ final class SurroundThemeTests: XCTestCase {
         ), diameterTolerance: 0.04, maximumDiameterDifference: 5, minimumExtentRatio: 0.92)
     }
 
+    func testFeltStoneFibersFollowSourceAlphaAndStayStableWhileResizing() throws {
+        for name in ["FeltMeadowBlackStone", "FeltMeadowWhiteStone"] {
+            let image = try XCTUnwrap(UIImage(named: name, in: Bundle(for: Self.self), compatibleWith: nil))
+            let contour = try XCTUnwrap(FeltFiberContour.stone(image: image))
+            XCTAssertEqual(contour, FeltFiberContour.stone(image: image))
+            XCTAssertGreaterThan(contour.points.count, 32)
+            let source = try XCTUnwrap(image.cgImage)
+            let pixels = try rgbaPixels(for: source, side: source.width)
+            var opaqueInside = 0, transparentOutside = 0
+            for point in contour.points {
+                XCTAssertTrue(point.x.isFinite && point.y.isFinite)
+                XCTAssertTrue(CGRect(x: 0, y: 0, width: 1, height: 1).contains(point))
+                let radius = hypot(point.x - 0.5, point.y - 0.5)
+                XCTAssertGreaterThan(radius, 0.4, "The contour follows the stone body, not an interior fiber")
+                XCTAssertLessThan(radius, 0.5)
+                func alpha(radialScale: CGFloat) -> UInt8 {
+                    let x = min(source.width - 1, max(0, Int((0.5 + (point.x - 0.5) * radialScale) * CGFloat(source.width))))
+                    let y = min(source.height - 1, max(0, Int((0.5 + (point.y - 0.5) * radialScale) * CGFloat(source.height))))
+                    return pixels[(y * source.width + x) * 4 + 3]
+                }
+                opaqueInside += alpha(radialScale: 0.95) >= 128 ? 1 : 0
+                transparentOutside += alpha(radialScale: 1.05) < 128 ? 1 : 0
+            }
+            // Allow isolated original wool flecks, but require the sampled
+            // silhouette to separate the connected body from its padding.
+            XCTAssertGreaterThan(Double(opaqueInside) / Double(contour.points.count), 0.9, name)
+            XCTAssertGreaterThan(Double(transparentOutside) / Double(contour.points.count), 0.9, name)
+
+            let reference = FeltEdgeFibers.stone(contour: contour, in: CGRect(x: 3, y: 5, width: 20, height: 20), seed: 71)
+            for diameter: CGFloat in [14, 20, 40] {
+                let rect = CGRect(x: 3, y: 5, width: diameter, height: diameter)
+                let fibers = FeltEdgeFibers.stone(contour: contour, in: rect, seed: 71)
+                let repeated = FeltEdgeFibers.stone(contour: contour, in: rect, seed: 71)
+                let other = FeltEdgeFibers.stone(contour: contour, in: rect, seed: 72)
+                XCTAssertEqual(fibers.body, repeated.body)
+                XCTAssertEqual(fibers.wisps, repeated.wisps)
+                XCTAssertNotEqual(fibers.body, other.body)
+                for (path, original) in [(fibers.body, reference.body), (fibers.wisps, reference.wisps)] {
+                    XCTAssertFalse(path.isEmpty)
+                    XCTAssertTrue(rect.insetBy(dx: -1.21, dy: -1.21).contains(path.boundingRect),
+                                  "Loose fibers stay within the stone's reserved fringe")
+                    let coordinates = normalizedPathCoordinates(path, cellSize: 1)
+                    XCTAssertTrue(coordinates.allSatisfy(\.isFinite))
+                    XCTAssertEqual(coordinates.count, normalizedPathCoordinates(original, cellSize: 1).count,
+                                   "Resizing preserves each stone's tufts")
+                }
+            }
+        }
+        let empty = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { _ in }
+        XCTAssertNil(FeltFiberContour.stone(image: empty), "Transparent artwork has no attached stone body")
+    }
+
+    func testFeltControlFibersFollowTheProvidedRoundedOutline() {
+        for size in [CGSize(width: 140, height: 28), CGSize(width: 190, height: 96)] {
+            let rect = CGRect(origin: CGPoint(x: 3, y: 5), size: size)
+            for style: RoundedCornerStyle in [.circular, .continuous] {
+                let outline = RoundedRectangle(cornerRadius: 12, style: style).path(in: rect)
+                let fibers = FeltEdgeFibers.roundedRectangle(outline: outline, in: rect, seed: 31)
+                let repeated = FeltEdgeFibers.roundedRectangle(outline: outline, in: rect, seed: 31)
+                XCTAssertEqual(fibers.body, repeated.body)
+                XCTAssertEqual(fibers.wisps, repeated.wisps)
+                XCTAssertNotEqual(fibers.body,
+                    FeltEdgeFibers.roundedRectangle(outline: outline, in: rect, seed: 32).body)
+                let otherOutline = RoundedRectangle(cornerRadius: 3, style: style).path(in: rect)
+                XCTAssertNotEqual(fibers.body,
+                    FeltEdgeFibers.roundedRectangle(outline: otherOutline, in: rect, seed: 31).body)
+                for path in [fibers.body, fibers.wisps] {
+                    XCTAssertFalse(path.isEmpty)
+                    XCTAssertTrue(rect.insetBy(dx: -1.61, dy: -1.61).contains(path.boundingRect))
+                    XCTAssertTrue(normalizedPathCoordinates(path, cellSize: 1).allSatisfy(\.isFinite))
+                    path.forEach { element in
+                        switch element {
+                        case .move(to: let root):
+                            XCTAssertTrue(outline.contains(root), "Every fiber starts inside the supplied control shape")
+                        case .curve(to: let tip, control1: _, control2: _):
+                            XCTAssertFalse(outline.contains(tip), "Every fiber extends beyond that same shape")
+                        default: break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testFeltControlFringeIsVisibleOutsideTheBodyAndAbsentInFallback() throws {
+        let scale = 3
+        let padding = 3 * scale
+        for scheme: ColorScheme in [.light, .dark] {
+            for color: StoneColor in [.black, .white] {
+                for size in [CGSize(width: 140, height: 28), CGSize(width: 190, height: 96)] {
+                    for textured in [false, true] {
+                        let view = FeltControlMaterial(color: color, shape: RoundedRectangle(cornerRadius: 9),
+                                                       colorScheme: scheme, showsTexture: textured)
+                            .frame(width: size.width, height: size.height)
+                            .padding(3)
+                            .environment(\.colorScheme, scheme)
+                        let raster = try nativeMaterialPixels(view)
+                        var outsideAlpha = [UInt8]()
+                        // Only straight mid-edges: rounded-corner antialiasing
+                        // cannot impersonate strands beyond the body.
+                        for x in (padding + 12 * scale)..<(raster.width - padding - 12 * scale) {
+                            for y in Array(0..<padding) + Array((raster.height - padding)..<raster.height) {
+                                outsideAlpha.append(raster.pixels[(y * raster.width + x) * 4 + 3])
+                            }
+                        }
+                        let message = "\(scheme) \(color) \(size), textured=\(textured)"
+                        if textured {
+                            XCTAssertGreaterThan(outsideAlpha.filter { $0 >= 16 }.count, 10,
+                                                 "Native pixels must show attached fibers: \(message)")
+                        } else {
+                            XCTAssertTrue(outsideAlpha.allSatisfy { $0 == 0 },
+                                          "Accessibility fallback has no fringe: \(message)")
+                        }
+                        for x in 0..<raster.width {
+                            XCTAssertEqual(raster.pixels[x * 4 + 3], 0, message)
+                            XCTAssertEqual(raster.pixels[((raster.height - 1) * raster.width + x) * 4 + 3], 0, message)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testFeltStoneFringeDisappearsBelowDetailThresholdAndWithoutShadows() throws {
+        let bundle = Bundle(for: Self.self)
+        let black = try XCTUnwrap(UIImage(named: "FeltMeadowBlackStone", in: bundle, compatibleWith: nil))
+        let white = try XCTUnwrap(UIImage(named: "FeltMeadowWhiteStone", in: bundle, compatibleWith: nil))
+        let blackContour = try XCTUnwrap(FeltFiberContour.stone(image: black))
+        let whiteContour = try XCTUnwrap(FeltFiberContour.stone(image: white))
+        var withFibers = SurroundTheme.feltMeadow.board
+        withFibers.stoneImages = StoneImages(black: [black], white: [white],
+                                           blackFiberContours: [blackContour], whiteFiberContours: [whiteContour])
+        var withoutFibers = withFibers
+        withoutFibers.stoneImages = StoneImages(black: [black], white: [white])
+        for color: StoneColor in [.black, .white] {
+            for (diameter, shadow): (CGFloat, CGFloat) in [(13, 1), (20, 0), (20, 1)] {
+                func render(_ board: BoardAppearance) throws -> [UInt8] {
+                    try nativeMaterialPixels(Stone(color: color, shadowRadius: shadow)
+                        .frame(width: diameter, height: diameter).padding(3)
+                        .environment(\.boardAppearance, board)
+                        .environment(\.colorScheme, .light)).pixels
+                }
+                let actual = try render(withFibers), plain = try render(withoutFibers)
+                let differences = zip(actual, plain).filter { $0 != $1 }.count
+                if diameter < 14 || shadow == 0 {
+                    XCTAssertEqual(differences, 0, "Flat stones have no added fiber pixels anywhere, including their padding")
+                } else {
+                    XCTAssertGreaterThan(differences, 10, "A detailed 20 pt stone visibly draws its edge fibers")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func nativeMaterialPixels<Content: View>(_ content: Content) throws
+        -> (pixels: [UInt8], width: Int, height: Int) {
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = 3
+        let image = try XCTUnwrap(renderer.cgImage)
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        return (pixels, image.width, image.height)
+    }
+
     private func assertEqualAlphaStoneFootprints(_ stones: StoneImages,
                                                 diameterTolerance: CGFloat = 0.02,
                                                 maximumDiameterDifference: Int = 1,

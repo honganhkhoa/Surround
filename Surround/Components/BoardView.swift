@@ -705,6 +705,7 @@ private struct ImageStone {
     var color: StoneColor
     var isRemoved: Bool
     var variant: Int
+    var fiberSeed: UInt32
 }
 
 /// Rendered stones in one Canvas, so a full board is a few dozen image draws
@@ -716,6 +717,8 @@ private struct ImageStoneCanvas: View {
     var cellSize: CGFloat
     var lightDirection: StoneLightDirection
     var shadowStyle: ImageStoneShadowStyle
+    var blackPalette: StonePalette
+    var whitePalette: StonePalette
     // The raised profile is capped at a 3 pt blur and 3 pt offset; allow
     // three blur radii beyond that offset, including edge intersections.
     private var overhang: CGFloat { shadowStyle == .raised ? 12 : 6 }
@@ -750,6 +753,11 @@ private struct ImageStoneCanvas: View {
                            inset: 0.5, opacity: 0.5)
             }
 
+            // Batch the loose fibers by player and captured state. Their
+            // roots follow the actual artwork rather than a perfect circle.
+            var fiberBodies = [Path](repeating: Path(), count: 4)
+            var fiberWisps = [Path](repeating: Path(), count: 4)
+            var fiberTemplates = [Int: FeltEdgeFibers]()
             for stone in stones {
                 let variants = stone.color == .black ? black : white
                 guard !variants.isEmpty else { continue }
@@ -760,6 +768,33 @@ private struct ImageStoneCanvas: View {
                 stoneContext.draw(variants[stone.variant % variants.count],
                                   in: CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
                                              width: side, height: side))
+                if let contour = images.fiberContour(stone.color, variant: stone.variant) {
+                    // Eight stable tuft patterns per artwork keep a dense
+                    // board from constructing every strand for every stone.
+                    let key = (stone.variant * 8 + Int(stone.fiberSeed)) * 2 + (stone.color == .black ? 0 : 1)
+                    let fibers: FeltEdgeFibers
+                    if let cached = fiberTemplates[key] {
+                        fibers = cached
+                    } else {
+                        fibers = FeltEdgeFibers.stone(contour: contour,
+                            in: CGRect(origin: .zero, size: stone.rect.size),
+                            seed: stone.fiberSeed, footprint: images.footprint)
+                        fiberTemplates[key] = fibers
+                    }
+                    let index = (stone.color == .black ? 0 : 2) + (stone.isRemoved ? 1 : 0)
+                    let offset = CGAffineTransform(translationX: stone.rect.minX, y: stone.rect.minY)
+                    fiberBodies[index].addPath(fibers.body, transform: offset)
+                    fiberWisps[index].addPath(fibers.wisps, transform: offset)
+                }
+            }
+            for index in 0..<4 where !fiberBodies[index].isEmpty || !fiberWisps[index].isEmpty {
+                let palette = index < 2 ? blackPalette : whitePalette
+                var fibers = context
+                fibers.opacity = index.isMultiple(of: 2) ? 1 : 0.5
+                fibers.stroke(fiberBodies[index], with: .color(palette.shade.opacity(0.7)),
+                              style: StrokeStyle(lineWidth: 0.3, lineCap: .round))
+                fibers.stroke(fiberWisps[index], with: .color(palette.highlight.opacity(0.75)),
+                              style: StrokeStyle(lineWidth: 0.22, lineCap: .round))
             }
         }
         // Tint only the rendered stones and their black contact shadows;
@@ -835,7 +870,8 @@ struct Stones: View {
                         imageStones.append(ImageStone(
                             rect: stoneRect, color: stoneColor, isRemoved: isRemoved,
                             variant: StoneImages.variantIndex(row: row, column: column,
-                                                              count: stoneImages.variants(stoneColor).count)
+                                                              count: stoneImages.variants(stoneColor).count),
+                            fiberSeed: UInt32(StoneImages.variantIndex(row: row, column: column, count: 8))
                         ))
                     }
                     if isRemoved {
@@ -938,7 +974,8 @@ struct Stones: View {
             if appearance.stoneImages != nil {
                 ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
                                  lightDirection: appearance.stoneLightDirection,
-                                 shadowStyle: appearance.imageStoneShadow)
+                                 shadowStyle: appearance.imageStoneShadow,
+                                 blackPalette: black, whitePalette: white)
             }
             
             if boardPosition.removedStones != nil {

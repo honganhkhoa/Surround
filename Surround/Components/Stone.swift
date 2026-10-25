@@ -43,9 +43,18 @@ struct StoneImages: Equatable {
     var footprint: CGFloat = 0.94
     /// Scene lighting applied to the artwork, independently of game marks.
     var tint: Color = .white
+    /// Optional wool silhouettes, sampled once from the source alpha. Other
+    /// materials keep their clean edges. Points follow each image variant.
+    var blackFiberContours: [FeltFiberContour] = []
+    var whiteFiberContours: [FeltFiberContour] = []
 
     func variants(_ color: StoneColor) -> [UIImage] {
         color == .black ? black : white
+    }
+
+    func fiberContour(_ color: StoneColor, variant: Int = 0) -> FeltFiberContour? {
+        let contours = color == .black ? blackFiberContours : whiteFiberContours
+        return contours.isEmpty ? nil : contours[variant % contours.count]
     }
 
     /// A stable variant for a point, so stones keep their look as the game
@@ -631,8 +640,41 @@ struct Stone: View {
                     }
                 }
             }.aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    if let color, let images = appearance.stoneImages,
+                       let contour = images.fiberContour(color) {
+                        FeltStoneFringe(contour: contour, footprint: images.footprint,
+                                        palette: appearance.stones(color))
+                            .colorMultiply(images.tint)
+                            .opacity(shadowRadius > 0 && usesDetailedStoneRendering(at: size) ? 1 : 0)
+                            .animation(nil, value: usesDetailedStoneRendering(at: size))
+                    }
+                }
             )
         }
+    }
+}
+
+/// Mounted even when a standalone stone becomes small and solid. Decoration
+/// can overhang its face without changing the stone's layout or hit region.
+private struct FeltStoneFringe: View {
+    let contour: FeltFiberContour
+    let footprint: CGFloat
+    let palette: StonePalette
+
+    var body: some View {
+        Canvas { context, size in
+            let rect = CGRect(origin: CGPoint(x: 2, y: 2),
+                              size: CGSize(width: size.width - 4, height: size.height - 4))
+            let fibers = FeltEdgeFibers.stone(contour: contour, in: rect, footprint: footprint)
+            context.stroke(fibers.body, with: .color(palette.shade.opacity(0.65)),
+                           style: StrokeStyle(lineWidth: 0.3, lineCap: .round))
+            context.stroke(fibers.wisps, with: .color(palette.highlight.opacity(0.7)),
+                           style: StrokeStyle(lineWidth: 0.22, lineCap: .round))
+        }
+        .padding(-2)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

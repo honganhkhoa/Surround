@@ -560,7 +560,9 @@ private enum FeltMeadowAssets {
     static let stones: StoneImages? = {
         guard let black = UIImage(named: "FeltMeadowBlackStone"),
               let white = UIImage(named: "FeltMeadowWhiteStone") else { return nil }
-        return StoneImages(black: [black], white: [white])
+        return StoneImages(black: [black], white: [white],
+                           blackFiberContours: FeltFiberContour.stone(image: black).map { [$0] } ?? [],
+                           whiteFiberContours: FeltFiberContour.stone(image: white).map { [$0] } ?? [])
     }()
 
     static let board = UIImage(named: "FeltMeadowBoard").map { BoardTexture(image: $0, mapping: .board) }

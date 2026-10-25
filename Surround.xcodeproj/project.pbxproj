@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
+		FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
+		FC2510010000000000000004 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
+		FC2510010000000000000005 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2410010000000000000003 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
 		FC2410010000000000000001 /* FeltControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2410010000000000000002 /* FeltControlSurface.swift */; };
 		9A4452C3CF1040DEB2F1B612 /* GameDetailDesignFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */; };
@@ -507,6 +511,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FC2510010000000000000001 /* FeltEdgeFibers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltEdgeFibers.swift; sourceTree = "<group>"; };
 		FC2410010000000000000002 /* FeltControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltControlSurface.swift; sourceTree = "<group>"; };
 		0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDesignFixtureTests.swift; sourceTree = "<group>"; };
 		87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRowMetricsTests.swift; sourceTree = "<group>"; };
@@ -1101,6 +1106,7 @@
 				AFA600012026100400000002 /* ProfileBiographyWebView.swift */,
 				AF3000023F00000000000002 /* ConditionalMovesPopover.swift */,
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
+				FC2510010000000000000001 /* FeltEdgeFibers.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
 				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
 				BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */,
@@ -1695,6 +1701,7 @@
 				BC042B4D24AB2DD10050B2D1 /* OGSUIConfig.swift in Sources */,
 				BC3F72F124F6485D0080DAA2 /* GameDetailView.swift in Sources */,
 				BC5EEBE7259B33BE00675761 /* Stone.swift in Sources */,
+				FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */,
 				BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */,
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
@@ -1732,6 +1739,7 @@
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,
+				FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */,
 				33D3DFBAA384CA900DFCD5B9 /* GameDetailTheme.swift in Sources */,
 				FC2410010000000000000003 /* FeltControlSurface.swift in Sources */,
 				794B0B8EB0A844FDB16DAA31 /* GameControlStateTests.swift in Sources */,
@@ -1876,6 +1884,7 @@
 				BC285B9E2557FE7E005378F9 /* se_wrapper.cpp in Sources */,
 				BC361AB8256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC5EEBE9259B33BE00675761 /* Stone.swift in Sources */,
+				FC2510010000000000000004 /* FeltEdgeFibers.swift in Sources */,
 				BC285B6D2557FCBA005378F9 /* Game.swift in Sources */,
 				BC285BBA25590AFA005378F9 /* NavigationService.swift in Sources */,
 				BCD3009D2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,
@@ -1922,6 +1931,7 @@
 				BC64939D25380DC3002B2200 /* TimeControl.swift in Sources */,
 				BC361AB7256246B4000C47F4 /* OGSChatLine.swift in Sources */,
 				BC5EEBE8259B33BE00675761 /* Stone.swift in Sources */,
+				FC2510010000000000000005 /* FeltEdgeFibers.swift in Sources */,
 				BC64937F25380A9F002B2200 /* SurroundWidgets.swift in Sources */,
 				BC6493EA253811EE002B2200 /* BoardView.swift in Sources */,
 				BCD3009C2B90786C002B11E0 /* OGSRemoteSetting.swift in Sources */,

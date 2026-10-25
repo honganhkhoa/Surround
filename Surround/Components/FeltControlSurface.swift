@@ -43,8 +43,32 @@ struct FeltControlMaterial: View {
                 .opacity(showsTexture ? 1 : 0)
             }
             .clipShape(shape)
+            .overlay {
+                FeltControlFringe(color: color, shape: shape)
+                    .opacity(showsTexture ? 1 : 0)
+            }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+}
+
+/// Loose strands sit beyond the trimmed body. The existing turn/warning ring
+/// remains above the cloth, and the fibers never affect layout or hit testing.
+private struct FeltControlFringe: View {
+    let color: StoneColor
+    let shape: RoundedRectangle
+
+    var body: some View {
+        let tones = SurroundTheme.feltMeadow.identityChipColors(color)
+        Canvas { context, size in
+            let rect = CGRect(x: 2, y: 2, width: size.width - 4, height: size.height - 4)
+            let fibers = FeltEdgeFibers.roundedRectangle(outline: shape.path(in: rect), in: rect)
+            context.stroke(fibers.body, with: .color(tones[color == .black ? 1 : 0].opacity(0.8)),
+                           style: StrokeStyle(lineWidth: 0.35, lineCap: .round))
+            context.stroke(fibers.wisps, with: .color(tones[color == .black ? 0 : 1].opacity(0.8)),
+                           style: StrokeStyle(lineWidth: 0.25, lineCap: .round))
+        }
+        .padding(-2)
     }
 }
 
