@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+# Every "part N of 2" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
+# interrupts xcodebuild at 46 minutes and needs the rest to save the result
+# bundle and failure evidence. Change part_deadline_seconds with these limits.
 jobs:
   test:
     runs-on: macos-26

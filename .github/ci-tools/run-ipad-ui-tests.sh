@@ -134,6 +134,13 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
+# Each part runs under supervise-ipad-ui-test-part.py. CI gives each part step
+# 50 minutes; at 46 the supervisor interrupts xcodebuild, which then has time
+# to write its result bundle and the supervisor its evidence: at most 1:45 of
+# signal grace and under a minute of bounded collection. A test that a
+# simulator crash killed is rerun once, within the same 46 minutes.
+readonly part_deadline_seconds=$((46 * 60))
+
 # The main, profile, and Messages phases each outgrew one CI step, so CI runs
 # each in two parts. Part 2 runs every second test declaration of the phase's
 # class (the SurroundUITests class for main, less the tests main skips); part
@@ -283,14 +290,19 @@ case "$phase" in
     fi
 
     echo "Running part ${part} of 2 of the iPad ${part_result_name} UI tests."
-    xcodebuild test-without-building \
+    part_result_bundle="TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult"
+    python3 .github/ci-tools/supervise-ipad-ui-test-part.py \
+      --simulator "$simulator_id" \
+      --deadline-seconds "$part_deadline_seconds" \
+      --diagnostics "${part_result_bundle%.xcresult}-Diagnostics" \
+      -- \
+      xcodebuild test-without-building \
       "${common_arguments[@]}" \
       "${selection_arguments[@]}" \
       -test-timeouts-enabled YES \
       -default-test-execution-time-allowance 900 \
       -maximum-test-execution-time-allowance 900 \
-      -resultBundlePath \
-      "TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult"
+      -resultBundlePath "$part_result_bundle"
     ;;
 
   messages)
