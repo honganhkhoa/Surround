@@ -672,11 +672,17 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 // XCTest can report a partially clipped LazyVGrid button as
                 // hittable, then dispatch its coordinate tap through another
                 // row. Move the entire target back inside the viewport.
+                // Drag in the target's own column: on a wide iPad, Settings'
+                // centred scroll view ends short of 75% of the window. A
+                // target wholly above the viewport gets a half-window drag.
+                let column = (element.frame.midX - app.frame.minX) / app.frame.width
+                let dx = min(0.95, max(0.05, column))
+                let distance: CGFloat = element.frame.maxY < safeTop ? 0.5 : 0.15
                 let dragStartsAt = app.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.75, dy: 0.35)
+                    withNormalizedOffset: CGVector(dx: dx, dy: 0.35)
                 )
                 let dragEndsAt = app.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.75, dy: 0.50)
+                    withNormalizedOffset: CGVector(dx: dx, dy: 0.35 + distance)
                 )
                 dragStartsAt.press(forDuration: 0.05, thenDragTo: dragEndsAt)
             } else {
