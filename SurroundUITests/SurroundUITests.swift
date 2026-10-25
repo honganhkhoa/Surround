@@ -2270,37 +2270,39 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         keepScreenshot("Live banner – replaces correspondence detail", in: app)
         backToHome()
 
-        let publicGamesTabs = app.descendants(matching: .any)
-            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationPublicGames)
-        // The live banner can cover iPad's top tab bar. Use the sidebar when
-        // needed, and account for duplicate accessibility nodes in adaptive tabs.
-        let openedSidebar = !publicGamesTabs.allElementsBoundByIndex.contains { $0.isHittable }
+        // Leave Home for a tab the live banner does not cover: on an 11-inch
+        // iPad in portrait it sits over Public games and most of Messages.
+        let aboutTabs = app.descendants(matching: .any)
+            .matching(identifier: SurroundUITestContract.AccessibilityID.navigationAbout)
+        // Still use the sidebar when the tab is unavailable, and account for
+        // duplicate accessibility nodes in adaptive tabs.
+        let openedSidebar = !aboutTabs.allElementsBoundByIndex.contains { $0.isHittable }
         if openedSidebar {
-            keepScreenshot("Live banner – overlaps iPad tabs", in: app)
+            keepScreenshot("Live banner – About tab unavailable", in: app)
             if let sidebar = nativeSidebarToggle(in: app) {
                 tap(sidebar, description: "Show navigation sidebar", in: app)
             }
         }
-        var publicGamesTab: XCUIElement?
-        let publicGamesReady = XCTNSPredicateExpectation(
+        var aboutTab: XCUIElement?
+        let aboutReady = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
-                publicGamesTab = publicGamesTabs.allElementsBoundByIndex.first(where: { $0.isHittable })
-                return publicGamesTab != nil
+                aboutTab = aboutTabs.allElementsBoundByIndex.first(where: { $0.isHittable })
+                return aboutTab != nil
             },
             object: nil
         )
-        guard XCTWaiter.wait(for: [publicGamesReady], timeout: 10) == .completed,
-              let publicGamesTab else {
+        guard XCTWaiter.wait(for: [aboutReady], timeout: 10) == .completed,
+              let aboutTab else {
             let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Accessibility hierarchy – Public games navigation unavailable"
+            hierarchy.name = "Accessibility hierarchy – About navigation unavailable"
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
-            keepScreenshot("Live banner – Public games navigation unavailable", in: app)
-            XCTFail("Expected a hittable Public games tab or sidebar item.")
+            keepScreenshot("Live banner – About navigation unavailable", in: app)
+            XCTFail("Expected a hittable About tab or sidebar item.")
             return
         }
-        tap(publicGamesTab, description: "Open Public games", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenPublicGames, in: app)
+        tap(aboutTab, description: "Open About", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)
         if openedSidebar && app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.navigationSettings)
             .allElementsBoundByIndex.contains(where: { $0.isHittable }) {
