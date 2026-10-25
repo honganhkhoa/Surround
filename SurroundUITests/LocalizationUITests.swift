@@ -447,19 +447,32 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         // Home scrolls beneath its native navigation bar. Checking only the
         // application's bounds can leave this small button near the header,
         // where a tap may instead activate the containing game row.
-        func visibleContentFrame() -> CGRect {
-            let window = app.windows.firstMatch.frame
-            let barBottom = app.navigationBars.allElementsBoundByIndex
-                .filter {
-                    $0.exists && $0.frame.width > 1 && $0.frame.height > 1
-                        && window.intersects($0.frame)
-                }
-                .map { $0.frame.maxY }
+        func visibleContentFrame(window: CGRect, navigationBars: [CGRect]) -> CGRect {
+            let barBottom = navigationBars
+                .filter { $0.width > 1 && $0.height > 1 && window.intersects($0) }
+                .map { $0.maxY }
                 .max() ?? window.minY
             let top = max(window.minY, barBottom) + 24
             let bottom = window.maxY - 120
             return CGRect(x: window.minX, y: top, width: window.width,
                           height: max(0, bottom - top))
+        }
+
+        func visibleContentFrame() -> CGRect {
+            visibleContentFrame(window: app.windows.firstMatch.frame,
+                                navigationBars: app.navigationBars.allElementsBoundByIndex
+                                    .filter { $0.exists }.map { $0.frame })
+        }
+
+        func visibleContentFrame(in root: XCUIElementSnapshot) -> CGRect {
+            var navigationBars = [CGRect]()
+            var pending = [root]
+            while let node = pending.popLast() {
+                if node.elementType == .navigationBar { navigationBars.append(node.frame) }
+                pending.append(contentsOf: node.children)
+            }
+            let window = root.children.first { $0.elementType == .window }?.frame ?? .null
+            return visibleContentFrame(window: window, navigationBars: navigationBars)
         }
 
         for _ in 0..<8 {
@@ -473,19 +486,23 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             start.press(forDuration: 0.05, thenDragTo: end)
         }
 
+        // Each sample reads two snapshots instead of about ten live queries.
+        // On CI those queries took 1-4 s per sample on top of the waiter's
+        // ~1 s polling interval, so three samples sometimes outlasted the old
+        // 10 s wait. Hit-testing waits on its own, after the frame settles.
         var previousFrame: CGRect?
         var stableSince: Date?
         var stableSamples = 0
         let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard button.exists, button.isHittable else {
+            guard let buttonSnapshot = try? button.snapshot(), let root = try? app.snapshot() else {
                 previousFrame = nil
                 stableSince = nil
                 stableSamples = 0
                 return false
             }
-            let frame = button.frame
+            let frame = buttonSnapshot.frame
             guard frame.width > 1, frame.height > 1,
-                  visibleContentFrame().contains(frame) else {
+                  visibleContentFrame(in: root).contains(frame) else {
                 previousFrame = nil
                 stableSince = nil
                 stableSamples = 0
@@ -505,10 +522,17 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             return stableSamples >= 3
                 && Date().timeIntervalSince(stableSince ?? Date()) >= 0.75
         }, object: nil)
-        let settled = XCTWaiter.wait(for: [stable], timeout: 10) == .completed
+        let settled = XCTWaiter.wait(for: [stable], timeout: stateSettleTimeout) == .completed
         XCTAssertTrue(settled,
                       "The conditional-moves button must retain a stable frame inside visible Home content before tapping.")
-        return settled
+        guard settled else { return false }
+        // Recheck the frame live in case whatever made the button hittable
+        // also moved it.
+        let ready = waitUntilHittable(button, timeout: 10)
+            && visibleContentFrame().contains(button.frame)
+        XCTAssertTrue(ready,
+                      "The settled conditional-moves button must be hittable inside visible Home content before tapping.")
+        return ready
     }
 
     private func verifyComposer(for username: String, language: Language, in app: XCUIApplication) {
