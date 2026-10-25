@@ -218,6 +218,8 @@ struct FeltEdgeFibers {
     private static func flattened(_ path: Path) -> [CGPoint] {
         var points = [CGPoint]()
         var current = CGPoint.zero, first = CGPoint.zero
+        // Typed Bernstein weights: Xcode 26.2 cannot type-check this closure
+        // with the curve sums written inline.
         path.forEach { element in
             switch element {
             case .move(let point):
@@ -231,18 +233,19 @@ struct FeltEdgeFibers {
                 let start = current
                 for index in 1...16 {
                     let t = CGFloat(index) / 16, u = 1 - t
-                    points.append(CGPoint(x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
-                                          y: u * u * start.y + 2 * u * t * control.y + t * t * end.y))
+                    let a: CGFloat = u * u, b: CGFloat = 2 * u * t, c: CGFloat = t * t
+                    points.append(CGPoint(x: a * start.x + b * control.x + c * end.x,
+                                          y: a * start.y + b * control.y + c * end.y))
                 }
                 current = end
             case .curve(let end, let control1, let control2):
                 let start = current
                 for index in 1...16 {
                     let t = CGFloat(index) / 16, u = 1 - t
-                    points.append(CGPoint(x: u * u * u * start.x + 3 * u * u * t * control1.x
-                                          + 3 * u * t * t * control2.x + t * t * t * end.x,
-                                          y: u * u * u * start.y + 3 * u * u * t * control1.y
-                                          + 3 * u * t * t * control2.y + t * t * t * end.y))
+                    let a: CGFloat = u * u * u, b: CGFloat = 3 * u * u * t
+                    let c: CGFloat = 3 * u * t * t, d: CGFloat = t * t * t
+                    points.append(CGPoint(x: a * start.x + b * control1.x + c * control2.x + d * end.x,
+                                          y: a * start.y + b * control1.y + c * control2.y + d * end.y))
                 }
                 current = end
             case .closeSubpath:
