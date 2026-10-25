@@ -41,7 +41,13 @@ struct ThemeLivePreview: View {
             // drawn in detail rather than in the small-board flat colors.
             let boardSide = max(side * 2, 150)
             ZStack(alignment: .topLeading) {
-                GameDetailBackdrop()
+                if theme == .surroundStudio {
+                    // Anchor the lower tree to the tile, not the oversized
+                    // board whose corner fills this preview.
+                    GameDetailBackdrop().frame(width: side, height: side)
+                } else {
+                    GameDetailBackdrop()
+                }
                 BoardView(boardPosition: Self.position)
                     .frame(width: boardSide, height: boardSide)
                     .offset(x: side * 0.22, y: side * 0.22)

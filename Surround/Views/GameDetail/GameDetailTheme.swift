@@ -1876,6 +1876,7 @@ private struct SurroundStudioSceneContent: View, Equatable {
     }
 
     var body: some View {
+        let tree = SurroundStudioDecorationLayout(size: size).tree
         ZStack {
             chrome
             Image("SurroundStudioScene")
@@ -1887,6 +1888,16 @@ private struct SurroundStudioSceneContent: View, Equatable {
                 .colorMultiply(scheme == .dark ? Color(themeHex: 0x495C7C) : .white)
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
                 .clipped()
+            // This lower canopy belongs to the room: boards and panels
+            // naturally cover it, while the native preview includes it too.
+            Image("SurroundStudioTree")
+                .resizable()
+                .saturation(scheme == .dark ? 0.42 : 1)
+                .colorMultiply(scheme == .dark ? Color(themeHex: 0x6C7D99) : .white)
+                .frame(width: tree.width, height: tree.height)
+                .shadow(color: Color(themeHex: scheme == .dark ? 0x070D16 : 0x342F21)
+                    .opacity(scheme == .dark ? 0.22 : 0.12), radius: 3, x: 3, y: 4)
+                .position(x: tree.midX, y: tree.midY)
             // Support native bars locally, leaving the room and board free
             // of a global scrim. Older toolbars have no glass of their own.
             VStack(spacing: 0) {
@@ -1937,10 +1948,11 @@ struct GameDetailSceneForeground: View {
     }
 }
 
-/// Like Raked Garden, the canopy follows the viewport independently of game
-/// panels, keeping its natural leaf scale through mode and orientation changes.
+/// Both canopies follow the viewport independently of game panels. The upper
+/// foliage reserves chrome; the lower tree stays behind the game and its bars.
 struct SurroundStudioDecorationLayout: Equatable {
     let foliage: CGRect
+    let tree: CGRect
 
     init(size: CGSize, usesLegacyChrome: Bool = false, hasTopEdgeClocks: Bool = false) {
         let width = size.width.isFinite ? max(0, size.width) : 0
@@ -1962,6 +1974,11 @@ struct SurroundStudioDecorationLayout: Equatable {
         let visibleHeight = min(heightLimit, 128 - 44 * shallowLandscape - 58 * shortPortrait)
         foliage = CGRect(x: width - foliageSide * 0.66 + 12 * roomy, y: visibleHeight - foliageSide,
                          width: foliageSide, height: foliageSide)
+        // Preserve natural leaf scale on phones and tablets, but bound the
+        // lower reach in shallow windows and scale down for preview tiles.
+        let treeSide = min(400, min(max(280, shortSide * 0.76), min(width * 0.82, height * 0.53)))
+        tree = CGRect(x: -treeSide * 0.3, y: height - treeSide * 0.83,
+                      width: treeSide, height: treeSide)
     }
 }
 

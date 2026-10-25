@@ -1286,7 +1286,7 @@ final class SurroundThemeTests: XCTestCase {
         let side = 128
         _ = try image(named: "SurroundStudioBoard")
         _ = try image(named: "SurroundStudioScene")
-        for name in ["SurroundStudioFoliage", "SurroundStudioVase"] {
+        for name in ["SurroundStudioFoliage", "SurroundStudioTree", "SurroundStudioVase"] {
             let source = try XCTUnwrap(image(named: name).cgImage, name)
             let pixels = try rgbaPixels(for: source, side: side)
             let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
@@ -1542,6 +1542,18 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertEqual(layout.foliage.size, folded.foliage.size)
             XCTAssertEqual(layout.foliage.size, legacy.foliage.size,
                            "Chrome clearance must not miniaturize the leaves")
+            XCTAssertEqual(layout.tree, folded.tree)
+            XCTAssertEqual(layout.tree, legacy.tree,
+                           "The background tree stays fixed as the clock and chrome layout changes")
+            XCTAssertEqual(layout.tree.width, layout.tree.height)
+            XCTAssertLessThan(layout.tree.minX, 0)
+            XCTAssertGreaterThan(layout.tree.maxY, size.height,
+                                 "The tree enters from beyond the lower-left viewport edge")
+            let visibleTree = layout.tree.intersection(CGRect(origin: .zero, size: size))
+            XCTAssertGreaterThan(visibleTree.width, 0)
+            XCTAssertGreaterThan(visibleTree.height, 0)
+            XCTAssertLessThanOrEqual(visibleTree.height, size.height * 0.45,
+                                    "Shallow windows leave the upper scene clear")
             XCTAssertLessThanOrEqual(layout.foliage.maxY, 128)
             XCTAssertLessThanOrEqual(folded.foliage.maxY, 88)
             XCTAssertLessThanOrEqual(legacy.foliage.maxY, 80,
@@ -1554,6 +1566,39 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertLessThanOrEqual(layout.foliage.maxY, 75,
                                         "Small floating windows keep their upper clock cards clear")
             }
+        }
+    }
+
+    func testStudioTreeKeepsNaturalPhoneScaleAndShrinksForThumbnails() {
+        for size in [CGSize(width: 375, height: 667), CGSize(width: 402, height: 874)] {
+            let tree = SurroundStudioDecorationLayout(size: size).tree
+            let visible = tree.intersection(CGRect(origin: .zero, size: size))
+            XCTAssertGreaterThanOrEqual(visible.width, 170)
+            XCTAssertLessThanOrEqual(visible.width, 220)
+            XCTAssertGreaterThanOrEqual(visible.height, 200)
+            XCTAssertLessThanOrEqual(visible.height, 260)
+        }
+        for side: CGFloat in [64, 128, 176] {
+            let tree = SurroundStudioDecorationLayout(size: CGSize(width: side, height: side)).tree
+            XCTAssertLessThan(tree.width, side,
+                              "The native thumbnail must show leaves without filling the whole room")
+            XCTAssertGreaterThan(tree.maxX, 0)
+            XCTAssertGreaterThan(tree.minY, side / 2)
+        }
+    }
+
+    func testStudioDecorationsStayFiniteForInvalidLayoutSlots() {
+        for size in [CGSize.zero, CGSize(width: 0, height: 320), CGSize(width: 320, height: 0),
+                     CGSize(width: -10, height: 400), CGSize(width: CGFloat.infinity, height: 400),
+                     CGSize(width: 400, height: CGFloat.nan)] {
+            let layout = SurroundStudioDecorationLayout(size: size)
+            for rect in [layout.foliage, layout.tree] {
+                XCTAssertTrue([rect.minX, rect.minY, rect.width, rect.height].allSatisfy { $0.isFinite })
+                XCTAssertGreaterThanOrEqual(rect.width, 0)
+                XCTAssertGreaterThanOrEqual(rect.height, 0)
+            }
+            XCTAssertEqual(layout.tree.size, .zero,
+                           "An absent viewport must not reserve a background tree")
         }
     }
 
