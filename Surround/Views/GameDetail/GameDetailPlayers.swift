@@ -412,6 +412,7 @@ private struct GameDetailClockCard: View {
             showsDetails = true
         } label: {
             content
+                .modifier(GameDetailFrostTextCasing(color: color))
                 // Column cards keep their rows aligned across the pair: the
                 // white card's komi line leaves the black card space below.
                 .padding(.top, columnCard ? 4 * scale : 0)
@@ -420,6 +421,10 @@ private struct GameDetailClockCard: View {
                 .padding(.horizontal, spaciousCompact ? 14 : (style == .full ? (columnCard ? 10 : 12) : 8))
                 .frame(minWidth: 44, maxWidth: style == .inline && !cardWidth.isFinite ? nil : .infinity)
                 .frame(height: style == .inline ? max(34, height - 10) : height)
+                .background {
+                    GameDetailControlFrost(color: color, cornerRadius: spaciousCompact ? 14 : 12,
+                                           compact: style == .inline)
+                }
                 .background { surface }
                 .overlay { clockOutline }
                 .modifier(GameDetailClearGlass(shape: shape,
@@ -988,6 +993,58 @@ private struct GameDetailClockCard: View {
     }
 }
 
+/// Decorative material stays inside the existing surface, beneath content.
+/// Neither its geometry reader nor the artwork participates in layout or taps.
+private struct GameDetailControlFrost: View {
+    let color: StoneColor
+    let cornerRadius: CGFloat
+    var compact = false
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        if !reduceTransparency, contrast != .increased,
+           let frost = theme.controlSurfaceFrost(color, for: colorScheme) {
+            GeometryReader { geometry in
+                let width = max(0, geometry.size.width)
+                let height = max(0, geometry.size.height)
+                // Tile at the image's fixed point scale so the scattered
+                // crystals keep their proportions as the control resizes.
+                Image(uiImage: frost.image)
+                    .resizable(resizingMode: .tile)
+                    .interpolation(.high)
+                    .frame(width: width, height: height)
+                    .shadow(color: Color(themeHex: 0x17394E).opacity(colorScheme == .dark ? 0.22 : 0.14),
+                            radius: 0.45, x: 0.35, y: 0.6)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                    .colorMultiply(frost.tint)
+                    .opacity(frost.opacity * (compact ? 0.9 : 1))
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Keep light glyph edges distinct when an opaque snow grain meets them.
+/// The tight, centered shadow changes no text metrics or interaction area.
+private struct GameDetailFrostTextCasing: ViewModifier {
+    let color: StoneColor
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        if theme == .frostPine, color == .black, !reduceTransparency, contrast != .increased {
+            content.shadow(color: Color(themeHex: 0x071926).opacity(0.9), radius: 0.65, x: 0, y: 0)
+        } else {
+            content
+        }
+    }
+}
+
 private struct GameDetailClearGlass: ViewModifier {
     let shape: RoundedRectangle
     let enabled: Bool
@@ -1141,6 +1198,10 @@ struct GameDetailPlayerIdentity: View {
                                                        avatarSize: columnAvatarSize,
                                                        padding: columnPadding)) : nil,
                alignment: isBottomRightPlayer ? .bottom : .top)
+        .background {
+            GameDetailControlFrost(color: color, cornerRadius: chipCornerRadius,
+                                   compact: navigationHeader || compactHeader || compactColumn || avatarOnly)
+        }
         .background {
             if theme == .feltMeadow {
                 FeltControlSurface(color: color, shape: RoundedRectangle(cornerRadius: chipCornerRadius))
@@ -1302,6 +1363,7 @@ struct GameDetailPlayerIdentity: View {
                 }
             }
             .padding(.trailing, 6)
+            .modifier(GameDetailFrostTextCasing(color: color))
         } else {
             stackedIdentityText
         }
@@ -1355,6 +1417,7 @@ struct GameDetailPlayerIdentity: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidths.column = $0 }
         #endif
         .padding(.horizontal, vertical ? 0 : 4)
+        .modifier(GameDetailFrostTextCasing(color: color))
     }
 
     private var avatar: some View {

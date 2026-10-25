@@ -1202,6 +1202,40 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         capture(60, app: app, note: "Opaque clock details popover from the design-matched fixture.")
     }
 
+    func testFrostPineControlInteractions() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "This smoke test covers the phone's full and inline Frost controls.")
+        let app = launch(artboard: 1, theme: "frostPine", appearance: .light)
+        defer { app.terminate() }
+        let position = element(ID.gameBoard, in: app).value as? String
+        XCTAssertNotNil(position, "The smoke test retains an identifiable game position")
+
+        tap("game.clock.black", in: app, matching: .button)
+        element("game.details", in: app)
+        XCTAssertTrue(app.popovers.firstMatch.exists, "The full Frost clock opens its details")
+        keepScreenshot("frost-pine-interaction-full-clock-details", in: app)
+        dismissPopover(in: app)
+
+        for (entry, name) in [(ID.profileBannerAvatarEntry(915_100), "avatar"),
+                              (ID.profileBannerNameEntry(915_100), "name")] {
+            tap(entry, in: app, matching: .button)
+            element(ID.screenPlayerProfile, in: app)
+            keepScreenshot("frost-pine-interaction-profile-\(name)", in: app)
+            navigateBackFromPlayerProfile(in: app)
+            XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, position,
+                           "Returning from the \(name) keeps the game position")
+        }
+
+        startChat(in: app, typing: false)
+        let inlineClock = app.navigationBars.buttons.matching(identifier: "game.clock.black").firstMatch
+        tap(inlineClock, description: "Open the inline Frost clock", in: app)
+        XCTAssertTrue(app.staticTexts["Time control"].waitForExistence(timeout: 5))
+        for color in ["black", "white"] {
+            element("game.details.clock.\(color)", in: app)
+        }
+        keepScreenshot("frost-pine-interaction-inline-clock-details", in: app)
+    }
+
     func testSingleClockDetailsRetainsBothTimes() {
         let app = launch(artboard: 11)
         startChat(in: app, typing: false)

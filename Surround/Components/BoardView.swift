@@ -1629,6 +1629,12 @@ struct BoardView: View {
                                     .opacity(detailed ? 1 : 0)
                             }
                         }
+                        .overlay {
+                            if let frost = appearance.surfaceFrost {
+                                BoardSurfaceOverlayView(surface: frost, cellSize: cellSize)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                            }
+                        }
                         .clipShape(RoundedRectangle(cornerRadius: faceRadius, style: .circular))
                         .overlay {
                             ZStack {

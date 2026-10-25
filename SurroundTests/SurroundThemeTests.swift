@@ -574,6 +574,67 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertLessThanOrEqual(try XCTUnwrap(diameters.max()) - XCTUnwrap(diameters.min()), 1)
     }
 
+    func testFrostPineSurfaceFrostKeepsThePlayingAreaClear() throws {
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        let image = try XCTUnwrap(UIImage(named: "FrostPineBoardFrost", in: bundle, compatibleWith: nil))
+        let source = try XCTUnwrap(image.cgImage)
+        let side = 128
+        let pixels = try rgbaPixels(for: source, side: side)
+        var center: [Double] = [], perimeter: [Double] = []
+        for y in 0..<side {
+            for x in 0..<side {
+                let alpha = Double(pixels[(y * side + x) * 4 + 3]) / 255
+                if (38..<90).contains(x), (38..<90).contains(y) {
+                    center.append(alpha)
+                } else if x < 26 || x >= 102 || y < 26 || y >= 102 {
+                    perimeter.append(alpha)
+                }
+            }
+        }
+        let centerCoverage = center.reduce(0, +) / Double(center.count)
+        let perimeterCoverage = perimeter.reduce(0, +) / Double(perimeter.count)
+        XCTAssertLessThan(centerCoverage, 0.05, "Surface frost must leave a clear central playing area")
+        XCTAssertGreaterThan(perimeterCoverage, max(0.02, centerCoverage * 2),
+                             "Frost must visibly collect around the perimeter rather than wash over the face")
+        XCTAssertTrue(perimeter.contains { $0 > 0.5 }, "Preserve some distinct frost crystals")
+        XCTAssertTrue(center.contains(0), "The overlay must have transparent clear space")
+    }
+
+    @MainActor
+    func testSurfaceFrostIsInvisibleBelowTheDetailThreshold() throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        let frost = BoardSurfaceOverlay(image: image)
+
+        func pixels(_ surface: BoardSurfaceOverlay?, cell: CGFloat) throws -> [UInt8] {
+            // Render the production layer on a solid face; this target
+            // intentionally does not compile the full interactive board.
+            let board = Color.black
+                .overlay {
+                    if let surface {
+                        BoardSurfaceOverlayView(surface: surface, cellSize: cell)
+                    }
+                }
+                .frame(width: cell * 9, height: cell * 9)
+            let renderer = ImageRenderer(content: board)
+            renderer.scale = 3
+            let rendered = try XCTUnwrap(renderer.uiImage?.cgImage)
+            return try rgbaPixels(for: rendered, side: 128)
+        }
+
+        for cell: CGFloat in [7, 13.99, 14] {
+            let plain = try pixels(nil, cell: cell)
+            let overlay = try pixels(frost, cell: cell)
+            if cell < 14 {
+                XCTAssertTrue(overlay == plain, "Compact boards must render identically with frost configured")
+            } else {
+                XCTAssertFalse(overlay == plain, "A visible detailed overlay is the positive control")
+            }
+        }
+    }
+
     func testStandardThemeKeepsTheOriginalBoard() {
         let board = SurroundTheme.standard.board
         XCTAssertEqual(board, BoardAppearance.standard)

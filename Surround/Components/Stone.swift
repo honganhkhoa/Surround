@@ -111,6 +111,33 @@ struct BoardTexture: Equatable {
     }
 }
 
+/// Transparent material resting on the whole board face. Stretching this
+/// composition to the face retains every edge on rectangular boards.
+struct BoardSurfaceOverlay: Equatable {
+    var image: UIImage
+    var opacity: Double = 1
+    var tint: Color = .white
+}
+
+/// The surface layer stays mounted across the detail threshold, without
+/// changing the board's layout, interactions or accessibility tree.
+struct BoardSurfaceOverlayView: View {
+    var surface: BoardSurfaceOverlay
+    var cellSize: CGFloat
+
+    var body: some View {
+        let detailed = usesDetailedStoneRendering(at: cellSize)
+        Image(uiImage: surface.image)
+            .resizable()
+            .interpolation(.high)
+            .colorMultiply(surface.tint)
+            .opacity(detailed ? surface.opacity : 0)
+            .animation(nil, value: detailed)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Light the polished board reflects: a broad sheen from the upper left,
 /// where the stones are lit from, and faint starry specks within it.
 struct BoardReflection: Equatable {
@@ -469,6 +496,8 @@ struct BoardAppearance: Equatable {
     var boardBevel = false
     var boardDepth: BoardDepth? = nil
     var boardReflection: BoardReflection? = nil
+    /// Irregular surface frost below all grid lines, stones and game marks.
+    var surfaceFrost: BoardSurfaceOverlay? = nil
     /// Scales the grid's line widths on detailed boards.
     var gridLineScale: CGFloat = 1
     /// Detailed grid treatment; intersections stay on the same grid.
