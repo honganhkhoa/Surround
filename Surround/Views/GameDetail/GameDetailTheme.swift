@@ -12,20 +12,42 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    /// The theme Game Detail shows. Themes are a Debug-only preview until
-    /// they have a proper home, so other builds ignore a stored choice.
-    static func current(storedID: String) -> SurroundTheme {
+    /// The themes that ship, in the order pickers show them.
+    static let released: [SurroundTheme] = [.standard, .surroundStudio, .rakedGarden, .nebulaPearl]
+
+    /// Whether only Debug builds offer this theme.
+    var isDebugOnly: Bool { !Self.released.contains(self) }
+
+    /// The themes this build offers. Debug builds add the unreleased ones,
+    /// which the pickers mark as Debug.
+    static var available: [SurroundTheme] {
         #if DEBUG
-        SurroundTheme(rawValue: storedID) ?? .standard
+        released + allCases.filter(\.isDebugOnly)
         #else
-        .standard
+        released
         #endif
     }
 
-    /// The temporary chooser's label; not localized until themes ship.
-    var debugTitle: String {
+    /// The theme games show. A stored theme this build does not offer falls
+    /// back to Classic.
+    static func current(storedID: String) -> SurroundTheme {
+        guard let theme = SurroundTheme(rawValue: storedID), available.contains(theme) else {
+            return .standard
+        }
+        return theme
+    }
+
+    /// The theme Home and Settings show: the games' theme with Whole app,
+    /// otherwise Classic.
+    static func current(storedID: String, appliesToWholeApp: Bool) -> SurroundTheme {
+        appliesToWholeApp ? current(storedID: storedID) : .standard
+    }
+
+    /// The name pickers show. Theme names are proper names and stay in
+    /// English; Classic describes the ordinary look and is translated.
+    var title: String {
         switch self {
-        case .standard: "Surround"
+        case .standard: String(localized: "Classic", comment: "Theme name: Surround's ordinary look, with a kaya board and flat stones")
         case .nebulaPearl: "Nebula & Pearl"
         case .rakedGarden: "Raked Garden"
         case .surroundStudio: "Surround Studio"
@@ -33,6 +55,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         case .feltMeadow: "Felt Meadow"
         }
     }
+
+    /// The pickers' thumbnail in the asset catalog, with a Dark variant
+    /// unless the theme is always dark. `.github/ci-tools/update-theme-previews.py`
+    /// writes it from the app's own rendering.
+    var previewImageName: String { "ThemePreview-\(rawValue)" }
 
     /// Natural scenes and standard follow the system; Nebula stays dark.
     var colorScheme: ColorScheme? {

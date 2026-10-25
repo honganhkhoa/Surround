@@ -699,9 +699,13 @@ struct GameDetailView: View {
         .overlay(alignment: .topTrailing) { duoBackButton(in: geometry) }
         .sheet(isPresented: self.$showSettings) {
             AppNavigationStack {
-                VStack {
-                    GameplaySettings()
-                    Spacer()
+                ScrollView {
+                    VStack {
+                        GameThemeSettings()
+                        GameplaySettings()
+                    }
+                    .frame(maxWidth: 600)
+                    .frame(maxWidth: .infinity)
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(

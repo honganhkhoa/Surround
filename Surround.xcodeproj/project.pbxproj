@@ -97,6 +97,7 @@
 		AE4200013C00000000000001 /* CompatibilityScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */; };
 		AE4400013C00000000000001 /* SurroundUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4400023C00000000000002 /* SurroundUITestCase.swift */; };
 		AE4500013C00000000000001 /* SurroundJourneyUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */; };
+		A7E5E1000000000000000003 /* ThemePickerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E5E1000000000000000004 /* ThemePickerUITests.swift */; };
 		AE4600013C00000000000001 /* ProfileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4600023C00000000000002 /* ProfileUITests.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
@@ -150,6 +151,7 @@
 		BC08721625E791A6006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC08721725E791A8006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
 		BC08721825E791A9006CA8B9 /* OGSAutomatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */; };
+		A7E5E1000000000000000001 /* ThemeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E5E1000000000000000002 /* ThemeSettings.swift */; };
 		BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C3F252451B300E3E66B /* SettingsView.swift */; };
 		BC0F1C4D2526EF6700E3E66B /* OGSChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */; };
 		BC0F1C522527290900E3E66B /* ChallengeCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0F1C512527290900E3E66B /* ChallengeCell.swift */; };
@@ -574,6 +576,7 @@
 		AE4300033C00000000000003 /* DesktopLayoutScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DesktopLayoutScreenshots.xctestplan; sourceTree = "<group>"; };
 		AE4400023C00000000000002 /* SurroundUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestCase.swift; sourceTree = "<group>"; };
 		AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundJourneyUITestCase.swift; sourceTree = "<group>"; };
+		A7E5E1000000000000000004 /* ThemePickerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerUITests.swift; sourceTree = "<group>"; };
 		AE4600023C00000000000002 /* ProfileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileUITests.swift; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -622,6 +625,7 @@
 		BC042B4524AB2DD10050B2D1 /* TimeUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TimeUtilities.swift; sourceTree = "<group>"; };
 		BC08720625E504FA006CA8B9 /* WaitingGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingGamesView.swift; sourceTree = "<group>"; };
 		BC08721425E7919F006CA8B9 /* OGSAutomatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSAutomatchEntry.swift; sourceTree = "<group>"; };
+		A7E5E1000000000000000002 /* ThemeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeSettings.swift; sourceTree = "<group>"; };
 		BC0F1C3F252451B300E3E66B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BC0F1C4C2526EF6600E3E66B /* OGSChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OGSChallenge.swift; sourceTree = "<group>"; };
 		BC0F1C512527290900E3E66B /* ChallengeCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChallengeCell.swift; sourceTree = "<group>"; };
@@ -974,6 +978,7 @@
 				AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */,
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
+				A7E5E1000000000000000004 /* ThemePickerUITests.swift */,
 				D03000042026093000000004 /* DuoSidebarUITests.swift */,
 				D10400022026100400000002 /* SceneActivationUITests.swift */,
 				655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */,
@@ -1005,6 +1010,7 @@
 				BCFA11510000000000000009 /* HomeRules.swift */,
 				BCA4904124E3FCC1002F4336 /* ThirdPartyLoginView.swift */,
 				BC0F1C3F252451B300E3E66B /* SettingsView.swift */,
+				A7E5E1000000000000000002 /* ThemeSettings.swift */,
 				AA1500022026091500000002 /* PlayerProfileView.swift */,
 				AFA600012026100400000003 /* PlayerAboutView.swift */,
 				AA1700032026091700000003 /* PlayerProfileGames.swift */,
@@ -1659,6 +1665,7 @@
 				BC5EEC5E25A41D7900675761 /* ChatLog.swift in Sources */,
 				BC4F7D4D25CEA69D0075C080 /* RulesPickerView.swift in Sources */,
 				BC0F1C40252451B300E3E66B /* SettingsView.swift in Sources */,
+				A7E5E1000000000000000001 /* ThemeSettings.swift in Sources */,
 				AA1500202026091500000001 /* PlayerProfileView.swift in Sources */,
 				AFA600022026100400000003 /* PlayerAboutView.swift in Sources */,
 				AA1700132026091700000003 /* PlayerProfileGames.swift in Sources */,
@@ -1829,6 +1836,7 @@
 				AE4400013C00000000000001 /* SurroundUITestCase.swift in Sources */,
 				AE4500013C00000000000001 /* SurroundJourneyUITestCase.swift in Sources */,
 				AE4600013C00000000000001 /* ProfileUITests.swift in Sources */,
+				A7E5E1000000000000000003 /* ThemePickerUITests.swift in Sources */,
 				D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */,
 				D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */,
 				D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */,

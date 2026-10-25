@@ -612,12 +612,49 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .frostPine)
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .feltMeadow)
         #else
-        XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .standard)
-        XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .standard)
-        XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
+        XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
+        XCTAssertEqual(SurroundTheme.current(storedID: "surroundStudio"), .surroundStudio)
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .standard)
         #endif
+    }
+
+    /// Classic and three scenes ship, in the pickers' order; Debug builds
+    /// append the unreleased themes.
+    func testPickersOfferTheReleasedThemesFirst() {
+        XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
+        XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), [.frostPine, .feltMeadow])
+        #if DEBUG
+        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + [.frostPine, .feltMeadow])
+        #else
+        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released)
+        #endif
+        XCTAssertEqual(SurroundTheme.standard.title, "Classic")
+    }
+
+    /// Pickers show exported thumbnails rather than drawing every scene live.
+    /// Each theme needs one, with its own Dark variant unless always dark.
+    func testEveryThemeHasPickerThumbnails() throws {
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        for theme in SurroundTheme.allCases {
+            let light = try XCTUnwrap(UIImage(named: theme.previewImageName, in: bundle,
+                                              compatibleWith: UITraitCollection(userInterfaceStyle: .light)),
+                                      "\(theme) has no picker thumbnail")
+            let dark = try XCTUnwrap(UIImage(named: theme.previewImageName, in: bundle,
+                                             compatibleWith: UITraitCollection(userInterfaceStyle: .dark)))
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(light.cgImage).width, 384, "\(theme) thumbnail stays sharp at 3×")
+            if theme.colorScheme == nil {
+                XCTAssertNotEqual(light.pngData(), dark.pngData(), "\(theme) needs a Dark thumbnail")
+            }
+        }
+    }
+
+    /// Games always wear the theme; Home and Settings only with Whole app.
+    func testGamesOnlyKeepsOtherScreensClassic() {
+        XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: true), .rakedGarden)
+        XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: false), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "unknown", appliesToWholeApp: true), .standard)
     }
 
     /// The concept warns about violet on indigo: glass stones need a clear

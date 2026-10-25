@@ -16,7 +16,18 @@ struct SettingsView: View {
     @State var showSupporterView = false
     @State var hidesRank: Bool = Setting(.hidesRank).wrappedValue
     @EnvironmentObject private var stackRouter: StackRouter
-    
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var themeID = SurroundTheme.standard.rawValue
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var themeAppliesToWholeApp = true
+    /// A host's group box style, kept for Classic.
+    @Environment(\.backgroundStyle) private var hostBackgroundStyle
+
+    /// With Whole app, Settings wears the games' theme.
+    private var theme: SurroundTheme {
+        SurroundTheme.current(storedID: themeID, appliesToWholeApp: themeAppliesToWholeApp)
+    }
+
     var accountSettings: some View {
         Group {
             if let user = ogs.user {
@@ -53,6 +64,8 @@ struct SettingsView: View {
                         Button(action: { ogs.logout() }) {
                             Text("Logout")
                         }
+                        // A theme's ink would otherwise make it read as a label.
+                        .foregroundStyle(.tint)
                         .contentShape(RoundedRectangle(cornerRadius: 10))
                         .hoverEffect()
                     }
@@ -188,12 +201,22 @@ struct SettingsView: View {
                         }
                     }
                 }.padding(.horizontal)
+                AppearanceSettings()
                 generalSettings
                 GameplaySettings(withDemoOption: true)
                 notificationSettings
             }
             .frame(maxWidth: 600)
         }
+        // Group boxes sit on the theme's panels over its scene. Changing the
+        // theme here keeps this view's identity, so the scroll position stays.
+        .environment(\.backgroundStyle, theme.hasScene ? AnyShapeStyle(theme.panel) : hostBackgroundStyle)
+        .background {
+            if theme.hasScene {
+                ThemeSceneBackdrop()
+            }
+        }
+        .surroundTheme(theme)
         .navigationTitle("Settings")
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenSettings)
     }
@@ -224,6 +247,7 @@ struct GameplaySettings: View {
                         Text("Try it out", comment: "Demo board in settings").bold().leadingAlignedInScrollView()
                     }
                 }
+                .foregroundStyle(.tint)
                 if showDemoBoard {
                     BoardDemoView()
                 }

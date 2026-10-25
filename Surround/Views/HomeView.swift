@@ -54,10 +54,13 @@ struct HomeView: View {
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
-    /// Home wears the theme Game Detail shows.
+    /// With Whole app, Home wears the theme Game Detail shows.
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var gameThemeID = SurroundTheme.standard.rawValue
-    
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var themeAppliesToWholeApp = true
+    @State private var showingAppearance = false
+
     @State var displayMode: GameCell.CellDisplayMode
 
     @State private var openingGameRequestID: UUID?
@@ -219,7 +222,9 @@ struct HomeView: View {
     // MARK: - Sections
 
     private var bandColumns: Int { HomeLayout.compactColumns(for: width) }
-    private var theme: SurroundTheme { SurroundTheme.current(storedID: gameThemeID) }
+    private var theme: SurroundTheme {
+        SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
+    }
     /// Section bands: full-width headers with one card per game.
     private var usesBands: Bool { bandColumns > 1 }
     private var margin: CGFloat { usesBands ? HomeLayout.bandMargin : HomeLayout.listMargin }
@@ -399,27 +404,17 @@ struct HomeView: View {
         .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeSkeleton)
     }
 
-    /// No active games: one message and one way to start.
+    /// No active games: one message. New game, first in the list, sits
+    /// just above it.
     private var firstRunView: some View {
         VStack(spacing: 10) {
-            VStack(spacing: 10) {
-                Text("No active games")
-                    .font(.title2.bold())
-                Text("Start a game, and it will show up here.", comment: "Homeview - first run, when the user has no active games")
-                    .modifier(HomeSecondaryText())
-                    .multilineTextAlignment(.center)
-            }
-            .modifier(HomeSceneLegibility())
-            Button(action: { nav.home.showingNewGameView = true }) {
-                Label("New game", systemImage: "plus")
-                    .font(.body.weight(.semibold))
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(HomeActionButtonStyle())
-            .padding(.top, 8)
+            Text("No active games")
+                .font(.title2.bold())
+            Text("Start a game, and it will show up here.", comment: "Homeview - first run, when the user has no active games")
+                .modifier(HomeSecondaryText())
+                .multilineTextAlignment(.center)
         }
+        .modifier(HomeSceneLegibility())
         .frame(maxWidth: .infinity)
         .padding(.horizontal)
         .padding(.top, 72)
@@ -509,6 +504,9 @@ struct HomeView: View {
         let isFirstRun = !hasActiveItems && !ogs.isLoadingOverview
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                newGameCapsule
+                    .frame(maxWidth: usesBands ? HomeLayout.newGameMaximumWidth : .infinity, alignment: .leading)
+                    .padding(.top, 8)
                 searchingCard
                 if isFirstLoad {
                     firstLoadView
@@ -545,7 +543,7 @@ struct HomeView: View {
         }
         .refreshable { await refresh() }
         // The scene stays put behind the scrolling games.
-        .background { HomeBackdrop() }
+        .background { ThemeSceneBackdrop() }
     }
 
     /// Pull to refresh: the overview, then the history preview.
@@ -693,34 +691,42 @@ struct HomeView: View {
 
     // MARK: - Header
 
-    private var displayModeMenu: some View {
-        Menu {
-            Picker(selection: $displayMode.animation(), label: Text("Display mode")) {
-                Label("Compact", systemImage: "square.fill.text.grid.1x2").tag(GameCell.CellDisplayMode.compact)
-                Label("Large", systemImage: "rectangle.grid.1x2").tag(GameCell.CellDisplayMode.full)
-            }
-            .pickerStyle(.inline)
+    /// Appearance: Compact or Large games, and the theme. Its popover hangs
+    /// from the button, and stays one on iPhone, so Home restyles in view
+    /// behind it. That needs the button to stay in the bar: a bar that folds
+    /// it into its More menu would open the popover at the top left. Home's
+    /// bar holds only the account menu and Appearance, so it never does
+    /// (`ThemePickerUITests.testHomeBarNeverFoldsAppearance`); keep other
+    /// actions in Home's content.
+    private var appearanceButton: some View {
+        Button {
+            showingAppearance = true
         } label: {
-            Label("Display mode",
-                  systemImage: displayMode == .compact ? "square.fill.text.grid.1x2" : "rectangle.grid.1x2")
-                .labelStyle(.iconOnly)
+            Label {
+                Text("Appearance", comment: "The app's look: a Settings group with the theme, and a Home button with the game layout and theme")
+            } icon: {
+                Image(systemName: "paintpalette")
+            }
+            .labelStyle(.iconOnly)
         }
         .accessibilityValue(displayMode == .compact ? Text("Compact") : Text("Large"))
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeDisplayMode)
-    }
-
-    private var displayModeToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            displayModeMenu
+        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.homeAppearance)
+        .popover(isPresented: $showingAppearance) {
+            HomeAppearanceOptions(displayMode: $displayMode)
+                .presentationCompactAdaptation(.popover)
         }
     }
 
-    /// New game with your preferred settings beside it, in the action color.
+    private var appearanceToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            appearanceButton
+        }
+    }
+
+    /// New game with your preferred settings beside it, in the action color,
+    /// first in Home's list.
     private var newGameCapsule: some View {
-        HomeNewGameCapsule(
-            showsPreferredSettingsTitle: showsPreferredSettingsTitle,
-            newGame: { nav.home.showingNewGameView = true }
-        ) {
+        HomeNewGameCapsule(newGame: { nav.home.showingNewGameView = true }) {
             preferredSettingsMenu
         }
     }
@@ -828,23 +834,6 @@ struct HomeView: View {
         return time.isEmpty ? ranked : "\(ranked) · \(time)"
     }
 
-    /// Wide bands spell out Preferred Settings, but only where the bar has
-    /// room: beside a shown sidebar, not iPadOS's top tab bar.
-    private var showsPreferredSettingsTitle: Bool {
-        guard horizontalSizeClass == .regular, usesBands else { return false }
-        #if targetEnvironment(macCatalyst)
-        return true
-        #else
-        return iPadTabContext?.sidebarVisible == true
-        #endif
-    }
-
-    private var newGameToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            newGameCapsule
-        }
-    }
-
     private var accountMenu: some View {
         Menu {
             if let user = ogs.user {
@@ -928,13 +917,7 @@ struct HomeView: View {
                         accountMenuToolbarItem
                     }
                 }
-                if #available(iOS 26.0, *) {
-                    // The capsule draws its own action-colored surface.
-                    newGameToolbarItem.sharedBackgroundVisibility(.hidden)
-                } else {
-                    newGameToolbarItem
-                }
-                displayModeToolbarItem
+                appearanceToolbarItem
             }
         }
         .overlay {
@@ -994,7 +977,14 @@ struct HomeView: View {
         }
         .onDisappear {
             isVisible = false
+            // A route can push a game (a match found, a notification) while
+            // Appearance is open; it should not reappear on Back.
+            showingAppearance = false
             historyPreviewLoader.cancel()
+        }
+        .onChange(of: ogs.isLoggedIn) { _, _ in
+            // An automatic logout must not leave Appearance to reopen later.
+            showingAppearance = false
         }
         .onChange(of: ogs.user?.id) { _, _ in
             resetRecentFinishedGames()
@@ -1115,12 +1105,12 @@ private struct HomeSkeletonEntry: Identifiable {
     let id: Int
 }
 
-/// The scene behind Home, softened under the large title: a veil in the
-/// page color that fades out below it, as on the canvas, so the title reads
-/// while the art still shows through. Its height follows the title's safe
-/// area as it collapses and grows with Dynamic Type, without replacing the
-/// navigation bar's own appearance or scroll-edge effects.
-private struct HomeBackdrop: View {
+/// The scene behind Home and Settings, softened under the large title: a
+/// veil in the page color that fades out below it, as on the canvas, so the
+/// title reads while the art still shows through. Its height follows the
+/// title's safe area as it collapses and grows with Dynamic Type, without
+/// replacing the navigation bar's own appearance or scroll-edge effects.
+struct ThemeSceneBackdrop: View {
     @Environment(\.surroundTheme) private var theme
     private let fadeLength: CGFloat = 72
 
@@ -1174,22 +1164,45 @@ struct HomeSceneLegibility: ViewModifier {
     }
 }
 
-/// New game with its star menu in one action-colored capsule. A view of its
-/// own, so the toolbar hosts it whole instead of splitting its Menu out into
-/// separate bar buttons.
+/// New game with its star menu in one action-colored capsule, first in
+/// Home's list. New game takes the width; the star half spells out
+/// Preferred Settings when there is room for both.
 private struct HomeNewGameCapsule<MenuContent: View>: View {
-    let showsPreferredSettingsTitle: Bool
     let newGame: () -> Void
     @ViewBuilder let menuContent: () -> MenuContent
+    @State private var width: CGFloat = 0
+    @State private var widthWithTitles: CGFloat = .infinity
 
     var body: some View {
+        // A Menu reports less than its label needs, so ViewThatFits would
+        // truncate the title; measure the titled row unseen instead.
+        capsule(showsPreferredSettingsTitle: width >= widthWithTitles)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .background {
+                HStack(spacing: 0) {
+                    Label("New game", systemImage: "plus")
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 16)
+                    Color.clear.frame(width: 1)
+                    Label("Preferred Settings", systemImage: "star.square.on.square")
+                        .labelStyle(PreferredSettingsLabelStyle(showsTitle: true))
+                        .padding(.horizontal, 16)
+                }
+                .font(.body.weight(.semibold))
+                .fixedSize()
+                .hidden()
+                .accessibilityHidden(true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { widthWithTitles = $0 }
+            }
+    }
+
+    private func capsule(showsPreferredSettingsTitle: Bool) -> some View {
         HStack(spacing: 0) {
             Button(action: newGame) {
                 Label("New game", systemImage: "plus")
                     .labelStyle(.titleAndIcon)
-                    .padding(.leading, 13)
-                    .padding(.trailing, 11)
-                    .frame(minHeight: 40)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: 50)
                     .contentShape(Rectangle())
             }
             .accessibilityIdentifier(
@@ -1197,31 +1210,32 @@ private struct HomeNewGameCapsule<MenuContent: View>: View {
             )
             Rectangle()
                 .fill(.white.opacity(0.45))
-                .frame(width: 1, height: 22)
+                .frame(width: 1, height: 26)
                 .accessibilityHidden(true)
             Menu {
                 menuContent()
             } label: {
                 Label("Preferred Settings", systemImage: "star.square.on.square")
                     .labelStyle(PreferredSettingsLabelStyle(showsTitle: showsPreferredSettingsTitle))
-                    .padding(.horizontal, 11)
-                    .frame(minWidth: 44, minHeight: 40)
+                    .padding(.horizontal, 16)
+                    .frame(minWidth: 56, minHeight: 50)
                     .contentShape(Rectangle())
             }
             .menuStyle(.button)
+            // New game takes the rest, never the star half's own width.
+            .fixedSize(horizontal: true, vertical: false)
             .accessibilityIdentifier(
                 SurroundUITestContract.AccessibilityID.homePreferredSettings
             )
         }
         .font(.body.weight(.semibold))
         .lineLimit(1)
-        .fixedSize()
         .buttonStyle(.plain)
         .modifier(HomeActionSurface())
     }
 }
 
-/// Wide layouts spell out Preferred Settings; narrow ones keep the star.
+/// Spells out Preferred Settings where it fits; otherwise the star alone.
 private struct PreferredSettingsLabelStyle: LabelStyle {
     let showsTitle: Bool
 

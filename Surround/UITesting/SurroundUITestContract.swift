@@ -91,6 +91,11 @@ enum SurroundUITestContract {
     /// Starts the isolated UI-test preferences suite with a Game Detail
     /// theme selected: `--surround-ui-theme nebulaPearl`.
     static let themeLaunchArgument = "--surround-ui-theme"
+    /// Starts the isolated preferences suite with the theme on Games only.
+    static let themeGamesOnlyLaunchArgument = "--surround-ui-theme-games-only"
+    /// Caps Home's Appearance popover at this many points, as a short screen
+    /// or window does: `--surround-ui-appearance-popover-height 360`.
+    static let appearancePopoverHeightLaunchArgument = "--surround-ui-appearance-popover-height"
     static let holdQuickMatchAcknowledgementsLaunchArgument =
         "--surround-hold-quick-match-acknowledgements"
     static let analysisDisabledLaunchArgument =
@@ -325,6 +330,15 @@ enum SurroundUITestContract {
         guard let index = arguments.firstIndex(of: gameDetailPlayersLaunchArgument),
               arguments.indices.contains(index + 1) else { return [] }
         return Set(arguments[index + 1].split(separator: ",").map(String.init))
+    }
+
+    static var appearancePopoverHeight: CGFloat? {
+        guard isEnabled else { return nil }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: appearancePopoverHeightLaunchArgument),
+              arguments.indices.contains(index + 1),
+              let height = Double(arguments[index + 1]), height.isFinite, height > 0 else { return nil }
+        return CGFloat(height)
     }
 
     static var simulatesHomeHistoryFailureOnce: Bool {
@@ -652,6 +666,7 @@ enum SurroundUITestContract {
     static let appStoreScreenshotWidgetProofToken: String? = nil
     static let isClearingAppStoreScreenshotWidgetFixture = false
     static let testsAppReviewPresentation = false
+    static let appearancePopoverHeight: CGFloat? = nil
     #endif
 
     enum AccessibilityID {
@@ -852,6 +867,15 @@ enum SurroundUITestContract {
         static let screenGameOptions = "screen.gameOptions"
         static let screenPreferredSettings = "screen.preferredSettings"
 
+        static func themeOption(_ theme: String) -> String {
+            "theme.option.\(theme)"
+        }
+        /// A tile's preview square; hidden from VoiceOver, listed for geometry.
+        static func themePreview(_ theme: String) -> String {
+            "theme.preview.\(theme)"
+        }
+        static let themeScope = "theme.scope"
+
         static func homeGame(_ id: Int) -> String {
             "home.game.\(id)"
         }
@@ -890,6 +914,9 @@ enum SurroundUITestContract {
         static let gameHistoryEmpty = "gameHistory.empty"
 
         static let homeNewGame = "home.newGame"
+        /// Home's Appearance button.
+        static let homeAppearance = "home.appearance"
+        /// The Compact/Large display mode inside Appearance's popover.
         static let homeDisplayMode = "home.displayMode"
         static let homeFirstRun = "home.firstRun"
         static let homeSkeleton = "home.skeleton"

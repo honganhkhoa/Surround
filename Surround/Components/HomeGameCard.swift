@@ -579,14 +579,6 @@ struct HomeActionSurface: ViewModifier {
     }
 }
 
-struct HomeActionButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .modifier(HomeActionSurface())
-            .opacity(configuration.isPressed ? 0.75 : 1)
-    }
-}
-
 // MARK: - Placeholder
 
 /// The first load's placeholder row: static shapes, no shimmer.

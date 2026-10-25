@@ -36,6 +36,9 @@ private func makeSurroundUserDefaults() -> UserDefaults {
            arguments.indices.contains(index + 1) {
             defaults.set(arguments[index + 1], forKey: SettingKey<String>.gameTheme.name)
         }
+        if arguments.contains(SurroundUITestContract.themeGamesOnlyLaunchArgument) {
+            defaults.set(false, forKey: SettingKey<Bool>.themeAppliesToWholeApp.name)
+        }
         return defaults
     }
     #endif
@@ -216,9 +219,15 @@ extension SettingKey {
         return .init(name: "homeViewDisplayMode")
     }
 
-    /// Game Detail's theme (`SurroundTheme`); a Debug-only preview for now.
+    /// The theme (`SurroundTheme`) games wear, and Home and Settings too
+    /// while `themeAppliesToWholeApp` is on.
     static var gameTheme: SettingKey<String> {
         return .init(name: "gameTheme", defaultValue: "standard")
+    }
+
+    /// Whole app (on) or Games only (off).
+    static var themeAppliesToWholeApp: SettingKey<Bool> {
+        return .init(name: "themeAppliesToWholeApp", defaultValue: true)
     }
 #endif
     

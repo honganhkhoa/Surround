@@ -727,7 +727,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
     private func auditFeltMeadowHome(appearance: SurroundUITestContract.Appearance, large: Bool) {
         // Plain offline Home retains the state fixtures and the ordinary
-        // display-mode menu; compatibility scenes have a different game list.
+        // Appearance popover; compatibility scenes have a different game list.
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.homeStatesLaunchArgument,
             SurroundUITestContract.themeLaunchArgument, "feltMeadow",
@@ -736,12 +736,13 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
         defer { app.terminate() }
         let home = element(ID.screenHome, in: app, matching: .scrollView)
         let mode = large ? "Large" : "Compact"
-        let picker = element(ID.homeDisplayMode, in: app, matching: .button)
-        // Toolbar menus do not consistently expose SwiftUI accessibilityValue
+        let picker = element(ID.homeAppearance, in: app, matching: .button)
+        // Toolbar buttons do not consistently expose SwiftUI accessibilityValue
         // through XCTest. Select explicitly and verify the resulting board size.
-        tap(picker, description: "Choose Home display mode", in: app)
-        let choice = app.buttons.matching(NSPredicate(format: "label == %@", mode)).firstMatch
-        tap(choice, description: "Show \(mode) Home games", in: app)
+        tap(picker, description: "Open Home's Appearance popover", in: app)
+        let modes = element(ID.homeDisplayMode, in: app, matching: .segmentedControl)
+        tap(modes.buttons[mode], description: "Show \(mode) Home games", in: app)
+        dismissPopover(in: app)
 
         let states: [(Int, String, [String])] = [
             (SurroundUITestContract.homeStatesLowTimeGameID, "low-time", ["Your move", "Low on time"]),
@@ -770,7 +771,7 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
             let evidence = XCTAttachment(string: """
             Appearance: \(appearance.rawValue)
             Display mode: \(mode), verified by board geometry
-            Menu accessibility value: \(picker.value ?? "absent")
+            Appearance button accessibility value: \(picker.value ?? "absent")
             Fixture: \(gameID) (\(state))
             Board: \(board.frame)
             Accessible state: \(board.label)

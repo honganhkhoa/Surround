@@ -22,6 +22,8 @@ enum HomeLayout {
     static let rowSpacing: CGFloat = 12
     static let bandMargin: CGFloat = 24
     static let listMargin: CGFloat = 16
+    /// New game fills a phone's list; wider layouts keep it to this.
+    static let newGameMaximumWidth: CGFloat = 480
 
     /// Two or three columns of section bands once two Compact cells fit;
     /// otherwise one grouped list, as on iPhone.
