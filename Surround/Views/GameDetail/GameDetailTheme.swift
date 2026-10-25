@@ -386,14 +386,14 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             )
         case .surroundStudio:
             return BoardAppearance(
-                boardColor: Color(themeHex: 0xE3AF69),
-                boardEdge: Color(themeHex: 0x79522F).opacity(0.65),
+                boardColor: Color(themeHex: 0xD8B27A),
+                boardEdge: Color(themeHex: 0x80613E).opacity(0.65),
                 boardTexture: SurroundStudioAssets.board,
                 boardBevel: true,
                 boardDepth: BoardDepth(
-                    upperFace: Color(themeHex: 0xBA803D), lowerFace: Color(themeHex: 0x79491F),
-                    highlight: Color(themeHex: 0xFFE0A6).opacity(0.45),
-                    shade: Color(themeHex: 0x65401F).opacity(0.7), shadow: Color(themeHex: 0x342316).opacity(0.35),
+                    upperFace: Color(themeHex: 0xB68D59), lowerFace: Color(themeHex: 0x785733),
+                    highlight: Color(themeHex: 0xF4DEBA).opacity(0.45),
+                    shade: Color(themeHex: 0x634C33).opacity(0.7), shadow: Color(themeHex: 0x342B22).opacity(0.35),
                     thicknessRatio: 0.012, maximumThickness: 8),
                 // The kaya grain stays quiet; exact charcoal lines and all
                 // game marks are drawn above it by the shared native board.
@@ -413,9 +413,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     label: Color(themeHex: 0xFFF9ED)
                 ),
                 white: StonePalette(
-                    highlight: Color(themeHex: 0xFFFDF5),
-                    shade: Color(themeHex: 0xD7CDBA),
-                    flat: Color(themeHex: 0xF4EDDE),
+                    highlight: Color(themeHex: 0xFFFEFB),
+                    shade: Color(themeHex: 0xD8D4CD),
+                    flat: Color(themeHex: 0xF5F3EF),
                     outline: Color(themeHex: 0x6B5C45),
                     rim: Color(themeHex: 0x776B58).opacity(0.5),
                     lastMove: Color(themeHex: 0x343B38),
@@ -619,8 +619,8 @@ private enum RakedGardenColors {
     static let lightOrdinary = adaptive(0x20518B, 0x123752)
 }
 
-/// Day pigments remain exact; static trait providers resolve the studio's
-/// cool charcoal and subdued ivory surfaces without recreating image assets.
+/// Balanced honey accents, neutral shell and charcoal follow the room's
+/// daylight; static trait providers subdue the same materials at night.
 private enum SurroundStudioColors {
     private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {
         Color(uiColor: UIColor { traits in
@@ -631,35 +631,36 @@ private enum SurroundStudioColors {
         })
     }
 
-    static let page = adaptive(0xE8DDC7, 0x121B24)
-    static let panel = adaptive(0xF7F2E8, 0x1C2932)
-    static let foreground = adaptive(0x303631, 0xE7E7DD)
-    static let panelBorder = adaptive(0x78684F, 0x9BA7A8)
-    static let blackGlass = adaptive(0x303735, 0x252D35)
-    static let whiteGlass = adaptive(0xF3EBDD, 0xCECEC3)
-    static let whiteIdentityGlass = adaptive(0xF7F0E2, 0xD5D4C8)
-    static let action = adaptive(0x3D634B, 0x3E6659)
-    static let chatBubble = adaptive(0xDDDCCB, 0x2D3B43)
-    static let selection = adaptive(0x3D634B, 0xB4CFBC)
+    static let page = adaptive(0xE5DED4, 0x121B24)
+    static let panel = adaptive(0xF5F2ED, 0x1C2932)
+    static let foreground = adaptive(0x293036, 0xE7E7DD)
+    static let panelBorder = adaptive(0x7C7060, 0x9BA7A8)
+    static let blackGlass = adaptive(0x34393C, 0x252D35)
+    static let whiteGlass = adaptive(0xF1EEE8, 0xCECEC3)
+    static let whiteIdentityGlass = adaptive(0xF5F2ED, 0xD5D4C8)
+    // A deeper honey pigment keeps the native white action glyph readable.
+    static let action = adaptive(0x86613E, 0x775838)
+    static let chatBubble = adaptive(0xE1DBD2, 0x2D3B43)
+    static let selection = adaptive(0x805B35, 0xDDC39D)
     static let conditional = adaptive(0x8A531D, 0xE4BD82)
-    static let cream = adaptive(0xFFF9ED, 0xF0EEE5)
-    static let keyline = adaptive(0xFFF9ED, 0x17222B)
-    static let treeGuide = adaptive(0x78684F, 0xA7AAA1)
-    static let idle = adaptive(0xD8CEBB, 0x303E47)
-    static let blackSurfaceTop = adaptive(0x3E4745, 0x343F47)
-    static let blackSurfaceBottom = adaptive(0x202624, 0x171F27)
-    static let whiteSurfaceTop = adaptive(0xE5DCCA, 0xBDBFB7)
-    static let whiteSurfaceBottom = adaptive(0xFFF9ED, 0xD8D8CE)
-    static let blackSolid = adaptive(0x282F2C, 0x222D34)
-    static let whiteForeground = adaptive(0x303631, 0x222C30)
-    static let blackAccent = adaptive(0xC6D5BD, 0xD1DABB)
-    static let whiteAccent = adaptive(0x3D634B, 0x294839)
-    static let turnOutline = adaptive(0x688360, 0xA9C7AC)
-    static let turnGlow = adaptive(0xA0B78F, 0xA7C3B1)
-    static let blackBorder = adaptive(0xB7BDAF, 0x9AA7AC)
-    static let whiteBorder = adaptive(0x78684F, 0x566064)
-    static let blackSecondary = adaptive(0xD8D8CB, 0xCFD4D0)
-    static let whiteSecondary = adaptive(0x5B6155, 0x3B4444)
+    static let cream = adaptive(0xFCFAF7, 0xF0EEE5)
+    static let keyline = adaptive(0xFCFAF7, 0x17222B)
+    static let treeGuide = adaptive(0x7C7060, 0xA7AAA1)
+    static let idle = adaptive(0xD7D0C6, 0x303E47)
+    static let blackSurfaceTop = adaptive(0x404548, 0x343F47)
+    static let blackSurfaceBottom = adaptive(0x22272A, 0x171F27)
+    static let whiteSurfaceTop = adaptive(0xE6E0D8, 0xBDBFB7)
+    static let whiteSurfaceBottom = adaptive(0xFCFAF7, 0xD8D8CE)
+    static let blackSolid = adaptive(0x2B3033, 0x222D34)
+    static let whiteForeground = adaptive(0x293036, 0x222C30)
+    static let blackAccent = adaptive(0xE3C89F, 0xE3C89F)
+    static let whiteAccent = adaptive(0x795530, 0x604321)
+    static let turnOutline = adaptive(0x967247, 0xD0B48A)
+    static let turnGlow = adaptive(0xC5A474, 0xC5AB85)
+    static let blackBorder = adaptive(0xBBB8B0, 0x9AA7AC)
+    static let whiteBorder = adaptive(0x7C7060, 0x566064)
+    static let blackSecondary = adaptive(0xD9D7D2, 0xCFD4D0)
+    static let whiteSecondary = adaptive(0x5C5B58, 0x3B4444)
     static let darkModerator = adaptive(0xDDC4F4, 0xDDC4F4)
     static let lightModerator = adaptive(0x633889, 0x4E2D67)
     static let darkProfessional = adaptive(0xBCE6B3, 0xBCE6B3)
@@ -1829,7 +1830,7 @@ private struct SurroundStudioSceneContent: View, Equatable {
     let scheme: ColorScheme
 
     private var chrome: Color {
-        Color(themeHex: scheme == .dark ? 0x121B24 : 0xE8DDC7)
+        Color(themeHex: scheme == .dark ? 0x121B24 : 0xE5DED4)
     }
 
     private var usesLegacyChrome: Bool {

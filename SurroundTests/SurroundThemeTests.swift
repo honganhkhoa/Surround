@@ -1022,7 +1022,7 @@ final class SurroundThemeTests: XCTestCase {
         let day = theme.board(for: .light)
         let night = theme.board(for: .dark)
         XCTAssertEqual(theme.board, day)
-        XCTAssertEqual(day.boardColor, Color(themeHex: 0xE3AF69), "Daytime keeps its golden kaya palette")
+        XCTAssertEqual(day.boardColor, Color(themeHex: 0xD8B27A), "Daytime keeps its balanced honey kaya palette")
         XCTAssertNotEqual(day.boardColor, night.boardColor)
         XCTAssertLessThan(luminance(night.boardColor, style: .dark), luminance(day.boardColor))
         XCTAssertEqual(night.gridStyle, day.gridStyle)
