@@ -102,6 +102,7 @@
 		AE4400013C00000000000001 /* SurroundUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4400023C00000000000002 /* SurroundUITestCase.swift */; };
 		AE4500013C00000000000001 /* SurroundJourneyUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */; };
 		A7E5E1000000000000000003 /* ThemePickerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E5E1000000000000000004 /* ThemePickerUITests.swift */; };
+		A7E5E1000000000000000005 /* ThemedScreensUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E5E1000000000000000006 /* ThemedScreensUITests.swift */; };
 		AE4600013C00000000000001 /* ProfileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4600023C00000000000002 /* ProfileUITests.swift */; };
 		AE535B9E2AE22AD700B98D58 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */; };
 		AE6000013B00000000000001 /* GameDetailConnectionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6000053B00000000000005 /* GameDetailConnectionCoordinator.swift */; };
@@ -582,6 +583,7 @@
 		AE4400023C00000000000002 /* SurroundUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundUITestCase.swift; sourceTree = "<group>"; };
 		AE4500023C00000000000002 /* SurroundJourneyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundJourneyUITestCase.swift; sourceTree = "<group>"; };
 		A7E5E1000000000000000004 /* ThemePickerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerUITests.swift; sourceTree = "<group>"; };
+		A7E5E1000000000000000006 /* ThemedScreensUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemedScreensUITests.swift; sourceTree = "<group>"; };
 		AE4600023C00000000000002 /* ProfileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileUITests.swift; sourceTree = "<group>"; };
 		AE535B9B2AE2274000B98D58 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainInterface.strings; sourceTree = "<group>"; };
 		AE535B9D2AE22AD700B98D58 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -984,6 +986,7 @@
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
 				A7E5E1000000000000000004 /* ThemePickerUITests.swift */,
+				A7E5E1000000000000000006 /* ThemedScreensUITests.swift */,
 				D03000042026093000000004 /* DuoSidebarUITests.swift */,
 				D10400022026100400000002 /* SceneActivationUITests.swift */,
 				655B546EB86C4BD48EE74240 /* MessagesNavigationUITests.swift */,
@@ -1845,6 +1848,7 @@
 				AE4500013C00000000000001 /* SurroundJourneyUITestCase.swift in Sources */,
 				AE4600013C00000000000001 /* ProfileUITests.swift in Sources */,
 				A7E5E1000000000000000003 /* ThemePickerUITests.swift in Sources */,
+				A7E5E1000000000000000005 /* ThemedScreensUITests.swift in Sources */,
 				D03000032026093000000003 /* DuoSidebarUITests.swift in Sources */,
 				D10100112026100100000011 /* DuoProfileSidebarUITests.swift in Sources */,
 				D10100032026100100000003 /* SidebarKeyboardUITests.swift in Sources */,

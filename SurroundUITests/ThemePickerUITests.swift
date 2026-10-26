@@ -191,12 +191,12 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         let scope = scopeControl(in: app)
         XCTAssertTrue(scope.isEnabled)
         XCTAssertTrue(scope.buttons["Whole app"].isSelected, "Whole app is the default.")
-        XCTAssertTrue(app.staticTexts["Home and Settings use it too."].exists)
+        XCTAssertTrue(app.staticTexts["Screens that support themes use it. Not every screen does yet."].exists)
         keepScreenshot("Settings – Raked Garden on the whole app", in: app)
 
         tap(scope.buttons["Games only"], description: "Keep the theme to games", in: app)
         XCTAssertTrue(scope.buttons["Games only"].isSelected)
-        XCTAssertTrue(app.staticTexts["Only games use it. Home and Settings stay Classic."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Only games use it. Other screens stay Classic."].waitForExistence(timeout: 5))
         keepScreenshot("Settings – Raked Garden in games only", in: app)
 
         let nebula = themeOption("nebulaPearl", in: app)
@@ -204,6 +204,9 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         assertSelected(nebula, true)
         XCTAssertEqual(nebula.value as? String, "Always dark")
         XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, even in Light Mode."].waitForExistence(timeout: 5))
+        // On the whole app it turns every screen dark, and says so.
+        tap(scopeControl(in: app).buttons["Whole app"], description: "Use the theme on the whole app", in: app)
+        XCTAssertTrue(app.staticTexts["Nebula & Pearl is always dark, so the whole app is too."].waitForExistence(timeout: 5))
     }
 
     func testGameOptionsOffersTheThemes() throws {
@@ -335,7 +338,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
             let app = launchApp(additionalLaunchArguments: [SurroundUITestContract.themeGamesOnlyLaunchArgument] + arguments,
                                 orientation: orientation)
             element(ID.screenHome, in: app)
-            restoreFullWindow(in: app)
+            restoreFullSizeWindow(in: app)
             let popover = openHomeAppearance(in: app)
             assertPreviewTilesKeepTheirColumnWidth(in: popover, context: "iPad \(name) popover")
             keepScreenshot("iPad Home – Appearance popover, \(name)", in: app)
@@ -351,7 +354,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
                             orientation: .landscapeLeft)
         addTeardownBlock { XCUIDevice.shared.orientation = .portrait }
         element(ID.screenHome, in: app)
-        restoreFullWindow(in: app)
+        restoreFullSizeWindow(in: app)
         openHomeAppearance(in: app)
         dismissPopover(in: app)
         XCUIDevice.shared.orientation = .portrait
@@ -409,7 +412,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         for (name, orientation, arguments) in cases {
             let app = launchApp(additionalLaunchArguments: arguments, orientation: orientation)
             element(ID.screenHome, in: app)
-            if isPad { restoreFullWindow(in: app) }
+            if isPad { restoreFullSizeWindow(in: app) }
             assertBarShowsAppearance(in: app, context: name)
             app.terminate()
         }
@@ -421,12 +424,12 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
                 // A failure must not leave the window narrow for later runs; a
                 // passing case restores it and quits first.
                 addTeardownBlock { [weak self] in
-                    if app.state == .runningForeground { self?.restoreFullWindow(in: app) }
+                    if app.state == .runningForeground { self?.restoreFullSizeWindow(in: app) }
                 }
                 let window = resizeWindow(to: CGSize(width: 375, height: 548), in: app)
                 XCTAssertEqual(window.width, 375, accuracy: 1, "The native window reaches its minimum width")
                 assertBarShowsAppearance(in: app, context: name)
-                restoreFullWindow(in: app)
+                restoreFullSizeWindow(in: app)
                 app.terminate()
             }
         }
@@ -510,33 +513,5 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
             Thread.sleep(forTimeInterval: 0.8)
         }
         return window.frame
-    }
-
-    /// iPadOS remembers a resized window across launches. Each case needs the
-    /// full screen, so restore it with the system's double tap on the window's
-    /// top edge, away from Home's live-game banner at the top center.
-    private func restoreFullWindow(in app: XCUIApplication) {
-        let window = app.windows.firstMatch
-        func isFull() -> Bool {
-            let frame = window.frame
-            return frame.minX <= 4 && frame.minY <= 40 && min(frame.width, frame.height) >= 700
-        }
-        guard window.exists, !isFull() else { return }
-        for x in [0.75, 0.25] where !isFull() {
-            window.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0))
-                .withOffset(CGVector(dx: 0, dy: 6)).doubleTap()
-            _ = pollUntil(timeout: 5) { isFull() }
-        }
-        // iPadOS 27 ignores the double tap in a small window: open the
-        // window's controls at its top left, then take the green full-screen
-        // one beside them.
-        if !isFull() {
-            let origin = window.coordinate(withNormalizedOffset: .zero)
-            origin.withOffset(CGVector(dx: 42, dy: 31)).tap()
-            Thread.sleep(forTimeInterval: 1)
-            origin.withOffset(CGVector(dx: 92, dy: 31)).tap()
-            _ = pollUntil(timeout: 5) { isFull() }
-        }
-        XCTAssertTrue(isFull(), "Expected the full-size iPad window; got \(window.frame)")
     }
 }

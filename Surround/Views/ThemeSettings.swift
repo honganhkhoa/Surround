@@ -216,8 +216,8 @@ struct ThemeScopePicker: View {
             return Text("Classic looks the same on every screen.", comment: "Caption under the theme scope choice while Classic is selected")
         }
         return appliesToWholeApp
-            ? Text("Home and Settings use it too.", comment: "Caption for Whole app: the chosen theme also applies to Home and Settings")
-            : Text("Only games use it. Home and Settings stay Classic.", comment: "Caption for Games only; Classic is the default theme's name")
+            ? Text("Screens that support themes use it. Not every screen does yet.", comment: "Caption for Whole app: the chosen theme applies to every screen that supports themes; some screens do not yet")
+            : Text("Only games use it. Other screens stay Classic.", comment: "Caption for Games only; Classic is the default theme's name")
     }
 
     private var useTheThemeOn: Text {
@@ -229,7 +229,7 @@ struct ThemeScopePicker: View {
             useTheThemeOn
             Picker(selection: $appliesToWholeApp) {
                 Text("Games only", comment: "Choice: the theme applies only to game screens").tag(false)
-                Text("Whole app", comment: "Choice: the theme applies to games, Home and Settings").tag(true)
+                Text("Whole app", comment: "Choice: the theme applies to every screen that supports themes").tag(true)
             } label: {
                 useTheThemeOn
             }
@@ -267,7 +267,11 @@ struct AppearanceSettings: View {
             VStack(alignment: .leading, spacing: 14) {
                 ThemePicker(selection: theme)
                 if theme.wrappedValue.colorScheme == .dark {
-                    Text("\(theme.wrappedValue.title) is always dark, even in Light Mode.", comment: "Note under the theme picker; %@ is a theme name")
+                    // On the whole app it turns every screen dark, not just
+                    // those that wear the theme.
+                    (appliesToWholeApp
+                        ? Text("\(theme.wrappedValue.title) is always dark, so the whole app is too.", comment: "Note under the theme picker when the theme applies to the whole app: a dark-only theme turns the whole app dark; %@ is a theme name")
+                        : Text("\(theme.wrappedValue.title) is always dark, even in Light Mode.", comment: "Note under the theme picker; %@ is a theme name"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -281,8 +285,8 @@ struct AppearanceSettings: View {
     }
 }
 
-/// The theme in a game's Options sheet. Whether Home and Settings wear it too
-/// stays a Settings choice.
+/// The theme in a game's Options sheet. Whether the rest of the app wears it
+/// too stays a Settings choice.
 struct GameThemeSettings: View {
     @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
     private var themeID = SurroundTheme.standard.rawValue

@@ -714,11 +714,19 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
-    /// Games always wear the theme; Home and Settings only with Whole app.
+    /// Games always wear the theme; other screens only with Whole app.
     func testGamesOnlyKeepsOtherScreensClassic() {
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: true), .rakedGarden)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: false), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "unknown", appliesToWholeApp: true), .standard)
+    }
+
+    /// A dark-only theme turns the whole app dark only when it applies to the
+    /// whole app; with Games only, the rest of the app keeps the system's look.
+    func testDarkOnlyThemesDarkenTheWholeAppOnlyThere() {
+        XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl", appliesToWholeApp: true).colorScheme, .dark)
+        XCTAssertNil(SurroundTheme.current(storedID: "nebulaPearl", appliesToWholeApp: false).colorScheme)
+        XCTAssertNil(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: true).colorScheme)
     }
 
     /// The concept warns about violet on indigo: glass stones need a clear

@@ -748,6 +748,34 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         return candidate
     }
 
+    /// iPadOS remembers a resized window across launches. Each case needs the
+    /// full screen, so restore it with the system's double tap on the window's
+    /// top edge, away from Home's live-game banner at the top center.
+    func restoreFullSizeWindow(in app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        func isFull() -> Bool {
+            let frame = window.frame
+            return frame.minX <= 4 && frame.minY <= 40 && min(frame.width, frame.height) >= 700
+        }
+        guard window.exists, !isFull() else { return }
+        for x in [0.75, 0.25] where !isFull() {
+            window.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0))
+                .withOffset(CGVector(dx: 0, dy: 6)).doubleTap()
+            _ = pollUntil(timeout: 5) { isFull() }
+        }
+        // iPadOS 27 ignores the double tap in a small window: open the
+        // window's controls at its top left, then take the green full-screen
+        // one beside them.
+        if !isFull() {
+            let origin = window.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: 42, dy: 31)).tap()
+            Thread.sleep(forTimeInterval: 1)
+            origin.withOffset(CGVector(dx: 92, dy: 31)).tap()
+            _ = pollUntil(timeout: 5) { isFull() }
+        }
+        XCTAssertTrue(isFull(), "Expected the full-size iPad window; got \(window.frame)")
+    }
+
     /// Closes a popover the way a person does: with a tap outside it.
     func dismissPopover(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let popover = app.popovers.firstMatch

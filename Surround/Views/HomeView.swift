@@ -1105,7 +1105,8 @@ private struct HomeSkeletonEntry: Identifiable {
     let id: Int
 }
 
-/// The scene behind Home and Settings, softened under the large title: a
+/// The scene behind the screens that wear the theme (Home, Settings, Public
+/// games, Game history), softened under the large title: a
 /// veil in the page color that fades out below it, as on the canvas, so the
 /// title reads while the art still shows through. Its height follows the
 /// title's safe area as it collapses and grows with Dynamic Type, without

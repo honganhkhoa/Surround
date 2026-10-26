@@ -102,6 +102,14 @@ struct GameHistoryView: View {
     @State private var activeIdentity: QueryIdentity?
     @StateObject private var previewLoader = FinishedGamePreviewLoader()
     @State private var isVisible = false
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var themeAppliesToWholeApp = true
+
+    private var theme: SurroundTheme {
+        SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
+    }
 
     init(
         player: OGSUser? = nil,
@@ -142,12 +150,16 @@ struct GameHistoryView: View {
             if let player {
                 Text(verbatim: player.username)
                     .font(.headline)
+                    .modifier(HomeSceneLegibility())
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))]) {
+            // On a theme's scene each game sits on its own card, as on Home.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300))],
+                      spacing: theme.hasScene ? HomeLayout.rowSpacing : nil) {
                 ForEach(pagination.games) { game in
                     HistoryGameCell(game: game, perspectivePlayerID: perspectivePlayerID ?? player?.id,
+                                    inCard: theme.hasScene,
                                     retryPreview: { previewLoader.retry(game: game, using: ogs) }) {
                         if player != nil {
                             navigation.openGame(game, using: nav)
@@ -161,6 +173,7 @@ struct GameHistoryView: View {
                             : game.ogsID.map(SurroundUITestContract.AccessibilityID.profileHistoryGame)
                                 ?? SurroundUITestContract.AccessibilityID.homeHistoryGame(game)
                     )
+                    .modifier(HomeCardOnScene())
                     .padding(.horizontal)
                     .historyPreviewDemand(for: game, loader: previewLoader, using: ogs,
                                           query: queryIdentity, screenIsVisible: isVisible)
@@ -185,10 +198,18 @@ struct GameHistoryView: View {
                         ),
                         retry: loadNextPage
                     )
+                    .modifier(HomeCardOnScene(padding: 8))
+                    .padding(.horizontal, theme.hasScene ? 16 : 0)
                 }
             }
-            .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
+            // Cards keep clear of the title and the bottom edge, as on Home.
+            .padding(.top, theme.hasScene ? 8 : 0)
+            .padding(.bottom, theme.hasScene ? 24 : 0)
+            .background(theme.hasScene ? .clear : Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
         }
+        // The scene stays put behind the scrolling games.
+        .background { if theme.hasScene { ThemeSceneBackdrop() } }
+        .surroundTheme(theme)
         .accessibilityIdentifier(
             player == nil
                 ? SurroundUITestContract.AccessibilityID.screenGameHistory

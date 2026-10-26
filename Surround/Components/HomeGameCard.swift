@@ -558,6 +558,24 @@ struct HomeCard: ViewModifier {
     }
 }
 
+/// A row on a screen that wears the theme sits on Home's card over the
+/// theme's scene. Classic keeps the screen's plain page, and the row stays as
+/// it was there.
+struct HomeCardOnScene: ViewModifier {
+    var padding: CGFloat = 0
+    @Environment(\.surroundTheme) private var theme
+
+    func body(content: Content) -> some View {
+        if theme.hasScene {
+            content
+                .padding(padding)
+                .modifier(HomeCard())
+        } else {
+            content
+        }
+    }
+}
+
 /// Links and small actions use a pigment readable on the theme's cards.
 struct HomeActionText: ViewModifier {
     @Environment(\.surroundTheme) private var theme

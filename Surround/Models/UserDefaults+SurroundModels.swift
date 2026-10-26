@@ -219,8 +219,8 @@ extension SettingKey {
         return .init(name: "homeViewDisplayMode")
     }
 
-    /// The theme (`SurroundTheme`) games wear, and Home and Settings too
-    /// while `themeAppliesToWholeApp` is on.
+    /// The theme (`SurroundTheme`) games wear, and every other screen that
+    /// supports themes too while `themeAppliesToWholeApp` is on.
     static var gameTheme: SettingKey<String> {
         return .init(name: "gameTheme", defaultValue: "standard")
     }

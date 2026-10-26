@@ -11,6 +11,14 @@ struct PublicGamesList: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var ogs: OGSService
     @EnvironmentObject var nav: NavigationService
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var gameThemeID = SurroundTheme.standard.rawValue
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var themeAppliesToWholeApp = true
+
+    private var theme: SurroundTheme {
+        SurroundTheme.current(storedID: gameThemeID, appliesToWholeApp: themeAppliesToWholeApp)
+    }
     
     @MainActor
     private func resolvePendingGameOpen(_ request: PendingGameOpen) async {
@@ -68,6 +76,7 @@ struct PublicGamesList: View {
                     ForEach(ogs.sortedPublicGames) { game in
                         Button(action: { nav.publicGames.activeGame = game }) {
                             GameCell(game: game)
+                                .modifier(HomeCardOnScene(padding: 12))
                         }
                         .accessibilityIdentifier(
                             SurroundUITestContract.AccessibilityID.publicGame(game)
@@ -76,8 +85,11 @@ struct PublicGamesList: View {
                         .padding()
                     }
                 }
-                .background(Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
+                .background(theme.hasScene ? .clear : Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
             }
+            // The scene stays put behind the scrolling games.
+            .background { if theme.hasScene { ThemeSceneBackdrop() } }
+            .surroundTheme(theme)
         }
         .stackDestination(isPresented: Binding(
             get: { nav.publicGames.activeGame != nil },

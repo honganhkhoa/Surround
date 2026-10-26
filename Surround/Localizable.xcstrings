@@ -69460,7 +69460,7 @@
       }
     },
     "Whole app" : {
-      "comment" : "Choice: the theme applies to games, Home and Settings",
+      "comment" : "Choice: the theme applies to every screen that supports themes",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -69625,168 +69625,168 @@
         }
       }
     },
-    "Home and Settings use it too." : {
-      "comment" : "Caption for Whole app: the chosen theme also applies to Home and Settings",
+    "Screens that support themes use it. Not every screen does yet." : {
+      "comment" : "Caption for Whole app: the chosen theme applies to every screen that supports themes; some screens do not yet",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auch Start und Einstellungen verwenden es."
+            "value" : "Bildschirme, die Designs unterstützen, verwenden es. Noch nicht alle tun das."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inicio y Configuración también lo usan."
+            "value" : "Lo usan las pantallas compatibles con temas. Aún no todas lo son."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’accueil et les paramètres l’utilisent aussi."
+            "value" : "Les écrans compatibles avec les thèmes l’utilisent. Ils ne le sont pas encore tous."
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beranda dan Pengaturan juga menggunakannya."
+            "value" : "Layar yang mendukung tema menggunakannya. Belum semua layar mendukungnya."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ホームと設定にも適用されます。"
+            "value" : "テーマに対応した画面に適用されます。まだ対応していない画面もあります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "홈과 설정에도 적용됩니다."
+            "value" : "테마를 지원하는 화면에 적용됩니다. 아직 모든 화면이 지원하지는 않습니다."
           }
         },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utama dan Tetapan turut menggunakannya."
+            "value" : "Skrin yang menyokong tema menggunakannya. Belum semua skrin menyokongnya."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Início e Ajustes também o usam."
+            "value" : "As telas compatíveis com temas o usam. Nem todas são compatíveis ainda."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Início e as Definições também o usam."
+            "value" : "Os ecrãs compatíveis com temas usam-no. Ainda nem todos o são."
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "หน้าหลักและการตั้งค่าก็ใช้ธีมนี้ด้วย"
+            "value" : "หน้าจอที่รองรับธีมจะใช้ธีมนี้ ยังไม่ใช่ทุกหน้าจอที่รองรับ"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trang chủ và Cài đặt cũng dùng chủ đề này."
+            "value" : "Các màn hình hỗ trợ chủ đề sẽ dùng chủ đề này. Chưa phải màn hình nào cũng hỗ trợ."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "主页和设置也会使用此主题。"
+            "value" : "支持主题的界面会使用此主题。目前并非所有界面都支持。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "首頁和設定也會使用此主題。"
+            "value" : "支援主題的畫面會使用此主題。目前並非所有畫面都支援。"
           }
         }
       }
     },
-    "Only games use it. Home and Settings stay Classic." : {
+    "Only games use it. Other screens stay Classic." : {
       "comment" : "Caption for Games only; Classic is the default theme's name",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nur Partien verwenden es. Start und Einstellungen bleiben Klassisch."
+            "value" : "Nur Partien verwenden es. Alle anderen Bildschirme bleiben Klassisch."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Solo las partidas lo usan. Inicio y Configuración siguen en Clásico."
+            "value" : "Solo las partidas lo usan. Las demás pantallas siguen en Clásico."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seules les parties l’utilisent. L’accueil et les paramètres restent en Classique."
+            "value" : "Seules les parties l’utilisent. Les autres écrans restent en Classique."
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hanya permainan yang menggunakannya. Beranda dan Pengaturan tetap Klasik."
+            "value" : "Hanya permainan yang menggunakannya. Layar lain tetap Klasik."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対局にのみ適用されます。ホームと設定はクラシックのままです。"
+            "value" : "対局にのみ適用されます。ほかの画面はクラシックのままです。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "대국에만 적용됩니다. 홈과 설정은 클래식으로 유지됩니다."
+            "value" : "대국에만 적용됩니다. 다른 화면은 클래식으로 유지됩니다."
           }
         },
         "ms" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hanya permainan menggunakannya. Utama dan Tetapan kekal Klasik."
+            "value" : "Hanya permainan menggunakannya. Skrin lain kekal Klasik."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Só as partidas o usam. Início e Ajustes continuam no Clássico."
+            "value" : "Só as partidas o usam. As outras telas continuam no Clássico."
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Só as partidas o usam. O Início e as Definições ficam no Clássico."
+            "value" : "Só as partidas o usam. Os outros ecrãs ficam no Clássico."
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ใช้เฉพาะในเกม หน้าหลักและการตั้งค่ายังคงเป็นคลาสสิก"
+            "value" : "ใช้เฉพาะในเกม หน้าจออื่นยังคงเป็นคลาสสิก"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chỉ ván đấu dùng chủ đề này. Trang chủ và Cài đặt vẫn là Cổ điển."
+            "value" : "Chỉ ván đấu dùng chủ đề này. Các màn hình khác vẫn là Cổ điển."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅对局使用此主题。主页和设置保持经典。"
+            "value" : "仅对局使用此主题。其他界面保持经典。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "僅對局使用此主題。首頁和設定維持經典。"
+            "value" : "僅對局使用此主題。其他畫面維持經典。"
           }
         }
       }
@@ -69870,6 +69870,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 永遠為深色，即使在淺色模式下也是如此。"
+          }
+        }
+      }
+    },
+    "%@ is always dark, so the whole app is too." : {
+      "comment" : "Note under the theme picker when the theme applies to the whole app: a dark-only theme turns the whole app dark; %@ is a theme name",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist immer dunkel – und damit auch die ganze App."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ siempre es oscuro, así que toda la app también lo es."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est toujours sombre, et toute l’app l’est donc aussi."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ selalu gelap, jadi seluruh aplikasi juga gelap."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は常にダークなので、アプリ全体もダークになります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 테마는 항상 어두우므로 앱 전체도 어두워집니다."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sentiasa gelap, jadi seluruh apl juga gelap."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ é sempre escuro, então o app inteiro também fica escuro."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ é sempre escuro, por isso toda a app também fica escura."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ มืดเสมอ ทั้งแอปจึงมืดด้วย"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ luôn tối, nên toàn bộ ứng dụng cũng tối theo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 始终为深色，因此整个 App 也会使用深色。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 永遠為深色，因此整個 App 也會使用深色。"
           }
         }
       }

@@ -71,6 +71,7 @@ struct SurroundApp: App {
             )
             .background(CatalystWindowResizeConfigurator())
             #endif
+            .modifier(WholeAppThemeAppearance())
             .modifier(FixtureColorScheme(colorScheme: fixtureColorScheme))
     }
 
@@ -89,6 +90,22 @@ struct SurroundApp: App {
             return .light
         }
         return nil
+    }
+}
+
+/// A dark-only theme on the whole app turns every screen dark, including
+/// those that do not wear themes yet, and the system's sheets and bars.
+/// With Games only, games alone turn dark, as they always have.
+private struct WholeAppThemeAppearance: ViewModifier {
+    @AppStorage(SettingKey<String>.gameTheme.name, store: userDefaults)
+    private var themeID = SurroundTheme.standard.rawValue
+    @AppStorage(SettingKey<Bool>.themeAppliesToWholeApp.name, store: userDefaults)
+    private var appliesToWholeApp = true
+
+    func body(content: Content) -> some View {
+        content.surroundWindowAppearance(
+            SurroundTheme.current(storedID: themeID, appliesToWholeApp: appliesToWholeApp).colorScheme
+        )
     }
 }
 

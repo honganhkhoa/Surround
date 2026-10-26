@@ -38,7 +38,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         return theme
     }
 
-    /// The theme Home and Settings show: the games' theme with Whole app,
+    /// The theme every screen that supports themes shows (Home, Settings,
+    /// Public games, Game history): the games' theme with Whole app,
     /// otherwise Classic.
     static func current(storedID: String, appliesToWholeApp: Bool) -> SurroundTheme {
         appliesToWholeApp ? current(storedID: storedID) : .standard
@@ -1672,7 +1673,8 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// Applies a theme to a screen that wears it (Game Detail and Home): its
+    /// Applies a theme to a screen that wears it (Game Detail, Home, Settings,
+    /// Public games, Game history): its
     /// surfaces, board and appearance. `ownsWindow` lets a screen that is
     /// leaving keep its look without holding the window's appearance.
     func surroundTheme(_ theme: SurroundTheme, ownsWindow: Bool = true) -> some View {
@@ -1698,6 +1700,15 @@ private struct GameDetailThemeModifier: ViewModifier {
             .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden) ? theme.foreground : .accentColor))
             .toolbarColorScheme(theme.colorScheme, for: .navigationBar, .bottomBar)
             .background(WindowInterfaceStyle(colorScheme: ownsWindow ? theme.colorScheme : nil))
+    }
+}
+
+extension View {
+    /// Holds the window in this appearance while the view is in it, and gives
+    /// the window back afterwards; nil asks nothing of it. The window's
+    /// appearance also reaches screens, sheets and bars outside this view.
+    func surroundWindowAppearance(_ colorScheme: ColorScheme?) -> some View {
+        background(WindowInterfaceStyle(colorScheme: colorScheme))
     }
 }
 

@@ -15,6 +15,8 @@ struct PlayerInfoLine: View {
     var conditionalMovesContext: ConditionalMovesPresentationContext?
     var navigationAccessibilityIdentifier: String
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.surroundTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .subheadline)
     private var conditionalMovesLineMinimumHeight: CGFloat = 30
 
@@ -111,7 +113,10 @@ struct PlayerInfoLine: View {
             .font(.subheadline)
             .bold()
             .lineLimit(1)
-            .foregroundColor(player.uiColor)
+            // On a theme's card, its role colors read as they do on Home.
+            .foregroundColor(theme.hasScene
+                ? theme.roleColor(for: player, on: colorScheme == .dark ? .black : .white)
+                : player.uiColor)
         if navigationAccessibilityIdentifier.isEmpty {
             label
         } else {
