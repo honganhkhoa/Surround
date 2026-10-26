@@ -241,7 +241,9 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let isHittable = waitUntilHittable(element, timeout: 10)
+        // A predicate wait has no final re-check, so one stalled snapshot on a
+        // hosted runner could use up a 10-second window.
+        let isHittable = waitUntilHittable(element, timeout: stateSettleTimeout)
         if !isHittable {
             let hierarchy = XCTAttachment(
                 string: """
@@ -657,10 +659,15 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             }
             app.swipeUp()
             #else
-            let safeTop = app.frame.minY
+            let frame = element.frame
+            // Only a target near the top can sit under a bar, so others skip
+            // the snapshot. A tap lands at the target's center; under a bar,
+            // it reaches the bar.
+            let safeTop = frame.midY < app.frame.minY + 240
+                ? topChromeBottom(over: frame, in: app) : app.frame.minY
             let safeBottom = app.frame.maxY - 100
-            let overlapsTopEdge = element.frame.minY < safeTop
-            let overlapsTabBar = element.frame.maxY > safeBottom
+            let overlapsTopEdge = frame.minY < app.frame.minY || frame.midY < safeTop
+            let overlapsTabBar = frame.maxY > safeBottom
 
             guard !element.isHittable
                     || overlapsTopEdge
@@ -675,21 +682,54 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 // Drag in the target's own column: on a wide iPad, Settings'
                 // centred scroll view ends short of 75% of the window. A
                 // target wholly above the viewport gets a half-window drag.
-                let column = (element.frame.midX - app.frame.minX) / app.frame.width
+                // Holding before lifting leaves no momentum, so the target
+                // stops where the next pass measures it.
+                let column = (frame.midX - app.frame.minX) / app.frame.width
                 let dx = min(0.95, max(0.05, column))
-                let distance: CGFloat = element.frame.maxY < safeTop ? 0.5 : 0.15
+                let distance: CGFloat = frame.maxY < safeTop ? 0.5 : 0.15
                 let dragStartsAt = app.coordinate(
                     withNormalizedOffset: CGVector(dx: dx, dy: 0.35)
                 )
                 let dragEndsAt = app.coordinate(
                     withNormalizedOffset: CGVector(dx: dx, dy: 0.35 + distance)
                 )
-                dragStartsAt.press(forDuration: 0.05, thenDragTo: dragEndsAt)
+                dragStartsAt.press(forDuration: 0.05, thenDragTo: dragEndsAt,
+                                   withVelocity: .default, thenHoldForDuration: 0.1)
             } else {
                 app.swipeUp()
             }
             #endif
         }
+    }
+
+    /// The bottom edge of the navigation and top tab bars over a target's
+    /// column. XCTest reports a row that scrolled under them as hittable,
+    /// but its tap reaches the bar. A control that belongs to a bar is
+    /// measured from the window instead.
+    private func topChromeBottom(over target: CGRect, in app: XCUIApplication) -> CGFloat {
+        let window = app.frame
+        // One snapshot instead of a query per bar; window chrome keeps its
+        // live frame in a landscape snapshot.
+        var bars = [CGRect]()
+        var barMembers = [CGRect]()
+        var pending = [(node: XCUIElementSnapshot, inBar: Bool)]()
+        if let root = try? app.snapshot() { pending.append((root, false)) }
+        while let (node, inBar) = pending.popLast() {
+            let isBar = node.elementType == .navigationBar || node.elementType == .tabBar
+            if isBar { bars.append(node.frame) }
+            if inBar || isBar { barMembers.append(node.frame) }
+            pending.append(contentsOf: node.children.map { (node: $0, inBar: inBar || isBar) })
+        }
+        let isBarMember = barMembers.contains {
+            abs($0.minX - target.minX) < 1 && abs($0.minY - target.minY) < 1
+                && abs($0.width - target.width) < 1 && abs($0.height - target.height) < 1
+        }
+        guard !isBarMember else { return window.minY }
+        let topBars = bars.filter {
+            !$0.isEmpty && $0.midY < window.midY
+                && $0.minX < target.maxX && target.minX < $0.maxX
+        }
+        return max(window.minY, topBars.map(\.maxY).max() ?? window.minY)
     }
 
     @discardableResult

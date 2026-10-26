@@ -173,7 +173,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
     private func assertMessagesLoadingFixture(_ state: String, in app: XCUIApplication) {
         let probe = element(SurroundUITestContract.AccessibilityID.messagesLoadingStartRead, in: app, matching: .button)
-        XCTAssertTrue(waitForValue(state, in: probe, timeout: 10),
+        XCTAssertTrue(waitForValue(state, in: probe, timeout: stateSettleTimeout),
                       "The opt-in fixture must expose the actual read flags, errors and held search count.")
     }
 
@@ -1989,11 +1989,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let field = element("messages.playerSearchField", in: app, matching: .textField)
         tap(field, description: "Focus inbox player search", in: app)
         field.typeText(value)
-        XCTAssertTrue(waitForValue(value, in: field, timeout: 10))
+        XCTAssertTrue(waitForValue(value, in: field, timeout: stateSettleTimeout))
     }
 
     private func assertSearch(_ value: String, playerID: Int, in app: XCUIApplication) {
-        XCTAssertTrue(waitForValue(value, in: element("messages.playerSearchField", in: app, matching: .textField), timeout: 10))
+        XCTAssertTrue(waitForValue(value, in: element("messages.playerSearchField", in: app, matching: .textField),
+                                   timeout: stateSettleTimeout))
         visibleElement("messages.search.profile.\(playerID)", in: app)
         visibleElement("messages.search.message.\(playerID)", in: app)
         element("messages.cancelPlayerSearch", in: app, matching: .button)
@@ -2508,20 +2509,32 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                 usable = visibleElement("messages.playerSearchField", in: app, matching: .textField)
             }
         case SurroundUITestContract.AccessibilityID.screenPlayerProfile:
-            let about = query(SurroundUITestContract.AccessibilityID.profileAbout, in: app)
-            let message = query(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
-            let edit = query(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
-            // The pop can still be settling; wait for the profile's own
-            // controls before choosing which one proves it is usable.
-            XCTAssertTrue(waitForCondition { (about.exists && about.isHittable) || message.exists || edit.exists },
-                          "Back from \(title) must reach a profile; none of its About, Message or Edit controls appeared.")
+            let aboutID = SurroundUITestContract.AccessibilityID.profileAbout
+            let messageID = SurroundUITestContract.AccessibilityID.profileMessage
+            let editID = SurroundUITestContract.AccessibilityID.profileEdit
+            let about = query(aboutID, in: app)
+            let message = query(messageID, in: app)
+            let edit = query(editID, in: app)
+            // The pop can still be settling. One query for any of the
+            // profile's own controls, which waitForExistence re-checks at its
+            // deadline, instead of four per poll that a stalled snapshot
+            // could cut to a single sample.
+            let profileControl = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier IN %@", [aboutID, messageID, editID])).firstMatch
+            guard profileControl.waitForExistence(timeout: stateSettleTimeout) else {
+                XCTFail("Back from \(title) must reach a profile; none of its About, Message or Edit controls appeared.")
+                return
+            }
             if about.exists && about.isHittable {
                 // About was opened from this retained row. At accessibility
                 // sizes the profile actions can be below its viewport.
                 usable = about
+            } else if message.exists {
+                usable = visibleElement(messageID, in: app)
+            } else if edit.exists {
+                usable = visibleElement(editID, in: app)
             } else {
-                usable = message.exists ? visibleElement(SurroundUITestContract.AccessibilityID.profileMessage, in: app)
-                    : visibleElement(SurroundUITestContract.AccessibilityID.profileEdit, in: app)
+                usable = visibleElement(aboutID, in: app, matching: .any)
             }
         case SurroundUITestContract.AccessibilityID.screenPlayerAbout:
             usable = biographyWebView(in: app)
@@ -2703,8 +2716,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForCondition { !alert.exists })
     }
 
-    private func waitForCondition(timeout: TimeInterval = 10, _ condition: @escaping () -> Bool) -> Bool {
+    /// Waits up to stateSettleTimeout by default: a predicate wait has no
+    /// final re-check, so one stalled snapshot could use up 10 seconds.
+    private func waitForCondition(timeout: TimeInterval? = nil, _ condition: @escaping () -> Bool) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        return XCTWaiter.wait(for: [expectation], timeout: timeout ?? stateSettleTimeout) == .completed
     }
 }
