@@ -371,9 +371,10 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertEqual(clock.width, 146, accuracy: 2, "Clock column width; got \(clock)")
         }
         // v147: the vertical toolbar Open wide uses outside Zen must not carry
-        // into Zen. Pass and More share one line at the right column's bottom.
+        // into Zen. Pass and More share one line at the right column's bottom,
+        // level with the board's bottom edge, as Exit Zen is level with its top.
         // With board depth, the line ends on the sidewall, not the slot.
-        assertZenActionLine(more: CGPoint(x: 891, y: 601 - drawnBoardInset(in: app).bottom), board: board, in: app)
+        assertZenActionLine(more: CGPoint(x: 891, y: 591 - drawnBoardInset(in: app).bottom), board: board, in: app)
     }
 
     /// v145 ZenDuoBookWide: Book wide's Zen keeps its tray (the navigation bar
@@ -418,8 +419,8 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         return (slot.maxX - drawn.maxX, slot.maxY - drawn.maxY)
     }
 
-    /// Zen's action line in the wide poses: More at its v145 origin, with the
-    /// pill on the same line to its left (not stacked above it).
+    /// Zen's action line in the wide poses: More at its expected origin, with
+    /// the pill on the same line to its left (not stacked above it).
     private func assertZenActionLine(more expected: CGPoint, board: CGRect, in app: XCUIApplication) {
         let more = element("game.actions", in: app, matching: .button).frame
         let pass = app.buttons["Pass"].firstMatch
