@@ -357,8 +357,9 @@ struct HomeAppearanceOptions: View {
 #if DEBUG && MAIN_APP
 /// Renders `ThemeLivePreview` for every theme and appearance into the app's
 /// `Documents/ThemePreviews/`, for `.github/ci-tools/update-theme-previews.py` to copy
-/// into the asset catalog. Launch with `--surround-ui-testing
-/// --surround-theme-preview-export`; a `done` file marks the end.
+/// into the asset catalogs. `themes.json` names the Debug-only themes, whose
+/// thumbnails join their art in `DebugThemes.xcassets`. Launch with
+/// `--surround-ui-testing --surround-theme-preview-export`; a `done` file marks the end.
 @MainActor
 enum ThemePreviewExport {
     static let argument = "--surround-theme-preview-export"
@@ -392,6 +393,9 @@ enum ThemePreviewExport {
                 try data.write(to: folder.appendingPathComponent(name), options: .atomic)
             }
         }
+        let manifest = ["debugOnly": SurroundTheme.allCases.filter(\.isDebugOnly).map(\.rawValue)]
+        try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
+            .write(to: folder.appendingPathComponent("themes.json"), options: .atomic)
         try Data("done\n".utf8).write(to: folder.appendingPathComponent("done"), options: .atomic)
         return folder
     }

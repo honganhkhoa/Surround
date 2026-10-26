@@ -768,6 +768,45 @@ final class SurroundThemeTests: XCTestCase {
         }
     }
 
+    /// Release and Beta Release leave out `DebugThemes.xcassets`, so a
+    /// Debug-only theme's art and thumbnail live there and a released
+    /// theme's never do. Releasing a theme moves its folder and thumbnail
+    /// into `Assets.xcassets`.
+    func testOnlyReleasedThemesShipTheirArt() throws {
+        let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Surround")
+        let shippingCatalog = app.appendingPathComponent("Assets.xcassets")
+        let debugCatalog = app.appendingPathComponent("DebugThemes.xcassets")
+        guard FileManager.default.isReadableFile(atPath: #filePath) else {
+            throw XCTSkip("The source tree is not readable from this test run.")
+        }
+        XCTAssert(FileManager.default.fileExists(atPath: shippingCatalog.path), "No catalog at \(shippingCatalog.path)")
+        func imagesets(in catalog: URL) -> [String] {
+            let items = FileManager.default.enumerator(at: catalog, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL } ?? []
+            return items.filter { $0.pathExtension == "imageset" }.map { $0.deletingPathExtension().lastPathComponent }
+        }
+        // Theme art is named after its theme: frostPine's is FrostPine….
+        func theme(of asset: String) -> SurroundTheme? {
+            SurroundTheme.allCases.first { theme in
+                asset == theme.previewImageName
+                    || asset.hasPrefix(theme.rawValue.prefix(1).uppercased() + theme.rawValue.dropFirst())
+            }
+        }
+        let shipping = imagesets(in: shippingCatalog)
+        let debug = imagesets(in: debugCatalog)
+        for asset in shipping {
+            XCTAssertFalse(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in DebugThemes.xcassets")
+        }
+        for asset in debug {
+            XCTAssertTrue(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in Assets.xcassets")
+        }
+        for theme in SurroundTheme.allCases {
+            XCTAssert((theme.isDebugOnly ? debug : shipping).contains(theme.previewImageName),
+                      "\(theme)'s thumbnail is in the wrong catalog")
+        }
+    }
+
     /// Games always wear the theme; other screens only with Whole app.
     func testGamesOnlyKeepsOtherScreensClassic() {
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden", appliesToWholeApp: true), .rakedGarden)

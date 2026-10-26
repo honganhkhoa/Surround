@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copies the app's exported theme previews into the asset catalog.
+"""Copies the app's exported theme previews into the asset catalogs.
 
 The theme pickers show these thumbnails instead of drawing every theme's
 scene and board live. Export them from a Debug build on an iOS Simulator:
@@ -13,8 +13,11 @@ When `Documents/ThemePreviews/done` appears in the app's data container
     .github/ci-tools/update-theme-previews.py <data container>/Documents/ThemePreviews
 
 Each theme gets `ThemePreview-<theme>.imageset`: a light image with a dark
-variant, or one image for an always-dark theme. The previous imagesets are
-replaced. Standard library only.
+variant, or one image for an always-dark theme. A released theme's goes into
+`Assets.xcassets`; a Debug-only theme's goes beside its art into
+`DebugThemes.xcassets`, which Release builds leave out. The export's
+`themes.json` names the Debug-only themes. The previous imagesets in both
+catalogs are replaced. Standard library only.
 """
 import argparse
 import json
@@ -35,10 +38,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("export", type=Path, help="The app's Documents/ThemePreviews folder")
     parser.add_argument("--catalog", type=Path, default=CATALOG)
+    parser.add_argument("--debug-catalog", type=Path, help="defaults to DebugThemes.xcassets beside --catalog")
     args = parser.parse_args()
+    args.debug_catalog = args.debug_catalog or args.catalog.with_name("DebugThemes.xcassets")
 
     if not (args.export / "done").exists():
         sys.exit(f"{args.export} has no finished export (missing 'done').")
+    manifest = args.export / "themes.json"
+    if not manifest.exists():
+        sys.exit(f"{args.export} has no themes.json; export again from a current Debug build.")
+    debug_only = set(json.loads(manifest.read_text())["debugOnly"])
     themes = {}
     for image in sorted(args.export.glob("*.jpg")):
         theme, _, appearance = image.stem.rpartition("-")
@@ -48,11 +57,14 @@ def main():
     if not themes:
         sys.exit(f"No previews in {args.export}.")
 
-    folder = args.catalog / "ThemePreviews"
-    shutil.rmtree(folder, ignore_errors=True)
-    folder.mkdir(parents=True)
-    write_json(folder / "Contents.json", {"info": INFO})
+    folders = {catalog: catalog / "ThemePreviews" for catalog in (args.catalog, args.debug_catalog)}
+    for folder in folders.values():
+        shutil.rmtree(folder, ignore_errors=True)
     for theme, images in themes.items():
+        folder = folders[args.debug_catalog if theme in debug_only else args.catalog]
+        if not folder.exists():
+            folder.mkdir(parents=True)
+            write_json(folder / "Contents.json", {"info": INFO})
         imageset = folder / f"ThemePreview-{theme}.imageset"
         imageset.mkdir()
         entries = []
@@ -64,7 +76,7 @@ def main():
             shutil.copyfile(images["dark"], imageset / f"{theme}-dark.jpg")
             entries.append({"appearances": DARK, "filename": f"{theme}-dark.jpg", "idiom": "universal"})
         write_json(imageset / "Contents.json", {"images": entries, "info": INFO})
-        print(f"{imageset.name}: {', '.join(sorted(images))}")
+        print(f"{folder.parent.name}/{imageset.name}: {', '.join(sorted(images))}")
 
 
 if __name__ == "__main__":
