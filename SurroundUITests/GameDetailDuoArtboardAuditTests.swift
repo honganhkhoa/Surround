@@ -372,7 +372,8 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         }
         // v147: the vertical toolbar Open wide uses outside Zen must not carry
         // into Zen. Pass and More share one line at the right column's bottom.
-        assertZenActionLine(more: CGPoint(x: 891, y: 601), board: board, in: app)
+        // With board depth, the line ends on the sidewall, not the slot.
+        assertZenActionLine(more: CGPoint(x: 891, y: 601 - drawnBoardInset(in: app).bottom), board: board, in: app)
     }
 
     /// v145 ZenDuoBookWide: Book wide's Zen keeps its tray (the navigation bar
@@ -395,7 +396,26 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             XCTAssertEqual(clock.minX, 143.7, accuracy: 2, "Clock column x; got \(clock)")
             XCTAssertEqual(clock.width, 160, accuracy: 2, "Clock column width; got \(clock)")
         }
-        assertZenActionLine(more: CGPoint(x: 899, y: 560.3), board: board, in: app)
+        // With board depth, More ends on the board's drawn side, not the slot's.
+        assertZenActionLine(more: CGPoint(x: 899 - drawnBoardInset(in: app).trailing, y: 560.3), board: board, in: app)
+    }
+
+    /// How far the board is drawn inside its slot, from the layout diagnostic.
+    /// Themes with depth inset it; flat themes draw the whole slot.
+    private func drawnBoardInset(in app: XCUIApplication) -> (trailing: CGFloat, bottom: CGFloat) {
+        let diagnostic = element("game.layout.geometry", in: app).value as? String ?? ""
+        func rect(_ key: String) -> CGRect? {
+            guard let start = diagnostic.range(of: ";" + key + "=(")?.upperBound,
+                  let end = diagnostic[start...].firstIndex(of: ")") else { return nil }
+            let values = diagnostic[start..<end].split(separator: ",")
+                .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+            return values.count == 4 ? CGRect(x: values[0], y: values[1], width: values[2], height: values[3]) : nil
+        }
+        guard let slot = rect("board"), let drawn = rect("drawnBoard") else {
+            XCTFail("The layout diagnostic reports the board's slot and the board as drawn: \(diagnostic)")
+            return (0, 0)
+        }
+        return (slot.maxX - drawn.maxX, slot.maxY - drawn.maxY)
     }
 
     /// Zen's action line in the wide poses: More at its v145 origin, with the

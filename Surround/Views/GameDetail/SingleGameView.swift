@@ -29,6 +29,8 @@ struct SingleGameView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
+    @Environment(\.boardAppearance) private var boardAppearance
+    @Environment(\.displayScale) private var displayScale
     @ScaledMetric(relativeTo: .body) private var clockScale: CGFloat = 1
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.appReviewCoordinator) private var appReviewCoordinator
@@ -952,7 +954,14 @@ struct SingleGameView: View {
             compactColumnIdentityShortHeight: GameDetailPlayerIdentity.compactColumnHeight(
                 dynamicTypeSize: dynamicTypeSize, secondLine: false),
             columnDetail: columnDetail(fullCards: true), compactColumnDetail: columnDetail(fullCards: false),
-            chromeBandTop: chromeBandTop)
+            chromeBandTop: chromeBandTop, boardDepth: boardDepthPlacement)
+    }
+
+    /// How the board draws inside its slot. Every board this screen shows has the game's size.
+    private var boardDepthPlacement: BoardDepthPlacement {
+        BoardDepthPlacement(boardWidth: game.currentPosition.width, boardHeight: game.currentPosition.height,
+                            showsCoordinates: showsBoardCoordinates, displayScale: displayScale,
+                            depth: boardAppearance.boardDepth)
     }
 
     #if DEBUG && MAIN_APP
@@ -964,6 +973,7 @@ struct SingleGameView: View {
 
     private func layoutDiagnostic(in geometry: GeometryProxy, plan: GameDetailLayoutPlan) -> String {
         var value = "content=\(geometry.size);global=\(geometry.frame(in: .global));safeArea=\(geometry.safeAreaInsets);board=\(plan[.board])"
+        value += ";drawnBoard=\(boardDepthPlacement.visibleBoard(in: plan[.board]))"
         #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SwiftUI, _version: 8.0.85)
         if #available(iOS 27.1, *) {
             let regions = geometry.reservedRegions(kind: .division, options: .includeInactive)

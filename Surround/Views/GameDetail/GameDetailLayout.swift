@@ -107,7 +107,8 @@ struct GameDetailLayoutPlan {
          compactColumnIdentityShortHeight: CGFloat? = nil,
          columnDetail: GameDetailColumnDetailLayouts = .init(),
          compactColumnDetail: GameDetailColumnDetailLayouts = .init(),
-         chromeBandTop: CGFloat? = nil) {
+         chromeBandTop: CGFloat? = nil,
+         boardDepth: BoardDepthPlacement? = nil) {
         // One panel on every arrangement, independent of the window size.
         let analyze = analyze && !zen
         let chat = chat && !zen && !analyze
@@ -134,6 +135,27 @@ struct GameDetailLayoutPlan {
         let margin: CGFloat = compact ? 0 : 24
         let gap: CGFloat = 8
         let identityBoardGap: CGFloat = 4
+        // A theme with depth draws the board smaller than its slot: the face,
+        // with its sidewall below, leaves room for the shadow. The slot stays
+        // as it is; what lines up with the board's sides, top or bottom lines
+        // up with the board as drawn. Gaps are still measured from the slot,
+        // whose margin holds the shadow.
+        func visible(_ board: CGRect) -> CGRect { boardDepth?.visibleBoard(in: board) ?? board }
+        func visibleWidth(ofBoard side: CGFloat) -> CGFloat {
+            visible(CGRect(x: 0, y: 0, width: side, height: side)).width
+        }
+        /// The side of a board drawn at least `width` wide. Depth grows slowly
+        /// with the side, so a few steps settle it; each steps a hair past, as
+        /// the drawn width otherwise only approaches `width` from below.
+        func boardSide(drawnWidth width: CGFloat) -> CGFloat {
+            var side = width
+            for _ in 0..<8 {
+                let shortfall = width - visibleWidth(ofBoard: side)
+                guard shortfall > 0 else { break }
+                side += shortfall + 0.01
+            }
+            return side
+        }
         spaciousCompactClocks = !compact && zen && division == nil && panelDivision == nil
         // Zen's two-line chips hug their content (canvas "Zen · iPhone"): the
         // familiar width at least, wider where the game's longest countdown,
@@ -190,12 +212,12 @@ struct GameDetailLayoutPlan {
             return (cardWidth < footerWidth ? 110 : GameDetailClockStyle.full.cardHeight) * fullClockScale
         }
         func portraitFullClockHeight(at availableWidth: CGFloat, reserving fixedHeight: CGFloat) -> CGFloat {
-            let preferred = fullClockHeight(at: availableWidth)
+            let preferred = fullClockHeight(at: visibleWidth(ofBoard: availableWidth))
             let boardWidth = min(availableWidth, max(0, height - fixedHeight - preferred))
             // Portrait clocks follow the board's final edges. Crossing the
             // narrow threshold adds a footer line to both cards, which can
             // only reduce the board further, so this reservation stays stable.
-            return max(preferred, fullClockHeight(at: boardWidth))
+            return max(preferred, fullClockHeight(at: visibleWidth(ofBoard: boardWidth)))
         }
         var rowWidth = max(0, width - margin * 2 - 16)
         if let division, division.height > division.width {
@@ -216,6 +238,15 @@ struct GameDetailLayoutPlan {
             let side = max(0, min(area.width, area.height))
             return rect(area.midX - side / 2, bottom ? area.maxY - side : area.midY - side / 2, side, side)
         }
+        /// A row above or below the board: each side that meets one of the
+        /// slot's sides moves in as far as the board is drawn inside it.
+        func alongBoard(_ frame: CGRect, _ board: CGRect) -> CGRect {
+            let drawn = visible(board)
+            guard drawn != board else { return frame }
+            let minX = frame.minX + (abs(frame.minX - board.minX) < 0.5 ? drawn.minX - board.minX : 0)
+            let maxX = frame.maxX - (abs(frame.maxX - board.maxX) < 0.5 ? board.maxX - drawn.maxX : 0)
+            return rect(minX, frame.minY, maxX - minX, frame.height)
+        }
 
         // Only an active Book fold splits the scene. Open is one canvas.
         let split = division
@@ -227,7 +258,10 @@ struct GameDetailLayoutPlan {
                 let leftWidth = max(0, split.minX - gap)
                 let rightX = min(width, split.maxX + gap)
                 let rightWidth = max(0, width - rightX - inset)
-                let rightActionHeight = actionRowHeight(at: rightWidth)
+                // The rows span the pane. Where the board does too, they
+                // share its drawn width; reserve their heights at that width.
+                let rightRowWidth = visibleWidth(ofBoard: rightWidth)
+                let rightActionHeight = actionRowHeight(at: rightRowWidth)
                 if zen {
                     clockStyle = .compact
                     stackedClocks = true
@@ -237,11 +271,14 @@ struct GameDetailLayoutPlan {
                     frames[.clocks] = rect((leftWidth - cw) / 2, (height - groupHeight) / 2, cw, clockHeight)
                     frames[.board] = square(in: rect(rightX, inset, rightWidth,
                                                     height - inset * 2 - rightActionHeight - gap))
-                    frames[.actions] = rect(rightX, self[.board].maxY + gap, rightWidth, rightActionHeight)
+                    let b = self[.board]
+                    let drawn = visible(b)
+                    frames[.actions] = rect(rightX + drawn.minX - b.minX, b.maxY + gap,
+                                            rightWidth - (b.width - drawn.width), rightActionHeight)
                 } else {
                     clockStyle = .full
                     let top = bandContentTop ?? inset
-                    var clockHeight = fullClockHeight(at: rightWidth)
+                    var clockHeight = fullClockHeight(at: rightRowWidth)
                     func availableBoardSide(with clockHeight: CGFloat) -> CGFloat {
                         height - top - inset - clockHeight - gap - identityHeight
                             - identityBoardGap * 2 - rightActionHeight
@@ -250,7 +287,7 @@ struct GameDetailLayoutPlan {
                     // in safe bounds.
                     if compact && availableBoardSide(with: clockHeight) < rightWidth {
                         clockStyle = .compact
-                        let cardWidth = max(0, (rightWidth - gap) / 2)
+                        let cardWidth = max(0, (rightRowWidth - gap) / 2)
                         compactClocksReserveStatusRow = !analyze && cardWidth < 200 * clockScale
                         clockHeight = max(compactClockHeight(cardWidth: cardWidth),
                                           compactClocksReserveStatusRow ? 68 * clockScale : 0)
@@ -262,9 +299,15 @@ struct GameDetailLayoutPlan {
                     frames[.board] = rect(rightX + (rightWidth - boardSide) / 2,
                                           boardY, boardSide, boardSide)
                     let b = self[.board]
-                    frames[.clocks] = rect(rightX, top, rightWidth, clockHeight)
-                    frames[.opponent] = rect(rightX, self[.clocks].maxY + gap, rightWidth, identityHeight)
-                    frames[.actions] = rect(rightX, b.maxY + identityBoardGap, rightWidth, rightActionHeight)
+                    // The board is centred in the pane, and so are its rows: they
+                    // keep their margin to the board as drawn. Depth never thins
+                    // as a board grows, so they are never narrower than rightRowWidth.
+                    let drawn = visible(b)
+                    let paneRowX = rightX + drawn.minX - b.minX
+                    let paneRowWidth = rightWidth - (b.width - drawn.width)
+                    frames[.clocks] = rect(paneRowX, top, paneRowWidth, clockHeight)
+                    frames[.opponent] = rect(paneRowX, self[.clocks].maxY + gap, paneRowWidth, identityHeight)
+                    frames[.actions] = rect(paneRowX, b.maxY + identityBoardGap, paneRowWidth, rightActionHeight)
                     let panelY = bandLeadingTop ?? inset
                     let panelHeight = max(0, height - panelY - (bandLeadingTop == nil ? inset : 0))
                     let panelLeading: CGFloat = 16
@@ -312,8 +355,10 @@ struct GameDetailLayoutPlan {
                 frames[.board] = square(in: rect(boardX, bottomY,
                                                  width - boardX * 2, height - bottomY - inset), bottom: true)
                 let b = self[.board]
-                frames[.opponent] = rect(b.minX - side - gap, b.minY, side, columnIdentityHeight)
-                frames[.actions] = rect(b.maxX + gap, max(bottomY, b.maxY - columnCornerHeight), side, columnCornerHeight)
+                let drawn = visible(b)
+                frames[.opponent] = rect(b.minX - side - gap, drawn.minY, side, columnIdentityHeight)
+                frames[.actions] = rect(b.maxX + gap, max(bottomY, drawn.maxY - columnCornerHeight),
+                                        side, columnCornerHeight)
             }
         } else if landscape && compact && (analyze || chat) {
             // A compact landscape always has two independent content regions.
@@ -329,9 +374,10 @@ struct GameDetailLayoutPlan {
             let availableWidth = max(0, width - gap - outer * 2)
             // Four branch columns receive 224pt when possible. Below that,
             // preserve the under-board bar's 346pt branch-arrow minimum first.
+            // The bar is as wide as the board is drawn.
             let preferredBoardWidth = availableWidth - minimumPanelWidth
             let boardWidth = separateControls
-                ? max(min(346, availableWidth), preferredBoardWidth) : preferredBoardWidth
+                ? max(min(boardSide(drawnWidth: 346), availableWidth), preferredBoardWidth) : preferredBoardWidth
             let boardSide = min(height - outer * 2 - controlsHeight, boardWidth)
             let boardX = width - outer - boardSide
             let panelWidth = boardX - outer - gap
@@ -342,24 +388,31 @@ struct GameDetailLayoutPlan {
             let cw = min(panelWidth, (separateControls ? 180 : 320) * clockScale)
             let clockX = separateControls ? outer + panelWidth - cw : outer
             let boardY = alignsColumnToBoard ? max(outer, (height - boardSide - controlsHeight) / 2) : outer
+            let drawn = visible(rect(boardX, boardY, boardSide, boardSide))
+            // Beside a board, the column starts level with its face and, where
+            // the board reaches the bottom margin, ends on its sidewall.
+            let besideBoard = analyze || !hidesBoard
+            let columnTop = besideBoard ? outer + (drawn.minY - boardY) : outer
+            let reachesBottom = besideBoard && abs(boardY + boardSide - (height - outer)) < 0.5
+            let columnBottom = height - outer - (reachesBottom ? boardY + boardSide - drawn.maxY : 0)
             // Inline faces are34pt inside44pt hit slots. Align the first face
             // with the board and keep8pt between faces and the following panel.
-            let clockY = alignsColumnToBoard ? max(0, boardY - 5) : outer
+            let clockY = alignsColumnToBoard ? max(0, drawn.minY - 5) : columnTop
             if clockHeight > 0 { frames[.clocks] = rect(clockX, clockY, cw, clockHeight) }
             let y = clockY + (clockHeight > 0 ? clockHeight + (alignsColumnToBoard ? 3 : gap) : 0)
             frames[.board] = rect(boardX, boardY, boardSide, boardSide)
             if analyze {
                 verticalAnalysisTree = usesVerticalToolbar
-                frames[.analysis] = rect(outer, y, panelWidth, height - outer - y)
+                frames[.analysis] = rect(outer, y, panelWidth, columnBottom - y)
                 if separateControls {
-                    frames[.analysisControls] = rect(boardX, self[.board].maxY + gap,
-                                                      boardSide, analysisControlHeight)
+                    frames[.analysisControls] = alongBoard(rect(boardX, self[.board].maxY + gap,
+                                                                boardSide, analysisControlHeight), self[.board])
                     frames[.analysis] = rect(outer, y, panelWidth, self[.analysisControls].maxY - y)
                 }
             } else {
                 let actionWidth = hidesBoard ? width - outer * 2 : panelWidth
                 let chatActionHeight = actionRowHeight(at: actionWidth)
-                let actionBottom = closedDuoChat ? boardY + boardSide : height - outer
+                let actionBottom = closedDuoChat ? drawn.maxY : columnBottom
                 frames[.actions] = rect(outer, actionBottom - chatActionHeight, actionWidth, chatActionHeight)
                 frames[.chat] = rect(outer, y, panelWidth, self[.actions].minY - y - gap)
                 if hidesBoard {
@@ -395,17 +448,25 @@ struct GameDetailLayoutPlan {
             let boardY = height - outer - boardSide
             if boardSide > 0 {
                 frames[.board] = rect(outer, boardY, boardSide, boardSide)
+                let b = self[.board]
+                let drawn = visible(b)
                 frames[.actions] = compact
                     ? rect(outer + boardSide + gap,
-                           max(panelY, height - outer - controlsHeight), side, controlsHeight)
-                    : rect(outer + boardSide + gap, boardY, side, boardSide)
+                           max(panelY, height - outer - (b.maxY - drawn.maxY) - controlsHeight),
+                           side, controlsHeight)
+                    : rect(outer + boardSide + gap, drawn.minY, side, drawn.height)
                 frames[.chat] = rect(outer, panelY, width - outer * 2, boardY - gap - panelY)
                 if preview && !compact {
                     // The preview bar takes the conversation's last row,
                     // directly above the board, which never moves.
                     let barY = boardY - gap - previewHeight
-                    frames[.preview] = rect(outer, barY, boardSide, previewHeight)
+                    frames[.preview] = alongBoard(rect(outer, barY, boardSide, previewHeight), b)
                     frames[.chat] = rect(outer, panelY, width - outer * 2, max(0, barY - gap - panelY))
+                }
+                if !compact {
+                    // The conversation starts on the board's drawn side, as its
+                    // preview row does. A compact one keeps the screen's edge.
+                    frames[.chat] = alongBoard(self[.chat], b)
                 }
             } else {
                 let rowHeight = actionRowHeight(at: width - outer * 2)
@@ -440,7 +501,8 @@ struct GameDetailLayoutPlan {
             // same footer budget as Play, even though Analyze paints its bar
             // above the board.
             let playActionHeight = max(intrinsicIdentityHeight,
-                actionRowHeight(at: rowWidth, includingActions: true, includingIdentity: true))
+                actionRowHeight(at: min(rowWidth, visibleWidth(ofBoard: contentWidth)),
+                                includingActions: true, includingIdentity: true))
             let fixedPlayHeight = 16 + margin + intrinsicIdentityHeight
                 + playActionHeight + gap * 2 + identityBoardGap
             let playClockHeight = portraitFullClockHeight(at: contentWidth, reserving: fixedPlayHeight)
@@ -454,6 +516,11 @@ struct GameDetailLayoutPlan {
             let panelWidth = compact ? contentWidth : boardSize
             frames[.analysis] = rect(panelX, panelY, panelWidth, max(0, boardY - boardGap - panelY))
             frames[.board] = rect((width - boardSize) / 2, boardY, boardSize, boardSize)
+            if !compact {
+                // The regular tree and its controls follow the board's edges;
+                // compact ones keep the screen's.
+                frames[.analysis] = alongBoard(self[.analysis], self[.board])
+            }
         } else if landscape && compact && usesVerticalToolbar && !accessibility
                     && division == nil && panelDivision == nil {
             // Duo Closed landscape, Play and Zen (rule 2): one 126 pt column on
@@ -470,7 +537,8 @@ struct GameDetailLayoutPlan {
                                        width - columnX - column - columnGap - trailing))
             let boardY = previewHeight + max(vertical, (height - previewHeight - boardSide) / 2)
             frames[.board] = rect(columnX + column + columnGap, boardY, boardSide, boardSide)
-            let b = self[.board]
+            // The column spans the board as drawn, from its face to its sidewall.
+            let b = visible(self[.board])
             stackedClocks = true
             columnActionRow = showsActions
             compactColumnIdentity = !hidesIdentity
@@ -533,12 +601,15 @@ struct GameDetailLayoutPlan {
             let bottom: CGFloat = usesVerticalToolbar ? 0 : 16
             let columnGap: CGFloat = 16
             let boardWidth = max(0, width - leading - trailing - 280 - columnGap)
-            var footer = actionRowHeight(at: boardWidth, includingActions: true, includingIdentity: true)
+            // The rows above and below the board are as wide as it is drawn.
+            var footer = actionRowHeight(at: visibleWidth(ofBoard: boardWidth),
+                                         includingActions: true, includingIdentity: true)
             var boardSide: CGFloat = 0
             for _ in 0..<4 {
                 let boardHeight = max(0, height - top - bottom - identityHeight - footer - identityBoardGap * 2)
                 boardSide = min(boardHeight, boardWidth)
-                let requiredFooter = actionRowHeight(at: boardSide, includingActions: true, includingIdentity: true)
+                let requiredFooter = actionRowHeight(at: visibleWidth(ofBoard: boardSide),
+                                                     includingActions: true, includingIdentity: true)
                 guard requiredFooter > footer else { break }
                 footer = requiredFooter
             }
@@ -550,12 +621,13 @@ struct GameDetailLayoutPlan {
                 : columnEnd + (width - columnEnd - boardSide) / 2
             let boardY = top + identityHeight + identityBoardGap
             frames[.board] = rect(boardX, boardY, boardSide, boardSide)
-            frames[.opponent] = rect(boardX, top, boardSide, identityHeight)
+            let drawn = visible(self[.board])
+            frames[.opponent] = rect(drawn.minX, top, drawn.width, identityHeight)
             // The row is at least 52 pt (64 at accessibility sizes): room for
             // the bar's single line beside the chip.
             previewInOpponentRow = preview && identityHeight > 0
-            frames[.actions] = rect(boardX, self[.board].maxY + identityBoardGap, boardSide, footer)
-            let panelTop = usesVerticalToolbar ? max(boardY, bandLeadingTop ?? 0) : top
+            frames[.actions] = rect(drawn.minX, self[.board].maxY + identityBoardGap, drawn.width, footer)
+            let panelTop = usesVerticalToolbar ? max(drawn.minY, bandLeadingTop ?? 0) : top
             let column = rect(leading, panelTop, columnWidth, height - bottom - panelTop)
             clockStyle = .full
             if chat || analyze {
@@ -635,11 +707,11 @@ struct GameDetailLayoutPlan {
             let reservedRight = zen && !usesVerticalToolbar ? left : right
             let boardWidth = max(0, width - boardX - outer - (rowActions ? 0 : reservedRight + boardGap))
             let boardAreaHeight = height - outerTop - outerBottom - previewHeight
-            var landscapeActionHeight = actionRowHeight(at: boardWidth)
+            var landscapeActionHeight = actionRowHeight(at: visibleWidth(ofBoard: boardWidth))
             if rowActions {
                 for _ in 0..<4 {
                     let squareWidth = min(boardWidth, max(0, boardAreaHeight - landscapeActionHeight - gap))
-                    let requiredHeight = actionRowHeight(at: squareWidth)
+                    let requiredHeight = actionRowHeight(at: visibleWidth(ofBoard: squareWidth))
                     guard requiredHeight > landscapeActionHeight else { break }
                     landscapeActionHeight = requiredHeight
                 }
@@ -651,15 +723,18 @@ struct GameDetailLayoutPlan {
                 frames[.board] = self[.board].offsetBy(dx: boardX - self[.board].minX, dy: 0)
             }
             let b = self[.board]
+            let drawn = visible(b)
             // Phone Zen's stacked chips grow from the board toward the window
             // edge where the game's countdown needs it; the board stays put.
             let zenColumn = compactHorizontalZen
                 ? min(max(left, zenChipWidth), max(left, b.minX - boardGap - outer)) : left
             let clockX = spaciousWideZen ? 24 : (compactHorizontalZen || unfoldedHorizontalZen ? b.minX - boardGap - zenColumn : outer)
             let clockWidth = spaciousWideZen ? max(0, b.minX - gap - clockX) : zenColumn
-            frames[.opponent] = rect(outer, outer, left, landscapeIdentityHeight)
+            // A column level with the board's top starts level with its face.
+            let columnTop = outer + (abs(b.minY - outer) < 0.5 ? drawn.minY - b.minY : 0)
+            frames[.opponent] = rect(outer, columnTop, left, landscapeIdentityHeight)
             let clockCenter = spaciousCompactClocks || trayFreeZenTop != nil ? b.midY : height / 2
-            let clockY = zen ? max(outer, clockCenter - clockHeight / 2) : outer + landscapeIdentityHeight + gap
+            let clockY = zen ? max(outer, clockCenter - clockHeight / 2) : columnTop + landscapeIdentityHeight + gap
             frames[.clocks] = rect(clockX, clockY, clockWidth, clockHeight)
             let cornerIdentityHeight = wrapsColumnNames ? shortColumnIdentityHeight : identityHeight
             let cornerHeight = (showsActions ? columnActionHeight : 0)
@@ -670,21 +745,26 @@ struct GameDetailLayoutPlan {
             if horizontalActionsInColumn {
                 let controlsHeight = max(44, actionSize.height)
                 let corner = controlsHeight + (showsCornerIdentity ? gap + cornerIdentityHeight : 0)
-                frames[.actions] = rect(b.maxX + boardGap, b.maxY - corner, surplusActionWidth, corner)
+                frames[.actions] = rect(b.maxX + boardGap, drawn.maxY - corner, surplusActionWidth, corner)
             } else if sideRowActions && !rowActions {
                 let actionX = b.maxX + boardGap
                 let actionWidth = width - (spaciousWideZen ? 24 : outer) - actionX
                 let actionHeight = actionRowHeight(at: actionWidth, includingIdentity: false)
-                frames[.actions] = rect(actionX, b.maxY - actionHeight, actionWidth, actionHeight)
+                frames[.actions] = rect(actionX, drawn.maxY - actionHeight, actionWidth, actionHeight)
             } else {
                 frames[.actions] = rowActions
-                    ? rect(b.minX, b.maxY + (showsCornerIdentity ? identityBoardGap : gap), b.width, landscapeActionHeight)
-                    : rect(b.maxX + boardGap, max(outer, b.maxY - cornerHeight), right, cornerHeight)
+                    ? rect(drawn.minX, b.maxY + (showsCornerIdentity ? identityBoardGap : gap), drawn.width,
+                           landscapeActionHeight)
+                    : rect(b.maxX + boardGap, max(outer, drawn.maxY - cornerHeight), right, cornerHeight)
             }
         } else {
             // Width-bound Play and Zen: the clock and identity rows bound the board.
             let contentWidth = width - margin * 2
             let topInset: CGFloat = compact ? 8 : (spaciousPortraitZen ? 10 : (zen ? 12 : 16))
+            // A regular row below the board spans it as drawn, never wider than
+            // the content's own row. Reserve its height at that width.
+            let rowActionHeight = !compact && (!zen || spaciousCompactClocks)
+                ? actionRowHeight(at: min(rowWidth, visibleWidth(ofBoard: contentWidth))) : actionHeight
             clockStyle = zen ? .compact : .full
             if compact && (foldsClock || height - contentWidth < 250) && clockStyle == .full { clockStyle = .compact }
             var ch = clocksInHeader ? 0 : (clockStyle == .full
@@ -698,7 +778,7 @@ struct GameDetailLayoutPlan {
             let keepsFoldedOpponentRow = opponentSharesStatusWhenFolded && compact
                 && clockStyle == .compact && !zen && !chat && !analyze && !hidesIdentity
             let rowGapCount: CGFloat = (ch > 0 ? 1 : 0) + (showsCorner ? 1 : 0)
-            let fixedWithoutClockOrIdentity = actionHeight + previewHeight
+            let fixedWithoutClockOrIdentity = rowActionHeight + previewHeight
                 + gap * rowGapCount + topInset + margin
             var fixedWithoutIdentity = ch + fixedWithoutClockOrIdentity
             var rowIdentityHeight = identityHeight
@@ -722,7 +802,7 @@ struct GameDetailLayoutPlan {
             frames[.clocks] = rect(margin + (compact ? 8 : 0), y, contentWidth - (compact ? 16 : 0), ch)
             y += ch + (ch > 0 ? gap : 0)
             if !compact && !zen {
-                y = max(y, height - margin - boardSize - actionHeight - rowIdentityHeight - opponentBoardGap - gap - previewHeight)
+                y = max(y, height - margin - boardSize - rowActionHeight - rowIdentityHeight - opponentBoardGap - gap - previewHeight)
             }
             frames[.opponent] = rect(margin + 8, y, contentWidth - 16, rowIdentityHeight)
             y += rowIdentityHeight + opponentBoardGap
@@ -730,12 +810,12 @@ struct GameDetailLayoutPlan {
             frames[.board] = rect((width - boardSize) / 2, y, boardSize, boardSize)
             frames[.actions] = rect(margin + 8, y + boardSize
                                     + (showsCorner ? (showsCornerIdentity ? identityBoardGap : gap) : 0),
-                                    contentWidth - 16, actionHeight)
+                                    contentWidth - 16, rowActionHeight)
             if !compact && !zen {
                 // When height limits the portrait board, every adjacent row
                 // follows the same edges instead of leaving three unrelated
                 // margins for clocks, identities and the board.
-                let board = self[.board]
+                let board = visible(self[.board])
                 for slot in [Slot.clocks, .opponent, .actions, .preview] {
                     let frame = self[slot]
                     if !frame.isEmpty {
@@ -756,7 +836,8 @@ struct GameDetailLayoutPlan {
             if zen {
                 if spaciousCompactClocks {
                     let board = self[.board]
-                    frames[.actions] = rect(board.minX, board.maxY + 12, board.width, actionHeight)
+                    let drawn = visible(board)
+                    frames[.actions] = rect(drawn.minX, board.maxY + 12, drawn.width, rowActionHeight)
                 }
                 // Zen centers the board in its scene, with clocks above and
                 // actions below. Clamp the whole group to the usable region so
@@ -826,7 +907,7 @@ struct GameDetailLayoutPlan {
         }
         if hidesIdentity { hidesActionIdentity = true }
         if preview && !previewInOpponentRow && self[.preview].isEmpty {
-            let b = self[.board]
+            let b = visible(self[.board])
             frames[.preview] = rect(b.minX, b.minY, b.width, min(previewHeight, b.height))
         }
         if zen {
@@ -839,9 +920,10 @@ struct GameDetailLayoutPlan {
             // board budget. Use empty space above a width-bound board first;
             // otherwise keep a bounded banner over its top edge.
             let board = self[.board]
-            let bannerWidth = !board.isEmpty ? board.width : max(0, width - margin * 2 - 16)
-            let bannerX = !board.isEmpty ? board.minX : (width - bannerWidth) / 2
-            let bannerHeight = min(max(44, recoveryHeight), !board.isEmpty ? board.height : height)
+            let drawn = visible(board)
+            let bannerWidth = !board.isEmpty ? drawn.width : max(0, width - margin * 2 - 16)
+            let bannerX = !board.isEmpty ? drawn.minX : (width - bannerWidth) / 2
+            let bannerHeight = min(max(44, recoveryHeight), !board.isEmpty ? drawn.height : height)
             let occupiedAbove = [Slot.clocks, .opponent, .analysis, .analysisControls]
                 .map { self[$0] }
                 .filter { !$0.isEmpty && $0.maxY <= board.minY && $0.maxX > bannerX && $0.minX < bannerX + bannerWidth }
@@ -858,7 +940,7 @@ struct GameDetailLayoutPlan {
             if availableY == nil && freeBottom >= bannerHeight + gap {
                 availableY = freeBottom - bannerHeight - gap
             }
-            let y = availableY ?? (!board.isEmpty ? board.minY : 0)
+            let y = availableY ?? (!board.isEmpty ? drawn.minY : 0)
             frames[.status] = rect(bannerX, y, bannerWidth, bannerHeight)
         }
         // Hidden slots have no position as well as no size. CoreGraphics can

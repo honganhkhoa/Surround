@@ -27,6 +27,32 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(frostDay.maximumThickness, frostNight.maximumThickness)
     }
 
+    /// What lines up with a board follows what BoardView draws in its frame:
+    /// the face and the sidewall below it, never the shadow's fade.
+    func testBoardDepthPlacementReportsTheDrawnFaceAndSidewall() throws {
+        let depth = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
+        let frame = CGRect(x: 30, y: 120, width: 700, height: 700)
+        let placement = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
+                                            displayScale: 2, depth: depth)
+        let geometry = BoardDepthGeometry(containerSize: frame.size, boardWidth: 19, boardHeight: 19,
+                                          showsCoordinates: true, displayScale: 2, depth: depth)
+        let drawn = placement.visibleBoard(in: frame)
+        XCTAssertGreaterThan(geometry.thickness, 0)
+        XCTAssertEqual(drawn.minX, frame.minX + geometry.faceRect.minX, accuracy: 0.001)
+        XCTAssertEqual(drawn.width, geometry.faceRect.width, accuracy: 0.001)
+        XCTAssertEqual(drawn.minY, frame.minY + geometry.faceRect.minY, accuracy: 0.001)
+        XCTAssertEqual(drawn.maxY, frame.minY + geometry.faceRect.maxY + geometry.thickness, accuracy: 0.001)
+        XCTAssertLessThan(drawn.maxY, frame.maxY, "The shadow fades below the sidewall")
+
+        var flat = placement
+        flat.depth = nil
+        XCTAssertEqual(flat.visibleBoard(in: frame), frame)
+        // 10 pt cells are below the detail threshold, where boards have no depth.
+        let compact = CGRect(x: 4, y: 4, width: 200, height: 200)
+        XCTAssertEqual(placement.visibleBoard(in: compact), compact)
+        XCTAssertEqual(placement.visibleBoard(in: .zero), .zero)
+    }
+
     /// Compact boards keep their exact slot, including rectangular previews;
     /// disabling depth for a widget must preserve that footprint at any size.
     func testBoardDepthKeepsCompactAndDisabledFootprintsUnchanged() {

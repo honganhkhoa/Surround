@@ -19,7 +19,8 @@ final class GameDetailLayoutTests: XCTestCase {
                       compactClockLineWidth: CGFloat = 0,
                       narrowChipWidth: CGFloat = 0,
                       identityTwoLineRowHeight: CGFloat? = nil,
-                      chromeBandTop: CGFloat? = nil) -> GameDetailLayoutPlan {
+                      chromeBandTop: CGFloat? = nil,
+                      boardDepth: BoardDepthPlacement? = nil) -> GameDetailLayoutPlan {
         GameDetailLayoutPlan(size: size, compact: compact, zen: zen, analyze: analyze,
                              chat: chat, hidesBoard: hidesBoard, keyboard: keyboard,
                              accessibility: false, foldsClock: false,
@@ -32,7 +33,8 @@ final class GameDetailLayoutTests: XCTestCase {
                              fullClockFooterWidth: fullClockFooterWidth,
                              compactClockLineWidth: compactClockLineWidth,
                              narrowChipWidth: narrowChipWidth,
-                             chromeBandTop: chromeBandTop)
+                             chromeBandTop: chromeBandTop,
+                             boardDepth: boardDepth)
     }
 
     func testZenChipsGrowToTheirLongestCountdownWithinTheRow() {
@@ -1735,6 +1737,261 @@ final class GameDetailLayoutTests: XCTestCase {
                     assertOccupiedSlotsFit(typing, in: size)
                 }
             }
+        }
+    }
+
+    // MARK: Board depth
+
+    /// Surround Studio's daytime board, which BoardView draws inset in its
+    /// slot to fit its sidewall and shadow.
+    private func studioDepth(lines: Int = 19) -> BoardDepthPlacement {
+        BoardDepthPlacement(boardWidth: lines, boardHeight: lines, showsCoordinates: false, displayScale: 3,
+                            depth: SurroundTheme.surroundStudio.board(for: .light).boardDepth)
+    }
+
+    private func assertRow(_ row: CGRect, along drawn: CGRect, _ message: String,
+                           file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(row.minX, drawn.minX, accuracy: 0.01, message, file: file, line: line)
+        XCTAssertEqual(row.maxX, drawn.maxX, accuracy: 0.01, message, file: file, line: line)
+    }
+
+    /// Flat themes keep the frames they had before boards had depth, also
+    /// where a board falls just short of the pane its rows span.
+    func testBoardsWithoutDepthKeepTheirFrames() {
+        let flat = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: true,
+                                       displayScale: 2, depth: nil)
+        let fold = CGRect(x: 455.5, y: 0, width: 40, height: 669)
+        let book = plan(CGSize(width: 867, height: 611), division: fold, panelDivision: fold,
+                        usesVerticalToolbar: true, chromeBandTop: 24, boardDepth: flat)
+        XCTAssertEqual(book[.board], CGRect(x: 503.75, y: 192, width: 355, height: 355))
+        for slot in [GameDetailLayoutPlan.Slot.clocks, .opponent, .actions] {
+            XCTAssertEqual(book[slot].minX, 503.5, "\(slot)")
+            XCTAssertEqual(book[slot].width, 355.5, "\(slot)")
+        }
+        let layouts: [(String, (BoardDepthPlacement?) -> GameDetailLayoutPlan)] = [
+            ("iPad portrait", { self.plan(CGSize(width: 820, height: 1074), recoveryHeight: 80, boardDepth: $0) }),
+            ("iPad landscape", { self.plan(CGSize(width: 1180, height: 820), preview: true, boardDepth: $0) }),
+            ("iPad portrait chat", { self.plan(CGSize(width: 820, height: 1074), chat: true, composerHeight: 50,
+                                               preview: true, boardDepth: $0) }),
+            ("phone landscape analyze", { self.plan(CGSize(width: 756, height: 334), compact: true, analyze: true,
+                                                    boardDepth: $0) }),
+            ("Duo Closed analyze", { self.plan(CGSize(width: 594, height: 466), compact: true, analyze: true,
+                                               usesVerticalToolbar: true, boardDepth: $0) }),
+        ]
+        for (name, layout) in layouts {
+            let without = layout(nil)
+            let flatBoard = layout(flat)
+            for slot in GameDetailLayoutPlan.Slot.allCases {
+                XCTAssertEqual(flatBoard[slot], without[slot], "\(name): \(slot)")
+            }
+        }
+        XCTAssertEqual(plan(CGSize(width: 594, height: 466), compact: true, analyze: true,
+                            usesVerticalToolbar: true, boardDepth: flat)[.analysisControls].width, 346)
+    }
+
+    func testDepthRowsFollowTheDrawnBoardOnIPad() {
+        let depth = studioDepth()
+        let portrait = CGSize(width: 820, height: 1074)
+        for (size, rows) in [(portrait, [GameDetailLayoutPlan.Slot.clocks, .opponent, .actions]),
+                             (CGSize(width: 1180, height: 820), [.opponent, .actions])] {
+            let flat = plan(size)
+            let p = plan(size, boardDepth: depth)
+            XCTAssertEqual(p[.board], flat[.board], "\(size): depth never moves the board")
+            let drawn = depth.visibleBoard(in: p[.board])
+            XCTAssertGreaterThan(drawn.minX - p[.board].minX, 10, "Studio insets an iPad board")
+            for slot in rows {
+                assertRow(p[slot], along: drawn, "\(size): \(slot)")
+                XCTAssertEqual(p[slot].minY, flat[slot].minY, accuracy: 0.01,
+                               "\(size): \(slot) keeps its gap from the board's slot")
+            }
+        }
+        let zen = plan(portrait, zen: true, boardDepth: depth)
+        assertRow(zen[.actions], along: depth.visibleBoard(in: zen[.board]), "Zen actions")
+        let recovery = plan(portrait, recoveryHeight: 80, boardDepth: depth)
+        assertRow(recovery[.status], along: depth.visibleBoard(in: recovery[.board]), "Recovery banner")
+        let preview = plan(CGSize(width: 1180, height: 820), preview: true, boardDepth: depth)
+        XCTAssertTrue(preview.previewInOpponentRow)
+        assertRow(preview[.opponent], along: depth.visibleBoard(in: preview[.board]), "Preview row")
+    }
+
+    func testDepthPanelsFollowTheDrawnBoardInRegularPortrait() {
+        let depth = studioDepth()
+        let size = CGSize(width: 820, height: 1074)
+        let chat = plan(size, chat: true, composerHeight: 50, preview: true, boardDepth: depth)
+        XCTAssertEqual(chat[.board], plan(size, chat: true, composerHeight: 50, preview: true)[.board])
+        let drawnChatBoard = depth.visibleBoard(in: chat[.board])
+        assertRow(chat[.preview], along: drawnChatBoard, "Chat preview bar")
+        XCTAssertEqual(chat[.chat].minX, drawnChatBoard.minX, accuracy: 0.01, "The conversation above it")
+        XCTAssertEqual(chat[.composer].minX, drawnChatBoard.minX, accuracy: 0.01)
+        XCTAssertEqual(chat[.chat].maxX, size.width - 24, "Its other side keeps the screen's margin")
+        XCTAssertEqual(chat[.actions].minY, drawnChatBoard.minY, accuracy: 0.01)
+        XCTAssertEqual(chat[.actions].maxY, drawnChatBoard.maxY, accuracy: 0.01,
+                       "More rests level with the sidewall")
+        let analysis = plan(size, analyze: true, boardDepth: depth)
+        let drawn = depth.visibleBoard(in: analysis[.board])
+        assertRow(analysis[.analysis], along: drawn, "Tree")
+        assertRow(analysis[.analysisControls], along: drawn, "Controls")
+        XCTAssertEqual(analysis[.analysisControls].maxY, plan(size, analyze: true)[.analysisControls].maxY,
+                       "The controls keep their gap from the board's slot")
+    }
+
+    func testDepthColumnsSpanTheDrawnBoardBesideIt() {
+        let depth = studioDepth()
+        let closed = CGSize(width: 594, height: 466)
+        for zen in [false, true] {
+            let flat = plan(closed, compact: true, zen: zen, usesVerticalToolbar: true)
+            let p = plan(closed, compact: true, zen: zen, usesVerticalToolbar: true, boardDepth: depth)
+            XCTAssertEqual(p[.board], flat[.board])
+            let drawn = depth.visibleBoard(in: p[.board])
+            XCTAssertGreaterThan(drawn.minY - p[.board].minY, 3)
+            XCTAssertEqual((zen ? p[.clocks] : p[.opponent]).minY, drawn.minY, accuracy: 0.01, "Zen \(zen)")
+            XCTAssertEqual(p[.actions].maxY, drawn.maxY, accuracy: 0.01, "Zen \(zen)")
+            for slot in [GameDetailLayoutPlan.Slot.clocks, .actions] {
+                XCTAssertEqual(p[slot].minX, 12, "The column keeps its place")
+                XCTAssertEqual(p[slot].width, 126)
+            }
+        }
+
+        let tall = CGSize(width: 669, height: 893)
+        let fold = CGRect(x: 0, y: 436, width: 669, height: 40)
+        let book = plan(tall, division: fold, boardDepth: depth)
+        XCTAssertEqual(book[.board], CGRect(x: 136, y: 484, width: 397, height: 397))
+        let drawnBook = depth.visibleBoard(in: book[.board])
+        XCTAssertEqual(book[.opponent].minY, drawnBook.minY, accuracy: 0.01)
+        XCTAssertEqual(book[.actions].maxY, drawnBook.maxY, accuracy: 0.01)
+        XCTAssertEqual(book[.board].minX - book[.opponent].maxX, 8, "Gutters stay measured from the slot")
+
+        // A 9×9 board has full depth on a phone.
+        let phoneDepth = studioDepth(lines: 9)
+        let phone = CGSize(width: 750, height: 312)
+        let landscape = plan(phone, compact: true, boardDepth: phoneDepth)
+        XCTAssertEqual(landscape[.board], CGRect(x: 216, y: 8, width: 296, height: 296))
+        let drawnPhone = phoneDepth.visibleBoard(in: landscape[.board])
+        XCTAssertGreaterThan(drawnPhone.minY - landscape[.board].minY, 2)
+        XCTAssertEqual(landscape[.opponent].minY, drawnPhone.minY, accuracy: 0.01)
+        XCTAssertEqual(landscape[.clocks].minY - landscape[.opponent].maxY, 8, accuracy: 0.01)
+        XCTAssertEqual(landscape[.actions].maxY, drawnPhone.maxY, accuracy: 0.01)
+        XCTAssertEqual(landscape[.actions].minX - landscape[.board].maxX, 12)
+    }
+
+    func testDepthRowsInBookWideAndClosedAnalyzeFollowTheDrawnBoard() {
+        let depth = studioDepth()
+        let wide = CGSize(width: 867, height: 635)
+        let fold = CGRect(x: 455.5, y: 0, width: 40, height: 669)
+        let book = plan(wide, division: fold, panelDivision: fold, usesVerticalToolbar: true,
+                        fullClockFooterWidth: 123, chromeBandTop: 24, boardDepth: depth)
+        XCTAssertEqual(book[.board], CGRect(x: 503.5, y: 192, width: 355.5, height: 355.5))
+        let drawnBook = depth.visibleBoard(in: book[.board])
+        for slot in [GameDetailLayoutPlan.Slot.clocks, .opponent, .actions] {
+            assertRow(book[slot], along: drawnBook, "Book wide \(slot)")
+        }
+        XCTAssertFalse(book.narrowFullClocks)
+
+        let closed = CGSize(width: 594, height: 466)
+        XCTAssertEqual(plan(closed, compact: true, analyze: true, usesVerticalToolbar: true)[.analysisControls].width, 346)
+        for coordinates in [false, true] {
+            var placement = depth
+            placement.showsCoordinates = coordinates
+            let p = plan(closed, compact: true, analyze: true, usesVerticalToolbar: true, boardDepth: placement)
+            let drawn = placement.visibleBoard(in: p[.board])
+            assertRow(p[.analysisControls], along: drawn, "Controls under the board")
+            // The branch arrows need the whole 346 pt; a hair less drops them.
+            XCTAssertGreaterThanOrEqual(p[.analysisControls].width, 346, "coordinates \(coordinates)")
+            XCTAssertLessThan(p[.analysisControls].width, 346.5, "coordinates \(coordinates)")
+            XCTAssertGreaterThanOrEqual(p[.analysisControls].minY, p[.board].maxY)
+            XCTAssertEqual(p[.clocks].minY, drawn.minY - 5, accuracy: 0.01, "The first clock face meets the face")
+            XCTAssertLessThanOrEqual(p[.analysis].maxX, p[.board].minX)
+        }
+    }
+
+    func testDepthReservesRowsAtTheDrawnWidth() {
+        let depth = studioDepth()
+        // Book wide: cards (343.6 - 8) / 2 wide need a second footer line.
+        let wide = CGSize(width: 867, height: 635)
+        let fold = CGRect(x: 455.5, y: 0, width: 40, height: 669)
+        let flatBook = plan(wide, division: fold, panelDivision: fold, usesVerticalToolbar: true,
+                            fullClockFooterWidth: 170, chromeBandTop: 24)
+        XCTAssertFalse(flatBook.narrowFullClocks)
+        XCTAssertEqual(flatBook[.clocks].height, 96)
+        let book = plan(wide, division: fold, panelDivision: fold, usesVerticalToolbar: true,
+                        fullClockFooterWidth: 170, chromeBandTop: 24, boardDepth: depth)
+        XCTAssertTrue(book.narrowFullClocks)
+        XCTAssertEqual(book[.clocks].height, 110)
+        XCTAssertEqual(book[.board], CGRect(x: 503.5, y: 206, width: 355.5, height: 355.5))
+
+        // iPad portrait: cards (749.6 - 8) / 2 wide.
+        let portrait = CGSize(width: 820, height: 1074)
+        XCTAssertEqual(plan(portrait, fullClockFooterWidth: 375)[.clocks].height, 96)
+        let clocks = plan(portrait, fullClockFooterWidth: 375, boardDepth: depth)
+        XCTAssertTrue(clocks.narrowFullClocks)
+        XCTAssertEqual(clocks[.clocks].height, 110)
+
+        // A 752 pt action fits the 756 pt row but not the 749.6 pt drawn one.
+        func actionPlan(_ size: CGSize, width: CGFloat, depth: BoardDepthPlacement?) -> GameDetailLayoutPlan {
+            GameDetailLayoutPlan(size: size, compact: false, zen: false, analyze: false, chat: false,
+                                 hidesBoard: false, keyboard: false, accessibility: false, foldsClock: false,
+                                 actionSize: CGSize(width: width, height: 48), boardDepth: depth)
+        }
+        let flatRow = actionPlan(portrait, width: 752, depth: nil)
+        XCTAssertFalse(flatRow.wrapsMainAction)
+        XCTAssertEqual(flatRow[.actions].height, 52)
+        let row = actionPlan(portrait, width: 752, depth: depth)
+        XCTAssertTrue(row.wrapsMainAction)
+        XCTAssertEqual(row[.actions].height, 96)
+        // Regular landscape: a 665 pt action fits the 676 pt board but not its drawn row.
+        let landscape = CGSize(width: 1180, height: 820)
+        let flatFooter = actionPlan(landscape, width: 665, depth: nil)
+        XCTAssertEqual(flatFooter[.board].width, 676)
+        XCTAssertEqual(flatFooter[.actions].height, 52)
+        let footer = actionPlan(landscape, width: 665, depth: depth)
+        XCTAssertTrue(footer.wrapsMainAction)
+        XCTAssertEqual(footer[.actions].height, 96)
+        XCTAssertEqual(footer[.board].width, 632)
+    }
+
+    func testDepthRowsKeepTheirMarginToAHeightBoundBookBoard() {
+        // The board is narrower than its pane; the rows overhang the drawn
+        // board as much as a flat theme's rows overhang its board.
+        let size = CGSize(width: 867, height: 600)
+        let fold = CGRect(x: 455.5, y: 0, width: 40, height: 669)
+        let flat = plan(size, division: fold, panelDivision: fold, usesVerticalToolbar: true, chromeBandTop: 24)
+        let depth = studioDepth()
+        let p = plan(size, division: fold, panelDivision: fold, usesVerticalToolbar: true, chromeBandTop: 24,
+                     boardDepth: depth)
+        XCTAssertEqual(p[.board], flat[.board])
+        XCTAssertLessThan(p[.board].width, flat[.clocks].width)
+        let drawn = depth.visibleBoard(in: p[.board])
+        let overhang = p[.board].minX - flat[.clocks].minX
+        for slot in [GameDetailLayoutPlan.Slot.clocks, .opponent, .actions] {
+            XCTAssertEqual(drawn.minX - p[slot].minX, overhang, accuracy: 0.01, "\(slot)")
+            XCTAssertEqual(p[slot].maxX - drawn.maxX, overhang, accuracy: 0.01, "\(slot)")
+        }
+    }
+
+    func testDepthPhoneLandscapePanelsSpanTheDrawnBoard() {
+        let depth = studioDepth(lines: 9)
+        let size = CGSize(width: 756, height: 334)
+        let flatChat = plan(size, compact: true, chat: true, composerHeight: 50)
+        let chat = plan(size, compact: true, chat: true, composerHeight: 50, boardDepth: depth)
+        XCTAssertEqual(chat[.board], flatChat[.board])
+        let drawn = depth.visibleBoard(in: chat[.board])
+        XCTAssertGreaterThan(drawn.minY - chat[.board].minY, 2)
+        XCTAssertEqual(chat[.chat].minY, drawn.minY, accuracy: 0.01)
+        XCTAssertEqual(chat[.actions].maxY, drawn.maxY, accuracy: 0.01)
+        XCTAssertEqual(chat[.board].minX - chat[.chat].maxX, 8, "The gutter stays measured from the slot")
+
+        let analysis = plan(size, compact: true, analyze: true, boardDepth: depth)
+        let drawnAnalysis = depth.visibleBoard(in: analysis[.board])
+        XCTAssertEqual(analysis[.analysis].minY, drawnAnalysis.minY, accuracy: 0.01)
+        XCTAssertEqual(analysis[.analysisControls].maxY, drawnAnalysis.maxY, accuracy: 0.01)
+    }
+
+    func testCompactPortraitChipsKeepTheScreenMargin() {
+        let size = CGSize(width: 393, height: 760)
+        let flat = plan(size, compact: true)
+        let p = plan(size, compact: true, boardDepth: studioDepth())
+        for slot in [GameDetailLayoutPlan.Slot.board, .clocks, .opponent, .actions] {
+            XCTAssertEqual(p[slot], flat[slot], "\(slot)")
         }
     }
 

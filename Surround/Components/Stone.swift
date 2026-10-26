@@ -227,6 +227,31 @@ struct BoardDepthGeometry: Equatable {
         self.shadowRadius = shadowRadius
         self.shadowOffset = shadowOffset
     }
+
+    /// The board as it is seen: its face and the sidewall below it, without
+    /// the shadow's fade. Views that line up with the board follow this.
+    var visibleRect: CGRect {
+        CGRect(x: faceRect.minX, y: faceRect.minY, width: faceRect.width, height: faceRect.height + thickness)
+    }
+}
+
+/// What BoardView gives BoardDepthGeometry, for a container that lines its
+/// own views up with the board BoardView draws in a frame it is given.
+struct BoardDepthPlacement: Equatable {
+    var boardWidth: Int
+    var boardHeight: Int
+    var showsCoordinates: Bool
+    var displayScale: CGFloat
+    var depth: BoardDepth?
+
+    /// The visible board inside `frame`, in the same coordinates; without
+    /// depth that is the whole frame.
+    func visibleBoard(in frame: CGRect) -> CGRect {
+        guard depth != nil, frame.width > 0, frame.height > 0 else { return frame }
+        return BoardDepthGeometry(containerSize: frame.size, boardWidth: boardWidth, boardHeight: boardHeight,
+                                  showsCoordinates: showsCoordinates, displayScale: displayScale, depth: depth)
+            .visibleRect.offsetBy(dx: frame.minX, dy: frame.minY)
+    }
 }
 
 /// Boards and stones show detail only where it can be seen. Below a 14 pt
