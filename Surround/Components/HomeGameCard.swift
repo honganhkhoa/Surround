@@ -455,8 +455,7 @@ private struct HomeGameNoteLine: View {
 /// reaches the 14 pt detail threshold, so a theme's textures and art show.
 struct HomeGameTile: View {
     @ObservedObject var game: Game
-    /// Nil shows a game without opening it, as Welcome's public games do.
-    var opensGame: (() -> Void)?
+    var opensGame: () -> Void
     var navigationAccessibilityIdentifier = ""
 
     @EnvironmentObject private var ogs: OGSService
@@ -480,18 +479,10 @@ struct HomeGameTile: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier(navigationAccessibilityIdentifier.isEmpty
                                      ? "" : "\(navigationAccessibilityIdentifier).playerInfo")
-            Group {
-                if let opensGame {
-                    HomeBoardButton(game: game, opensGame: opensGame,
-                                    accessibilityIdentifier: navigationAccessibilityIdentifier,
-                                    accessibilityLabel: facts.accessibilityLabel)
-                } else {
-                    BoardView(boardPosition: game.currentPosition)
-                        .accessibilityElement()
-                        .accessibilityLabel(Text(verbatim: facts.accessibilityLabel))
-                }
-            }
-            .aspectRatio(1, contentMode: .fit)
+            HomeBoardButton(game: game, opensGame: opensGame,
+                            accessibilityIdentifier: navigationAccessibilityIdentifier,
+                            accessibilityLabel: facts.accessibilityLabel)
+                .aspectRatio(1, contentMode: .fit)
             HomeClockChip(game: game, facts: facts, color: facts.bottomColor, size: .tile) {
                 if facts.userColor != nil {
                     Text("You")
@@ -510,7 +501,7 @@ struct HomeGameTile: View {
         }
         .padding(HomeLayout.largeTilePadding)
         .contentShape(Rectangle())
-        .onTapGesture { opensGame?() }
+        .onTapGesture(perform: opensGame)
         .modifier(GamePlayerProfileMenu(game: game))
     }
 }
