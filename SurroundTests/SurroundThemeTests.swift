@@ -53,6 +53,34 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(placement.visibleBoard(in: .zero), .zero)
     }
 
+    /// Public games' cards and Home's Large tiles: the players' rows above and
+    /// below a board that spans the column run edge to edge with it as drawn.
+    func testBoardColumnRowsMeetTheDrawnBoard() throws {
+        let depth = try XCTUnwrap(SurroundTheme.surroundStudio.board(for: .light).boardDepth)
+        let board = BoardDepthPlacement(boardWidth: 19, boardHeight: 19, showsCoordinates: false,
+                                        displayScale: 3, depth: depth)
+        // A 337 pt card on an iPhone, with nothing limiting its height.
+        let column = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: board)
+        let drawn = board.visibleBoard(in: CGRect(x: 0, y: 0, width: 337, height: 337))
+        XCTAssertEqual(column.side, 337)
+        XCTAssertEqual(column.rowWidth, drawn.width, accuracy: 0.001)
+        XCTAssertLessThan(column.rowWidth, 337 - 8, "Studio insets each side by about 5 pt")
+        XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: 600, rows: 60, board: board), column)
+        XCTAssertEqual(BoardColumnLayout.Column(width: 337, height: .infinity, rows: 60, board: board), column)
+
+        // A board shorter than the column's width leaves the rows at that width.
+        let short = BoardColumnLayout.Column(width: 337, height: 300, rows: 60, board: board)
+        XCTAssertEqual(short.side, 240)
+        XCTAssertEqual(short.rowWidth, 337)
+
+        // Flat themes keep the rows a VStack gives them.
+        var flat = board
+        flat.depth = nil
+        let flatColumn = BoardColumnLayout.Column(width: 337, height: nil, rows: 60, board: flat)
+        XCTAssertEqual(flatColumn.side, 337)
+        XCTAssertEqual(flatColumn.rowWidth, 337)
+    }
+
     /// Compact boards keep their exact slot, including rectangular previews;
     /// disabling depth for a widget must preserve that footprint at any size.
     func testBoardDepthKeepsCompactAndDisabledFootprintsUnchanged() {

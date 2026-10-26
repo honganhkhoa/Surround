@@ -467,7 +467,7 @@ struct HomeGameTile: View {
 
     var body: some View {
         let facts = HomeGameFacts(game: game, user: ogs.user)
-        HomeTileColumn(spacing: 8, board: BoardDepthPlacement(
+        BoardColumnLayout(spacing: 8, board: BoardDepthPlacement(
             boardWidth: game.currentPosition.width, boardHeight: game.currentPosition.height,
             showsCoordinates: false, displayScale: displayScale, depth: boardAppearance.boardDepth)) {
             HomeClockChip(game: game, facts: facts, color: facts.topColor, size: .tile) {
@@ -512,63 +512,6 @@ struct HomeGameTile: View {
         .contentShape(Rectangle())
         .onTapGesture { opensGame?() }
         .modifier(GamePlayerProfileMenu(game: game))
-    }
-}
-
-/// The tile's chip, board and chip, top to bottom. The chips run edge to edge
-/// with the board as it is drawn: a theme with depth draws it inset within
-/// its square, leaving room for the shadow.
-private struct HomeTileColumn: Layout {
-    var spacing: CGFloat
-    var board: BoardDepthPlacement
-
-    private struct Arrangement {
-        var side: CGFloat
-        var drawn: CGRect
-        var top: CGSize
-        var bottom: CGSize
-        /// A chip that cannot shrink to the board widens the column, as in a VStack.
-        var width: CGFloat
-    }
-
-    private func arrangement(_ proposal: ProposedViewSize, subviews: Subviews) -> Arrangement {
-        let width = proposal.width ?? HomeLayout.largeBoardSize
-        func arrangement(side: CGFloat) -> Arrangement {
-            let drawn = board.visibleBoard(in: CGRect(x: 0, y: 0, width: side, height: side))
-            let chip = ProposedViewSize(width: drawn.width, height: nil)
-            let top = subviews[0].sizeThatFits(chip)
-            let bottom = subviews[2].sizeThatFits(chip)
-            return Arrangement(side: side, drawn: drawn, top: top, bottom: bottom,
-                               width: max(width, top.width, bottom.width))
-        }
-        let widest = arrangement(side: width)
-        guard let height = proposal.height, height.isFinite else { return widest }
-        // A height shorter than the column fits the board to what remains.
-        let chips = widest.top.height + widest.bottom.height + spacing * 2
-        let side = min(width, max(0, height - chips))
-        return side < width ? arrangement(side: side) : widest
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard subviews.count == 3 else { return .zero }
-        let column = arrangement(proposal, subviews: subviews)
-        let height = column.top.height + column.side + column.bottom.height + spacing * 2
-        return CGSize(width: column.width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard subviews.count == 3 else { return }
-        // Measured as in sizeThatFits: a wide chip makes the bounds wider than the board.
-        let column = arrangement(proposal, subviews: subviews)
-        let boardX = bounds.minX + (bounds.width - column.side) / 2
-        let boardY = bounds.minY + column.top.height + spacing
-        let drawnMidX = boardX + column.drawn.midX
-        subviews[0].place(at: CGPoint(x: drawnMidX - column.top.width / 2, y: bounds.minY),
-                          proposal: ProposedViewSize(width: column.drawn.width, height: column.top.height))
-        subviews[1].place(at: CGPoint(x: boardX, y: boardY),
-                          proposal: ProposedViewSize(width: column.side, height: column.side))
-        subviews[2].place(at: CGPoint(x: drawnMidX - column.bottom.width / 2, y: boardY + column.side + spacing),
-                          proposal: ProposedViewSize(width: column.drawn.width, height: column.bottom.height))
     }
 }
 

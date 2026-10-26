@@ -254,6 +254,79 @@ struct BoardDepthPlacement: Equatable {
     }
 }
 
+/// A row, the board and a row, top to bottom, as a VStack lays them out.
+/// Where the board spans the column, the rows run edge to edge with the board
+/// as drawn: a theme with depth draws it inset within its square.
+struct BoardColumnLayout: Layout {
+    /// Nil keeps the spacing a VStack would use between these views.
+    var spacing: CGFloat?
+    var board: BoardDepthPlacement
+
+    /// The board's side and the rows' width in a column `width` wide, where
+    /// the rows and spacing take `rows` points of an optional `height`.
+    struct Column: Equatable {
+        var side: CGFloat
+        var rowWidth: CGFloat
+
+        init(width: CGFloat, height: CGFloat?, rows: CGFloat, board: BoardDepthPlacement) {
+            side = height.map { min(width, max(0, $0 - rows)) } ?? width
+            // The rows meet the board's sides only where it spans the column.
+            rowWidth = side < width ? width
+                : board.visibleBoard(in: CGRect(x: 0, y: 0, width: side, height: side)).width
+        }
+    }
+
+    private struct Arrangement {
+        var column: Column
+        var top: CGSize
+        var bottom: CGSize
+        var spacing: (CGFloat, CGFloat)
+        /// A row that cannot shrink to the board widens the column, as in a VStack.
+        var width: CGFloat
+    }
+
+    private func arrangement(_ proposal: ProposedViewSize, subviews: Subviews) -> Arrangement {
+        let width = proposal.width ?? subviews[1].sizeThatFits(.unspecified).width
+        let spacing = (self.spacing ?? subviews[0].spacing.distance(to: subviews[1].spacing, along: .vertical),
+                       self.spacing ?? subviews[1].spacing.distance(to: subviews[2].spacing, along: .vertical))
+        let full = ProposedViewSize(width: width, height: nil)
+        var top = subviews[0].sizeThatFits(full)
+        var bottom = subviews[2].sizeThatFits(full)
+        let rows = top.height + bottom.height + spacing.0 + spacing.1
+        let column = Column(width: width, height: proposal.height, rows: rows, board: board)
+        if column.rowWidth != width {
+            let drawn = ProposedViewSize(width: column.rowWidth, height: nil)
+            top = subviews[0].sizeThatFits(drawn)
+            bottom = subviews[2].sizeThatFits(drawn)
+        }
+        return Arrangement(column: column, top: top, bottom: bottom, spacing: spacing,
+                           width: max(width, top.width, bottom.width))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 3 else { return .zero }
+        let column = arrangement(proposal, subviews: subviews)
+        let height = column.top.height + column.column.side + column.bottom.height + column.spacing.0 + column.spacing.1
+        return CGSize(width: column.width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        // Measured as in sizeThatFits: a wide row makes the bounds wider than the board.
+        let column = arrangement(proposal, subviews: subviews)
+        let side = column.column.side
+        let midX = bounds.midX
+        let boardY = bounds.minY + column.top.height + column.spacing.0
+        let rowWidth = column.column.rowWidth
+        subviews[0].place(at: CGPoint(x: midX - column.top.width / 2, y: bounds.minY),
+                          proposal: ProposedViewSize(width: rowWidth, height: column.top.height))
+        subviews[1].place(at: CGPoint(x: midX - side / 2, y: boardY),
+                          proposal: ProposedViewSize(width: side, height: side))
+        subviews[2].place(at: CGPoint(x: midX - column.bottom.width / 2, y: boardY + side + column.spacing.1),
+                          proposal: ProposedViewSize(width: rowWidth, height: column.bottom.height))
+    }
+}
+
 /// Boards and stones show detail only where it can be seen. Below a 14 pt
 /// cell they are solid colors: the flat board color, a straight grid, and
 /// flat stones with an optional solid outline; no images, textures,

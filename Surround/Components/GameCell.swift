@@ -133,6 +133,8 @@ struct GameCell: View {
     var showsConditionalMoves = false
     var navigationAccessibilityIdentifier = ""
     @EnvironmentObject var ogs: OGSService
+    @Environment(\.boardAppearance) private var boardAppearance
+    @Environment(\.displayScale) private var displayScale
 
     enum CellDisplayMode: String, Codable {
         case full
@@ -228,7 +230,10 @@ struct GameCell: View {
     @ViewBuilder
     private var cellContent: some View {
         if displayMode == .full {
-            VStack {
+            // The players' lines run edge to edge with the board as drawn.
+            BoardColumnLayout(board: BoardDepthPlacement(
+                boardWidth: game.currentPosition.width, boardHeight: game.currentPosition.height,
+                showsCoordinates: false, displayScale: displayScale, depth: boardAppearance.boardDepth)) {
                 PlayerInfoLine(
                     game: game,
                     color: .black,
