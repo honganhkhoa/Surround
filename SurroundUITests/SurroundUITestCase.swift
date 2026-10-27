@@ -144,22 +144,31 @@ class SurroundUITestCase: XCTestCase {
     ) {
         if isPresented() == selected { return }
         var target = control
-        if !target.exists || !target.isHittable {
-            let overflow = app.buttons.matching(NSPredicate(
-                format: "identifier IN %@ OR label == %@",
-                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
-            )).allElementsBoundByIndex.first { $0.isHittable }
-            guard let overflow else {
-                keepHierarchy(of: app, name: "missing game toolbar overflow")
-                XCTFail("Expected the game mode or native toolbar overflow", file: file, line: line)
-                return
-            }
+        let overflows = app.buttons.matching(NSPredicate(
+            format: "identifier IN %@ OR label == %@",
+            ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
+        ))
+        var overflow: XCUIElement?
+        // The toggle can briefly read as not hittable while no overflow shows
+        // either, although it is on screen a moment later (iPadOS 26.5,
+        // October 2026). Wait for one of them; a collapsed toolbar shows its
+        // overflow at once.
+        let reachable = pollUntil(timeout: 5) {
+            if target.exists && target.isHittable { return true }
+            overflow = overflows.allElementsBoundByIndex.first { $0.isHittable }
+            return overflow != nil
+        }
+        if let overflow {
             overflow.tap()
             if !target.exists || !target.isHittable {
                 let menuActions = app.buttons.matching(NSPredicate(format: "label IN %@", labels))
                 target = menuActions.allElementsBoundByIndex.first { $0.isHittable }
                     ?? menuActions.firstMatch
             }
+        } else if !reachable {
+            keepHierarchy(of: app, name: "missing game toolbar overflow")
+            XCTFail("Expected the game mode or native toolbar overflow", file: file, line: line)
+            return
         }
         XCTAssertTrue(pollUntil(timeout: 5) { target.exists && target.isHittable },
                       "Expected the native game mode action", file: file, line: line)
