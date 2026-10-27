@@ -1392,14 +1392,12 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         assertQuickMatchToggle(rapid, isOn: true, in: app)
         let liveToggle = element(live, in: app)
         scrollIntoTappableArea(liveToggle, in: app)
-        // The switch accessibility frame includes its wide label. Target the
-        // trailing switch itself, since the center can be empty label space.
-        activate(liveToggle, at: CGVector(dx: 0.95, dy: 0.5))
+        setSwitch(liveToggle, to: "1", description: "Live speed")
         assertQuickMatchToggle(rapid, isOn: true, in: app)
         assertQuickMatchToggle(live, isOn: true, in: app)
         let rapidToggle = element(rapid, in: app)
         scrollIntoTappableArea(rapidToggle, in: app)
-        activate(rapidToggle, at: CGVector(dx: 0.95, dy: 0.5))
+        setSwitch(rapidToggle, to: "0", description: "Rapid speed")
         assertQuickMatchToggle(rapid, isOn: false, in: app)
         assertQuickMatchToggle(live, isOn: true, in: app)
 

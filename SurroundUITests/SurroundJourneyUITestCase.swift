@@ -1034,7 +1034,55 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         }
         XCTAssertNotNil(entry, "Expected a visible main navigation entry: \(identifier)")
         guard let entry else { return }
+        #if targetEnvironment(macCatalyst)
         tap(entry, description: identifier, in: app)
+        #else
+        // In October 2026 CI an iPadOS 26 tab tap was delivered without
+        // selecting its tab. Tapping a selected tab again pops its stack, so
+        // retry only once another entry is seen to stay selected. Tabs that
+        // expose no selection, like the iPadOS 18 top tab bar, never retry.
+        let previous = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier IN %@ AND identifier != %@ AND selected == true",
+            Array(tabTitles.keys), identifier
+        )).firstMatch
+        let hadPrevious = previous.exists
+        tap(entry, description: identifier, in: app)
+        guard hadPrevious else { return }
+        // On iPad, Profile and Settings open a sheet and keep the selected
+        // tab; the sheet hides the sidebar, so the entry stops being hittable.
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !previous.exists || !entry.isHittable || entry.isSelected
+        }, object: nil)
+        guard XCTWaiter.wait(for: [settled], timeout: 10) != .completed,
+              previous.exists, entry.isHittable, !entry.isSelected else { return }
+        XCTContext.runActivity(named: "Retry selecting \(identifier); another entry stayed selected") { _ in
+            activate(entry)
+        }
+        #endif
+    }
+
+    /// Turns a switch row to `value` by tapping its trailing control.
+    /// SwiftUI includes the wide label in a switch's accessibility frame, so
+    /// the row's center can be empty label space.
+    func setSwitch(_ toggle: XCUIElement, to value: String, description: String) {
+        let oldValue = toggle.value as? String
+        guard oldValue != value else { return }
+        activate(toggle, at: CGVector(dx: 0.95, dy: 0.5))
+        // In October 2026 CI several switches ignored a tap that XCTest
+        // delivered onto them, and the same taps work locally. Give the
+        // first tap the 10 seconds it always had, so a late one is not
+        // undone, then tap the knob once more only if the switch still
+        // shows its old value, logged so CI shows how often that happens.
+        guard !waitForValue(value, in: toggle, timeout: 10), let oldValue,
+              toggle.value as? String == oldValue else { return }
+        XCTContext.runActivity(named: "Retry the \(description) tap; the first left it unchanged") { _ in
+            let knob = toggle.switches.firstMatch
+            if knob.isHittable {
+                activate(knob)
+            } else {
+                activate(toggle, at: CGVector(dx: 0.95, dy: 0.5))
+            }
+        }
     }
 
     func openOwnProfileFromMainNavigation(in app: XCUIApplication) {

@@ -987,9 +987,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let hideRatings = app.switches["Hide ranks and ratings"].firstMatch
         XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
         scrollIntoTappableArea(hideRatings, in: app)
-        // SwiftUI includes the wide label in a switch's accessibility frame.
-        // Activate the trailing switch rather than empty label space.
-        activate(hideRatings, at: CGVector(dx: 0.95, dy: 0.5))
+        setSwitch(hideRatings, to: "1", description: "Hide ranks and ratings")
         XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: stateSettleTimeout))
         let profileEntry = element(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
         scrollIntoTappableArea(profileEntry, in: app)
