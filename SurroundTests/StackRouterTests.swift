@@ -54,6 +54,37 @@ final class StackRouterTests: XCTestCase {
         XCTAssertEqual(hidden.occlusion, EdgeInsets())
     }
 
+    func testSwipeRevealedDrawerKeepsTheClosedSampleAndReclaimsItsInset() {
+        // Landscape iPad Pro 13-inch on iPadOS 27, tab bar hidden.
+        let closed = EdgeInsets(top: 32, leading: 0, bottom: 20, trailing: 0)
+        let revealing = EdgeInsets(top: 32, leading: 0, bottom: 64, trailing: 0)
+
+        XCTAssertTrue(AppSidebarInsets.revealsHiddenDrawer(
+            current: revealing, closed: closed, physicalTop: 32, physicalBottom: 20))
+        let metrics = AppSidebarInsets(current: revealing, closed: closed,
+                                      physical: .init(), sidebarVisible: true)
+        XCTAssertEqual(metrics.occlusion, EdgeInsets(top: 0, leading: 0, bottom: 44, trailing: 0))
+        XCTAssertFalse(AppSidebarInsets.revealsHiddenDrawer(
+            current: closed, closed: closed, physicalTop: 32, physicalBottom: 20))
+        XCTAssertFalse(AppSidebarInsets.revealsHiddenDrawer(
+            current: EdgeInsets(top: 32, leading: 0, bottom: 20.5, trailing: 0), closed: closed,
+            physicalTop: 32, physicalBottom: 20), "Half a point is rounding, not a drawer.")
+        XCTAssertFalse(AppSidebarInsets.revealsHiddenDrawer(
+            current: revealing, closed: nil, physicalTop: 32, physicalBottom: 20),
+                       "Without a closed sample, as while the tab bar hides, nothing is a drawer.")
+    }
+
+    func testZenStatusBarIsNotADrawerReveal() {
+        let zen = EdgeInsets(top: 0, leading: 0, bottom: 20, trailing: 0)
+        let normal = EdgeInsets(top: 32, leading: 0, bottom: 20, trailing: 0)
+
+        XCTAssertFalse(AppSidebarInsets.revealsHiddenDrawer(
+            current: normal, closed: zen, physicalTop: 32, physicalBottom: 20),
+                       "Leaving Zen returns the status bar to the physical edge too.")
+        XCTAssertFalse(AppSidebarInsets.revealsHiddenDrawer(
+            current: zen, closed: normal, physicalTop: 0, physicalBottom: 20))
+    }
+
     func testSidebarTransitionCannotTurnReducedHostInsetsIntoNegativeOcclusion() {
         let metrics = AppSidebarInsets(
             current: .init(top: 0, leading: 20, bottom: 0, trailing: 0),

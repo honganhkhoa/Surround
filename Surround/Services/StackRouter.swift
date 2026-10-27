@@ -416,6 +416,19 @@ struct AppSidebarInsets: Equatable {
         EdgeInsets(top: 0, leading: rightToLeft ? right : left,
                    bottom: 0, trailing: rightToLeft ? left : right)
     }
+
+    /// iPadOS 27's edge swipe lays out its overlay drawer while the sidebar
+    /// still reports hidden. With hidden tabs, a closed host reserves only the
+    /// physical vertical edges, so an inset past both those edges and the
+    /// closed sample is that drawer. The physical edge keeps a returning
+    /// status bar (leaving Zen) out. Hiding the tab bar clears the closed
+    /// samples, and without one nothing counts.
+    static func revealsHiddenDrawer(current: EdgeInsets, closed: EdgeInsets?,
+                                    physicalTop: CGFloat, physicalBottom: CGFloat) -> Bool {
+        guard let closed else { return false }
+        return current.top > max(physicalTop, closed.top) + 0.5
+            || current.bottom > max(physicalBottom, closed.bottom) + 0.5
+    }
 }
 
 #if MAIN_APP

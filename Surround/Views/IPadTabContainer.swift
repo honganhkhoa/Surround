@@ -344,6 +344,8 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             let physicalFrame = host.view.convert(window.safeAreaLayoutGuide.layoutFrame, from: window)
             let physicalLeft = max(0, physicalFrame.minX - bounds.minX)
             let physicalRight = max(0, bounds.maxX - physicalFrame.maxX)
+            let physicalTop = max(0, physicalFrame.minY - bounds.minY)
+            let physicalBottom = max(0, bounds.maxY - physicalFrame.maxY)
             let rightToLeft = host.view.effectiveUserInterfaceLayoutDirection == .rightToLeft
             let hostInsets = host.view.safeAreaInsets
             let available: Bool
@@ -356,33 +358,33 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             let visible = available && !controller.sidebar.isHidden
             let key = IPadHostBaselineKey(root: selectedRoot, width: bounds.width, height: bounds.height,
                 physicalLeft: physicalLeft, physicalRight: physicalRight, rightToLeft: rightToLeft)
-            if !visible && !sidebarTransitionInProgress { hiddenHostBaselines[key] = hostInsets }
+            func logical(_ insets: UIEdgeInsets) -> EdgeInsets {
+                EdgeInsets(top: insets.top, leading: rightToLeft ? insets.right : insets.left,
+                           bottom: insets.bottom, trailing: rightToLeft ? insets.left : insets.right)
+            }
+            let revealing = !visible && controller.isTabBarHidden
+                && AppSidebarInsets.revealsHiddenDrawer(
+                    current: logical(hostInsets), closed: hiddenHostBaselines[key].map(logical),
+                    physicalTop: physicalTop, physicalBottom: physicalBottom)
+            let occluded = visible || revealing
+            if !occluded && !sidebarTransitionInProgress { hiddenHostBaselines[key] = hostInsets }
             // Rotation may introduce a new baseline while the drawer is open.
             // With hidden tabs, this outer host reserves only physical vertical
             // edges when closed; the child navigation stack owns its header.
             // Use those edges until a closed sample exists for the new size.
             // Other screens retain their own native chrome as the fallback.
             let fallbackInsets = controller.isTabBarHidden
-                ? UIEdgeInsets(top: max(0, physicalFrame.minY - bounds.minY),
-                               left: hostInsets.left,
-                               bottom: max(0, bounds.maxY - physicalFrame.maxY),
-                               right: hostInsets.right)
+                ? UIEdgeInsets(top: physicalTop, left: hostInsets.left,
+                               bottom: physicalBottom, right: hostInsets.right)
                 : hostInsets
             let closedInsets = hiddenHostBaselines[key] ?? fallbackInsets
             pendingMetrics = IPadTabMetrics(
                 sidebarAvailable: available, sidebarVisible: visible,
                 insets: AppSidebarInsets(
-                    current: EdgeInsets(top: hostInsets.top,
-                        leading: rightToLeft ? hostInsets.right : hostInsets.left,
-                        bottom: hostInsets.bottom,
-                        trailing: rightToLeft ? hostInsets.left : hostInsets.right),
-                    closed: EdgeInsets(top: closedInsets.top,
-                        leading: rightToLeft ? closedInsets.right : closedInsets.left,
-                        bottom: closedInsets.bottom,
-                        trailing: rightToLeft ? closedInsets.left : closedInsets.right),
+                    current: logical(hostInsets), closed: logical(closedInsets),
                     physical: AppSidebarInsets.horizontal(left: physicalLeft, right: physicalRight,
                                                           rightToLeft: rightToLeft),
-                    sidebarVisible: visible))
+                    sidebarVisible: occluded))
             if !metricsDeliveryScheduled {
                 metricsDeliveryScheduled = true
                 DispatchQueue.main.async { [weak self] in
