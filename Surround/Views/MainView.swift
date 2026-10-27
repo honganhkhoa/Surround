@@ -65,6 +65,10 @@ struct MainView: View {
     @State var backgroundTask: PlatformBackgroundTask?
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
+    /// This window's request in the app-wide display sleep switch.
+    @State private var displaySleepWindow = UUID()
+    /// Withdraws the request if this window's views go without an onDisappear.
+    @StateObject private var displaySleepLifetime = ViewLifetime()
 
     @EnvironmentObject var nav: NavigationService
 
@@ -78,12 +82,20 @@ struct MainView: View {
         Set(RootView.allCases.map(\.rawValue))
     }
 
-    func updateDisplaySleepPrevention() {
+    private var keepsDisplayAwake: Bool {
+        nav.keepsDisplayAwake(isActive: scenePhase == .active, liveGames: ogs.liveGames,
+                              waitingLiveGames: ogs.waitingLiveGames)
+    }
+
+    private func setKeepsDisplayAwake(_ keepsAwake: Bool) {
         guard allowsRemoteActivity else { return }
-        let hasLiveGame = !ogs.liveGames.isEmpty || ogs.waitingLiveGames > 0
-        SystemPlatformServices.shared.setPreventsDisplaySleep(
-            scenePhase == .active && hasLiveGame
-        )
+        let window = displaySleepWindow
+        SystemPlatformServices.shared.setPreventsDisplaySleep(keepsAwake, for: window)
+        if displaySleepLifetime.release == nil {
+            displaySleepLifetime.release = {
+                SystemPlatformServices.shared.setPreventsDisplaySleep(false, for: window)
+            }
+        }
     }
 
     func endBackgroundTask() {
@@ -309,10 +321,8 @@ struct MainView: View {
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard allowsRemoteActivity else { return }
             if phase == .active {
-                updateDisplaySleepPrevention()
                 self.onAppActive(newLaunch: false)
             } else if phase == .background {
-                SystemPlatformServices.shared.setPreventsDisplaySleep(false)
                 self.backgroundTask = SystemPlatformServices.shared.beginBackgroundTask {
                     self.endBackgroundTask()
                 }
@@ -327,12 +337,15 @@ struct MainView: View {
                 }
             }
         }
-        .onReceive(Publishers.CombineLatest(ogs.$liveGames, ogs.$waitingLiveGames), perform: { liveGames, waitingLiveGames in
-            guard allowsRemoteActivity else { return }
-            SystemPlatformServices.shared.setPreventsDisplaySleep(
-                scenePhase == .active && (!liveGames.isEmpty || waitingLiveGames > 0)
-            )
-        })
+        // Each window asks for itself; the display sleeps only once no
+        // window asks, so one window leaving the foreground cannot let
+        // another window's live game sleep.
+        .onChange(of: keepsDisplayAwake, initial: true) { _, keepsAwake in
+            setKeepsDisplayAwake(keepsAwake)
+        }
+        .onDisappear {
+            setKeepsDisplayAwake(false)
+        }
         .onOpenURL { url in
             nav.handle(appURL: url)
         }

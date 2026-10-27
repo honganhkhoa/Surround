@@ -638,20 +638,6 @@ struct GameDetailView: View {
         guard let currentGame = self.currentGame ?? departingGame else {
             return AnyView(EmptyView())
         }
-        // A profile route has no picker, so the notice still points at the
-        // user's other live games, but never at the one on screen. Like the
-        // service's live list, a game without a speed tag counts by its clock.
-        let timeControl = currentGame.gameData?.timeControl
-        let viewingOwnLiveGame = currentGame.gamePhase != .finished
-            && currentGame.isUserPlaying
-            && (timeControl?.speed ?? timeControl?.inferredSpeed(
-                boardWidth: currentGame.width, boardHeight: currentGame.height))?.isRealtime == true
-        let notificationContext = GameDetailNotificationContext(
-            ownLiveGame: viewingOwnLiveGame ? currentGame.ID : nil,
-            // The picker lists games by their tag only.
-            listsLiveGames: viewingOwnLiveGame && allowsActiveGamesCarousel
-                && timeControl?.speed?.isRealtime == true
-        )
 
         let showsActiveGamesButton = canShowActiveGames
         var title = currentGame.gameName?.trimmingCharacters(
@@ -743,19 +729,15 @@ struct GameDetailView: View {
         .navigationBarHidden(hidesZenChrome || hidesNavigationBarInDuoWide)
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)
+        .modifier(GameDetailNotificationRegistration(
+            game: currentGame, allowsActiveGamesCarousel: allowsActiveGamesCarousel,
+            contextID: notificationContextID
+        ))
         .onAppear {
-            nav.gameDetailNotificationContexts[notificationContextID] = notificationContext
             updateActiveGameList()
             updateDetailOfCurrentGameIfNecessary()
         }
-        .onChange(of: notificationContext) { _, newContext in
-            // A retained navigation destination can receive game updates
-            // after disappearing. Only its visible registration owns notices.
-            guard nav.gameDetailNotificationContexts[notificationContextID] != nil else { return }
-            nav.gameDetailNotificationContexts[notificationContextID] = newContext
-        }
         .onDisappear {
-            nav.gameDetailNotificationContexts.removeValue(forKey: notificationContextID)
             clearKeyboardVisibility()
         }
         .onChange(of: currentGame) { oldGame, newGame in
@@ -856,6 +838,43 @@ struct GameDetailView: View {
             .surroundTheme(SurroundTheme.current(storedID: gameThemeID),
                              ownsWindow: self.currentGame != nil)
         )
+    }
+}
+
+/// Registers what a visible Game Detail shows with its window. It observes the
+/// game itself, so a result reaches the app's notices and display sleep at
+/// once, even when nothing else redraws the screen.
+private struct GameDetailNotificationRegistration: ViewModifier {
+    @ObservedObject var game: Game
+    let allowsActiveGamesCarousel: Bool
+    let contextID: UUID
+    @EnvironmentObject private var nav: NavigationService
+    // Whether the user plays this game follows the signed-in account.
+    @EnvironmentObject private var ogs: OGSService
+    @StateObject private var lifetime = ViewLifetime()
+
+    private var context: GameDetailNotificationContext {
+        GameDetailNotificationContext(showing: game, allowsActiveGamesCarousel: allowsActiveGamesCarousel)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                nav.gameDetailNotificationContexts[contextID] = context
+                // A finished game must not keep a restored window awake
+                // because this registration outlived its views.
+                let nav = nav, contextID = contextID
+                lifetime.release = { nav.removeGameDetailNotificationContext(contextID) }
+            }
+            .onChange(of: context) { _, newContext in
+                // A retained navigation destination can receive game updates
+                // after disappearing. Only its visible registration owns notices.
+                guard nav.gameDetailNotificationContexts[contextID] != nil else { return }
+                nav.gameDetailNotificationContexts[contextID] = newContext
+            }
+            .onDisappear {
+                nav.gameDetailNotificationContexts.removeValue(forKey: contextID)
+            }
     }
 }
 

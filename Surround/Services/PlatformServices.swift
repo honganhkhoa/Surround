@@ -19,7 +19,7 @@ protocol PlatformServicing: AnyObject {
     func configureAmbientAudioSession()
     func beginBackgroundTask(expirationHandler: @escaping () -> Void) -> PlatformBackgroundTask?
     func endBackgroundTask(_ task: PlatformBackgroundTask?)
-    func setPreventsDisplaySleep(_ preventsSleep: Bool)
+    func setPreventsDisplaySleep(_ preventsSleep: Bool, for window: UUID)
 
     func isAttachedSoftwareKeyboardVisible(from notification: Notification) -> Bool
     func open(_ url: URL)
@@ -33,6 +33,7 @@ final class SystemPlatformServices: PlatformServicing {
     static let shared = SystemPlatformServices()
 
     private var displaySleepActivity: NSObjectProtocol?
+    private var displaySleepRequests = DisplaySleepRequests()
 
     private init() {}
 
@@ -85,7 +86,12 @@ final class SystemPlatformServices: PlatformServicing {
         #endif
     }
 
-    func setPreventsDisplaySleep(_ preventsSleep: Bool) {
+    func setPreventsDisplaySleep(_ preventsSleep: Bool, for window: UUID) {
+        guard let keepsAwake = displaySleepRequests.set(preventsSleep, for: window) else { return }
+        applyDisplaySleepPrevention(keepsAwake)
+    }
+
+    private func applyDisplaySleepPrevention(_ preventsSleep: Bool) {
         #if targetEnvironment(macCatalyst)
         if preventsSleep {
             guard displaySleepActivity == nil else {

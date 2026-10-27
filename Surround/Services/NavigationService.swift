@@ -103,7 +103,7 @@ struct PendingGameOpen: Identifiable, Equatable {
     }
 }
 
-/// What a visible Game Detail shows, for the app's notices.
+/// What a visible Game Detail shows, for the app's notices and display sleep.
 struct GameDetailNotificationContext: Equatable {
     /// The user's own unfinished live game on screen. The live-game notice
     /// never points at it, and challenge notices wait during live play.
@@ -111,6 +111,64 @@ struct GameDetailNotificationContext: Equatable {
     /// Its Active games picker lists the user's other live games, so the
     /// live-game notice gives way to it.
     var listsLiveGames = false
+    /// An unfinished live game is on screen, played or watched: its window
+    /// keeps the display awake until the game ends.
+    var showsLiveGameInPlay = false
+}
+
+extension GameDetailNotificationContext {
+    init(showing game: Game, allowsActiveGamesCarousel: Bool) {
+        let timeControl = game.gameData?.timeControl
+        // Like the service's live list, a game without a speed tag counts
+        // by its clock.
+        let speed = timeControl?.speed ?? timeControl?.inferredSpeed(
+            boardWidth: game.width, boardHeight: game.height)
+        let ended = game.gamePhase == .finished
+            || !(game.gameData?.outcome?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let inPlay = speed?.isRealtime == true && !ended
+        // A profile route has no picker, so the notice still points at the
+        // user's other live games, but never at the one on screen.
+        let playing = inPlay && game.isUserPlaying
+        self.init(
+            ownLiveGame: playing ? game.ID : nil,
+            // The picker lists games by their tag only.
+            listsLiveGames: playing && allowsActiveGamesCarousel && timeControl?.speed?.isRealtime == true,
+            showsLiveGameInPlay: inPlay
+        )
+    }
+}
+
+/// Runs `release` once SwiftUI drops the view state that owns it. Window-wide
+/// registrations use it for cleanup that cannot wait for an `onDisappear`
+/// that may never come, as when the system disconnects a background scene
+/// whose NavigationService is reused when the window returns.
+final class ViewLifetime: ObservableObject {
+    var release: (() -> Void)?
+
+    deinit {
+        // Never publish while SwiftUI is tearing views down.
+        if let release { DispatchQueue.main.async(execute: release) }
+    }
+}
+
+/// The windows asking to keep the display awake. The app-wide switch follows
+/// whether any window asks, so one window leaving the foreground never lets
+/// another window's live game sleep.
+struct DisplaySleepRequests {
+    private(set) var windows = Set<UUID>()
+
+    var keepsAwake: Bool { !windows.isEmpty }
+
+    /// Returns the new app-wide state when this request changes it.
+    mutating func set(_ keepsAwake: Bool, for window: UUID) -> Bool? {
+        let before = self.keepsAwake
+        if keepsAwake {
+            windows.insert(window)
+        } else {
+            windows.remove(window)
+        }
+        return self.keepsAwake == before ? nil : self.keepsAwake
+    }
 }
 
 enum GameOpenResolutionSource: Equatable {
@@ -210,6 +268,24 @@ class NavigationService: ObservableObject {
     /// The global message presenter is open in this window.
     @Published var showingPrivateChatView = false
 
+    /// A visible Game Detail shows a live game that has not ended, whoever
+    /// plays it, so this window keeps the display awake.
+    var visibleGameDetailShowsLiveGameInPlay: Bool {
+        gameDetailNotificationContexts.values.contains(where: \.showsLiveGameInPlay)
+    }
+
+    /// This window keeps the display awake in the foreground while the user
+    /// has a live game, waits for one to start, or watches one that has not
+    /// ended. A finished game stops counting before the service's live list
+    /// drops it.
+    func keepsDisplayAwake(isActive: Bool, liveGames: [Game], waitingLiveGames: Int) -> Bool {
+        isActive && (
+            liveGames.contains { $0.gamePhase != .finished && $0.gameData?.outcome == nil }
+                || waitingLiveGames > 0
+                || visibleGameDetailShowsLiveGameInPlay
+        )
+    }
+
     /// The user plays a live game on screen; challenge notices wait for it.
     /// Visible Game Details report this themselves, so a finished or
     /// spectated live game opened from Home does not hide notices.
@@ -234,6 +310,13 @@ class NavigationService: ObservableObject {
         gameDetailReconnectingBadges.contains { context, badges in
             !badges.isEmpty && gameDetailNotificationContexts[context] != nil
         }
+    }
+
+    /// Drops a Game Detail's registration and the badges it reported, for a
+    /// Game Detail whose views are gone.
+    func removeGameDetailNotificationContext(_ context: UUID) {
+        gameDetailNotificationContexts.removeValue(forKey: context)
+        gameDetailReconnectingBadges.removeValue(forKey: context)
     }
 
     func setGameDetailReconnectingBadge(_ badge: UUID, context: UUID, shown: Bool) {

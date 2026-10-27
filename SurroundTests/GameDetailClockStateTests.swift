@@ -526,6 +526,97 @@ final class GameDetailClockStateTests: XCTestCase {
         XCTAssertEqual(nav.liveGamesNeedingNotice(among: liveGames).count, 2)
     }
 
+    /// A Game Detail keeps its window awake while it shows a live game that
+    /// has not ended, played or watched, and lets it sleep once the game ends.
+    func testWatchedLiveGameKeepsTheWindowAwakeUntilItEnds() throws {
+        let live = try game()
+        let context = GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+        XCTAssertTrue(context.showsLiveGameInPlay, "A spectated live game in play keeps the display awake")
+        XCTAssertNil(context.ownLiveGame, "Watching is not playing")
+        XCTAssertFalse(context.listsLiveGames)
+
+        let nav = NavigationService()
+        let contextID = UUID()
+        nav.gameDetailNotificationContexts[contextID] = context
+        XCTAssertTrue(nav.visibleGameDetailShowsLiveGameInPlay)
+
+        live.gamePhase = .stoneRemoval
+        XCTAssertTrue(GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+            .showsLiveGameInPlay, "Stone removal is still part of the game")
+        live.gamePhase = .finished
+        let ended = GameDetailNotificationContext(showing: live, allowsActiveGamesCarousel: true)
+        XCTAssertFalse(ended.showsLiveGameInPlay, "A finished game lets the display sleep")
+        nav.gameDetailNotificationContexts[contextID] = ended
+        XCTAssertFalse(nav.visibleGameDetailShowsLiveGameInPlay)
+
+        let resigned = try game()
+        resigned.gameData?.outcome = "Resignation"
+        XCTAssertFalse(GameDetailNotificationContext(showing: resigned, allowsActiveGamesCarousel: true)
+            .showsLiveGameInPlay, "A result ends the game before its phase does")
+
+        let correspondence = try game(.Simple(perMove: 86_400))
+        XCTAssertFalse(GameDetailNotificationContext(showing: correspondence, allowsActiveGamesCarousel: true)
+            .showsLiveGameInPlay, "A correspondence game never keeps the display awake")
+    }
+
+    /// Only the foreground counts; a finished live game stops counting before
+    /// the service's live list drops it.
+    func testWindowKeepsTheDisplayAwakeForLiveGamesInPlay() throws {
+        let live = try game()
+        let nav = NavigationService()
+        func keepsAwake(isActive: Bool = true, liveGames: [Game] = [], waiting: Int = 0) -> Bool {
+            nav.keepsDisplayAwake(isActive: isActive, liveGames: liveGames, waitingLiveGames: waiting)
+        }
+        XCTAssertFalse(keepsAwake())
+        XCTAssertTrue(keepsAwake(liveGames: [live]))
+        XCTAssertTrue(keepsAwake(waiting: 1), "Waiting for a live game to start")
+        nav.gameDetailNotificationContexts[UUID()] = GameDetailNotificationContext(
+            showing: live, allowsActiveGamesCarousel: false)
+        XCTAssertTrue(keepsAwake(), "Watching a live game in play")
+        XCTAssertFalse(keepsAwake(isActive: false, liveGames: [live], waiting: 1))
+        live.gamePhase = .finished
+        nav.gameDetailNotificationContexts.removeAll()
+        XCTAssertFalse(keepsAwake(liveGames: [live]))
+    }
+
+    /// Each window asks for itself. The app-wide switch turns off only once
+    /// no window asks, so one window leaving the foreground cannot let
+    /// another window's live game sleep.
+    func testDisplayStaysAwakeWhileAnyWindowAsks() {
+        var requests = DisplaySleepRequests()
+        let first = UUID(), second = UUID()
+        XCTAssertEqual(requests.set(true, for: first), true)
+        XCTAssertNil(requests.set(true, for: second), "Already awake")
+        XCTAssertNil(requests.set(true, for: first), "Repeating a request changes nothing")
+        XCTAssertNil(requests.set(false, for: first), "The second window still asks")
+        XCTAssertTrue(requests.keepsAwake)
+        XCTAssertEqual(requests.set(false, for: second), false)
+        XCTAssertNil(requests.set(false, for: second))
+        XCTAssertFalse(requests.keepsAwake)
+    }
+
+    /// A Game Detail torn down without onDisappear (a background scene the
+    /// system disconnects, whose NavigationService returns with the window)
+    /// still withdraws its registration, so a finished game cannot keep the
+    /// restored window awake or hide notices.
+    func testRegistrationOutlivingItsViewsIsWithdrawn() {
+        let nav = NavigationService()
+        let context = UUID()
+        nav.gameDetailNotificationContexts[context] = GameDetailNotificationContext(showsLiveGameInPlay: true)
+        nav.setGameDetailReconnectingBadge(UUID(), context: context, shown: true)
+        var lifetime: ViewLifetime? = ViewLifetime()
+        lifetime?.release = { nav.removeGameDetailNotificationContext(context) }
+        XCTAssertTrue(nav.keepsDisplayAwake(isActive: true, liveGames: [], waitingLiveGames: 0))
+
+        let released = expectation(description: "Released after the view state goes")
+        lifetime = nil
+        DispatchQueue.main.async { released.fulfill() }
+        wait(for: [released], timeout: 1)
+        XCTAssertFalse(nav.keepsDisplayAwake(isActive: true, liveGames: [], waitingLiveGames: 0))
+        XCTAssertTrue(nav.gameDetailNotificationContexts.isEmpty)
+        XCTAssertTrue(nav.gameDetailReconnectingBadges.isEmpty)
+    }
+
     func testWidestCountdownSamplesIncludeTheDayAndHourForm() {
         // A 30-day clock shows "30 days" at its maximum, but "29 days 23h"
         // one second under it: the samples must include the wider form.
