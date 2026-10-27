@@ -1171,7 +1171,9 @@ struct SingleGameView: View {
                         self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
                     }
                 }
-                if let stonePlacingPlayer = stonePlacingPlayer {
+                // A pass also follows the current position, but places nothing.
+                if let stonePlacingPlayer = stonePlacingPlayer,
+                   case .placeStone = newPosition.lastMove {
                     if newPosition.previousPosition?.hasTheSamePosition(with: game.currentPosition) ?? false {
                         stonePlacingPlayer.play()
                     }

@@ -1985,6 +1985,60 @@ final class OGSServiceEventTests: XCTestCase {
         XCTAssertEqual(game.currentPosition.lastMoveNumber, 2)
     }
 
+    /// OGS sends a disconnection deadline only as `auto_resign`; clock events
+    /// keep it until `clear_auto_resign` or a `player_update` that drops the
+    /// player. Once the subscription ends (a dropped socket), the next
+    /// gamedata starts from the server's state.
+    func testAutoResignDeadlineSurvivesClockEventsUntilClearedOrResubscribed() throws {
+        let socket = FakeWebsocket()
+        let service = makeService(socket: socket)
+        let game = Game(ogsGame: try makeEmptyGameData(id: 270))
+        game.ogs = service
+        service.connect(to: game, owner: .explicit(UUID()))
+        let payload = try makeEmptyGameDataPayload(id: 270)
+        socket.deliver(name: "game/270/gamedata", data: payload)
+        let whiteID = try XCTUnwrap(game.whitePlayer?.id)
+        let deadline = Date().timeIntervalSince1970 * 1_000 + 120_000
+        let autoResign: [String: Any] = ["game_id": 270, "player_id": whiteID, "expiration": deadline]
+        socket.deliver(name: "game/270/auto_resign", data: autoResign)
+        XCTAssertEqual(game.clock?.autoResignTime[.white], deadline)
+
+        let clock = try XCTUnwrap(payload["clock"] as? [String: Any])
+        socket.deliver(name: "game/270/clock", data: clock)
+        XCTAssertEqual(game.clock?.autoResignTime[.white], deadline, "A clock event keeps the deadline")
+        XCTAssertNotNil(game.clock?.whiteTimeUntilAutoResign)
+        socket.deliver(name: "game/270/gamedata", data: payload)
+        XCTAssertEqual(game.clock?.autoResignTime[.white], deadline, "So does gamedata on the same subscription")
+
+        // Deadlines are kept by color, so a Rengo player dropped while
+        // disconnected must not pass their countdown to the teammate.
+        let blackID = try XCTUnwrap(game.blackPlayer?.id)
+        let blackDeadline = deadline + 30_000
+        socket.deliver(name: "game/270/auto_resign",
+                       data: ["game_id": 270, "player_id": blackID, "expiration": blackDeadline] as [String: Any])
+        socket.deliver(name: "game/270/player_update", data: [
+            "players": ["black": blackID, "white": whiteID],
+            "dropped_players": ["white": [whiteID]],
+        ] as [String: Any])
+        XCTAssertNil(game.clock?.autoResignTime[.white], "A dropped player's deadline goes with them")
+        XCTAssertNil(game.clock?.whiteTimeUntilAutoResign)
+        XCTAssertEqual(game.clock?.autoResignTime[.black], blackDeadline, "The other team's deadline stays")
+        socket.deliver(name: "game/270/clear_auto_resign", data: ["game_id": 270, "player_id": blackID])
+        socket.deliver(name: "game/270/auto_resign", data: autoResign)
+
+        socket.deliver(name: "game/270/clear_auto_resign", data: ["game_id": 270, "player_id": whiteID])
+        XCTAssertNil(game.clock?.autoResignTime[.white])
+
+        socket.deliver(name: "game/270/auto_resign", data: autoResign)
+        socket.dropSocket()
+        XCTAssertEqual(game.clock?.autoResignTime[.white], deadline,
+                       "Offline, the deadline stays for the disconnected snapshot")
+        socket.openSocket(authenticate: true)
+        socket.deliver(name: "game/270/gamedata", data: payload)
+        XCTAssertNil(game.clock?.autoResignTime[.white],
+                     "A missed clear_auto_resign cannot leave a stale deadline")
+    }
+
     func testMalformedTimeControlCannotHydrateGameAndLaterValidDataRecovers() throws {
         let socket = FakeWebsocket()
         let service = makeService(socket: socket, cachedUsers: try makePublicGameUsers())

@@ -35,12 +35,11 @@ struct FriendshipNoticeBanner: View {
     }
 }
 
-/// Reuses the same message access and presentation from the global notice row
-/// or native Game Detail toolbar, where the system keeps it clear of clocks.
+/// Message access in the global notice row, on every screen including Game
+/// Detail, until the game gets a design of its own for it.
 struct PrivateMessageNotificationButton: View {
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var nav: NavigationService
-    var isInToolbar = false
 
     static func isVisible(ogs: OGSService, nav: NavigationService) -> Bool {
         guard ogs.socketStatus == .connected else { return false }
@@ -64,59 +63,19 @@ struct PrivateMessageNotificationButton: View {
             }
     }
 
-    private var toolbarLabel: some View {
-        ZStack(alignment: .topTrailing) {
-            Image(systemName: "message.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(.orange)
-                .frame(width: 44, height: 44)
-            if ogs.privateMessagesUnreadCount > 0 {
-                Text(verbatim: String(ogs.privateMessagesUnreadCount))
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .frame(minWidth: 18, minHeight: 18)
-                    .background(.red, in: Capsule())
-                    .fixedSize()
-                    .accessibilityHidden(true)
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
-    }
-
-    private var messageButton: some View {
+    var body: some View {
         Button {
             guard !nav.showingPrivateChatView || ogs.superchatPeerIds.isEmpty else { return }
             nav.showingPrivateChatView.toggle()
         } label: {
-            if isInToolbar {
-                toolbarLabel
-            } else {
-                messageLabel.labelStyle(.iconOnly)
-                    .padding()
-                    .foregroundStyle(.white)
-                    .background(Color.orange, in: RoundedRectangle(cornerRadius: 10))
-            }
+            messageLabel.labelStyle(.iconOnly)
+                .padding()
+                .foregroundStyle(.white)
+                .background(Color.orange, in: RoundedRectangle(cornerRadius: 10))
         }
         .accessibilityLabel(Text("Messages"))
         .accessibilityValue(Text(verbatim: String(ogs.privateMessagesUnreadCount)))
         .accessibilityIdentifier("global.privateMessages")
-    }
-
-    var body: some View {
-        if isInToolbar {
-            // Native toolbar extraction drops a Label's overlay and value.
-            // Keep the badge, accessibility and action in one custom item.
-            ZStack {
-                messageButton.buttonStyle(.plain)
-            }
-            .frame(width: 44, height: 44)
-            .accessibilityElement(children: .contain)
-        } else {
-            messageButton
-        }
     }
 }
 
@@ -126,8 +85,12 @@ struct NotificationPopup: View {
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var friendshipNotice: OGSFriendshipNotice?
+    /// When a banner already on screen starts to fade in after the socket
+    /// leaves `.connected` (2 s, so a short blip shows nothing). One mounted
+    /// while offline is opaque at once and has none.
+    @State private var connectionBannerFadeIn: ContinuousClock.Instant?
 
-    
+
     var connectionPopup: some View {
         ZStack {
             HStack(spacing: 5) {
@@ -165,8 +128,14 @@ struct NotificationPopup: View {
     }
 
     /// Tells the game when the banner occupies its title slot: from the
-    /// moment it shows until "Connected" has faded (2 s delay, 0.35 s fade).
+    /// moment it becomes visible until "Connected" has faded (2 s delay,
+    /// 0.35 s fade), so the title never blanks while the banner is clear.
     private func publishConnectionBanner() async {
+        if connectionBannerShown && !nav.connectionBannerVisible,
+           let fadeIn = connectionBannerFadeIn, fadeIn > ContinuousClock.now {
+            try? await Task.sleep(until: fadeIn)
+            guard !Task.isCancelled else { return }
+        }
         if !connectionBannerShown && nav.connectionBannerVisible
             && ogs.socketStatus == .connected && showsConnectionPopup {
             try? await Task.sleep(for: .seconds(2.4))
@@ -178,24 +147,19 @@ struct NotificationPopup: View {
     }
     
     var viewingLiveGames: Bool {
-        if nav.gameDetailNotificationContexts.values.contains(true) {
-            return true
-        }
-        if nav.main.rootView == .home {
-            if let gameSpeed = nav.home.activeGame?.gameData?.timeControl.speed {
-                return gameSpeed.isRealtime
-            }
-        }
-        
-        return false
+        nav.visibleGameDetailPlaysLiveGame
     }
-    
+
+    var liveGamesElsewhere: [Game] {
+        nav.liveGamesNeedingNotice(among: ogs.liveGames)
+    }
+
     var viewingHomeView: Bool {
         return nav.main.rootView == .home && nav.home.activeGame == nil
     }
-    
+
     func goToLiveGames() {
-        if let game = ogs.liveGames.first {
+        if let game = liveGamesElsewhere.first {
             nav.goToActiveGame(game: game)
         }
     }
@@ -203,7 +167,7 @@ struct NotificationPopup: View {
     var liveGamesPopup: some View {
         Button(action: goToLiveGames) {
             VStack {
-                if (ogs.liveGames.count == 1) {
+                if (liveGamesElsewhere.count == 1) {
                     Text("Live game in progress...", comment: "In Popup. When only 1 game in progress.").bold().foregroundColor(.white)
                     Text("Tap to go to game", comment: "Popup. When a single game is in progress.").font(.subheadline).foregroundColor(.white)
                 } else {
@@ -256,10 +220,6 @@ struct NotificationPopup: View {
         }
     }
     
-    private var gameOwnsNotificationAccess: Bool {
-        !nav.gameDetailNotificationContexts.isEmpty
-    }
-
     func closeChatWindow() {
         guard ogs.superchatPeerIds.count == 0 else {
             return
@@ -270,7 +230,9 @@ struct NotificationPopup: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            if nav.showingPrivateChatView {
+            // The panel shows only while connected, and so does the layer
+            // that closes it: offline it would swallow taps on an empty window.
+            if nav.showingPrivateChatView && ogs.socketStatus == .connected {
                 Color.white
                     .opacity(0.01)
                     .contentShape(Rectangle())
@@ -281,15 +243,14 @@ struct NotificationPopup: View {
                     HStack {
                         // Game Detail owns connection status, but its active
                         // picker does not replace cross-speed live/challenge notices.
-                        if ogs.liveGames.filter({ $0.gameData?.outcome == nil }).count > 0 && !viewingLiveGames {
+                        if !liveGamesElsewhere.isEmpty {
                             liveGamesPopup
                         } else if ogs.waitingLiveGames > 0 && !viewingHomeView {
                             waitingGamesPopup
                         } else if shouldShowChallengeReceivedPopup {
                             challengeReceivedPopup
                         }
-                        if !gameOwnsNotificationAccess,
-                           PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav) {
+                        if PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav) {
                             PrivateMessageNotificationButton()
                         }
                     }
@@ -312,6 +273,16 @@ struct NotificationPopup: View {
             if showsConnectionPopup {
                 connectionPopup
             }
+        }
+        .onChange(of: ogs.socketStatus) { oldStatus, newStatus in
+            if newStatus == .connected {
+                connectionBannerFadeIn = nil
+            } else if oldStatus == .connected {
+                connectionBannerFadeIn = showsConnectionPopup ? ContinuousClock.now + .seconds(2) : nil
+            }
+        }
+        .onChange(of: showsConnectionPopup) { _, shows in
+            if shows { connectionBannerFadeIn = nil }
         }
         .task(id: connectionBannerShown) { await publishConnectionBanner() }
         .onDisappear {

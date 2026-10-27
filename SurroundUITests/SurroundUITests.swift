@@ -2143,7 +2143,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(waitWithFinalCheck(for: [reopenedDismissed], timeout: 10), .completed)
     }
 
-    func testGameMessageNotificationUsesToolbarWithoutCoveringClocks() {
+    func testGameMessageNotificationUsesTheAppPopup() {
         // The basic game fixture has no private messages. Explicitly seed
         // incoming messages so this journey exercises the unread notice.
         let app = launchApp(additionalLaunchArguments: [
@@ -2156,52 +2156,20 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertGreaterThan(unreadCount, 0,
                              "The notification fixture must contain unread private messages.")
         tap(id.homeGame(SurroundUITestContract.fixtureGameID), in: app)
-        setGameAnalyzing(true, in: app)
+        element(id.gameDetail(SurroundUITestContract.fixtureGameID), in: app)
 
+        // Until Game Detail has a design of its own for messages, it keeps
+        // the app's notice row like every other screen, in every pose.
         XCTAssertTrue(messageButton.waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons.matching(identifier: messageIdentifier).count, 1,
-                       "Game Detail replaces the overlay icon with one native toolbar action.")
-        XCTAssertTrue(messageButton.isHittable,
+                       "Game Detail shows the app's one Messages notice.")
+        XCTAssertFalse(app.navigationBars.buttons[messageIdentifier].exists,
+                       "Game Detail adds no Messages toolbar item.")
+        XCTAssertTrue(waitUntilHittable(messageButton, timeout: 10),
                       "Private messages must remain reachable in Game Detail.")
         XCTAssertEqual(Int(messageButton.value as? String ?? ""), unreadCount,
-                       "Native toolbar extraction must preserve the unread-message count.")
-        XCTAssertGreaterThanOrEqual(messageButton.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(messageButton.frame.height, 44)
-        XCTAssertTrue(pollUntil(timeout: 5) {
-            app.buttons.matching(identifier: "game.clock.white").allElementsBoundByIndex
-                .contains { $0.isHittable }
-        }, "The current clock must remain reachable.")
-        let clockCandidates = ["game.clock.black", "game.clock.white"].flatMap { identifier in
-            app.buttons.matching(identifier: identifier).allElementsBoundByIndex
-        }
-        // Retained hidden content can remain in the XCTest tree.
-        // Count the reachable controls, including any duplicate targets.
-        let visibleClocks = clockCandidates.filter { $0.isHittable }
-        let currentClockIsInHorizontalNavigationBar = app.navigationBars.allElementsBoundByIndex.contains { bar in
-            bar.frame.width > bar.frame.height
-                && bar.buttons.matching(identifier: "game.clock.white").allElementsBoundByIndex
-                    .contains { $0.isHittable }
-        }
-        let clockEvidence = XCTAttachment(string: clockCandidates.map {
-            "\($0.identifier): hittable=\($0.isHittable), frame=\($0.frame)"
-        }.joined(separator: "\n") + "\n\n" + app.debugDescription)
-        clockEvidence.name = "Notification toolbar clock candidates"
-        clockEvidence.lifetime = .keepAlways
-        add(clockEvidence)
-        keepScreenshot("Private-message toolbar leaves game clocks visible", in: app)
-        if app.frame.width < 500 && currentClockIsInHorizontalNavigationBar {
-            XCTAssertEqual(visibleClocks.count, 1,
-                           "The crowded phone header must show the complete current clock instead of compressing two Fischer clocks.")
-        }
-        XCTAssertEqual(visibleClocks.filter { $0.identifier == "game.clock.white" }.count, 1,
-                       "The selected layout must expose exactly one reachable current clock.")
-        for clock in visibleClocks {
-            XCTAssertTrue(clock.isHittable, "Each displayed clock must remain reachable.")
-            let overlap = messageButton.frame.intersection(clock.frame)
-            XCTAssertTrue(overlap.isNull || overlap.isEmpty,
-                          "The message action must not cover \(clock.identifier): \(overlap)")
-            XCTAssertGreaterThanOrEqual(clock.frame.height, 44)
-        }
+                       "The notice keeps the unread-message count.")
+        keepScreenshot("Private-message notice over Game Detail", in: app)
         tap(messageButton, description: "Open private messages from Game Detail", in: app)
         element("global.privateMessagesPanel", in: app)
     }
@@ -2341,6 +2309,20 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                       "Your finished realtime game must preserve the banner for the separate active live game.")
         openLiveGameFromBanner()
         keepScreenshot("Live banner – replaces a history detail", in: app)
+        backToHome()
+
+        // The same finished game opened from Home's own history section is
+        // Home's active game. It must not hide the banner (or a rematch offer).
+        let homeHistoryGame = elementAfterScrolling(
+            SurroundUITestContract.AccessibilityID.homeHistoryGame(historyGameID),
+            in: app
+        )
+        scrollIntoTappableArea(homeHistoryGame, in: app)
+        tap(homeHistoryGame, description: "Open your finished realtime game from Home", in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(historyGameID), in: app)
+        XCTAssertTrue(banner.waitForExistence(timeout: 5),
+                      "A finished realtime game opened from Home must preserve the banner.")
+        openLiveGameFromBanner()
         backToHome()
     }
 

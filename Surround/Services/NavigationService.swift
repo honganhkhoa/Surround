@@ -103,6 +103,16 @@ struct PendingGameOpen: Identifiable, Equatable {
     }
 }
 
+/// What a visible Game Detail shows, for the app's notices.
+struct GameDetailNotificationContext: Equatable {
+    /// The user's own unfinished live game on screen. The live-game notice
+    /// never points at it, and challenge notices wait during live play.
+    var ownLiveGame: GameID?
+    /// Its Active games picker lists the user's other live games, so the
+    /// live-game notice gives way to it.
+    var listsLiveGames = false
+}
+
 enum GameOpenResolutionSource: Equatable {
     case activeGame
     case sharedOverview
@@ -185,10 +195,10 @@ class NavigationService: ObservableObject {
         #endif
     }
     
-    /// Visible Game Detail owners, including UIKit-hosted tab content. True
-    /// means their picker covers the user's live games; correspondence and
-    /// spectator screens still need notices. Each window has its own service.
-    @Published var gameDetailNotificationContexts: [UUID: Bool] = [:]
+    /// Visible Game Detail owners, including UIKit-hosted tab content, and
+    /// what each shows; correspondence and spectator screens still need
+    /// notices. Each window has its own service.
+    @Published var gameDetailNotificationContexts: [UUID: GameDetailNotificationContext] = [:]
     /// The Reconnecting… badges each Game Detail context is rendering. The
     /// app's connection banner gives way only while a visible game shows one;
     /// in stone removal, after the game, in Analyze's glow-only chips or a
@@ -197,9 +207,28 @@ class NavigationService: ObservableObject {
     /// The app's connection banner is on screen, including its "Connected"
     /// fade-out. On iPhone it sits in the title slot, so the title gives way.
     @Published var connectionBannerVisible = false
-    /// The global message presenter and a visible game's native toolbar share
-    /// one presentation in this window.
+    /// The global message presenter is open in this window.
     @Published var showingPrivateChatView = false
+
+    /// The user plays a live game on screen; challenge notices wait for it.
+    /// Visible Game Details report this themselves, so a finished or
+    /// spectated live game opened from Home does not hide notices.
+    var visibleGameDetailPlaysLiveGame: Bool {
+        gameDetailNotificationContexts.values.contains { $0.ownLiveGame != nil }
+    }
+
+    /// The user's unfinished live games that no visible Game Detail shows or
+    /// lists in its Active games picker: the ones the live-game notice offers.
+    func liveGamesNeedingNotice(among liveGames: [Game]) -> [Game] {
+        let contexts = gameDetailNotificationContexts.values
+        guard !contexts.contains(where: \.listsLiveGames) else { return [] }
+        let onScreen = Set(contexts.compactMap(\.ownLiveGame))
+        // A `phase` event ends a game before its outcome or the service's
+        // list catches up; it must not be offered in that moment.
+        return liveGames.filter {
+            $0.gameData?.outcome == nil && $0.gamePhase != .finished && !onScreen.contains($0.ID)
+        }
+    }
 
     var visibleGameDetailShowsReconnectingBadge: Bool {
         gameDetailReconnectingBadges.contains { context, badges in

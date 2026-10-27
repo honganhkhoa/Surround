@@ -99,8 +99,10 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 currentPosition.gameScores = gameData?.score
 
                 pauseControl = data.pauseControl
-                clock = data.clock
-                
+                var newClock = data.clock
+                if data.phase != .finished { newClock.keepAutoResign(from: clock) }
+                clock = newClock
+
                 undoRequest = data.undoRequested
 
                 autoScoringDone = data.autoScoringDone
@@ -1004,6 +1006,36 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
         }
         
         self.clock?.autoResignTime.removeValue(forKey: playerColor)
+    }
+
+    /// A Rengo player dropped from a team takes their disconnection deadline
+    /// along: deadlines are kept by color, and a teammate now holds it. The
+    /// web client clears that color's countdown the same way.
+    func clearAutoResign(droppedIn update: OGSPlayerUpdate?) {
+        guard let dropped = update?.droppedPlayers, var clock else { return }
+        let colors = [StoneColor.black, .white].filter {
+            !dropped[$0].isEmpty && clock.autoResignTime[$0] != nil
+        }
+        guard !colors.isEmpty else { return }
+        for color in colors {
+            clock.autoResignTime.removeValue(forKey: color)
+            switch color {
+            case .black: clock.blackTimeUntilAutoResign = nil
+            case .white: clock.whiteTimeUntilAutoResign = nil
+            }
+        }
+        self.clock = clock
+    }
+
+    /// Drops every disconnection deadline, so a new subscription starts from
+    /// the server's state: one kept across clock updates may have gone stale,
+    /// since its clear_auto_resign could be sent while unsubscribed.
+    func clearAllAutoResign() {
+        guard var clock, !clock.autoResignTime.isEmpty else { return }
+        clock.autoResignTime = [:]
+        clock.blackTimeUntilAutoResign = nil
+        clock.whiteTimeUntilAutoResign = nil
+        self.clock = clock
     }
     
     var isUserPlaying: Bool {

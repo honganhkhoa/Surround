@@ -1041,6 +1041,10 @@ class OGSService: ObservableObject {
     private var desiredGameConnections = [Int: DesiredGameConnection]()
     private var connectedGames = [Int: Game]()
     private var connectedWithChat = [Int: Bool]()
+    /// Games whose subscription ended. Their disconnection deadlines, kept
+    /// across clock updates, may have gone stale meanwhile; the next gamedata
+    /// drops them, after the offline snapshot has stopped showing them.
+    private var gamesAwaitingAutoResignReset = Set<Int>()
     private var locallyReservedVariationNumbersByGameID = [Int: Set<Int>]()
     private enum GameResynchronizationState {
         case awaitingTargetedSnapshot
@@ -1617,6 +1621,7 @@ class OGSService: ObservableObject {
             markPendingGameResynchronizationsAsEscalated()
             // The transport has gone away, so none of these subscriptions are
             // currently active. Keep only explicit desired state for reconnect.
+            gamesAwaitingAutoResignReset.formUnion(connectedGames.keys)
             self.connectedGames.removeAll()
             self.connectedWithChat.removeAll()
         case "surround/socketOpened":
@@ -1843,6 +1848,9 @@ class OGSService: ObservableObject {
             }
             do {
                 let ogsGame = try dictionaryDecoder.decode(OGSGame.self, from: gameData)
+                if gamesAwaitingAutoResignReset.remove(ogsGameId) != nil {
+                    connectedGame.clearAllAutoResign()
+                }
                 connectedGame.gameData = ogsGame
                 let missingPlayers = connectedGame.unresolvedRengoPlayerIDs
                 unresolvedRengoPlayersAfterSnapshot[ogsGameId] = missingPlayers.isEmpty
@@ -1899,6 +1907,7 @@ class OGSService: ObservableObject {
                     OGSMoveExtra.self,
                     from: playerUpdate
                 ).playerUpdate
+                connectedGame.clearAutoResign(droppedIn: update)
                 if !connectedGame.rengo || update?.rengoTeams != nil {
                     connectedGame.latestPlayerUpdate = update
                 } else {
@@ -1920,7 +1929,9 @@ class OGSService: ObservableObject {
         case "clock":
             if let clockdata = data as? [String: Any] {
                 do {
-                    connectedGame.clock = try dictionaryDecoder.decode(OGSClock.self, from: clockdata)
+                    var clock = try dictionaryDecoder.decode(OGSClock.self, from: clockdata)
+                    clock.keepAutoResign(from: connectedGame.clock)
+                    connectedGame.clock = clock
                     if let pauseControl = connectedGame.clock?.pauseControl {
                         connectedGame.pauseControl = pauseControl
                     }
@@ -2038,6 +2049,7 @@ class OGSService: ObservableObject {
                 let decoder = DictionaryDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 if let playerUpdate = try? decoder.decode(OGSPlayerUpdate.self, from: update) {
+                    connectedGame.clearAutoResign(droppedIn: playerUpdate)
                     guard !connectedGame.rengo || playerUpdate.rengoTeams != nil else { return }
                     connectedGame.latestPlayerUpdate = playerUpdate
                     resynchronizeRengoPlayersIfNeeded(gameID: ogsGameId, game: connectedGame)
@@ -3858,6 +3870,7 @@ class OGSService: ObservableObject {
         )
         let wasConnected = connectedGames.removeValue(forKey: gameID) != nil
         let wasConnectedWithChat = connectedWithChat.removeValue(forKey: gameID) ?? false
+        if wasConnected { gamesAwaitingAutoResignReset.insert(gameID) }
 
         guard wasConnected, ogsWebsocket.opened else {
             return

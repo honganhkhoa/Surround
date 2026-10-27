@@ -536,6 +536,9 @@ struct GameControlPresentation: ViewModifier {
                 RematchChallengeSheet(challenge: presentation.challenge)
             }
             .alert(item: $state.confirmation, content: confirmationAlert)
+            .onChange(of: confirmationStillApplies) { _, applies in
+                if !applies { state.confirmation = nil }
+            }
             .onChange(of: game.ID, initial: true) { _, _ in
                 updateContext()
             }
@@ -546,6 +549,22 @@ struct GameControlPresentation: ViewModifier {
 
     private func updateContext() {
         state.updateContext(gameID: game.ID, accountID: ogs.user?.id)
+    }
+
+    /// A confirmation answers for the game as it stood when it was asked.
+    /// Once a move, a phase change or the result rules its action out, it
+    /// closes, and an answer already on its way is dropped.
+    private func stillApplies(_ kind: GameControlConfirmation.Kind) -> Bool {
+        switch kind {
+        case .pass: return game.gamePhase == .play && game.isUserTurn
+        case .resume: return game.isUserPlaying && game.gamePhase == .stoneRemoval
+        case .resign: return game.isUserPlaying && game.gamePhase != .finished
+        case .cancel: return game.isUserPlaying && game.canBeCancelled
+        }
+    }
+
+    private var confirmationStillApplies: Bool {
+        state.confirmation.map { stillApplies($0.kind) } ?? true
     }
 
     private func confirmationAlert(
@@ -586,7 +605,8 @@ struct GameControlPresentation: ViewModifier {
               state.matches(
                 gameID: confirmation.gameID,
                 accountID: confirmation.accountID
-              ), !state.blocksGameActions, ogs.socketStatus == .connected else { return }
+              ), !state.blocksGameActions, ogs.socketStatus == .connected,
+              stillApplies(confirmation.kind) else { return }
         switch confirmation.kind {
         case .pass:
             let pendingMove = pendingMove
@@ -611,6 +631,9 @@ struct GameControlPresentation: ViewModifier {
 private struct GameScoringRecoveryStatus: View {
     @ObservedObject var state: GameControlState
     let notice: GameControlState.ScoringNotice
+    // Read here, not by the row: SingleGameView builds the row only to take
+    // this banner from it, so the row's environment is never installed.
+    @EnvironmentObject private var ogs: OGSService
     @State private var showsExplanation = false
 
     private var explanation: LocalizedStringKey {
@@ -631,6 +654,9 @@ private struct GameScoringRecoveryStatus: View {
                         .labelStyle(.iconOnly).frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
+                    // Offline, Refresh could only fail again at once; the
+                    // recovery settles by itself on the gamedata after reconnecting.
+                    .disabled(ogs.socketStatus != .connected)
                     .accessibilityIdentifier("game.scoring.refresh")
             case .refreshing:
                 Text("Refreshing game…").frame(maxWidth: .infinity, alignment: .leading)

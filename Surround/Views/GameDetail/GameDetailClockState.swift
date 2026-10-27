@@ -7,6 +7,9 @@ struct GameDetailClockState {
     let color: StoneColor
     var clockOverride: OGSClock? = nil
     var isConnected = true
+    /// The socket is recovering a connection it had. Before the first one
+    /// (launch, sign-in) the badge reads Connecting…, as the app's banner does.
+    var recoversConnection = true
 
     var clock: OGSClock? { clockOverride ?? game.clock }
     var isFinished: Bool {
@@ -45,7 +48,10 @@ struct GameDetailClockState {
 
     func badgeTitle(narrow: Bool = false) -> String {
         guard !isFinished, !isScoring else { return "" }
-        if reconnecting { return String(localized: "Reconnecting…") }
+        if reconnecting {
+            return recoversConnection ? String(localized: "Reconnecting…")
+                : String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS")
+        }
         if ownsUndoRequest {
             return canAnswerUndo ? String(localized: "Undo?") : String(localized: "Undo asked")
         }

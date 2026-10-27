@@ -353,7 +353,8 @@ private struct GameDetailClockCard: View {
     @Environment(\.surroundTheme) private var theme
 
     private var state: GameDetailClockState {
-        .init(game: game, color: color, clockOverride: clockOverride, isConnected: isConnected)
+        .init(game: game, color: color, clockOverride: clockOverride, isConnected: isConnected,
+              recoversConnection: ogs.socketStatus == .reconnecting)
     }
     private var foreground: Color {
         theme.clockForeground(color, scheme: colorScheme)
@@ -475,7 +476,8 @@ private struct GameDetailClockCard: View {
         }
         .popover(isPresented: $showsDetails) {
             GameDetailClockDetails(game: game, showsClocks: revealsBothClocks || style == .inline,
-                                   clockOverride: clockOverride, isConnected: isConnected)
+                                   clockOverride: clockOverride, isConnected: isConnected,
+                                   recoversConnection: state.recoversConnection)
         }
     }
 
@@ -721,7 +723,9 @@ private struct GameDetailClockCard: View {
         }.max() ?? 0
         let statusWidth: CGFloat
         if showsStatus {
-            let titles = [String(localized: "Reconnecting…"), String(localized: "Undo?"),
+            let titles = [String(localized: "Reconnecting…"),
+                          String(localized: "Connecting…", comment: "Clock badge while the app first connects to OGS"),
+                          String(localized: "Undo?"),
                           String(localized: "Undo asked"), String(localized: "Passed"),
                           String(localized: "Not started"), String(localized: "To move"),
                           String(localized: "Teammate"), String(localized: "Your move", comment: "Game"),
@@ -1706,11 +1710,13 @@ private struct GameDetailClockDetails: View {
     var showsClocks = false
     var clockOverride: OGSClock?
     var isConnected = true
+    var recoversConnection = true
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         GameDetailInformationContent(game: game, showsClocks: showsClocks,
-                                     clockOverride: clockOverride, isConnected: isConnected)
+                                     clockOverride: clockOverride, isConnected: isConnected,
+                                     recoversConnection: recoversConnection)
             .padding(18)
             .modifier(GameDetailOpaquePopover(identifier: "game.details"))
             .environment(\.openPlayerProfile, openPlayerProfile.map { action in
@@ -1746,6 +1752,7 @@ private struct GameDetailInformationContent: View {
     var showsClocks = false
     var clockOverride: OGSClock?
     var isConnected = true
+    var recoversConnection = true
     @Environment(\.openPlayerProfile) private var openPlayerProfile
     @Environment(\.colorScheme) private var colorScheme
     @Setting(.hidesRank) private var hidesRank: Bool
@@ -1879,7 +1886,8 @@ private struct GameDetailInformationContent: View {
 
     @ViewBuilder private func clockReadout(_ color: StoneColor) -> some View {
         let state = GameDetailClockState(game: game, color: color,
-                                         clockOverride: clockOverride, isConnected: isConnected)
+                                         clockOverride: clockOverride, isConnected: isConnected,
+                                         recoversConnection: recoversConnection)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if state.isFinished {
                 Text(verbatim: state.resultTitle).font(.subheadline)

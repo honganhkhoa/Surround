@@ -63,6 +63,20 @@ struct OGSClock {
             return whitePlayerId
         }
     }
+
+    /// OGS reports disconnection deadlines only through `auto_resign` events;
+    /// clock and gamedata payloads never carry them. A replacement clock keeps
+    /// the previous ones until `clear_auto_resign`, as the web client does.
+    mutating func keepAutoResign(from previous: OGSClock?) {
+        guard let previous else { return }
+        for (color, time) in previous.autoResignTime where autoResignTime[color] == nil {
+            autoResignTime[color] = time
+            switch color {
+            case .black: blackTimeUntilAutoResign = previous.blackTimeUntilAutoResign
+            case .white: whiteTimeUntilAutoResign = previous.whiteTimeUntilAutoResign
+            }
+        }
+    }
 }
 
 extension OGSClock: Decodable {

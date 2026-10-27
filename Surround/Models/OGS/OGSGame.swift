@@ -115,13 +115,25 @@ struct OGSPlayerUpdate: Codable, Equatable {
         }
     }
     
+    /// The Rengo players this update removed from each team; either side may
+    /// be absent.
+    struct DroppedPlayers: Codable, Equatable {
+        var black: [Int]?
+        var white: [Int]?
+
+        subscript(color: StoneColor) -> [Int] {
+            (color == .black ? black : white) ?? []
+        }
+    }
+
     var players: Players?
     var rengoTeams: RengoTeams?
+    var droppedPlayers: DroppedPlayers?
 }
 
 extension OGSPlayerUpdate {
     private enum CodingKeys: String, CodingKey {
-        case players, rengoTeams
+        case players, rengoTeams, droppedPlayers
     }
 
     private struct TeamKey: CodingKey {
@@ -153,6 +165,8 @@ extension OGSPlayerUpdate {
         } else {
             rengoTeams = nil
         }
+        // Only clears disconnection deadlines; never reject the update over it.
+        droppedPlayers = try? container.decodeIfPresent(DroppedPlayers.self, forKey: .droppedPlayers)
     }
 }
 

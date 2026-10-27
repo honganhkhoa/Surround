@@ -1584,15 +1584,14 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
 
     func testPhoneNotificationAccess() {
         let app = launch()
+        // Messages use the app's notice row, which shows only for unread
+        // messages (SurroundUITests covers it over Game Detail); this fixture
+        // has none, so the toolbar is drawn without it.
         XCTAssertFalse(app.buttons["global.privateMessages"].exists,
                        "The design review fixture starts without private messages")
-        XCTAssertFalse(app.buttons["game.privateMessagesNotification"].exists,
-                       "Game Detail must not add a private-message toolbar control")
         keepScreenshot("game-settings-toolbar-without-message-badge", in: app)
         tap(ID.gameOptions, in: app, matching: .button)
         element(ID.screenGameOptions, in: app)
-        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "game.privateMessages").firstMatch.exists,
-                       "Game Settings contains gameplay preferences only")
         XCTAssertTrue(app.switches["Board coordinates"].exists)
         capture(1, app: app, note: "Settings contains gameplay preferences only, with no message route or added message toolbar control.",
                 suffix: "-notification-access")

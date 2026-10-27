@@ -638,10 +638,20 @@ struct GameDetailView: View {
         guard let currentGame = self.currentGame ?? departingGame else {
             return AnyView(EmptyView())
         }
-        let viewingOwnLiveGame = allowsActiveGamesCarousel
-            && currentGame.gamePhase != .finished
+        // A profile route has no picker, so the notice still points at the
+        // user's other live games, but never at the one on screen. Like the
+        // service's live list, a game without a speed tag counts by its clock.
+        let timeControl = currentGame.gameData?.timeControl
+        let viewingOwnLiveGame = currentGame.gamePhase != .finished
             && currentGame.isUserPlaying
-            && currentGame.gameData?.timeControl.speed?.isRealtime == true
+            && (timeControl?.speed ?? timeControl?.inferredSpeed(
+                boardWidth: currentGame.width, boardHeight: currentGame.height))?.isRealtime == true
+        let notificationContext = GameDetailNotificationContext(
+            ownLiveGame: viewingOwnLiveGame ? currentGame.ID : nil,
+            // The picker lists games by their tag only.
+            listsLiveGames: viewingOwnLiveGame && allowsActiveGamesCarousel
+                && timeControl?.speed?.isRealtime == true
+        )
 
         let showsActiveGamesButton = canShowActiveGames
         var title = currentGame.gameName?.trimmingCharacters(
@@ -734,15 +744,15 @@ struct GameDetailView: View {
         .navigationBarBackButtonHidden(navigationBarHidden)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            nav.gameDetailNotificationContexts[notificationContextID] = viewingOwnLiveGame
+            nav.gameDetailNotificationContexts[notificationContextID] = notificationContext
             updateActiveGameList()
             updateDetailOfCurrentGameIfNecessary()
         }
-        .onChange(of: viewingOwnLiveGame) { _, isViewingOwnLiveGame in
+        .onChange(of: notificationContext) { _, newContext in
             // A retained navigation destination can receive game updates
             // after disappearing. Only its visible registration owns notices.
             guard nav.gameDetailNotificationContexts[notificationContextID] != nil else { return }
-            nav.gameDetailNotificationContexts[notificationContextID] = isViewingOwnLiveGame
+            nav.gameDetailNotificationContexts[notificationContextID] = newContext
         }
         .onDisappear {
             nav.gameDetailNotificationContexts.removeValue(forKey: notificationContextID)
@@ -1376,14 +1386,6 @@ private struct GameToolbarLayout: ViewModifier {
             .toolbar(removing: isVerticalToolbar ? .title : nil)
             .environment(\.compactGameModesInToolbar, !zenMode)
             .toolbar {
-                if !nav.gameDetailNotificationContexts.isEmpty,
-                   PrivateMessageNotificationButton.isVisible(ogs: ogs, nav: nav) {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        PrivateMessageNotificationButton(isInToolbar: true)
-                            .tint(.orange)
-                            .modifier(GameToolbarMinimumTouchTarget())
-                    }
-                }
                 if zenMode {
                     if !exitsZenFromContent {
                         ToolbarItem(placement: .topBarTrailing) {
