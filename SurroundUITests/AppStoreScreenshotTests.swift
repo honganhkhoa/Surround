@@ -448,7 +448,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             object: personal
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [personalSelected], timeout: 10),
+            waitWithFinalCheck(for: [personalSelected], timeout: 10),
             .completed,
             "Expected Personal to be the selected chat channel.",
             file: file,
@@ -563,7 +563,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             object: selectedPosition
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [selected], timeout: 10),
+            waitWithFinalCheck(for: [selected], timeout: 10),
             .completed,
             "Expected the saved conditional variation to be selected",
             file: file,
@@ -1819,7 +1819,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             predicate: NSPredicate(format: "hittable == true"),
             object: element
         )
-        let result = XCTWaiter.wait(for: [hittable], timeout: 10)
+        let result = waitWithFinalCheck(for: [hittable], timeout: 10)
         XCTAssertEqual(
             result,
             .completed,

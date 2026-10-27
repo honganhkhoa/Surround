@@ -38,7 +38,7 @@ final class SceneActivationUITests: SurroundJourneyUITestCase {
         let activeProbe = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             probe.exists && (probe.value as? String)?.contains("\"isActive\":true") == true
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [activeProbe], timeout: 15), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [activeProbe], timeout: 15), .completed,
                        "Expected an active scene probe at \(stage).")
         let json = try XCTUnwrap(probe.value as? String)
         let attachment = XCTAttachment(string: json)

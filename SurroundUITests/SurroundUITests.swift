@@ -165,7 +165,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: menuItem
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout),
+            waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout),
             .completed,
             "Expected the Analyze menu to dismiss without selecting an action.",
             file: file,
@@ -463,7 +463,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             predicate: NSPredicate(format: "selected == true"),
             object: element
         )
-        guard XCTWaiter.wait(for: [selected], timeout: timeout) == .completed else {
+        guard waitWithFinalCheck(for: [selected], timeout: timeout) == .completed else {
             return false
         }
 
@@ -644,15 +644,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         in app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date(timeIntervalSinceNow: timeout)
-        repeat {
-            if chatInputHasKeyboardFocus(in: app) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        return false
+        pollUntil(timeout: timeout) { chatInputHasKeyboardFocus(in: app) }
     }
 
     private func focusSharedVariationInput(
@@ -1012,7 +1004,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 },
                 object: nil
             )
-            _ = XCTWaiter.wait(for: [ready], timeout: 10)
+            _ = waitWithFinalCheck(for: [ready], timeout: 10)
             // An accessibility query can outlast the waiter's deadline even
             // when the transition succeeded. Accept the fresh exact state.
             let after = observeSelection()
@@ -1250,7 +1242,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             let dismissed = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: done
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
+            XCTAssertEqual(waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout), .completed)
             let messages = element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
             XCTAssertTrue(waitUntilHittable(messages, timeout: 10),
                           "Dismissing the account sheet must retain the selected Messages destination.")
@@ -1453,19 +1445,19 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             predicate: NSPredicate(format: "selected == true"),
             object: custom
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [customSelected], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [customSelected], timeout: 10), .completed)
         element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
         let quickMatchHidden = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"),
             object: quickMatchScroll
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [quickMatchHidden], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [quickMatchHidden], timeout: 10), .completed)
         activate(quickMatch)
         let quickMatchSelected = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "selected == true"),
             object: quickMatch
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [quickMatchSelected], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [quickMatchSelected], timeout: 10), .completed)
         XCTAssertTrue(quickMatchScroll.waitForExistence(timeout: 10))
 
         let liveTab = element(
@@ -1701,7 +1693,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: banner
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [firstBatch], timeout: 5),
+            waitWithFinalCheck(for: [firstBatch], timeout: 5),
             .completed,
             "Each requested correspondence game must create a separate search."
         )
@@ -1742,7 +1734,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: banner
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [bothBatches], timeout: 5),
+            waitWithFinalCheck(for: [bothBatches], timeout: 5),
             .completed,
             "Repeating a batch must add searches without replacing the first batch."
         )
@@ -1772,7 +1764,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             predicate: NSPredicate(format: "label == %@", "Starting searches…"),
             object: find
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [starting], timeout: 5), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [starting], timeout: 5), .completed)
         XCTAssertFalse(find.isEnabled, "Awaiting acknowledgement must prevent duplicate submissions.")
         XCTAssertFalse(gameCount.isEnabled)
         XCTAssertTrue(element(SurroundUITestContract.AccessibilityID.quickMatchWaitingBanner, in: app)
@@ -2135,7 +2127,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         tap(nextGame, description: "Switch to the second correspondence game", in: app)
         element(SurroundUITestContract.AccessibilityID.gameDetail(gameIDs[1]), in: app)
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: popover)
-        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [dismissed], timeout: 10), .completed)
         XCTAssertFalse(carousel.exists, "Selecting a game must return to its unobstructed board.")
         openActiveGames()
         let reopened = element(SurroundUITestContract.AccessibilityID.gameActiveGamesPopover, in: app)
@@ -2148,7 +2140,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let reopenedDismissed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: reopened
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [reopenedDismissed], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [reopenedDismissed], timeout: 10), .completed)
     }
 
     func testGameMessageNotificationUsesToolbarWithoutCoveringClocks() {
@@ -2289,7 +2281,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             },
             object: nil
         )
-        guard XCTWaiter.wait(for: [aboutReady], timeout: 10) == .completed,
+        guard waitWithFinalCheck(for: [aboutReady], timeout: 10) == .completed,
               let aboutTab else {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "Accessibility hierarchy – About navigation unavailable"
@@ -2450,7 +2442,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: thirteen
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [flipped], timeout: 5),
+            waitWithFinalCheck(for: [flipped], timeout: 5),
             .completed,
             "A board size must respond while searches are being restored."
         )
@@ -2550,7 +2542,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let profileWasPopped = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: profile
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [profileWasPopped], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [profileWasPopped], timeout: 10), .completed)
 
         // A REST-only route fails deterministically, then returns to the
         // existing Home context. Do not assert the transient loading overlay:
@@ -2619,7 +2611,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: error
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [errorDisappeared], timeout: 10),
+            waitWithFinalCheck(for: [errorDisappeared], timeout: 10),
             .completed,
             "Expected the history error to disappear after Retry succeeds."
         )
@@ -2898,7 +2890,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: shareVariation
         )
         XCTAssertEqual(
-            XCTWaiter.wait(
+            waitWithFinalCheck(
                 for: [shareableVariationSelected],
                 timeout: 10
             ),
@@ -3099,7 +3091,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: secondPreview
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [secondPreviewGone], timeout: 10),
+            waitWithFinalCheck(for: [secondPreviewGone], timeout: 10),
             .completed,
             "Expected Send to dismiss the compact sharing preview."
         )
@@ -3193,7 +3185,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
                 object: analyzeControlBar
             )
             XCTAssertEqual(
-                XCTWaiter.wait(for: [exitedAnalyze], timeout: 10),
+                waitWithFinalCheck(for: [exitedAnalyze], timeout: 10),
                 .completed,
                 "Selecting a chat preview should exit Analyze mode"
             )
@@ -4036,7 +4028,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: addAfterRemoval
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [removedConditionalState], timeout: 10),
+            waitWithFinalCheck(for: [removedConditionalState], timeout: 10),
             .completed,
             "Expected the server echo to remove the selected conditional variation."
         )
@@ -4085,7 +4077,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: selectedNode
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [restoredConditionalState], timeout: stateSettleTimeout),
+            waitWithFinalCheck(for: [restoredConditionalState], timeout: stateSettleTimeout),
             .completed,
             "Expected the server echo to restore the selected conditional variation."
         )
@@ -4205,7 +4197,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: selectedNode
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [deleted], timeout: 10),
+            waitWithFinalCheck(for: [deleted], timeout: 10),
             .completed,
             "Expected coordinated deletion to remove the selected branch after the server echo."
         )
@@ -4381,7 +4373,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: deletedPosition
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [deleted], timeout: 10),
+            waitWithFinalCheck(for: [deleted], timeout: 10),
             .completed,
             "Expected the deleted analysis position to disappear"
         )
@@ -4530,7 +4522,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: sharingCancel
         )
         XCTAssertEqual(
-            XCTWaiter.wait(
+            waitWithFinalCheck(
                 for: [
                     sharingTitleGone,
                     sharingPreviewGone,
@@ -4997,7 +4989,7 @@ final class SurroundUITests: SurroundJourneyUITestCase {
             object: sharingCancel
         )
         XCTAssertEqual(
-            XCTWaiter.wait(
+            waitWithFinalCheck(
                 for: [
                     sharingTitleGone,
                     sharingPreviewGone,

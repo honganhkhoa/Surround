@@ -288,7 +288,7 @@ final class CompatibilityScreenshotTests: SurroundUITestCase {
                     object: app
                 )
                 XCTAssertEqual(
-                    XCTWaiter.wait(for: [sheetDismissed], timeout: 10),
+                    waitWithFinalCheck(for: [sheetDismissed], timeout: 10),
                     .completed,
                     "Closing \(scene.rawValue) must return to Home without reopening the sheet or retaining its readiness marker."
                 )

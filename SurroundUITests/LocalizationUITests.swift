@@ -522,7 +522,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             return stableSamples >= 3
                 && Date().timeIntervalSince(stableSince ?? Date()) >= 0.75
         }, object: nil)
-        let settled = XCTWaiter.wait(for: [stable], timeout: stateSettleTimeout) == .completed
+        let settled = waitWithFinalCheck(for: [stable], timeout: stateSettleTimeout) == .completed
         XCTAssertTrue(settled,
                       "The conditional-moves button must retain a stable frame inside visible Home content before tapping.")
         guard settled else { return false }

@@ -60,7 +60,7 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "isSelected == %@", NSNumber(value: selected)), object: option
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [expectation], timeout: 5), .completed,
                        "\(option.identifier) should\(selected ? "" : " not") be selected", file: file, line: line)
     }
 

@@ -151,7 +151,7 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         let expected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             collapsed ? !probe.isHittable : probe.isHittable
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 8), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [expected], timeout: 8), .completed)
     }
 
     // iPadOS can move these native toolbar items into its overflow menu at

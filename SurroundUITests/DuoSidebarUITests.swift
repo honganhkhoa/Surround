@@ -48,7 +48,7 @@ final class DuoSidebarUITests: SurroundJourneyUITestCase {
         let sidebarReady = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hittable == true"), object: settings
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [sidebarReady], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [sidebarReady], timeout: 10), .completed)
         let editButtons = app.buttons.matching(NSPredicate(
             format: "label IN %@", ["Edit", "Edit Sidebar", "Edit sidebar"]
         ))
@@ -68,7 +68,7 @@ final class DuoSidebarUITests: SurroundJourneyUITestCase {
         let sidebarClosed = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in !settings.isHittable }, object: nil
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [sidebarClosed], timeout: 10), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [sidebarClosed], timeout: 10), .completed,
                        "Selecting a destination must close the overlay sidebar.")
         selectMainNavigation(SurroundUITestContract.AccessibilityID.navigationAbout, in: app)
         element(SurroundUITestContract.AccessibilityID.screenAbout, in: app)

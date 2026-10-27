@@ -2716,10 +2716,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForCondition { !alert.exists })
     }
 
-    /// Waits up to stateSettleTimeout by default: a predicate wait has no
-    /// final re-check, so one stalled snapshot could use up 10 seconds.
+    /// Waits up to stateSettleTimeout by default: one stalled snapshot can
+    /// take most of 10 seconds.
     private func waitForCondition(timeout: TimeInterval? = nil, _ condition: @escaping () -> Bool) -> Bool {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout ?? stateSettleTimeout) == .completed
+        return waitWithFinalCheck(for: [expectation], timeout: timeout ?? stateSettleTimeout) == .completed
     }
 }

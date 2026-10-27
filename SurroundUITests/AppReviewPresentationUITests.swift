@@ -23,7 +23,7 @@ final class AppReviewPresentationUITests: SurroundJourneyUITestCase {
             let settled = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "value == %@", expected), object: status
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 10), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [settled], timeout: 10), .completed,
                            "The scene must receive the hosted presentation state: \(expected); actual: \(String(describing: status.value)).")
         }
 
@@ -72,7 +72,7 @@ final class AppReviewPresentationUITests: SurroundJourneyUITestCase {
             back = backs.allElementsBoundByIndex.first(where: { $0.isHittable })
             return back != nil
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [visibleBack], timeout: 10), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [visibleBack], timeout: 10), .completed,
                        "Expected the game toolbar's visible Back control.")
         if let back { tap(back, description: "Return to Home", in: app) }
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)

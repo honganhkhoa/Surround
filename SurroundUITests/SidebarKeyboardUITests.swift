@@ -162,7 +162,7 @@ final class SidebarKeyboardUITests: SurroundJourneyUITestCase {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in condition() }, object: nil
         )
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        return waitWithFinalCheck(for: [expectation], timeout: timeout) == .completed
     }
 
     private func recordLayout(_ phase: String, app: XCUIApplication, composer: XCUIElement) {

@@ -96,7 +96,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             object: element
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [matches], timeout: 10), .completed,
+            waitWithFinalCheck(for: [matches], timeout: 10), .completed,
             "Expected \(property) to remain \(value.debugDescription).",
             file: file, line: line
         )
@@ -191,7 +191,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             predicate: NSPredicate(format: "enabled == true"), object: previous
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [enabled], timeout: 10), .completed,
+            waitWithFinalCheck(for: [enabled], timeout: 10), .completed,
             "Initial Analyze must select the current position before any user interaction."
         )
 
@@ -257,7 +257,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             return value.count == draft.count + 1
                 && value.replacingOccurrences(of: ".", with: "") == draft
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [edited], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [edited], timeout: 10), .completed)
     }
 
     func testFocusedChatTabRoundTripKeepsDraftWithoutRestoringKeyboard() {
@@ -325,7 +325,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
                     && window.contains(board.frame) && window.contains(returnButton.frame)
                     && returnButton.frame.maxY <= board.frame.minY + 1
             }, object: nil)
-            let result = XCTWaiter.wait(for: [fits], timeout: 10)
+            let result = waitWithFinalCheck(for: [fits], timeout: 10)
             keepScreenshot("Chat preview – largest Dynamic Type – \(orientation.rawValue)", in: app)
             XCTAssertEqual(result, .completed,
                            "The full board and preview action must fit without overlapping at the largest text size. Window: \(app.windows.firstMatch.frame); board: \(board.frame); return: \(returnButton.frame).")
@@ -432,7 +432,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         let portrait = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             app.frame.height > app.frame.width
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [portrait], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [portrait], timeout: 10), .completed)
         assertProperty("value", equals: markedBoard, of: element(ID.gameBoard, in: app))
         assertProperty("value", equals: markerTool, of: element(ID.gameAnalyzeMarkerMenu, in: app))
         XCTAssertFalse(app.textFields[ID.gameChatInput].exists)
@@ -446,7 +446,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         let landscape = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             app.frame.width > app.frame.height
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 10), .completed)
+        XCTAssertEqual(waitWithFinalCheck(for: [landscape], timeout: 10), .completed)
         assertProperty("value", equals: draft, of: element(ID.gameChatInput, in: app, matching: .textField))
         XCTAssertFalse(chatInputHasKeyboardFocus(in: app))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: ID.gameAnalyzeControlBar).firstMatch.exists)

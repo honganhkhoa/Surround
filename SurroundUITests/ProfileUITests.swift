@@ -179,7 +179,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let value = search.value as? String ?? ""
             return value == query || (query.isEmpty && value == search.placeholderValue)
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: stateSettleTimeout), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [changed], timeout: stateSettleTimeout), .completed,
                        "The picker should retain the requested search text.")
     }
 
@@ -196,7 +196,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let changed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", labels[state] ?? state), object: action
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: stateSettleTimeout), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [changed], timeout: stateSettleTimeout), .completed,
                       "Expected the profile's friendship state to become \(state).")
         return action
     }
@@ -270,7 +270,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let dismissed = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: confirmation
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
+            XCTAssertEqual(waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout), .completed)
             element(identifier, in: app)
             return
         }
@@ -284,7 +284,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let request = app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.profileFriendRequest).firstMatch
         let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: request)
-        XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: timeout), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [removed], timeout: timeout), .completed,
                        "A completed request must leave the sender profile's incoming-request banner.")
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID)].exists)
         XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.friendRequestReject(playerID)].exists)
@@ -323,7 +323,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let dismissed = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: done
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout), .completed,
                            "Done must dismiss the account sheet.")
             element(destinationID, in: app)
             // A screen's identifier also marks containers inside it, and the
@@ -333,7 +333,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let revealed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 destinations.allElementsBoundByIndex.contains { $0.isHittable }
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [revealed], timeout: stateSettleTimeout), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [revealed], timeout: stateSettleTimeout), .completed,
                            "Done must reveal the previously selected primary tab.")
             assertAccountTabsAbsent()
         }
@@ -369,7 +369,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 entry = visibleSidebarRow(identifier)
                 return entry != nil
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [ready], timeout: stateSettleTimeout), .completed,
                            "The native \(title) sidebar row must remain available.")
             guard let entry,
                   let messages = sidebarRow(id.navigationMessages),
@@ -397,7 +397,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 return active.count == 1 && active[0].placeholderValue == "Message hakhoa"
                     && active[0].value as? String == draft
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [ready], timeout: stateSettleTimeout), .completed,
                            "The selected Messages peer and its unsent draft must survive the sheet.")
             let selectedPeer = element(id.profileMessageToolbarEntry(peerID), in: app)
             XCTAssertTrue(selectedPeer.isHittable && selectedPeer.label.contains("hakhoa"))
@@ -561,7 +561,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let settingsDismissed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: settingsScreen
         )
-        let dismissalResult = XCTWaiter.wait(for: [settingsDismissed], timeout: stateSettleTimeout)
+        let dismissalResult = waitWithFinalCheck(for: [settingsDismissed], timeout: stateSettleTimeout)
         recordSettingsDismissalState("after Done wait: \(dismissalResult)")
         if dismissalResult != .completed {
             keepScreenshot("Settings dismissal failed after Done", in: app)
@@ -874,8 +874,8 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let secondID = SurroundUITestContract.AccessibilityID.profileHistoryGame(ids[1])
         let first = revealProfileControl(firstID, in: app)
         let previewFailed = NSPredicate(format: "label CONTAINS %@", "Board unavailable")
-        expectation(for: previewFailed, evaluatedWith: first)
-        waitForExpectations(timeout: stateSettleTimeout)
+        XCTAssertEqual(waitWithFinalCheck(for: [XCTNSPredicateExpectation(predicate: previewFailed, object: first)],
+                                          timeout: stateSettleTimeout), .completed)
         XCTAssertTrue(first.label.contains("Lost"))
         XCTAssertTrue(first.label.contains("by resignation"))
         XCTAssertTrue(first.label.contains("Board unavailable"),
@@ -1315,7 +1315,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let dismissed = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: done
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
+            XCTAssertEqual(waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout), .completed)
         } else if usesAccountMenu {
             navigateBackFromPlayerProfile(in: app)
         } else {
@@ -1364,7 +1364,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 visibleTab = tabs.allElementsBoundByIndex.first(where: { $0.isHittable })
                 return visibleTab != nil
             }, object: nil)
-            guard XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout) == .completed,
+            guard waitWithFinalCheck(for: [ready], timeout: stateSettleTimeout) == .completed,
                   let tab = visibleTab else {
                 return XCTFail("Expected a visible tab: \(identifier)")
             }

@@ -70,7 +70,7 @@ final class DuoProfileSidebarUITests: SurroundJourneyUITestCase {
         let leftProfile = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: profileScreen
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [leftProfile], timeout: 10), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [leftProfile], timeout: 10), .completed,
                        "Selecting Home must leave the own Profile tab after repeated sidebar toggles.")
         assertSidebarCollapsed(settings)
         keepScreenshot("Home after own Profile sidebar round trips", in: app)
@@ -158,7 +158,7 @@ final class DuoProfileSidebarUITests: SurroundJourneyUITestCase {
             let returned = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: profileScreen
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed,
+            XCTAssertEqual(waitWithFinalCheck(for: [returned], timeout: 10), .completed,
                            "The visible Back control must pop the profile after sidebar round trips.")
             element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
             XCTAssertEqual(board.value as? String, boardValue,
@@ -202,7 +202,7 @@ final class DuoProfileSidebarUITests: SurroundJourneyUITestCase {
             back = candidates.allElementsBoundByIndex.first(where: { $0.isHittable })
             return back != nil
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 10), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [visible], timeout: 10), .completed,
                       "A pushed profile must retain a visible, usable Back control.")
         guard let back else { return nil }
         XCTAssertGreaterThan(back.frame.width, 0)
@@ -219,7 +219,7 @@ final class DuoProfileSidebarUITests: SurroundJourneyUITestCase {
         let collapsed = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in !settings.exists || !settings.isHittable }, object: nil
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 10), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [collapsed], timeout: 10), .completed,
                        "Closing the native sidebar must complete on the retained destination.")
     }
 
@@ -242,7 +242,7 @@ final class DuoProfileSidebarUITests: SurroundJourneyUITestCase {
             previous = frame
             return consecutive >= 3
         }, object: nil)
-        let result = XCTWaiter.wait(for: [settled], timeout: 10)
+        let result = waitWithFinalCheck(for: [settled], timeout: 10)
         if result != .completed { keepWindowGeometryDiagnostic(for: element, in: app) }
         XCTAssertEqual(result, .completed,
                        "The loaded profile's observable body frame must settle inside the native window. \(windowGeometryDescription(for: element, in: app))")

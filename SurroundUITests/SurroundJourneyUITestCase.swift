@@ -241,8 +241,8 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        // A predicate wait has no final re-check, so one stalled snapshot on a
-        // hosted runner could use up a 10-second window.
+        // One stalled snapshot on a hosted runner can take most of a
+        // 10-second window, so allow the longer settle time.
         let isHittable = waitUntilHittable(element, timeout: stateSettleTimeout)
         if !isHittable {
             let hierarchy = XCTAttachment(
@@ -285,7 +285,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             predicate: NSPredicate(format: "hittable == true"),
             object: element
         )
-        return XCTWaiter.wait(for: [hittable], timeout: timeout) == .completed
+        return waitWithFinalCheck(for: [hittable], timeout: timeout) == .completed
     }
 
     @discardableResult
@@ -580,7 +580,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             predicate: NSPredicate(format: "value == %@", value),
             object: textField
         )
-        return XCTWaiter.wait(for: [completeValue], timeout: timeout) == .completed
+        return waitWithFinalCheck(for: [completeValue], timeout: timeout) == .completed
     }
 
     func assertSelected(
@@ -600,7 +600,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: selectedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [selected], timeout: stateSettleTimeout),
+            waitWithFinalCheck(for: [selected], timeout: stateSettleTimeout),
             .completed,
             "Expected element with identifier \(identifier) to be selected",
             file: file,
@@ -625,7 +625,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: selectedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [notSelected], timeout: stateSettleTimeout),
+            waitWithFinalCheck(for: [notSelected], timeout: stateSettleTimeout),
             .completed,
             "Expected element with identifier \(identifier) not to be selected",
             file: file,
@@ -1026,7 +1026,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         }
         func waitForEntry() -> Bool {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in visibleEntry() }, object: nil)
-            return XCTWaiter.wait(for: [ready], timeout: 10) == .completed
+            return waitWithFinalCheck(for: [ready], timeout: 10) == .completed
         }
         if !waitForEntry(), let sidebar = nativeSidebarToggle(in: app) {
             tap(sidebar, description: "Show navigation sidebar", in: app)
@@ -1053,7 +1053,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             !previous.exists || !entry.isHittable || entry.isSelected
         }, object: nil)
-        guard XCTWaiter.wait(for: [settled], timeout: 10) != .completed,
+        guard waitWithFinalCheck(for: [settled], timeout: 10) != .completed,
               previous.exists, entry.isHittable, !entry.isSelected else { return }
         XCTContext.runActivity(named: "Retry selecting \(identifier); another entry stayed selected") { _ in
             activate(entry)
@@ -1093,7 +1093,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             account.exists || profile.exists || app.tabBars.buttons["Profile"].exists
                 || app.buttons["Toggle sidebar"].exists
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [navigationReady], timeout: stateSettleTimeout), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [navigationReady], timeout: stateSettleTimeout), .completed,
                        "Expected the account menu or Profile navigation to appear.")
         if account.exists {
             tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
@@ -1123,7 +1123,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: presentedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed,
+            waitWithFinalCheck(for: [dismissed], timeout: stateSettleTimeout), .completed,
             "Expected the popover or menu to dismiss."
         )
         // Menu disappearance alone would also pass after an accidental tap on
@@ -1195,7 +1195,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 visibleBack = button
                 return true
             }, object: nil)
-            let readiness = XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout)
+            let readiness = waitWithFinalCheck(for: [ready], timeout: stateSettleTimeout)
             if readiness != .completed {
                 let hierarchy = XCTAttachment(string: """
                     Profile-owning Duo windows: \(owningWindowCount)
@@ -1225,7 +1225,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             // content, rather than the title, must leave the visible stack.
             object: profileScreen
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: stateSettleTimeout), .completed,
+        XCTAssertEqual(waitWithFinalCheck(for: [returned], timeout: stateSettleTimeout), .completed,
                        "Back must pop the profile and reveal its originating page.",
                        file: file, line: line)
     }

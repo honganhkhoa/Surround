@@ -632,6 +632,41 @@ class SurroundUITestCase: XCTestCase {
         add(hierarchy)
     }
 
+    /// `XCTWaiter.wait` plus one direct evaluation when it times out. A
+    /// predicate expectation evaluates only while time remains, so on hosted
+    /// runners a single accessibility query that stalled for 29 s used up a
+    /// 30 s wait although the app had reached the expected state (October
+    /// 2026). The final evaluation has no deadline of its own.
+    func waitWithFinalCheck(
+        for expectations: [XCTNSPredicateExpectation],
+        timeout: TimeInterval
+    ) -> XCTWaiter.Result {
+        let result = XCTWaiter.wait(for: expectations, timeout: timeout)
+        guard result == .timedOut,
+              expectations.allSatisfy({ passesFinalCheck($0) })
+        else { return result }
+        XCTContext.runActivity(named: "A \(Int(timeout)) s wait timed out, but its condition held on a final check") { _ in }
+        return .completed
+    }
+
+    /// Evaluates an expectation's predicate once, outside its waiter. The
+    /// waiter reads an element's attributes in a safe mode where a missing
+    /// element simply does not match; read directly, the same attributes
+    /// record a test failure. Anything this check cannot read the waiter's
+    /// way keeps the timeout.
+    func passesFinalCheck(_ expectation: XCTNSPredicateExpectation) -> Bool {
+        let predicate = expectation.predicate
+        guard let element = expectation.object as? XCUIElement else {
+            return predicate.evaluate(with: expectation.object)
+        }
+        // Here a block predicate reads its elements outside safe mode.
+        if predicate.predicateFormat.hasPrefix("BLOCKPREDICATE") {
+            return element.exists && predicate.evaluate(with: element)
+        }
+        let attributes = FinalCheckAttributes(element)
+        return predicate.evaluate(with: attributes) && !attributes.isUnreadable
+    }
+
     func pollUntil(
         timeout: TimeInterval,
         condition: () -> Bool
@@ -644,5 +679,45 @@ class SurroundUITestCase: XCTestCase {
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.25))
         } while Date() < deadline
         return condition()
+    }
+}
+
+/// An element's attributes for a final check, each read only when the
+/// predicate asks for it. A missing element reads as absent, like the
+/// waiter's safe mode. For an existing one, hittability comes from the
+/// element as the waiter reads it, and everything else from a snapshot,
+/// which throws rather than recording a failure; if that or a key fails,
+/// the check is unreadable.
+private final class FinalCheckAttributes: NSObject {
+    private let element: XCUIElement
+    @objc let exists: Bool
+    private(set) var isUnreadable = false
+    private lazy var snapshot: (any XCUIElementSnapshot)? = {
+        guard exists else { return nil }
+        do {
+            return try element.snapshot()
+        } catch {
+            isUnreadable = true
+            return nil
+        }
+    }()
+
+    init(_ element: XCUIElement) {
+        self.element = element
+        exists = element.exists
+        super.init()
+    }
+
+    @objc var isHittable: Bool { exists && element.isHittable }
+    @objc var isSelected: Bool { snapshot?.isSelected ?? false }
+    @objc var isEnabled: Bool { snapshot?.isEnabled ?? false }
+    @objc var value: Any? { snapshot?.value }
+    @objc var label: String? { snapshot?.label }
+    @objc var identifier: String? { snapshot?.identifier }
+    @objc var placeholderValue: String? { snapshot?.placeholderValue }
+
+    override func value(forUndefinedKey key: String) -> Any? {
+        isUnreadable = true
+        return nil
     }
 }
