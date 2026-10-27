@@ -196,7 +196,7 @@ struct GameCell: View {
 
     private var boardContent: some View {
         ZStack {
-            BoardView(boardPosition: game.currentPosition)
+            PositionBoardView(boardPosition: game.currentPosition).equatable()
             if game.gameData == nil {
                 Color(UIColor.systemBackground).opacity(0.65)
                 ProgressView()

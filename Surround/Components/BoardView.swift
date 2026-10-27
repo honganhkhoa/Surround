@@ -700,7 +700,7 @@ private struct FrostedBoardEdge: View {
     }
 }
 
-private struct ImageStone {
+private struct ImageStone: Equatable {
     var rect: CGRect
     var color: StoneColor
     var isRemoved: Bool
@@ -710,8 +710,10 @@ private struct ImageStone {
 
 /// Rendered stones in one Canvas, so a full board is a few dozen image draws
 /// rather than a view per stone. Shadows are batched below all stones,
-/// following the images' key-light direction.
-private struct ImageStoneCanvas: View {
+/// following the images' key-light direction. Equatable: a Canvas redraws
+/// whenever its view updates, so an unchanged board (a clock tick on a row
+/// or in Game Detail) must not repaint its stones and their blurred shadows.
+private struct ImageStoneCanvas: View, Equatable {
     var stones: [ImageStone]
     var images: StoneImages?
     var cellSize: CGFloat
@@ -976,6 +978,7 @@ struct Stones: View {
                                  lightDirection: appearance.stoneLightDirection,
                                  shadowStyle: appearance.imageStoneShadow,
                                  blackPalette: black, whitePalette: white)
+                .equatable()
             }
             
             if boardPosition.removedStones != nil {
@@ -1446,6 +1449,26 @@ private struct BoardMarkupEditingOverlay: View {
         }
         selectionFeedbackGenerator?.selectionChanged()
         #endif
+    }
+}
+
+/// A board that shows a position and nothing else, as in list rows and
+/// cards. A live game's row re-renders on every clock tick; compared by the
+/// position it shows, the board is skipped then instead of redrawing its
+/// stones. It still follows the position's own changes and the theme. Its
+/// own compositing group keeps the render server from redrawing its stones'
+/// shadows when the row's clock text changes beside it. (A geometry group
+/// would too, but it moves the grid by a pixel on fractional positions.)
+struct PositionBoardView: View, Equatable {
+    let boardPosition: BoardPosition
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.boardPosition === rhs.boardPosition
+    }
+
+    var body: some View {
+        BoardView(boardPosition: boardPosition)
+            .compositingGroup()
     }
 }
 

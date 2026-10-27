@@ -146,7 +146,7 @@ struct WelcomeView: View {
     private func publicGameBoards(_ fit: BoardFit) -> some View {
         HStack(spacing: boardSpacing) {
             ForEach(publicGames.prefix(fit.columns)) { game in
-                BoardView(boardPosition: game.currentPosition)
+                PositionBoardView(boardPosition: game.currentPosition).equatable()
                     .frame(width: fit.side, height: fit.side)
             }
         }

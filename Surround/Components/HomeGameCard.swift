@@ -520,7 +520,7 @@ private struct HomeBoardButton: View {
         Button(action: opensGame) {
             ZStack {
                 ZStack {
-                    BoardView(boardPosition: game.currentPosition)
+                    PositionBoardView(boardPosition: game.currentPosition).equatable()
                     if game.gameData == nil {
                         Rectangle().fill(GameDetailSurfaceStyle(role: .panel).opacity(0.65))
                         ProgressView()

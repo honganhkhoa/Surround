@@ -136,7 +136,7 @@ private struct ActiveGamePopoverEntry: View {
                     } else {
                         theme.idleGameMark(scheme: colorScheme)
                     }
-                    BoardView(boardPosition: game.currentPosition)
+                    PositionBoardView(boardPosition: game.currentPosition).equatable()
                         .frame(width: cellSize, height: cellSize)
                         .padding(.horizontal, 5)
                     if isSelected {

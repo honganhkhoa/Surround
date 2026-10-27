@@ -216,7 +216,7 @@ struct HistoryGameCell: View {
     @ViewBuilder
     private var boardPreview: some View {
         if let position = game.finishedHistoryPosition {
-            BoardView(boardPosition: position)
+            PositionBoardView(boardPosition: position).equatable()
         } else {
             VStack(spacing: 8) {
                 if game.historyDetailState == .unavailable {
