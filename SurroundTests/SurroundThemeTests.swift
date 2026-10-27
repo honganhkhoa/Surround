@@ -1420,9 +1420,9 @@ final class SurroundThemeTests: XCTestCase {
         for stone in [board.black, board.white] {
             XCTAssertGreaterThan(contrast(stone.lastMove, stone.flat), 4.5)
             XCTAssertGreaterThan(contrast(stone.label, stone.flat), 4.5)
-            XCTAssertGreaterThan(contrast(stone.territoryMark, board.boardColor), 3)
+            XCTAssertGreaterThan(max(contrast(stone.territoryMark, board.boardColor),
+                                     contrast(board.scoreMarkOutline(on: nil), board.boardColor)), 3)
         }
-        XCTAssertGreaterThan(contrast(board.black.territoryMark, board.white.territoryMark), 2)
         let keyline = try XCTUnwrap(theme.treeMarkKeyline)
         XCTAssertGreaterThan(contrast(theme.selectionMark, theme.panel), 3)
         XCTAssertGreaterThan(contrast(theme.selectionMark, keyline), 3)
@@ -1436,6 +1436,20 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertGreaterThan(contrast(board.removeMark, casing), 3)
         XCTAssertGreaterThan(contrast(board.restoreMark, casing), 3)
         XCTAssertGreaterThan(contrast(try XCTUnwrap(board.removedStoneOutline), board.boardColor), 3)
+    }
+
+    func testStudioTerritoryOwnersStayDistinctInBothAppearances() {
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            let board = SurroundTheme.surroundStudio.board(for: style == .dark ? .dark : .light)
+            XCTAssertGreaterThanOrEqual(contrast(board.black.territoryMark, board.white.territoryMark,
+                                                style: style), 12,
+                                       "Territory owners must remain distinct in small filled squares")
+            XCTAssertLessThan(luminance(board.black.territoryMark, style: style),
+                              luminance(board.boardColor, style: style))
+            XCTAssertGreaterThan(luminance(board.white.territoryMark, style: style),
+                                 luminance(board.boardColor, style: style),
+                                 "White ownership should read as light shell, not another dark pigment")
+        }
     }
 
     func testStudioControlFallbacksKeepReadableText() throws {

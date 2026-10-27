@@ -441,7 +441,8 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     outline: Color(themeHex: 0x1C2021),
                     rim: Color(themeHex: 0x7C8280).opacity(0.4),
                     lastMove: Color(themeHex: 0xFFF9ED),
-                    label: Color(themeHex: 0xFFF9ED)
+                    label: Color(themeHex: 0xFFF9ED),
+                    territory: Color(themeHex: 0x181D20)
                 ),
                 white: StonePalette(
                     highlight: Color(themeHex: 0xFFFEFB),
@@ -451,9 +452,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     rim: Color(themeHex: 0x776B58).opacity(0.5),
                     lastMove: Color(themeHex: 0x343B38),
                     label: Color(themeHex: 0x303631),
-                    // A darker warm mark remains distinct from kaya where
-                    // a clamshell-colored territory square would disappear.
-                    territory: Color(themeHex: 0x736044)
+                    // A shell fill distinguishes ownership from black;
+                    // the dark score outline separates it from honey kaya.
+                    territory: Color(themeHex: 0xFFF9ED)
                 ),
                 emptyPointMarker: Color(themeHex: 0x282D2E),
                 markOutline: Color(themeHex: 0x64543B),
