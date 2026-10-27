@@ -207,14 +207,16 @@ struct GameHistoryView: View {
             .padding(.bottom, theme.hasScene ? 24 : 0)
             .background(theme.hasScene ? .clear : Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
         }
-        // The scene stays put behind the scrolling games.
-        .background { if theme.hasScene { ThemeSceneBackdrop() } }
-        .surroundTheme(theme)
+        // On the scroll view itself: after the backdrop, the identifier would
+        // also mark the backdrop's empty host, and a first match finds that.
         .accessibilityIdentifier(
             player == nil
                 ? SurroundUITestContract.AccessibilityID.screenGameHistory
                 : SurroundUITestContract.AccessibilityID.screenProfileGameHistory
         )
+        // The scene stays put behind the scrolling games.
+        .background { if theme.hasScene { ThemeSceneBackdrop() } }
+        .surroundTheme(theme)
         .onAppear {
             isVisible = true
             if let activeIdentity, activeIdentity != queryIdentity {

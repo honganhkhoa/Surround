@@ -87,6 +87,9 @@ struct PublicGamesList: View {
                 }
                 .background(theme.hasScene ? .clear : Color(colorScheme == .dark ? UIColor.systemGray5 : UIColor.white))
             }
+            // On the scroll view itself: on the group, the identifier would
+            // also mark the backdrop's empty host, and a first match finds that.
+            .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenPublicGames)
             // The scene stays put behind the scrolling games.
             .background { if theme.hasScene { ThemeSceneBackdrop() } }
             .surroundTheme(theme)
@@ -107,7 +110,6 @@ struct PublicGamesList: View {
             await resolvePendingGameOpen(request)
         }
         .navigationBarTitle(Text("Public live games"))
-        .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.screenPublicGames)
     }
 }
 
