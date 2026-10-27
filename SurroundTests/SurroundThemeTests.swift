@@ -769,8 +769,8 @@ final class SurroundThemeTests: XCTestCase {
     }
 
     /// Release and Beta Release leave out `DebugThemes.xcassets`, so a
-    /// Debug-only theme's art and thumbnail live there and a released
-    /// theme's never do. Releasing a theme moves its folder and thumbnail
+    /// Debug-only theme's art, sounds and thumbnail live there and a released
+    /// theme's never do. Releasing a theme moves its assets and thumbnail
     /// into `Assets.xcassets`.
     func testOnlyReleasedThemesShipTheirArt() throws {
         let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -781,20 +781,22 @@ final class SurroundThemeTests: XCTestCase {
             throw XCTSkip("The source tree is not readable from this test run.")
         }
         XCTAssert(FileManager.default.fileExists(atPath: shippingCatalog.path), "No catalog at \(shippingCatalog.path)")
-        func imagesets(in catalog: URL) -> [String] {
+        func assets(in catalog: URL) -> Set<String> {
             let items = FileManager.default.enumerator(at: catalog, includingPropertiesForKeys: nil)?
                 .compactMap { $0 as? URL } ?? []
-            return items.filter { $0.pathExtension == "imageset" }.map { $0.deletingPathExtension().lastPathComponent }
+            return Set(items.filter { ["imageset", "dataset"].contains($0.pathExtension) }
+                .map { $0.deletingPathExtension().lastPathComponent })
         }
         // Theme art is named after its theme: frostPine's is FrostPine….
         func theme(of asset: String) -> SurroundTheme? {
             SurroundTheme.allCases.first { theme in
                 asset == theme.previewImageName
                     || asset.hasPrefix(theme.rawValue.prefix(1).uppercased() + theme.rawValue.dropFirst())
+                    || asset.hasPrefix("StoneSound-\(theme.rawValue)-")
             }
         }
-        let shipping = imagesets(in: shippingCatalog)
-        let debug = imagesets(in: debugCatalog)
+        let shipping = assets(in: shippingCatalog)
+        let debug = assets(in: debugCatalog)
         for asset in shipping {
             XCTAssertFalse(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in DebugThemes.xcassets")
         }
@@ -802,8 +804,17 @@ final class SurroundThemeTests: XCTestCase {
             XCTAssertTrue(theme(of: asset)?.isDebugOnly ?? false, "\(asset) belongs in Assets.xcassets")
         }
         for theme in SurroundTheme.allCases {
-            XCTAssert((theme.isDebugOnly ? debug : shipping).contains(theme.previewImageName),
+            let expected = theme.isDebugOnly ? debug : shipping
+            let other = theme.isDebugOnly ? shipping : debug
+            XCTAssert(expected.contains(theme.previewImageName),
                       "\(theme)'s thumbnail is in the wrong catalog")
+            for color: StoneColor in [.black, .white] {
+                for variation in StonePlacementSoundPlayer.variations {
+                    let name = StonePlacementSoundPlayer.assetName(theme: theme, color: color, variation: variation)
+                    XCTAssertTrue(expected.contains(name), "\(name) is missing from its theme's catalog")
+                    XCTAssertFalse(other.contains(name), "\(name) is also in the wrong catalog")
+                }
+            }
         }
     }
 

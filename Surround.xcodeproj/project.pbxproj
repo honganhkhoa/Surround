@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
+		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
+		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
 		FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000004 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
@@ -514,6 +517,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
+		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		FC2510010000000000000001 /* FeltEdgeFibers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltEdgeFibers.swift; sourceTree = "<group>"; };
 		FC2410010000000000000002 /* FeltControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltControlSurface.swift; sourceTree = "<group>"; };
 		0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDesignFixtureTests.swift; sourceTree = "<group>"; };
@@ -935,6 +940,7 @@
 			children = (
 				E271DDB41A1044F0BB9E1A1A /* GameDetailInteractionTests.swift */,
 				1C0AD3E8262AC421242AB561 /* SurroundThemeTests.swift */,
+				517D00052026102700000005 /* StonePlacementSoundTests.swift */,
 				BCFA1151000000000000000C /* HomeRulesTests.swift */,
 				0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */,
 				87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */,
@@ -1143,6 +1149,7 @@
 				D90700022026090700000002 /* AppReviewPolicy.swift */,
 				D90700092026090700000009 /* AppReviewGameActivity.swift */,
 				AE3000023A00000000000002 /* PlatformServices.swift */,
+				517D00022026102700000002 /* StonePlacementSoundPlayer.swift */,
 				BC042B4324AB2DD10050B2D1 /* OGSService.swift */,
 				BCFA1151000000000000000E /* SeekGraphSendHold.swift */,
 				686F061F637F46B6B7F51343 /* FinishedGamePreviewLoader.swift */,
@@ -1622,6 +1629,7 @@
 				AF2000013E00000000000001 /* OGSConditionalMoves.swift in Sources */,
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
+				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,
@@ -1745,6 +1753,8 @@
 				DC8A4325B4F64D408614BEB9 /* MessagesFoldLayout.swift in Sources */,
 				D4DC30082E14495596DF728D /* GameDetailInteractionTests.swift in Sources */,
 				96BD71A30B7D334BB8E64426 /* SurroundThemeTests.swift in Sources */,
+				517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */,
+				517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */,
 				BCFA1151000000000000000B /* HomeRules.swift in Sources */,
 				BCFA1151000000000000000D /* HomeRulesTests.swift in Sources */,
 				C1ACC76C51B9DBE9AC72CBCA /* Stone.swift in Sources */,

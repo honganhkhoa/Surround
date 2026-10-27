@@ -10,6 +10,7 @@ import Combine
 import AVFoundation
 
 struct BoardDemoView: View {
+    @Environment(\.surroundTheme) private var theme
     @StateObject var game = Game(
         width: 19, height: 19, blackName: "Black", whiteName: "White", gameId: .OGS(-1)
     )
@@ -25,17 +26,13 @@ struct BoardDemoView: View {
     @State var speechSynthesizer: AVSpeechSynthesizer?
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
-    @State var stonePlacingPlayer: AVAudioPlayer?
+    @StateObject private var stoneSoundPlayer = StonePlacementSoundPlayer()
 
     func initializePlayersIfNecessary() {
         if voiceCountdown && self.speechSynthesizer == nil {
             self.speechSynthesizer = AVSpeechSynthesizer()
         }
-        if soundOnStonePlacement && self.stonePlacingPlayer == nil {
-            if let audioData = NSDataAsset(name: "stonePlacing")?.data {
-                self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
-            }
-        }
+        stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
     }
     
     func updateTimeAfterMove(time: inout ThinkingTime) {
@@ -52,6 +49,7 @@ struct BoardDemoView: View {
         simulatingRequest = true
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .milliseconds(300))) {
             do {
+                let previousPosition = game.currentPosition
                 try game.makeMove(move: move)
                 if var clock = game.clock {
                     if clock.currentPlayerColor == .black {
@@ -63,8 +61,9 @@ struct BoardDemoView: View {
                     clock.currentPlayerColor = game.currentPosition.nextToMove
                     game.clock = clock
                 }
-                if let stonePlacingPlayer = stonePlacingPlayer, soundOnStonePlacement {
-                    stonePlacingPlayer.play()
+                if soundOnStonePlacement,
+                   let color = StonePlacementSoundPlayer.placedStoneColor(after: previousPosition, in: game.currentPosition) {
+                    stoneSoundPlayer.play(theme: theme, color: color, enabled: soundOnStonePlacement)
                 }
             } catch {}
             pendingMove = nil
@@ -161,6 +160,7 @@ struct BoardDemoView: View {
         }
         .onDisappear {
             self.speechSynthesizer = nil
+            stoneSoundPlayer.reset()
         }
         .onChange(of: pendingMove) { _, move in
             if let move = move, autoSubmitForLiveGames {
@@ -169,6 +169,12 @@ struct BoardDemoView: View {
         }
         .onChange(of: voiceCountdown) { _, _ in
             self.initializePlayersIfNecessary()
+        }
+        .onChange(of: theme) { _, _ in
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+        }
+        .onChange(of: soundOnStonePlacement) { _, _ in
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
         }
     }
 }

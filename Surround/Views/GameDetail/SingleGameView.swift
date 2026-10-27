@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVFAudio
 import Combine
 
 struct SingleGameView: View {
@@ -30,6 +29,7 @@ struct SingleGameView: View {
     @Environment(\.locale) private var locale
     @Environment(\.isVerticalToolbar) private var isVerticalToolbar
     @Environment(\.boardAppearance) private var boardAppearance
+    @Environment(\.surroundTheme) private var theme
     @Environment(\.displayScale) private var displayScale
     @ScaledMetric(relativeTo: .body) private var clockScale: CGFloat = 1
     @Environment(\.scenePhase) private var scenePhase
@@ -81,7 +81,7 @@ struct SingleGameView: View {
     @State private var analyzeMarkupsByPosition =
         [ObjectIdentifier: BoardMarkups]()
     
-    @State var stonePlacingPlayer: AVAudioPlayer? = nil
+    @StateObject private var stoneSoundPlayer = StonePlacementSoundPlayer()
     @StateObject private var conditionalMoveRequest = GameControlState()
     @State private var showingConditionalMoveSubmissionError = false
     @State private var hasUsedAddToConditionalMoves =
@@ -1165,30 +1165,16 @@ struct SingleGameView: View {
                 analyticsPosition = newPosition
             }
             
-            if soundOnStonePlacement {
-                if self.stonePlacingPlayer == nil {
-                    if let audioData = NSDataAsset(name: "stonePlacing")?.data {
-                        self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
-                    }
-                }
-                // A pass also follows the current position, but places nothing.
-                if let stonePlacingPlayer = stonePlacingPlayer,
-                   case .placeStone = newPosition.lastMove {
-                    if newPosition.previousPosition?.hasTheSamePosition(with: game.currentPosition) ?? false {
-                        stonePlacingPlayer.play()
-                    }
-                }
+            if soundOnStonePlacement,
+               let color = StonePlacementSoundPlayer.placedStoneColor(after: game.currentPosition, in: newPosition) {
+                stoneSoundPlayer.play(theme: theme, color: color, enabled: soundOnStonePlacement)
             }
         }
         .onAppear {
             if owningRootView == nil { owningRootView = navigation.main.rootView }
             chatSession.setGamePresentationActive(isChatRouteActive && !zenMode)
             isVisibleForAppReview = true
-            if self.soundOnStonePlacement {
-                if let audioData = NSDataAsset(name: "stonePlacing")?.data {
-                    self.stonePlacingPlayer = try? AVAudioPlayer(data: audioData)
-                }
-            }
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
             #if DEBUG && MAIN_APP
             if !hasAppliedUITestScene {
                 hasAppliedUITestScene = true
@@ -1227,10 +1213,16 @@ struct SingleGameView: View {
             }
             updateReviewGameObservation()
         }
+        .onChange(of: theme) { _, _ in
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+        }
+        .onChange(of: soundOnStonePlacement) { _, _ in
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+        }
         .onDisappear {
             isVisibleForAppReview = false
             stopReviewGameObservation()
-            self.stonePlacingPlayer = nil
+            stoneSoundPlayer.reset()
             // This owner survives adaptive layout changes. Leaving its route
             // suspends keyboard focus without discarding the chat draft.
             chatSession.gamePresentationDisappeared()
