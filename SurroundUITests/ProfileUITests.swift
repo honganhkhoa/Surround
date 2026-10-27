@@ -179,7 +179,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let value = search.value as? String ?? ""
             return value == query || (query.isEmpty && value == search.placeholderValue)
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: stateSettleTimeout), .completed,
                        "The picker should retain the requested search text.")
     }
 
@@ -196,7 +196,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let changed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", labels[state] ?? state), object: action
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: stateSettleTimeout), .completed,
                       "Expected the profile's friendship state to become \(state).")
         return action
     }
@@ -270,7 +270,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let dismissed = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"), object: confirmation
             )
-            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: stateSettleTimeout), .completed)
             element(identifier, in: app)
             return
         }
@@ -333,7 +333,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             let revealed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 destinations.allElementsBoundByIndex.contains { $0.isHittable }
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [revealed], timeout: 10), .completed,
+            XCTAssertEqual(XCTWaiter.wait(for: [revealed], timeout: stateSettleTimeout), .completed,
                            "Done must reveal the previously selected primary tab.")
             assertAccountTabsAbsent()
         }
@@ -369,7 +369,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 entry = visibleSidebarRow(identifier)
                 return entry != nil
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout), .completed,
                            "The native \(title) sidebar row must remain available.")
             guard let entry,
                   let messages = sidebarRow(id.navigationMessages),
@@ -397,7 +397,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 return active.count == 1 && active[0].placeholderValue == "Message hakhoa"
                     && active[0].value as? String == draft
             }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout), .completed,
                            "The selected Messages peer and its unsent draft must survive the sheet.")
             let selectedPeer = element(id.profileMessageToolbarEntry(peerID), in: app)
             XCTAssertTrue(selectedPeer.isHittable && selectedPeer.label.contains("hakhoa"))
@@ -413,9 +413,9 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(composer.placeholderValue, "Message hakhoa")
         tap(composer, description: "Write a draft before opening account sheets", in: app)
         composer.typeText(String(draft.prefix(1)))
-        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: stateSettleTimeout))
         composer.typeText(String(draft.dropFirst()))
-        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
 
         for visit in 1...2 {
             openSidebarAccountSheet(id.navigationProfile, title: "Profile")
@@ -665,7 +665,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
         tap(search, description: "Find the former friend", in: app)
         search.typeText("Bamboo\n")
-        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: stateSettleTimeout))
         tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
         assertLoadedProfile(named: "BambooPath", in: app)
         tap(assertFriendshipState("none", in: app), description: "Send a friend request", in: app)
@@ -728,7 +728,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                        "Pending acceptance must prevent another submission.")
         let release = element(SurroundUITestContract.AccessibilityID.friendshipReleaseResponse,
                               in: app, matching: .button)
-        XCTAssertTrue(waitForValue("held", in: release, timeout: 10),
+        XCTAssertTrue(waitForValue("held", in: release, timeout: stateSettleTimeout),
                       "The fixture must hold the response before navigating away.")
         XCTAssertTrue(release.isEnabled)
         XCTAssertFalse(app.alerts.firstMatch.exists)
@@ -738,7 +738,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
     private func releaseHeldFriendshipResponse(in app: XCUIApplication) -> XCUIElement {
         let release = element(SurroundUITestContract.AccessibilityID.friendshipReleaseResponse,
                               in: app, matching: .button)
-        XCTAssertTrue(waitForValue("held", in: release, timeout: 10),
+        XCTAssertTrue(waitForValue("held", in: release, timeout: stateSettleTimeout),
                       "The response must remain pending until the destination is visible.")
         tap(release, description: "Deliver the held friendship failure", in: app)
         return release
@@ -754,7 +754,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
             .matching(identifier: SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
         XCTAssertFalse(app.alerts.firstMatch.exists)
         let release = releaseHeldFriendshipResponse(in: app)
-        XCTAssertTrue(waitForValue("delivered", in: release, timeout: 10),
+        XCTAssertTrue(waitForValue("delivered", in: release, timeout: stateSettleTimeout),
                       "The failure must finish on the picker before reopening the sender profile.")
         XCTAssertFalse(app.descendants(matching: .any)
             .matching(identifier: SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
@@ -797,7 +797,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         openFriendshipProfileFromPicker(playerID,
                                        username: SurroundUITestContract.friendshipFixtureRequestUsernames[0], in: app)
         let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
-        XCTAssertTrue(waitForValue("dark", in: identity, timeout: 10))
+        XCTAssertTrue(waitForValue("dark", in: identity, timeout: stateSettleTimeout))
         for identifier in [
             SurroundUITestContract.AccessibilityID.friendRequestReject(playerID),
             SurroundUITestContract.AccessibilityID.friendRequestAccept(playerID),
@@ -875,7 +875,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let first = revealProfileControl(firstID, in: app)
         let previewFailed = NSPredicate(format: "label CONTAINS %@", "Board unavailable")
         expectation(for: previewFailed, evaluatedWith: first)
-        waitForExpectations(timeout: 10)
+        waitForExpectations(timeout: stateSettleTimeout)
         XCTAssertTrue(first.label.contains("Lost"))
         XCTAssertTrue(first.label.contains("by resignation"))
         XCTAssertTrue(first.label.contains("Board unavailable"),
@@ -990,7 +990,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         // SwiftUI includes the wide label in a switch's accessibility frame.
         // Activate the trailing switch rather than empty label space.
         activate(hideRatings, at: CGVector(dx: 0.95, dy: 0.5))
-        XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: 10))
+        XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: stateSettleTimeout))
         let profileEntry = element(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
         scrollIntoTappableArea(profileEntry, in: app)
         tap(profileEntry, description: "Reopen own profile with ratings hidden", in: app)
@@ -1011,7 +1011,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         tap(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
         let identity = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 10), "The own-profile title remains Profile.")
-        XCTAssertTrue(waitForValue("dark", in: identity, timeout: 10))
+        XCTAssertTrue(waitForValue("dark", in: identity, timeout: stateSettleTimeout))
         keepScreenshot("Own profile – supporter identity in dark and largest Dynamic Type", in: app)
         let provisional = revealProfileControl(SurroundUITestContract.AccessibilityID.profileRatingCategory("9x9"), in: app)
         XCTAssertTrue((provisional.value as? String ?? "").contains("Provisional"))
@@ -1303,7 +1303,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let usesAccountMenu = app.buttons[SurroundUITestContract.AccessibilityID.accountMenu].waitForExistence(timeout: 2)
         openOwnProfileFromMainNavigation(in: app)
         let header = element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
-        XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: 10),
+        XCTAssertTrue(waitForValue(appearance.rawValue, in: header, timeout: stateSettleTimeout),
                       "The profile must resolve the requested appearance, independent of the test host.")
         keepScreenshot("Own profile – \(appearance.rawValue) appearance", in: app)
         #if !targetEnvironment(macCatalyst)
@@ -1366,7 +1366,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
                 visibleTab = tabs.allElementsBoundByIndex.first(where: { $0.isHittable })
                 return visibleTab != nil
             }, object: nil)
-            guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed,
+            guard XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout) == .completed,
                   let tab = visibleTab else {
                 return XCTFail("Expected a visible tab: \(identifier)")
             }
@@ -1520,7 +1520,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
         tap(search, description: "Search opponents", in: app)
         search.typeText("Bamboo\n")
-        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: stateSettleTimeout))
         let playerID = SurroundUITestContract.profileFixturePickerFriendID
         let selectionID = SurroundUITestContract.AccessibilityID.opponentSelection(playerID)
         assertNotSelected(selectionID, in: app)
@@ -1541,56 +1541,97 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         assertSelected(selectionID, in: app)
     }
 
-    func testPickerProfilesSelectDifferentOpponentsWithoutReplacingEditedChallenge() {
+    private let editedChallengeName = "Profile draft retained"
+
+    /// Opens a custom challenge and edits its name, speed and opponent mode,
+    /// so a later opponent choice can be shown to keep the rest of the draft.
+    private func launchEditedChallengeDraft() -> XCUIApplication {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.compatibilityScreenshotLaunchArgument,
             SurroundUITestContract.compatibilitySceneLaunchArgument,
             SurroundUITestContract.CompatibilityScene.customGame.rawValue,
         ])
-        let draftName = "Profile draft retained"
         let name = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
         let oldName = name.value as? String ?? ""
         // Acquire focus and place the caret in one interaction. A second tap
         // can land on the keyboard while its presentation moves the field.
-        XCTAssertTrue(waitUntilHittable(name, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(name, timeout: stateSettleTimeout),
                       "The challenge game name must be hittable before acquiring focus.")
         activate(name, at: CGVector(dx: 0.95, dy: 0.5))
-        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldName.count) + draftName + "\n")
-        XCTAssertTrue(waitForValue(draftName, in: name, timeout: 10))
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldName.count) + editedChallengeName + "\n")
+        XCTAssertTrue(waitForValue(editedChallengeName, in: name, timeout: stateSettleTimeout))
 
         _ = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameSpeed, in: app, matching: .segmentedControl)
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.customGameSpeed, app: app)
         _ = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponentMode, in: app, matching: .segmentedControl)
         selectSegment(at: 1, in: SurroundUITestContract.AccessibilityID.customGameOpponentMode, app: app)
+        return app
+    }
 
-        for (query, playerID, username) in [
-            ("Bamboo", 801_001, "BambooPath"),
-            ("Misty", 801_002, "MistyMountain"),
-        ] {
-            let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
-            tap(opponent, description: "Choose draft opponent", in: app)
-            let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
-            tap(search, description: "Search draft opponents", in: app)
-            search.typeText(query + "\n")
-            XCTAssertTrue(waitForValue(query, in: search, timeout: 10))
-            tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
-            element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
-            XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
-            tap(SurroundUITestContract.AccessibilityID.profileSelectOpponent, in: app, matching: .button)
+    private func searchDraftOpponents(_ query: String, in app: XCUIApplication) {
+        let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
+        tap(opponent, description: "Choose draft opponent", in: app)
+        let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
+        tap(search, description: "Search draft opponents", in: app)
+        search.typeText(query + "\n")
+        XCTAssertTrue(waitForValue(query, in: search, timeout: stateSettleTimeout))
+    }
 
-            element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app)
-            XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
-                SurroundUITestContract.AccessibilityID.screenPlayerProfile).firstMatch.exists)
-            XCTAssertFalse(app.descendants(matching: .any)
-                .matching(identifier: SurroundUITestContract.AccessibilityID.screenOpponentPicker).firstMatch.exists)
-            let selectedOpponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
-            XCTAssertTrue(selectedOpponent.label.contains(username), "The existing draft should use the newly selected opponent.")
-            let preservedName = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
-            XCTAssertEqual(preservedName.value as? String, draftName)
-            let speed = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameSpeed, in: app, matching: .segmentedControl)
-            XCTAssertTrue(speed.buttons.element(boundBy: 1).isSelected,
-                          "Profile selection must retain the draft's correspondence setting.")
-        }
+    private func chooseDraftOpponentThroughProfile(query: String, playerID: Int, in app: XCUIApplication) {
+        searchDraftOpponents(query, in: app)
+        tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(playerID), in: app, matching: .button)
+        element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
+        XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.profileChallenge].exists)
+        tap(SurroundUITestContract.AccessibilityID.profileSelectOpponent, in: app, matching: .button)
+    }
+
+    private func assertEditedChallengeDraft(
+        opponent username: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        element(SurroundUITestContract.AccessibilityID.screenCustomGame, in: app, file: file, line: line)
+        // One query for both screens: on a stalled runner each unscoped
+        // snapshot can take tens of seconds.
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", [
+            SurroundUITestContract.AccessibilityID.screenPlayerProfile,
+            SurroundUITestContract.AccessibilityID.screenOpponentPicker,
+        ])).firstMatch.exists, "Choosing an opponent must return to the challenge form.", file: file, line: line)
+        let selectedOpponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
+        XCTAssertTrue(selectedOpponent.label.contains(username),
+                      "The existing draft should use the newly selected opponent.", file: file, line: line)
+        let preservedName = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameName, in: app, matching: .textField)
+        XCTAssertEqual(preservedName.value as? String, editedChallengeName, file: file, line: line)
+        let speed = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameSpeed, in: app, matching: .segmentedControl)
+        XCTAssertTrue(speed.buttons.element(boundBy: 1).isSelected,
+                      "Choosing an opponent must retain the draft's correspondence setting.", file: file, line: line)
+    }
+
+    func testPickerProfileSelectsOpponentWithoutReplacingEditedChallenge() {
+        let app = launchEditedChallengeDraft()
+        chooseDraftOpponentThroughProfile(query: "Bamboo", playerID: 801_001, in: app)
+        assertEditedChallengeDraft(opponent: "BambooPath", in: app)
+
+        // Selecting from the profile pops it and the picker together. The
+        // form must still push a fresh, usable picker afterwards.
+        let opponent = revealCustomGameControl(SurroundUITestContract.AccessibilityID.customGameOpponent, in: app, matching: .button)
+        tap(opponent, description: "Choose another draft opponent", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        tap(element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app),
+            description: "Search draft opponents again", in: app)
+    }
+
+    func testPickerProfileReplacesChosenOpponentWithoutReplacingEditedChallenge() {
+        let app = launchEditedChallengeDraft()
+        // Pick the first opponent from its row; the profile route itself is
+        // covered by the test above, and this one needs only a prior choice.
+        searchDraftOpponents("Bamboo", in: app)
+        tap(SurroundUITestContract.AccessibilityID.opponentSelection(801_001), in: app, matching: .button)
+        assertEditedChallengeDraft(opponent: "BambooPath", in: app)
+
+        chooseDraftOpponentThroughProfile(query: "Misty", playerID: 801_002, in: app)
+        assertEditedChallengeDraft(opponent: "MistyMountain", in: app)
     }
 
     func testSavedSettingsProfileBackPreservesPickerWithoutSubmittingChallenge() {
@@ -1608,7 +1649,7 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         let search = element(SurroundUITestContract.AccessibilityID.opponentSearch, in: app)
         tap(search, description: "Search saved-setting opponents", in: app)
         search.typeText("Bamboo\n")
-        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: 10))
+        XCTAssertTrue(waitForValue("Bamboo", in: search, timeout: stateSettleTimeout))
         tap(SurroundUITestContract.AccessibilityID.profilePickerEntry(801_001), in: app, matching: .button)
         element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app)
         element(SurroundUITestContract.AccessibilityID.profileChallengeWithSettings, in: app, matching: .button)

@@ -121,7 +121,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let emptyHeading = app.staticTexts.matching(NSPredicate(
             format: "label BEGINSWITH %@ AND label CONTAINS %@", "No Results for", emptyQuery)).firstMatch
         let emptyHeadingVisible = emptyHeading.waitForExistence(timeout: 10)
-            && waitUntilHittable(emptyHeading, timeout: 10)
+            && waitUntilHittable(emptyHeading, timeout: stateSettleTimeout)
         if !emptyHeadingVisible {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "Loaded empty search – native heading hierarchy"
@@ -352,7 +352,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let detail = element("messages.detailPane", in: app)
             composer = detail.textFields.matching(identifier:
                 SurroundUITestContract.AccessibilityID.privateMessageComposer).firstMatch
-            XCTAssertTrue(waitUntilHittable(composer, timeout: 10),
+            XCTAssertTrue(waitUntilHittable(composer, timeout: stateSettleTimeout),
                           "Initial wide opening must leave the root detail composer usable.")
             XCTAssertEqual(composer.frame, activeComposer.frame,
                            "The root detail must own the only active composer.")
@@ -374,9 +374,9 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let inbox = element("messages.inboxPane", in: app)
             let search = inbox.textFields["messages.playerSearchField"].firstMatch
             let row = inbox.buttons[SurroundUITestContract.AccessibilityID.privateMessageRow(firstPeerID)].firstMatch
-            XCTAssertTrue(waitUntilHittable(search, timeout: 10) && window.contains(search.frame),
+            XCTAssertTrue(waitUntilHittable(search, timeout: stateSettleTimeout) && window.contains(search.frame),
                           "Initial wide opening must leave the inbox search visible and usable.")
-            XCTAssertTrue(waitUntilHittable(row, timeout: 10) && inbox.frame.contains(row.frame)
+            XCTAssertTrue(waitUntilHittable(row, timeout: stateSettleTimeout) && inbox.frame.contains(row.frame)
                           && window.contains(row.frame),
                           "Initial wide opening must leave the selected inbox thread fully readable.")
             XCTAssertNil(visibleBack(from: "Messages", in: app),
@@ -414,12 +414,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let draft = "Unsent through software keyboard transition"
         tap(composer, description: "Focus the private-message draft", in: app)
         composer.typeText(String(draft.prefix(1)))
-        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(String(draft.prefix(1)), in: composer, timeout: stateSettleTimeout))
         // The first typeText call can show only the hardware-keyboard accessory.
         // Keep the first-character readability check before completing the draft.
         assertLatestIsReadable("Messages after first draft character", keyboard: .any)
         composer.typeText(String(draft.dropFirst()))
-        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
         assertLatestIsReadable("Messages after complete draft with full software keyboard", keyboard: .fullSoftware)
         #endif
     }
@@ -436,7 +436,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let composer = assertConversation("hakhoa", peerID: firstPeerID, in: app)
         let transcript = wide ? rootTranscript(in: app) : nativeTranscript(over: app.windows.firstMatch.frame, in: app)
         let initialLatest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
-        XCTAssertTrue(waitUntilHittable(initialLatest, timeout: 10), "Seed a conversation that follows latest.")
+        XCTAssertTrue(waitUntilHittable(initialLatest, timeout: stateSettleTimeout), "Seed a conversation that follows latest.")
         let draft = "Unsent draft while new replies arrive"
         enterDraft(draft, in: composer, app: app)
         let progress = transcript
@@ -449,11 +449,11 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForValue("delivered:2/2", in: progress, timeout: 50),
                       "Both fresh incoming replies must be delivered through the offline service.")
         let latest = transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch
-        XCTAssertTrue(waitUntilHittable(latest, timeout: 10), "Following latest must reveal the new incoming reply.")
+        XCTAssertTrue(waitUntilHittable(latest, timeout: stateSettleTimeout), "Following latest must reveal the new incoming reply.")
         XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
                                  "The newest reply must remain above the composer after keyboard avoidance.")
         XCTAssertTrue(composer.isHittable)
-        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
         keepScreenshot("Long history follows incoming replies with retained draft", in: app)
     }
 
@@ -646,7 +646,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                       "The exact older reading witness must remain fully readable after incoming appends.")
         XCTAssertFalse(initialLatest.isHittable, "New replies must not switch older reading back to latest.")
         XCTAssertFalse(transcript.staticTexts[SurroundUITestContract.messagesIncomingLatestText].firstMatch.isHittable)
-        XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
         keepScreenshot("Older witness and draft retained after incoming replay", in: app)
     }
 
@@ -747,7 +747,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let keyboard = app.keyboards.firstMatch
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "Search must own the software keyboard.")
         let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
-        XCTAssertTrue(waitUntilHittable(description, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(description, timeout: stateSettleTimeout))
         XCTAssertLessThanOrEqual(description.frame.maxY, keyboard.frame.minY + 1,
                                  "Empty search guidance must remain readable above the keyboard.")
         assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
@@ -757,7 +757,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         try assertRenderedMessagesTitle(in: app, navigationBar: navigationBar, stage: "Empty focused search")
 
         search.typeText("Copper")
-        XCTAssertTrue(waitForValue("Copper", in: search, timeout: 10))
+        XCTAssertTrue(waitForValue("Copper", in: search, timeout: stateSettleTimeout))
         assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:1", in: app)
         assertMessagesLoadingStatus("Searching…", in: app)
         XCTAssertTrue(keyboard.exists)
@@ -780,8 +780,8 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
 
         cancelInboxSearch(in: app)
         XCTAssertTrue(waitForCondition { !keyboard.exists }, "Cancel must dismiss the search keyboard.")
-        XCTAssertTrue(waitForValue("", in: search, timeout: 10))
-        XCTAssertTrue(waitUntilHittable(firstRequest, timeout: 10), "Cancel must restore the expanded inbox content.")
+        XCTAssertTrue(waitForValue("", in: search, timeout: stateSettleTimeout))
+        XCTAssertTrue(waitUntilHittable(firstRequest, timeout: stateSettleTimeout), "Cancel must restore the expanded inbox content.")
         assertMessagesLoadingFixture("friends:0;requests:0;errors:0;search:0", in: app)
         assertMessagesLoadingStatus(nil, in: app)
         assertMessagesLoadingFramesAfterSearchCancel(anchors, equalTo: restingFrames, in: app)
@@ -957,10 +957,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             let transcript = app.scrollViews.matching(identifier: SurroundUITestContract.AccessibilityID.profileConversation)
                 .allElementsBoundByIndex.first { $0.isHittable } ?? app.scrollViews[SurroundUITestContract.AccessibilityID.profileConversation].firstMatch
             let latest = transcript.staticTexts["Offline message from hakhoa"].firstMatch
-            XCTAssertTrue(waitUntilHittable(latest, timeout: 10), "The latest message must stay readable without a repair gesture.")
+            XCTAssertTrue(waitUntilHittable(latest, timeout: stateSettleTimeout), "The latest message must stay readable without a repair gesture.")
             XCTAssertLessThanOrEqual(latest.frame.maxY, composer.frame.minY + 1,
                                      "Message content must remain above the composer after backgrounding.")
-            XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
         }
         assertLatestMessageIsReadable()
         keepScreenshot("Messages before background return", in: app)
@@ -1014,7 +1014,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
                 history.isHittable && readableViewport().contains(history.frame)
             }, "The exact older message must remain fully readable without another scroll gesture.")
             XCTAssertLessThanOrEqual(history.frame.maxY, composer.frame.minY + 1)
-            XCTAssertTrue(waitForValue(draft, in: composer, timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: composer, timeout: stateSettleTimeout))
             assertKeyboardHiddenComposerMatchesBaseline()
             keepScreenshot("Older message after background return \(cycle)", in: app)
         }
@@ -1087,7 +1087,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "A software keyboard is required.")
         guard keyboard.exists else { return }
         let description = app.staticTexts["Search by username to view a profile or start a conversation."].firstMatch
-        XCTAssertTrue(waitUntilHittable(description, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(description, timeout: stateSettleTimeout))
         XCTAssertLessThanOrEqual(description.frame.maxY, keyboard.frame.minY,
                                  "The complete search description must be readable above the keyboard.")
         // Keyboard AX bounds can exclude its prediction strip. Check the actual
@@ -1123,7 +1123,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         cancelInboxSearch(in: app)
         assertWideRoot(in: app, expectedBounds: bounds)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10))
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         XCTAssertNil(visibleBack(from: "Messages", in: app))
         keepScreenshot("Search Cancel retains selected peer and draft", in: app)
     }
@@ -1204,12 +1204,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         back(from: "CopperKoi", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         if wide {
-            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         }
         cancelInboxSearch(in: app)
         if !wide {
             openInboxConversation(firstPeerID, in: app)
-            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .nativePush, in: app), timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .nativePush, in: app), timeout: stateSettleTimeout))
         } else {
             assertWideRoot(in: app)
             assertInboxSelection(firstPeerID, in: app)
@@ -1246,11 +1246,11 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
              restoredMessagesControl: anchorID, in: app)
         assertWideRoot(in: app, expectedBounds: bounds, requireSearchHittability: false)
         let restoredAnchor = query(anchorID, in: app)
-        XCTAssertTrue(waitUntilHittable(restoredAnchor, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(restoredAnchor, timeout: stateSettleTimeout))
         XCTAssertEqual(restoredAnchor.frame.minY, anchorY, accuracy: 16,
                        "About and a linked player must preserve the inbox's scrolled context.")
         assertHistoryWitnessVisible(historyWitness, username: "hakhoa", in: app)
-        XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: 10))
+        XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         keepScreenshot("Profile biography – Back restores inbox and older peer history", in: app)
     }
 
@@ -1313,14 +1313,14 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         setSearch("Copper", in: app)
         tap("messages.search.profile.\(searchPlayerID)", in: app, matching: .button)
         assertLoadedProfile(named: "CopperKoi", in: app)
-        XCTAssertTrue(waitForValue("dark", in: element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app), timeout: 10))
+        XCTAssertTrue(waitForValue("dark", in: element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app), timeout: stateSettleTimeout))
         element(SurroundUITestContract.AccessibilityID.profileBiographySummary, in: app)
         keepScreenshot("Profile biography – formatted summary in dark and largest text", in: app)
         openAbout(in: app)
         let web = biographyWebView(in: app)
         let readable = biographyText(containing: "Readable biography", in: app)
         revealBiographyElement(readable, in: web, app: app)
-        XCTAssertTrue(waitUntilHittable(readable, timeout: 10), "Sanitized authored colors and tiny text must remain readable.")
+        XCTAssertTrue(waitUntilHittable(readable, timeout: stateSettleTimeout), "Sanitized authored colors and tiny text must remain readable.")
         XCTAssertFalse(app.staticTexts["Unsafe script ran"].exists,
                        "Authored scripts must not run or appear as biography text.")
         let failure = biographyText(containing: "Go board photograph", in: app)
@@ -1360,7 +1360,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         setSearch("Copper", in: app)
         tap("messages.search.profile.\(searchPlayerID)", in: app, matching: .button)
         assertLoadedProfile(named: "CopperKoi", in: app)
-        XCTAssertTrue(waitForValue("light", in: element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app), timeout: 10))
+        XCTAssertTrue(waitForValue("light", in: element(SurroundUITestContract.AccessibilityID.profileLoaded, in: app), timeout: stateSettleTimeout))
         openAbout(in: app)
         let web = biographyWebView(in: app)
         let rejectedImage = biographyText(containing: "Sanitizer-rejected Go photograph", in: app)
@@ -1463,7 +1463,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         XCTAssertTrue(waitForCondition(timeout: 30) { !marker.exists }, "Closing Safari must remove its page.")
         element(SurroundUITestContract.AccessibilityID.screenPlayerAbout, in: app)
         let restoredLink = biographyWebView(in: app).links["Open local biography page"].firstMatch
-        XCTAssertTrue(waitUntilHittable(restoredLink, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(restoredLink, timeout: stateSettleTimeout))
         XCTAssertEqual(restoredLink.frame.minY, sourceY, accuracy: 4,
                        "Safari dismissal must restore the biography reading position without a repair gesture.")
         keepScreenshot("Profile biography – Safari dismissal resumes About", in: app)
@@ -1472,12 +1472,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         back(from: "CopperKoi", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         if wide {
-            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         }
         cancelInboxSearch(in: app)
         if !wide {
             openInboxConversation(firstPeerID, in: app)
-            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .nativePush, in: app), timeout: 10))
+            XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, presentation: .nativePush, in: app), timeout: stateSettleTimeout))
         } else {
             assertWideRoot(in: app)
             assertInboxSelection(firstPeerID, in: app)
@@ -1496,12 +1496,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         openConversationProfile(searchPlayerID, username: "CopperKoi", in: app)
         back(from: "CopperKoi", to: "messages.conversation", in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
-                                                               presentation: .nativePush, in: app), timeout: 10))
+                                                               presentation: .nativePush, in: app), timeout: stateSettleTimeout))
         back(from: "CopperKoi", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         tap("messages.search.message.\(searchPlayerID)", in: app, matching: .button)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
-                                                               presentation: .nativePush, in: app), timeout: 10),
+                                                               presentation: .nativePush, in: app), timeout: stateSettleTimeout),
                       "Reopening the searched peer must restore its own draft.")
     }
 
@@ -1517,12 +1517,12 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         openConversationProfile(friendID, username: "BambooPath", in: app)
         back(from: "BambooPath", to: "messages.conversation", in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("BambooPath", peerID: friendID,
-                                                               presentation: .nativePush, in: app), timeout: 10))
+                                                               presentation: .nativePush, in: app), timeout: stateSettleTimeout))
         tapVisible("messages.challenge.\(friendID)", in: app)
         assertChallenge(for: "BambooPath", in: app)
         back(from: "Challenge", to: "messages.conversation", in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("BambooPath", peerID: friendID,
-                                                               presentation: .nativePush, in: app), timeout: 10))
+                                                               presentation: .nativePush, in: app), timeout: stateSettleTimeout))
         back(from: "BambooPath", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         XCTAssertNil(visibleBack(from: "Messages", in: app),
                      "Inline Friends must not leave a Friends destination below the conversation.")
@@ -1531,7 +1531,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         // Expansion uses ordinary view lifetime; Back need not force either form.
         tapFriend(friendID, in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("BambooPath", peerID: friendID,
-                                                               presentation: .nativePush, in: app), timeout: 10))
+                                                               presentation: .nativePush, in: app), timeout: stateSettleTimeout))
     }
 
     func testPlayerSearchProfileBackAndMessageOnlyActions() {
@@ -1580,7 +1580,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
         keepScreenshot("Conversation username opens peer Profile", in: app)
         back(from: "hakhoa", to: wide ? SurroundUITestContract.AccessibilityID.screenMessages : "messages.conversation", in: app)
-        XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: 10),
+        XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: stateSettleTimeout),
                       "Back from the username's Profile must retain the selected peer and unsent draft.")
         keepScreenshot("Conversation username Profile Back retains draft", in: app)
     }
@@ -1602,7 +1602,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertWideSearchRoot(in: app, searchBounds: searchBounds, detailBounds: detailBounds)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10))
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         tapVisible("messages.challenge.\(firstPeerID)", in: app)
         assertChallenge(for: "hakhoa", in: app)
         assertFullWidthDestination(SurroundUITestContract.AccessibilityID.screenCustomGame, over: bounds, in: app)
@@ -1610,7 +1610,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertWideSearchRoot(in: app, searchBounds: searchBounds, detailBounds: detailBounds)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10))
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         XCTAssertNil(visibleBack(from: "Messages", in: app),
                      "Back must restore the wide root without a conversation pushed over it.")
     }
@@ -1659,11 +1659,11 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         assertWideSearchRoot(in: app, searchBounds: searchBounds, detailBounds: detailBounds)
         assertSearch("Copper", playerID: searchPlayerID, in: app)
         XCTAssertTrue(waitForValue(rootDraft, in: assertConversation("hakhoa", peerID: firstPeerID,
-                                                                   presentation: .wideRoot, in: app), timeout: 10),
+                                                                   presentation: .wideRoot, in: app), timeout: stateSettleTimeout),
                       "A shared native push must not replace the root's independently selected peer.")
         tap("messages.search.message.\(searchPlayerID)", in: app, matching: .button)
         XCTAssertTrue(waitForValue(nestedDraft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
-                                                                     presentation: .wideRoot, in: app), timeout: 10),
+                                                                     presentation: .wideRoot, in: app), timeout: stateSettleTimeout),
                       "Root selection must restore the draft created for that peer in the native push.")
         XCTAssertNil(visibleBack(from: "Messages", in: app))
     }
@@ -1703,7 +1703,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         cancelInboxSearch(in: app)
         assertWideRoot(in: app, expectedBounds: bounds)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("CopperKoi", peerID: searchPlayerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10),
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout),
                       "Cancel must keep the latest selected recipient and exact draft.")
         // CopperKoi has no thread fixture; neither existing thread is selected.
         assertInboxSelection(nil, in: app)
@@ -1724,7 +1724,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         enterDraft(firstDraft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), app: app)
         openConversationProfile(firstPeerID, username: "hakhoa", in: app)
         back(from: "hakhoa", to: "messages.conversation", in: app)
-        XCTAssertTrue(waitForValue(firstDraft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: 10))
+        XCTAssertTrue(waitForValue(firstDraft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: stateSettleTimeout))
         if !wide {
             back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         }
@@ -1741,13 +1741,13 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         }
         assertUnread(false, peerID: secondPeerID, in: app)
         openInboxConversation(firstPeerID, in: app)
-        XCTAssertTrue(waitForValue(firstDraft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: 10),
+        XCTAssertTrue(waitForValue(firstDraft, in: assertConversation("hakhoa", peerID: firstPeerID, in: app), timeout: stateSettleTimeout),
                       "Switching peers must restore the first peer's draft without leaking the second peer's text.")
         if !wide {
             back(from: "hakhoa", to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         }
         openInboxConversation(secondPeerID, in: app)
-        XCTAssertTrue(waitForValue(secondDraft, in: assertConversation("khoahong", peerID: secondPeerID, in: app), timeout: 10),
+        XCTAssertTrue(waitForValue(secondDraft, in: assertConversation("khoahong", peerID: secondPeerID, in: app), timeout: stateSettleTimeout),
                       "Each peer must retain its own unsent draft after repeated navigation.")
     }
 
@@ -1771,7 +1771,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
              restoredMessagesControl: anchorID, in: app)
         assertWideRoot(in: app, expectedBounds: bounds, requireSearchHittability: false)
         let restoredFriend = query(anchorID, in: app)
-        XCTAssertTrue(waitUntilHittable(restoredFriend, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(restoredFriend, timeout: stateSettleTimeout),
                       "Native Back must restore the scrolled inbox's visible friend context.")
         XCTAssertEqual(restoredFriend.frame.minY, anchorFrame.minY, accuracy: 16,
                        "Back must preserve the visible inbox anchor, without a reveal gesture.")
@@ -1807,7 +1807,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             !self.query(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[0]), in: app).exists
         })
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10))
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         let secondProfile = inboxElement(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[1]), in: app)
         let requestCreated = Date(timeIntervalSince1970: 1_789_516_800)
         let relativeAge = requestCreated.formatted(
@@ -1829,7 +1829,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         back(from: username, to: SurroundUITestContract.AccessibilityID.screenMessages, in: app)
         assertWideRoot(in: app, expectedBounds: bounds)
         XCTAssertTrue(waitForValue(draft, in: assertConversation("hakhoa", peerID: firstPeerID,
-                                                               presentation: .wideRoot, in: app), timeout: 10))
+                                                               presentation: .wideRoot, in: app), timeout: stateSettleTimeout))
         XCTAssertFalse(query(SurroundUITestContract.AccessibilityID.friendRequestProfile(ids[1]), in: app).exists)
         XCTAssertFalse(app.alerts.firstMatch.exists, "The covered inbox must not replay Profile's resolved error after Back.")
         inboxElement(SurroundUITestContract.AccessibilityID.friendRequestAccept(ids[2]), in: app)
@@ -2026,7 +2026,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         ))
         return (0..<3).map { index in
             let button = buttons.element(boundBy: index)
-            XCTAssertTrue(waitUntilHittable(button, timeout: 10),
+            XCTAssertTrue(waitUntilHittable(button, timeout: stateSettleTimeout),
                           "The ordered Friends prefix must be visible in its current presentation.")
             return button.identifier
         }
@@ -2358,7 +2358,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         if (presentation ?? (usesColumns(in: app) ? .wideRoot : .nativePush)) == .wideRoot {
             let heading = element("messages.conversation.heading", in: app)
             let identity = heading.buttons["messages.conversation.profile.\(peerID)"].firstMatch
-            XCTAssertTrue(waitUntilHittable(identity, timeout: 10), "The wide root must visibly identify its selected peer.")
+            XCTAssertTrue(waitUntilHittable(identity, timeout: stateSettleTimeout), "The wide root must visibly identify its selected peer.")
             XCTAssertTrue(identity.label.contains(username))
         }
         return composer
@@ -2371,10 +2371,10 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         // Confirm input readiness before the remaining keyboard events. This
         // does not retry or repair a partially entered draft.
         composer.typeText(firstCharacter)
-        XCTAssertTrue(waitForValue(firstCharacter, in: composer, timeout: 10),
+        XCTAssertTrue(waitForValue(firstCharacter, in: composer, timeout: stateSettleTimeout),
                       "The focused composer must receive the first keyboard event exactly.")
         composer.typeText(String(value.dropFirst()))
-        XCTAssertTrue(waitForValue(value, in: composer, timeout: 10))
+        XCTAssertTrue(waitForValue(value, in: composer, timeout: stateSettleTimeout))
     }
 
     private func openConversationProfile(_ peerID: Int, username: String, in app: XCUIApplication) {
@@ -2606,7 +2606,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private func assertLatestHistoryVisible(username: String, in app: XCUIApplication) {
         let transcript = rootTranscript(in: app)
         let latest = transcript.staticTexts["Offline message from \(username)"].firstMatch
-        XCTAssertTrue(waitUntilHittable(latest, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(latest, timeout: stateSettleTimeout),
                       "The retained root must resume its latest message without a repair gesture.")
         let older = transcript.staticTexts.matching(NSPredicate(
             format: "label == %@",
@@ -2659,7 +2659,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             format: "label == %@",
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
-        XCTAssertTrue(waitUntilHittable(marker, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(marker, timeout: stateSettleTimeout),
                       "The selected peer must restore its own older message context without scrolling again.")
         let latest = transcript.staticTexts["Offline message from \(username)"].firstMatch
         XCTAssertFalse(latest.isHittable, "History restoration must not silently jump to the newest message.")
@@ -2669,7 +2669,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
         let transcript = rootTranscript(in: app)
         let detail = element("messages.detailPane", in: app)
         let composer = detail.textFields[SurroundUITestContract.AccessibilityID.privateMessageComposer].firstMatch
-        XCTAssertTrue(waitUntilHittable(composer, timeout: 10))
+        XCTAssertTrue(waitUntilHittable(composer, timeout: stateSettleTimeout))
         let bounds = transcript.frame.intersection(app.windows.firstMatch.frame)
         // The ScrollView may extend beneath the composer. Capture only a
         // readable message from the actual unobscured transcript viewport.
@@ -2696,7 +2696,7 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
     private func assertHistoryWitnessVisible(_ witness: String, username: String, in app: XCUIApplication) {
         let transcript = rootTranscript(in: app)
         let marker = transcript.staticTexts.matching(NSPredicate(format: "label == %@", witness)).firstMatch
-        XCTAssertTrue(waitUntilHittable(marker, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(marker, timeout: stateSettleTimeout),
                       "The same pre-navigation reading witness must remain visible without scrolling again.")
         let latest = transcript.staticTexts["Offline message from \(username)"].firstMatch
         XCTAssertFalse(latest.isHittable, "History restoration must not silently jump to the newest message.")

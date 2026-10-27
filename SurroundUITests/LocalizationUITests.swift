@@ -186,8 +186,23 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
             if initialValue == "1" {
                 // Change only this offline editor preference; never press Find.
                 activate(allow, at: CGVector(dx: 0.95, dy: 0.5))
+                // In October 2026 CI the switch ignored a tap that XCTest
+                // delivered onto it, and the same tap works locally. Give the
+                // first tap the 10 seconds it always had, so a late one is not
+                // undone, then tap the knob once more only if the switch is
+                // still on, logged so CI shows how often that happens.
+                if !waitForValue("0", in: allow, timeout: 10), allow.value as? String == "1" {
+                    XCTContext.runActivity(named: "Retry the Allow handicap tap; the first left it on") { _ in
+                        let control = allow.switches.firstMatch
+                        if control.isHittable {
+                            activate(control)
+                        } else {
+                            activate(allow, at: CGVector(dx: 0.95, dy: 0.5))
+                        }
+                    }
+                }
             }
-            XCTAssertTrue(waitForValue("0", in: allow, timeout: 10))
+            XCTAssertTrue(waitForValue("0", in: allow, timeout: stateSettleTimeout))
             let footnote = localizedLabelAfterScrolling(
                 language.text("Never play with handicap stones."), in: app)
             assertVisible(footnote, in: app)
@@ -528,7 +543,7 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         guard settled else { return false }
         // Recheck the frame live in case whatever made the button hittable
         // also moved it.
-        let ready = waitUntilHittable(button, timeout: 10)
+        let ready = waitUntilHittable(button, timeout: stateSettleTimeout)
             && visibleContentFrame().contains(button.frame)
         XCTAssertTrue(ready,
                       "The settled conditional-moves button must be hittable inside visible Home content before tapping.")

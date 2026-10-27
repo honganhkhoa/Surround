@@ -600,7 +600,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: selectedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [selected], timeout: 10),
+            XCTWaiter.wait(for: [selected], timeout: stateSettleTimeout),
             .completed,
             "Expected element with identifier \(identifier) to be selected",
             file: file,
@@ -625,7 +625,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             object: selectedElement
         )
         XCTAssertEqual(
-            XCTWaiter.wait(for: [notSelected], timeout: 10),
+            XCTWaiter.wait(for: [notSelected], timeout: stateSettleTimeout),
             .completed,
             "Expected element with identifier \(identifier) not to be selected",
             file: file,
@@ -783,7 +783,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
         }
         XCTAssertTrue(candidate.waitForExistence(timeout: 10),
                       "Expected \(identifier) inside its scroll viewport", file: file, line: line)
-        XCTAssertTrue(waitUntilHittable(candidate, timeout: 10),
+        XCTAssertTrue(waitUntilHittable(candidate, timeout: stateSettleTimeout),
                       "Expected \(identifier) to be usable after bounded scrolling", file: file, line: line)
         return candidate
     }
@@ -1045,7 +1045,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
             account.exists || profile.exists || app.tabBars.buttons["Profile"].exists
                 || app.buttons["Toggle sidebar"].exists
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [navigationReady], timeout: 10), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [navigationReady], timeout: stateSettleTimeout), .completed,
                        "Expected the account menu or Profile navigation to appear.")
         if account.exists {
             tap(SurroundUITestContract.AccessibilityID.accountMenu, in: app, matching: .button)
@@ -1147,7 +1147,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                 visibleBack = button
                 return true
             }, object: nil)
-            let readiness = XCTWaiter.wait(for: [ready], timeout: 10)
+            let readiness = XCTWaiter.wait(for: [ready], timeout: stateSettleTimeout)
             if readiness != .completed {
                 let hierarchy = XCTAttachment(string: """
                     Profile-owning Duo windows: \(owningWindowCount)
@@ -1164,7 +1164,7 @@ class SurroundJourneyUITestCase: SurroundUITestCase {
                            "Expected one profile-owning Duo window with one hittable native Back action.",
                            file: file, line: line)
             guard readiness == .completed, let back = visibleBack else { return }
-            // Readiness above replaces tap's 10-second hittability wait.
+            // Readiness above replaces tap's hittability wait.
             activate(back)
         } else {
             let identifiedBack = navigationBar.buttons.matching(identifier: "BackButton").firstMatch
