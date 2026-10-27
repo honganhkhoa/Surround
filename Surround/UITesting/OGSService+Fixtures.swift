@@ -2107,6 +2107,9 @@ extension OGSService {
                 remoteSettings: OGSRemoteSetting(preferences: userDefaults),
                 initialState: state
             )
+            if SurroundUITestContract.ticksFixtureClocks {
+                FixtureClockTicker.start(Array(state.activeGames.values) + Array(state.publicGames.values))
+            }
             if SurroundUITestContract.includesMessagesMarketing {
                 for friend in state.friends {
                     service.markPrivateMessageThreadAsRead(peerId: friend.id)
@@ -3852,6 +3855,30 @@ extension OGSService {
 
         return makeService(from: state)
     }
+    /// Performance runs: every fixture game's clock moves as OGSService's 1 s
+    /// timer moves a connected game's, the timer the offline service turns off.
+    private enum FixtureClockTicker {
+        private static var timer: Timer?
+
+        static func start(_ games: [Game]) {
+            timer?.invalidate()
+            let games = games.map { WeakGame(game: $0) }
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                for case let game? in games.map(\.game) {
+                    guard game.gameData?.outcome == nil,
+                          let system = game.gameData?.timeControl.system else { continue }
+                    if game.gamePhase == .stoneRemoval || !(game.pauseControl?.isPaused() ?? false) {
+                        game.clock?.calculateTimeLeft(with: system, pauseControl: game.pauseControl)
+                    }
+                }
+            }
+        }
+
+        private struct WeakGame {
+            weak var game: Game?
+        }
+    }
+
     /// The socket-down review switch keeps the design game's clock moving as
     /// OGSService's 1 s timer does for a connected game, so a test can tell a
     /// display frozen at the disconnect from one that follows the local clock.

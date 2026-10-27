@@ -1,14 +1,18 @@
 import XCTest
 import UIKit
 
-/// Opt-in: Game Detail's CPU, memory and time under one theme, through fixed
-/// journeys, so runs under different themes can be compared. Set
+/// Opt-in: the CPU, memory and time of Game Detail and the other screens that
+/// wear the theme (Home, Public games, Game history, Settings) under one theme,
+/// through fixed journeys, so runs under different themes can be compared. Set
 /// TEST_RUNNER_SURROUND_THEME_PERFORMANCE=1 and choose the theme with
-/// TEST_RUNNER_SURROUND_PERFORMANCE_THEME (`standard`, the default, or
-/// `nebulaPearl`, `rakedGarden`, `surroundStudio` or `feltMeadow`). Standard runs in dark
-/// mode, or light as `standardLight` to compare light scene themes fairly;
-/// each scene theme chooses its own appearance. Append `Night` to an adaptive
-/// scene theme to fix its appearance in dark mode.
+/// TEST_RUNNER_SURROUND_PERFORMANCE_THEME (`standard`, the default, or any
+/// `SurroundTheme` raw value). Standard runs in dark mode, or light as
+/// `standardLight` to compare light scene themes fairly; each scene theme
+/// chooses its own appearance. Append `Night` to an adaptive scene theme to fix
+/// its appearance in dark mode. TEST_RUNNER_SURROUND_PERFORMANCE_TICKS=1 ticks
+/// every fixture clock each second, as a connected game's clock ticks, and
+/// TEST_RUNNER_SURROUND_PERFORMANCE_HOME_LAYOUT (`compact` or `full`) picks
+/// Home's layout instead of the idiom's default.
 ///
 /// Taps go to coordinates resolved before measuring, so XCUITest's element
 /// queries stay out of the measured blocks as far as possible. Each block
@@ -17,6 +21,8 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
     private typealias ID = SurroundUITestContract.AccessibilityID
 
     private var theme = "standard"
+    private var ticksClocks = false
+    private var homeLayout: String?
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -25,6 +31,8 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
             throw XCTSkip("Opt in to the Game Detail theme performance runs.")
         }
         theme = environment["SURROUND_PERFORMANCE_THEME"] ?? "standard"
+        ticksClocks = environment["SURROUND_PERFORMANCE_TICKS"] == "1"
+        homeLayout = environment["SURROUND_PERFORMANCE_HOME_LAYOUT"]
     }
 
     /// Board redraws: step back and forward through the game in Analyze.
@@ -112,7 +120,84 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
         }
     }
 
+    // MARK: - Screens beside Game Detail
+
+    /// Home at rest: with ticking clocks, each tick redraws what reads them.
+    /// The fixture's automatch search keeps a spinner turning, so the render
+    /// server redraws the boards' shadows on every frame here, ticks or not.
+    func testHomeIdle() {
+        let app = launch(into: .home, screen: ID.screenHome)
+        defer { app.terminate() }
+        Thread.sleep(forTimeInterval: 2)
+        measureJourney("home-idle", app: app) {
+            Thread.sleep(forTimeInterval: 10)
+        }
+    }
+
+    /// Home's games and their boards scrolling past the scene.
+    func testHomeScroll() {
+        let app = launch(into: .home, screen: ID.screenHome)
+        defer { app.terminate() }
+        measureScroll("home-scroll", app: app)
+    }
+
+    /// Public games: ten detailed boards at rest, clocks ticking if asked.
+    func testPublicGamesIdle() {
+        let app = launch(into: .publicGames, screen: ID.screenPublicGames)
+        defer { app.terminate() }
+        Thread.sleep(forTimeInterval: 2)
+        measureJourney("public-idle", app: app) {
+            Thread.sleep(forTimeInterval: 10)
+        }
+    }
+
+    /// Public games' detailed boards scrolling past the scene.
+    func testPublicGamesScroll() {
+        let app = launch(into: .publicGames, screen: ID.screenPublicGames)
+        defer { app.terminate() }
+        measureScroll("public-scroll", app: app)
+    }
+
+    /// Game history's rows scrolling past the scene.
+    func testGameHistoryScroll() {
+        let app = launch(into: .gameHistory, screen: ID.screenGameHistory)
+        defer { app.terminate() }
+        measureScroll("history-scroll", app: app)
+    }
+
+    /// Settings' panels and demo board scrolling past the scene.
+    func testSettingsScroll() {
+        let app = launch(into: .settings, screen: ID.screenSettings)
+        defer { app.terminate() }
+        measureScroll("settings-scroll", app: app)
+    }
+
     // MARK: - Helpers
+
+    /// Three flings down the screen and four back up, each left to settle.
+    private func measureScroll(_ name: String, app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        let lower = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.78))
+        let upper = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.30))
+        Thread.sleep(forTimeInterval: 1)
+        measureJourney(name, app: app) {
+            for down in [true, true, true, false, false, false, false] {
+                (down ? lower : upper).press(forDuration: 0.01, thenDragTo: down ? upper : lower,
+                                             withVelocity: .fast, thenHoldForDuration: 0)
+                Thread.sleep(forTimeInterval: 1.2)
+            }
+        }
+    }
+
+    private func launch(into scene: SurroundUITestContract.CompatibilityScene,
+                        screen: String) -> XCUIApplication {
+        let app = launchApp(additionalLaunchArguments: launchArguments(scene: scene, artboard: false),
+                            orientation: .portrait)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: screen).firstMatch
+            .waitForExistence(timeout: 30))
+        Thread.sleep(forTimeInterval: 1)
+        return app
+    }
 
     private func measureJourney(_ name: String, app: XCUIApplication, block: () -> Void) {
         let options = XCTMeasureOptions()
@@ -129,27 +214,40 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
     }
 
     private func mark(_ event: String, _ journey: String, _ iteration: Int) {
-        let line = String(format: "[ThemePerf] %@ theme=%@ journey=%@ iteration=%d epoch=%.3f\n",
-                          event, theme, journey, iteration, Date().timeIntervalSince1970)
+        let line = String(format: "[ThemePerf] %@ theme=%@ journey=%@ iteration=%d epoch=%.3f ticks=%d\n",
+                          event, theme, journey, iteration, Date().timeIntervalSince1970, ticksClocks ? 1 : 0)
         FileHandle.standardOutput.write(Data(line.utf8))
     }
 
-    private func launchAtHome() -> XCUIApplication {
+    private func launchArguments(scene: SurroundUITestContract.CompatibilityScene,
+                                 artboard: Bool) -> [String] {
         var arguments = [SurroundUITestContract.compatibilityScreenshotLaunchArgument,
                          SurroundUITestContract.emptyMessagesLaunchArgument,
-                         SurroundUITestContract.compatibilitySceneLaunchArgument,
-                         SurroundUITestContract.CompatibilityScene.home.rawValue,
-                         SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, "1"]
+                         SurroundUITestContract.compatibilitySceneLaunchArgument, scene.rawValue]
+        if artboard {
+            arguments += [SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, "1"]
+        }
         if theme == "standard" || theme == "standardLight" {
             arguments += [SurroundUITestContract.appearanceLaunchArgument,
                           theme == "standard" ? "dark" : "light"]
-        } else if ["rakedGardenNight", "surroundStudioNight", "feltMeadowNight"].contains(theme) {
+        } else if theme.hasSuffix("Night") {
             arguments += [SurroundUITestContract.themeLaunchArgument, String(theme.dropLast("Night".count)),
                           SurroundUITestContract.appearanceLaunchArgument, "dark"]
         } else {
             arguments += [SurroundUITestContract.themeLaunchArgument, theme]
         }
-        let app = launchApp(additionalLaunchArguments: arguments, orientation: .portrait)
+        if ticksClocks {
+            arguments.append(SurroundUITestContract.fixtureClockTicksLaunchArgument)
+        }
+        if let homeLayout {
+            arguments += [SurroundUITestContract.homeDisplayModeLaunchArgument, homeLayout]
+        }
+        return arguments
+    }
+
+    private func launchAtHome() -> XCUIApplication {
+        let app = launchApp(additionalLaunchArguments: launchArguments(scene: .home, artboard: true),
+                            orientation: .portrait)
         element(ID.screenHome, in: app)
         return app
     }

@@ -93,6 +93,12 @@ enum SurroundUITestContract {
     static let themeLaunchArgument = "--surround-ui-theme"
     /// Starts the isolated preferences suite with the theme on Games only.
     static let themeGamesOnlyLaunchArgument = "--surround-ui-theme-games-only"
+    /// Starts the isolated preferences suite with Home in this layout:
+    /// `--surround-ui-home-display-mode compact` or `full`.
+    static let homeDisplayModeLaunchArgument = "--surround-ui-home-display-mode"
+    /// Ticks every fixture game's clock each second, as OGSService's timer
+    /// does for connected games, so performance runs see live clocks.
+    static let fixtureClockTicksLaunchArgument = "--surround-fixture-clock-ticks"
     /// Caps Home's Appearance popover at this many points, as a short screen
     /// or window does: `--surround-ui-appearance-popover-height 360`.
     static let appearancePopoverHeightLaunchArgument = "--surround-ui-appearance-popover-height"
@@ -321,6 +327,10 @@ enum SurroundUITestContract {
     static var simulatesGameDetailSocketDown: Bool {
         (isCapturingCompatibilityScreenshots || isCapturingAppStoreScreenshots)
             && ProcessInfo.processInfo.arguments.contains(gameDetailSocketDownLaunchArgument)
+    }
+
+    static var ticksFixtureClocks: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains(fixtureClockTicksLaunchArgument)
     }
 
     /// Comma-separated audit variants, usable with either offline capture route.
@@ -645,6 +655,7 @@ enum SurroundUITestContract {
     static let isCapturingCompatibilityScreenshots = false
     static let gameDetailDesignArtboard: Int? = nil
     static let simulatesGameDetailSocketDown = false
+    static let ticksFixtureClocks = false
     static let simulatesUnavailableProfile = false
     static let simulatesUnavailableProfileSections = false
     static let includesProfileContent = false

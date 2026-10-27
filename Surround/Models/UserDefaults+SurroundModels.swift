@@ -39,6 +39,10 @@ private func makeSurroundUserDefaults() -> UserDefaults {
         if arguments.contains(SurroundUITestContract.themeGamesOnlyLaunchArgument) {
             defaults.set(false, forKey: SettingKey<Bool>.themeAppliesToWholeApp.name)
         }
+        if let index = arguments.firstIndex(of: SurroundUITestContract.homeDisplayModeLaunchArgument),
+           arguments.indices.contains(index + 1) {
+            defaults.set(arguments[index + 1], forKey: SettingKey<String>.homeViewDisplayMode.name)
+        }
         return defaults
     }
     #endif
