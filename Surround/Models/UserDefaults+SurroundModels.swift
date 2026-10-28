@@ -233,6 +233,12 @@ extension SettingKey {
     static var themeAppliesToWholeApp: SettingKey<Bool> {
         return .init(name: "themeAppliesToWholeApp", defaultValue: true)
     }
+
+    /// Where the iPad sidebar sits beside content (landscape), whether the
+    /// person folded it into the top tab bar.
+    static var iPadSidebarHidden: SettingKey<Bool> {
+        return .init(name: "iPadSidebarHidden", defaultValue: false)
+    }
 #endif
     
     static var hapticsFeedback: SettingKey<Bool> {

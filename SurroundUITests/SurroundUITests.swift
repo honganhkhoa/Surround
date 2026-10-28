@@ -1251,6 +1251,53 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         #endif
     }
 
+    /// A game hides the sidebar and the tab bar; leaving it restores the
+    /// person's choice between the sidebar and the top tab bar.
+    func testIPadLandscapeSidebarChoiceSurvivesGames() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("The Mac sidebar is always shown.")
+        #else
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad, "The iPad tab sidebar only.")
+        let id = SurroundUITestContract.AccessibilityID.self
+        let gameID = SurroundUITestContract.fixtureGameID
+        let app = launchApp()
+        element(id.screenHome, in: app)
+        let settingsRow = app.cells.matching(identifier: id.navigationSettings).firstMatch
+        func visitGame() {
+            tap(id.homeGamePlayerInfo(gameID), in: app)
+            element(id.gameBoard, in: app)
+            // iOS 18 exposes the destination title; newer UIKit uses BackButton.
+            let back = app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@", "BackButton", "Active games"
+            )).firstMatch
+            tap(back, description: "Back to active games", in: app)
+            XCTAssertTrue(app.navigationBars["Active games"].waitForExistence(timeout: 10))
+            // Let the sidebar finish any change before checking it.
+            Thread.sleep(forTimeInterval: 1)
+        }
+        func rotateToPortraitAndBack() {
+            XCUIDevice.shared.orientation = .portrait
+            Thread.sleep(forTimeInterval: 2)
+            XCUIDevice.shared.orientation = .landscapeLeft
+            Thread.sleep(forTimeInterval: 2)
+        }
+        XCTAssertTrue(waitUntilHittable(settingsRow, timeout: 10), "Landscape opens with the sidebar shown")
+        visitGame()
+        XCTAssertTrue(waitUntilHittable(settingsRow, timeout: 10), "Leaving a game brings the sidebar back")
+        rotateToPortraitAndBack()
+        XCTAssertTrue(waitUntilHittable(settingsRow, timeout: 10), "Rotating back to landscape brings the sidebar back")
+
+        guard let hide = nativeSidebarToggle(in: app) else { return XCTFail("Expected the sidebar's own toggle") }
+        tap(hide, description: "Fold the sidebar into the top tab bar", in: app)
+        let folded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == false"), object: settingsRow)
+        XCTAssertEqual(waitWithFinalCheck(for: [folded], timeout: 10), .completed)
+        visitGame()
+        XCTAssertFalse(settingsRow.isHittable, "Leaving a game keeps the top tab bar the person chose")
+        rotateToPortraitAndBack()
+        XCTAssertFalse(settingsRow.isHittable, "Rotating back to landscape keeps the top tab bar the person chose")
+        #endif
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,

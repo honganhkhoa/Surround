@@ -77,13 +77,15 @@ struct IPadTabContainer: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIViewController(context: Context) -> UITabBarController {
-        context.coordinator.makeController(
+        context.coordinator.persistsSidebarChoice = context.environment.surroundAllowsLocalPersistence
+        return context.coordinator.makeController(
             regularWidth: context.environment.horizontalSizeClass == .regular,
             layoutDirection: context.environment.layoutDirection
         )
     }
 
     func updateUIViewController(_ controller: UITabBarController, context: Context) {
+        context.coordinator.persistsSidebarChoice = context.environment.surroundAllowsLocalPersistence
         context.coordinator.update(
             self, regularWidth: context.environment.horizontalSizeClass == .regular,
             layoutDirection: context.environment.layoutDirection
@@ -110,6 +112,15 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         private var pendingMetrics: IPadTabMetrics?
         private var deliveredMetrics: IPadTabMetrics?
         private var metricsDeliveryScheduled = false
+        /// Where the sidebar sits beside content, the person's choice between
+        /// it and the top tab bar. It outlives games and launches.
+        private var prefersSidebarHidden = userDefaults[.iPadSidebarHidden] ?? false
+        var persistsSidebarChoice = true
+        /// The window size at which the open sidebar last sat beside content.
+        private var sidebarBesideContentSize: CGSize?
+        private var changingSidebar = false
+        private var selectingTab = false
+        private var revealedByPerson = false
 
         init(_ parent: IPadTabContainer) { self.parent = parent }
 
@@ -120,6 +131,10 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             controller.delegate = self
             controller.mode = .tabSidebar
             controller.sidebar.preferredLayout = .overlap
+            // From iPadOS 26, UIKit restores the sidebar's last toggled
+            // visibility under this identifier. UI tests start from its default.
+            if SurroundUITestContract.isEnabled { controller.customizationIdentifier = UUID().uuidString }
+            if prefersSidebarHidden { controller.sidebar.isHidden = true }
             controller.sidebar.delegate = self
             controller.onHorizontalSizeClassChange = { [weak self] in
                 self?.hiddenHostBaselines.removeAll()
@@ -197,7 +212,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             // The first direction is set at creation; only a later flip moves
             // the sidebar to the other edge.
             if current != .unspecified {
-                controller.sidebar.isHidden = true
+                setSidebarHidden(true)
                 hiddenHostBaselines.removeAll()
             }
             controller.view.semanticContentAttribute = attribute
@@ -208,7 +223,31 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         /// In overlay widths (portrait) UIKit closes it after a selection.
         private func closeSidebarOverGame() {
             guard let controller, controller.isTabBarHidden else { return }
-            controller.sidebar.isHidden = true
+            setSidebarHidden(true)
+        }
+
+        /// The app's own changes never count as the person's choice.
+        private func setSidebarHidden(_ hidden: Bool) {
+            guard let controller, controller.sidebar.isHidden != hidden else { return }
+            changingSidebar = true
+            controller.sidebar.isHidden = hidden
+            changingSidebar = false
+        }
+
+        private func saveSidebarChoice(hidden: Bool) {
+            prefersSidebarHidden = hidden
+            if persistsSidebarChoice { userDefaults[.iPadSidebarHidden] = hidden }
+        }
+
+        /// Leaving a game puts back the person's choice. UIKit forgets its
+        /// own once the app changes the sidebar.
+        private func restoreSidebarChoice() {
+            guard let controller, !controller.isTabBarHidden else { return }
+            if prefersSidebarHidden {
+                setSidebarHidden(true)
+            } else if sidebarBesideContentSize == controller.view.bounds.size {
+                setSidebarHidden(false)
+            }
         }
 
         private func applyTabs(regularWidth: Bool) {
@@ -290,6 +329,8 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
 
         func tabBarController(_ controller: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
+            selectingTab = true
+            DispatchQueue.main.async { [weak self] in self?.selectingTab = false }
             closeSidebarOverGame()
             switch effectiveRoot(tab) {
             case .profile:
@@ -315,6 +356,17 @@ struct IPadTabContainer: UIViewControllerRepresentable {
 
         func tabBarController(_ controller: UITabBarController, sidebarVisibilityWillChange sidebar: UITabBarController.Sidebar,
                               animator: any UITabBarController.Sidebar.Animating) {
+            // Only the person's own toggle beside content is a choice: not the
+            // app's, not UIKit's after a selection or a resize, not over a game.
+            revealedByPerson = false
+            if !changingSidebar, !selectingTab, !controller.isTabBarHidden,
+               self.controller?.isTransitioningSize == false {
+                if !sidebar.isHidden {
+                    revealedByPerson = true
+                } else if sidebarBesideContentSize == controller.view.bounds.size {
+                    saveSidebarChoice(hidden: true)
+                }
+            }
             sidebarTransitionID = UUID()
             sidebarTransitionInProgress = true
             let transitionID = sidebarTransitionID
@@ -327,6 +379,12 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                     self.deliverMetrics()
                     self.sidebarTransitionInProgress = false
                     self.measureLayout()
+                    // An opened overlay (portrait) is not a choice.
+                    if self.revealedByPerson, let controller = self.controller, !controller.sidebar.isHidden,
+                       self.sidebarBesideContentSize == controller.view.bounds.size {
+                        self.saveSidebarChoice(hidden: false)
+                    }
+                    self.revealedByPerson = false
                 }
             }
         }
@@ -366,6 +424,14 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             available = regularWidth && controller.mode != .tabBar
             #endif
             let visible = available && !controller.sidebar.isHidden
+            if visible && !controller.isTabBarHidden && !sidebarTransitionInProgress {
+                // Beside content, the host's leading inset makes room for it;
+                // an overlay leaves only the window's own edge.
+                let leading = rightToLeft ? hostInsets.right - physicalRight : hostInsets.left - physicalLeft
+                let size = controller.view.bounds.size
+                if leading > 0.5 { sidebarBesideContentSize = size }
+                else if sidebarBesideContentSize == size { sidebarBesideContentSize = nil }
+            }
             let key = IPadHostBaselineKey(root: selectedRoot, width: bounds.width, height: bounds.height,
                 physicalLeft: physicalLeft, physicalRight: physicalRight, rightToLeft: rightToLeft)
             func logical(_ insets: UIEdgeInsets) -> EdgeInsets {
@@ -425,7 +491,8 @@ struct IPadTabContainer: UIViewControllerRepresentable {
                 // the drawer's bottom inset, which shrinks the game's board.
                 hiddenHostBaselines.removeAll()
                 controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
-                controller.sidebar.isHidden = true
+                setSidebarHidden(true)
+                restoreSidebarChoice()
             }
         }
 
@@ -488,6 +555,9 @@ private final class IPadTabGroupContentController: UIViewController {
 private final class IPadTabBarController: UITabBarController {
     var onHorizontalSizeClassChange: ((Bool) -> Void)?
     var onLayout: (() -> Void)?
+    /// A rotation or window resize, during which UIKit moves the sidebar
+    /// itself.
+    private(set) var isTransitioningSize = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -503,14 +573,17 @@ private final class IPadTabBarController: UITabBarController {
     /// it was closed before. A sidebar the person opened stays open.
     override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
         let keepsSidebarClosed = isTabBarHidden && sidebar.isHidden
+        isTransitioningSize = true
         super.viewWillTransition(to: size, with: coordinator)
-        guard keepsSidebarClosed else { return }
         coordinator.animate(alongsideTransition: { [weak self] _ in
-            self?.closeSidebarIfReopened()
+            if keepsSidebarClosed { self?.closeSidebarIfReopened() }
         }) { [weak self] _ in
-            self?.closeSidebarIfReopened()
+            if keepsSidebarClosed { self?.closeSidebarIfReopened() }
             // UIKit can apply its restored visibility after the completion.
-            DispatchQueue.main.async { [weak self] in self?.closeSidebarIfReopened() }
+            DispatchQueue.main.async { [weak self] in
+                if keepsSidebarClosed { self?.closeSidebarIfReopened() }
+                self?.isTransitioningSize = false
+            }
         }
     }
 
