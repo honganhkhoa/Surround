@@ -267,7 +267,7 @@ jobs:
 
   ipad-profile-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 135
+    timeout-minutes: 185
 
     steps:
       - uses: actions/checkout@v4
@@ -294,7 +294,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad profile UI tests, part 1 of 2
+      - name: Run iPad profile UI tests, part 1 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -302,12 +302,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh profile-1 \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run iPad profile UI tests, part 2 of 2
+      - name: Run iPad profile UI tests, part 2 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh profile-2 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run iPad profile UI tests, part 3 of 3
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile-3 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad profile UI test results
@@ -323,7 +331,7 @@ jobs:
   # step also warms the UI build's derived data.
   minimum-ios-18:
     runs-on: macos-15
-    timeout-minutes: 155
+    timeout-minutes: 205
 
     steps:
       - uses: actions/checkout@v4
@@ -381,7 +389,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad profile UI tests on iPadOS 18, part 1 of 2
+      - name: Run iPad profile UI tests on iPadOS 18, part 1 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -389,12 +397,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh profile-1 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run iPad profile UI tests on iPadOS 18, part 2 of 2
+      - name: Run iPad profile UI tests on iPadOS 18, part 2 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh profile-2 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run iPad profile UI tests on iPadOS 18, part 3 of 3
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh profile-3 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iOS 18 test results
