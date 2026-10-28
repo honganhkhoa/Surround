@@ -114,6 +114,10 @@ struct AnalyzeControlBar: View {
     }
 
     var body: some View {
+        // ViewThatFits picks the first row whose ideal width fits, then gives
+        // it the whole bar, so the row's spacer keeps the editing tools at the
+        // leading edge and navigation at the trailing edge. Fixing the rows'
+        // width would collapse that spacer and centre every control together.
         ViewThatFits(in: .horizontal) {
             if analysisAvailable {
                 if showsConditionalMoveQuickAction && selectedPosition != nil
@@ -126,25 +130,21 @@ struct AnalyzeControlBar: View {
                         conditionalMoveQuickActionPresentation: .labeled,
                         showsLiveButton: false
                     )
-                    .fixedSize(horizontal: true, vertical: false)
                     controlBarContent(
                         showsAdjacentBranches: true,
                         conditionalMoveQuickActionPresentation: .iconOnly,
                         showsLiveButton: false
                     )
-                    .fixedSize(horizontal: true, vertical: false)
                     controlBarContent(
                         showsAdjacentBranches: false,
                         conditionalMoveQuickActionPresentation: .labeled,
                         showsLiveButton: false
                     )
-                    .fixedSize(horizontal: true, vertical: false)
                     controlBarContent(
                         showsAdjacentBranches: false,
                         conditionalMoveQuickActionPresentation: .iconOnly,
                         showsLiveButton: false
                     )
-                    .fixedSize(horizontal: true, vertical: false)
                 } else {
                     controlBarContent(
                         showsAdjacentBranches: true,
@@ -152,7 +152,6 @@ struct AnalyzeControlBar: View {
                         showsLiveButton: false,
                         showsConditionalShortcut: false
                     )
-                    .fixedSize(horizontal: true, vertical: false)
                 }
                 // At the absolute 254pt minimum, the conditional action remains
                 // in More and the five essential targets retain their width.
@@ -162,7 +161,6 @@ struct AnalyzeControlBar: View {
                     showsLiveButton: false,
                     showsConditionalShortcut: false
                 )
-                .fixedSize(horizontal: true, vertical: false)
             } else {
                 controlBarContent(
                     showsAdjacentBranches: false,
