@@ -134,13 +134,16 @@ for test_name in "$keyboard_preflight_test_name" "${composer_test_names[@]}"; do
   fi
 done
 
-# Each part runs under supervise-ipad-ui-test-part.py. CI gives each part step
-# 50 minutes; at 46 the supervisor interrupts xcodebuild, which then has time
-# to write its result bundle and the supervisor its evidence: at most 1:45 of
-# signal grace and under a minute of bounded collection. A test that a
-# simulator crash killed, or that failed only because XCTest timed out on a UI
-# query, is rerun once, within the same 46 minutes.
+# Each part, and the composer and continuity phases, run under
+# supervise-ipad-ui-test-part.py. CI gives each part step 50 minutes; at 46 the
+# supervisor interrupts xcodebuild, which then has time to write its result
+# bundle and the supervisor its evidence: at most 1:45 of signal grace and
+# under a minute of bounded collection. The composer and continuity steps get
+# 45 minutes and the same margin. A test that a simulator crash killed, or
+# that failed only because XCTest timed out on a UI query, is rerun once,
+# within the same deadline.
 readonly part_deadline_seconds=$((46 * 60))
+readonly isolated_phase_deadline_seconds=$((41 * 60))
 
 # The main, profile, and Messages phases each outgrew one CI step, so CI runs
 # each in two parts. Part 2 runs every second test declaration of the phase's
@@ -187,6 +190,25 @@ common_arguments=(
   -derivedDataPath "$derived_data_path"
   -parallel-testing-enabled NO
 )
+
+# Runs the selected tests under the supervisor into one result bundle; its
+# failure evidence goes beside the bundle.
+run_supervised_tests() {
+  local deadline_seconds="$1" result_bundle="$2"
+  shift 2
+  python3 .github/ci-tools/supervise-ipad-ui-test-part.py \
+    --simulator "$simulator_id" \
+    --deadline-seconds "$deadline_seconds" \
+    --diagnostics "${result_bundle%.xcresult}-Diagnostics" \
+    -- \
+    xcodebuild test-without-building \
+    "${common_arguments[@]}" \
+    "$@" \
+    -test-timeouts-enabled YES \
+    -default-test-execution-time-allowance 900 \
+    -maximum-test-execution-time-allowance 900 \
+    -resultBundlePath "$result_bundle"
+}
 
 case "$phase" in
   build)
@@ -291,19 +313,9 @@ case "$phase" in
     fi
 
     echo "Running part ${part} of 2 of the iPad ${part_result_name} UI tests."
-    part_result_bundle="TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult"
-    python3 .github/ci-tools/supervise-ipad-ui-test-part.py \
-      --simulator "$simulator_id" \
-      --deadline-seconds "$part_deadline_seconds" \
-      --diagnostics "${part_result_bundle%.xcresult}-Diagnostics" \
-      -- \
-      xcodebuild test-without-building \
-      "${common_arguments[@]}" \
-      "${selection_arguments[@]}" \
-      -test-timeouts-enabled YES \
-      -default-test-execution-time-allowance 900 \
-      -maximum-test-execution-time-allowance 900 \
-      -resultBundlePath "$part_result_bundle"
+    run_supervised_tests "$part_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-${part_result_name}-${part}.xcresult" \
+      "${selection_arguments[@]}"
     ;;
 
   messages)
@@ -327,26 +339,16 @@ case "$phase" in
     done
 
     echo "Running the isolated iPad composer and keyboard UI tests."
-    xcodebuild test-without-building \
-      "${common_arguments[@]}" \
-      "${selection_arguments[@]}" \
-      -test-timeouts-enabled YES \
-      -default-test-execution-time-allowance 900 \
-      -maximum-test-execution-time-allowance 900 \
-      -resultBundlePath \
-      "TestResults/SurroundUITests-${result_label}-Composer.xcresult"
+    run_supervised_tests "$isolated_phase_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-Composer.xcresult" \
+      "${selection_arguments[@]}"
     ;;
 
   continuity)
     mkdir -p TestResults
     echo "Running the iPad game layout and interaction continuity UI tests."
-    xcodebuild test-without-building \
-      "${common_arguments[@]}" \
-      "-only-testing:${continuity_test_case}" \
-      -test-timeouts-enabled YES \
-      -default-test-execution-time-allowance 900 \
-      -maximum-test-execution-time-allowance 900 \
-      -resultBundlePath \
-      "TestResults/SurroundUITests-${result_label}-Continuity.xcresult"
+    run_supervised_tests "$isolated_phase_deadline_seconds" \
+      "TestResults/SurroundUITests-${result_label}-Continuity.xcresult" \
+      "-only-testing:${continuity_test_case}"
     ;;
 esac

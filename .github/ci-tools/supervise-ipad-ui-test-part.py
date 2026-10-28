@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one CI UI-test part under a deadline and rerun only simulator-crash and query-timeout victims.
+"""Run one CI UI-test step under a deadline and rerun only simulator-crash and query-timeout victims.
 
 Usage: supervise-ipad-ui-test-part.py --simulator UUID --deadline-seconds 2760 \
     --diagnostics DIR -- xcodebuild test-without-building ... -resultBundlePath NAME.xcresult
@@ -13,7 +13,8 @@ once, into NAME-Rerun.xcresult, only when every failure is either a test
 crashed by SIGTERM or SIGKILL, or XCTest timing out while it evaluated a UI
 query; neither the app nor its test runner left a crash report; and, for a
 crash, a SimRenderServer crash report or CoreSimulator's rendering-service
-recovery appeared during the run. Before the rerun, the simulator must read
+recovery appeared during the run; for a query timeout, XCTest never reported
+the app failing to go idle during that test. Before the rerun, the simulator must read
 Booted and `simctl bootstatus` must report its boot finished. Python 3.9+;
 macOS xcrun.
 """
@@ -46,6 +47,19 @@ CRASH_FAILURE = re.compile(r"Test crashed with signal (?:term|kill)\.?")
 QUERY_TIMEOUT_FAILURE = re.compile(
     r"Failed to (?:get matching snapshots?|resolve query): Timed out while evaluating UI query\.?")
 FAILED_TEST_CASE = re.compile(r"Test Case '-\[(\w+)\.(\w+) (\w+)\]' failed \((\d+(?:\.\d+)?) seconds\)")
+STARTED_TEST_CASE = re.compile(r"Test Case '-\[(\w+)\.(\w+) (\w+)\]' started")
+ENDED_TEST_CASE = re.compile(r"Test Case '-\[[^]]+\]' (?:passed|failed|skipped)")
+WAIT_FOR_IDLE = re.compile(r"Wait for (\S+) to idle")
+# XCTest's notes that a wait for the app to go idle gave up. In CI, the one
+# query timeout that matched a hang (continuity, where another run of the same
+# step failed with "process main thread busy") came right after such a note
+# ended the app's last idle wait. None of ten stall timeouts did, although the
+# note also appears in tests that recover, during stall episodes too. So only a
+# note ending the app's latest idle wait counts. The composer phase's
+# keyboard-animation stall prints the first note as well, so such a composer
+# failure stays red.
+APP_NOT_IDLE = ("App animations complete notification not received",
+                "App event loop idle notification not received")
 # About what xcodebuild spends around a part's tests: 36 s before the first and
 # 64 s after the last until it reported the result, in CI run 40462251724's
 # iPadOS 26 Messages part 2.
@@ -166,7 +180,7 @@ def rerun_seconds(tests, durations, min_rerun):
 
     A query-timeout rerun needs xcodebuild's overhead plus the time each test
     ran in the first attempt, until it failed. A long journey that failed early
-    can take longer to pass; the deadline then stops the rerun, and the part
+    can take longer to pass; the deadline then stops the rerun, and the step
     fails as it would have without one. A crash rerun follows a reboot, and a
     crashed test's duration is cut short, so a rerun with a crash or an unknown
     duration needs at least `min_rerun`.
@@ -285,7 +299,7 @@ def rerun_decision(attempt, summary, summary_error, reports, recovered, remainin
     if attempt["externalSignal"]:
         return None, "the step was interrupted"
     if attempt["stoppedAtDeadline"]:
-        return None, "the part reached its deadline"
+        return None, "the step reached its deadline"
     if summary is None:
         return None, "the result bundle could not be read: " + (summary_error or "unknown error")
     tests, reason = rerun_candidates(summary)
@@ -299,6 +313,11 @@ def rerun_decision(attempt, summary, summary_error, reports, recovered, remainin
     if (any("crash" in causes for causes in tests.values()) and not recovered
             and not any(report["process"] == SIMULATOR_CRASH_PROCESS for report in reports)):
         return None, "no SimRenderServer crash report or rendering-service recovery appeared"
+    not_idle = attempt.get("appNotIdle") or {}
+    for test in sorted(tests):
+        if "queryTimeout" in tests[test] and test in not_idle:
+            return None, "the app did not go idle before {} failed (\"{}\"), so its query timeout may be a hang".format(
+                test, not_idle[test])
     needed = rerun_seconds(tests, attempt.get("failedTestSeconds") or {}, min_rerun)
     if remaining < needed:
         return None, "only {:.0f} s remain before the deadline, and the rerun needs {:.0f} s".format(
@@ -335,7 +354,8 @@ class Supervisor:
         """Run one xcodebuild, mirroring its output; stop it at the shared deadline."""
         result = {"command": command, "exitCode": None, "stoppedAtDeadline": False,
                   "signalsSent": [], "externalSignal": None,
-                  "consoleMarkers": dict.fromkeys(CONSOLE_MARKERS, 0), "failedTestSeconds": {}}
+                  "consoleMarkers": dict.fromkeys(CONSOLE_MARKERS, 0), "failedTestSeconds": {},
+                  "appNotIdle": {}}
         started = time.monotonic()
         if self.external_signals:
             result["externalSignal"] = self.external_signals[0]
@@ -345,6 +365,7 @@ class Supervisor:
         handled_signals = 0
         stdout_held = False
         capture = None
+        current_test = idle_wait = None
         mirror = True
         with open(console_path, "wb", buffering=0) as console:
             child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -393,10 +414,23 @@ class Supervisor:
                                 for name, marker in CONSOLE_MARKERS.items():
                                     if marker in text:
                                         result["consoleMarkers"][name] += 1
+                                test_started = STARTED_TEST_CASE.search(text)
+                                if test_started:
+                                    current_test, idle_wait = "/".join(test_started.group(1, 2, 3)), None
+                                wait = WAIT_FOR_IDLE.search(text)
+                                if wait:
+                                    idle_wait = wait.group(1)
+                                    if idle_wait == TESTED_BUNDLES[0] and current_test:
+                                        result["appNotIdle"].pop(current_test, None)
+                                marker = next((marker for marker in APP_NOT_IDLE if marker in text), None)
+                                if marker and current_test and idle_wait == TESTED_BUNDLES[0]:
+                                    result["appNotIdle"][current_test] = marker
                                 failed = FAILED_TEST_CASE.search(text)
                                 if failed:
                                     result["failedTestSeconds"]["/".join(failed.group(1, 2, 3))] = float(
                                         failed.group(4))
+                                if ENDED_TEST_CASE.search(text):
+                                    current_test = None
                             pending = pending[-1024 * 1024:]
             finally:
                 if child.poll() is None:  # Only an exception can leave the loop early.
@@ -689,7 +723,7 @@ def run(args):
         if interrupted():
             return status["exitCode"]
         if attempt["stoppedAtDeadline"]:
-            annotate("error", "UI-test part deadline",
+            annotate("error", "UI-test deadline",
                      "xcodebuild was interrupted after {:.0f} minutes; see {}.".format(
                          args.deadline_seconds / 60, output))
             status["exitCode"] = DEADLINE_EXIT_CODE
@@ -746,7 +780,7 @@ def run(args):
         if interrupted():
             return status["exitCode"]
         if rerun["stoppedAtDeadline"]:
-            annotate("error", "UI-test part deadline", "The deadline stopped the rerun of {}; see {}.".format(
+            annotate("error", "UI-test deadline", "The deadline stopped the rerun of {}; see {}.".format(
                 names, rerun_bundle))
             status["exitCode"] = DEADLINE_EXIT_CODE
         else:

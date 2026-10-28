@@ -54,6 +54,12 @@ QUERY_TIMEOUT_SUMMARY = {
 }
 QUERY_TIMEOUT_CONSOLE = ("Test Case '-[SurroundUITests.MessagesNavigationUITests "
                          "testMessagesSearchLoadingFailureAndRetryKeepNavigationStable]' failed (129.486 seconds).")
+QUERY_TIMEOUT_STARTED = ("Test Case '-[SurroundUITests.MessagesNavigationUITests "
+                         "testMessagesSearchLoadingFailureAndRetryKeepNavigationStable]' started.")
+# What XCTest printed before CI run 40534450628's continuity timeout, which matched a main-thread hang.
+NOT_IDLE = "    t =   124.85s App animations complete notification not received, will attempt to continue."
+APP_IDLE_WAIT = "    t =    64.82s     Wait for com.honganhkhoa.Surround to idle"
+SPRINGBOARD_IDLE_WAIT = "    t =     3.41s Wait for com.apple.springboard to idle"
 PASSED_SUMMARY = {"result": "Passed", "failedTests": 0, "passedTests": 1, "testFailures": []}
 EMPTY_SUMMARY = {"result": "Passed", "failedTests": 0, "passedTests": 0, "testFailures": []}
 SIM_RENDER_REPORT = {
@@ -285,6 +291,16 @@ class DecisionTests(unittest.TestCase):
         self.assertIn("needs 300 s", self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=239)[1])
         self.assertEqual(self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=300)[0],
                          [QUERY_SELECTOR])
+
+    def test_a_query_timeout_after_the_app_did_not_go_idle_never_reruns(self):
+        not_idle = dict(self.ATTEMPT, failedTestSeconds={QUERY_SELECTOR: 129.486},
+                        appNotIdle={QUERY_SELECTOR: "App animations complete notification not received"})
+        tests, reason = self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), attempt=not_idle)
+        self.assertIsNone(tests)
+        self.assertIn("did not go idle before " + QUERY_SELECTOR + " failed", reason)
+        # A crashed test is not held to it: a dead render server stops animations too.
+        crashed = dict(self.ATTEMPT, appNotIdle={SELECTOR: "App animations complete notification not received"})
+        self.assertEqual(self.decide(attempt=crashed), ([SELECTOR], None))
 
     def test_app_hangs_and_quoted_timeouts_never_rerun(self):
         for text in ("Failed to get matching snapshots: Unable to perform work on main run loop, "
@@ -573,7 +589,7 @@ class SupervisorProcessTests(unittest.TestCase):
                                      deadline=3)
         self.assertEqual(result.returncode, 124, result.stdout)
         self.assertLess(time.monotonic() - started, 15)
-        self.assertIn(b"::error title=UI-test part deadline::", result.stdout)
+        self.assertIn(b"::error title=UI-test deadline::", result.stdout)
         self.assertEqual(self.worker_marker.read_text(), "interrupted")
         attempt = self.status()["attempts"][0]
         self.assertTrue(attempt["stoppedAtDeadline"])
@@ -839,6 +855,35 @@ class SupervisorProcessTests(unittest.TestCase):
         self.assertEqual(status["rerun"]["boot"]["states"], ["Booted"])
         self.assertIsNone(status["crashSummary"])
         self.assertEqual(status["attempts"][0]["failedTestSeconds"], {QUERY_SELECTOR: 129.486})
+
+    def test_only_a_note_ending_the_apps_last_idle_wait_blocks_a_query_timeout_rerun(self):
+        other = "Test Case '-[SurroundUITests.MessagesNavigationUITests testOther]' started."
+        other_ended = "Test Case '-[SurroundUITests.MessagesNavigationUITests testOther]' passed (61.000 seconds)."
+        scenarios = {
+            # As in CI run 40534450628: the app's last idle wait gave up, then a query timed out.
+            "the failed test's last wait": (
+                [QUERY_TIMEOUT_STARTED, APP_IDLE_WAIT, NOT_IDLE, QUERY_TIMEOUT_CONSOLE], False),
+            "another test": (
+                [other, APP_IDLE_WAIT, NOT_IDLE, other_ended, QUERY_TIMEOUT_STARTED, QUERY_TIMEOUT_CONSOLE], True),
+            "a later wait that ended": (
+                [QUERY_TIMEOUT_STARTED, APP_IDLE_WAIT, NOT_IDLE, APP_IDLE_WAIT, QUERY_TIMEOUT_CONSOLE], True),
+            "a SpringBoard wait": (
+                [QUERY_TIMEOUT_STARTED, APP_IDLE_WAIT, SPRINGBOARD_IDLE_WAIT, NOT_IDLE, QUERY_TIMEOUT_CONSOLE], True),
+            "after the test ended": (
+                [QUERY_TIMEOUT_STARTED, APP_IDLE_WAIT, QUERY_TIMEOUT_CONSOLE, APP_IDLE_WAIT, NOT_IDLE], True),
+        }
+        for name, (console, reruns) in scenarios.items():
+            with self.subTest(name):
+                self.tearDown()
+                self.setUp()
+                result = self.run_supervisor({"first": self.query_timeout(console=console),
+                                              "rerun": {"exit": 0, "summary": PASSED_SUMMARY}})
+                self.assertEqual(result.returncode, 0 if reruns else 65, result.stdout)
+                self.assertEqual(len(self.calls()), 2 if reruns else 1)
+                if not reruns:
+                    self.assertIn(b"No rerun: the app did not go idle before " + QUERY_SELECTOR.encode(), result.stdout)
+                    self.assertEqual(self.status()["attempts"][0]["appNotIdle"],
+                                     {QUERY_SELECTOR: "App animations complete notification not received"})
 
     def test_a_query_timeout_rerun_needs_its_measured_time_and_must_pass(self):
         result = self.run_supervisor({"first": self.query_timeout()}, deadline=220)
