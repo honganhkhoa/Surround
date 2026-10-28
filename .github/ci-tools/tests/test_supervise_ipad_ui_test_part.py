@@ -2,6 +2,7 @@
 """Supervisor regression tests use fake xcodebuild and xcrun only, never a real simulator."""
 
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -39,6 +40,20 @@ ASSERTION_SUMMARY = {
                       "targetName": "SurroundUITests",
                       "testIdentifierString": "MessagesNavigationUITests/testInitialTwoMessageOpeningStaysAboveComposerWithoutInput()"}],
 }
+QUERY_TIMED_OUT = "MessagesNavigationUITests/testMessagesSearchLoadingFailureAndRetryKeepNavigationStable()"
+QUERY_SELECTOR = "SurroundUITests/MessagesNavigationUITests/testMessagesSearchLoadingFailureAndRetryKeepNavigationStable"
+# The failure and console line CI run 40462251724 recorded when a UI query stalled.
+QUERY_TIMEOUT_SUMMARY = {
+    "result": "Failed", "failedTests": 1, "passedTests": 14, "skippedTests": 6,
+    "testFailures": [{
+        "failureText": "Failed to resolve query: Timed out while evaluating UI query.",
+        "targetName": "SurroundUITests",
+        "testIdentifierString": QUERY_TIMED_OUT,
+        "testName": "testMessagesSearchLoadingFailureAndRetryKeepNavigationStable()",
+    }],
+}
+QUERY_TIMEOUT_CONSOLE = ("Test Case '-[SurroundUITests.MessagesNavigationUITests "
+                         "testMessagesSearchLoadingFailureAndRetryKeepNavigationStable]' failed (129.486 seconds).")
 PASSED_SUMMARY = {"result": "Passed", "failedTests": 0, "passedTests": 1, "testFailures": []}
 EMPTY_SUMMARY = {"result": "Passed", "failedTests": 0, "passedTests": 0, "testFailures": []}
 SIM_RENDER_REPORT = {
@@ -70,6 +85,8 @@ FAKE_XCODEBUILD = textwrap.dedent("""\
         pids.write("%d\\n" % os.getpid())
     worker = None
     def finish(code):
+        if scenario.get("simulatorStateAfter"):
+            Path(os.environ["FAKE_SIM_STATE"]).write_text(scenario["simulatorStateAfter"])
         if worker is not None:
             try:
                 worker.wait(timeout=10)
@@ -127,12 +144,27 @@ FAKE_XCRUN = textwrap.dedent("""\
         if not summary.exists():
             sys.exit("no summary")
         print(summary.read_text())
-    elif arguments[:2] == ["simctl", "bootstatus"]:
+    elif arguments[:2] == ["simctl", "boot"]:
         import time
         time.sleep(float(os.environ.get("FAKE_BOOT_SECONDS", "0")))
-        sys.exit(int(os.environ.get("FAKE_BOOT_EXIT", "0")))
+        code = int(os.environ.get("FAKE_BOOT_EXIT", "0"))
+        after = os.environ.get("FAKE_BOOT_STATE_AFTER") or ("Booted" if code == 0 else None)
+        if after:
+            Path(os.environ["FAKE_SIM_STATE"]).write_text(after)
+        sys.exit(code)
+    elif arguments[:2] == ["simctl", "bootstatus"]:
+        import time
+        print("Status=4, isTerminal=NO\\n\\tWaiting on System App", flush=True)
+        time.sleep(float(os.environ.get("FAKE_BOOTSTATUS_SECONDS", "0")))
+        sys.exit(int(os.environ.get("FAKE_BOOTSTATUS_EXIT", "0")))
     elif arguments[:2] == ["simctl", "list"]:
-        print("{{}}")
+        # The state file holds comma-separated states, one per listing; the last one stays.
+        import time
+        time.sleep(float(os.environ.get("FAKE_LIST_SECONDS", "0")))
+        states = Path(os.environ["FAKE_SIM_STATE"]).read_text().split(",")
+        Path(os.environ["FAKE_SIM_STATE"]).write_text(",".join(states[1:] or states))
+        device = {{"udid": os.environ["FAKE_UDID"].lower(), "state": states[0]}}
+        print(json.dumps({{"devices": {{"com.apple.CoreSimulator.SimRuntime.iOS-26-5": [device]}}}}))
     elif arguments[:3] == ["simctl", "io", arguments[2]] and arguments[3] == "screenshot":
         Path(arguments[4]).write_bytes(b"fake screenshot")
     else:
@@ -230,6 +262,63 @@ class DecisionTests(unittest.TestCase):
         self.assertIn("interrupted", self.decide(attempt=dict(self.ATTEMPT, externalSignal=15))[1])
         self.assertIn("could not be read", supervise.rerun_decision(
             self.ATTEMPT, None, "no result bundle", [], True, 1200, 300)[1])
+
+
+    def query_timeout(self, text, identifier=QUERY_TIMED_OUT):
+        return dict(QUERY_TIMEOUT_SUMMARY, testFailures=[dict(QUERY_TIMEOUT_SUMMARY["testFailures"][0],
+                                                              failureText=text, testIdentifierString=identifier)])
+
+    def test_query_timeouts_rerun_without_crash_evidence_in_their_measured_time(self):
+        timed = dict(self.ATTEMPT, failedTestSeconds={QUERY_SELECTOR: 129.486})
+        for text in ("Failed to resolve query: Timed out while evaluating UI query.",
+                     "Failed to get matching snapshots: Timed out while evaluating UI query.",
+                     "Failed to get matching snapshot: Timed out while evaluating UI query."):
+            self.assertEqual(self.decide(summary=self.query_timeout(text), reports=(), attempt=timed),
+                             ([QUERY_SELECTOR], None))
+        # CI's run had 239 s left: enough for xcodebuild's overhead and the 129-s test, not the 300-s floor.
+        self.assertEqual(self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=239, attempt=timed),
+                         ([QUERY_SELECTOR], None))
+        tests, reason = self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=220, attempt=timed)
+        self.assertIsNone(tests)
+        self.assertIn("the rerun needs 229 s", reason)
+        # Without a measured duration it needs the floor.
+        self.assertIn("needs 300 s", self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=239)[1])
+        self.assertEqual(self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), remaining=300)[0],
+                         [QUERY_SELECTOR])
+
+    def test_app_hangs_and_quoted_timeouts_never_rerun(self):
+        for text in ("Failed to get matching snapshots: Unable to perform work on main run loop, "
+                     "process main thread busy for 30.0s",
+                     "XCTAssertTrue failed - Failed to resolve query: Timed out while evaluating UI query.",
+                     "Failed to resolve query: Timed out while evaluating UI query. Retrying"):
+            tests, reason = self.decide(summary=self.query_timeout(text), reports=())
+            self.assertIsNone(tests, text)
+            self.assertIn("failed with", reason)
+
+    def test_query_timeouts_keep_the_other_gates(self):
+        self.assertIn("Surround", self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=("Surround",))[1])
+        timed_out = dict(self.ATTEMPT, consoleMarkers={"executionTimeAllowanceFailures": 1})
+        self.assertIn("execution time allowance",
+                      self.decide(summary=QUERY_TIMEOUT_SUMMARY, reports=(), attempt=timed_out)[1])
+        mixed = dict(QUERY_TIMEOUT_SUMMARY, failedTests=2,
+                     testFailures=QUERY_TIMEOUT_SUMMARY["testFailures"] + ASSERTION_SUMMARY["testFailures"])
+        self.assertIn("XCTAssertTrue failed", self.decide(summary=mixed, reports=())[1])
+        many = dict(QUERY_TIMEOUT_SUMMARY, failedTests=4, testFailures=[
+            dict(QUERY_TIMEOUT_SUMMARY["testFailures"][0], testIdentifierString="A/test{}()".format(index))
+            for index in range(4)])
+        self.assertIn("more than the 3", self.decide(summary=many, reports=())[1])
+
+    def test_a_crash_beside_a_query_timeout_still_needs_crash_evidence_and_the_floor(self):
+        both = dict(CRASH_SUMMARY, failedTests=2,
+                    testFailures=CRASH_SUMMARY["testFailures"] + QUERY_TIMEOUT_SUMMARY["testFailures"])
+        self.assertIn("no SimRenderServer", self.decide(summary=both, reports=())[1])
+        timed = dict(self.ATTEMPT, failedTestSeconds={QUERY_SELECTOR: 129.486, SELECTOR: 20})
+        self.assertEqual(self.decide(summary=both, attempt=timed), (sorted([SELECTOR, QUERY_SELECTOR]), None))
+        self.assertIn("needs 300 s", self.decide(summary=both, attempt=timed, remaining=299)[1])
+        # The crashed test's duration is cut short; the floor stands in for it.
+        long = dict(self.ATTEMPT, failedTestSeconds={QUERY_SELECTOR: 400, SELECTOR: 20})
+        self.assertIn("needs 500 s", self.decide(summary=both, attempt=long, remaining=450)[1])
+        self.assertIn("needs 300 s", self.decide(remaining=299, attempt=long)[1])
 
 
 class EvidenceTests(unittest.TestCase):
@@ -333,7 +422,9 @@ class SupervisorProcessTests(unittest.TestCase):
                         FAKE_SCENARIO=str(self.root / "scenario.json"), FAKE_REPORTS=str(self.root / "reports"),
                         FAKE_CORE_LOG=str(self.core_log), FAKE_WORKER_MARKER=str(self.worker_marker),
                         FAKE_READY=str(self.ready), FAKE_SLEEPER_PID=str(self.root / "sleeper.pid"),
-                        FAKE_PIDS=str(self.root / "fake.pids"), PYTHONDONTWRITEBYTECODE="1")
+                        FAKE_PIDS=str(self.root / "fake.pids"), FAKE_SIM_STATE=str(self.root / "sim-state"),
+                        FAKE_UDID=UDID, PYTHONDONTWRITEBYTECODE="1")
+        (self.root / "sim-state").write_text("Booted")
 
     def tearDown(self):
         # Each fake xcodebuild leads its own process group, as the real one does.
@@ -372,7 +463,9 @@ class SupervisorProcessTests(unittest.TestCase):
         return json.loads((self.diagnostics / "status.json").read_text())
 
     def crash(self, **changes):
+        # xcodebuild leaves a simulator that crashed Shutdown.
         first = {"exit": 65, "summary": CRASH_SUMMARY, "reports": [SIM_RENDER_REPORT],
+                 "simulatorStateAfter": "Shutdown",
                  "console": ["Restarting after unexpected exit, crash, or test timeout; summary will include totals."]}
         first.update(changes)
         return first
@@ -411,8 +504,12 @@ class SupervisorProcessTests(unittest.TestCase):
         self.assertIn("-skip-testing:SurroundUITests/MessagesNavigationUITests/testOther", first)
         self.assertEqual([value for value in rerun if "-testing" in value], ["-only-testing:" + SELECTOR])
         self.assertEqual(rerun[-2:], ["-resultBundlePath", self.bundle[:-len(".xcresult")] + "-Rerun.xcresult"])
-        self.assertIn(["simctl", "bootstatus", UDID, "-b"], self.calls("xcrun.jsonl"))
+        xcrun = self.calls("xcrun.jsonl")
+        self.assertLess(xcrun.index(["simctl", "boot", UDID]), xcrun.index(["simctl", "bootstatus", UDID]))
         status = self.status()
+        self.assertTrue(status["rerun"]["boot"]["finished"])
+        self.assertEqual(status["rerun"]["boot"]["states"], ["Shutdown", "Booted"])
+        self.assertEqual(status["rerun"]["causes"], ["crash"])
         self.assertEqual(status["exitCode"], 0)
         self.assertEqual(status["rerun"]["tests"], [SELECTOR])
         self.assertTrue(status["coreSimulatorRecovery"])
@@ -593,12 +690,170 @@ class SupervisorProcessTests(unittest.TestCase):
         self.assertIn("interrupted", status["rerun"]["reasonNotRerun"])
         self.assertIn("crashReports", status["rerun"])
 
-    def test_the_time_minimum_is_checked_again_after_a_slow_boot(self):
-        self.env["FAKE_BOOT_SECONDS"] = "6"
+    def test_a_boot_slower_than_the_time_left_is_cut_short(self):
+        self.env["FAKE_BOOT_SECONDS"] = "20"
+        started = time.monotonic()
         result = self.run_supervisor({"first": self.crash()}, deadline=100, min_rerun=95)
         self.assertEqual(result.returncode, 65, result.stdout)
-        self.assertIn(b"remained after the simulator booted", result.stdout)
+        self.assertLess(time.monotonic() - started, 15)
+        self.assertIn(b"did not boot again", result.stdout)
         self.assertEqual(len(self.calls()), 1)
+
+    def test_the_time_minimum_is_checked_again_after_a_slow_gate(self):
+        # Each slow listing costs 5 s: one before the decision, then two in the gate.
+        self.env["FAKE_LIST_SECONDS"] = "5"
+        result = self.run_supervisor({"first": self.crash()}, deadline=100, min_rerun=90)
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertIn(b"remained after the simulator booted, and the rerun needs 90 s", result.stdout)
+        self.assertTrue(self.status()["rerun"]["boot"]["booted"])
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_a_query_timeout_rerun_rechecks_its_measured_time_after_the_gate(self):
+        # 100 s of overhead plus the 20-s test: one 8-s listing fits before the decision, a second does not.
+        self.env["FAKE_LIST_SECONDS"] = "8"
+        console = QUERY_TIMEOUT_CONSOLE.replace("129.486 seconds", "20.000 seconds")
+        result = self.run_supervisor({"first": self.query_timeout(console=[console])}, deadline=132)
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertIn(b"remained after the simulator booted, and the rerun needs 120 s", result.stdout)
+        self.assertEqual(self.status()["rerun"]["boot"]["states"], ["Booted"])
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_an_outside_signal_ends_the_boot_gate_early(self):
+        for name, state, bootstatus_seconds in (("still Booting", "Booting", "0"),
+                                                 ("waiting for bootstatus", "Shutdown", "60")):
+            with self.subTest(name):
+                self.tearDown()
+                self.setUp()
+                self.env["FAKE_BOOTSTATUS_SECONDS"] = bootstatus_seconds
+                process = self.start_supervisor({"first": self.crash(simulatorStateAfter=state)})
+                self.wait_for(self.diagnostics / "boot.log")
+                if state == "Shutdown":
+                    deadline = time.monotonic() + 20
+                    while ["simctl", "bootstatus", UDID] not in self.calls("xcrun.jsonl") \
+                            and time.monotonic() < deadline:
+                        time.sleep(0.05)
+                    self.assertIn(["simctl", "bootstatus", UDID], self.calls("xcrun.jsonl"))
+                started = time.monotonic()
+                process.send_signal(signal.SIGTERM)
+                output = self.finish_supervisor(process)
+                self.assertLess(time.monotonic() - started, 10)
+                self.assertEqual(process.returncode, 128 + signal.SIGTERM, output)
+                status = self.status()
+                self.assertFalse(status["rerun"]["boot"]["finished"])
+                self.assertIn("interrupted", status["rerun"]["reasonNotRerun"])
+                if state == "Shutdown":
+                    self.assertEqual(status["rerun"]["boot"]["bootStatus"]["error"], "interrupted")
+                self.assertEqual(len(self.calls()), 1)
+
+    def test_a_simulator_still_shutting_down_is_booted_once_it_stops(self):
+        result = self.run_supervisor({"first": self.crash(simulatorStateAfter="Shutting Down,Shutting Down,"
+                                                                              "Shutting Down,Shutdown"),
+                                      "rerun": {"exit": 0, "summary": PASSED_SUMMARY}})
+        self.assertEqual(result.returncode, 0, result.stdout)
+        boot = self.status()["rerun"]["boot"]
+        self.assertEqual(boot["states"], ["Shutting Down", "Shutdown", "Booted"])
+        self.assertEqual(boot["boot"]["exitCode"], 0)
+        self.assertEqual([call for call in self.calls("xcrun.jsonl") if call[:2] == ["simctl", "boot"]],
+                         [["simctl", "boot", UDID]])
+
+    def test_a_simulator_that_never_finishes_booting_stops_the_gate_at_its_limit(self):
+        # Reading Booted is not enough; the rerun waits for bootstatus, within its spare time.
+        self.env["FAKE_BOOTSTATUS_SECONDS"] = "30"
+        started = time.monotonic()
+        result = self.run_supervisor({"first": self.crash()}, deadline=100, min_rerun=95)
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertLess(time.monotonic() - started, 15)
+        self.assertIn(b"read Booted, but simctl bootstatus did not report the boot finished within 5 s, "
+                      b"all the time the rerun could spare", result.stdout)
+        self.assertEqual(len(self.calls()), 1)
+        boot_log = (self.diagnostics / "boot.log").read_text()
+        self.assertIn("Shutdown", boot_log)
+        self.assertIn("Booted", boot_log)
+        self.assertIn("Waiting on System App", boot_log)
+        self.tearDown()
+        self.setUp()
+        self.env["FAKE_BOOTSTATUS_EXIT"] = "1"
+        result = self.run_supervisor({"first": self.crash()})
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertIn(b"read Booted, but simctl bootstatus exited 1", result.stdout)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_a_boot_that_another_boot_raced_keeps_waiting_for_booted(self):
+        # simctl boot exits 149 when the device left Shutdown meanwhile; that is no reason to give up.
+        self.env.update(FAKE_BOOT_EXIT="149", FAKE_BOOT_STATE_AFTER="Booting,Booted")
+        result = self.run_supervisor({"first": self.crash(), "rerun": {"exit": 0, "summary": PASSED_SUMMARY}})
+        self.assertEqual(result.returncode, 0, result.stdout)
+        boot = self.status()["rerun"]["boot"]
+        self.assertEqual(boot["boot"]["exitCode"], 149)
+        self.assertEqual(boot["states"], ["Shutdown", "Booting", "Booted"])
+        self.assertTrue(boot["finished"])
+
+    def test_the_boot_gate_stops_at_its_cap_when_the_part_has_time_to_spare(self):
+        # In process, so the three-minute cap can be shortened.
+        self.env["FAKE_BOOTSTATUS_SECONDS"] = "60"
+        (self.root / "scenario.json").write_text(json.dumps({"first": self.crash()}))
+        output = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        started = time.monotonic()
+        with mock.patch.dict(os.environ, self.env, clear=True), \
+                mock.patch.object(supervise, "BOOT_LIMIT_SECONDS", 3), \
+                mock.patch.object(sys, "argv", ["supervise"] + self.command()[2:]), \
+                mock.patch.object(sys, "stdout", output), mock.patch.object(sys, "stderr", io.StringIO()):
+            code = supervise.main()
+            output.flush()
+        self.assertEqual(code, 65)
+        self.assertLess(time.monotonic() - started, 20)
+        text = output.buffer.getvalue()
+        self.assertIn(b"did not report the boot finished within 3 s.", text)
+        self.assertNotIn(b"all the time the rerun could spare", text)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_a_simulator_that_never_reads_booted_stops_the_gate_at_its_limit(self):
+        started = time.monotonic()
+        result = self.run_supervisor({"first": self.crash(simulatorStateAfter="Booting")},
+                                     deadline=100, min_rerun=95)
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertLess(time.monotonic() - started, 15)
+        self.assertIn(b"did not boot again: it was still Booting after 5 s, all the time", result.stdout)
+        self.assertNotIn(["simctl", "boot", UDID], self.calls("xcrun.jsonl"))
+        self.assertEqual(len(self.calls()), 1)
+
+    def query_timeout(self, **changes):
+        first = {"exit": 65, "summary": QUERY_TIMEOUT_SUMMARY, "console": [QUERY_TIMEOUT_CONSOLE]}
+        first.update(changes)
+        return first
+
+    def test_a_query_timeout_reruns_on_the_booted_simulator_and_recovers(self):
+        result = self.run_supervisor({"first": self.query_timeout(),
+                                      "rerun": {"exit": 0, "summary": PASSED_SUMMARY}})
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn(b"::warning title=UI query timeout recovered::A UI query timed out during " +
+                      QUERY_SELECTOR.encode() + b"; it passed on a rerun.", result.stdout)
+        first, rerun = self.calls()
+        self.assertEqual([value for value in rerun if "-testing" in value], ["-only-testing:" + QUERY_SELECTOR])
+        self.assertNotIn(["simctl", "boot", UDID], self.calls("xcrun.jsonl"))
+        self.assertIn(["simctl", "bootstatus", UDID], self.calls("xcrun.jsonl"))
+        status = self.status()
+        self.assertEqual(status["exitCode"], 0)
+        self.assertEqual(status["rerun"]["causes"], ["queryTimeout"])
+        self.assertEqual(status["rerun"]["neededSeconds"], 229)
+        self.assertEqual(status["rerun"]["boot"]["states"], ["Booted"])
+        self.assertIsNone(status["crashSummary"])
+        self.assertEqual(status["attempts"][0]["failedTestSeconds"], {QUERY_SELECTOR: 129.486})
+
+    def test_a_query_timeout_rerun_needs_its_measured_time_and_must_pass(self):
+        result = self.run_supervisor({"first": self.query_timeout()}, deadline=220)
+        self.assertEqual(result.returncode, 65, result.stdout)
+        # The remaining time counts from the supervisor's start, so a busy machine can shave a second off.
+        self.assertRegex(result.stdout, rb"No rerun: only 2[0-2]\d s remain before the deadline, and the rerun needs 229 s")
+        self.assertEqual(len(self.calls()), 1)
+        self.tearDown()
+        self.setUp()
+        result = self.run_supervisor({"first": self.query_timeout(),
+                                      "rerun": {"exit": 65, "summary": QUERY_TIMEOUT_SUMMARY}})
+        self.assertEqual(result.returncode, 65, result.stdout)
+        self.assertIn(b"::error title=UI query timeout::The rerun of " + QUERY_SELECTOR.encode() +
+                      b" after a UI query timeout did not pass", result.stdout)
+        self.assertEqual(len(self.calls()), 2)
 
     def test_cli_rejects_reused_diagnostics_and_unbounded_commands(self):
         self.diagnostics.mkdir()

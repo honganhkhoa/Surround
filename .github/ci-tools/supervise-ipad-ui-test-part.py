@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one CI UI-test part under a deadline and rerun only simulator-crash victims.
+"""Run one CI UI-test part under a deadline and rerun only simulator-crash and query-timeout victims.
 
 Usage: supervise-ipad-ui-test-part.py --simulator UUID --deadline-seconds 2760 \
     --diagnostics DIR -- xcodebuild test-without-building ... -resultBundlePath NAME.xcresult
@@ -9,11 +9,13 @@ SIGKILL, so xcodebuild can still finish its result bundle inside the CI step
 limit. When the first run fails, DIR keeps its console, the crash reports and
 CoreSimulator.log lines written during it, and status.json with the rerun
 decision; a failed rerun adds its own under a rerun- prefix. Tests are rerun
-once, into NAME-Rerun.xcresult, only when every
-failure is a test crashed by SIGTERM or SIGKILL, a SimRenderServer crash report
-or CoreSimulator's rendering-service recovery appeared during the run, and
-neither the app nor its test runner left a crash report. Python 3.9+; macOS
-xcrun.
+once, into NAME-Rerun.xcresult, only when every failure is either a test
+crashed by SIGTERM or SIGKILL, or XCTest timing out while it evaluated a UI
+query; neither the app nor its test runner left a crash report; and, for a
+crash, a SimRenderServer crash report or CoreSimulator's rendering-service
+recovery appeared during the run. Before the rerun, the simulator must read
+Booted and `simctl bootstatus` must report its boot finished. Python 3.9+;
+macOS xcrun.
 """
 
 import argparse
@@ -36,6 +38,20 @@ import time
 # The failure text XCTest records for the test that was running when the
 # simulator rebooted underneath it.
 CRASH_FAILURE = re.compile(r"Test crashed with signal (?:term|kill)\.?")
+# The failure text XCTest records when one accessibility query outlasts its own
+# timeout. On hosted runners such queries stall in episodes late in a job
+# (October 2026) and fail whichever test is running. XCTest reports an app main
+# thread it finds busy differently ("process main thread busy"), which is never
+# rerun; a hang that only makes queries time out reads like a stall.
+QUERY_TIMEOUT_FAILURE = re.compile(
+    r"Failed to (?:get matching snapshots?|resolve query): Timed out while evaluating UI query\.?")
+FAILED_TEST_CASE = re.compile(r"Test Case '-\[(\w+)\.(\w+) (\w+)\]' failed \((\d+(?:\.\d+)?) seconds\)")
+# About what xcodebuild spends around a part's tests: 36 s before the first and
+# 64 s after the last until it reported the result, in CI run 40462251724's
+# iPadOS 26 Messages part 2.
+RERUN_OVERHEAD_SECONDS = 100
+BOOT_LIMIT_SECONDS = 180
+BOOT_POLL_SECONDS = 2
 SIMULATOR_CRASH_PROCESS = "SimRenderServer"
 TESTED_PROCESSES = ("Surround", "SurroundUITests-Runner")
 TESTED_BUNDLES = ("com.honganhkhoa.Surround", "com.honganhkhoa.SurroundUITests.xctrunner")
@@ -118,26 +134,48 @@ def summarize_failures(summary):
             for failure in summary.get("testFailures") or []]
 
 
-def crashed_tests(summary):
-    """Return (selectors, None) when every failure is a signal crash, else (None, reason)."""
+def rerun_candidates(summary):
+    """Return ({selector: causes}, None) when every failure is a signal crash or
+    a UI query timeout, else (None, reason). A cause is "crash" or "queryTimeout"."""
     failures = summary.get("testFailures") or []
     if not failures:
         return None, "the result bundle records no test failure"
-    tests = set()
+    tests = {}
     for failure in failures:
         target = failure.get("targetName")
         identifier = failure.get("testIdentifierString")
         text = (failure.get("failureText") or "").strip()
         if not target or not identifier:
             return None, "a failure has no test identifier"
-        if not CRASH_FAILURE.fullmatch(text):
+        if CRASH_FAILURE.fullmatch(text):
+            cause = "crash"
+        elif QUERY_TIMEOUT_FAILURE.fullmatch(text):
+            cause = "queryTimeout"
+        else:
             return None, "{} failed with: {}".format(identifier, text[:200])
-        tests.add(target + "/" + re.sub(r"\(\)$", "", identifier))
+        tests.setdefault(target + "/" + re.sub(r"\(\)$", "", identifier), set()).add(cause)
     if summary.get("failedTests") != len(tests):
-        return None, "{} failed tests but {} crashed".format(summary.get("failedTests"), len(tests))
+        return None, "{} failed tests but {} can be rerun".format(summary.get("failedTests"), len(tests))
     if len(tests) > MAX_RERUN_TESTS:
-        return None, "{} tests crashed, more than the {} a rerun takes".format(len(tests), MAX_RERUN_TESTS)
-    return sorted(tests), None
+        return None, "{} tests failed, more than the {} a rerun takes".format(len(tests), MAX_RERUN_TESTS)
+    return tests, None
+
+
+def rerun_seconds(tests, durations, min_rerun):
+    """The time a rerun of `tests` ({selector: causes}) needs before the deadline.
+
+    A query-timeout rerun needs xcodebuild's overhead plus the time each test
+    ran in the first attempt, until it failed. A long journey that failed early
+    can take longer to pass; the deadline then stops the rerun, and the part
+    fails as it would have without one. A crash rerun follows a reboot, and a
+    crashed test's duration is cut short, so a rerun with a crash or an unknown
+    duration needs at least `min_rerun`.
+    """
+    timed_out = [test for test, causes in tests.items() if "crash" not in causes]
+    needed = RERUN_OVERHEAD_SECONDS + sum(durations.get(test, 0) for test in timed_out) if timed_out else 0
+    if len(timed_out) < len(tests) or any(test not in durations for test in timed_out):
+        needed = max(needed, min_rerun)
+    return needed
 
 
 def report_snapshot(directories):
@@ -250,7 +288,7 @@ def rerun_decision(attempt, summary, summary_error, reports, recovered, remainin
         return None, "the part reached its deadline"
     if summary is None:
         return None, "the result bundle could not be read: " + (summary_error or "unknown error")
-    tests, reason = crashed_tests(summary)
+    tests, reason = rerun_candidates(summary)
     if reason:
         return None, reason
     if attempt["consoleMarkers"].get("executionTimeAllowanceFailures"):
@@ -258,11 +296,14 @@ def rerun_decision(attempt, summary, summary_error, reports, recovered, remainin
     tested = sorted({report["process"] for report in reports if is_tested_process(report)})
     if tested:
         return None, "a crash report names the tested process " + ", ".join(tested)
-    if not recovered and not any(report["process"] == SIMULATOR_CRASH_PROCESS for report in reports):
+    if (any("crash" in causes for causes in tests.values()) and not recovered
+            and not any(report["process"] == SIMULATOR_CRASH_PROCESS for report in reports)):
         return None, "no SimRenderServer crash report or rendering-service recovery appeared"
-    if remaining < min_rerun:
-        return None, "only {:.0f} s remain before the deadline".format(max(0, remaining))
-    return tests, None
+    needed = rerun_seconds(tests, attempt.get("failedTestSeconds") or {}, min_rerun)
+    if remaining < needed:
+        return None, "only {:.0f} s remain before the deadline, and the rerun needs {:.0f} s".format(
+            max(0, remaining), needed)
+    return sorted(tests), None
 
 
 class Supervisor:
@@ -294,7 +335,7 @@ class Supervisor:
         """Run one xcodebuild, mirroring its output; stop it at the shared deadline."""
         result = {"command": command, "exitCode": None, "stoppedAtDeadline": False,
                   "signalsSent": [], "externalSignal": None,
-                  "consoleMarkers": dict.fromkeys(CONSOLE_MARKERS, 0)}
+                  "consoleMarkers": dict.fromkeys(CONSOLE_MARKERS, 0), "failedTestSeconds": {}}
         started = time.monotonic()
         if self.external_signals:
             result["externalSignal"] = self.external_signals[0]
@@ -352,6 +393,10 @@ class Supervisor:
                                 for name, marker in CONSOLE_MARKERS.items():
                                     if marker in text:
                                         result["consoleMarkers"][name] += 1
+                                failed = FAILED_TEST_CASE.search(text)
+                                if failed:
+                                    result["failedTestSeconds"]["/".join(failed.group(1, 2, 3))] = float(
+                                        failed.group(4))
                             pending = pending[-1024 * 1024:]
             finally:
                 if child.poll() is None:  # Only an exception can leave the loop early.
@@ -402,6 +447,110 @@ def bounded_tool(command, output, timeout):
         return {"command": command, "error": str(error)}
 
 
+def simulator_state(simulator):
+    """simctl's state for the device, such as Booted or Shutdown, or None when unknown."""
+    try:
+        completed = subprocess.run(["xcrun", "simctl", "list", "devices", "--json"],
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=15)
+        for devices in (json.loads(completed.stdout).get("devices") or {}).values():
+            for device in devices:
+                if str(device.get("udid", "")).upper() == simulator.upper():
+                    return device.get("state")
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError, TypeError):
+        pass
+    return None
+
+
+def run_until(command, log, limit, stopped):
+    """Run `command` into `log` for at most `limit` seconds, or until `stopped()`; never raises."""
+    started = time.monotonic()
+    log.flush()
+    try:
+        child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+    except OSError as error:
+        return {"command": command, "error": str(error)}
+    while child.poll() is None:
+        if stopped():
+            reason = "interrupted"
+        elif time.monotonic() - started >= limit:
+            reason = "timed out after {:.0f} s".format(limit)
+        else:
+            time.sleep(0.2)
+            continue
+        child.kill()
+        child.wait()
+        return {"command": command, "error": reason}
+    return {"command": command, "exitCode": child.returncode}
+
+
+def boot_simulator(simulator, limit, log_path, stopped=lambda: False):
+    """Wait up to `limit` seconds for the device to finish booting, booting it once if Shutdown.
+
+    xcodebuild leaves a simulator that crashed Shutting Down, then Shutdown, so
+    simctl's state settles first. Reading Booted is not enough: after a
+    SimRenderServer crash on iPadOS 26.5, a rerun started as soon as the state
+    read Booted had its test runner refused about 18 s later ("Busy",
+    "Application failed preflight checks"). So `simctl bootstatus` then waits
+    for the boot to finish. On CI (36aa3e5, October 2026) bootstatus stayed at
+    "Waiting on System App" past a fixed 180 s; such a rerun is still refused,
+    but within the time it can spare. `stopped` ends the wait early, for an
+    outside signal.
+    """
+    started = time.monotonic()
+    result = {"booted": False, "finished": False, "states": [], "boot": None, "bootStatus": None,
+              "limitSeconds": round(limit, 1)}
+    with open(log_path, "a") as log:  # simctl appends its own output.
+        while True:
+            state = simulator_state(simulator)
+            elapsed = time.monotonic() - started
+            log.write("{:.1f} s: {}\n".format(elapsed, state or "unknown"))
+            log.flush()
+            if not result["states"] or result["states"][-1] != state:
+                result["states"].append(state)
+            if state == "Booted":
+                result["booted"] = True
+                break
+            if stopped():
+                break
+            if state == "Shutdown" and result["boot"] is None:
+                result["boot"] = run_until(["xcrun", "simctl", "boot", simulator], log,
+                                           max(1, limit - elapsed), stopped)
+                continue
+            if elapsed >= limit or (state == "Shutdown" and result["boot"].get("exitCode") != 0):
+                break
+            time.sleep(min(BOOT_POLL_SECONDS, limit - elapsed))
+        if result["booted"] and not stopped():
+            result["bootStatus"] = run_until(["xcrun", "simctl", "bootstatus", simulator], log,
+                                             max(1, limit - (time.monotonic() - started)), stopped)
+            result["finished"] = result["bootStatus"].get("exitCode") == 0
+    result["elapsedSeconds"] = round(time.monotonic() - started, 1)
+    return result
+
+
+def boot_failure(boot):
+    """Why the boot gate did not let a rerun start, naming its time limit when that ran out."""
+    limit = "{:.0f} s".format(max(0, boot["limitSeconds"]))
+    if boot["limitSeconds"] < BOOT_LIMIT_SECONDS:
+        limit += ", all the time the rerun could spare"
+
+    def failed(result, tool, timed_out):
+        if "exitCode" in result:
+            return "simctl {} exited {}".format(tool, result["exitCode"])
+        if result["error"].startswith("timed out"):
+            return timed_out + " within " + limit
+        return "simctl {} failed: {}".format(tool, result["error"])
+
+    if boot["booted"]:
+        return "the simulator read Booted, but " + failed(
+            boot["bootStatus"] or {"error": "not checked"}, "bootstatus",
+            "simctl bootstatus did not report the boot finished")
+    if boot["boot"] and boot["boot"].get("exitCode") != 0 and boot["states"][-1] == "Shutdown":
+        detail = failed(boot["boot"], "boot", "simctl boot did not finish")
+    else:
+        detail = "it was still {} after {}".format(boot["states"][-1] or "in an unknown state", limit)
+    return "the simulator did not boot again: " + detail
+
+
 def copy_reports(paths, destination):
     """Describe every new report; copy them until REPORT_COPY_LIMIT is reached."""
     reports, total = [], 0
@@ -429,6 +578,13 @@ def crash_summary(reports):
     return "CoreSimulator recovered its rendering service"
 
 
+def cause_summary(causes, reports):
+    parts = ([crash_summary(reports)] if "crash" in causes else []) + (
+        ["a UI query timed out"] if "queryTimeout" in causes else [])
+    summary = " and ".join(parts)
+    return summary[:1].upper() + summary[1:]
+
+
 def collect_crash_evidence(args, report_dirs, since, output, prefix, status):
     """Copy the reports and CoreSimulator.log lines written since `since`.
 
@@ -452,7 +608,11 @@ def evidence_start(report_dirs, core_simulator_log):
 
 
 def collect_failure(supervisor, args, bundle, attempt, console_temp, report_dirs, since, status):
-    """Keep the failed first attempt's evidence; return the tests to rerun, or None."""
+    """Keep the failed first attempt's evidence.
+
+    Returns (tests to rerun, their causes, the seconds the rerun needs), or
+    three Nones.
+    """
     output = Path(args.diagnostics)
     output.mkdir(parents=True)
     shutil.move(console_temp, str(output / "console.log"))
@@ -476,8 +636,17 @@ def collect_failure(supervisor, args, bundle, attempt, console_temp, report_dirs
                                    remaining, args.min_rerun_seconds)
     status["rerun"] = {"tests": tests, "reasonNotRerun": reason,
                        "remainingSecondsAtDecision": round(remaining)}
-    status["crashSummary"] = crash_summary(reports) if tests else None
-    return tests
+    status["crashSummary"] = status["causeSummary"] = None
+    if not tests:
+        return None, None, None
+    candidates = rerun_candidates(summary)[0]
+    causes = sorted(set().union(*candidates.values()))
+    needed = rerun_seconds(candidates, attempt["failedTestSeconds"], args.min_rerun_seconds)
+    status["rerun"].update(causes=causes, neededSeconds=round(needed))
+    if "crash" in causes:
+        status["crashSummary"] = crash_summary(reports)
+    status["causeSummary"] = cause_summary(causes, reports)
+    return tests, causes, needed
 
 
 def run(args):
@@ -513,7 +682,8 @@ def run(args):
         status["attempts"].append(attempt)
         if attempt["exitCode"] == 0 and not attempt["stoppedAtDeadline"] and not supervisor.external_signals:
             return 0
-        tests = collect_failure(supervisor, args, bundle, attempt, console_temp, report_dirs, since, status)
+        tests, causes, needed = collect_failure(supervisor, args, bundle, attempt, console_temp,
+                                                report_dirs, since, status)
         if deadline_shot.exists():
             shutil.move(str(deadline_shot), str(output / "deadline.png"))
         if interrupted():
@@ -530,22 +700,24 @@ def run(args):
             status["exitCode"] = attempt["exitCode"] or 1
             return status["exitCode"]
         names = ", ".join(tests)
-        print("[SurroundCI] {} under {}; rerunning only {} into {}.".format(
-            status["crashSummary"], names, "it" if len(tests) == 1 else "them", rerun_bundle),
+        title = "Simulator crash" if "crash" in causes else "UI query timeout"
+        print("[SurroundCI] {} during {}; rerunning only {} into {}.".format(
+            status["causeSummary"], names, "it" if len(tests) == 1 else "them", rerun_bundle),
             file=sys.stderr, flush=True)
-        boot = bounded_tool(["xcrun", "simctl", "bootstatus", args.simulator, "-b"],
-                            output / "bootstatus.log", max(1, min(180, supervisor.remaining() - 60)))
-        status["rerun"]["bootStatus"] = boot
+        boot = boot_simulator(args.simulator, min(BOOT_LIMIT_SECONDS, supervisor.remaining() - needed),
+                              output / "boot.log", lambda: bool(supervisor.external_signals))
+        status["rerun"]["boot"] = boot
         if interrupted():
             return status["exitCode"]
         refusal = None
-        if boot.get("exitCode") != 0:
-            refusal = "the simulator did not boot again"
-        elif supervisor.remaining() < args.min_rerun_seconds:
-            refusal = "only {:.0f} s remained after the simulator booted".format(max(0, supervisor.remaining()))
+        if not boot["finished"]:
+            refusal = boot_failure(boot)
+        elif supervisor.remaining() < needed:
+            refusal = "only {:.0f} s remained after the simulator booted, and the rerun needs {:.0f} s".format(
+                max(0, supervisor.remaining()), needed)
         if refusal:
             status["rerun"]["reasonNotRerun"] = refusal
-            annotate("error", "Simulator crash", "No rerun of {}: {}.".format(names, refusal))
+            annotate("error", title, "No rerun of {}: {}.".format(names, refusal))
             status["exitCode"] = attempt["exitCode"] or 1
             return status["exitCode"]
         rerun_since = evidence_start(report_dirs, args.core_simulator_log)
@@ -562,9 +734,9 @@ def run(args):
         if (rerun["exitCode"] == 0 and not rerun["stoppedAtDeadline"] and not supervisor.external_signals
                 and rerun_summary is not None and rerun_summary.get("failedTests") == 0
                 and (rerun_summary.get("passedTests") or 0) >= len(tests)):
-            annotate("warning", "Simulator crash recovered",
-                     "{} during {}; it passed on a rerun. The first result bundle keeps the crash; "
-                     "evidence is in {}.".format(status["crashSummary"], names, output))
+            annotate("warning", title + " recovered",
+                     "{} during {}; it passed on a rerun. The first result bundle keeps the failure; "
+                     "evidence is in {}.".format(status["causeSummary"], names, output))
             status["exitCode"] = 0
             return 0
         rerun_reports, rerun_recovered, rerun_log = collect_crash_evidence(
@@ -578,8 +750,8 @@ def run(args):
                 names, rerun_bundle))
             status["exitCode"] = DEADLINE_EXIT_CODE
         else:
-            annotate("error", "Simulator crash", "The rerun of {} after a simulator crash did not pass; "
-                     "see {}.".format(names, rerun_bundle))
+            annotate("error", title, "The rerun of {} after {} did not pass; see {}.".format(
+                names, "a simulator crash" if "crash" in causes else "a UI query timeout", rerun_bundle))
             status["exitCode"] = rerun["exitCode"] or attempt["exitCode"] or 1
         return status["exitCode"]
     finally:
@@ -600,7 +772,8 @@ def main():
     parser.add_argument("--simulator", required=True)
     parser.add_argument("--deadline-seconds", type=float, required=True)
     parser.add_argument("--diagnostics", required=True, help="Fresh directory, written only on failure")
-    parser.add_argument("--min-rerun-seconds", type=float, default=300)
+    parser.add_argument("--min-rerun-seconds", type=float, default=300,
+                        help="Seconds a crash rerun, or one without measured test durations, needs at least")
     parser.add_argument("--interrupt-grace-seconds", type=float, default=90)
     parser.add_argument("--terminate-grace-seconds", type=float, default=15)
     parser.add_argument("--report-directory", action="append", default=None)

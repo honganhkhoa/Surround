@@ -138,7 +138,8 @@ done
 # 50 minutes; at 46 the supervisor interrupts xcodebuild, which then has time
 # to write its result bundle and the supervisor its evidence: at most 1:45 of
 # signal grace and under a minute of bounded collection. A test that a
-# simulator crash killed is rerun once, within the same 46 minutes.
+# simulator crash killed, or that failed only because XCTest timed out on a UI
+# query, is rerun once, within the same 46 minutes.
 readonly part_deadline_seconds=$((46 * 60))
 
 # The main, profile, and Messages phases each outgrew one CI step, so CI runs
