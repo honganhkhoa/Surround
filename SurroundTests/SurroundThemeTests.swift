@@ -467,6 +467,55 @@ final class SurroundThemeTests: XCTestCase {
         try assertNightAnalysisMarksRemainReadable(.frostPine)
     }
 
+    func testFrostPineDayStonesBrightenWithoutChangingNightArtworkOrSilhouettes() throws {
+        let theme = SurroundTheme.frostPine
+        let night = try XCTUnwrap(theme.board(for: .dark).stoneImages)
+        let day = try XCTUnwrap(theme.board(for: .light).stoneImages)
+        XCTAssertEqual(day.tint, .white)
+        XCTAssertEqual(night.tint, Color(themeHex: 0xD5E2EE))
+        let bundle = Bundle(for: SurroundThemeTests.self)
+        for (family, dayImages, nightImages) in [("FrostPineMidnight", day.black, night.black),
+                                                 ("FrostPinePale", day.white, night.white)] {
+            XCTAssertEqual(dayImages.count, 4)
+            XCTAssertEqual(nightImages.count, 4)
+            for index in 0..<min(dayImages.count, nightImages.count) {
+                let original = try XCTUnwrap(UIImage(named: "\(family)\(index)", in: bundle, compatibleWith: nil))
+                let source = try XCTUnwrap(original.cgImage)
+                let light = try XCTUnwrap(dayImages[index].cgImage)
+                let dark = try XCTUnwrap(nightImages[index].cgImage)
+                XCTAssertEqual(light.width, source.width)
+                XCTAssertEqual(light.height, source.height)
+                let before = try rgbaPixels(for: source, side: source.width)
+                let after = try rgbaPixels(for: light, side: source.width)
+                XCTAssertEqual(try rgbaPixels(for: dark, side: source.width), before,
+                               "Night keeps the original ice artwork")
+                XCTAssertEqual(stride(from: 3, to: before.count, by: 4).map { before[$0] },
+                               stride(from: 3, to: after.count, by: 4).map { after[$0] },
+                               "Daylight grading must preserve the opaque interior and transparent edge")
+                func brightness(_ pixels: [UInt8], at offset: Int) -> Double {
+                    0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1])
+                        + 0.0722 * Double(pixels[offset + 2])
+                }
+                let middleTones = stride(from: 0, to: before.count, by: 4).filter {
+                    before[$0 + 3] == 255 && (20...220).contains(brightness(before, at: $0))
+                }
+                XCTAssertGreaterThan(middleTones.count, 1000)
+                let lift = middleTones.reduce(0.0) {
+                    $0 + brightness(after, at: $1) - brightness(before, at: $1)
+                } / Double(max(1, middleTones.count))
+                XCTAssertGreaterThan(lift, 8, "Both ice colors need a visible daylight lift")
+            }
+        }
+        // Resolving either appearance repeatedly must reuse its own images.
+        for scheme: ColorScheme in [.light, .dark, .light, .dark] {
+            let resolved = try XCTUnwrap(theme.board(for: scheme).stoneImages)
+            let cached = scheme == .light ? day : night
+            for (actual, expected) in zip(resolved.black + resolved.white, cached.black + cached.white) {
+                XCTAssertTrue(actual === expected)
+            }
+        }
+    }
+
     func testFrostedBoardRimDoesNotMoveThePlayingSurface() throws {
         for scheme: ColorScheme in [.light, .dark] {
             let frost = try XCTUnwrap(SurroundTheme.frostPine.board(for: scheme).boardDepth)

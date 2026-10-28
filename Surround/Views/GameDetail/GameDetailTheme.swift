@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage
 
 /// A curated look for Game Detail: its scene, its surfaces and the board.
 /// `.standard` is Surround's ordinary appearance.
@@ -100,6 +101,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
             night.restoreMark = Color(themeHex: 0x1A3B25)
             night.removedStoneOutline = Color(themeHex: 0x112018)
             return night
+        }
+        if self == .frostPine, scheme == .light {
+            var day = board
+            day.stoneImages = FrostPineAssets.dayStones
+            return day
         }
         if self == .frostPine, scheme == .dark {
             var night = board
@@ -678,25 +684,48 @@ private enum SurroundStudioAssets {
     static let board = UIImage(named: "SurroundStudioBoard").map { BoardTexture(image: $0, mapping: .board) }
 }
 
-private enum FrostPineAssets {
+private final class FrostPineAssets {
+    private init() {}
+    private static let bundle = Bundle(for: FrostPineAssets.self)
+
     static let stones: StoneImages? = {
-        let black = (0..<4).compactMap { UIImage(named: "FrostPineMidnight\($0)") }
-        let white = (0..<4).compactMap { UIImage(named: "FrostPinePale\($0)") }
+        let black = (0..<4).compactMap { UIImage(named: "FrostPineMidnight\($0)", in: bundle, compatibleWith: nil) }
+        let white = (0..<4).compactMap { UIImage(named: "FrostPinePale\($0)", in: bundle, compatibleWith: nil) }
         guard black.count == 4, white.count == 4 else { return nil }
         return StoneImages(black: black, white: white)
+    }()
+
+    /// Lift the ice's middle tones against the bright daytime board without
+    /// adding a veil over the dark depths or clipping the reflected glints.
+    /// Resolve once per process; night keeps the original artwork and tint.
+    static let dayStones: StoneImages? = {
+        guard let stones else { return nil }
+        guard let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return stones }
+        let context = CIContext(options: [.workingColorSpace: sRGB, .outputColorSpace: sRGB])
+        func grade(_ images: [UIImage], power: Float) -> [UIImage]? {
+            var result: [UIImage] = []
+            for image in images {
+                guard let source = image.cgImage else { return nil }
+                let input = CIImage(cgImage: source, options: [.colorSpace: sRGB])
+                let graded = input.applyingFilter("CIGammaAdjust", parameters: ["inputPower": power])
+                guard let output = context.createCGImage(graded, from: input.extent,
+                                                        format: .RGBA8, colorSpace: sRGB) else { return nil }
+                result.append(UIImage(cgImage: output, scale: image.scale, orientation: image.imageOrientation))
+            }
+            return result
+        }
+        guard let black = grade(stones.black, power: 0.82),
+              let white = grade(stones.white, power: 0.60) else { return stones }
+        var day = stones
+        day.black = black
+        day.white = white
+        return day
     }()
 
     static let board = UIImage(named: "FrostPineBoard").map { BoardTexture(image: $0, mapping: .board) }
     static let surfaceFrost = UIImage(named: "FrostPineBoardFrost").map {
         BoardSurfaceOverlay(image: $0, opacity: 0.88)
     }
-    static let controlFrost: BoardSurfaceOverlay? = {
-        guard let image = UIImage(named: "FrostPineControlFrost")?.cgImage else { return nil }
-        // A fixed 160 pt tile preserves the snow deposits' size and aspect
-        // across wide clocks, tall chips and compact navigation controls.
-        let tiledImage = UIImage(cgImage: image, scale: CGFloat(image.width) / 160, orientation: .up)
-        return BoardSurfaceOverlay(image: tiledImage)
-    }()
     static let snow = UIImage(named: "FrostPineSnow")
     static let pine = UIImage(named: "FrostPinePine")
     static let pinecone = UIImage(named: "FrostPinePinecone")
@@ -998,17 +1027,6 @@ extension SurroundTheme {
     /// The natural scenes use their own foregrounds, translucent pigment
     /// on older systems, and opaque controls under Increase Contrast.
     var usesLightSceneSurfaces: Bool { self == .rakedGarden || self == .surroundStudio || self == .frostPine || self == .feltMeadow || self == .nightGarden }
-
-    /// Other themes retain their existing surfaces. Image identity remains
-    /// stable through clock ticks; only its native grade follows appearance.
-    func controlSurfaceFrost(_ color: StoneColor, for scheme: ColorScheme) -> BoardSurfaceOverlay? {
-        guard self == .frostPine, var frost = FrostPineAssets.controlFrost else { return nil }
-        // Sparse opaque crowns keep snow above the tinted glass. Lowering
-        // the whole field's opacity makes it look embedded in the pigment.
-        frost.opacity = scheme == .dark ? 0.92 : 1
-        frost.tint = .white
-        return frost
-    }
 
     /// Tinted Liquid Glass for a player's clock, in the stone's color.
     /// Light stones use a strong tint to preserve their material color over
