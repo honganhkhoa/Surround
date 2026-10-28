@@ -14,6 +14,16 @@ enum GameID: Hashable {
 }
 
 class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equatable {
+    struct AppliedMove {
+        let before: BoardPosition
+        let after: BoardPosition
+    }
+
+    /// Successful incremental main-line moves only. Snapshot reconstruction,
+    /// analysis, undo and scoring can change positions without replaying audio.
+    /// Passthrough delivery also keeps a newly opened game silent.
+    let moveApplied = PassthroughSubject<AppliedMove, Never>()
+
     static func == (lhs: Game, rhs: Game) -> Bool {
         return lhs.ID == rhs.ID
     }
@@ -492,6 +502,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                 let registeredPosition = self.moveTree.register(newPosition: newPosition, fromPosition: self.currentPosition, mainBranch: true)
                 self.currentPosition = registeredPosition
                 self.undoRequest = nil
+                moveApplied.send(AppliedMove(before: fromPosition, after: registeredPosition))
                 return registeredPosition
             }
             if fromPosition === fromAnalyticsPosition {

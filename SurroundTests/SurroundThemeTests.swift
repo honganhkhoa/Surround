@@ -842,6 +842,7 @@ final class SurroundThemeTests: XCTestCase {
                 asset == theme.previewImageName
                     || asset.hasPrefix(theme.rawValue.prefix(1).uppercased() + theme.rawValue.dropFirst())
                     || asset.hasPrefix("StoneSound-\(theme.rawValue)-")
+                    || asset.hasPrefix("StoneCapture-\(theme.rawValue)-")
             }
         }
         let shipping = assets(in: shippingCatalog)
@@ -862,6 +863,12 @@ final class SurroundThemeTests: XCTestCase {
                     let name = StonePlacementSoundPlayer.assetName(theme: theme, color: color, variation: variation)
                     XCTAssertTrue(expected.contains(name), "\(name) is missing from its theme's catalog")
                     XCTAssertFalse(other.contains(name), "\(name) is also in the wrong catalog")
+                    for tier in StonePlacementSoundPlayer.CaptureTier.allCases {
+                        let capture = StonePlacementSoundPlayer.captureAssetName(theme: theme, color: color,
+                                                                                tier: tier, variation: variation)
+                        XCTAssertTrue(expected.contains(capture), "\(capture) is missing from its theme's catalog")
+                        XCTAssertFalse(other.contains(capture), "\(capture) is also in the wrong catalog")
+                    }
                 }
             }
         }

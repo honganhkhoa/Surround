@@ -1164,11 +1164,10 @@ struct SingleGameView: View {
             if game.currentPosition === analyticsPosition {
                 analyticsPosition = newPosition
             }
-            
-            if soundOnStonePlacement,
-               let color = StonePlacementSoundPlayer.placedStoneColor(after: game.currentPosition, in: newPosition) {
-                stoneSoundPlayer.play(theme: theme, color: color, enabled: soundOnStonePlacement)
-            }
+        }
+        .onReceive(game.moveApplied) { move in
+            stoneSoundPlayer.play(move: move, theme: theme,
+                                  enabled: soundOnStonePlacement && isVisibleForAppReview)
         }
         .onAppear {
             if owningRootView == nil { owningRootView = navigation.main.rootView }
@@ -1214,10 +1213,10 @@ struct SingleGameView: View {
             updateReviewGameObservation()
         }
         .onChange(of: theme) { _, _ in
-            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
         }
         .onChange(of: soundOnStonePlacement) { _, _ in
-            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
         }
         .onDisappear {
             isVisibleForAppReview = false
@@ -1294,6 +1293,8 @@ struct SingleGameView: View {
             chatSession.selectChannel(channel)
         }
         .onChange(of: game.ID) { _, _ in
+            stoneSoundPlayer.reset()
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
             updateReviewGameObservation()
             chatSession.reset()
             conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)

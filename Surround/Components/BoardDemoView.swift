@@ -27,12 +27,13 @@ struct BoardDemoView: View {
     @State var lastUtterance: String?
     @State var clearLastUtteranceCancellable: AnyCancellable?
     @StateObject private var stoneSoundPlayer = StonePlacementSoundPlayer()
+    @State private var isVisibleForStoneSounds = false
 
     func initializePlayersIfNecessary() {
         if voiceCountdown && self.speechSynthesizer == nil {
             self.speechSynthesizer = AVSpeechSynthesizer()
         }
-        stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+        stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForStoneSounds)
     }
     
     func updateTimeAfterMove(time: inout ThinkingTime) {
@@ -49,7 +50,6 @@ struct BoardDemoView: View {
         simulatingRequest = true
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: .milliseconds(300))) {
             do {
-                let previousPosition = game.currentPosition
                 try game.makeMove(move: move)
                 if var clock = game.clock {
                     if clock.currentPlayerColor == .black {
@@ -60,10 +60,6 @@ struct BoardDemoView: View {
                     clock.lastMoveTime = Date().timeIntervalSince1970 * 1000
                     clock.currentPlayerColor = game.currentPosition.nextToMove
                     game.clock = clock
-                }
-                if soundOnStonePlacement,
-                   let color = StonePlacementSoundPlayer.placedStoneColor(after: previousPosition, in: game.currentPosition) {
-                    stoneSoundPlayer.play(theme: theme, color: color, enabled: soundOnStonePlacement)
                 }
             } catch {}
             pendingMove = nil
@@ -122,7 +118,12 @@ struct BoardDemoView: View {
                 .font(.caption)
                 .leadingAlignedInScrollView()
         }
+        .onReceive(game.moveApplied) { move in
+            stoneSoundPlayer.play(move: move, theme: theme,
+                                  enabled: soundOnStonePlacement && isVisibleForStoneSounds)
+        }
         .onAppear {
+            isVisibleForStoneSounds = true
             self.initializePlayersIfNecessary()
             self.game.clock = OGSClock(
                 blackTime: ThinkingTime(thinkingTime: Double(timeControl.mainTime!), thinkingTimeLeft: Double(timeControl.mainTime!), periods: timeControl.periods, periodTime: Double(timeControl.periodTime!)),
@@ -159,6 +160,7 @@ struct BoardDemoView: View {
             })
         }
         .onDisappear {
+            isVisibleForStoneSounds = false
             self.speechSynthesizer = nil
             stoneSoundPlayer.reset()
         }
@@ -171,10 +173,10 @@ struct BoardDemoView: View {
             self.initializePlayersIfNecessary()
         }
         .onChange(of: theme) { _, _ in
-            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForStoneSounds)
         }
         .onChange(of: soundOnStonePlacement) { _, _ in
-            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement)
+            stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForStoneSounds)
         }
     }
 }

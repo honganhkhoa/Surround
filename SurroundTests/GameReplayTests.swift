@@ -7,6 +7,79 @@ import Combine
 import XCTest
 
 final class GameReplayTests: XCTestCase {
+    func testMoveAppliedEmitsOnceAfterSuccessfulMainLineMoves() throws {
+        let game = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(1))
+        let initial = game.currentPosition
+        var events = [Game.AppliedMove]()
+        let subscription = game.moveApplied.sink { event in
+            XCTAssertTrue(game.currentPosition === event.after, "Observers see the committed position")
+            events.append(event)
+        }
+        defer { subscription.cancel() }
+        XCTAssertTrue(events.isEmpty, "Subscribing must not replay the current board")
+
+        let placed = try game.makeMove(move: .placeStone(2, 2))
+        XCTAssertEqual(events.count, 1)
+        XCTAssertTrue(events.first?.before === initial)
+        XCTAssertTrue(events.first?.after === placed)
+        XCTAssertEqual(events.first?.after.lastMoveColor, .black)
+
+        let passed = try game.makeMove(move: .pass)
+        XCTAssertEqual(events.count, 2, "Passes are moves, allowing sound consumers to stop pending capture tails")
+        XCTAssertTrue(events.last?.before === placed)
+        XCTAssertTrue(events.last?.after === passed)
+        XCTAssertEqual(events.last?.after.lastMove, .pass)
+    }
+
+    func testMoveAppliedIgnoresInvalidMovesAnalysisUndoAndScoring() throws {
+        let game = Game(width: 9, height: 9, blackName: "black", whiteName: "white", gameId: .OGS(1))
+        try game.makeMove(move: .placeStone(2, 2))
+        var events = [Game.AppliedMove]()
+        let subscription = game.moveApplied.sink { events.append($0) }
+        defer { subscription.cancel() }
+
+        XCTAssertThrowsError(try game.makeMove(move: .placeStone(2, 2)))
+        let authoritativePosition = game.currentPosition
+        try game.makeMove(move: .placeStone(3, 3), fromAnalyticsPosition: authoritativePosition)
+        XCTAssertTrue(game.currentPosition === authoritativePosition)
+        game.undoLastMoves(count: 1)
+        game.currentPosition.removedStones = [[1, 1]]
+        game.gamePhase = .stoneRemoval
+        XCTAssertTrue(events.isEmpty)
+
+        // Promoting an already existing analysis branch is still a new live
+        // move, even when MoveTree reuses the same BoardPosition object.
+        let variation = try game.makeMove(move: .placeStone(4, 4), fromAnalyticsPosition: game.currentPosition)
+        XCTAssertTrue(events.isEmpty)
+        let live = try game.makeMove(move: .placeStone(4, 4))
+        XCTAssertTrue(live === variation)
+        XCTAssertEqual(events.count, 1)
+    }
+
+    func testMoveAppliedIgnoresOneMoveReconnectAndCatchUpSnapshots() throws {
+        let fullSnapshot = try loadGameFixture(id: 25_076_729)
+        var snapshot = fullSnapshot
+        snapshot.moves = Array(fullSnapshot.moves.prefix(1))
+        let game = Game(ogsGame: snapshot)
+        let before = game.currentPosition
+        var events = [Game.AppliedMove]()
+        let subscription = game.moveApplied.sink { events.append($0) }
+        defer { subscription.cancel() }
+        XCTAssertTrue(events.isEmpty, "Initial game construction must not be replayed on subscription")
+
+        snapshot.moves = Array(fullSnapshot.moves.prefix(2))
+        game.gameData = snapshot
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, before.lastMoveNumber + 1)
+        XCTAssertTrue(game.currentPosition.previousPosition === before,
+                      "A one-move snapshot can reuse the live parent and still must remain silent")
+        XCTAssertTrue(events.isEmpty)
+
+        snapshot.moves = Array(fullSnapshot.moves.prefix(5))
+        game.gameData = snapshot
+        XCTAssertEqual(game.currentPosition.lastMoveNumber, 5)
+        XCTAssertTrue(events.isEmpty)
+    }
+
     func testEstimatedScoreStatusDistinguishesLeadsAndEvenScore() {
         let game = Game(width: 2, height: 1, blackName: "black", whiteName: "white", gameId: .OGS(1))
 

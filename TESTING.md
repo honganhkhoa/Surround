@@ -31,6 +31,8 @@ xcodebuild test \
 
 The simulator helper accepts an iOS major version and an optional exact family of `iPhone` or `iPad`; it defaults to `iPhone`. CI runs the unit target on both the current iOS 26 simulator and the latest installed simulator in the minimum supported iOS 18 major release.
 
+`StonePlacementSoundTests` checks theme placement/capture assets, prisoner deltas (including legal self-capture), capture-count tiers, separate placement and capture voices, delayed playback cancellation, and bounded lazy caching without playing audio. `GameReplayTests` verifies that only successful incremental main-line moves emit `Game.moveApplied`; initial loads, reconnect snapshots, analysis, undo, and scoring stay silent. `SurroundThemeTests/testOnlyReleasedThemesShipTheirArt` keeps both sound families in their theme's shipping or Debug-only asset catalog. For listening, enable Stone sounds in Settings and use its demo board or a game: captures follow placement by about 250 ms, and muting, leaving the board, switching theme, or the next move stops any pending capture sound.
+
 App Store review tests use isolated preferences, an injected clock and delay, and a fake presenter. `AppReviewPolicyTests` covers eligibility, session lifecycle, cancellation, and requests from multiple windows; `AppReviewGameActivityTests` covers authoritative move and game-finish evidence. Automatic review requests are disabled in OGS Beta, previews, offline UI tests, and screenshot captures. The offline navigation journey verifies the About review link using the root's discarded URL action, without opening the App Store.
 
 ## Offline iPhone UI tests
