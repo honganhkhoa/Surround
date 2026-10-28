@@ -1219,6 +1219,38 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
     }
 
+    /// Landscape iPad keeps the sidebar beside every screen except a game:
+    /// a selection must not fold it into the top tab bar.
+    func testIPadLandscapeSidebarStaysOpenAfterSelection() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("The Mac sidebar is always shown.")
+        #else
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad, "The iPad tab sidebar only.")
+        let id = SurroundUITestContract.AccessibilityID.self
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+        ])
+        element(id.screenHome, in: app)
+        func row(_ identifier: String) -> XCUIElement {
+            app.cells.matching(identifier: identifier).firstMatch
+        }
+        XCTAssertTrue(waitUntilHittable(row(id.navigationSettings), timeout: 10),
+                      "Landscape opens with the sidebar shown")
+        for (entry, screen) in [(id.navigationPublicGames, id.screenPublicGames),
+                                (id.navigationMessages, id.screenMessages),
+                                (id.navigationAbout, id.screenAbout),
+                                (id.navigationHome, id.screenHome)] {
+            tap(row(entry), description: entry, in: app)
+            element(screen, in: app)
+            // A closing sidebar starts at once; allow it to finish.
+            Thread.sleep(forTimeInterval: 1)
+            XCTAssertTrue(row(id.navigationSettings).isHittable, "Selecting \(entry) keeps the sidebar open")
+        }
+        #endif
+    }
+
     func testTopLevelNavigation() throws {
         try XCTSkipIf(
             UIDevice.current.userInterfaceIdiom == .phone,

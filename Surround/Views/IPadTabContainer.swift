@@ -120,7 +120,6 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             controller.delegate = self
             controller.mode = .tabSidebar
             controller.sidebar.preferredLayout = .overlap
-            controller.sidebar.isHidden = true
             controller.sidebar.delegate = self
             controller.onHorizontalSizeClassChange = { [weak self] in
                 self?.hiddenHostBaselines.removeAll()
@@ -193,11 +192,23 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             guard let controller else { return }
             let attribute: UISemanticContentAttribute = direction == .rightToLeft
                 ? .forceRightToLeft : .forceLeftToRight
-            if controller.view.semanticContentAttribute != attribute {
+            let current = controller.view.semanticContentAttribute
+            guard current != attribute else { return }
+            // The first direction is set at creation; only a later flip moves
+            // the sidebar to the other edge.
+            if current != .unspecified {
                 controller.sidebar.isHidden = true
                 hiddenHostBaselines.removeAll()
-                controller.view.semanticContentAttribute = attribute
             }
+            controller.view.semanticContentAttribute = attribute
+        }
+
+        /// The sidebar stays open beside other screens after a selection. It
+        /// overlays only a game, which hides the tab bar, so close it there.
+        /// In overlay widths (portrait) UIKit closes it after a selection.
+        private func closeSidebarOverGame() {
+            guard let controller, controller.isTabBarHidden else { return }
+            controller.sidebar.isHidden = true
         }
 
         private func applyTabs(regularWidth: Bool) {
@@ -206,7 +217,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             tabs[.browser]?.preferredPlacement = regularWidth ? .sidebarOnly : .fixed
             let root = selectedRoot
             if let selected = controller.selectedTab, effectiveRoot(selected) != root {
-                controller.sidebar.isHidden = true
+                closeSidebarOverGame()
             }
             var primary: [RootView] = [.home, .publicGames]
             if parent.isLoggedIn { primary.append(.privateMessages) }
@@ -279,7 +290,7 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         }
 
         func tabBarController(_ controller: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
-            controller.sidebar.isHidden = true
+            closeSidebarOverGame()
             switch effectiveRoot(tab) {
             case .profile:
                 if parent.isLoggedIn { parent.onAccountSheet(.profile) }
@@ -294,7 +305,6 @@ struct IPadTabContainer: UIViewControllerRepresentable {
         func tabBarController(_ controller: UITabBarController, didSelectTab tab: UITab, previousTab: UITab?) {
             guard !changingTabs, let root = effectiveRoot(tab) else { return }
             if parent.selection != root { parent.selection = root }
-            controller.sidebar.isHidden = true
             applyTabs(regularWidth: regularWidth)
         }
 
@@ -410,9 +420,12 @@ struct IPadTabContainer: UIViewControllerRepresentable {
             guard let controller else { return }
             let hidden = contexts[selectedRoot]?.prefersTabBarHidden ?? false
             if controller.isTabBarHidden != hidden {
-                controller.sidebar.isHidden = true
+                // Hide the tab bar before closing the sidebar. On iPadOS 27,
+                // closing an open sidebar first leaves the closed host with
+                // the drawer's bottom inset, which shrinks the game's board.
                 hiddenHostBaselines.removeAll()
                 controller.setTabBarHidden(hidden, animated: controller.view.window != nil)
+                controller.sidebar.isHidden = true
             }
         }
 

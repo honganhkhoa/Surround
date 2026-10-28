@@ -443,7 +443,8 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
     /// text sizes, so the button need not be hittable.)
     private func assertBarShowsAppearance(in app: XCUIApplication, context: String,
                                           file: StaticString = #filePath, line: UInt = #line) {
-        let bar = app.navigationBars.firstMatch
+        // An open iPad sidebar has its own navigation bar, listed first.
+        let bar = app.navigationBars.containing(.button, identifier: ID.homeAppearance).firstMatch
         let appearance = bar.buttons.matching(identifier: ID.homeAppearance).firstMatch
         for position in ["top", "scrolled"] {
             if position == "scrolled", !scrollHomeDown(in: app, file: file, line: line) {
