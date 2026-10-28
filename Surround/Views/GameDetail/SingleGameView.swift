@@ -1052,14 +1052,14 @@ struct SingleGameView: View {
                     conversationPanel.clipShape(UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12))
                         .transition(chatTransition)
                 } }
-                    .gameDetailSlot(.chat, plan: chatPlan)
+                    .gameDetailSlot(.chat, plan: chatPlan, sceneVisible: showsChatPanel)
                 Group { if showsChatPanel && ogs.user != nil {
                     chatComposer.clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
                         .transition(chatTransition)
                 } }
-                    .gameDetailSlot(.composer, plan: chatPlan)
+                    .gameDetailSlot(.composer, plan: chatPlan, sceneVisible: showsChatPanel && ogs.user != nil)
                 Group { if showsChatPreview && !plan.previewInOpponentRow { chatPreviewBar } }
-                    .gameDetailSlot(.preview, plan: plan)
+                    .gameDetailSlot(.preview, plan: plan, sceneVisible: showsChatPreview && !plan.previewInOpponentRow)
             }
             .preference(key: GameDetailClocksInHeaderPreferenceKey.self, value: plan.clocksInHeader)
             .preference(key: GameDetailCurrentPlayerClockInHeaderPreferenceKey.self,

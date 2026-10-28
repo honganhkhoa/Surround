@@ -723,7 +723,7 @@ private struct ImageStoneCanvas: View, Equatable {
     var whitePalette: StonePalette
     // The raised profile is capped at a 3 pt blur and 3 pt offset; allow
     // three blur radii beyond that offset, including edge intersections.
-    private var overhang: CGFloat { shadowStyle == .raised ? 12 : 6 }
+    private var overhang: CGFloat { shadowStyle == .contact ? 6 : 12 }
 
     var body: some View {
         Canvas(rendersAsynchronously: false) { context, _ in
@@ -735,9 +735,10 @@ private struct ImageStoneCanvas: View, Equatable {
             // Long casts shift the apparent center of a tiny stone. Keep
             // phone-size shadows close to its footprint; larger boards
             // retain the theme's full raised profile and light direction.
-            let shadowScale = min(1, max(0.35, (cellSize - 10) / 30))
+            let glass = shadowStyle == .raisedGlass
+            let shadowScale = min(1, max(glass ? 0.5 : 0.35, (cellSize - 10) / 30))
 
-            if shadowStyle == .raised {
+            if shadowStyle != .contact {
                 // A full-footprint cast stays visible against wood grain at
                 // phone size. Cap its spread so larger boards do not float.
                 drawShadow(in: context, radius: min(3, max(1.8, cellSize * 0.07)) * shadowScale,
@@ -746,9 +747,13 @@ private struct ImageStoneCanvas: View, Equatable {
                            inset: 0, opacity: 0.34)
                 // The tighter edge keeps the curved stone grounded; the
                 // cast above is softer than the default contact-only shadow.
-                drawShadow(in: context, radius: min(1, max(0.45, cellSize * 0.02)),
-                           x: min(0.5, cellSize * 0.01), y: min(0.8, cellSize * 0.02),
-                           inset: 0.2, opacity: 0.32)
+                // Glass needs a distinct contact edge on dark enamel even
+                // at phone size. Keep it tight so the stone stays centered.
+                drawShadow(in: context,
+                           radius: min(1, max(glass ? 0.5 : 0.45, cellSize * (glass ? 0.025 : 0.02))),
+                           x: min(glass ? 0.9 : 0.5, cellSize * (glass ? 0.025 : 0.01)),
+                           y: min(glass ? 1.5 : 0.8, cellSize * (glass ? 0.045 : 0.02)),
+                           inset: glass ? 0.1 : 0.2, opacity: glass ? 0.5 : 0.32)
             } else {
                 drawShadow(in: context, radius: max(0.6, cellSize * 0.06 * shadowScale),
                            x: cellSize * 0.03 * shadowScale, y: cellSize * 0.06 * shadowScale,

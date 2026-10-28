@@ -398,7 +398,8 @@ final class SurroundThemeTests: XCTestCase {
                         "FrostPineMidnight", "FrostPinePale"]
         let names = families.flatMap { family in (0..<4).map { "\(family)\($0)" } }
             + ["FeltMeadowBlackStone", "FeltMeadowWhiteStone",
-               "NightGardenBlackStone", "NightGardenWhiteStone"]
+               "NightGardenBlackStone", "NightGardenWhiteStone",
+               "ChristmasKeepsakesRubyStone", "ChristmasKeepsakesIvoryStone"]
         let side = 128
         for name in names {
             let image = try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
@@ -777,6 +778,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .frostPine)
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .feltMeadow)
         XCTAssertEqual(SurroundTheme.current(storedID: "nightGarden"), .nightGarden)
+        XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .christmasKeepsakes)
         #else
         XCTAssertEqual(SurroundTheme.current(storedID: "nebulaPearl"), .nebulaPearl)
         XCTAssertEqual(SurroundTheme.current(storedID: "rakedGarden"), .rakedGarden)
@@ -784,6 +786,7 @@ final class SurroundThemeTests: XCTestCase {
         XCTAssertEqual(SurroundTheme.current(storedID: "frostPine"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "feltMeadow"), .standard)
         XCTAssertEqual(SurroundTheme.current(storedID: "nightGarden"), .standard)
+        XCTAssertEqual(SurroundTheme.current(storedID: "christmasKeepsakes"), .standard)
         #endif
     }
 
@@ -791,9 +794,9 @@ final class SurroundThemeTests: XCTestCase {
     /// append the unreleased themes.
     func testPickersOfferTheReleasedThemesFirst() {
         XCTAssertEqual(SurroundTheme.released, [.standard, .surroundStudio, .rakedGarden, .nebulaPearl])
-        XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), [.frostPine, .feltMeadow, .nightGarden])
+        XCTAssertEqual(SurroundTheme.allCases.filter(\.isDebugOnly), [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes])
         #if DEBUG
-        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + [.frostPine, .feltMeadow, .nightGarden])
+        XCTAssertEqual(SurroundTheme.available, SurroundTheme.released + [.frostPine, .feltMeadow, .nightGarden, .christmasKeepsakes])
         #else
         XCTAssertEqual(SurroundTheme.available, SurroundTheme.released)
         #endif
@@ -1053,6 +1056,113 @@ final class SurroundThemeTests: XCTestCase {
         try assertNightAnalysisMarksRemainReadable(.feltMeadow)
     }
 
+    func testChristmasKeepsakesPaletteAndGlassMarkersAdaptToAppearance() throws {
+        let theme = SurroundTheme.christmasKeepsakes
+        XCTAssertTrue(theme.isDebugOnly)
+        XCTAssertTrue(theme.hasScene)
+        XCTAssertNil(theme.colorScheme, "Christmas Keepsakes follows system appearance")
+        assertAdaptiveColorsFollowRepeatedTraitChanges(theme)
+        for scheme: ColorScheme in [.light, .dark] {
+            let style: UIUserInterfaceStyle = scheme == .dark ? .dark : .light
+            try assertNightAnalysisMarksRemainReadable(theme, scheme: scheme)
+            try assertNightControlFallbacksKeepReadableTextAndRoles(theme, scheme: scheme)
+            let board = theme.board(for: scheme)
+            for stone in [board.black, board.white] {
+                let casing = try XCTUnwrap(stone.detailedMarkerCasing)
+                XCTAssertGreaterThanOrEqual(contrast(stone.lastMove, casing, style: style), 3,
+                                           "Last-move rings remain visible across glass reflections")
+                XCTAssertGreaterThanOrEqual(contrast(stone.label, casing, style: style), 4.5,
+                                           "Variation labels retain a contrasting casing over glass")
+            }
+            for surface in [theme.pageBackground, theme.panel, theme.chatBubble] {
+                XCTAssertGreaterThanOrEqual(contrast(theme.foreground, surface, style: style), 4.5)
+                XCTAssertGreaterThanOrEqual(contrast(theme.detailSecondaryForeground, surface, style: style), 4.5)
+            }
+            for surface in [theme.pageBackground, theme.panel] {
+                XCTAssertGreaterThanOrEqual(contrast(theme.homeActionForeground, surface, style: style), 4.5)
+            }
+            for surface in [theme.panel, theme.chatBubble] {
+                XCTAssertGreaterThanOrEqual(contrast(theme.chatCoordinateForeground, surface, style: style), 4.5)
+            }
+            XCTAssertGreaterThanOrEqual(contrast(board.emptyPointMarker, board.boardColor, style: style), 4.5)
+        }
+    }
+
+    func testChristmasKeepsakesKeepsFullDecorationsOnTheLandscapeTabletop() {
+        for (size, board, clocks) in [
+            (CGSize(width: 1024, height: 768), CGRect(x: 379, y: 118, width: 582, height: 582),
+             CGRect(x: 92, y: 320, width: 224, height: 180)),
+            (CGSize(width: 1376, height: 1032), CGRect(x: 509, y: 158, width: 782, height: 782),
+             CGRect(x: 124, y: 449, width: 300, height: 200))
+        ] {
+            let layout = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
+                .board: board, .clocks: clocks
+            ])
+            XCTAssertTrue(layout.usesLandscapeTabletop)
+            XCTAssertEqual(layout.pine.origin, .zero, "Corner artwork meets the viewport, not an interior crop")
+            XCTAssertLessThan(layout.pine.maxX, board.minX)
+            XCTAssertGreaterThanOrEqual(layout.gifts.width, size.height * 0.25,
+                                        "Gifts retain tabletop scale instead of shrinking to the narrow gutter")
+            XCTAssertLessThan(layout.gifts.maxX, board.minX)
+            XCTAssertGreaterThan(layout.gifts.minY, clocks.maxY)
+            XCTAssertTrue(CGRect(origin: .zero, size: size).contains(layout.gifts))
+            XCTAssertFalse(layout.gifts.intersects(board))
+            for panel: GameDetailLayoutPlan.Slot in [.analysis, .information, .chat] {
+                let other = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
+                    .board: board,
+                    .clocks: CGRect(x: 18, y: 76, width: board.minX - 80, height: 71),
+                    panel: CGRect(x: 18, y: 153, width: board.minX - 80, height: size.height - 200)
+                ])
+                XCTAssertEqual(layout, other, "Panels cover stable tabletop objects without moving or shrinking them")
+            }
+        }
+    }
+
+    func testChristmasKeepsakesUsesCornerPlacementWithoutASpaciousLandscapeTabletop() {
+        let portrait = CGSize(width: 768, height: 1024)
+        let baseline = ChristmasKeepsakesDecorationLayout(size: portrait)
+        XCTAssertEqual(baseline, ChristmasKeepsakesDecorationLayout(size: portrait, occupiedFrames: [
+            .board: CGRect(x: 20, y: 250, width: 728, height: 728),
+            .clocks: CGRect(x: 20, y: 80, width: 728, height: 80)
+        ]))
+        XCTAssertFalse(baseline.usesLandscapeTabletop)
+        for size in [CGSize.zero, CGSize(width: -20, height: 40),
+                     CGSize(width: CGFloat.infinity, height: CGFloat.nan), CGSize(width: 1024, height: 768)] {
+            let layout = ChristmasKeepsakesDecorationLayout(size: size, occupiedFrames: [
+                .board: .infinite, .clocks: .null,
+                .chat: CGRect(x: -200, y: 10, width: 100, height: 300)
+            ])
+            XCTAssertFalse(layout.usesLandscapeTabletop)
+            for frame in [layout.pine, layout.gifts] {
+                XCTAssertTrue(frame.minX.isFinite && frame.minY.isFinite)
+                XCTAssertTrue(frame.width.isFinite && frame.height.isFinite)
+                XCTAssertGreaterThanOrEqual(frame.width, 0)
+                XCTAssertGreaterThanOrEqual(frame.height, 0)
+            }
+        }
+    }
+
+    func testChristmasKeepsakesChangesLightingWithoutMovingTheBoard() throws {
+        let theme = SurroundTheme.christmasKeepsakes
+        let day = theme.board(for: .light), night = theme.board(for: .dark)
+        XCTAssertEqual(theme.board, day)
+        XCTAssertLessThan(luminance(night.boardColor), luminance(day.boardColor))
+        XCTAssertLessThan(luminance(try XCTUnwrap(night.compactBoardColor)),
+                          luminance(try XCTUnwrap(day.compactBoardColor)))
+        XCTAssertEqual(day.gridStyle, .straight)
+        XCTAssertEqual(night.gridStyle, day.gridStyle)
+        XCTAssertEqual(night.gridLineScale, day.gridLineScale)
+        XCTAssertEqual(night.stoneLightDirection, day.stoneLightDirection)
+        XCTAssertEqual(night.boardDepth?.thicknessRatio, day.boardDepth?.thicknessRatio)
+        XCTAssertEqual(night.boardDepth?.maximumThickness, day.boardDepth?.maximumThickness)
+        for board in [day, night] {
+            XCTAssertNil(board.boardDepth, "The lacquered board keeps a thin edge")
+            XCTAssertFalse(board.boardBevel)
+        }
+        // Asset integrity uses the test bundle below. The cached main-bundle
+        // image wrappers may be nil in this unhosted unit target.
+    }
+
     func testNightGardenPaletteAndFacetedMarkersAdaptToAppearance() throws {
         let theme = SurroundTheme.nightGarden
         XCTAssertNil(theme.colorScheme, "Night Garden follows the system appearance")
@@ -1182,7 +1292,7 @@ final class SurroundThemeTests: XCTestCase {
                 XCTAssertGreaterThan(contrast(theme.clockAccent(color), surface, style: style), 4.5)
                 XCTAssertGreaterThanOrEqual(
                     contrast(theme.clockSuddenDeathAccent(color, scheme: scheme), surface, style: style), 4.5)
-                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden {
+                if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
                     for (state, accent) in [
                         ("Accepted", theme.clockAgreementAccent(color, scheme: scheme)),
                         ("Disconnected", theme.clockDisconnectedAccent(color, scheme: scheme)),
@@ -1205,7 +1315,7 @@ final class SurroundThemeTests: XCTestCase {
         }
         XCTAssertGreaterThan(contrast(.white, try XCTUnwrap(theme.actionTint), style: style), 4.5)
         XCTAssertGreaterThan(contrast(.white, theme.statusBadge, style: style), 4.5)
-        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden {
+        if theme == .surroundStudio || theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes {
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockUndoBadge(scheme: scheme), style: style), 4.5,
                                        "The Undo badge keeps its white text readable")
             XCTAssertGreaterThanOrEqual(contrast(.white, theme.clockSuddenDeathBadge(scheme: scheme), style: style), 4.5,
@@ -1766,6 +1876,28 @@ final class SurroundThemeTests: XCTestCase {
         try assertEqualAlphaStoneFootprints(StoneImages(
             black: [try image(named: "NightGardenBlackStone")],
             white: [try image(named: "NightGardenWhiteStone")]
+        ))
+    }
+
+    func testChristmasKeepsakesAssetsSeparateGlassFromSceneDecorations() throws {
+        let bundle = Bundle(for: Self.self)
+        func image(_ suffix: String) throws -> UIImage {
+            let name = "ChristmasKeepsakes" + suffix
+            return try XCTUnwrap(UIImage(named: name, in: bundle, compatibleWith: nil), name)
+        }
+        for suffix in ["BoardSurface", "Backdrop"] {
+            let pixels = try rgbaPixels(for: XCTUnwrap(image(suffix).cgImage), side: 128)
+            XCTAssertTrue(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 },
+                          "The board and backdrop are continuous opaque surfaces")
+        }
+        for suffix in ["Pine", "Gifts"] {
+            let pixels = try rgbaPixels(for: XCTUnwrap(image(suffix).cgImage), side: 128)
+            let alpha = stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
+            XCTAssertTrue(alpha.contains { $0 > 127 }, "The decoration contains visible artwork")
+            XCTAssertTrue(alpha.contains { $0 < 16 }, "The decoration retains a transparent background")
+        }
+        try assertEqualAlphaStoneFootprints(StoneImages(
+            black: [try image("RubyStone")], white: [try image("IvoryStone")]
         ))
     }
 

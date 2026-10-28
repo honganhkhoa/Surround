@@ -81,6 +81,8 @@ enum StoneLightDirection: Equatable {
 enum ImageStoneShadowStyle: Equatable {
     case contact
     case raised
+    /// A firmer contact edge gives polished glass depth on dark enamel.
+    case raisedGlass
 }
 
 /// A board surface, either a seamless fixed-size tile or one composition

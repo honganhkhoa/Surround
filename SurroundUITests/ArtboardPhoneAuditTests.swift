@@ -482,6 +482,18 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
                                          boardBrightnessBand: 0.30...0.60)
     }
 
+    func testChristmasKeepsakesBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "christmasKeepsakes", appearance: .light,
+                                         suffix: "christmas-keepsakes", pageBrightnessBand: 0.70...1,
+                                         boardBrightnessBand: 0.12...0.40)
+    }
+
+    func testChristmasKeepsakesNightBoardMarkerGallery() throws {
+        try auditThemeBoardMarkerGallery(theme: "christmasKeepsakes", appearance: .dark,
+                                         suffix: "christmas-keepsakes-night", pageBrightnessBand: 0...0.25,
+                                         boardBrightnessBand: 0.08...0.32)
+    }
+
     func testNightGardenBoardMarkerGallery() throws {
         try auditThemeBoardMarkerGallery(theme: "nightGarden", appearance: .light,
                                          suffix: "night-garden", pageBrightnessBand: 0.70...1,
@@ -701,6 +713,51 @@ final class ArtboardPhoneAuditTests: SurroundJourneyUITestCase {
     func testSurroundStudioNightThemeStates() throws {
         try auditThemeStates(theme: "surroundStudio", title: "Surround Studio at night",
                              suffix: "-surround-studio-night", appearance: .dark)
+    }
+
+    func testChristmasKeepsakesThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                                       suffix: "-christmas-keepsakes", appearance: nil, deviceAppearance: .light)
+    }
+
+    func testChristmasKeepsakesNightThemePanelTransitions() throws {
+        try auditThemePanelTransitions(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                                       suffix: "-christmas-keepsakes-night", appearance: nil, deviceAppearance: .dark)
+    }
+
+    func testChristmasKeepsakesThemeStates() throws {
+        try auditThemeStates(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                             suffix: "-christmas-keepsakes", appearance: .light)
+    }
+
+    func testChristmasKeepsakesNightThemeStates() throws {
+        try auditThemeStates(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                             suffix: "-christmas-keepsakes-night", appearance: .dark)
+    }
+
+    func testChristmasKeepsakesThemeScoring() throws {
+        try auditThemeScoring(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                              suffix: "-christmas-keepsakes", appearance: .light)
+    }
+
+    func testChristmasKeepsakesNightThemeScoring() throws {
+        try auditThemeScoring(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                              suffix: "-christmas-keepsakes-night", appearance: .dark)
+    }
+
+    func testChristmasKeepsakesThemeSmallPhone() throws {
+        try auditThemeSmallPhone(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                                 suffix: "-christmas-keepsakes", appearance: .light)
+    }
+
+    func testChristmasKeepsakesThemeControlStates() {
+        auditThemeControlStates(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                                appearance: .light, suffix: "-christmas-keepsakes")
+    }
+
+    func testChristmasKeepsakesNightThemeControlStates() {
+        auditThemeControlStates(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                                appearance: .dark, suffix: "-christmas-keepsakes-night")
     }
 
     func testNightGardenThemeStates() throws {

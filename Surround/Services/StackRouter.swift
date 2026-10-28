@@ -712,10 +712,11 @@ struct AppNavigationStack<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     /// The native Back button belongs to this host, outside the destination's
-    /// tint scope. Only a loaded Night Garden game needs the legacy override.
+    /// tint scope. Illustrated garden and keepsake scenes need matching ink.
     private var legacyGameDetailTint: Color? {
         let theme = SurroundTheme.current(storedID: gameThemeID)
-        guard theme == .nightGarden, let route = navigation.path.last else { return nil }
+        guard theme == .nightGarden || theme == .christmasKeepsakes,
+              let route = navigation.path.last else { return nil }
         let hasLoadedGame: Bool = switch route {
         case .homeGame: nav.home.activeGame != nil
         case .historyGame: nav.gameHistory.activeGame != nil

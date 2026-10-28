@@ -447,6 +447,110 @@ final class GameDetailIPadArtboardAuditTests: SurroundJourneyUITestCase {
         return sum / Double(count)
     }
 
+    func testChristmasKeepsakesThemeOrientations() {
+        auditThemeOrientations(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                               suffix: "-christmas-keepsakes", appearance: .light)
+    }
+
+    func testChristmasKeepsakesNightThemeOrientations() {
+        auditThemeOrientations(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                               suffix: "-christmas-keepsakes-night", appearance: .dark)
+    }
+
+    func testChristmasKeepsakesThemePanels() {
+        auditThemePanels(theme: "christmasKeepsakes", title: "Christmas Keepsakes",
+                         suffix: "-christmas-keepsakes", appearance: .light)
+    }
+
+    func testChristmasKeepsakesNightThemePanels() {
+        auditThemePanels(theme: "christmasKeepsakes", title: "Christmas Keepsakes in Dark Mode",
+                         suffix: "-christmas-keepsakes-night", appearance: .dark)
+    }
+
+    func testChristmasKeepsakesNightBackgroundComposition() {
+        let app = launchGame(artboard: 24, theme: "christmasKeepsakes", appearance: .dark)
+        defer {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            app.terminate()
+        }
+        setSidebarCollapsed(true, in: app)
+        let board = element(ID.gameBoard, in: app)
+        let selectedIdentifier = ID.gameAnalysisPosition(baseMoveNumber: 38,
+                                                         movePath: ["lj", "lk", "mk"])
+        let variation = "variation:38:lj-lk-mk"
+
+        func assertAnalysisRetained() {
+            XCTAssertEqual(board.value as? String, variation,
+                           "The background must retain the selected analysis position")
+            element(ID.gameAnalyzeControlBar, in: app)
+            XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists, "Analyze stays the only open panel")
+            assertSelected(selectedIdentifier, in: app)
+        }
+
+        func record(_ state: String, portrait: Bool = false) {
+            Thread.sleep(forTimeInterval: 0.7)
+            let name = "christmas-keepsakes-night-ipad-background-\(state)"
+            recordArtboardCapture(portrait ? 26 : 24, screenshotName: name, in: app,
+                                  note: "Same Dark artboard 24 analysis fixture; \(state).")
+            keepScreenshot(name, in: app)
+            let geometry = app.descendants(matching: .any)
+                .matching(identifier: "game.layout.geometry").firstMatch
+            let attachment = XCTAttachment(string: """
+            Board: \(board.frame)
+            Board value: \(String(describing: board.value))
+            Game layout geometry: \(String(describing: geometry.value))
+
+            \(app.debugDescription)
+            """)
+            attachment.name = name + "-geometry"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+
+        assertAnalysisRetained()
+        assertAuditAnalysisTreeAxis(vertical: true, in: app)
+        record("landscape-initial")
+        let landscapeBoard = board.frame
+        func assertLandscapeBoardUnchanged(_ state: String) {
+            XCTAssertTrue(pollUntil(timeout: 5) {
+                let frame = board.frame
+                return abs(frame.minX - landscapeBoard.minX) <= 1
+                    && abs(frame.minY - landscapeBoard.minY) <= 1
+                    && abs(frame.width - landscapeBoard.width) <= 1
+                    && abs(frame.height - landscapeBoard.height) <= 1
+            }, "\(state) must preserve the board frame \(landscapeBoard); got \(board.frame)")
+            assertAnalysisRetained()
+        }
+
+        setSidebarCollapsed(false, in: app)
+        assertLandscapeBoardUnchanged("Opening the native sidebar")
+        XCTAssertTrue(board.isHittable, "The sidebar leaves the board interactive")
+        record("landscape-sidebar-open")
+        setSidebarCollapsed(true, in: app)
+        assertLandscapeBoardUnchanged("Closing the native sidebar")
+        record("landscape-sidebar-closed")
+
+        XCUIDevice.shared.orientation = .portrait
+        let controls = element(ID.gameAnalyzeControlBar, in: app)
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            let frame = board.frame
+            return window.height > window.width && frame.width > 0
+                && abs(frame.width - frame.height) <= 1 && window.contains(frame)
+                && controls.frame.maxY <= frame.minY + 1
+        }, "The same analysis board must fit the portrait window")
+        assertAnalysisRetained()
+        let tree = assertAuditAnalysisTreeAxis(vertical: false, in: app)
+        XCTAssertLessThanOrEqual(tree.maxY, controls.frame.minY + 1)
+        XCTAssertLessThanOrEqual(controls.frame.maxY, board.frame.minY + 1)
+        record("portrait", portrait: true)
+    }
+
+    func testChristmasKeepsakesThemeNarrowWindow() {
+        auditNarrowNativeWindowArtboard(theme: "christmasKeepsakes", suffix: "-christmas-keepsakes",
+                                       appearance: .light)
+    }
+
     func testNightGardenThemeOrientations() {
         auditThemeOrientations(theme: "nightGarden", title: "Night Garden", suffix: "-night-garden",
                                appearance: .light)

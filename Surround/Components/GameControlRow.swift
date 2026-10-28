@@ -90,9 +90,9 @@ private struct GameControlGlass<Surface: Shape>: ViewModifier {
                 content.glassEffect(.regular.tint(disabled ? prominentFill : (theme.actionGlassTint ?? prominentFill))
                     .interactive(interactive && !disabled), in: shape)
             } else {
-                // The garden's petals can pass beneath More. Give its ink
+                // Scene decorations can pass beneath More. Give its ink
                 // a stable surface that follows the current appearance.
-                content.glassEffect((theme == .nightGarden
+                content.glassEffect((theme == .nightGarden || theme == .christmasKeepsakes
                     ? Glass.regular.tint(theme.panel.opacity(0.9)) : .clear)
                     .interactive(interactive), in: shape)
             }
@@ -204,10 +204,10 @@ struct GameControlRow: View {
     }
 
     private var moreForeground: Color {
-        guard theme == .nightGarden else {
+        guard theme == .nightGarden || theme == .christmasKeepsakes else {
             return theme == .feltMeadow ? theme.foreground : .accentColor
         }
-        // Glass can choose its own content appearance over the garden. Keep
+        // Glass can choose its own content appearance over the scene. Keep
         // the dots paired with the panel's palette through moves and rotation.
         let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
         return Color(uiColor: UIColor(theme.foreground).resolvedColor(with: traits))

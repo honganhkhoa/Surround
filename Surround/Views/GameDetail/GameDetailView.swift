@@ -685,7 +685,12 @@ struct GameDetailView: View {
         .accessibilityIdentifier(
             SurroundUITestContract.AccessibilityID.gameDetail(currentGame)
         )
-        .background { GameDetailBackdrop().ignoresSafeArea(.container) }
+        .backgroundPreferenceValue(GameDetailSceneBoundsPreferenceKey.self) { anchors in
+            GeometryReader { scene in
+                GameDetailBackdrop(occupiedFrames: anchors.mapValues { scene[$0] })
+            }
+            .ignoresSafeArea(.container)
+        }
         .overlay {
             GameDetailSceneForeground(hasTopEdgeClocks: hasActiveVerticalDisplayDivision(in: geometry))
                 .ignoresSafeArea(.container)
@@ -1136,7 +1141,7 @@ private struct GameToolbarLayout: ViewModifier {
         }
         .toggleStyle(.button)
         .labelStyle(.iconOnly)
-        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden) && !analyzingIsPresented
+        .modifier(GameDetailLegacyTint(color: (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) && !analyzingIsPresented
             ? theme.foreground : .accentColor))
         .accessibilityIdentifier(
             compact
@@ -1463,7 +1468,7 @@ private struct GameToolbarChatButton: View {
     private var iconColor: Color {
         if isSelected { return colorScheme == .dark ? .black : .white }
         if #available(iOS 26.0, macCatalyst 26.0, *) { return .primary }
-        return (theme == .feltMeadow || theme == .nightGarden) ? theme.foreground : .accentColor
+        return (theme == .feltMeadow || theme == .nightGarden || theme == .christmasKeepsakes) ? theme.foreground : .accentColor
     }
 
     var body: some View {
