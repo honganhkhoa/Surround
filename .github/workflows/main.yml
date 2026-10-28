@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 
-# Every "part N of 2" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
+# Every "part N of M" step below keeps a 50-minute limit: run-ipad-ui-tests.sh
 # interrupts xcodebuild at 46 minutes and needs the rest to save the result
 # bundle and failure evidence. The composer and continuity steps keep 45
 # minutes, interrupted at 41. Change part_deadline_seconds and
@@ -151,7 +151,7 @@ jobs:
 
   ipad-ui-tests:
     runs-on: macos-26
-    timeout-minutes: 135
+    timeout-minutes: 185
 
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +178,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run main iPad UI tests, part 1 of 2
+      - name: Run main iPad UI tests, part 1 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -186,12 +186,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh main-1 \
             "${{ steps.simulator.outputs.id }}" iPad
 
-      - name: Run main iPad UI tests, part 2 of 2
+      - name: Run main iPad UI tests, part 2 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main-2 \
+            "${{ steps.simulator.outputs.id }}" iPad
+
+      - name: Run main iPad UI tests, part 3 of 3
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main-3 \
             "${{ steps.simulator.outputs.id }}" iPad
 
       - name: Upload iPad UI test results
@@ -400,7 +408,7 @@ jobs:
 
   minimum-ios-18-ui-tests:
     runs-on: macos-15
-    timeout-minutes: 135
+    timeout-minutes: 185
 
     steps:
       - uses: actions/checkout@v4
@@ -433,7 +441,7 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh build \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run main iPad UI tests on iPadOS 18, part 1 of 2
+      - name: Run main iPad UI tests on iPadOS 18, part 1 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
@@ -441,12 +449,20 @@ jobs:
           .github/ci-tools/run-ipad-ui-tests.sh main-1 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
-      - name: Run main iPad UI tests on iPadOS 18, part 2 of 2
+      - name: Run main iPad UI tests on iPadOS 18, part 2 of 3
         if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
         timeout-minutes: 50
         shell: bash
         run: |
           .github/ci-tools/run-ipad-ui-tests.sh main-2 \
+            "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
+
+      - name: Run main iPad UI tests on iPadOS 18, part 3 of 3
+        if: ${{ !cancelled() && steps.ipad_ui_build.outcome == 'success' }}
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          .github/ci-tools/run-ipad-ui-tests.sh main-3 \
             "${{ steps.ipad_simulator.outputs.id }}" iPadOS18
 
       - name: Upload iPadOS 18 UI test results
