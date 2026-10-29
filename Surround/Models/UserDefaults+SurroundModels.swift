@@ -248,6 +248,11 @@ extension SettingKey {
     static var showsBoardCoordinates: SettingKey<Bool> {
         return .init(name: "showsBoardCoordinates", defaultValue: false)
     }
+
+    /// The last chat-panel choice made in a regular Game Detail layout.
+    static var regularGameChatVisible: SettingKey<Bool> {
+        return .init(name: "regularGameChatVisible", defaultValue: false)
+    }
     
     static var hasUsedAddToConditionalMoves: SettingKey<Bool> {
         return .init(

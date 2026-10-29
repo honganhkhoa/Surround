@@ -2046,6 +2046,63 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         )
     }
 
+    private func openFixtureGameFromHome(in app: XCUIApplication) {
+        let gameID = SurroundUITestContract.fixtureGameID
+        tap(SurroundUITestContract.AccessibilityID.homeGamePlayerInfo(gameID), in: app)
+        element(SurroundUITestContract.AccessibilityID.gameDetail(gameID), in: app)
+        element(SurroundUITestContract.AccessibilityID.gameBoard, in: app)
+    }
+
+    private func returnHomeFromFixtureGame(in app: XCUIApplication) {
+        if chatInputHasKeyboardFocus(in: app) {
+            dismissSoftwareKeyboardIfNeeded(in: app)
+        }
+        let backs = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@ OR label == %@",
+            "BackButton", "Active games", "Back"
+        ))
+        var back: XCUIElement?
+        let visibleBack = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            back = backs.allElementsBoundByIndex.first(where: { $0.isHittable })
+            return back != nil
+        }, object: nil)
+        XCTAssertEqual(waitWithFinalCheck(for: [visibleBack], timeout: 10), .completed,
+                       "Expected the game's visible Back control.")
+        guard let back else { return }
+        tap(back, description: "Return to Home", in: app)
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        element(SurroundUITestContract.AccessibilityID.homeGamePlayerInfo(
+            SurroundUITestContract.fixtureGameID
+        ), in: app)
+    }
+
+    func testRegularGameChatVisibilitySurvivesReopeningGameDetail() throws {
+        #if !targetEnvironment(macCatalyst)
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad,
+                      "This journey exercises the regular game layout.")
+        #endif
+        let app = launchApp()
+        let chat = app.scrollViews[SurroundUITestContract.AccessibilityID.gameChatLog]
+        openFixtureGameFromHome(in: app)
+        XCTAssertFalse(chat.exists, "Chat starts closed without a saved choice.")
+
+        openGameChat(in: app)
+        element(SurroundUITestContract.AccessibilityID.gameChatLog, in: app)
+        returnHomeFromFixtureGame(in: app)
+        openFixtureGameFromHome(in: app)
+        element(SurroundUITestContract.AccessibilityID.gameChatLog, in: app)
+        XCTAssertTrue(gameToolbarToggleIsOn(gameChatControl(in: app)),
+                      "Reopening Game Detail restores the open Chat panel.")
+        XCTAssertFalse(chatInputHasKeyboardFocus(in: app),
+                       "Restoring Chat must not automatically focus its composer.")
+
+        setGameChatVisible(false, in: app)
+        returnHomeFromFixtureGame(in: app)
+        openFixtureGameFromHome(in: app)
+        XCTAssertFalse(chat.exists, "Reopening Game Detail also remembers closing Chat.")
+        XCTAssertFalse(gameToolbarToggleIsOn(gameChatControl(in: app)))
+    }
+
     func testRegularIPadToolbarPlacesActiveGamesBetweenAnalyzeAndZen() throws {
         #if targetEnvironment(macCatalyst)
         throw XCTSkip("This toolbar order applies to native iPad.")

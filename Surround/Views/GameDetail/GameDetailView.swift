@@ -50,6 +50,9 @@ struct GameDetailView: View {
     @State private var hasActiveVerticalDisplayDivision = false
     @State var zenMode = false
     @State var interaction = GameDetailInteraction()
+    @State private var hasRestoredChatPanel = false
+    @AppStorage(SettingKey<Bool>.regularGameChatVisible.name, store: userDefaults)
+    private var regularGameChatVisible = false
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
@@ -544,6 +547,10 @@ struct GameDetailView: View {
     }
 
     private var compactLayout: Bool {
+        usesCompactLayout(at: contentWidth)
+    }
+
+    private func usesCompactLayout(at width: CGFloat) -> Bool {
         var compactLayout = true
         #if os(iOS)
         compactLayout = horizontalSizeClass == .compact
@@ -553,17 +560,27 @@ struct GameDetailView: View {
             compactLayout = true
         }
         #endif
-        if contentWidth > 0 && contentWidth < 600 {
+        if width > 0 && width < 600 {
             compactLayout = true
         }
         return compactLayout
+    }
+
+    private func restoreChatPanelIfNeeded(contentWidth: CGFloat) {
+        guard !hasRestoredChatPanel, contentWidth > 0, currentGame != nil else { return }
+        // Restore once for this route, after measuring the actual layout.
+        // Resizing and returning from Profile keep the current task intact.
+        hasRestoredChatPanel = true
+        if !usesCompactLayout(at: contentWidth), interaction.panel == .playerInfo {
+            interaction.setChatVisible(regularGameChatVisible)
+        }
     }
 
     private var navigationBarHidden: Bool {
         zenMode
     }
 
-    var body: some View {
+    private var measuredContent: some View {
         GeometryReader { geometry in
             content(geometry: geometry)
                 .background {
@@ -597,8 +614,19 @@ struct GameDetailView: View {
                     .accessibilityHidden(true)
                 }
         }
+    }
+
+    var body: some View {
+        measuredContent
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
             contentWidth = width
+            restoreChatPanelIfNeeded(contentWidth: width)
+        }
+        .onChange(of: interaction) { oldValue, newValue in
+            guard hasRestoredChatPanel, !compactLayout,
+                  oldValue.analysisResetRevision == newValue.analysisResetRevision,
+                  oldValue.isChatVisible != newValue.isChatVisible else { return }
+            regularGameChatVisible = newValue.isChatVisible
         }
         .onChange(of: currentGame) { oldGame, newGame in
             departingGame = newGame == nil ? oldGame : nil
@@ -739,6 +767,7 @@ struct GameDetailView: View {
             contextID: notificationContextID
         ))
         .onAppear {
+            restoreChatPanelIfNeeded(contentWidth: geometry.size.width)
             updateActiveGameList()
             updateDetailOfCurrentGameIfNecessary()
         }

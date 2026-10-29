@@ -154,6 +154,69 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testCompactChatChangesPreserveTheRegularChatPreference() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad,
+                      "This journey needs room for the regular game layout.")
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.home.rawValue,
+            GameLayoutUITestContract.launchArgument,
+        ])
+        let gameID = SurroundUITestContract.screenshotPrimaryGameID
+
+        func openGame() {
+            let entry = element(ID.homeGamePlayerInfo(gameID), in: app)
+            scrollIntoTappableArea(entry, in: app)
+            tap(entry, description: "Open the fixture game", in: app)
+            element(ID.gameDetail(gameID), in: app)
+            element(ID.gameBoard, in: app)
+        }
+
+        func reopenInRegularLayout() {
+            // Compact Chat can focus the composer. End input before leaving
+            // so the navigation control remains accessible on a small layout.
+            if chatInputHasKeyboardFocus(in: app) {
+                dismissSoftwareKeyboardIfNeeded(in: app)
+            }
+            let backs = app.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@ OR label == %@",
+                "BackButton", "Active games", "Back"
+            ))
+            var back: XCUIElement?
+            let visibleBack = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                back = backs.allElementsBoundByIndex.first(where: { $0.isHittable })
+                return back != nil
+            }, object: nil)
+            XCTAssertEqual(waitWithFinalCheck(for: [visibleBack], timeout: 10), .completed,
+                           "Expected the game's visible Back control.")
+            guard let back else { return }
+            tap(back, description: "Return to Home", in: app)
+            element(ID.screenHome, in: app)
+            tap(GameLayoutUITestContract.regular, in: app, matching: .button)
+            assertProperty("label", equals: "regular",
+                           of: element(GameLayoutUITestContract.current, in: app))
+            openGame()
+        }
+
+        openGame()
+        openGameChat(in: app)
+        changeLayout(toCompact: true, in: app)
+        setGameChatVisible(false, in: app)
+        reopenInRegularLayout()
+        element(ID.gameChatLog, in: app)
+        XCTAssertTrue(gameToolbarToggleIsOn(gameChatControl(in: app)),
+                      "Closing Chat in compact layout must preserve the saved regular open state.")
+
+        setGameChatVisible(false, in: app)
+        changeLayout(toCompact: true, in: app)
+        openGameChat(in: app)
+        reopenInRegularLayout()
+        XCTAssertFalse(app.scrollViews[ID.gameChatLog].exists,
+                       "Opening Chat in compact layout must preserve the saved regular closed state.")
+        XCTAssertFalse(gameToolbarToggleIsOn(gameChatControl(in: app)))
+    }
+
     func testMovePreviewKeepsAnExitAcrossLayouts() throws {
         let app = launchContinuityScene(.activeGameBoard)
         let liveBoard = try boardValue(in: app)
