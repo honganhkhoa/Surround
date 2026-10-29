@@ -87,7 +87,7 @@ private struct QuickMatchActionArea: View {
                             .foregroundStyle(.tint)
                             .accessibilityHidden(true)
                     } else {
-                        ProgressView()
+                        SearchSpinner(tint: .accentColor)
                             .accessibilityHidden(true)
                     }
 
@@ -132,8 +132,7 @@ private struct QuickMatchActionArea: View {
                                 Image(systemName: "hourglass")
                                     .accessibilityHidden(true)
                             } else {
-                                ProgressView()
-                                    .tint(.primary)
+                                SearchSpinner(tint: .primary)
                                     .accessibilityHidden(true)
                             }
                         }

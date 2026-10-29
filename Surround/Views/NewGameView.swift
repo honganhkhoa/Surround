@@ -303,8 +303,7 @@ struct NewGameView: View {
                             if reduceMotion {
                                 Image(systemName: "hourglass")
                             } else {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                SearchSpinner(tint: .white)
                             }
                         }
                         .accessibilityHidden(true)

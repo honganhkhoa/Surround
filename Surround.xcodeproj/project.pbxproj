@@ -11,6 +11,7 @@
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
 		FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
+		FC2610290000000000000002 /* SearchSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2610290000000000000001 /* SearchSpinner.swift */; };
 		FC2510010000000000000003 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000004 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
 		FC2510010000000000000005 /* FeltEdgeFibers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2510010000000000000001 /* FeltEdgeFibers.swift */; };
@@ -520,6 +521,7 @@
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		FC2510010000000000000001 /* FeltEdgeFibers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltEdgeFibers.swift; sourceTree = "<group>"; };
+		FC2610290000000000000001 /* SearchSpinner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSpinner.swift; sourceTree = "<group>"; };
 		FC2410010000000000000002 /* FeltControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltControlSurface.swift; sourceTree = "<group>"; };
 		0189D12871764C28AF2D6CE0 /* GameDetailDesignFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDesignFixtureTests.swift; sourceTree = "<group>"; };
 		87DB1CF4B22A44B2AA1EBCCE /* GameControlRowMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlRowMetricsTests.swift; sourceTree = "<group>"; };
@@ -1120,6 +1122,7 @@
 				AF3000023F00000000000002 /* ConditionalMovesPopover.swift */,
 				BC5EEBE6259B33BE00675761 /* Stone.swift */,
 				FC2510010000000000000001 /* FeltEdgeFibers.swift */,
+				FC2610290000000000000001 /* SearchSpinner.swift */,
 				BC042B4024AB2DD10050B2D1 /* BoardView.swift */,
 				BC042B2C24AB2DD00050B2D1 /* TimerView.swift */,
 				BCC8203224BDA6CC005D6A5E /* InlineTimerView.swift */,
@@ -1721,6 +1724,7 @@
 				FC2510010000000000000002 /* FeltEdgeFibers.swift in Sources */,
 				BC042B5924AB2DD10050B2D1 /* TimeUtilities.swift in Sources */,
 				BC55D2D624B81E90003E20E7 /* HomeView.swift in Sources */,
+				FC2610290000000000000002 /* SearchSpinner.swift in Sources */,
 				BCAE413A24D1234500B5DB74 /* se_wrapper.cpp in Sources */,
 				BCC8DFF225E0F38B00A6D500 /* NotificationPopup.swift in Sources */,
 				1373C1F45AB341E3BE209866 /* FriendshipControls.swift in Sources */,

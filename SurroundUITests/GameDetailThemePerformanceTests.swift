@@ -123,8 +123,9 @@ final class GameDetailThemePerformanceTests: SurroundJourneyUITestCase {
     // MARK: - Screens beside Game Detail
 
     /// Home at rest: with ticking clocks, each tick redraws what reads them.
-    /// The fixture's automatch search keeps a spinner turning, so the render
-    /// server redraws the boards' shadows on every frame here, ticks or not.
+    /// The fixture's waiting searches show a stopped spinner (SearchSpinner);
+    /// results from before it include the render server redrawing the boards'
+    /// shadows on every frame for the spinning one.
     func testHomeIdle() {
         let app = launch(into: .home, screen: ID.screenHome)
         defer { app.terminate() }

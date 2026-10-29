@@ -353,7 +353,7 @@ struct HomeView: View {
                         if reduceMotion {
                             Image(systemName: "hourglass")
                         } else {
-                            ProgressView()
+                            SearchSpinner()
                         }
                     }
                     .accessibilityHidden(true)
