@@ -248,7 +248,7 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
             assertTrayFreeOpenWideZen(window: window, in: app)
         }
         if number == 43 && pose == .bookWide {
-            assertBookWideZenKeepsItsTray(in: app)
+            assertTrayFreeBookWideZen(window: window, in: app)
         }
         if pose == .closedLandscape && [7, 42].contains(number) {
             assertClosedLandscapeColumn(zen: number == 42, in: app)
@@ -377,28 +377,38 @@ final class GameDetailDuoArtboardAuditTests: SurroundJourneyUITestCase {
         assertZenActionLine(more: CGPoint(x: 891, y: 591 - drawnBoardInset(in: app).bottom), board: board, in: app)
     }
 
-    /// v145 ZenDuoBookWide: Book wide's Zen keeps its tray (the navigation bar
-    /// holds Exit Zen); the board 439.5 at (503.5, 108.75) on the right pane,
-    /// the 160 pt clock column at x 143.7, and Pass and More on one line.
-    private func assertBookWideZenKeepsItsTray(in app: XCUIApplication) {
+    /// Book wide uses the reclaimed navigation band and keeps Exit clear of
+    /// the right-pane board and the centered clock column on the left.
+    private func assertTrayFreeBookWideZen(window: CGRect, in app: XCUIApplication) {
         let board = element(ID.gameBoard, in: app).frame
-        let exit = element(ID.gameZenExit, in: app, matching: .button).frame
+        let exitButton = element(ID.gameZenExit, in: app, matching: .button)
+        let exit = exitButton.frame
         print("[DuoZenBoard] pose=\(pose.rawValue) board=\(board) exit=\(exit)")
-        XCTAssertEqual(board.width, 439.5, accuracy: 2, "Book wide Zen board (v145 439.5 at (503.5, 108.75)); got \(board)")
-        XCTAssertEqual(board.minX, 503.5, accuracy: 2, "Book wide Zen board x; got \(board)")
-        XCTAssertEqual(board.minY, 108.75, accuracy: 2, "Book wide Zen board top; got \(board)")
+        XCTAssertTrue(exitButton.isHittable, "Exit Zen remains reachable")
+        XCTAssertFalse(exit.intersects(board), "Exit stays clear of the board")
+        XCTAssertGreaterThanOrEqual(board.minX, window.midX, "The board stays in the right pane")
+        XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(board))
         let tray = app.navigationBars.allElementsBoundByIndex.filter {
-            $0.exists && $0.frame.height > 0 && $0.frame.contains(CGPoint(x: exit.midX, y: exit.midY))
+            $0.exists && !$0.frame.isEmpty && $0.frame.intersects(window) && $0.isHittable
         }
-        XCTAssertFalse(tray.isEmpty, "Book wide Zen keeps its tray: Exit Zen sits in the navigation bar; exit=\(exit)")
-        XCTAssertEqual(exit.minX, 773, accuracy: 2, "Exit Zen x; got \(exit)")
+        XCTAssertTrue(tray.isEmpty, "Book wide Zen hides its navigation tray")
+        let sidebar = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR identifier == %@ OR label CONTAINS[c] 'sidebar'",
+            "ToggleSidebar", ID.gameSidebarToggle
+        )).allElementsBoundByIndex.filter { $0.exists && $0.isHittable }
+        XCTAssertTrue(sidebar.isEmpty, "Zen hides both native and custom sidebar buttons")
         for identifier in ["game.clock.black", "game.clock.white"] {
             let clock = element(identifier, in: app).frame
-            XCTAssertEqual(clock.minX, 143.7, accuracy: 2, "Clock column x; got \(clock)")
-            XCTAssertEqual(clock.width, 160, accuracy: 2, "Clock column width; got \(clock)")
+            XCTAssertLessThanOrEqual(clock.maxX, window.midX, "Clocks stay in the left pane")
+            XCTAssertFalse(exit.intersects(clock))
         }
-        // With board depth, More ends on the board's drawn side, not the slot's.
-        assertZenActionLine(more: CGPoint(x: 899 - drawnBoardInset(in: app).trailing, y: 560.3), board: board, in: app)
+        let more = element("game.actions", in: app, matching: .button).frame
+        XCTAssertGreaterThanOrEqual(more.minY, board.maxY, "Actions stay below the board")
+        let pass = app.buttons["Pass"].firstMatch
+        if pass.exists {
+            XCTAssertEqual(pass.frame.midY, more.midY, accuracy: 2)
+            XCTAssertLessThanOrEqual(pass.frame.maxX, more.minX + 1)
+        }
     }
 
     /// How far the board is drawn inside its slot, from the layout diagnostic.

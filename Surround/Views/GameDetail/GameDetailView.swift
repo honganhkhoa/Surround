@@ -208,7 +208,19 @@ struct GameDetailView: View {
     }
 
     private var prefersHorizontalZenToolbar: Bool {
-        zenMode && (compactLandscape || hasActiveVerticalDisplayDivision || openLandscape)
+        zenMode && (compactLandscape || regularPhoneLandscape
+                    || hasActiveVerticalDisplayDivision || openLandscape)
+    }
+
+    private var regularPhoneLandscape: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        guard UIDevice.current.userInterfaceIdiom == .phone,
+              horizontalSizeClass == .regular,
+              let size = windowGeometry?.windowSize else { return false }
+        return size.width > size.height
+        #else
+        return false
+        #endif
     }
 
     /// Duo wide poses (Book and Open). The navigation bar would hold only the
@@ -222,13 +234,16 @@ struct GameDetailView: View {
         return size.width > size.height
     }
 
-    /// Zen keeps only Exit: on iPad, whose navigation bar carries the sidebar
-    /// toggle (iPadOS 27 adds it once the tab bar hides, with no API to remove
-    /// it alone; earlier versions show the game's own), and on Duo Open wide,
-    /// whose tray would otherwise sit over the board. Duo Book wide keeps its tray.
+    /// Sidebar navigation also appears on regular-width phones, including
+    /// Duo Open tall and ordinary iPhone landscape. Hiding Back and our own
+    /// items leaves the system sidebar toggle and its full navigation band.
+    /// Hide that bar in Zen and keep Exit in the game content instead,
+    /// including Book wide's split layout.
     private var hidesZenChrome: Bool {
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        return zenMode && (UIDevice.current.userInterfaceIdiom == .pad || openLandscape)
+        return zenMode && (UIDevice.current.userInterfaceIdiom == .pad
+                           || horizontalSizeClass == .regular
+                           || openLandscape)
         #else
         return false
         #endif
@@ -245,7 +260,8 @@ struct GameDetailView: View {
     /// Zen): in the band the navigation bar's items used, 24 pt from the
     /// window's top, in the game content's coordinates.
     private var chromeBandTop: CGFloat? {
-        guard hidesNavigationBarInDuoWide || (hidesZenChrome && openLandscape),
+        guard hidesNavigationBarInDuoWide
+                || (hidesZenChrome && (openLandscape || hasActiveVerticalDisplayDivision)),
               let windowGeometry else { return nil }
         let contentTop = windowGeometry.contentFrame.minY - windowGeometry.windowFrame.minY
         return max(0, max(24, windowGeometry.windowSafeAreaTop) - contentTop)
@@ -361,13 +377,15 @@ struct GameDetailView: View {
         // Open Duo's horizontal system status tray places Exit over the
         // board's upper-right edge when the top safe area is reclaimed.
         // Keep that native reservation while still returning the side rail.
-        if zenMode && (compactLandscape || regularLandscape) && !openLandscape
+        if zenMode && (compactLandscape || regularPhoneLandscape || regularLandscape) && !openLandscape
             && !isVerticalToolbar && !hasActiveVerticalDisplayDivision
             && !effectiveAttachedKeyboardVisible {
             edges.insert(.top)
         }
-        // Without its tray, Open wide Zen measures from the window's top.
-        if hidesZenChrome && openLandscape { edges.insert(.top) }
+        // Without their tray, both wide Duo Zen layouts use the window's top.
+        if hidesZenChrome && (openLandscape || hasActiveVerticalDisplayDivision) {
+            edges.insert(.top)
+        }
         return edges
     }
 
@@ -576,10 +594,6 @@ struct GameDetailView: View {
         }
     }
 
-    private var navigationBarHidden: Bool {
-        zenMode
-    }
-
     private var measuredContent: some View {
         GeometryReader { geometry in
             content(geometry: geometry)
@@ -760,7 +774,7 @@ struct GameDetailView: View {
         // Catalyst keeps this useful as the Mac window title in Zen mode.
         .navigationTitle(navigationTitle)
         .navigationBarHidden(hidesZenChrome || hidesNavigationBarInDuoWide)
-        .navigationBarBackButtonHidden(navigationBarHidden)
+        .navigationBarBackButtonHidden(zenMode)
         .navigationBarTitleDisplayMode(.inline)
         .modifier(GameDetailNotificationRegistration(
             game: currentGame, allowsActiveGamesCarousel: allowsActiveGamesCarousel,
@@ -822,7 +836,7 @@ struct GameDetailView: View {
         .surroundAnimationKeyboardObservations(ownerID: animationObservationID)
         .surroundAnimationState(
             "detail.visibilityState",
-            value: "attachedKeyboard=\(effectiveAttachedKeyboardVisible);navigationHidden=\(navigationBarHidden);compact=\(compactLayout)",
+            value: "attachedKeyboard=\(effectiveAttachedKeyboardVisible);navigationHidden=\(hidesZenChrome || hidesNavigationBarInDuoWide);compact=\(compactLayout)",
             ownerID: animationObservationID,
             focusRequestID: variationShareDraft?.focusRequestID
         )

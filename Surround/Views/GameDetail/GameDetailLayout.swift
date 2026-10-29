@@ -269,8 +269,19 @@ struct GameDetailLayoutPlan {
                     let clockHeight = compactClockHeight(cardWidth: cw) * 2 + gap
                     let groupHeight = clockHeight
                     frames[.clocks] = rect((leftWidth - cw) / 2, (height - groupHeight) / 2, cw, clockHeight)
-                    frames[.board] = square(in: rect(rightX, inset, rightWidth,
-                                                    height - inset * 2 - rightActionHeight - gap))
+                    var board = square(in: rect(rightX, inset, rightWidth,
+                                                 height - inset * 2 - rightActionHeight - gap))
+                    // Book wide's Exit now lives in the reclaimed top band.
+                    // Keep the centered board when it already clears the
+                    // control; short windows give its 44 pt target a gap.
+                    if let chromeBandTop {
+                        let clearTop = chromeBandTop + 44 + gap
+                        if board.minY < clearTop {
+                            board = square(in: rect(rightX, clearTop, rightWidth,
+                                                    height - clearTop - inset - rightActionHeight - gap))
+                        }
+                    }
+                    frames[.board] = board
                     let b = self[.board]
                     let drawn = visible(b)
                     frames[.actions] = rect(rightX + drawn.minX - b.minX, b.maxY + gap,

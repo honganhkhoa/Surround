@@ -1057,6 +1057,25 @@ final class GameDetailLayoutTests: XCTestCase {
         assertOccupiedSlotsFit(p, in: size)
     }
 
+    func testBookWideZenBoardClearsContentExitInShortWindows() {
+        for height: CGFloat in [621, 460] {
+            let size = CGSize(width: 887, height: height)
+            let division = CGRect(x: 445, y: 0, width: 12, height: height)
+            let centered = plan(size, zen: true, division: division)
+            let p = plan(size, zen: true, division: division, chromeBandTop: 24)
+            XCTAssertGreaterThanOrEqual(p[.board].minY, 24 + 44 + 8,
+                                        "The board clears Exit's touch target and its gap")
+            XCTAssertGreaterThanOrEqual(p[.board].minX, division.maxX)
+            XCTAssertEqual(p[.clocks], centered[.clocks],
+                           "The left pane retains its full-height clock layout")
+            if centered[.board].minY >= 24 + 44 + 8 {
+                XCTAssertEqual(p[.board], centered[.board],
+                               "A board that already clears Exit stays centered")
+            }
+            assertOccupiedSlotsFit(p, in: size)
+        }
+    }
+
     func testBookTallOnlyPlayAndZenKeepBodyClocksByFold() {
         let size = CGSize(width: 669, height: 870)
         let division = CGRect(x: 0, y: 395, width: 669, height: 12)

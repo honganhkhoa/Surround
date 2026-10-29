@@ -454,6 +454,7 @@
 		F24668BF7717401ABC1B359E /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		F25D04D509B847029CD1EB05 /* OGSFriendship.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55D3CC0016A4475B4C3881B /* OGSFriendship.swift */; };
 		54BD24A1EC3F40B58CDBDCDF /* GameDetailDuoArtboardAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED8268715BD49398AD409E1 /* GameDetailDuoArtboardAuditTests.swift */; };
+		AC094B751A2146E99D72BD53 /* GameDetailZenChromeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D8078A24FC940AF945A55C9 /* GameDetailZenChromeUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -767,6 +768,7 @@
 		EEC58AEE01CB46809AB3EAD9 /* ChatSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionState.swift; sourceTree = "<group>"; };
 		F06A00023D00000000000002 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 		0ED8268715BD49398AD409E1 /* GameDetailDuoArtboardAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailDuoArtboardAuditTests.swift; sourceTree = "<group>"; };
+		6D8078A24FC940AF945A55C9 /* GameDetailZenChromeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailZenChromeUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -994,6 +996,7 @@
 				0C4C93033626462FA2E9EDC6 /* GameDetailIPadArtboardAuditTests.swift */,
 				7E1A2B3C4D5E6F7081920A1C /* GameDetailThemePerformanceTests.swift */,
 				0ED8268715BD49398AD409E1 /* GameDetailDuoArtboardAuditTests.swift */,
+				6D8078A24FC940AF945A55C9 /* GameDetailZenChromeUITests.swift */,
 				AE4100023C00000000000002 /* AppStoreScreenshotTests.swift */,
 				AE4200023C00000000000002 /* CompatibilityScreenshotTests.swift */,
 				AE4600023C00000000000002 /* ProfileUITests.swift */,
@@ -1859,6 +1862,7 @@
 				31918698BFEB4CE09EE2C520 /* GameDetailIPadArtboardAuditTests.swift in Sources */,
 				7E1A2B3C4D5E6F7081920A1B /* GameDetailThemePerformanceTests.swift in Sources */,
 				54BD24A1EC3F40B58CDBDCDF /* GameDetailDuoArtboardAuditTests.swift in Sources */,
+				AC094B751A2146E99D72BD53 /* GameDetailZenChromeUITests.swift in Sources */,
 				F07BD496F6F74422B6C7D403 /* GameLayoutUITestHarness.swift in Sources */,
 				C0D100092026082900000009 /* CorrespondenceWidgetGridLayout.swift in Sources */,
 				AE4100013C00000000000001 /* AppStoreScreenshotTests.swift in Sources */,
