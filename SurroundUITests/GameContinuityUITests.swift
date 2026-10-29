@@ -48,6 +48,76 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         return app
     }
 
+    /// The normal More menu keeps an offered undo reachable even when the
+    /// compact clock layout omits its status label. No game action is selected.
+    func testMoreMenuExposesOfferedUndoWithoutChangingGame() throws {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.emptyMessagesLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.activeGameBoard.rawValue,
+            SurroundUITestContract.gameDetailDesignArtboardLaunchArgument, "79",
+            SurroundUITestContract.gameDetailClockStateLaunchArgument, "undo-offered",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        ], orientation: .landscapeLeft)
+        defer { XCUIDevice.shared.orientation = .portrait }
+        func preserve(_ name: String) {
+            keepScreenshot(name, in: app)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = name + " hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        let board = element(ID.gameBoard, in: app)
+        let initialBoard = try XCTUnwrap(board.value as? String)
+        let whiteClock = element("game.clock.white", in: app, matching: .button)
+        let initialClock = try XCTUnwrap(whiteClock.value as? String)
+        let more = element(ID.gameActionsMenu, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(more, timeout: 10))
+        more.tap()
+        func action(_ title: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(NSPredicate(
+                format: "(elementType == %lu OR elementType == %lu) AND label == %@",
+                XCUIElement.ElementType.button.rawValue,
+                XCUIElement.ElementType.menuItem.rawValue, title
+            )).firstMatch
+        }
+        let accept = action("Accept undo")
+        let reject = action("Reject undo")
+        guard pollUntil(timeout: 10, condition: {
+            accept.exists && accept.isHittable && reject.exists && reject.isHittable
+        }) else {
+            preserve("More menu offered undo actions missing")
+            XCTFail("The normal More menu must expose both Accept undo and Reject undo for an offered request.")
+            return
+        }
+        XCTAssertFalse(action("Cancel undo").exists,
+                       "The recipient must not see the requester's withdrawal action.")
+        XCTAssertFalse(action("Request undo").exists,
+                       "A pending request must not offer a second undo request.")
+        preserve("More menu offered undo actions")
+        let backdrop = app.otherElements["PopoverDismissRegion"].firstMatch
+        if backdrop.exists && backdrop.isHittable {
+            backdrop.tap()
+        } else {
+            let window = app.windows.firstMatch.frame
+            let x = accept.frame.midX < window.midX ? window.width - 24 : 24
+            let y = accept.frame.midY < window.midY ? window.height - 80 : 80
+            app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: x, dy: y)).tap()
+        }
+        guard pollUntil(timeout: 10, condition: { !accept.exists && !reject.exists }) else {
+            preserve("More menu offered undo did not dismiss")
+            XCTFail("An independent outside interaction must dismiss the undo menu.")
+            return
+        }
+        XCTAssertEqual(board.value as? String, initialBoard)
+        XCTAssertEqual(whiteClock.value as? String, initialClock,
+                       "Opening and dismissing More must leave the request pending.")
+        XCTAssertTrue(waitUntilHittable(more, timeout: 10))
+        preserve("More menu offered undo dismissed without game action")
+    }
+
     func testNativePhoneLandscapeLargestTextKeepsBoardAndActionsResponsive() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else {
             throw XCTSkip("This regression needs a native compact phone window, without the layout harness.")

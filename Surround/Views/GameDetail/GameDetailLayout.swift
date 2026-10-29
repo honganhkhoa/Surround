@@ -432,6 +432,23 @@ struct GameDetailLayoutPlan {
                                          self[.actions].minY - y - gap)
                     frames[.actions] = rect(outer, height - outer - chatActionHeight, actionWidth, chatActionHeight)
                 }
+                if closedDuoChat && self[.chat].height < max(50, composerHeight) {
+                    // A wrapped accessibility action can consume the entire
+                    // conversation beside the board. Give controls a separate
+                    // full-width footer before reserving the composer; keep
+                    // the column width stable so its text does not reflow.
+                    let footerWidth = max(0, width - outer * 2)
+                    let footerHeight = actionRowHeight(at: footerWidth)
+                    let footerY = max(outer, height - outer - footerHeight)
+                    let bodyBottom = max(outer, footerY - gap)
+                    let side = max(0, min(boardWidth, bodyBottom - outer))
+                    frames[.board] = rect(width - outer - side,
+                        outer + (bodyBottom - outer - side) / 2, side, side)
+                    frames[.clocks] = rect(clockX, outer, cw, clockHeight)
+                    let chatTop = outer + clockHeight + gap
+                    frames[.chat] = rect(outer, chatTop, panelWidth, footerY - gap - chatTop)
+                    frames[.actions] = rect(outer, footerY, footerWidth, footerHeight)
+                }
             }
         } else if chat && !landscape {
             // Portrait panels sit above the board. Chat gives the action a
