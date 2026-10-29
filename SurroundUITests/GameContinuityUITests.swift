@@ -48,6 +48,103 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         return app
     }
 
+    func testNativePhoneLandscapeLargestTextKeepsBoardAndActionsResponsive() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            throw XCTSkip("This regression needs a native compact phone window, without the layout harness.")
+        }
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.activeGameBoard.rawValue,
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+            SurroundUITestContract.appearanceLaunchArgument, "dark",
+        ], orientation: .portrait)
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let board = app.descendants(matching: .any).matching(identifier: ID.gameBoard).firstMatch
+        XCTAssertTrue(board.waitForExistence(timeout: 10))
+        let initialBoard = try XCTUnwrap(board.value as? String)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let actions = app.buttons.matching(identifier: ID.gameActionsMenu).firstMatch
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height && board.exists && actions.exists
+                && board.frame.width >= 140 && board.frame.height >= 140
+                && abs(board.frame.width - board.frame.height) <= 1
+                && window.insetBy(dx: -1, dy: -1).contains(board.frame)
+                && window.insetBy(dx: -1, dy: -1).contains(actions.frame)
+                && actions.isHittable && !board.frame.intersects(actions.frame)
+        }, object: nil)
+        guard XCTWaiter.wait(for: [visible], timeout: 10) == .completed else {
+            keepScreenshot("Largest-text native landscape board failure", in: app)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Largest-text native landscape board hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            XCTFail("Largest-text native phone landscape must show a usable board and More control.")
+            return
+        }
+        XCTAssertEqual(board.value as? String, initialBoard)
+        print("[NativeBoardLandscapeRegression] beforeZen window=\(app.windows.firstMatch.frame) board=\(board.frame) actions=\(actions.frame)")
+        keepScreenshot("Largest-text native landscape board and actions", in: app)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Largest-text native landscape positive geometry"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        // An actual mode transition proves the expected image is responsive.
+        activateZenControl(ID.gameZenEnter, in: app)
+        element(ID.gameZenExit, in: app)
+        XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, initialBoard)
+        tap(ID.gameZenExit, in: app, matching: .button)
+        XCTAssertTrue(waitUntilHittable(actions, timeout: 10))
+        XCTAssertEqual(element(ID.gameBoard, in: app).value as? String, initialBoard)
+        print("[NativeBoardLandscapeRegression] afterZen window=\(app.windows.firstMatch.frame) board=\(board.frame) actions=\(actions.frame)")
+        keepScreenshot("Largest-text native landscape after Zen round trip", in: app)
+    }
+
+    private func primaryHomeGameEntry(in app: XCUIApplication) -> XCUIElement {
+        let home = app.scrollViews.matching(identifier: ID.screenHome).firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        let entry = home.descendants(matching: .any).matching(
+            identifier: ID.homeGamePlayerInfo(SurroundUITestContract.screenshotPrimaryGameID)
+        ).firstMatch
+        func viewport() -> CGRect {
+            // Home's scroll AX frame includes the sidebar and native chrome.
+            // Its wrappers expose the actual clipped content column.
+            app.descendants(matching: .any).matching(identifier: ID.screenHome)
+                .allElementsBoundByIndex.map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(app.frame) }
+                .reduce(app.frame) { $0.intersection($1) }
+                .insetBy(dx: 8, dy: 8)
+        }
+        for _ in 0..<4 {
+            let visible = viewport()
+            XCTAssertFalse(visible.isEmpty, "Home must expose a visible content viewport.")
+            guard !visible.isEmpty else { return entry }
+            if entry.exists && entry.isHittable && visible.contains(entry.frame) { break }
+            let frame = entry.exists ? entry.frame : nil
+            let delta = frame.map { $0.midY - visible.midY } ?? visible.height
+            let distance = min(abs(delta), visible.height * 0.6)
+            let startY = delta >= 0 ? visible.maxY : visible.minY
+            let origin = home.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(
+                dx: visible.midX - home.frame.minX, dy: startY - home.frame.minY
+            ))
+            let end = origin.withOffset(CGVector(
+                dx: visible.midX - home.frame.minX,
+                dy: startY + (delta >= 0 ? -distance : distance) - home.frame.minY
+            ))
+            start.press(forDuration: 0.05, thenDragTo: end,
+                        withVelocity: .default, thenHoldForDuration: 0.1)
+        }
+        XCTAssertTrue(entry.waitForExistence(timeout: 10),
+                      "The exact primary fixture player details must appear after bounded Home scrolling.")
+        XCTAssertTrue(waitUntilHittable(entry, timeout: 10))
+        XCTAssertTrue(viewport().contains(entry.frame),
+                      "The primary fixture player details must be visible inside Home's content viewport.")
+        return entry
+    }
+
     private func changeLayout(
         toCompact compact: Bool,
         in app: XCUIApplication,
@@ -330,8 +427,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         let gameID = SurroundUITestContract.screenshotPrimaryGameID
 
         func openGame() {
-            let entry = element(ID.homeGamePlayerInfo(gameID), in: app)
-            scrollIntoTappableArea(entry, in: app)
+            let entry = primaryHomeGameEntry(in: app)
             tap(entry, description: "Open the fixture game", in: app)
             element(ID.gameDetail(gameID), in: app)
             element(ID.gameBoard, in: app)
@@ -493,8 +589,7 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.compatibilitySceneLaunchArgument,
             SurroundUITestContract.CompatibilityScene.home.rawValue,
         ])
-        let gameEntry = element(ID.homeGamePlayerInfo(SurroundUITestContract.screenshotPrimaryGameID), in: app)
-        for _ in 0..<6 where !gameEntry.isHittable { app.swipeUp() }
+        let gameEntry = primaryHomeGameEntry(in: app)
         tap(gameEntry, description: "Open the fixture game", in: app)
         element(ID.gameBoard, in: app)
         let draft = "Keep this draft while checking Settings"

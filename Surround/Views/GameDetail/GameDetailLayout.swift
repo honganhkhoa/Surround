@@ -718,15 +718,12 @@ struct GameDetailLayoutPlan {
             let reservedRight = zen && !usesVerticalToolbar ? left : right
             let boardWidth = max(0, width - boardX - outer - (rowActions ? 0 : reservedRight + boardGap))
             let boardAreaHeight = height - outerTop - outerBottom - previewHeight
-            var landscapeActionHeight = actionRowHeight(at: visibleWidth(ofBoard: boardWidth))
-            if rowActions {
-                for _ in 0..<4 {
-                    let squareWidth = min(boardWidth, max(0, boardAreaHeight - landscapeActionHeight - gap))
-                    let requiredHeight = actionRowHeight(at: visibleWidth(ofBoard: squareWidth))
-                    guard requiredHeight > landscapeActionHeight else { break }
-                    landscapeActionHeight = requiredHeight
-                }
-            }
+            // A wrapped footer owns this entire region, independently of the
+            // square board above it. Measuring it again at the smaller square
+            // creates a feedback loop: extra wrapping grows the footer until
+            // the board and the footer's own width both collapse to zero.
+            let landscapeActionWidth = rowActions ? boardWidth : visibleWidth(ofBoard: boardWidth)
+            let landscapeActionHeight = actionRowHeight(at: landscapeActionWidth)
             let footer = rowActions ? landscapeActionHeight + gap : 0
             frames[.board] = square(in: rect(boardX, outerTop + previewHeight,
                                              boardWidth, boardAreaHeight - footer))
@@ -764,7 +761,7 @@ struct GameDetailLayoutPlan {
                 frames[.actions] = rect(actionX, drawn.maxY - actionHeight, actionWidth, actionHeight)
             } else {
                 frames[.actions] = rowActions
-                    ? rect(drawn.minX, b.maxY + (showsCornerIdentity ? identityBoardGap : gap), drawn.width,
+                    ? rect(boardX, b.maxY + (showsCornerIdentity ? identityBoardGap : gap), landscapeActionWidth,
                            landscapeActionHeight)
                     : rect(b.maxX + boardGap, max(outer, drawn.maxY - cornerHeight), right, cornerHeight)
             }

@@ -799,6 +799,57 @@ final class GameDetailLayoutTests: XCTestCase {
         }
     }
 
+    func testNativePhoneLandscapeLargestTextKeepsBoardAndActionsVisible() {
+        // iPhone 16 Pro: 874 x 402 landscape window, with its native horizontal
+        // safe areas and 44 pt navigation bar outside the content proposal.
+        // The real Play labels matter: the unit bundle has no catalog.
+        let size = CGSize(width: 750, height: 358)
+        let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
+            phase: .play, localizedLabels: ["Pass", "Submit move", "Rematch", "Next (999+)"])
+        let p = GameDetailLayoutPlan(size: size, compact: true, zen: false,
+            analyze: false, chat: false, hidesBoard: false, keyboard: false,
+            accessibility: true, foldsClock: true, clockScale: 1.65,
+            actionSize: metrics.horizontalSize, actionMetrics: metrics)
+        XCTAssertGreaterThanOrEqual(p[.board].width, 140,
+            "Largest-text phone landscape must retain a usable board, not only clocks.")
+        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2,
+            "The main action and More must both retain visible slots.")
+        XCTAssertGreaterThanOrEqual(p[.actions].height, metrics.rowHeight(at: p[.actions].width))
+        XCTAssertLessThanOrEqual(p[.board].maxY, p[.actions].minY)
+        XCTAssertFalse(p[.board].intersects(p[.clocks]))
+        assertOccupiedSlotsFit(p, in: size)
+    }
+
+    func testAccessibilityLandscapeFooterKeepsBoardAcrossPhasesAndShortWindows() {
+        let phases: [(OGSGamePhase, [String])] = [
+            (.play, ["Pass", "Submit move", "Rematch", "Next (999+)"]),
+            (.stoneRemoval, ["Accept", "Clear estimates"]),
+        ]
+        for size in [CGSize(width: 750, height: 358), CGSize(width: 750, height: 324),
+                     CGSize(width: 667, height: 331)] {
+            for dynamicType in [DynamicTypeSize.accessibility3, .accessibility5] {
+                for (phase, labels) in phases {
+                    let metrics = GameControlRowMetrics(dynamicTypeSize: dynamicType,
+                        phase: phase, localizedLabels: labels)
+                    for zen in [false, true] {
+                        let p = GameDetailLayoutPlan(size: size, compact: true, zen: zen,
+                            analyze: false, chat: false, hidesBoard: false, keyboard: false,
+                            accessibility: true, foldsClock: true, clockScale: 1.65,
+                            actionSize: metrics.horizontalSize, actionMetrics: metrics)
+                        XCTAssertGreaterThanOrEqual(p[.board].width, 140,
+                            "\(size), \(dynamicType), \(phase), zen=\(zen): \(p[.board])")
+                        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2)
+                        XCTAssertGreaterThanOrEqual(p[.actions].height,
+                            metrics.rowHeight(at: p[.actions].width))
+                        XCTAssertLessThanOrEqual(p[.board].maxY, p[.actions].minY)
+                        XCTAssertFalse(p[.board].intersects(p[.clocks]))
+                        assertOccupiedSlotsFit(p, in: size)
+                    }
+                }
+            }
+        }
+    }
+
     func testAccessibilityActionWrapsAcrossFullRowAfterIdentityHides() {
         let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
                                            localizedLabels: englishActionLabels)

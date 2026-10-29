@@ -170,7 +170,15 @@ class SurroundUITestCase: XCTestCase {
             XCTFail("Expected the game mode or native toolbar overflow", file: file, line: line)
             return
         }
-        XCTAssertTrue(pollUntil(timeout: 5) { target.exists && target.isHittable },
+        let actionReachable = pollUntil(timeout: 5) { target.exists && target.isHittable }
+        if !actionReachable {
+            keepHierarchy(of: app, name: "Missing native game mode action")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Missing native game mode action"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        XCTAssertTrue(actionReachable,
                       "Expected the native game mode action", file: file, line: line)
         #if targetEnvironment(macCatalyst)
         target.click()
