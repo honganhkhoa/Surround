@@ -767,6 +767,109 @@ final class ChatSessionStateTests: XCTestCase {
         XCTAssertEqual(survivingSession?.message, "A field can briefly outlive its route")
     }
 
+    func testInactiveSessionAndPendingSendOutliveAllPresentationReferences() {
+        let store = GameChatSessionStore()
+        let response = PassthroughSubject<Void, Error>()
+        weak var retainedSession: ChatSessionState?
+        var submissions = [String]()
+        let send: (String) -> AnyPublisher<Void, Error> = { text in
+            submissions.append(text)
+            return response.eraseToAnyPublisher()
+        }
+        do {
+            let presented = store.session(for: .OGS(101), accountID: 7)
+            retainedSession = presented
+            let composer = UUID()
+            presented.composerAppeared(id: composer, shareFocusRequestID: nil)
+            presented.message = "Pending main message"
+            presented.sendMessage(from: composer, using: send)
+            presented.selectChannel(.personal)
+            presented.message = "Unsent Personal draft"
+            store.deactivate(gameID: .OGS(101), accountID: 7)
+        }
+
+        XCTAssertNotNil(retainedSession)
+        let reopened = store.session(for: .OGS(101), accountID: 7)
+        XCTAssertTrue(reopened === retainedSession)
+        XCTAssertEqual(reopened.message, "Unsent Personal draft")
+        XCTAssertTrue(reopened.isSending)
+        XCTAssertFalse(reopened.wantsInputFocus)
+        reopened.setGamePresentationActive(true)
+        let replacementComposer = UUID()
+        reopened.composerAppeared(id: replacementComposer, shareFocusRequestID: nil)
+        reopened.selectChannel(.main)
+        XCTAssertEqual(reopened.message, "Pending main message")
+        reopened.sendMessage(from: replacementComposer, using: send)
+        XCTAssertEqual(submissions, ["Pending main message"])
+        reopened.selectChannel(.personal)
+
+        response.send(())
+        drainMainQueue()
+        XCTAssertFalse(reopened.isSending)
+        XCTAssertEqual(reopened.message, "Unsent Personal draft")
+        reopened.selectChannel(.main)
+        XCTAssertEqual(reopened.message, "")
+    }
+
+    func testAccountCleanupWithoutPresentedGameCancelsAndReleasesOldSessions() {
+        let store = GameChatSessionStore()
+        let response = PassthroughSubject<Void, Error>()
+        var cancellations = 0
+        weak var oldFirst: ChatSessionState?
+        weak var oldSecond: ChatSessionState?
+        do {
+            let first = store.session(for: .OGS(101), accountID: 7)
+            let second = store.session(for: .OGS(102), accountID: 7)
+            oldFirst = first
+            oldSecond = second
+            first.message = "Old account pending draft"
+            first.sendMessage { _ in
+                response.handleEvents(receiveCancel: { cancellations += 1 })
+                    .eraseToAnyPublisher()
+            }
+            second.selectChannel(.personal)
+            second.message = "Old account Personal draft"
+            store.deactivate(gameID: .OGS(101), accountID: 7)
+            store.deactivate(gameID: .OGS(102), accountID: 7)
+        }
+        XCTAssertNotNil(oldFirst)
+        XCTAssertNotNil(oldSecond)
+        let current = store.session(for: .OGS(101), accountID: 8)
+        current.message = "Current account draft"
+
+        // The stable owner performs this while Home has no game presented.
+        store.discardOtherAccounts(keeping: 8)
+        XCTAssertEqual(cancellations, 1)
+        XCTAssertNil(oldFirst)
+        XCTAssertNil(oldSecond)
+        response.send(())
+        drainMainQueue()
+        XCTAssertEqual(current.message, "Current account draft")
+        XCTAssertNil(current.failure)
+    }
+
+    func testWindowStoreReleaseCancelsAndReleasesInactivePendingSession() {
+        let response = PassthroughSubject<Void, Error>()
+        var cancellations = 0
+        weak var releasedStore: GameChatSessionStore?
+        weak var releasedSession: ChatSessionState?
+        do {
+            let windowStore = GameChatSessionStore()
+            releasedStore = windowStore
+            let presented = windowStore.session(for: .OGS(101), accountID: 7)
+            releasedSession = presented
+            presented.message = "Pending while leaving the window"
+            presented.sendMessage { _ in
+                response.handleEvents(receiveCancel: { cancellations += 1 })
+                    .eraseToAnyPublisher()
+            }
+            windowStore.deactivate(gameID: .OGS(101), accountID: 7)
+        }
+        XCTAssertNil(releasedStore)
+        XCTAssertNil(releasedSession)
+        XCTAssertEqual(cancellations, 1)
+    }
+
     private func drainMainQueue() {
         let drained = expectation(description: "Deliver scheduled send completion")
         DispatchQueue.main.async { drained.fulfill() }

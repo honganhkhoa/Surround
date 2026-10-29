@@ -224,6 +224,155 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testBackToHomeAndReopeningOwnGameKeepsChannelDrafts() throws {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        let gameID = SurroundUITestContract.liveBannerCorrespondenceGameIDs[0]
+        let mainDraft = "5backHomeMainDraft"
+        let personalDraft = "6backHomePersonalDraft"
+
+        func input() -> XCUIElement {
+            element(ID.gameChatInput, in: app, matching: .textField)
+        }
+
+        func openOwnGameFromHome() {
+            let home = element(ID.screenHome, in: app, matching: .scrollView)
+            let entries = home.buttons.matching(identifier: ID.homeGame(gameID))
+            for attempt in 0...4 {
+                let viewport = app.descendants(matching: .any)
+                    .matching(identifier: ID.screenHome).allElementsBoundByIndex.map(\.frame)
+                    .filter { !$0.isEmpty && $0.intersects(app.frame) }
+                    .reduce(app.frame) { $0.intersection($1) }.insetBy(dx: 8, dy: 8)
+                XCTAssertFalse(viewport.isEmpty || viewport.isNull)
+                let entry = entries.firstMatch
+                if entry.exists,
+                   viewport.contains(CGPoint(x: entry.frame.midX, y: entry.frame.midY)),
+                   entry.isHittable {
+                    tap(entry, description: "Reopen the exact own correspondence game", in: app)
+                    element(ID.gameDetail(gameID), in: app)
+                    return
+                }
+                guard attempt < 4 else { break }
+                let delta = entry.exists ? entry.frame.midY - viewport.midY : viewport.height
+                let distance = min(abs(delta), viewport.height * 0.6)
+                let startY = delta >= 0 ? viewport.maxY : viewport.minY
+                let origin = home.coordinate(withNormalizedOffset: .zero)
+                let start = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX, dy: startY - home.frame.minY
+                ))
+                let end = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX,
+                    dy: startY + (delta >= 0 ? -distance : distance) - home.frame.minY
+                ))
+                start.press(forDuration: 0.05, thenDragTo: end,
+                            withVelocity: .default, thenHoldForDuration: 0.1)
+            }
+            XCTFail("Expected the exact own-game card after bounded Home scrolling.")
+        }
+
+        func returnHome() {
+            dismissSoftwareKeyboardIfNeeded(in: app)
+            var back: XCUIElement?
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let native = app.buttons.matching(identifier: "BackButton")
+                    .allElementsBoundByIndex.filter { $0.isHittable }
+                if native.count == 1 {
+                    back = native[0]
+                    return true
+                }
+                guard native.isEmpty else { return false }
+                let owned = app.buttons.matching(identifier: ID.gameBack)
+                    .allElementsBoundByIndex.filter { $0.isHittable }
+                if owned.count == 1 {
+                    back = owned[0]
+                    return true
+                }
+                guard owned.isEmpty else { return false }
+                let titled = app.navigationBars.buttons.matching(NSPredicate(
+                    format: "identifier != %@ AND (label == %@ OR label == %@)",
+                    ID.gameActiveGamesButton, "Active games", "Back"
+                )).allElementsBoundByIndex.filter { $0.isHittable }
+                back = titled.count == 1 ? titled[0] : nil
+                return back != nil
+            }, "Expected the current game's unique Back control.")
+            guard let back else { return }
+            tap(back, description: "Pop Game Detail back to Home", in: app)
+            element(ID.screenHome, in: app, matching: .scrollView)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                !app.descendants(matching: .any)
+                    .matching(identifier: ID.gameDetail(gameID)).firstMatch.exists
+            }, "Back must remove Game Detail, not merely dismiss its keyboard or popover.")
+        }
+
+        @discardableResult
+        func requireDraft(_ expected: String, phase: String) -> Bool {
+            let field = input()
+            let retained = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", expected), object: field
+            )
+            guard waitWithFinalCheck(for: [retained], timeout: 10) == .completed else {
+                keepScreenshot("Back-reopen draft failure – " + phase, in: app)
+                let hierarchy = XCTAttachment(string: app.debugDescription)
+                hierarchy.name = "Back-reopen draft failure – " + phase
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+                XCTFail("Back to Home and reopening must retain the exact \(phase) draft.")
+                return false
+            }
+            return true
+        }
+
+        func selectMainChannel() {
+            tap(ID.gameChatChannelPicker, in: app)
+            tap(requiredMenuButton(ID.gameChatChannelMain, title: "Chat", in: app),
+                description: "Main chat channel", in: app)
+        }
+
+        openOwnGameFromHome()
+        typeDraft(mainDraft, in: app)
+        selectPersonalChannel(in: app)
+        let emptyPersonal = input()
+        XCTAssertTrue((emptyPersonal.value as? String ?? "").isEmpty
+                      || emptyPersonal.value as? String == emptyPersonal.placeholderValue)
+        typeDraft(personalDraft, in: app)
+        keepScreenshot("Distinct main and Personal drafts before Back", in: app)
+
+        returnHome()
+        openOwnGameFromHome()
+        openGameChat(in: app)
+        XCTAssertFalse(chatInputHasKeyboardFocus(in: app))
+        XCTAssertEqual(element(ID.gameChatChannelPicker, in: app).value as? String, "Chat",
+                       "Reopening starts on main Chat without exposing the Personal draft.")
+        guard requireDraft(mainDraft, phase: "main after first reopen") else { return }
+        selectPersonalChannel(in: app)
+        guard requireDraft(personalDraft, phase: "Personal after first reopen") else { return }
+
+        let personalInput = input()
+        tap(personalInput, description: "Edit the restored Personal draft", in: app)
+        // A tap can select the existing word. Collapse that selection through
+        // the supported keyboard event before inserting an independent edit.
+        personalInput.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
+        XCTAssertEqual(personalInput.value as? String, personalDraft)
+        personalInput.typeText(".")
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            guard let text = personalInput.value as? String else { return false }
+            return text.count == personalDraft.count + 1
+                && text.filter { $0 != "." } == personalDraft
+        }, "The restored composer must accept an independent edit without losing its draft.")
+        let editedPersonal = try XCTUnwrap(personalInput.value as? String)
+
+        returnHome()
+        openOwnGameFromHome()
+        openGameChat(in: app)
+        guard requireDraft(mainDraft, phase: "unchanged main after second reopen") else { return }
+        selectPersonalChannel(in: app)
+        guard requireDraft(editedPersonal, phase: "edited Personal after second reopen") else { return }
+        selectMainChannel()
+        guard requireDraft(mainDraft, phase: "main after independent channel selection") else { return }
+        keepScreenshot("Back-reopen retained independent channel drafts and edit", in: app)
+    }
+
     func testOwnGameSwitchingKeepsIndependentChatDrafts() throws {
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.liveGameBannerNavigationLaunchArgument,

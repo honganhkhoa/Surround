@@ -250,7 +250,7 @@ final class ChatSessionState: ObservableObject {
     }
 }
 
-/// A game-detail route can switch games without discarding their unsent work.
+/// A window keeps unsent work when switching games or popping a game route.
 /// Each game retains its own requests, channel drafts and duplicate-send guard.
 final class GameChatSessionStore: ObservableObject {
     let objectWillChange = ObservableObjectPublisher()

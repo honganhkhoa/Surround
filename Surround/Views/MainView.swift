@@ -65,6 +65,9 @@ struct MainView: View {
     @State var backgroundTask: PlatformBackgroundTask?
     @State var widgetInfos = [WidgetInfo]()
     @State var firstLaunch = true
+    /// Drafts and pending sends survive a popped game route in this window.
+    /// Game Detail observes the store; the root need not redraw on each edit.
+    @State private var gameChatSessions = GameChatSessionStore()
     /// This window's request in the app-wide display sleep switch.
     @State private var displaySleepWindow = UUID()
     /// Withdraws the request if this window's views go without an onDisappear.
@@ -150,6 +153,7 @@ struct MainView: View {
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
+            .environmentObject(gameChatSessions)
             .environment(\.openURL, environment.openURL)
             .environment(\.locale, environment.locale)
             .environment(\.layoutDirection, environment.layoutDirection)
@@ -318,6 +322,11 @@ struct MainView: View {
         .onChange(of: nav.main.rootView) { _, _ in
             redirectSignedOutAccountDestination()
         }
+        .onReceive(ogs.$user.map { $0?.id }.removeDuplicates()) { accountID in
+            // The account can change while Home is visible and no game route
+            // exists to discard its old drafts or cancel pending callbacks.
+            gameChatSessions.discardOtherAccounts(keeping: accountID)
+        }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard allowsRemoteActivity else { return }
             if phase == .active {
@@ -358,6 +367,7 @@ struct MainView: View {
             allowing: ["*"]
         )
         .environment(\.surroundAllowsRemoteActivity, allowsRemoteActivity)
+        .environmentObject(gameChatSessions)
     }
 }
 

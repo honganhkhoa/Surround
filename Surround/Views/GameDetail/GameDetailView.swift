@@ -56,7 +56,7 @@ struct GameDetailView: View {
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
-    @StateObject private var chatSessions = GameChatSessionStore()
+    @EnvironmentObject private var chatSessions: GameChatSessionStore
     private var chatSession: ChatSessionState {
         chatSessions.session(for: (currentGame ?? departingGame)?.ID,
                              accountID: ogs.user?.id)
@@ -1682,6 +1682,7 @@ private func gameDetailPreviewFixture() -> (
     }
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Phone — Active games", traits: .fixedLayout(width: 390, height: 844)) {
@@ -1695,6 +1696,7 @@ private func gameDetailPreviewFixture() -> (
     }
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Regular landscape — Zen mode", traits: .fixedLayout(width: 960, height: 754)) {
@@ -1706,6 +1708,7 @@ private func gameDetailPreviewFixture() -> (
     .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Regular portrait — Active game", traits: .fixedLayout(width: 750, height: 1024)) {
@@ -1717,5 +1720,6 @@ private func gameDetailPreviewFixture() -> (
     .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 #endif
