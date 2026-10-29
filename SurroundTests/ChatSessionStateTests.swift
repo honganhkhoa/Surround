@@ -444,6 +444,329 @@ final class ChatSessionStateTests: XCTestCase {
         XCTAssertNil(session.scrollAnchor)
     }
 
+    func testGameSwitchingRetainsIndependentGameAndChannelDrafts() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        first.message = "First game chat"
+        first.selectChannel(.personal)
+        first.message = "First game personal note"
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+
+        let second = store.session(for: .OGS(102), accountID: 7)
+        XCTAssertFalse(first === second)
+        XCTAssertEqual(second.message, "")
+        second.message = "Second game chat"
+        second.selectChannel(.personal)
+        XCTAssertEqual(second.message, "")
+        second.message = "Second game personal note"
+
+        let returned = store.session(for: .OGS(101), accountID: 7)
+        XCTAssertTrue(first === returned)
+        // Game Detail opens the main channel when switching games.
+        returned.selectChannel(.main)
+        XCTAssertEqual(returned.message, "First game chat")
+        returned.selectChannel(.personal)
+        XCTAssertEqual(returned.message, "First game personal note")
+        second.selectChannel(.main)
+        XCTAssertEqual(second.message, "Second game chat")
+        second.selectChannel(.personal)
+        XCTAssertEqual(second.message, "Second game personal note")
+    }
+
+    func testSwitchingGamesDeactivatesOldComposerWithoutRestoringFocus() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        let oldComposer = UUID()
+        first.composerAppeared(id: oldComposer, shareFocusRequestID: nil)
+        first.requestInputFocus()
+        first.message = "Unsent first game draft"
+        let oldRevision = first.focusRevision
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+        first.recordInputFocus(true, composerID: oldComposer,
+                               expectedRevision: oldRevision)
+
+        let second = store.session(for: .OGS(102), accountID: 7)
+        XCTAssertFalse(first.isActiveComposer(oldComposer))
+        XCTAssertFalse(first.wantsInputFocus)
+        XCTAssertFalse(second.wantsInputFocus)
+        XCTAssertEqual(second.message, "")
+
+        let returned = store.session(for: .OGS(101), accountID: 7)
+        returned.setGamePresentationActive(true)
+        returned.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        XCTAssertEqual(returned.message, "Unsent first game draft")
+        XCTAssertFalse(returned.wantsInputFocus)
+        XCTAssertFalse(returned.shouldRestoreInputFocus(
+            composerID: oldComposer, revision: oldRevision
+        ))
+    }
+
+    func testPendingSendStaysWithItsGameAndStillPreventsDuplicateSubmission() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        let originalComposer = UUID()
+        first.composerAppeared(id: originalComposer, shareFocusRequestID: nil)
+        let response = PassthroughSubject<Void, Error>()
+        var submissions = [String]()
+        first.message = "First game message"
+        let send: (String) -> AnyPublisher<Void, Error> = { message in
+            submissions.append(message)
+            return response.eraseToAnyPublisher()
+        }
+        first.sendMessage(from: originalComposer, using: send)
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+        let second = store.session(for: .OGS(102), accountID: 7)
+        second.message = "Second game unsent draft"
+
+        let returned = store.session(for: .OGS(101), accountID: 7)
+        returned.setGamePresentationActive(true)
+        let replacementComposer = UUID()
+        returned.composerAppeared(id: replacementComposer, shareFocusRequestID: nil)
+        returned.sendMessage(from: replacementComposer, using: send)
+        XCTAssertEqual(submissions, ["First game message"])
+        XCTAssertTrue(returned.isSending)
+        response.send(())
+        drainMainQueue()
+
+        XCTAssertFalse(returned.isSending)
+        XCTAssertEqual(returned.message, "")
+        XCTAssertEqual(second.message, "Second game unsent draft")
+        XCTAssertNil(second.failure)
+    }
+
+    func testSendFailureWhileAnotherGameIsVisibleRetainsOriginalDraftAndRetry() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        let response = PassthroughSubject<Void, Error>()
+        first.message = "Retry only in first game"
+        first.sendMessage { _ in response.eraseToAnyPublisher() }
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+        let second = store.session(for: .OGS(102), accountID: 7)
+        second.message = "Leave second game alone"
+        response.send(completion: .failure(SendError.unavailable))
+        drainMainQueue()
+
+        let returned = store.session(for: .OGS(101), accountID: 7)
+        XCTAssertEqual(returned.message, "Retry only in first game")
+        XCTAssertEqual(returned.failure, .messageSend)
+        XCTAssertFalse(returned.isSending)
+        XCTAssertEqual(second.message, "Leave second game alone")
+        XCTAssertNil(second.failure)
+        let retry = PassthroughSubject<Void, Error>()
+        returned.sendMessage { message in
+            XCTAssertEqual(message, "Retry only in first game")
+            return retry.eraseToAnyPublisher()
+        }
+        retry.send(())
+        drainMainQueue()
+        XCTAssertEqual(returned.message, "")
+    }
+
+    func testAccountChangeDiscardsEveryOldGameAndRejectsQueuedCompletion() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        let second = store.session(for: .OGS(102), accountID: 7)
+        let response = PassthroughSubject<Void, Error>()
+        let composer = UUID()
+        first.composerAppeared(id: composer, shareFocusRequestID: nil)
+        first.requestInputFocus()
+        first.message = "Old account pending message"
+        first.sendMessage { _ in response.eraseToAnyPublisher() }
+        second.message = "Old account second game"
+        response.send(())
+
+        // A new render may acquire its session before the account observer runs.
+        let newAccount = store.session(for: .OGS(101), accountID: 8)
+        XCTAssertFalse(newAccount === first)
+        XCTAssertEqual(newAccount.message, "")
+        newAccount.message = "New account draft"
+        store.discardOtherAccounts(keeping: 8)
+        first.recordInputFocus(true, composerID: composer)
+        drainMainQueue()
+
+        XCTAssertEqual(first.message, "")
+        XCTAssertEqual(second.message, "")
+        XCTAssertFalse(first.isSending)
+        XCTAssertFalse(first.wantsInputFocus)
+        XCTAssertEqual(newAccount.message, "New account draft")
+        XCTAssertNil(newAccount.failure)
+        let oldAccountAgain = store.session(for: .OGS(101), accountID: 7)
+        XCTAssertFalse(oldAccountAgain === first)
+        XCTAssertEqual(oldAccountAgain.message, "")
+    }
+
+    func testLogoutDiscardsSignedInGameDrafts() {
+        let store = GameChatSessionStore()
+        let signedIn = store.session(for: .OGS(101), accountID: 7)
+        signedIn.message = "Signed-in draft"
+        signedIn.selectChannel(.personal)
+        signedIn.message = "Private note"
+        store.discardOtherAccounts(keeping: nil)
+
+        XCTAssertEqual(signedIn.message, "")
+        signedIn.selectChannel(.main)
+        XCTAssertEqual(signedIn.message, "")
+        XCTAssertEqual(store.session(for: .OGS(101), accountID: nil).message, "")
+        XCTAssertEqual(store.session(for: .OGS(101), accountID: 7).message, "")
+    }
+
+    func testStaleComposerCannotSubmitRetainedPersonalDraftAfterSwitchOrReturn() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        let oldComposer = UUID()
+        first.composerAppeared(id: oldComposer, shareFocusRequestID: nil)
+        first.selectChannel(.personal)
+        first.message = "Personal draft must never become public"
+        var submitted = [String]()
+        let send: (String) -> AnyPublisher<Void, Error> = { message in
+            submitted.append(message)
+            return Empty().eraseToAnyPublisher()
+        }
+
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+        let second = store.session(for: .OGS(102), accountID: 7)
+        second.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        second.message = "Second game draft"
+        first.sendMessage(from: oldComposer, using: send)
+        XCTAssertTrue(submitted.isEmpty)
+        XCTAssertEqual(first.message, "Personal draft must never become public")
+        XCTAssertEqual(second.message, "Second game draft")
+
+        first.setGamePresentationActive(true)
+        first.selectChannel(.main)
+        first.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        first.message = "Newer first-game main draft"
+        first.sendMessage(from: oldComposer, using: send)
+        XCTAssertTrue(submitted.isEmpty)
+        XCTAssertEqual(first.message, "Newer first-game main draft")
+        first.selectChannel(.personal)
+        XCTAssertEqual(first.message, "Personal draft must never become public")
+    }
+
+    func testDiscardedAccountComposerCannotSubmitAfterItsGameIsReused() {
+        let store = GameChatSessionStore()
+        let old = store.session(for: .OGS(101), accountID: 7)
+        let oldComposer = UUID()
+        old.composerAppeared(id: oldComposer, shareFocusRequestID: nil)
+        old.message = "Old account draft"
+        store.discardOtherAccounts(keeping: 8)
+        let current = store.session(for: .OGS(101), accountID: 8)
+        let currentComposer = UUID()
+        current.composerAppeared(id: currentComposer, shareFocusRequestID: nil)
+        current.message = "Current account draft"
+        var submitted = [String]()
+        old.sendMessage(from: oldComposer) { message in
+            submitted.append(message)
+            return Empty().eraseToAnyPublisher()
+        }
+        current.sendMessage(from: oldComposer) { message in
+            submitted.append(message)
+            return Empty().eraseToAnyPublisher()
+        }
+        XCTAssertTrue(submitted.isEmpty)
+        XCTAssertEqual(current.message, "Current account draft")
+        XCTAssertTrue(current.isActiveComposer(currentComposer))
+    }
+
+    func testOldWindowTransitionCompletionCannotRestoreAnotherGamesFocus() throws {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        first.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        first.requestInputFocus()
+        let oldTransition = try XCTUnwrap(first.beginWindowSizeTransition())
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+
+        let second = store.session(for: .OGS(102), accountID: 7)
+        second.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        second.requestInputFocus()
+        let currentTransition = try XCTUnwrap(second.beginWindowSizeTransition())
+        first.completeWindowSizeTransition(oldTransition)
+        XCTAssertFalse(first.wantsInputFocus)
+        XCTAssertEqual(first.focusRestorationRevision, 0)
+        XCTAssertEqual(second.focusRestorationRevision, 0)
+
+        second.completeWindowSizeTransition(currentTransition)
+        XCTAssertTrue(second.wantsInputFocus)
+        XCTAssertEqual(second.focusRestorationRevision, 1)
+    }
+
+    func testReturningToLatestChatKeepsGameDraftAndPendingSend() {
+        let store = GameChatSessionStore()
+        let first = store.session(for: .OGS(101), accountID: 7)
+        first.message = "First game message"
+        let response = PassthroughSubject<Void, Error>()
+        first.sendMessage { _ in response.eraseToAnyPublisher() }
+        first.recordScrollPosition(atEnd: false, anchor: "older-first-game-message",
+                                   userInitiated: true)
+        store.deactivate(gameID: .OGS(101), accountID: 7)
+        let second = store.session(for: .OGS(102), accountID: 7)
+        second.message = "Second game draft"
+
+        let returned = store.session(for: .OGS(101), accountID: 7)
+        returned.resetReadingPosition()
+        XCTAssertTrue(returned.isAtEndOfChat)
+        XCTAssertNil(returned.scrollAnchor)
+        XCTAssertEqual(returned.message, "First game message")
+        XCTAssertTrue(returned.isSending)
+        XCTAssertEqual(second.message, "Second game draft")
+
+        response.send(())
+        drainMainQueue()
+        XCTAssertFalse(returned.isSending)
+        XCTAssertEqual(returned.message, "")
+        XCTAssertEqual(second.message, "Second game draft")
+    }
+
+    func testRouteOwnerReceivesFocusChangesWithoutWindowGeometryChanges() {
+        let store = GameChatSessionStore()
+        let session = store.session(for: .OGS(101), accountID: 7)
+        session.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        var ownerInvalidations = 0
+        let observation = store.objectWillChange.sink { ownerInvalidations += 1 }
+        defer { observation.cancel() }
+
+        session.requestInputFocus()
+        XCTAssertTrue(session.wantsInputFocus)
+        XCTAssertGreaterThan(ownerInvalidations, 0,
+                             "The toolbar owner must update even without keyboard geometry events.")
+        let afterFocus = ownerInvalidations
+        session.dismissInput()
+        XCTAssertFalse(session.wantsInputFocus)
+        XCTAssertGreaterThan(ownerInvalidations, afterFocus)
+    }
+
+    func testDiscardedAccountSessionsNoLongerInvalidateRouteOwner() {
+        let store = GameChatSessionStore()
+        let discarded = store.session(for: .OGS(101), accountID: 7)
+        let kept = store.session(for: .OGS(101), accountID: 8)
+        var ownerInvalidations = 0
+        let observation = store.objectWillChange.sink { ownerInvalidations += 1 }
+        defer { observation.cancel() }
+        store.discardOtherAccounts(keeping: 8)
+        let afterDiscard = ownerInvalidations
+
+        // An obsolete field can still retain its old session after logout.
+        discarded.message = "Obsolete field update"
+        discarded.failure = .messageSend
+        XCTAssertEqual(ownerInvalidations, afterDiscard)
+        kept.composerAppeared(id: UUID(), shareFocusRequestID: nil)
+        kept.requestInputFocus()
+        XCTAssertGreaterThan(ownerInvalidations, afterDiscard)
+    }
+
+    func testRetainedSessionObservationDoesNotRetainItsRouteStore() {
+        weak var releasedStore: GameChatSessionStore?
+        var survivingSession: ChatSessionState?
+        do {
+            let store = GameChatSessionStore()
+            releasedStore = store
+            survivingSession = store.session(for: .OGS(101), accountID: 7)
+        }
+        XCTAssertNil(releasedStore)
+        survivingSession?.message = "A field can briefly outlive its route"
+        XCTAssertEqual(survivingSession?.message, "A field can briefly outlive its route")
+    }
+
     private func drainMainQueue() {
         let drained = expectation(description: "Deliver scheduled send completion")
         DispatchQueue.main.async { drained.fulfill() }

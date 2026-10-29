@@ -60,6 +60,19 @@ xcodebuild test \
 
 Substitute `18` in the simulator selection to reproduce the minimum-OS selection. CI uses `macos-26` for iOS 26 and `macos-15` with Xcode 26.2 for iOS 18. Each job builds once, validates the three selected test declarations, and runs without retries or parallel test workers. The limits are five minutes per test, twenty minutes for the test step, fifteen minutes for the build step, and forty minutes for the job. Result bundles are retained for fourteen days in `surround-iphone-26-navigation-test-results` and `surround-iphone-18-navigation-test-results`. This targeted lane does not run the full iPad journey suite or test Duo device poses.
 
+Select `-only-testing:SurroundUITests/SurroundUITests/testOwnGameNavigationAndSwitchingRemainResponsive`
+for the native iOS regression of the own-game layout freeze fixed in `8f18885`. It keeps the
+normal offline navigation shell mounted for twenty Home → own game → Active
+games → other game → current-game dismissal → Back cycles, split between native
+portrait and landscape orientations. Every destination and dismissal has a
+ten-second wait; Back must produce a real Home transition after each switch.
+Home cards are revealed through their visible scroll viewport after rotation;
+failed readiness checks retain a screenshot and accessibility hierarchy.
+Progress markers identify the last completed cycle and phase for host-side hang
+triage. `TEST_RUNNER_SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES` can select 2–100 cycles
+for a focused run (default: 20). The test uses only bundled fixtures and does not
+simulate Duo poses; native Closed/Book/Open continuity still needs its own audit.
+
 ## Offline Duo sidebar test
 
 On iOS 27 phones, the root navigation uses an owned `UITabBarController` so the Duo sidebar can show native Surround/OGS groups and overlap every destination. Hosting controllers remain stable across compact and regular layouts. UIKit receives the full window, including the keyboard region, so its tab bar stays behind a software keyboard. Shared navigation content ignores horizontal container safe areas and restores horizontal padding measured from the enclosing window's safe-area guide. Titles and toolbars retain UIKit's layout; this modifier leaves vertical content insets and keyboard avoidance unchanged. Presented stacks keep their own layout. Padding must not depend on safe-area geometry measured from that same modified content, which can oscillate at pixel boundaries during native sidebar layout. Game screens forward tab-bar visibility through `appTabBarHidden(_:)`.
@@ -154,6 +167,8 @@ The phase selection is centralized in `.github/ci-tools/run-ipad-ui-tests.sh` so
 `GameContinuityUITests` runs in the isolated `continuity` phase, after composer tests in CI. Only checks that need compact/regular transitions opt into the Debug-only `--surround-game-layout-transitions` harness, which changes the existing game route between regular width and a 430-point compact layout without changing its identity. These checks cover chat variation and move-preview exits, an ordinary draft and selected channel with active or dismissed keyboard focus, a frozen sharing draft and marked analysis session, and the preferred Forward branch after backing up. The harness changes the production layout inputs while retaining the board and composer in stable layout slots. Its compact top-leading control overlay leaves the native mode buttons exposed; it does not simulate a physical fold or establish system sheet/toolbar adaptation. Rematch sheet retention and native device-pose behavior still require a Device Hub transition check. For that manual check, `--surround-rengo-game` adds generated teammates to the primary offline compatibility game, allowing team details and panel continuity to be exercised without a live game. Normal screenshots are unchanged unless the flag is supplied.
 
 Other continuity checks use the native offline game or Home fixture without the layout harness. They verify that profile/tab navigation and an ordinary-chat Zen round trip retain drafts without automatically reopening the keyboard. The largest Dynamic Type check rotates the native fixture through both regular orientations, verifies that the preview action and square board fit, then uses Return to game and confirms the current board is restored. Explicit Analyze exits are checked in the native regular layout and the harness's compact layout, separately from state-preserving layout transitions.
+
+`GameContinuityUITests/testOwnGameSwitchingKeepsIndependentChatDrafts` opens two generated own correspondence games through Home and Active games. It checks exact, independent Chat and Personal drafts across game switches, the main-channel selection and dismissed keyboard on return, and continued editing of a restored draft. The test uses offline fixtures and never submits a message.
 
 `GameDetailLayoutTests` checks square board bounds, active Duo division avoidance, clock pairing, measured action-label fit, portrait Analyze bottom spacing, and compact/regular keyboard composer placement. Native rotation coverage in `GameContinuityUITests` checks retained marked analysis and chat drafts through the toolbar toggles. Geometry tests do not establish Liquid Glass appearance; verify that visually on an iOS 26+ simulator or device.
 

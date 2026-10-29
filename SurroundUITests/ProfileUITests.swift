@@ -984,9 +984,46 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app)
         keepScreenshot("Own profile – ratings and game history", in: app)
         navigateBackFromPlayerProfile(in: app)
-        let hideRatings = app.switches["Hide ranks and ratings"].firstMatch
+        let settings = element(SurroundUITestContract.AccessibilityID.screenSettings,
+                               in: app, matching: .scrollView)
+        let hideRatings = settings.switches["Hide ranks and ratings"].firstMatch
         XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
-        scrollIntoTappableArea(hideRatings, in: app)
+        func settingsViewport() -> CGRect {
+            let window = app.windows.firstMatch.frame
+            let scroll = settings.frame.intersection(window)
+            let barBottom = app.navigationBars.allElementsBoundByIndex
+                .filter { $0.exists && $0.frame.intersects(scroll) }
+                .map { $0.frame.maxY }.max() ?? scroll.minY
+            let top = max(scroll.minY, barBottom) + 8
+            let bottom = min(scroll.maxY, window.maxY - 100)
+            return CGRect(x: scroll.minX + 8, y: top, width: scroll.width - 16,
+                          height: max(0, bottom - top))
+        }
+        for _ in 0..<4 {
+            let viewport = settingsViewport()
+            XCTAssertFalse(viewport.isEmpty, "Settings must expose a visible content viewport.")
+            guard !viewport.isEmpty else { return }
+            let frame = hideRatings.frame
+            if viewport.contains(frame) && hideRatings.isHittable { break }
+            // Settings is a centered 600pt pane on iPad. App-wide swipes
+            // can miss it and leave this real control below the display.
+            let delta = frame.midY - viewport.midY
+            let distance = min(abs(delta), viewport.height * 0.6)
+            let startY = delta >= 0 ? viewport.maxY : viewport.minY
+            let origin = settings.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(
+                dx: viewport.midX - settings.frame.minX, dy: startY - settings.frame.minY
+            ))
+            let end = origin.withOffset(CGVector(
+                dx: viewport.midX - settings.frame.minX,
+                dy: startY + (delta >= 0 ? -distance : distance) - settings.frame.minY
+            ))
+            start.press(forDuration: 0.05, thenDragTo: end,
+                        withVelocity: .default, thenHoldForDuration: 0.1)
+        }
+        XCTAssertTrue(settingsViewport().contains(hideRatings.frame),
+                      "The hide-ratings control must be visible before changing it.")
+        XCTAssertTrue(waitUntilHittable(hideRatings, timeout: 10))
         setSwitch(hideRatings, to: "1", description: "Hide ranks and ratings")
         XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: stateSettleTimeout))
         let profileEntry = element(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)

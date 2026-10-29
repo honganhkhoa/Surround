@@ -127,6 +127,170 @@ final class GameContinuityUITests: SurroundJourneyUITestCase {
         )
     }
 
+    func testOwnGameSwitchingKeepsIndependentChatDrafts() throws {
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        let gameIDs = SurroundUITestContract.liveBannerCorrespondenceGameIDs
+        let firstID = gameIDs[0]
+        let secondID = gameIDs[1]
+        let popover = app.descendants(matching: .any)
+            .matching(identifier: ID.gameActiveGamesPopover).firstMatch
+        let firstDraft = "1firstGameDraft"
+        let secondDraft = "2secondGameDraft"
+        let firstNote = "3firstGamePersonal"
+        let secondNote = "4secondGamePersonal"
+
+        func input() -> XCUIElement {
+            element(ID.gameChatInput, in: app, matching: .textField)
+        }
+
+        func assertDraft(_ text: String) {
+            assertProperty("value", equals: text, of: input())
+        }
+
+        func assertEmptyDraft() {
+            let field = input()
+            let value = field.value as? String ?? ""
+            XCTAssertTrue(value.isEmpty || value == field.placeholderValue,
+                          "Another game or channel must not inherit an unsent draft.")
+        }
+
+        func openFirstOwnGame() {
+            let home = element(ID.screenHome, in: app, matching: .scrollView)
+            let entry = home.buttons.matching(identifier: ID.homeGame(firstID)).firstMatch
+            for attempt in 0...4 {
+                let viewport = app.descendants(matching: .any)
+                    .matching(identifier: ID.screenHome).allElementsBoundByIndex.map(\.frame)
+                    .filter { !$0.isEmpty && $0.intersects(app.frame) }
+                    .reduce(app.frame) { $0.intersection($1) }.insetBy(dx: 8, dy: 8)
+                XCTAssertFalse(viewport.isEmpty || viewport.isNull,
+                               "Home must expose a visible content viewport.")
+                if entry.exists,
+                   viewport.contains(CGPoint(x: entry.frame.midX, y: entry.frame.midY)),
+                   entry.isHittable {
+                    tap(entry, description: "Open first own correspondence game", in: app)
+                    element(ID.gameDetail(firstID), in: app)
+                    return
+                }
+                guard attempt < 4 else { break }
+                let delta = entry.exists ? entry.frame.midY - viewport.midY : viewport.height
+                let distance = min(abs(delta), viewport.height * 0.6)
+                let startY = delta >= 0 ? viewport.maxY : viewport.minY
+                let origin = home.coordinate(withNormalizedOffset: .zero)
+                let start = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX, dy: startY - home.frame.minY
+                ))
+                let end = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX,
+                    dy: startY + (delta >= 0 ? -distance : distance) - home.frame.minY
+                ))
+                start.press(forDuration: 0.05, thenDragTo: end,
+                            withVelocity: .default, thenHoldForDuration: 0.1)
+            }
+            XCTFail("Expected the exact first own-game card after scoped Home scrolling.")
+        }
+
+        func switchTo(_ gameID: Int) {
+            dismissSoftwareKeyboardIfNeeded(in: app)
+            let direct = app.buttons.matching(identifier: ID.gameActiveGamesButton).firstMatch
+            let overflow = app.buttons.matching(NSPredicate(
+                format: "identifier IN %@ OR label == %@",
+                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
+            )).firstMatch
+            XCTAssertTrue(pollUntil(timeout: 10) { direct.exists || overflow.isHittable })
+            if direct.exists {
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    // Native hidden tab-bar AX can overlap this visible item.
+                    // Resolve its center freshly, then require the real popover.
+                    XCTAssertTrue(direct.isEnabled)
+                    XCTAssertTrue(app.frame.contains(direct.frame))
+                    XCTAssertGreaterThan(direct.frame.width, 0)
+                    XCTAssertGreaterThan(direct.frame.height, 0)
+                    direct.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                } else {
+                    tap(direct, description: "Active games", in: app)
+                }
+            } else {
+                tap(overflow, description: "Game toolbar overflow", in: app)
+                tap(requiredMenuButton(ID.gameActiveGamesButton, title: "Active games", in: app),
+                    description: "Active games", in: app)
+            }
+            XCTAssertTrue(popover.waitForExistence(timeout: 10))
+            let entry = popover.buttons.matching(identifier: ID.gameActiveGamesEntry(gameID)).firstMatch
+            XCTAssertTrue(entry.waitForExistence(timeout: 10))
+            tap(entry, description: "Switch to own game \(gameID)", in: app)
+            element(ID.gameDetail(gameID), in: app)
+            XCTAssertTrue(pollUntil(timeout: 10) { !popover.exists },
+                          "The chosen game must replace the popover.")
+            openGameChat(in: app)
+            XCTAssertFalse(chatInputHasKeyboardFocus(in: app),
+                           "Returning to a game must not reopen its keyboard.")
+            XCTAssertEqual(element(ID.gameChatChannelPicker, in: app).value as? String, "Chat",
+                           "Game switching must retain the main-channel privacy policy.")
+        }
+
+        func selectMainChannel() {
+            tap(ID.gameChatChannelPicker, in: app)
+            tap(requiredMenuButton(ID.gameChatChannelMain, title: "Chat", in: app),
+                description: "Main chat channel", in: app)
+        }
+
+        openFirstOwnGame()
+        typeDraft(firstDraft, in: app)
+        switchTo(secondID)
+        assertEmptyDraft()
+        typeDraft(secondDraft, in: app)
+        switchTo(firstID)
+        keepScreenshot("Own-game draft after first A-B-A return", in: app)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Own-game draft after first A-B-A return"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        // This must fail against the original product, which resets ChatSessionState.
+        assertDraft(firstDraft)
+        switchTo(secondID)
+        assertDraft(secondDraft)
+
+        switchTo(firstID)
+        selectPersonalChannel(in: app)
+        assertEmptyDraft()
+        typeDraft(firstNote, in: app)
+        switchTo(secondID)
+        assertDraft(secondDraft)
+        selectPersonalChannel(in: app)
+        assertEmptyDraft()
+        typeDraft(secondNote, in: app)
+        switchTo(firstID)
+        assertDraft(firstDraft)
+        selectPersonalChannel(in: app)
+        assertDraft(firstNote)
+        switchTo(secondID)
+        assertDraft(secondDraft)
+        selectPersonalChannel(in: app)
+        assertDraft(secondNote)
+
+        switchTo(firstID)
+        assertDraft(firstDraft)
+        let field = input()
+        tap(field, description: "Continue the restored first-game draft", in: app)
+        field.typeText(".")
+        // Tapping can position the caret inside the text; independently verify
+        // that one new character was inserted without losing the original draft.
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            guard let value = field.value as? String else { return false }
+            return value.count == firstDraft.count + 1
+                && value.replacingOccurrences(of: ".", with: "") == firstDraft
+        })
+        let editedDraft = try XCTUnwrap(field.value as? String)
+        dismissSoftwareKeyboardIfNeeded(in: app)
+        selectPersonalChannel(in: app)
+        assertDraft(firstNote)
+        selectMainChannel()
+        assertDraft(editedDraft)
+        keepScreenshot("Independent own-game and channel drafts retained", in: app)
+    }
+
     func testChatVariationPreviewKeepsAnExitAcrossLayouts() throws {
         let app = launchContinuityScene(.activeGameBoard)
         let liveBoard = try boardValue(in: app)

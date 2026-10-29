@@ -1296,7 +1296,11 @@ struct SingleGameView: View {
             stoneSoundPlayer.reset()
             stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
             updateReviewGameObservation()
-            chatSession.reset()
+            // The route retains a separate chat session for each game. Keep
+            // GameDetail's main-channel-on-switch policy without erasing drafts
+            // or cancelling an in-flight message owned by another game.
+            chatSession.selectChannel(.main)
+            chatSession.setGamePresentationActive(isChatRouteActive && !zenMode)
             conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
             showingConditionalMoveSubmissionError = false
             preferredNextPositionByPosition.removeAll()

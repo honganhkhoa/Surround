@@ -365,6 +365,7 @@ struct ChatLog: View {
                 .onChange(of: game.ID) { _, _ in
                     // The active-game picker retains this transcript view. Its
                     // local reading intent must reset with the owning session.
+                    session.resetReadingPosition()
                     followsLatestMessages = true
                     visibleScrollAnchor = nil
                     scrollPosition.scrollTo(edge: .bottom)
@@ -587,6 +588,7 @@ struct NewChatInput: View {
         subtitle: LocalizedStringResource
     ) -> some View {
         Button {
+            guard session.isActiveComposer(composerID) else { return }
             onInteraction()
             session.selectChannel(channel)
             selectedChannel.wrappedValue = channel
@@ -637,6 +639,7 @@ struct NewChatInput: View {
                     variationShareDraft.wrappedValue?.name ?? ""
                 },
                 set: { name in
+                    guard session.isActiveComposer(composerID) else { return }
                     guard var draft = variationShareDraft.wrappedValue else {
                         return
                     }
@@ -649,6 +652,7 @@ struct NewChatInput: View {
         return Binding(
             get: { session.message },
             set: { message in
+                guard session.isActiveComposer(composerID) else { return }
                 session.message = message
                 onInteraction()
             }
@@ -661,6 +665,9 @@ struct NewChatInput: View {
     }
 
     private func send() {
+        // A removed field can deliver a queued submit after another game has
+        // changed the route's channel. Never send its retained draft then.
+        guard session.isActiveComposer(composerID) else { return }
         onInteraction()
         if let draft = variationShareDraft.wrappedValue {
             session.failure = nil
@@ -691,7 +698,7 @@ struct NewChatInput: View {
         let channel = selectedChannel.wrappedValue.resolved(
             isUserPlaying: game.isUserPlaying
         )
-        session.sendMessage { message in
+        session.sendMessage(from: composerID) { message in
             ogs.sendChat(in: game, channel: channel, body: message)
                 .zip(game.$chatLog.setFailureType(to: Error.self))
                 .map { _ in () }

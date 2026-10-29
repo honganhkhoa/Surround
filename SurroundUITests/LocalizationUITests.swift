@@ -266,8 +266,50 @@ final class LocalizationUITests: SurroundJourneyUITestCase {
         defer { app.terminate() }
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
         assertVisible(localizedLabel(language.text("Active games"), in: app), in: app)
-        element(SurroundUITestContract.AccessibilityID.homeGame(
-            SurroundUITestContract.screenshotPrimaryGameID), in: app)
+        let home = app.scrollViews.matching(
+            identifier: SurroundUITestContract.AccessibilityID.screenHome
+        ).firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 10))
+        let primaryGame = home.buttons.matching(
+            identifier: SurroundUITestContract.AccessibilityID.homeGame(
+                SurroundUITestContract.screenshotPrimaryGameID)
+        ).firstMatch
+        func homeViewport() -> CGRect {
+            // The scroll view's AX frame includes native chrome and the
+            // sidebar. Its screen.home wrappers expose clipped content.
+            app.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.screenHome)
+                .allElementsBoundByIndex.map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(app.frame) }
+                .reduce(app.frame) { $0.intersection($1) }
+                .insetBy(dx: 8, dy: 8)
+        }
+        for _ in 0..<4 {
+            let viewport = homeViewport()
+            XCTAssertFalse(viewport.isEmpty, "Home must expose a visible content viewport.")
+            guard !viewport.isEmpty else { return }
+            if primaryGame.exists && primaryGame.isHittable
+                && viewport.contains(primaryGame.frame) { break }
+            let frame = primaryGame.exists ? primaryGame.frame : nil
+            let delta = frame.map { $0.midY - viewport.midY } ?? viewport.height
+            let distance = min(abs(delta), viewport.height * 0.6)
+            let startY = delta >= 0 ? viewport.maxY : viewport.minY
+            let origin = home.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(
+                dx: viewport.midX - home.frame.minX, dy: startY - home.frame.minY
+            ))
+            let end = origin.withOffset(CGVector(
+                dx: viewport.midX - home.frame.minX,
+                dy: startY + (delta >= 0 ? -distance : distance) - home.frame.minY
+            ))
+            start.press(forDuration: 0.05, thenDragTo: end,
+                        withVelocity: .default, thenHoldForDuration: 0.1)
+        }
+        XCTAssertTrue(primaryGame.waitForExistence(timeout: 10),
+                      "The exact primary fixture game must appear after bounded Home scrolling.")
+        XCTAssertTrue(waitUntilHittable(primaryGame, timeout: 10))
+        XCTAssertTrue(homeViewport().contains(primaryGame.frame),
+                      "The primary fixture game must be visible inside Home's content viewport.")
         capture("home", language: language, in: app)
 
         // This read-only popover opens existing fixture plans without opening a
