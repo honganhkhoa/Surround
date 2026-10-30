@@ -289,7 +289,8 @@ For a quicker single-localization run, pass the exact test-plan configuration:
 output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
 .github/ci-tools/capture-app-store-screenshots.sh \
   --output "$output_path" \
-  --locale en-US
+  --locale en-US \
+  --keep-simulators
 ```
 
 `--locale` is repeatable. When it is omitted, the runner captures all thirteen supported localizations.
@@ -300,14 +301,17 @@ The output path must not already exist. Reusable build products default to the g
 - selects an accepted 6.9-inch iPhone and 13-inch iPad from that runtime as device-type templates without booting or modifying them, then creates fresh disposable simulators for capture;
 - pins the status bar for repeatable output;
 - runs the selected test-plan configurations (`en-US`, `fr-FR`, `de-DE`, `ja-JP`, `vi-VN`, `th-TH`, `zh-Hans-CN`, `zh-Hant-TW`, `ko-KR`, `es-ES`, `es-MX`, `pt-BR`, and `pt-PT` by default);
-- captures ten portrait iPhone scenes and ten landscape iPad scenes per locale;
-- keeps the iPad app sidebar visible except in Zen mode (the Home Screen widget is captured from SpringBoard);
+- captures nine portrait iPhone scenes, one landscape iPhone themes scene, and ten landscape iPad scenes per locale;
+- features Raked Garden in Game Detail for `06-themes` on iPhone (landscape, Zen mode) and `04-themes` on iPad (landscape, default mode, no Chat or Analyze panel, collapsed app sidebar), replacing the former Zen screenshots;
+- selects the theme in a separate isolated app launch and returns subsequent scenes to the standard theme;
+- captures the approved five-message English conversation and native composer in `11-messages`, replacing iPhone Preferred Settings and iPad Open Challenges while preserving ten sources per family;
+- keeps the iPad app sidebar visible except in the themes scene (the Home Screen widget is captured from SpringBoard);
 - exports named XCTest attachments and uses Image I/O to bake attachment orientation into the pixel raster;
 - writes neutral orientation metadata (`1`) and current pixel dimensions;
 - validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
-- deletes the disposable simulators during teardown, including after a failed capture, without changing the template simulators.
+- deletes the disposable simulators during teardown, including after a failed capture, without changing the template simulators, unless `--keep-simulators` retains them for separately reviewed cleanup. The retained devices are shut down, and `simulators.tsv` records their exact UUIDs and names even if capture fails.
 
-The complete thirteen-locale run produces 260 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. The capture command remains useful on its own; the reviewed App Store Connect publishing workflow below invokes it automatically.
+The complete thirteen-locale run produces 260 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Promotional framing may use a landscape canvas for the iPhone theme card. The public manifest and publisher require uniform dimensions within each screenshot family, so the mixed portrait/landscape set needs per-image size support before publication preparation. The unframed `prepare` path also does not accept this mixed-orientation source set.
 
 To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 27.0 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
 
@@ -325,7 +329,7 @@ When the shipping app and fixtures are unchanged, a supported scene replacement 
 
 This command requires Python 3.9+, Xcode, the original runtime and Xcode version, and a complete original thirteen-locale, two-family capture with its aggregate XCTest result, raw attachment manifest, source PNGs, log, and recorded source context. The currently supported replacement is defined by the scene contract in `.github/ci-tools/app-store-screenshot-provenance.py`; it is not an arbitrary scene selector. `--derived-data` selects a reusable build cache; `--device-name` selects an accepted iPhone template. It creates one disposable iPhone, builds the actual test products, selects the explicitly guarded scene-refresh test in a copied generated test plan, and captures all thirteen locales. It does not prepare or alter a Home Screen widget. Failure retains the sibling `<output>.refresh-work` evidence directory and deletes only its disposable device.
 
-The new capture has `mode: "scene-refresh"` and a hashed `screenshot-provenance.json`; it explicitly identifies both original result bundles and both iPhone destinations. Every one of its 260 source images is bound to its original device, locale, test attachment and bytes. The full base and fresh aggregate result bundles, raw attachments, source images and source contexts are copied under `origins/`; the base run is never modified. The current contract refreshes one iPhone scene per locale: exactly 247 sources must remain byte-identical, and only the thirteen declared replacements may change. Arbitrary screenshot mixing is rejected. Source context records permit only the bounded screenshot test/tool and testing guide changes; shipping source changes require a new complete capture instead.
+The new capture has `mode: "scene-refresh"` and a hashed `screenshot-provenance.json`; it explicitly identifies both original result bundles and both iPhone destinations. Every one of its 260 source images is bound to its original device, locale, test attachment and bytes. The full base and fresh aggregate result bundles, raw attachments, source images and source contexts are copied under `origins/`; the base run is never modified. The historical refresh contract retains the former Zen scenes and refreshes one iPhone Quick Match scene per locale: exactly 247 sources must remain byte-identical, and only the thirteen declared replacements may change. The Raked Garden replacement changes both families and the iPhone source orientation, so it requires a new full capture. Arbitrary screenshot mixing is rejected. Source context records permit only the bounded screenshot test/tool and testing guide changes; shipping source changes require a new complete capture instead.
 
 The offline verifier checks every evidence inventory and image hash and can be called by preparation and staging before their existing full matrix, decoded PNG, framing and manifest gates:
 

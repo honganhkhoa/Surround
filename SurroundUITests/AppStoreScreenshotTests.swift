@@ -21,24 +21,24 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         "03-game-chat",
         "04-quick-match",
         "05-game-analysis",
-        "06-zen-mode",
-        "07-preferred-settings",
+        "06-themes",
         "08-public-games",
         "09-conditional-moves",
         "10-home-screen-widget",
+        "11-messages",
     ]
 
     private let expectedPadSceneNames = [
         "01-game-board",
         "02-active-games",
         "03-game-analysis",
-        "04-zen-mode",
+        "04-themes",
         "05-conditional-moves",
         "06-public-games",
         "07-quick-match",
-        "08-open-challenges",
         "09-preferred-settings",
         "10-home-screen-widget",
+        "11-messages",
     ]
 
     override func setUpWithError() throws {
@@ -71,6 +71,22 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         hierarchy.name = "Quick Match marketing pilot hierarchy"
         hierarchy.lifetime = .keepAlways
         add(hierarchy)
+        #endif
+    }
+
+    func testThemeMarketingPilot() throws {
+        guard ProcessInfo.processInfo.environment[
+            "SURROUND_THEME_MARKETING_PILOT"
+        ] == "1" else {
+            throw XCTSkip("Select and opt in to the standalone theme marketing pilot.")
+        }
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("Theme marketing capture requires an iOS Simulator.")
+        #else
+        captureThemeScreenshot()
+        XCTAssertEqual(capturedSceneNames, [
+            UIDevice.current.userInterfaceIdiom == .phone ? "06-themes" : "04-themes"
+        ])
         #endif
     }
 
@@ -245,42 +261,9 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             )
         }
 
-        tap(
-            SurroundUITestContract.AccessibilityID.gameZenEnter,
-            in: gameApp,
-            matching: .button
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.gameZenExit,
-            in: gameApp,
-            matching: .button
-        )
-        if !isPhone {
-            setSidebarCollapsed(true, in: gameApp)
-        }
-        capture(isPhone ? "06-zen-mode" : "04-zen-mode", in: gameApp)
-        tap(
-            SurroundUITestContract.AccessibilityID.gameZenExit,
-            in: gameApp,
-            matching: .button
-        )
-        if !isPhone {
-            // Zen mode hides the navigation toolbar that owns the collapsed
-            // sidebar's reveal control. Exit Zen first, then restore the
-            // sidebar so its state cannot leak into later app launches.
-            let zenEnter = element(
-                SurroundUITestContract.AccessibilityID.gameZenEnter,
-                in: gameApp,
-                matching: .button
-            )
-            XCTAssertTrue(
-                waitUntil(timeout: 10) { zenEnter.isHittable },
-                "Expected the game toolbar after exiting Zen mode."
-            )
-            setSidebarCollapsed(false, in: gameApp)
-        }
-
         gameApp.terminate()
+
+        captureThemeScreenshot()
 
         let conditionalMovesApp = launchApp()
         openFixtureGame(in: conditionalMovesApp)
@@ -296,33 +279,41 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         capture("02-active-games", in: homeApp)
         homeApp.terminate()
 
-        let preferredSettingsApp = launchApp()
-        // The star opens a menu of saved setups; its last item is the editor.
-        tap(
-            SurroundUITestContract.AccessibilityID.homePreferredSettings,
-            in: preferredSettingsApp
-        )
-        tap(
-            SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit,
-            in: preferredSettingsApp
-        )
-        element(
-            SurroundUITestContract.AccessibilityID.screenPreferredSettings,
-            in: preferredSettingsApp
-        )
-        for settingIndex in 0..<2 {
-            element(
-                SurroundUITestContract.AccessibilityID.preferredSetting(
-                    settingIndex
-                ),
+        if !isPhone {
+            let preferredSettingsApp = launchApp()
+            // The star opens a menu of saved setups; its last item is the editor.
+            tap(
+                SurroundUITestContract.AccessibilityID.homePreferredSettings,
                 in: preferredSettingsApp
             )
+            // iPadOS 27's native menu drops this action's SwiftUI identifier.
+            // Its observed slider image still identifies the same editor action
+            // in every locale, without depending on translated menu text.
+            let identifiedEditor = preferredSettingsApp.descendants(matching: .any)
+                .matching(identifier: SurroundUITestContract.AccessibilityID.homePreferredSettingsEdit)
+                .firstMatch
+            let nativeMenuEditor = preferredSettingsApp.buttons
+                .containing(.image, identifier: "slider.horizontal.3").firstMatch
+            let editorAction = waitForFirstHittable(
+                [identifiedEditor, nativeMenuEditor], timeout: 10
+            )
+            XCTAssertNotNil(editorAction, "Expected the Preferred Settings editor menu action.")
+            editorAction?.tap()
+            element(
+                SurroundUITestContract.AccessibilityID.screenPreferredSettings,
+                in: preferredSettingsApp
+            )
+            for settingIndex in 0..<2 {
+                element(
+                    SurroundUITestContract.AccessibilityID.preferredSetting(
+                        settingIndex
+                    ),
+                    in: preferredSettingsApp
+                )
+            }
+            capture("09-preferred-settings", in: preferredSettingsApp)
+            preferredSettingsApp.terminate()
         }
-        capture(
-            isPhone ? "07-preferred-settings" : "09-preferred-settings",
-            in: preferredSettingsApp
-        )
-        preferredSettingsApp.terminate()
 
         let newGameApp = launchApp()
         tap(
@@ -337,9 +328,6 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             SurroundUITestContract.AccessibilityID.screenOpenChallenges,
             in: newGameApp
         )
-        if !isPhone {
-            capture("08-open-challenges", in: newGameApp)
-        }
         selectSegment(
             at: 0,
             in: SurroundUITestContract.AccessibilityID.newGameOptionPicker,
@@ -366,6 +354,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         publicGamesApp.terminate()
 
         captureHomeScreenWidget()
+        captureMessagesScreenshot()
 
         XCTAssertEqual(
             capturedSceneNames.sorted(),
@@ -375,9 +364,79 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         #endif
     }
 
-    private func launchApp() -> XCUIApplication {
+    private func captureThemeScreenshot() {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        // Use a separate launch so the featured theme cannot change the
+        // remaining screenshot scenes or their widget fixture preferences.
+        let app = launchApp(theme: "rakedGarden", landscape: true)
+        openFixtureGame(in: app)
+        setGameAnalyzing(false, in: app)
+        setGameChatVisible(false, in: app)
+        if isPhone {
+            tap(SurroundUITestContract.AccessibilityID.gameZenEnter,
+                in: app, matching: .button)
+            element(SurroundUITestContract.AccessibilityID.gameZenExit,
+                    in: app, matching: .button)
+        } else {
+            setSidebarCollapsed(true, in: app)
+            element(SurroundUITestContract.AccessibilityID.gameZenEnter,
+                    in: app, matching: .button)
+            XCTAssertFalse(app.buttons[SurroundUITestContract.AccessibilityID.gameZenExit].exists,
+                           "The iPad theme scene uses the default game mode.")
+        }
+        XCTAssertFalse(app.scrollViews[SurroundUITestContract.AccessibilityID.gameChatLog].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier:
+            SurroundUITestContract.AccessibilityID.gameAnalyzeControlBar).firstMatch.exists)
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height && self.gameBoardIsShown(in: app)
+        }, "The theme scene must settle in landscape with its board visible.")
+        capture(isPhone ? "06-themes" : "04-themes", in: app)
+        app.terminate()
+    }
+
+    private func captureMessagesScreenshot() {
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         #if !targetEnvironment(macCatalyst)
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .phone
+        XCUIDevice.shared.orientation = isPhone ? .portrait : .landscapeRight
+        #endif
+        // Reuse the existing opt-in marketing fixture and real Messages route.
+        // Run after the widget so this compatibility launch cannot replace the
+        // shared App Store widget proof used by the SpringBoard capture.
+        let app = XCUIApplication()
+        app.launchArguments = [
+            SurroundUITestContract.launchArgument,
+            SurroundUITestContract.compatibilityScreenshotLaunchArgument,
+            SurroundUITestContract.compatibilitySceneLaunchArgument,
+            SurroundUITestContract.CompatibilityScene.messagesInbox.rawValue,
+            SurroundUITestContract.messagesMarketingLaunchArgument,
+        ]
+        registerAppTermination(app)
+        app.launch()
+        element(SurroundUITestContract.AccessibilityID.screenMessages, in: app)
+        if isPhone {
+            tap(SurroundUITestContract.AccessibilityID.privateMessageRow(851_001), in: app)
+        } else {
+            setSidebarCollapsed(false, in: app)
+        }
+        element(SurroundUITestContract.AccessibilityID.privateMessageComposer,
+                in: app, matching: .textField)
+        for text in [
+            "gg that was close", "yeah I thought you had me after that ko",
+            "same haha", "one more?", "sure let’s swap colors",
+        ] {
+            XCTAssertTrue(app.staticTexts[text].firstMatch.waitForExistence(timeout: 10),
+                          "The Messages screenshot must retain the approved English conversation.")
+        }
+        XCTAssertFalse(app.keyboards.firstMatch.exists,
+                       "The Messages screenshot shows the native composer without a keyboard.")
+        capture("11-messages", in: app)
+        app.terminate()
+    }
+
+    private func launchApp(theme: String? = nil, landscape: Bool = false) -> XCUIApplication {
+        #if !targetEnvironment(macCatalyst)
+        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .phone && !landscape
             ? .portrait
             // XCUIScreen stores iPad landscape captures on a portrait pixel
             // canvas and describes the display orientation in image metadata.
@@ -393,6 +452,13 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 .appStoreScreenshotWidgetProofTokenLaunchArgument,
             appStoreWidgetProofToken,
         ]
+        if let theme {
+            app.launchArguments += [
+                SurroundUITestContract.themeLaunchArgument, theme,
+                SurroundUITestContract.appearanceLaunchArgument,
+                SurroundUITestContract.Appearance.light.rawValue,
+            ]
+        }
         registerAppTermination(app)
         app.launch()
         element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
@@ -550,6 +616,37 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
                 movePath:
                     SurroundUITestContract.screenshotConditionalMovePaths[0]
             )
+        let position = element(identifier, in: app, matching: .button, file: file, line: line)
+        let tree = element(
+            SurroundUITestContract.AccessibilityID.gameAnalyzeTreeScroll,
+            in: app, matching: .scrollView, file: file, line: line
+        )
+        // The current move can be visible while this saved branch ends just
+        // beyond the compact tree's right edge. Reveal the actual button with
+        // a short measured horizontal drag before asking XCTest to tap it.
+        for _ in 0..<6 {
+            let viewport = tree.frame.insetBy(dx: 8, dy: 8)
+            let frame = position.frame
+            if viewport.contains(frame) && position.isHittable { break }
+            let horizontalOverflow: CGFloat
+            if frame.maxX > viewport.maxX {
+                horizontalOverflow = -(frame.maxX - viewport.maxX + 12)
+            } else if frame.minX < viewport.minX {
+                horizontalOverflow = viewport.minX - frame.minX + 12
+            } else {
+                break
+            }
+            let distance = min(abs(horizontalOverflow), tree.frame.width * 0.3)
+            let direction: CGFloat = horizontalOverflow < 0 ? -1 : 1
+            let start = tree.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let end = start.withOffset(CGVector(dx: direction * distance, dy: 0))
+            start.press(forDuration: 0.05, thenDragTo: end)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.35))
+        }
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            tree.frame.insetBy(dx: 8, dy: 8).contains(position.frame) && position.isHittable
+        }, "Expected the saved conditional variation fully inside its analysis tree.",
+           file: file, line: line)
         tap(identifier, in: app, file: file, line: line)
 
         let selectedPosition = element(
@@ -888,7 +985,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             appWindow.waitForExistence(timeout: 10),
             "Expected an application window before capturing \(name)."
         )
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if UIDevice.current.userInterfaceIdiom == .phone && name != "06-themes" {
             XCTAssertGreaterThan(
                 appWindow.frame.height,
                 appWindow.frame.width,
@@ -898,7 +995,7 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
             XCTAssertGreaterThan(
                 appWindow.frame.width,
                 appWindow.frame.height,
-                "The iPad app content must be landscape for \(name)."
+                "The app content must be landscape for \(name)."
             )
         }
 

@@ -38,24 +38,24 @@ readonly -a expected_iphone_scenes=(
   "03-game-chat"
   "04-quick-match"
   "05-game-analysis"
-  "06-zen-mode"
-  "07-preferred-settings"
+  "06-themes"
   "08-public-games"
   "09-conditional-moves"
   "10-home-screen-widget"
+  "11-messages"
 )
 
 readonly -a expected_ipad_scenes=(
   "01-game-board"
   "02-active-games"
   "03-game-analysis"
-  "04-zen-mode"
+  "04-themes"
   "05-conditional-moves"
   "06-public-games"
   "07-quick-match"
-  "08-open-challenges"
   "09-preferred-settings"
   "10-home-screen-widget"
+  "11-messages"
 )
 
 readonly -a preferred_iphone_names=(
@@ -86,7 +86,7 @@ Capture deterministic App Store screenshots with Xcode's native UI-test tools.
 
 Usage:
   capture-app-store-screenshots.sh --output PATH [--derived-data PATH]
-                                   [--locale LOCALE]...
+                                   [--locale LOCALE]... [--keep-simulators]
 
 Options:
   --output PATH        Required. A new output directory; it must not exist.
@@ -98,6 +98,9 @@ Options:
                        en-US, fr-FR, de-DE, ja-JP, vi-VN, th-TH,
                        zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES, es-MX, pt-BR,
                        and pt-PT. Defaults to all thirteen.
+  --keep-simulators    Retain the task-created devices for reviewed cleanup.
+                       Teardown still clears overrides and shuts them down.
+                       Their UUIDs and names are recorded in simulators.tsv.
   -h, --help           Show this help.
 
 Environment overrides:
@@ -114,7 +117,8 @@ The AppStoreScreenshots test plan must contain configurations named en-US,
 fr-FR, de-DE, ja-JP, vi-VN, th-TH, zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES,
 es-MX, pt-BR, and pt-PT. For example, pass --locale en-US for an English-only
 capture. The UI test must keep exactly ten named screenshot attachments for
-iPhone and exactly ten for iPad.
+iPhone and exactly ten for iPad. The iPhone themes source is landscape; its
+other nine scenes are portrait. Every iPad source is landscape.
 Run this command with --help after changing the scene contract, then review
 the generated index.html.
 
@@ -124,7 +128,7 @@ the xcodebuild log, and an index.html review gallery.
 
 Selected simulators are preserved and used only as device-type templates. The
 script creates fresh disposable iPhone and iPad simulators for deterministic
-Home Screen state, then deletes them on exit.
+Home Screen state. It deletes them on exit unless --keep-simulators is set.
 EOF
 }
 
@@ -755,7 +759,9 @@ restore_simulators() {
       fi
     fi
 
-    if ! run_bounded_cleanup 30 \
+    if [[ "$keep_simulators" == true ]]; then
+      echo "Retained task-created simulator for reviewed cleanup: ${device_id}"
+    elif ! run_bounded_cleanup 30 \
       xcrun simctl delete "$device_id" >/dev/null 2>&1; then
       echo "warning: Could not delete disposable simulator ${device_id}." >&2
     fi
@@ -795,6 +801,7 @@ validate_png() {
   local png_path="$1"
   local device_family="$2"
   local validation_stage="${3:-final}"
+  local scene="${4:-}"
   local metadata
   local format
   local width
@@ -828,25 +835,38 @@ validate_png() {
   esac
 
   dimensions="${width}x${height}"
-  case "${device_family}:${validation_stage}:${dimensions}" in
-    iphone-6.9:raw:1260x2736|iphone-6.9:final:1260x2736|\
-    iphone-6.9:raw:1290x2796|iphone-6.9:final:1290x2796|\
-    iphone-6.9:raw:1320x2868|iphone-6.9:final:1320x2868)
-      ;;
-    ipad-13:raw:2064x2752|ipad-13:raw:2048x2732|\
-    ipad-13:raw:2752x2064|ipad-13:raw:2732x2048|\
-    ipad-13:final:2752x2064|ipad-13:final:2732x2048)
-      ;;
-    iphone-6.9:*)
-      fail "Unexpected iPhone screenshot dimensions or orientation ${dimensions}: ${png_path}"
-      ;;
-    ipad-13:*)
-      fail "Unexpected iPad screenshot dimensions or orientation ${dimensions}: ${png_path}"
-      ;;
-    *)
-      fail "Unknown device family '${device_family}' while validating ${png_path}"
-      ;;
-  esac
+  # The themes scene alone features a landscape iPhone. Raw XCTest pixels
+  # may still use a portrait canvas with orientation metadata; final pixels
+  # must be landscape after normalization. Keep the other nine scenes strict.
+  if [[ "$device_family" == "iphone-6.9" && "$scene" == "06-themes" ]]; then
+    case "${validation_stage}:${dimensions}" in
+      raw:1260x2736|raw:1290x2796|raw:1320x2868|\
+      raw:2736x1260|raw:2796x1290|raw:2868x1320|\
+      final:2736x1260|final:2796x1290|final:2868x1320)
+        ;;
+      *) fail "Unexpected landscape iPhone themes dimensions ${dimensions}: ${png_path}" ;;
+    esac
+  else
+    case "${device_family}:${validation_stage}:${dimensions}" in
+      iphone-6.9:raw:1260x2736|iphone-6.9:final:1260x2736|\
+      iphone-6.9:raw:1290x2796|iphone-6.9:final:1290x2796|\
+      iphone-6.9:raw:1320x2868|iphone-6.9:final:1320x2868)
+        ;;
+      ipad-13:raw:2064x2752|ipad-13:raw:2048x2732|\
+      ipad-13:raw:2752x2064|ipad-13:raw:2732x2048|\
+      ipad-13:final:2752x2064|ipad-13:final:2732x2048)
+        ;;
+      iphone-6.9:*)
+        fail "Unexpected iPhone screenshot dimensions or orientation ${dimensions}: ${png_path}"
+        ;;
+      ipad-13:*)
+        fail "Unexpected iPad screenshot dimensions or orientation ${dimensions}: ${png_path}"
+        ;;
+      *)
+        fail "Unknown device family '${device_family}' while validating ${png_path}"
+        ;;
+    esac
+  fi
 
   if [[ "$validation_stage" == "final" ]]; then
     "$screenshot_normalizer_path" --validate-neutral "$png_path" >/dev/null
@@ -874,6 +894,7 @@ copy_normalized_screenshot() {
 
 output_argument=""
 derived_data_argument=""
+keep_simulators=false
 requested_locales=()
 
 while (( $# > 0 )); do
@@ -903,6 +924,10 @@ while (( $# > 0 )); do
       ;;
     --locale=*)
       requested_locales+=("${1#*=}")
+      shift
+      ;;
+    --keep-simulators)
+      keep_simulators=true
       shift
       ;;
     -h|--help)
@@ -1115,6 +1140,7 @@ iphone_id="$(
 [[ "$iphone_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] \
   || fail "Could not create a disposable iPhone simulator."
 delete_device_ids+=("$iphone_id")
+printf '%s\t%s\n' "$iphone_id" "$iphone_name" >>"${output_root}/simulators.tsv"
 
 ipad_name="Surround App Store iPad $$"
 ipad_id="$(
@@ -1126,6 +1152,7 @@ ipad_id="$(
 [[ "$ipad_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] \
   || fail "Could not create a disposable iPad simulator."
 delete_device_ids+=("$ipad_id")
+printf '%s\t%s\n' "$ipad_id" "$ipad_name" >>"${output_root}/simulators.tsv"
 
 echo "Created disposable iPhone: ${iphone_name} (${iphone_id})"
 echo "Created disposable iPad:   ${ipad_name} (${ipad_id})"
@@ -1370,7 +1397,7 @@ while IFS=$'\t' read -r locale device_id device_name scene exported_file_name; d
   [[ ! -e "$destination_path" ]] \
     || fail "Duplicate screenshot for ${locale}/${device_family}/${scene}."
 
-  validate_png "$source_attachment" "$device_family" raw
+  validate_png "$source_attachment" "$device_family" raw "$scene"
   mkdir -p "$destination_directory"
   copy_normalized_screenshot "$source_attachment" "$destination_path" "$device_family"
 done <"$records_path"
@@ -1391,7 +1418,7 @@ for locale in "${selected_locales[@]}"; do
       screenshot_path="${combination_path}/${scene}.png"
       [[ -f "$screenshot_path" ]] \
         || fail "Missing ordered screenshot: ${locale}/${device_family}/${scene}.png"
-      validate_png "$screenshot_path" "$device_family"
+      validate_png "$screenshot_path" "$device_family" final "$scene"
     done
 
     shopt -s nullglob
@@ -1485,7 +1512,7 @@ jq -n \
       if [[ "$device_family" == "iphone-6.9" ]]; then
         gallery_device_name="$iphone_name"
         gallery_grid_class="grid-iphone"
-        gallery_orientation="Portrait"
+        gallery_orientation="Portrait; Themes in landscape"
         gallery_scenes=("${expected_iphone_scenes[@]}")
       else
         gallery_device_name="$ipad_name"

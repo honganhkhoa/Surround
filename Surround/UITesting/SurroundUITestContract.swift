@@ -390,8 +390,8 @@ enum SurroundUITestContract {
         isEnabled && ProcessInfo.processInfo.arguments.contains(messagesContentLaunchArgument)
     }
 
-    /// Standalone marketing drafts use the real Messages inbox and conversation.
-    /// Other offline journeys and the exact-ten App Store capture stay unchanged.
+    /// Marketing captures use the real Messages inbox and conversation through
+    /// this separate, opt-in compatibility launch, including the App Store scene.
     static var includesMessagesMarketing: Bool {
         isCapturingCompatibilityScreenshots
             && compatibilityScene == .messagesInbox
