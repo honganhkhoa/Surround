@@ -63,7 +63,7 @@ struct GameDetailClockState {
         guard let userColor = game.userStoneColor else { return String(localized: "To move") }
         if game.rengo && userColor == color && !game.isUserTurn { return String(localized: "Teammate") }
         if narrow { return String(localized: "To move") }
-        return userColor == color ? String(localized: "Your move", comment: "Game") : String(localized: "Their move")
+        return userColor == color ? String(localized: "Your move", comment: "Status indicating that it is the player's turn to move.") : String(localized: "Their move")
     }
     var running: Bool {
         isConnected && canShowTimer && !isFinished && !isScoring && !paused && autoResign == nil

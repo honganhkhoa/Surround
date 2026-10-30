@@ -84,9 +84,9 @@ enum TimeControlSystem: Hashable {
         case .Canadian:
             return String(localized: "Canadian Byo-Yomi", comment: "TimeControl system name")
         case .Absolute:
-            return String(localized: "Absolute", comment: "TimeControl system name")
+            return String(localized: "Absolute", comment: "Time-control system name: Absolute, a fixed total time for the game.")
         case .Simple:
-            return String(localized: "Simple", comment: "TimeControl system name")
+            return String(localized: "Simple", comment: "Time-control system name: Simple, a fixed time allowance for each move.")
         case .None:
             return String(localized: "No time control", comment: "TimeControl system name")
         case .Unknown(let system):
@@ -103,9 +103,9 @@ enum TimeControlSystem: Hashable {
         case .Canadian:
             return String(localized: "Canadian", comment: "TimeControl system name - shorter")
         case .Absolute:
-            return String(localized: "Absolute", comment: "TimeControl system name - shorter")
+            return String(localized: "Absolute", comment: "Time-control system name: Absolute, a fixed total time for the game.")
         case .Simple:
-            return String(localized: "Simple", comment: "TimeControl system name - shorter")
+            return String(localized: "Simple", comment: "Time-control system name: Simple, a fixed time allowance for each move.")
         case .None:
             return String(localized: "No control", comment: "TimeControl system name - shorter")
         case .Unknown(let system):

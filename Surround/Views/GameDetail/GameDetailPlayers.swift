@@ -207,7 +207,7 @@ struct GameDetailClockPair: View {
         let countdown = GameDetailClockState.widestCountdownSamples(maximumTime: maximumTime)
             .map { width(timeString(timeLeft: TimeInterval($0)), timeFont) }.max() ?? 0
         let badgeFont = UIFont.systemFont(ofSize: 12 * scale, weight: .semibold)
-        let titles = [String(localized: "Your move", comment: "Game"), String(localized: "Their move"),
+        let titles = [String(localized: "Your move", comment: "Status indicating that it is the player's turn to move."), String(localized: "Their move"),
                       String(localized: "To move"), String(localized: "Teammate"), String(localized: "Passed")]
         // Title, hourglass and its 3 pt gap, 6 pt capsule padding per side.
         // Typed in parts: Xcode 26.2's type checker times out on one expression.
@@ -734,7 +734,7 @@ private struct GameDetailClockCard: View {
                           String(localized: "Undo?"),
                           String(localized: "Undo asked"), String(localized: "Passed"),
                           String(localized: "Not started"), String(localized: "To move"),
-                          String(localized: "Teammate"), String(localized: "Your move", comment: "Game"),
+                          String(localized: "Teammate"), String(localized: "Your move", comment: "Status indicating that it is the player's turn to move."),
                           String(localized: "Their move")]
             let titleWidth = titles.map {
                 ($0 as NSString).size(withAttributes: [.font: badgeFont]).width

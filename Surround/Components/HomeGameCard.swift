@@ -155,7 +155,7 @@ struct HomeGameFacts {
     var turnText: String {
         guard userColor != nil else { return "" }
         return awaitsUser
-            ? String(localized: "Your move", comment: "Game\nHomeview")
+            ? String(localized: "Your move", comment: "Status indicating that it is the player's turn to move.")
             : String(localized: "Their move")
     }
 

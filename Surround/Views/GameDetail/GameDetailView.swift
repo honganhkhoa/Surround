@@ -1137,7 +1137,11 @@ private struct GameToolbarLayout: ViewModifier {
            let opponent = game.currentPlayer(with: color.opponentColor()) {
             let teammates = game.gameData?.rengoTeams?[color.opponentColor()].count ?? 0
             HStack(spacing: 4) {
-                Text(verbatim: String(localized: "vs.", defaultValue: "vs")).fixedSize()
+                Text(verbatim: String(
+                    localized: "game.navigation.versus",
+                    defaultValue: "vs",
+                    comment: "Short prefix before the opponent's name in the compact game navigation title. English omits the period here."
+                )).fixedSize()
                 Text(verbatim: opponent.username)
                     .lineLimit(1).truncationMode(.tail)
                 if !hidesRank {

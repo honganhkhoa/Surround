@@ -392,7 +392,7 @@ struct HomeView: View {
     /// The first load: placeholder rows where the games will be.
     private var firstLoadView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(String(localized: "Your move", comment: "Game\nHomeview"))
+            sectionHeader(String(localized: "Your move", comment: "Status indicating that it is the player's turn to move."))
                 .redacted(reason: .placeholder)
             gameGrid((0..<3).map { HomeSkeletonEntry(id: $0) }) { _, separated in
                 HomeSkeletonRow(showsSeparator: separated)
@@ -524,7 +524,7 @@ struct HomeView: View {
                     }
                     gameSection(String(localized: "Live games", comment: "Homeview"),
                                 games: ogs.liveGames, context: .live)
-                    gameSection(String(localized: "Your move", comment: "Game\nHomeview"),
+                    gameSection(String(localized: "Your move", comment: "Status indicating that it is the player's turn to move."),
                                 games: userTurnGames, context: .userTurn,
                                 emptyText: String(localized: "No correspondence games on your turn"))
                     gameSection(String(localized: "Their move"),

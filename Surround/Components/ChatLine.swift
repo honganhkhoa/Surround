@@ -57,16 +57,16 @@ struct ChatLine: View {
         if let channelTitle {
             let channelAndBody = Text(
                 "\(channelTitle), \(body)",
-                comment: "Accessible chat description combining the channel and message."
+                comment: "Two parts of an accessibility description separated by a comma, such as a speaker and message or a game speed and search status."
             )
             return Text(
                 "\(sender), \(channelAndBody)",
-                comment: "Accessible chat description combining the sender and message, including its channel when present."
+                comment: "Two parts of an accessibility description separated by a comma, such as a speaker and message or a game speed and search status."
             )
         }
         return Text(
             "\(sender), \(body)",
-            comment: "Accessible chat description combining the sender and message, including its channel when present."
+            comment: "Two parts of an accessibility description separated by a comma, such as a speaker and message or a game speed and search status."
         )
     }
 

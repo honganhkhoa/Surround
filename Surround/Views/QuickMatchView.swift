@@ -831,7 +831,7 @@ struct QuickMatchForm<Header: View>: View {
             .toggleStyle(.switch)
             .disabled(formIsDisabled)
             .accessibilityLabel(activity.quickMatchDescription.map {
-                String(localized: "\(speed.quickMatchTitle), \($0)")
+                String(localized: "\(speed.quickMatchTitle), \($0)", comment: "Two parts of an accessibility description separated by a comma, such as a speaker and message or a game speed and search status.")
             } ?? speed.quickMatchTitle)
             .accessibilityHint(speedEstimate(speed))
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.quickMatchSpeed(speed.rawValue))

@@ -1249,7 +1249,7 @@ class Game: ObservableObject, Identifiable, CustomDebugStringConvertible, Equata
                         if let timeLeft = time?.timeLeft, timeLeft <= 10 {
                             return String(localized: "Your move (\(Int(timeLeft), specifier: "%02d"))", comment: "Integer is for time left")
                         }
-                        return String(localized: "Your move", comment: "Game")
+                        return String(localized: "Your move", comment: "Status indicating that it is the player's turn to move.")
                     }
                 } else {
                     if userStoneColor == clock?.currentPlayerColor {

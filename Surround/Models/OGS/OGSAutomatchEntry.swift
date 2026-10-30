@@ -1199,7 +1199,7 @@ struct AutomatchEntryPresentation: Equatable {
             ? String(
                 localized: "\(sizeText) \(speedText)",
                 locale: locale,
-                comment: "Board size followed by game speed in a waiting Quick Match request."
+                comment: "Two formatted values separated by a space: time components, or a board size followed by game speed."
             )
             : String(
                 localized: "\(sizeText) · \(speedText)",

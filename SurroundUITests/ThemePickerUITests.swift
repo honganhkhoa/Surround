@@ -311,6 +311,8 @@ final class ThemePickerUITests: SurroundJourneyUITestCase {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone, "This checks the iPhone popover.")
         let app = launchApp(additionalLaunchArguments: [
             SurroundUITestContract.themeGamesOnlyLaunchArgument,
+            // The live-game banner can cover Appearance at large text sizes.
+            SurroundUITestContract.homeFinishedOnlyLaunchArgument,
             "-UIPreferredContentSizeCategoryName", UIContentSizeCategory.accessibilityExtraLarge.rawValue,
         ], orientation: .portrait)
         let popover = openHomeAppearance(in: app)

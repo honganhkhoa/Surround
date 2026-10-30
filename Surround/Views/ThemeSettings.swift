@@ -189,7 +189,9 @@ struct ThemePicker: View {
                     // Beyond this size, "Surround" outgrows a two-column tile.
                     .dynamicTypeSize(...DynamicTypeSize.accessibility3)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    // Localized names can need more than two lines. Rows
+                    // keep their height and the containing picker scrolls.
+                    .fixedSize(horizontal: false, vertical: true)
                 #if DEBUG
                 if theme.isDebugOnly {
                     Text(verbatim: "Debug")

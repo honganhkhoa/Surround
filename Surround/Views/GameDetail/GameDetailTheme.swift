@@ -47,18 +47,18 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
         appliesToWholeApp ? current(storedID: storedID) : .standard
     }
 
-    /// The name pickers show. Theme names are proper names and stay in
-    /// English; Classic describes the ordinary look and is translated.
+    /// Localized display names describe each theme's mood and materials.
+    /// Surround Studio keeps its branded name; stored IDs stay language-neutral.
     var title: String {
         switch self {
         case .standard: String(localized: "Classic", comment: "Theme name: Surround's ordinary look, with a kaya board and flat stones")
-        case .nebulaPearl: "Nebula & Pearl"
-        case .rakedGarden: "Raked Garden"
+        case .nebulaPearl: String(localized: "Nebula & Pearl", comment: "Theme name: a cosmic nebula, dark glass stones and luminous pearls. Use a short, natural title naming the nebula and pearl.")
+        case .rakedGarden: String(localized: "Raked Garden", comment: "Theme name: a Japanese dry landscape garden with raked sand, basalt and jade stones. Use a short, natural garden title; the sand pattern is visible in the preview.")
         case .surroundStudio: "Surround Studio"
-        case .frostPine: "Frost & Pine"
-        case .feltMeadow: "Felt Meadow"
-        case .nightGarden: "Night Garden"
-        case .christmasKeepsakes: "Christmas Keepsakes"
+        case .frostPine: String(localized: "Frost & Pine", comment: "Theme name: frost crystals and pine branches. Preserve the winter frost and pine imagery in a short title.")
+        case .feltMeadow: String(localized: "Felt Meadow", comment: "Theme name: a meadow crafted from soft wool felt. Felt is the textile material, not the past tense of feel. Use a short, natural title.")
+        case .nightGarden: String(localized: "Night Garden", comment: "Theme name: a quiet garden at night with lanterns and glass stones. Use a short, natural title.")
+        case .christmasKeepsakes: String(localized: "Christmas Keepsakes", comment: "Theme name: cherished Christmas ornaments, enamel pieces and keepsakes. Preserve Christmas and the treasured-object mood in a short, natural title.")
         }
     }
 

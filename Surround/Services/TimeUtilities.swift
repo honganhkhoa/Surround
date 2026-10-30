@@ -83,14 +83,14 @@ class TimeUtilities {
                 localized: "\(hoursLeft)h left",
                 bundle: resolvedBundle,
                 locale: resolvedLocale,
-                comment: "Time left - more than 2 days left, hours part"
+                comment: "Hours remaining on a game clock, shown alone or after a day count."
             )
             if hoursLeft > 0 {
                 return String(
                     localized: "\(daysString) \(hoursString)",
                     bundle: resolvedBundle,
                     locale: resolvedLocale,
-                    comment: "Time left on timer - more than 2 days [days - hours]"
+                    comment: "Two formatted values separated by a space: time components, or a board size followed by game speed."
                 )
             } else {
                 return daysString
@@ -101,7 +101,7 @@ class TimeUtilities {
                     localized: "\(hoursLeft + 24)h left",
                     bundle: resolvedBundle,
                     locale: resolvedLocale,
-                    comment: "Time left - 1 day to 2 days."
+                    comment: "Hours remaining on a game clock, shown alone or after a day count."
                 )
             } else {
                 if hoursLeft >= 1 {
