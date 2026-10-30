@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10A00022026102900000002 /* BetaSimulatorLoginBridge.swift */; };
 		517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00032026102700000003 /* StonePlacementSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00022026102700000002 /* StonePlacementSoundPlayer.swift */; };
 		517D00042026102700000004 /* StonePlacementSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517D00052026102700000005 /* StonePlacementSoundTests.swift */; };
@@ -519,6 +520,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B10A00022026102900000002 /* BetaSimulatorLoginBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetaSimulatorLoginBridge.swift; sourceTree = "<group>"; };
 		517D00022026102700000002 /* StonePlacementSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundPlayer.swift; sourceTree = "<group>"; };
 		517D00052026102700000005 /* StonePlacementSoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StonePlacementSoundTests.swift; sourceTree = "<group>"; };
 		FC2510010000000000000001 /* FeltEdgeFibers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeltEdgeFibers.swift; sourceTree = "<group>"; };
@@ -851,6 +853,7 @@
 		AE3100063A00000000000006 /* UITesting */ = {
 			isa = PBXGroup;
 			children = (
+				B10A00022026102900000002 /* BetaSimulatorLoginBridge.swift */,
 				7B77C59F81B64243879D948F /* GameLayoutUITestHarness.swift */,
 				7E1A2B3C4D5E6F7081920B1C /* BoardMarkerAuditHarness.swift */,
 				AD0800022026090800000002 /* SurroundAnimationDiagnostics.swift */,
@@ -1636,6 +1639,7 @@
 				AF1000013D00000000000001 /* AnalyzeControlBar.swift in Sources */,
 				AE3000013A00000000000001 /* PlatformServices.swift in Sources */,
 				517D00012026102700000001 /* StonePlacementSoundPlayer.swift in Sources */,
+				B10A00012026102900000001 /* BetaSimulatorLoginBridge.swift in Sources */,
 				AE3100013A00000000000001 /* SurroundUITestContract.swift in Sources */,
 				AE3100023A00000000000002 /* SurroundUITestOfflineServices.swift in Sources */,
 				AE3100073A00000000000007 /* OGSService+Fixtures.swift in Sources */,

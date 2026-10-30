@@ -279,10 +279,9 @@ if (localStorage.getItem('ogs.config.user')==null) {
                                 if case .failure(let error) = completion {
                                     print(error)
                                 }
-                            }, receiveValue: { ogsUIConfig in
+                            }, receiveValue: { _ in
                                 ogs.loadOverview()
                                 self.parent.dismiss()
-                                print(ogsUIConfig)
                             })
                     }
                 }

@@ -16,6 +16,28 @@ Friendship journeys opt into `--surround-friendship` for three incoming requests
 
 Navigation content layout is centralized in `AppNavigationStack`, `AppNavigationLink` for direct-view pushes, and `appNavigationDestination` for Boolean pushes. Use these shared entry points instead of applying layout modifiers in individual screens; value links using `StackRoute` are already covered by the stack’s destination builder. The content hosts publish `isVerticalToolbar` synchronously for game controls and backgrounds. Keep SDK-specific toolbar presentation in the shared navigation helpers; `AppNavigationLayout.reclaimsEmptyVerticalBarTopInset` remains the single switch for the optional top-inset reclamation. The Preferred Settings editor journey exercises Boolean editor presentation, a nested rules link, retained edits after Back, and the Create route.
 
+## Opt-in Beta simulator authentication
+
+Debug Beta simulator builds include a local login bridge for preparing a real test account before a UI journey. It is compiled only with `DEBUG`, `OGS_BETA`, `MAIN_APP`, and `targetEnvironment(simulator)`. It is inactive without explicit launch arguments and rejects production origins and offline fixture mode. Release, physical-device, Catalyst, and production app builds omit the bridge. This prepares native authentication; it does not exercise the embedded sign-in form. Use a dedicated simulator and a correctly signed Beta installation.
+
+A host companion launches the app with `--surround-beta-login-bridge <UUID>` and `--surround-beta-login-account <username>`. The app creates a private `tmp/surround-beta-login-bridge/<UUID>/` directory containing `ready.json` with the protocol version, run/account, exact Beta origin/bundle, expiry, and an ephemeral Curve25519 public key. The private key stays in app memory. The host reads a locally provisioned credential internally and atomically writes a mode-0600 `request.json` with version `1`, its base64 raw Curve25519 public key, and a base64 AES-GCM combined ciphertext. The encrypted JSON contains `username` and `password`. Derive the 32-byte key with X25519 and HKDF-SHA256 using the run UUID's UTF-8 bytes as salt and `surround-beta-simulator-login-v1` as shared info; authenticate the UTF-8 string `<UUID>:<username>` as additional data. Passwords are limited to 4,096 UTF-8 bytes; the complete encrypted request is limited to 128 KiB, allowing JSON escaping, AES-GCM, and base64 overhead even for a maximum-length password and a 64-character account name. Both the host and app enforce these limits.
+
+The app accepts one request within 90 seconds, deletes its ciphertext before decrypting, and uses the normal native login path. A fresh HTTP UI configuration and the WebSocket server's `authenticate` identity callback must match the expected account. `result.json` contains only version, run/account, status (`authenticated`, `rejected`, `failed`, or `timeout`), and the booleans `httpAuthenticated`, `webSocketAuthenticated`, and `persistedSession`. A local socket readiness flag alone is insufficient. The host must remove its exact handoff directory after consuming the result. Passwords and tokens must never enter launch arguments, environment variables, logs, attachments, or plaintext handoff files. Plaintext exists transiently in host/app memory; zeroization is not guaranteed.
+
+`--surround-beta-login-probe` verifies a persisted session without a password request. A different existing account is preserved unless the host explicitly passes `--surround-beta-login-replace-account`. Login clears the prior identity before attempting authentication. After timeout or interruption, session state is uncertain: cancelling the existing Combine login subscription does not cancel its underlying HTTP request. Inspect or probe the session before retrying.
+
+The standalone synthetic checks use no Keychain, simulator, or network:
+
+```sh
+mkdir -p .build/beta-login-checks/module-cache
+xcrun swiftc -D BETA_SIMULATOR_LOGIN_BRIDGE_TESTS \
+  -module-cache-path .build/beta-login-checks/module-cache \
+  Surround/UITesting/BetaSimulatorLoginBridge.swift \
+  .github/ci-tools/tests/BetaSimulatorLoginBridgeChecks.swift \
+  -o .build/beta-login-checks/checks
+.build/beta-login-checks/checks
+```
+
 ## Deterministic unit tests
 
 Run `SurroundTests` from Xcode, or select an installed iOS 26 iPhone simulator and run the unit target from the command line:

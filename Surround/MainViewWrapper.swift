@@ -67,6 +67,9 @@ struct MainViewWrapper: View {
             .environmentObject(ogs)
             .environmentObject(sgs)
             .environmentObject(nav)
+            #if DEBUG && OGS_BETA && MAIN_APP && targetEnvironment(simulator)
+            .onAppear { BetaSimulatorLoginBridge.startIfRequested(service: ogs) }
+            #endif
     }
 
     #if DEBUG && MAIN_APP

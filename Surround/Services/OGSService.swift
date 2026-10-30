@@ -2194,6 +2194,29 @@ class OGSService: ObservableObject {
         }).eraseToAnyPublisher()
     }
     
+    #if DEBUG && OGS_BETA && MAIN_APP && targetEnvironment(simulator)
+    var acceptsBetaSimulatorLoginCredentials: Bool { environment == .beta }
+
+    /// The ordinary readiness flag only records a local send. This opt-in
+    /// simulator probe requires the server's authenticated identity callback.
+    func verifyBetaSimulatorSocketIdentity(username: String, completion: @escaping (Bool) -> Void) {
+        guard environment == .beta, let config = ogsUIConfig,
+              config.user.username == username, config.user.anonymous == false,
+              let jwt = config.userJwt, !jwt.isEmpty, ogsWebsocket.opened else {
+            completion(false)
+            return
+        }
+        let userID = config.user.id
+        ogsWebsocket.emit(command: "authenticate", data: ["jwt": jwt]) { response, error in
+            guard error == nil, let identity = response as? [String: Any] else {
+                completion(false)
+                return
+            }
+            completion(identity["id"] as? Int == userID && identity["username"] as? String == username)
+        }
+    }
+    #endif
+
     func logout() {
         self.ogsUIConfig = nil
         if enablesAppSideEffects {
