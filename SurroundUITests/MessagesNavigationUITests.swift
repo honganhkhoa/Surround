@@ -2593,12 +2593,17 @@ final class MessagesNavigationUITests: SurroundJourneyUITestCase {
             SurroundUITestContract.messagesOverflowHistoryText(username: username, index: index)
         )).firstMatch
         for _ in 0..<8 {
-            let viewport = transcriptViewport(transcript, above: composer, within: bounds, in: app)
+            // A native push can cover the sidebar and expand beyond the root
+            // columns. Measure its current viewport rather than the root's
+            // previous allocation, which can exclude incoming bubbles.
+            let viewport = transcriptViewport(transcript, above: composer,
+                                               within: app.windows.firstMatch.frame, in: app)
             if marker.exists && viewport.contains(marker.frame) && marker.isHittable { break }
             dragMessagesViewport(viewport, toward: marker.exists ? marker.frame : nil,
                                  earlierWhenAbsent: true, in: app)
         }
-        XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer, within: bounds, in: app).contains(marker.frame) && marker.isHittable,
+        XCTAssertTrue(marker.exists && transcriptViewport(transcript, above: composer,
+                                                          within: app.windows.firstMatch.frame, in: app).contains(marker.frame) && marker.isHittable,
                       "The native push must reach a fully visible older message before Back.")
         XCTAssertFalse(transcript.staticTexts["Offline message from \(username)"].firstMatch.isHittable)
     }
