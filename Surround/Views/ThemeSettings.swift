@@ -87,6 +87,14 @@ struct ThemePreviewTile: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                if theme == .standard {
+                    // Classic's plain backdrop can match its host. Keep the
+                    // full tile visible, independently of the selection ring.
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.16), lineWidth: 0.75)
+                }
+            }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
             .accessibilityIdentifier(SurroundUITestContract.AccessibilityID.themePreview(theme.rawValue))
