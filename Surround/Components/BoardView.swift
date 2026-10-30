@@ -719,6 +719,7 @@ private struct ImageStoneCanvas: View, Equatable {
     var cellSize: CGFloat
     var lightDirection: StoneLightDirection
     var shadowStyle: ImageStoneShadowStyle
+    var shading: ImageStoneShading
     var blackPalette: StonePalette
     var whitePalette: StonePalette
     // The raised profile is capped at a 3 pt blur and 3 pt offset; allow
@@ -775,6 +776,12 @@ private struct ImageStoneCanvas: View, Equatable {
                 stoneContext.draw(variants[stone.variant % variants.count],
                                   in: CGRect(x: stone.rect.midX - side / 2, y: stone.rect.midY - side / 2,
                                              width: side, height: side))
+                // Removed stones retain their original faded artwork. The
+                // living face gets a small shoulder accent before all marks.
+                if !stone.isRemoved {
+                    shading.draw(in: stoneContext, rect: stone.rect, color: stone.color,
+                                 cellSize: cellSize, lightDirection: lightDirection)
+                }
                 if let contour = images.fiberContour(stone.color, variant: stone.variant) {
                     // Eight stable tuft patterns per artwork keep a dense
                     // board from constructing every strand for every stone.
@@ -982,6 +989,7 @@ struct Stones: View {
                 ImageStoneCanvas(stones: imageStones, images: stoneImages, cellSize: size,
                                  lightDirection: appearance.stoneLightDirection,
                                  shadowStyle: appearance.imageStoneShadow,
+                                 shading: appearance.imageStoneShading,
                                  blackPalette: black, whitePalette: white)
                 .equatable()
             }

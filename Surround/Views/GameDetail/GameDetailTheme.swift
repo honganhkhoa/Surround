@@ -456,6 +456,7 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                 stoneImages: SurroundStudioAssets.stones,
                 stoneLightDirection: .upperLeft,
                 imageStoneShadow: .raised,
+                imageStoneShading: .clamshellShoulder,
                 gridColor: Color(themeHex: 0x3E382E),
                 coordinateColor: Color(themeHex: 0x4B3D2C),
                 black: StonePalette(

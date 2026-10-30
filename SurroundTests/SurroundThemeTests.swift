@@ -1675,6 +1675,53 @@ final class SurroundThemeTests: XCTestCase {
         try assertEqualAlphaStoneFootprints(stones)
     }
 
+    @MainActor
+    func testStudioShoulderPreservesLargeFlatAndBlackStones() throws {
+        let bundle = Bundle(for: Self.self)
+        let black = try XCTUnwrap(UIImage(named: "SurroundStudioSlate0", in: bundle, compatibleWith: nil))
+        let white = try XCTUnwrap(UIImage(named: "SurroundStudioClamshell0", in: bundle, compatibleWith: nil))
+        for scheme: ColorScheme in [.light, .dark] {
+            for theme in SurroundTheme.allCases {
+                XCTAssertEqual(theme.board(for: scheme).imageStoneShading,
+                               theme == .surroundStudio ? .clamshellShoulder : .artwork)
+            }
+            var board = SurroundTheme.surroundStudio.board(for: scheme)
+            let tint = board.stoneImages?.tint ?? .white
+            board.stoneImages = StoneImages(black: [black], white: [white], tint: tint)
+            for color: StoneColor in [.black, .white] {
+                for (diameter, shadow): (CGFloat, CGFloat) in [(7, 1), (13.99, 1), (20, 0),
+                                                               (20, 1), (32, 1), (44, 1)] {
+                    func render(_ shading: ImageStoneShading) throws -> (pixels: [UInt8], width: Int, height: Int) {
+                        var appearance = board
+                        appearance.imageStoneShading = shading
+                        return try nativeMaterialPixels(Stone(color: color, shadowRadius: shadow)
+                            .frame(width: diameter, height: diameter).padding(3)
+                            .environment(\.boardAppearance, appearance)
+                            .environment(\.colorScheme, scheme))
+                    }
+                    let actual = try render(.clamshellShoulder), plain = try render(.artwork)
+                    if color == .black || diameter < 14 || diameter >= 32 || shadow == 0 {
+                        XCTAssertEqual(actual.pixels, plain.pixels,
+                                       "Only detailed phone-size white stones receive the accent")
+                    } else {
+                        XCTAssertGreaterThan(zip(actual.pixels, plain.pixels).filter { $0 != $1 }.count, 10)
+                        // A visible edge change must leave the central grain
+                        // and the face beneath last-move marks untouched.
+                        let midX = actual.width / 2, midY = actual.height / 2
+                        for y in (midY - 3)...(midY + 3) {
+                            for x in (midX - 3)...(midX + 3) {
+                                for channel in 0..<4 {
+                                    let offset = (y * actual.width + x) * 4 + channel
+                                    XCTAssertLessThanOrEqual(abs(Int(actual.pixels[offset]) - Int(plain.pixels[offset])), 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func testFeltMeadowAssetsKeepSeparateBoardAndEqualAlphaStoneFootprints() throws {
         let bundle = Bundle(for: SurroundThemeTests.self)
         func image(named name: String) throws -> UIImage {

@@ -85,6 +85,35 @@ enum ImageStoneShadowStyle: Equatable {
     case raisedGlass
 }
 
+/// A small surface accent for artwork whose shallow shoulder disappears
+/// when reduced to phone size. Large stones keep their original lighting.
+enum ImageStoneShading: Equatable {
+    case artwork
+    case clamshellShoulder
+
+    func opacity(for color: StoneColor, cellSize: CGFloat, diameter: CGFloat) -> Double {
+        guard self == .clamshellShoulder, color == .white,
+              cellSize.isFinite, diameter.isFinite,
+              usesDetailedStoneRendering(at: cellSize), diameter > 0 else { return 0 }
+        return 0.18 * Double(min(1, max(0, (32 - diameter) / 12)))
+    }
+
+    func draw(in context: GraphicsContext, rect: CGRect, color: StoneColor,
+              cellSize: CGFloat, lightDirection: StoneLightDirection) {
+        let strength = opacity(for: color, cellSize: cellSize, diameter: rect.width)
+        guard strength > 0 else { return }
+        let center = CGPoint(x: rect.minX + rect.width * (lightDirection == .upperLeft ? 0.34 : 0.66),
+                             y: rect.minY + rect.height * 0.3)
+        // The clear center keeps the ivory face and shell lines untouched.
+        // Shade stays inside the silhouette and follows the artwork's light.
+        context.fill(Path(ellipseIn: rect.insetBy(dx: 0.1, dy: 0.1)), with: .radialGradient(
+            Gradient(stops: [.init(color: .clear, location: 0.5),
+                             .init(color: .black.opacity(strength * 0.2), location: 0.72),
+                             .init(color: .black.opacity(strength), location: 1)]),
+            center: center, startRadius: 0, endRadius: rect.width * 0.76))
+    }
+}
+
 /// A board surface, either a seamless fixed-size tile or one composition
 /// scaled to cover the entire board without repeating within its bounds.
 struct BoardTexture: Equatable {
@@ -608,6 +637,7 @@ struct BoardAppearance: Equatable {
     var stoneImages: StoneImages? = nil
     var stoneLightDirection: StoneLightDirection = .upperLeft
     var imageStoneShadow: ImageStoneShadowStyle = .contact
+    var imageStoneShading: ImageStoneShading = .artwork
     var gridColor: Color
     var coordinateColor: Color
     var black: StonePalette
@@ -732,6 +762,17 @@ struct Stone: View {
                             .colorMultiply(images.tint)
                             .frame(width: size / images.footprint, height: size / images.footprint)
                             .frame(width: size, height: size)
+                            .overlay {
+                                if appearance.imageStoneShading != .artwork {
+                                    Canvas { context, canvasSize in
+                                        appearance.imageStoneShading.draw(in: context,
+                                            rect: CGRect(origin: .zero, size: canvasSize), color: color!,
+                                            cellSize: size, lightDirection: appearance.stoneLightDirection)
+                                    }
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
+                                }
+                            }
                             .shadow(color: .black.opacity(0.35), radius: shadowRadius,
                                     x: shadowXSign * shadowRadius / 2, y: shadowRadius)
                     } else {
