@@ -41,15 +41,21 @@ final class ChatSessionState: ObservableObject {
         }
     }
 
-    @Published var message = ""
-    private var draftsByChannel: [String: String] = [:]
-    private var draftChannel = OGSChatSendChannel.main
+    // Different retained routes can present the same game in different channels.
+    // The route owns its selection; every draft operation names its channel.
+    @Published private var draftsByChannel: [OGSChatSendChannel: String] = [:]
 
-    func selectChannel(_ channel: OGSChatSendChannel) {
-        guard channel != draftChannel else { return }
-        draftsByChannel[draftChannel.rawValue] = message
-        draftChannel = channel
-        message = draftsByChannel[channel.rawValue] ?? ""
+    func message(in channel: OGSChatSendChannel) -> String {
+        draftsByChannel[channel] ?? ""
+    }
+
+    func setMessage(_ message: String, in channel: OGSChatSendChannel) {
+        draftsByChannel[channel] = message.isEmpty ? nil : message
+    }
+
+    func setMessage(_ message: String, in channel: OGSChatSendChannel, from composerID: UUID) {
+        guard isActiveComposer(composerID) else { return }
+        setMessage(message, in: channel)
     }
     @Published private(set) var isSending = false
     @Published var failure: Failure?
@@ -110,20 +116,26 @@ final class ChatSessionState: ObservableObject {
     }
 
     /// The operation belongs to the game session, never the current TextField.
-    func sendMessage(from composerID: UUID, using send: (String) -> AnyPublisher<Void, Error>) {
+    func sendMessage(
+        in channel: OGSChatSendChannel,
+        from composerID: UUID,
+        using send: (OGSChatSendChannel, String) -> AnyPublisher<Void, Error>
+    ) {
         guard isActiveComposer(composerID) else { return }
-        sendMessage(using: send)
+        sendMessage(in: channel, using: send)
     }
 
-    func sendMessage(using send: (String) -> AnyPublisher<Void, Error>) {
-        guard !isSending, !message.isEmpty else { return }
-        let submittedMessage = message
-        let submittedChannel = draftChannel
+    func sendMessage(
+        in channel: OGSChatSendChannel,
+        using send: (OGSChatSendChannel, String) -> AnyPublisher<Void, Error>
+    ) {
+        let submittedMessage = message(in: channel)
+        guard !isSending, !submittedMessage.isEmpty else { return }
         let requestID = UUID()
         sendID = requestID
         isSending = true
         failure = nil
-        sendCancellable = send(submittedMessage)
+        sendCancellable = send(channel, submittedMessage)
             .first()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
@@ -134,10 +146,8 @@ final class ChatSessionState: ObservableObject {
                 switch completion {
                 case .finished:
                     // The user may have started a different draft while sending.
-                    if self.draftChannel == submittedChannel {
-                        if self.message == submittedMessage { self.message = "" }
-                    } else if self.draftsByChannel[submittedChannel.rawValue] == submittedMessage {
-                        self.draftsByChannel[submittedChannel.rawValue] = nil
+                    if self.message(in: channel) == submittedMessage {
+                        self.setMessage("", in: channel)
                     }
                 case .failure:
                     self.failure = .messageSend
@@ -234,9 +244,7 @@ final class ChatSessionState: ObservableObject {
         sendCancellable?.cancel()
         sendCancellable = nil
         isSending = false
-        message = ""
         draftsByChannel.removeAll()
-        draftChannel = .main
         failure = nil
         // Account changes can leave this route mounted, but its old field and
         // queued focus callbacks must not carry over to the new session.

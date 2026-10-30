@@ -551,7 +551,11 @@ struct NewChatInput: View {
     }
 
     private var selectedChannelTitle: LocalizedStringResource {
-        channelTitle(selectedChannel.wrappedValue)
+        channelTitle(effectiveChannel)
+    }
+
+    private var effectiveChannel: OGSChatSendChannel {
+        selectedChannel.wrappedValue.resolved(isUserPlaying: game.isUserPlaying)
     }
 
     private var channelPlaceholder: LocalizedStringResource {
@@ -562,7 +566,7 @@ struct NewChatInput: View {
             )
         }
 
-        switch selectedChannel.wrappedValue {
+        switch effectiveChannel {
         case .main:
             return LocalizedStringResource("Say hi!")
         case .malkovich:
@@ -590,7 +594,6 @@ struct NewChatInput: View {
         Button {
             guard session.isActiveComposer(composerID) else { return }
             onInteraction()
-            session.selectChannel(channel)
             selectedChannel.wrappedValue = channel
         } label: {
             Label {
@@ -622,7 +625,7 @@ struct NewChatInput: View {
     }
 
     private var backgroundColor: AnyShapeStyle {
-        switch selectedChannel.wrappedValue {
+        switch effectiveChannel {
         case .main:
             return AnyShapeStyle(GameDetailAppearance.panel)
         case .malkovich:
@@ -649,11 +652,14 @@ struct NewChatInput: View {
                 }
             )
         }
+        // Capture this field's channel so a queued edit cannot migrate text
+        // into a newly selected channel or another retained game presentation.
+        let channel = effectiveChannel
         return Binding(
-            get: { session.message },
+            get: { session.message(in: channel) },
             set: { message in
                 guard session.isActiveComposer(composerID) else { return }
-                session.message = message
+                session.setMessage(message, in: channel, from: composerID)
                 onInteraction()
             }
         )
@@ -661,7 +667,7 @@ struct NewChatInput: View {
 
     private var canSend: Bool {
         variationShareDraft.wrappedValue != nil
-            || (!session.message.isEmpty && !session.isSending)
+            || (!session.message(in: effectiveChannel).isEmpty && !session.isSending)
     }
 
     private func send() {
@@ -675,7 +681,7 @@ struct NewChatInput: View {
                 try ogs.shareVariation(
                     draft.variation,
                     in: game,
-                    channel: selectedChannel.wrappedValue,
+                    channel: effectiveChannel,
                     name: draft.name
                 )
                 onVariationShared()
@@ -695,10 +701,7 @@ struct NewChatInput: View {
             return
         }
 
-        let channel = selectedChannel.wrappedValue.resolved(
-            isUserPlaying: game.isUserPlaying
-        )
-        session.sendMessage(from: composerID) { message in
+        session.sendMessage(in: effectiveChannel, from: composerID) { channel, message in
             ogs.sendChat(in: game, channel: channel, body: message)
                 .zip(game.$chatLog.setFailureType(to: Error.self))
                 .map { _ in () }
@@ -711,9 +714,7 @@ struct NewChatInput: View {
             if let draft = variationShareDraft.wrappedValue {
                 VariationSharePreviewRow(
                     variation: draft.variation,
-                    channel: selectedChannel.wrappedValue.resolved(
-                        isUserPlaying: game.isUserPlaying
-                    ),
+                    channel: effectiveChannel,
                     onCancel: onCancelVariationSharing
                 )
                 .padding(.horizontal, 10)
