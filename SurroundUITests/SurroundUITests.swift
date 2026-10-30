@@ -2279,6 +2279,236 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         XCTAssertEqual(waitWithFinalCheck(for: [reopenedDismissed], timeout: 10), .completed)
     }
 
+    /// Regression for the own-game layout freeze fixed in 8f18885. Keep the
+    /// real navigation shell mounted while repeatedly hiding/showing its tab
+    /// bar and changing the selected game through Active games.
+    func testOwnGameNavigationAndSwitchingRemainResponsive() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This regression exercises native iOS tab-bar layout.")
+        #else
+        let configuredCycles = ProcessInfo.processInfo.environment[
+            "SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES"
+        ] ?? "20"
+        guard let cycles = Int(configuredCycles), (2...100).contains(cycles) else {
+            XCTFail("SURROUND_UI_OWN_GAME_NAVIGATION_CYCLES must be an integer from 2 through 100.")
+            return
+        }
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.liveGameBannerNavigationLaunchArgument,
+        ], orientation: .portrait)
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let id = SurroundUITestContract.AccessibilityID.self
+        let gameIDs = SurroundUITestContract.liveBannerCorrespondenceGameIDs
+        let popover = app.descendants(matching: .any)
+            .matching(identifier: id.gameActiveGamesPopover).firstMatch
+        let board = app.descendants(matching: .any)
+            .matching(identifier: id.gameBoard).firstMatch
+
+        func checkpoint(_ phase: String, cycle: Int) {
+            let message = "[OwnGameFreezeRegression] cycle=\(cycle)/\(cycles) phase=\(phase) "
+                + "orientation=\(XCUIDevice.shared.orientation.rawValue) "
+                + "uptime=\(ProcessInfo.processInfo.systemUptime)\n"
+            FileHandle.standardOutput.write(Data(message.utf8))
+        }
+
+        @discardableResult
+        func requireWithEvidence(_ satisfied: Bool, _ message: String) -> Bool {
+            if !satisfied {
+                keepScreenshot("Own-game navigation failure", in: app)
+                let hierarchy = XCTAttachment(string: app.debugDescription)
+                hierarchy.name = "Own-game navigation failure – " + message
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+            }
+            XCTAssertTrue(satisfied, message)
+            return satisfied
+        }
+
+        func tapReady(_ target: XCUIElement, description: String) {
+            guard requireWithEvidence(target.waitForExistence(timeout: 10),
+                                      "Expected \(description)."),
+                  requireWithEvidence(waitUntilHittable(target, timeout: 10),
+                                      "Expected responsive \(description) within ten seconds.") else { return }
+            target.tap()
+        }
+
+        func homeViewport() -> CGRect {
+            // Home's scroll-view AX frame can include the entire window,
+            // including native bars. Its contained screen.home node exposes
+            // the actual clipped content frame; intersect the wrappers so a
+            // landscape drag stays inside that visible scroll viewport.
+            app.descendants(matching: .any).matching(identifier: id.screenHome)
+                .allElementsBoundByIndex.map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(app.frame) }
+                .reduce(app.frame) { $0.intersection($1) }
+                .insetBy(dx: 8, dy: 8)
+        }
+
+        func openOwnGameFromHome(_ gameID: Int) {
+            let home = app.scrollViews.matching(identifier: id.screenHome).firstMatch
+            guard requireWithEvidence(home.waitForExistence(timeout: 10),
+                                      "Expected Home's scroll view.") else { return }
+            let games = home.buttons.matching(identifier: id.homeGame(gameID))
+            for attempt in 0...4 {
+                // Resolve again after every rotation/scroll. Existence alone
+                // also matches cards clipped below the landscape tab bar.
+                let game = games.firstMatch
+                let viewport = homeViewport()
+                guard requireWithEvidence(!viewport.isEmpty && !viewport.isNull,
+                                          "Expected Home's visible content viewport.") else { return }
+                if game.exists {
+                    let frame = game.frame
+                    let tapPoint = CGPoint(x: frame.midX, y: frame.midY)
+                    // Element taps land at the center. A partially clipped
+                    // board remains usable when that center is clear of both
+                    // bars. Requiring the whole thumbnail to fit caused
+                    // unnecessary reverse drags after native scrolling.
+                    if viewport.contains(tapPoint) && game.isHittable {
+                        tapReady(game, description: "own correspondence game \(gameID)")
+                        return
+                    }
+                }
+                guard attempt < 4 else { break }
+                let before = game.exists ? game.frame : nil
+                let delta = before.map { $0.midY - viewport.midY } ?? viewport.height
+                let distance = min(abs(delta), viewport.height * 0.6)
+                let startY = delta >= 0 ? viewport.maxY : viewport.minY
+                let endY = startY + (delta >= 0 ? -distance : distance)
+                let origin = home.coordinate(withNormalizedOffset: .zero)
+                let start = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX, dy: startY - home.frame.minY
+                ))
+                let end = origin.withOffset(CGVector(
+                    dx: viewport.midX - home.frame.minX, dy: endY - home.frame.minY
+                ))
+                start.press(forDuration: 0.05, thenDragTo: end,
+                            withVelocity: .default, thenHoldForDuration: 0.1)
+                guard requireWithEvidence(pollUntil(timeout: 10) {
+                    let refreshed = games.firstMatch
+                    return refreshed.exists && refreshed.frame != before
+                }, "The scoped Home drag must move the requested game within ten seconds.") else { return }
+            }
+            requireWithEvidence(false, "Expected a visible, responsive Home game \(gameID) after scoped scrolling.")
+        }
+
+        func waitForGame(_ gameID: Int) {
+            element(id.gameDetail(gameID), in: app)
+            XCTAssertTrue(board.waitForExistence(timeout: 10))
+            XCTAssertTrue(pollUntil(timeout: 10) { !popover.exists },
+                          "The selected game must have an unobstructed board.")
+        }
+
+        func openActiveGames() {
+            let direct = app.buttons.matching(identifier: id.gameActiveGamesButton).firstMatch
+            let overflow = app.buttons.matching(NSPredicate(
+                format: "identifier IN %@ OR label == %@",
+                ["OverflowBarButtonItem", "BottomOverflowBarButtonItem", "More"], "More"
+            )).firstMatch
+            XCTAssertTrue(pollUntil(timeout: 10) { direct.exists || overflow.isHittable },
+                          "Expected Active games or its toolbar overflow.")
+            if direct.exists {
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    // iOS 27 can leave the hidden tab bar's AX frame over this
+                    // visible item. Use its freshly resolved center, as in the
+                    // single-switch journey, then verify the actual popover.
+                    XCTAssertTrue(direct.isEnabled)
+                    XCTAssertTrue(app.frame.contains(direct.frame))
+                    XCTAssertGreaterThan(direct.frame.width, 0)
+                    XCTAssertGreaterThan(direct.frame.height, 0)
+                    direct.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                } else {
+                    tapReady(direct, description: "Active games")
+                }
+            } else {
+                tapReady(overflow, description: "game toolbar overflow")
+                tapReady(requiredMenuButton(id.gameActiveGamesButton, title: "Active games", in: app),
+                         description: "overflowed Active games")
+            }
+            XCTAssertTrue(popover.waitForExistence(timeout: 10),
+                          "Opening Active games must respond within ten seconds.")
+        }
+
+        func returnHome() {
+            let identifiedBacks = app.buttons.matching(identifier: "BackButton")
+            let navigationBacks = app.navigationBars.buttons.matching(NSPredicate(
+                format: "identifier != %@ AND (label == %@ OR label == %@)",
+                id.gameActiveGamesButton, "Active games", "Back"
+            ))
+            var visibleBack: XCUIElement?
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let identified = identifiedBacks.allElementsBoundByIndex.filter { $0.isHittable }
+                if identified.count == 1 {
+                    visibleBack = identified[0]
+                } else if identified.isEmpty {
+                    // iOS 18 exposes the destination title on Back. Scope
+                    // that fallback to the navigation bar and exclude the
+                    // distinct Active games toolbar action with the same label.
+                    let titled = navigationBacks.allElementsBoundByIndex.filter { $0.isHittable }
+                    visibleBack = titled.count == 1 ? titled[0] : nil
+                } else {
+                    visibleBack = nil
+                }
+                return visibleBack != nil
+            }, "Expected the selected game's unique visible Back control.")
+            guard let visibleBack else { return }
+            tapReady(visibleBack, description: "Back to Home")
+            element(id.screenHome, in: app)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                !app.descendants(matching: .any)
+                    .matching(identifier: id.gameDetail(gameIDs[1])).firstMatch.exists
+            }, "Back must leave Game Detail, not merely dismiss a popover.")
+        }
+
+        for cycle in 1...cycles {
+            if cycle == cycles / 2 + 1 {
+                XCUIDevice.shared.orientation = .landscapeLeft
+                var previousViewport: CGRect?
+                requireWithEvidence(pollUntil(timeout: 10) {
+                    let viewport = homeViewport()
+                    defer { previousViewport = viewport }
+                    return XCUIDevice.shared.orientation == .landscapeLeft
+                        && app.frame.width > app.frame.height
+                        && !viewport.isEmpty && !viewport.isNull
+                        && viewport == previousViewport
+                }, "Landscape Home must expose settled content geometry within ten seconds.")
+            }
+            XCTContext.runActivity(named: "Own-game navigation cycle \(cycle) of \(cycles)") { _ in
+                checkpoint("open-own-game", cycle: cycle)
+                openOwnGameFromHome(gameIDs[0])
+                waitForGame(gameIDs[0])
+
+                checkpoint("switch-own-game", cycle: cycle)
+                openActiveGames()
+                let secondGame = popover.buttons.matching(
+                    identifier: id.gameActiveGamesEntry(gameIDs[1])
+                ).firstMatch
+                tapReady(secondGame, description: "second own correspondence game")
+                waitForGame(gameIDs[1])
+
+                checkpoint("dismiss-current-game", cycle: cycle)
+                openActiveGames()
+                let selectedGame = popover.buttons.matching(
+                    identifier: id.gameActiveGamesEntry(gameIDs[1])
+                ).firstMatch
+                XCTAssertTrue(selectedGame.waitForExistence(timeout: 10))
+                XCTAssertTrue(selectedGame.isSelected)
+                tapReady(selectedGame, description: "current game entry")
+                waitForGame(gameIDs[1])
+
+                // A new navigation action must still work after the popover
+                // disappears. A screenshot or the visible board is not enough.
+                checkpoint("return-home", cycle: cycle)
+                returnHome()
+                checkpoint("complete", cycle: cycle)
+            }
+        }
+        openOwnGameFromHome(gameIDs[1])
+        waitForGame(gameIDs[1])
+        returnHome()
+        keepScreenshot("Own-game navigation remained responsive after \(cycles) cycles", in: app)
+        #endif
+    }
+
     func testGameMessageNotificationUsesTheAppPopup() {
         // The basic game fixture has no private messages. Explicitly seed
         // incoming messages so this journey exercises the unread notice.
@@ -3797,13 +4027,22 @@ final class SurroundUITests: SurroundJourneyUITestCase {
         let chooseOpponent = app.buttons["Select your opponent…"].firstMatch
         XCTAssertTrue(chooseOpponent.waitForExistence(timeout: 10))
         tap(chooseOpponent, description: "Choose an opponent for the saved setup", in: app)
-        element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
+        let picker = element(SurroundUITestContract.AccessibilityID.screenOpponentPicker, in: app)
         keepScreenshot("home-preferred-settings-picker", in: app)
-        let back = app.navigationBars.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR label == %@", "BackButton", "Back"
+        let pickerNavigationBar = app.navigationBars["Select your opponent"].firstMatch
+        XCTAssertTrue(pickerNavigationBar.waitForExistence(timeout: 10))
+        // iOS 18 labels Back with the previous page's title. Scope the
+        // action to this picker so the iPad sidebar button cannot match.
+        let back = pickerNavigationBar.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@ OR label == %@",
+            "BackButton", "Active games", "Back"
         )).firstMatch
-        tap(back.exists ? back : app.navigationBars.buttons.firstMatch,
-            description: "Return to Home without choosing", in: app)
+        tap(back, description: "Return to Home without choosing", in: app)
+        let pickerDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: picker
+        )
+        XCTAssertEqual(waitWithFinalCheck(for: [pickerDismissed], timeout: 10), .completed,
+                       "Back must leave the opponent picker without selecting a player.")
         element(SurroundUITestContract.AccessibilityID.homeNewGame, in: app, matching: .button)
 
         tap(SurroundUITestContract.AccessibilityID.homePreferredSettings, in: app)

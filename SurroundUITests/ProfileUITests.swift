@@ -984,9 +984,46 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         _ = revealProfileControl(SurroundUITestContract.AccessibilityID.profileAllHistory, in: app)
         keepScreenshot("Own profile – ratings and game history", in: app)
         navigateBackFromPlayerProfile(in: app)
-        let hideRatings = app.switches["Hide ranks and ratings"].firstMatch
+        let settings = element(SurroundUITestContract.AccessibilityID.screenSettings,
+                               in: app, matching: .scrollView)
+        let hideRatings = settings.switches["Hide ranks and ratings"].firstMatch
         XCTAssertTrue(hideRatings.waitForExistence(timeout: 10))
-        scrollIntoTappableArea(hideRatings, in: app)
+        func settingsViewport() -> CGRect {
+            let window = app.windows.firstMatch.frame
+            let scroll = settings.frame.intersection(window)
+            let barBottom = app.navigationBars.allElementsBoundByIndex
+                .filter { $0.exists && $0.frame.intersects(scroll) }
+                .map { $0.frame.maxY }.max() ?? scroll.minY
+            let top = max(scroll.minY, barBottom) + 8
+            let bottom = min(scroll.maxY, window.maxY - 100)
+            return CGRect(x: scroll.minX + 8, y: top, width: scroll.width - 16,
+                          height: max(0, bottom - top))
+        }
+        for _ in 0..<4 {
+            let viewport = settingsViewport()
+            XCTAssertFalse(viewport.isEmpty, "Settings must expose a visible content viewport.")
+            guard !viewport.isEmpty else { return }
+            let frame = hideRatings.frame
+            if viewport.contains(frame) && hideRatings.isHittable { break }
+            // Settings is a centered 600pt pane on iPad. App-wide swipes
+            // can miss it and leave this real control below the display.
+            let delta = frame.midY - viewport.midY
+            let distance = min(abs(delta), viewport.height * 0.6)
+            let startY = delta >= 0 ? viewport.maxY : viewport.minY
+            let origin = settings.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(
+                dx: viewport.midX - settings.frame.minX, dy: startY - settings.frame.minY
+            ))
+            let end = origin.withOffset(CGVector(
+                dx: viewport.midX - settings.frame.minX,
+                dy: startY + (delta >= 0 ? -distance : distance) - settings.frame.minY
+            ))
+            start.press(forDuration: 0.05, thenDragTo: end,
+                        withVelocity: .default, thenHoldForDuration: 0.1)
+        }
+        XCTAssertTrue(settingsViewport().contains(hideRatings.frame),
+                      "The hide-ratings control must be visible before changing it.")
+        XCTAssertTrue(waitUntilHittable(hideRatings, timeout: 10))
         setSwitch(hideRatings, to: "1", description: "Hide ranks and ratings")
         XCTAssertTrue(waitForValue("1", in: hideRatings, timeout: stateSettleTimeout))
         let profileEntry = element(SurroundUITestContract.AccessibilityID.profileSettingsEntry, in: app)
@@ -1683,5 +1720,204 @@ final class ProfileUITests: SurroundJourneyUITestCase {
         keepScreenshot("Profile – unavailable with retry", in: app)
         navigateBackFromPlayerProfile(in: app)
         element(SurroundUITestContract.AccessibilityID.screenSettings, in: app)
+    }
+
+    func testGameplayBoardCoordinatesUpdatesAfterOneTapAndReopen() throws {
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This regression uses the native iOS Settings sheet.")
+        #else
+        let id = SurroundUITestContract.AccessibilityID.self
+        let app = launchApp(additionalLaunchArguments: [
+            SurroundUITestContract.appearanceLaunchArgument, "light",
+            "-UIPreferredContentSizeCategoryName", UIContentSizeCategory.large.rawValue,
+        ], orientation: .portrait)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertLessThanOrEqual(app.frame.width, 500,
+                "Run a Duo in Closed portrait; this compact Settings regression must not silently test an inner pose.")
+            XCTAssertGreaterThan(app.frame.height, app.frame.width,
+                "The one-tap regression requires portrait before any preference input.")
+            guard app.frame.width <= 500, app.frame.height > app.frame.width else { return }
+        }
+        var dispatchCounts = ["ON": 0, "OFF": 0]
+        var feedbackMismatches: [String] = []
+
+        @discardableResult
+        func captureState(_ name: String, toggle: XCUIElement) -> String? {
+            let capturedValue = toggle.value as? String
+            keepScreenshot("Gameplay coordinates – \(name)", in: app)
+            let evidence = XCTAttachment(string: """
+                Time: \(Date())
+                Phase: \(name)
+                Switch value: \(String(describing: capturedValue))
+                Switch frame: \(toggle.frame)
+                Window: \(app.windows.firstMatch.frame)
+                Switch hittable: \(toggle.isHittable)
+                One-tap dispatch intents: \(dispatchCounts)
+                Application hierarchy:
+                \(app.debugDescription)
+                """)
+            evidence.name = "Gameplay coordinates state – \(name)"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            return capturedValue
+        }
+
+        func openSettings() -> XCUIElement {
+            element(id.screenHome, in: app)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                tap(id.accountMenu, in: app, matching: .button)
+                tap(requiredMenuButton(id.accountMenuSettings, title: "Settings", in: app),
+                    description: "Open normal account Settings", in: app)
+            } else {
+                selectMainNavigation(id.navigationSettings, in: app)
+            }
+            return element(id.screenSettings, in: app, matching: .scrollView)
+        }
+
+        func revealCoordinates(in settings: XCUIElement) -> XCUIElement? {
+            let toggle = settings.switches["Board coordinates"].firstMatch
+            guard toggle.waitForExistence(timeout: 10) else {
+                keepScreenshot("Gameplay coordinates – missing control", in: app)
+                XCTFail("Normal Settings must contain Board coordinates.")
+                return nil
+            }
+            for _ in 0..<6 {
+                let window = app.windows.firstMatch.frame
+                let pane = settings.frame.intersection(window)
+                let barBottom = app.navigationBars.allElementsBoundByIndex
+                    .filter { $0.exists && $0.frame.intersects(pane) }
+                    .map { $0.frame.maxY }.max() ?? max(pane.minY, window.minY + 80)
+                let top = max(pane.minY, barBottom) + 8
+                let bottom = min(pane.maxY, window.maxY - 80)
+                let viewport = CGRect(x: pane.minX + 8, y: top,
+                    width: max(0, pane.width - 16), height: max(0, bottom - top))
+                let frame = toggle.frame
+                if viewport.contains(frame), toggle.isHittable { return toggle }
+                let column = min(viewport.maxX - 12, max(viewport.minX + 12, frame.midX))
+                guard dragScrollView(settings, axis: .vertical,
+                    targetFrame: validInteractionFrame(frame, interactionPoint: CGVector(dx: 0.95, dy: 0.5)),
+                    containerFrame: viewport, interactionPoint: CGVector(dx: 0.95, dy: 0.5),
+                    dragStartPoint: CGPoint(x: column, y: viewport.midY),
+                    dragVelocity: .default, dragHoldDuration: 0.1) else { break }
+            }
+            captureState("control not fully exposed before input", toggle: toggle)
+            XCTFail("The whole exact switch must be visible inside Settings before a single knob tap.")
+            return nil
+        }
+
+        func dispatchOneKnobTap(_ direction: String, from oldValue: String,
+                                expecting newValue: String, toggle: XCUIElement) -> Bool {
+            captureState("before one \(direction) tap", toggle: toggle)
+            guard dispatchCounts[direction] == 0, toggle.value as? String == oldValue,
+                  toggle.isHittable else {
+                XCTFail("One-tap precondition failed; do not retry or touch an uncertain preference.")
+                return false
+            }
+            let frame = toggle.frame
+            let intent = XCTAttachment(string: """
+                Direction: \(direction)
+                Expected previous value: \(oldValue)
+                Exactly one supported coordinate tap; automatic retry: false
+                Row frame: \(frame)
+                Trailing knob point: \(CGPoint(x: frame.minX + frame.width * 0.95, y: frame.midY))
+                """)
+            intent.name = "Single Board coordinates \(direction) dispatch intent"
+            intent.lifetime = .keepAlways
+            add(intent)
+            XCTContext.runActivity(named: "Dispatch exactly one Board coordinates \(direction) knob tap") { _ in
+                dispatchCounts[direction] = 1
+                activate(toggle, at: CGVector(dx: 0.95, dy: 0.5))
+            }
+            // Read-only evidence comes before any scroll, theme/demo change,
+            // Done, reopen or second preference action can refresh this view.
+            let immediateValue = captureState("immediately after one \(direction) tap", toggle: toggle)
+            let observationStart = ProcessInfo.processInfo.systemUptime
+            let observationDeadline = observationStart + 5
+            var samples: [String] = []
+            var fullWindowSampleCount = 0
+            var sawExpectedValue = false
+            var revertedAfterExpected = false
+            var unreadableValue = false
+            var finalValue: String?
+            func recordValue(_ value: String?, phase: String, start: TimeInterval, end: TimeInterval) {
+                samples.append("phase=\(phase), start=\(start), end=\(end), value=\(String(describing: value))")
+                if sawExpectedValue && value != newValue { revertedAfterExpected = true }
+                if value == newValue { sawExpectedValue = true }
+                if value != oldValue && value != newValue { unreadableValue = true }
+                finalValue = value
+            }
+            recordValue(immediateValue, phase: "immediate capture before full window", start: 0, end: 0)
+            while true {
+                let readStart = ProcessInfo.processInfo.systemUptime - observationStart
+                let value = toggle.value as? String
+                let readEnd = ProcessInfo.processInfo.systemUptime - observationStart
+                recordValue(value, phase: "full-window sample", start: readStart, end: readEnd)
+                fullWindowSampleCount += 1
+                let remaining = observationDeadline - ProcessInfo.processInfo.systemUptime
+                if remaining <= 0 { break }
+                RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, remaining)))
+            }
+            let endCaptureStart = ProcessInfo.processInfo.systemUptime - observationStart
+            let endValue = captureState("same view after full five-second \(direction) window", toggle: toggle)
+            recordValue(endValue, phase: "final capture", start: endCaptureStart,
+                        end: ProcessInfo.processInfo.systemUptime - observationStart)
+            let trace = XCTAttachment(string: samples.joined(separator: "\n"))
+            trace.name = "Full five-second same-view Board coordinates \(direction) sample trace"
+            trace.lifetime = .keepAlways
+            add(trace)
+            if !sawExpectedValue || finalValue != newValue || revertedAfterExpected || unreadableValue || fullWindowSampleCount < 2 {
+                // Keep every observed reversion red, even if the final sample
+                // or diagnostic reopening later agrees with persisted state.
+                feedbackMismatches.append("\(direction): same-view five-second trace failed; saw expected=\(sawExpectedValue), final=\(String(describing: finalValue)), reverted=\(revertedAfterExpected), unreadable=\(unreadableValue), samples=\(samples.count). Inspect PNG versus AX.")
+            }
+            return true
+        }
+
+        func closeSettings() -> Bool {
+            let done = app.buttons.matching(NSPredicate(
+                format: "identifier == %@ OR label == %@", "account.sheet.done", "Done"
+            )).allElementsBoundByIndex.filter { $0.isHittable }
+            guard done.count == 1 else {
+                keepScreenshot("Gameplay coordinates – missing unique Settings Done", in: app)
+                XCTFail("The normal Settings sheet must expose one exact Done control.")
+                return false
+            }
+            tap(done[0], description: "Close Settings without another preference touch", in: app)
+            let screen = app.scrollViews[id.screenSettings].firstMatch
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: screen)
+            guard XCTWaiter.wait(for: [dismissed], timeout: 10) == .completed else {
+                keepScreenshot("Gameplay coordinates – Done did not reveal Home", in: app)
+                XCTFail("Done must dismiss Settings; do not continue input against an unknown screen.")
+                return false
+            }
+            element(id.screenHome, in: app)
+            return true
+        }
+
+        var settings = openSettings()
+        guard let initial = revealCoordinates(in: settings),
+              dispatchOneKnobTap("ON", from: "0", expecting: "1", toggle: initial),
+              closeSettings() else { return }
+        settings = openSettings()
+        guard let reopenedOn = revealCoordinates(in: settings) else { return }
+        captureState("ordinary reopen after one ON tap", toggle: reopenedOn)
+        guard reopenedOn.value as? String == "1" else {
+            XCTFail("A single ON tap must persist. No OFF cleanup is safe while the persisted outcome is uncertain.")
+            return
+        }
+        guard dispatchOneKnobTap("OFF", from: "1", expecting: "0", toggle: reopenedOn),
+              closeSettings() else { return }
+        settings = openSettings()
+        guard let restored = revealCoordinates(in: settings) else { return }
+        captureState("ordinary reopen after one OFF restoration", toggle: restored)
+        guard restored.value as? String == "0" else {
+            XCTFail("Exactly one OFF tap must restore the isolated preference; no recovery tap is allowed.")
+            return
+        }
+        guard closeSettings() else { return }
+        XCTAssertEqual(dispatchCounts, ["ON": 1, "OFF": 1], "The regression permits only its two recorded knob dispatches.")
+        XCTAssertTrue(feedbackMismatches.isEmpty, feedbackMismatches.joined(separator: "\n"))
+        #endif
     }
 }

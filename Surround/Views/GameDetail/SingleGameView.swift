@@ -1289,14 +1289,13 @@ struct SingleGameView: View {
 
     var body: some View {
         interactiveGameContent
-        .onChange(of: selectedChatChannel.wrappedValue, initial: true) { _, channel in
-            chatSession.selectChannel(channel)
-        }
         .onChange(of: game.ID) { _, _ in
             stoneSoundPlayer.reset()
             stoneSoundPlayer.prepare(theme: theme, enabled: soundOnStonePlacement && isVisibleForAppReview)
             updateReviewGameObservation()
-            chatSession.reset()
+            // Drafts and pending sends belong to the game; GameDetail owns
+            // this route's main-channel-on-switch policy.
+            chatSession.setGamePresentationActive(isChatRouteActive && !zenMode)
             conditionalMoveRequest.updateContext(gameID: game.ID, accountID: ogs.user?.id)
             showingConditionalMoveSubmissionError = false
             preferredNextPositionByPosition.removeAll()

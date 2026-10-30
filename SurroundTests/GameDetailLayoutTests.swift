@@ -799,6 +799,57 @@ final class GameDetailLayoutTests: XCTestCase {
         }
     }
 
+    func testNativePhoneLandscapeLargestTextKeepsBoardAndActionsVisible() {
+        // iPhone 16 Pro: 874 x 402 landscape window, with its native horizontal
+        // safe areas and 44 pt navigation bar outside the content proposal.
+        // The real Play labels matter: the unit bundle has no catalog.
+        let size = CGSize(width: 750, height: 358)
+        let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
+            phase: .play, localizedLabels: ["Pass", "Submit move", "Rematch", "Next (999+)"])
+        let p = GameDetailLayoutPlan(size: size, compact: true, zen: false,
+            analyze: false, chat: false, hidesBoard: false, keyboard: false,
+            accessibility: true, foldsClock: true, clockScale: 1.65,
+            actionSize: metrics.horizontalSize, actionMetrics: metrics)
+        XCTAssertGreaterThanOrEqual(p[.board].width, 140,
+            "Largest-text phone landscape must retain a usable board, not only clocks.")
+        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2,
+            "The main action and More must both retain visible slots.")
+        XCTAssertGreaterThanOrEqual(p[.actions].height, metrics.rowHeight(at: p[.actions].width))
+        XCTAssertLessThanOrEqual(p[.board].maxY, p[.actions].minY)
+        XCTAssertFalse(p[.board].intersects(p[.clocks]))
+        assertOccupiedSlotsFit(p, in: size)
+    }
+
+    func testAccessibilityLandscapeFooterKeepsBoardAcrossPhasesAndShortWindows() {
+        let phases: [(OGSGamePhase, [String])] = [
+            (.play, ["Pass", "Submit move", "Rematch", "Next (999+)"]),
+            (.stoneRemoval, ["Accept", "Clear estimates"]),
+        ]
+        for size in [CGSize(width: 750, height: 358), CGSize(width: 750, height: 324),
+                     CGSize(width: 667, height: 331)] {
+            for dynamicType in [DynamicTypeSize.accessibility3, .accessibility5] {
+                for (phase, labels) in phases {
+                    let metrics = GameControlRowMetrics(dynamicTypeSize: dynamicType,
+                        phase: phase, localizedLabels: labels)
+                    for zen in [false, true] {
+                        let p = GameDetailLayoutPlan(size: size, compact: true, zen: zen,
+                            analyze: false, chat: false, hidesBoard: false, keyboard: false,
+                            accessibility: true, foldsClock: true, clockScale: 1.65,
+                            actionSize: metrics.horizontalSize, actionMetrics: metrics)
+                        XCTAssertGreaterThanOrEqual(p[.board].width, 140,
+                            "\(size), \(dynamicType), \(phase), zen=\(zen): \(p[.board])")
+                        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2)
+                        XCTAssertGreaterThanOrEqual(p[.actions].height,
+                            metrics.rowHeight(at: p[.actions].width))
+                        XCTAssertLessThanOrEqual(p[.board].maxY, p[.actions].minY)
+                        XCTAssertFalse(p[.board].intersects(p[.clocks]))
+                        assertOccupiedSlotsFit(p, in: size)
+                    }
+                }
+            }
+        }
+    }
+
     func testAccessibilityActionWrapsAcrossFullRowAfterIdentityHides() {
         let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
                                            localizedLabels: englishActionLabels)
@@ -1380,6 +1431,88 @@ final class GameDetailLayoutTests: XCTestCase {
         XCTAssertEqual(p[.board], CGRect(x: 230, y: 55, width: 356, height: 356))
         XCTAssertFalse(p[.chat].intersects(p[.board]))
         assertOccupiedSlotsFit(p, in: size)
+    }
+
+    func testNativeDuoClosedLandscapeLargestTextKeepsChatComposerVisible() {
+        // The native 678 x 466 cover window reserves 84 pt for its vertical
+        // toolbar. AX5 Play actions wrap in the remaining 214 pt Chat column;
+        // the recorded Next pill alone was 136 x 184, leaving no composer.
+        let window = CGSize(width: 678, height: 466)
+        let size = CGSize(width: window.width - 84, height: window.height)
+        let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
+            phase: .play, localizedLabels: ["Pass", "Submit move", "Rematch", "Next (999+)"])
+        let p = GameDetailLayoutPlan(size: size, compact: true, zen: false,
+            analyze: false, chat: true, hidesBoard: false, keyboard: false,
+            accessibility: true, foldsClock: true, clockScale: 1.65,
+            actionSize: metrics.horizontalSize, actionMetrics: metrics,
+            composerHeight: 92, usesVerticalToolbar: true)
+        XCTAssertTrue(p[.composer].height >= 92 && p[.chat].height >= 44,
+            "Selected Chat must retain a full composer and readable history: composer=\(p[.composer]), chat=\(p[.chat])")
+        XCTAssertGreaterThanOrEqual(p[.board].width, 140)
+        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2)
+        XCTAssertGreaterThanOrEqual(p[.actions].height, metrics.rowHeight(at: p[.actions].width))
+        for slot in [GameDetailLayoutPlan.Slot.board, .clocks, .actions] {
+            XCTAssertFalse(p[slot].intersects(p[.composer]), "\(slot) covers the composer")
+        }
+        XCTAssertFalse(p[.actions].intersects(p[.board]))
+        assertOccupiedSlotsFit(p, in: size)
+    }
+
+    func testClosedDuoLandscapeChatReservesComposerAcrossPhasesAndDepth() {
+        let phases: [(OGSGamePhase, [String])] = [
+            (.play, ["Pass", "Submit move", "Rematch", "Next (999+)"]),
+            (.stoneRemoval, ["Accept", "Clear estimates"]),
+        ]
+        for size in [CGSize(width: 594, height: 466), CGSize(width: 594, height: 454),
+                     CGSize(width: 594, height: 430)] {
+            for (phase, labels) in phases {
+                let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
+                    phase: phase, localizedLabels: labels)
+                for depth in [nil, studioDepth()] {
+                    for composerHeight: CGFloat in [50, 92, 188] {
+                        let p = GameDetailLayoutPlan(size: size, compact: true, zen: false,
+                            analyze: false, chat: true, hidesBoard: false, keyboard: false,
+                            accessibility: true, foldsClock: true, clockScale: 1.65,
+                            actionSize: metrics.horizontalSize, actionMetrics: metrics,
+                            composerHeight: composerHeight, usesVerticalToolbar: true, boardDepth: depth)
+                        XCTAssertGreaterThanOrEqual(p[.composer].height, 50,
+                            "\(size), \(phase), composer \(composerHeight): \(p[.composer])")
+                        XCTAssertLessThanOrEqual(p[.composer].height, composerHeight)
+                        if composerHeight <= 92 { XCTAssertGreaterThan(p[.chat].height, 0) }
+                        XCTAssertGreaterThanOrEqual(p[.board].width, 140)
+                        XCTAssertGreaterThanOrEqual(p[.actions].width, metrics.moreButtonDiameter * 2)
+                        XCTAssertGreaterThanOrEqual(p[.actions].height, metrics.rowHeight(at: p[.actions].width))
+                        for slot in [GameDetailLayoutPlan.Slot.board, .clocks, .actions] {
+                            XCTAssertFalse(p[slot].intersects(p[.composer]))
+                        }
+                        XCTAssertFalse(p[.actions].intersects(p[.board]))
+                        assertOccupiedSlotsFit(p, in: size)
+                    }
+                }
+            }
+        }
+    }
+
+    func testClosedDuoLargestTextTypingKeepsBoardFooterAndComposer() {
+        let size = CGSize(width: 594, height: 466)
+        let metrics = GameControlRowMetrics(dynamicTypeSize: .accessibility5,
+            phase: .play, localizedLabels: ["Pass", "Submit move", "Rematch", "Next (999+)"])
+        func layout(keyboard: Bool, overlap: CGFloat = 0) -> GameDetailLayoutPlan {
+            GameDetailLayoutPlan(size: size, compact: true, zen: false,
+                analyze: false, chat: true, hidesBoard: false, keyboard: keyboard,
+                accessibility: true, foldsClock: true, clockScale: 1.65,
+                actionSize: metrics.horizontalSize, actionMetrics: metrics,
+                composerHeight: 92, keyboardOverlap: overlap, usesVerticalToolbar: true)
+        }
+        let resting = layout(keyboard: false)
+        for overlap: CGFloat in [150, 180] {
+            let typing = layout(keyboard: true, overlap: overlap)
+            assertSceneOutsideChat(typing, equals: resting)
+            XCTAssertEqual(typing[.composer].height, 92, accuracy: 0.5)
+            XCTAssertGreaterThan(typing[.chat].height, 0)
+            XCTAssertLessThanOrEqual(typing[.composer].maxY, size.height - overlap - 8)
+            assertOccupiedSlotsFit(typing, in: size)
+        }
     }
 
     func testDuoOpenWideZenCentresTheBoardOnTheHingeWithoutATray() {

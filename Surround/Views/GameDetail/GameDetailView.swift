@@ -56,7 +56,11 @@ struct GameDetailView: View {
     @State private var showsCompactChatBoard = true
     @State private var variationShareDraft: VariationShareDraft?
     @State private var selectedChatChannel = OGSChatSendChannel.main
-    @StateObject private var chatSession = ChatSessionState()
+    @EnvironmentObject private var chatSessions: GameChatSessionStore
+    private var chatSession: ChatSessionState {
+        chatSessions.session(for: (currentGame ?? departingGame)?.ID,
+                             accountID: ogs.user?.id)
+    }
     @StateObject private var gameControlState = GameControlState()
     @State private var selectedConditionalVariation: ConditionalMoveBranch?
     @Setting(.hidesRank) private var hidesRank: Bool
@@ -601,20 +605,21 @@ struct GameDetailView: View {
                     GameDetailWindowGeometryReader(
                         layoutFrame: geometry.frame(in: .global),
                         beginSizeTransition: {
-                            guard let token = chatSession.beginWindowSizeTransition() else { return nil }
+                            let session = chatSession
+                            guard let token = session.beginWindowSizeTransition() else { return nil }
                             #if DEBUG && MAIN_APP
                             SurroundAnimationDiagnostics.record(
                                 "composer.windowTransitionBegan", ownerID: animationObservationID,
-                                fields: ["focusRevision": String(chatSession.focusRevision)]
+                                fields: ["focusRevision": String(session.focusRevision)]
                             )
                             #endif
                             return { allowsRestoration in
-                                chatSession.completeWindowSizeTransition(token, allowsRestoration: allowsRestoration)
+                                session.completeWindowSizeTransition(token, allowsRestoration: allowsRestoration)
                                 #if DEBUG && MAIN_APP
                                 SurroundAnimationDiagnostics.record(
                                     "composer.windowTransitionCompleted", ownerID: animationObservationID,
-                                    fields: ["wantsFocus": String(chatSession.wantsInputFocus),
-                                             "restorationRevision": String(chatSession.focusRestorationRevision)]
+                                    fields: ["wantsFocus": String(session.wantsInputFocus),
+                                             "restorationRevision": String(session.focusRestorationRevision)]
                                 )
                                 #endif
                             }
@@ -790,6 +795,7 @@ struct GameDetailView: View {
         }
         .onChange(of: currentGame) { oldGame, newGame in
             if newGame.ID != oldGame.ID {
+                chatSessions.deactivate(gameID: oldGame.ID, accountID: ogs.user?.id)
                 selectedConditionalVariation = nil
                 showSettings = false
                 showsActiveGames = false
@@ -807,7 +813,8 @@ struct GameDetailView: View {
                 updateDetailOfCurrentGameIfNecessary()
             }
         }
-        .onChange(of: ogs.user?.id) { _, _ in
+        .onChange(of: ogs.user?.id) { _, newAccountID in
+            chatSessions.discardOtherAccounts(keeping: newAccountID)
             clearKeyboardVisibility()
             selectedConditionalVariation = nil
             zenMode = false
@@ -1675,6 +1682,7 @@ private func gameDetailPreviewFixture() -> (
     }
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Phone — Active games", traits: .fixedLayout(width: 390, height: 844)) {
@@ -1688,6 +1696,7 @@ private func gameDetailPreviewFixture() -> (
     }
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Regular landscape — Zen mode", traits: .fixedLayout(width: 960, height: 754)) {
@@ -1699,6 +1708,7 @@ private func gameDetailPreviewFixture() -> (
     .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 
 #Preview("Regular portrait — Active game", traits: .fixedLayout(width: 750, height: 1024)) {
@@ -1710,5 +1720,6 @@ private func gameDetailPreviewFixture() -> (
     .environment(\.horizontalSizeClass, UserInterfaceSizeClass.regular)
     .environmentObject(fixture.ogs)
     .environmentObject(fixture.navigation)
+    .environmentObject(GameChatSessionStore())
 }
 #endif

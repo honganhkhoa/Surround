@@ -300,6 +300,35 @@ struct GameControlRow: View {
                 }
                 if game.isUserPlaying {
                     if game.gamePhase == .play {
+                        // Keep pending undo responses reachable when the clock's
+                        // status label is omitted by a compact layout.
+                        if game.canAcceptUndo {
+                            Button(action: {
+                                performGameAction {
+                                    guard game.canAcceptUndo else { return }
+                                    ogs.acceptUndo(game: game)
+                                }
+                            }) {
+                                Label("Accept undo", systemImage: "arrow.uturn.left")
+                            }.disabled(blocksGameActions)
+                            Button(action: {
+                                performGameAction {
+                                    guard game.canAcceptUndo else { return }
+                                    ogs.cancelUndo(game: game)
+                                }
+                            }) {
+                                Label("Reject undo", systemImage: "xmark")
+                            }.disabled(blocksGameActions)
+                        } else if game.canCancelUndo {
+                            Button(action: {
+                                performGameAction {
+                                    guard game.canCancelUndo else { return }
+                                    ogs.cancelUndo(game: game)
+                                }
+                            }) {
+                                Label("Cancel undo", systemImage: "xmark")
+                            }.disabled(blocksGameActions)
+                        }
                         if !game.rengo && game.undoRequest == nil {
                             Button(action: { performGameAction { ogs.requestUndo(game: game) } }) {
                                 Label("Request undo", systemImage: "arrow.uturn.left")

@@ -223,6 +223,7 @@ struct SettingsView: View {
 }
 
 struct GameplaySettings: View {
+    @ObservedObject private var preferences = userDefaults
     var withDemoOption = false
     @State var showDemoBoard = false
     

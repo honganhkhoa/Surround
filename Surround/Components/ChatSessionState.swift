@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// One game detail owns this state; adaptive chat views only present it.
+/// One game owns this state; adaptive chat views only present it.
 final class ChatSessionState: ObservableObject {
     enum Failure: Hashable, Identifiable {
         case messageSend
@@ -41,15 +41,21 @@ final class ChatSessionState: ObservableObject {
         }
     }
 
-    @Published var message = ""
-    private var draftsByChannel: [String: String] = [:]
-    private var draftChannel = OGSChatSendChannel.main
+    // Different retained routes can present the same game in different channels.
+    // The route owns its selection; every draft operation names its channel.
+    @Published private var draftsByChannel: [OGSChatSendChannel: String] = [:]
 
-    func selectChannel(_ channel: OGSChatSendChannel) {
-        guard channel != draftChannel else { return }
-        draftsByChannel[draftChannel.rawValue] = message
-        draftChannel = channel
-        message = draftsByChannel[channel.rawValue] ?? ""
+    func message(in channel: OGSChatSendChannel) -> String {
+        draftsByChannel[channel] ?? ""
+    }
+
+    func setMessage(_ message: String, in channel: OGSChatSendChannel) {
+        draftsByChannel[channel] = message.isEmpty ? nil : message
+    }
+
+    func setMessage(_ message: String, in channel: OGSChatSendChannel, from composerID: UUID) {
+        guard isActiveComposer(composerID) else { return }
+        setMessage(message, in: channel)
     }
     @Published private(set) var isSending = false
     @Published var failure: Failure?
@@ -69,6 +75,12 @@ final class ChatSessionState: ObservableObject {
         } else if let anchor {
             scrollAnchor = anchor
         }
+    }
+
+    /// Switching games starts the transcript at its latest message.
+    func resetReadingPosition() {
+        scrollAnchor = nil
+        isAtEndOfChat = true
     }
 
     private var sendCancellable: AnyCancellable?
@@ -104,15 +116,26 @@ final class ChatSessionState: ObservableObject {
     }
 
     /// The operation belongs to the game session, never the current TextField.
-    func sendMessage(using send: (String) -> AnyPublisher<Void, Error>) {
-        guard !isSending, !message.isEmpty else { return }
-        let submittedMessage = message
-        let submittedChannel = draftChannel
+    func sendMessage(
+        in channel: OGSChatSendChannel,
+        from composerID: UUID,
+        using send: (OGSChatSendChannel, String) -> AnyPublisher<Void, Error>
+    ) {
+        guard isActiveComposer(composerID) else { return }
+        sendMessage(in: channel, using: send)
+    }
+
+    func sendMessage(
+        in channel: OGSChatSendChannel,
+        using send: (OGSChatSendChannel, String) -> AnyPublisher<Void, Error>
+    ) {
+        let submittedMessage = message(in: channel)
+        guard !isSending, !submittedMessage.isEmpty else { return }
         let requestID = UUID()
         sendID = requestID
         isSending = true
         failure = nil
-        sendCancellable = send(submittedMessage)
+        sendCancellable = send(channel, submittedMessage)
             .first()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
@@ -123,10 +146,8 @@ final class ChatSessionState: ObservableObject {
                 switch completion {
                 case .finished:
                     // The user may have started a different draft while sending.
-                    if self.draftChannel == submittedChannel {
-                        if self.message == submittedMessage { self.message = "" }
-                    } else if self.draftsByChannel[submittedChannel.rawValue] == submittedMessage {
-                        self.draftsByChannel[submittedChannel.rawValue] = nil
+                    if self.message(in: channel) == submittedMessage {
+                        self.setMessage("", in: channel)
                     }
                 case .failure:
                     self.failure = .messageSend
@@ -216,16 +237,14 @@ final class ChatSessionState: ObservableObject {
         wantsInputFocus = focused
     }
 
-    /// Explicit game/account changes discard state and invalidate late callbacks.
+    /// Discarding an account or route invalidates its state and late callbacks.
     func reset() {
         sizeTransitionFocus = nil
         sendID = nil
         sendCancellable?.cancel()
         sendCancellable = nil
         isSending = false
-        message = ""
         draftsByChannel.removeAll()
-        draftChannel = .main
         failure = nil
         // Account changes can leave this route mounted, but its old field and
         // queued focus callbacks must not carry over to the new session.
@@ -235,7 +254,49 @@ final class ChatSessionState: ObservableObject {
         wantsInputFocus = false
         activeComposerID = nil
         composerPresentationID = UUID()
-        scrollAnchor = nil
-        isAtEndOfChat = true
+        resetReadingPosition()
+    }
+}
+
+/// A window keeps unsent work when switching games or popping a game route.
+/// Each game retains its own requests, channel drafts and duplicate-send guard.
+final class GameChatSessionStore: ObservableObject {
+    let objectWillChange = ObservableObjectPublisher()
+
+    private struct Key: Hashable {
+        let accountID: Int?
+        let gameID: GameID?
+    }
+
+    private var sessions: [Key: ChatSessionState] = [:]
+    private var sessionObservations: [Key: AnyCancellable] = [:]
+
+    func session(for gameID: GameID?, accountID: Int?) -> ChatSessionState {
+        let key = Key(accountID: accountID, gameID: gameID)
+        if let session = sessions[key] { return session }
+        let session = ChatSessionState()
+        sessions[key] = session
+        // Game Detail reads focus intent for its toolbar as well as passing
+        // this session to observed child views. Keep that owner up to date
+        // when a hardware keyboard produces no window-geometry change.
+        sessionObservations[key] = session.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        return session
+    }
+
+    func deactivate(gameID: GameID?, accountID: Int?) {
+        sessions[Key(accountID: accountID, gameID: gameID)]?
+            .gamePresentationDisappeared()
+    }
+
+    /// Account changes must also invalidate callbacks held by old composers.
+    /// The new account may already have acquired its empty session this render.
+    func discardOtherAccounts(keeping accountID: Int?) {
+        let discardedKeys = sessions.keys.filter { $0.accountID != accountID }
+        for key in discardedKeys {
+            sessionObservations.removeValue(forKey: key)?.cancel()
+            sessions.removeValue(forKey: key)?.reset()
+        }
     }
 }

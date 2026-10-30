@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct MainViewWrapper: View {
     @SceneStorage("sceneID") var sceneID = UUID().uuidString
@@ -273,6 +274,7 @@ private extension NavigationService {
 
 private struct CompatibilityScreenshotRootView: View {
     let scene: SurroundUITestContract.CompatibilityScene
+    @State private var gameChatSessions = GameChatSessionStore()
 
     @EnvironmentObject private var ogs: OGSService
     @EnvironmentObject private var sgs: SurroundService
@@ -492,6 +494,10 @@ private struct CompatibilityScreenshotRootView: View {
 
     var body: some View {
         sceneView
+            .environmentObject(gameChatSessions)
+            .onReceive(ogs.$user.map { $0?.id }.removeDuplicates()) { accountID in
+                gameChatSessions.discardOtherAccounts(keeping: accountID)
+            }
             .modifier(GameLayoutTransitionUITestModifier())
             .modifier(
                 CompatibilityScreenshotReadinessModifier(
