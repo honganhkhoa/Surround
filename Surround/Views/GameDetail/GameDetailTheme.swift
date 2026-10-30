@@ -295,11 +295,11 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     highlight: Color(themeHex: 0xBEC9EF).opacity(0.38),
                     shade: Color(themeHex: 0x080C1C).opacity(0.8), shadow: .black.opacity(0.5),
                     thicknessRatio: 0.009, maximumThickness: 6),
-                // The concept's board catches the scene's light from the upper
-                // left. It lightens most of the surface, brightest in that
-                // corner, which also sets the dark glass off as a shape.
+                // Lift the indigo sheen across the whole playing surface so
+                // dark amethyst glass keeps its silhouette at phone size,
+                // including away from the brighter upper-left reflection.
                 boardReflection: BoardReflection(color: Color(themeHex: 0x8E9BD8),
-                                                 corner: 0.36, middle: 0.19, edge: 0.07, reach: 1.8,
+                                                 corner: 0.36, middle: 0.31, edge: 0.20, reach: 1.8,
                                                  dustDensity: 97, glintDensity: 1.9),
                 gridLineScale: 1.2,
                 stoneImages: NebulaPearlAssets.stones,
@@ -318,8 +318,9 @@ enum SurroundTheme: String, CaseIterable, Identifiable {
                     rim: Color(themeHex: 0xB8A2E6).opacity(0.5),
                     lastMove: .white,
                     label: .white,
-                    // Lighter than the stones, so territory stands out on indigo.
-                    territory: Color(themeHex: 0x9C80FF),
+                    // Lighter than the stones, so territory stands out even
+                    // on the board's brighter reflected indigo surface.
+                    territory: Color(themeHex: 0xA58DFF),
                     detailedMarkerCasing: Color(themeHex: 0x1B122C)
                 ),
                 // Moon pearl: ivory with a lilac shade.
