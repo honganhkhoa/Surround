@@ -1,0 +1,313 @@
+import CryptoKit
+import CoreGraphics
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+import XCTest
+@testable import ASCReleaseCore
+
+final class DuoAssetLibraryTests: XCTestCase {
+    func testRuntimeOrdinaryGroupUsesOneSharedLimitAcrossDisplays() throws {
+        let route = try DuoAssetLibraryRouting.resolve(catalog: catalog())
+        XCTAssertEqual(route["placementGroup"], .string("runtime-duo-group"))
+        XCTAssertEqual(route["maxCountPerGroupAndLocalization"], .number(10))
+        XCTAssertEqual(route["imageSpecs"]?.arrayValue?.count, 4)
+        XCTAssertEqual(route["legacyScreenshotDisplayType"], .null)
+        XCTAssertEqual(route["uploadAcceptanceVerified"], .bool(false))
+        XCTAssertEqual(route["publisherMutationAdapterAvailable"], .bool(false))
+    }
+
+    func testMissingAmbiguousOrIMessageOnlyGroupFailsClosed() throws {
+        for groups: [[String: Any]] in [[], [group(), group()], [group(platform: "IMESSAGE_APP_STORE")]] {
+            XCTAssertThrowsError(try DuoAssetLibraryRouting.resolve(catalog: catalog(groups: groups)))
+        }
+    }
+
+    func testMissingSpecOrAlphaAllowanceFailsClosed() throws {
+        XCTAssertThrowsError(try DuoAssetLibraryRouting.resolve(catalog: catalog(alpha: true)))
+        XCTAssertThrowsError(try DuoAssetLibraryRouting.resolve(catalog: catalog(includeInner: false)))
+    }
+
+    func testMalformedMappedSpecCannotBeSilentlyDiscarded() throws {
+        XCTAssertThrowsError(try DuoAssetLibraryRouting.resolve(catalog: catalog(malformedSpec: true)))
+    }
+
+    func testReturnedResourceIDsCannotBeDotPathSegments() throws {
+        for appID in [".", ".."] {
+            let transport = ReadOnlyDuoTransport(catalog: try catalog(), appID: appID)
+            let credentials = ASCCredentials(keyId: "test", issuerId: "test",
+                                             privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation)
+            let client = ASCAPIClient(credentials: credentials, transport: transport, maxRetries: 0)
+            XCTAssertThrowsError(try DuoAssetLibraryInspector(client: client).capture(bundleId: "com.example.App", version: "3.0"))
+            XCTAssertEqual(transport.methods, ["GET", "GET"])
+        }
+    }
+
+    func testInspectorUsesOnlyGETAndReturnedPerAppPlacementIDs() throws {
+        let transport = ReadOnlyDuoTransport(catalog: try catalog())
+        let credentials = ASCCredentials(keyId: "test", issuerId: "test",
+                                         privateKeyPEM: P256.Signing.PrivateKey().pemRepresentation)
+        let client = ASCAPIClient(credentials: credentials, transport: transport, maxRetries: 0)
+        let result = try DuoAssetLibraryInspector(client: client).capture(bundleId: "com.example.App", version: "3.0")
+        XCTAssertEqual(result["assetLibraryId"], .string("library"))
+        XCTAssertEqual(result["perAppAssetLibraryReadable"], .bool(true))
+        XCTAssertEqual(result["uploadAcceptanceVerified"], .bool(false))
+        XCTAssertEqual(result["localizations"]?.arrayValue?.first?["orderedPlacements"]?.arrayValue?.first?["id"], .string("placement"))
+        XCTAssertEqual(transport.methods, Array(repeating: "GET", count: 6))
+        XCTAssertEqual(transport.lastQuery?.first { $0.name == "filter[placementGroup]" }?.value, "runtime-duo-group")
+        XCTAssertEqual(transport.lastQuery?.first { $0.name == "sort" }?.value, "placementGroupPosition")
+    }
+
+    func testOfflineAdapterUsesAssetLibraryBodiesWithoutLegacyFields() throws {
+        let adapter = try DuoAssetLibraryAdapter(catalog: catalog(), assetLibraryID: "library")
+        let reserve = try adapter.reserveImage(fileName: "05-quick.png", fileSize: 123)
+        XCTAssertEqual(reserve.method, "POST")
+        XCTAssertEqual(reserve.path, "/v1/appAssetLibraryImages")
+        XCTAssertEqual(reserve.body["data"]?["attributes"]?.objectValue?.keys.sorted(), ["category", "fileName", "fileSize"])
+        XCTAssertEqual(reserve.body["data"]?["relationships"]?["assetLibrary"]?["data"]?["id"], .string("library"))
+        let commit = try adapter.commitImage(imageID: "returned-image")
+        XCTAssertEqual(commit.method, "PATCH")
+        XCTAssertEqual(commit.body["data"]?["attributes"], .object(["uploaded": .bool(true)]))
+        let placement = try adapter.placeProcessedImage(processedImage(), expectedSpecID: "spec-0", localizationID: "target-locale")
+        XCTAssertEqual(placement.path, "/v1/appAssetLibraryPlacements")
+        XCTAssertEqual(placement.body["data"]?["attributes"], .object([
+            "placementType": .string("APP_SCREENSHOT"), "placementGroup": .string("runtime-duo-group")]))
+        XCTAssertEqual(placement.body["data"]?["relationships"]?.objectValue?.keys.sorted(), ["appStoreVersionLocalization", "image"])
+    }
+
+    func testPlacementRequiresProcessedImageAndMatchedSpecification() throws {
+        let adapter = try DuoAssetLibraryAdapter(catalog: catalog(), assetLibraryID: "library")
+        for state in ["AWAITING_UPLOAD", "UPLOAD_COMPLETE", "FAILED", "COMPLETE", "ACTIVE"] {
+            XCTAssertThrowsError(try adapter.placeProcessedImage(processedImage(state: state), expectedSpecID: "spec-0", localizationID: "loc"))
+        }
+        XCTAssertThrowsError(try adapter.placeProcessedImage(processedImage(), expectedSpecID: "spec-1", localizationID: "loc"))
+        XCTAssertThrowsError(try adapter.placeProcessedImage(processedImage(), expectedSpecID: "unknown", localizationID: "loc"))
+    }
+
+    func testOrderingHasTenUniqueIDsInArrayOrderAndNoPositionAttribute() throws {
+        let adapter = try DuoAssetLibraryAdapter(catalog: catalog(), assetLibraryID: "library")
+        let ids = (1...10).map { "placement-\($0)" }.reversed().map { $0 }
+        let request = try adapter.orderPlacements(ids, localizationID: "target-locale")
+        XCTAssertEqual(request.path, "/v1/appAssetLibraryPlacementOrderingRequests")
+        XCTAssertEqual(request.body["data"]?["attributes"], .object(["placementGroup": .string("runtime-duo-group")]))
+        XCTAssertEqual(request.body["data"]?["relationships"]?["orderedPlacements"]?["data"]?.arrayValue?.compactMap { $0["id"]?.stringValue }, ids)
+        for invalid in [Array(ids.prefix(9)), ids + ["extra"], Array(repeating: "same", count: 10)] {
+            XCTAssertThrowsError(try adapter.orderPlacements(invalid, localizationID: "loc"))
+        }
+    }
+
+    func testOfflineAdapterRejectsUnsafeIDsAndReservationInputs() throws {
+        let adapter = try DuoAssetLibraryAdapter(catalog: catalog(), assetLibraryID: "library")
+        for id in ["", ".", "..", "a/b", "a?query"] {
+            XCTAssertThrowsError(try adapter.commitImage(imageID: id))
+        }
+        for name in ["../x.png", "x.jpg", "/x.png", "x.png?secret"] {
+            XCTAssertThrowsError(try adapter.reserveImage(fileName: name, fileSize: 1))
+        }
+        XCTAssertThrowsError(try adapter.reserveImage(fileName: "x.png", fileSize: 0))
+    }
+
+    func testOfflinePlanPreservesReviewedOriginsAndUnresolvedTargetIDs() throws {
+        let fixture = try planFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        let plan = try fixture.build()
+        XCTAssertEqual(plan["publishable"], .bool(false))
+        XCTAssertEqual(plan["networkExecutorIncluded"], .bool(false))
+        XCTAssertEqual(plan["targetVersion"], .null)
+        let locale = try XCTUnwrap(plan["localizations"]?.arrayValue?.first)
+        XCTAssertEqual(locale["appStoreVersionLocalizationId"], .null)
+        let images = try XCTUnwrap(locale["images"]?.arrayValue)
+        XCTAssertEqual(images.count, 10)
+        XCTAssertEqual(images.map { $0["position"]?.intValue }, Array(1...10).map(Optional.some))
+        XCTAssertEqual(images[0]["origin"], .object(["kind": .string("fixture-original-origin"), "launch": .null]))
+        XCTAssertEqual(images[0]["imageId"], .null)
+        XCTAssertEqual(images[0]["placementId"], .null)
+        XCTAssertEqual(Set(images.compactMap { $0["reservationDependencyKey"]?.stringValue }).count, 10)
+        XCTAssertEqual(plan["qualificationLimits"], .object(["widgetUnresolved": .array([.string("AX_READY_NOT_OBSERVED")])]))
+    }
+
+    func testOfflinePlanRejectsChangedInputsWrongAppAndCatalogFileConstraints() throws {
+        let fixture = try planFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        XCTAssertThrowsError(try DuoAssetLibraryPlanBuilder.build(inspectionURL: fixture.inspection, expectedInspectionSHA256: fixture.inspectionSHA, importURL: fixture.importURL,
+            expectedImportSHA256: String(repeating: "0", count: 64), expectedSelectionSHA256: fixture.selectionSHA))
+        var inspection = try FileIO.readJSON(at: fixture.inspection).objectValue!
+        let original = inspection
+        inspection["bundleId"] = .string("another.app")
+        try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+        XCTAssertThrowsError(try fixture.build(revisedInspectionSHA256: FileIO.sha256(try Data(contentsOf: fixture.inspection))))
+        inspection = original
+        var catalog = inspection["catalogResources"]!.arrayValue!
+        var row = catalog[0].objectValue!, attrs = row["attributes"]!.objectValue!
+        var specs = attrs["imageSpecs"]!.arrayValue!
+        for index in specs.indices {
+            var spec = specs[index].objectValue!
+            spec["maxFileSize"] = .number(1)
+            specs[index] = .object(spec)
+        }
+        attrs["imageSpecs"] = .array(specs); row["attributes"] = .object(attrs); catalog[0] = .object(row)
+        inspection["catalogResources"] = .array(catalog)
+        try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+        XCTAssertThrowsError(try fixture.build(revisedInspectionSHA256: FileIO.sha256(try Data(contentsOf: fixture.inspection))))
+        try FileIO.writeJSONValue(.object(original), to: fixture.inspection)
+        try Data("tampered retained evidence".utf8).write(to: fixture.directory.appendingPathComponent("import/config.json"))
+        XCTAssertThrowsError(try fixture.build())
+    }
+
+    func testOfflinePlanPinsInspectionAndRejectsStaleTargetIDs() throws {
+        let fixture = try planFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        var inspection = try FileIO.readJSON(at: fixture.inspection).objectValue!
+        inspection["localizations"] = .array([.object(["locale": .string("en-US"), "localizationId": .string("old-2.4-locale")])])
+        try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+        XCTAssertThrowsError(try fixture.build()) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Inspection hash differs"))
+        }
+        XCTAssertThrowsError(try fixture.build(revisedInspectionSHA256: FileIO.sha256(try Data(contentsOf: fixture.inspection)))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Absent target"))
+        }
+        inspection["localizations"] = .array([])
+        for (version, platform) in [("2.4", "IOS"), ("3.0", "MAC_OS")] {
+            inspection["targetVersion"] = .object(["id": .string("target"), "attributes": .object([
+                "appVersionState": .string("PREPARE_FOR_SUBMISSION"), "versionString": .string(version), "platform": .string(platform)])])
+            try FileIO.writeJSONValue(.object(inspection), to: fixture.inspection)
+            XCTAssertThrowsError(try fixture.build(revisedInspectionSHA256: FileIO.sha256(try Data(contentsOf: fixture.inspection))))
+        }
+    }
+
+    private func processedImage(state: String = "PREPARE_FOR_SUBMISSION") -> JSONValue {
+        .object(["type": .string("appAssetLibraryImages"), "id": .string("returned-image"),
+                 "attributes": .object(["state": .string(state), "category": .string("APP_SCREENSHOTS_AND_PREVIEWS"), "specId": .string("spec-0")])])
+    }
+
+    func testOfflinePlanRequiresCompleteConfiguredLocaleBijection() throws {
+        let fixture = try planFixture(extraConfiguredLocale: true)
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+        XCTAssertThrowsError(try fixture.build()) { error in
+            XCTAssertTrue(error.localizedDescription.contains("configured locale bijection"))
+        }
+    }
+
+    private struct PlanFixture {
+        let directory: URL, importURL: URL, inspection: URL
+        let importSHA: String, selectionSHA: String, inspectionSHA: String
+        func build(revisedInspectionSHA256: String? = nil) throws -> JSONValue {
+            try DuoAssetLibraryPlanBuilder.build(inspectionURL: inspection, expectedInspectionSHA256: revisedInspectionSHA256 ?? inspectionSHA, importURL: importURL,
+                expectedImportSHA256: importSHA, expectedSelectionSHA256: selectionSHA)
+        }
+    }
+
+    private func planFixture(extraConfiguredLocale: Bool = false) throws -> PlanFixture {
+        let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString)
+        let root = directory.appendingPathComponent("import")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let originalSelection = directory.appendingPathComponent("AppStoreReleases/3.0/screenshots/selected-lineup.json").path
+        let configURL = root.appendingPathComponent("config.json")
+        var configuredLocales: [JSONValue] = [.object([
+            "appStoreLocale": .string("en-US"), "screenshotConfiguration": .string("en-US")])]
+        if extraConfiguredLocale {
+            configuredLocales.append(.object(["appStoreLocale": .string("es-MX"), "screenshotConfiguration": .string("es-MX")]))
+        }
+        try FileIO.writeJSONValue(.object(["bundleId": .string("com.example.App"), "localizations": .array(configuredLocales)]), to: configURL)
+        let provider = CGDataProvider(data: Data(repeating: 96, count: 1398 * 2034 * 3) as CFData)!
+        let image = CGImage(width: 1398, height: 2034, bitsPerComponent: 8, bitsPerPixel: 24, bytesPerRow: 1398 * 3,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+        let png = NSMutableData(); let destination = CGImageDestinationCreateWithData(png, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil); XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let bytes = png as Data, imageSHA = FileIO.sha256(bytes)
+        var cards: [JSONValue] = [], selected: [JSONValue] = []
+        for family in ["iphone-6.9", "ipad-13", "iphone-duo-profile"] {
+            for position in 1...10 {
+                let file = "\(position).png", relative = "screenshots/en-US/\(family)/\(file)"
+                let asset: JSONValue = .object(["sha256": .string(imageSHA), "dimensions": .array([.number(1398), .number(2034)]),
+                                               "importedPath": .string(relative)])
+                if family == "iphone-duo-profile" { try FileIO.write(data: bytes, to: root.appendingPathComponent(relative)) }
+                var card: [String: JSONValue] = ["appStoreLocale": .string("en-US"), "screenshotConfiguration": .string("en-US"),
+                    "family": .string(family), "position": .number(Double(position)), "assets": .object(["screenshots": asset])]
+                card["origin"] = .object(["kind": .string("fixture-original-origin"), "launch": .null]); cards.append(.object(card))
+                card["outputFile"] = .string(file); selected.append(.object(card))
+            }
+        }
+        let limits: JSONValue = .object(["widgetUnresolved": .array([.string("AX_READY_NOT_OBSERVED")])])
+        let selectionURL = root.appendingPathComponent("selection.json")
+        try FileIO.writeJSONValue(.object(["releaseVersion": .string("3.0"), "screenshotConfigurationOrder": .array([.string("en-US")]),
+            "selectedFramedImageCount": .number(30), "images": .array(selected), "qualificationLimits": limits,
+            "localeMappingSource": .object(["path": .string("../../Surround/config.json"), "sha256": .string(FileIO.sha256(try Data(contentsOf: configURL)))]),
+            "locales": .array([.object(["appStoreLocale": .string("en-US"), "screenshotConfiguration": .string("en-US")])])]), to: selectionURL)
+        let selectionSHA = FileIO.sha256(try Data(contentsOf: selectionURL))
+        func binding(_ url: URL, original: String) throws -> JSONValue {
+            let data = try Data(contentsOf: url)
+            return .object(["originalPath": .string(original), "retainedPath": .string(url.lastPathComponent),
+                            "sha256": .string(FileIO.sha256(data)), "bytes": .number(Double(data.count))])
+        }
+        let importURL = root.appendingPathComponent("selected-import.json")
+        try FileIO.writeJSONValue(.object(["schemaVersion": .number(1), "mode": .string("selected-import"), "publishable": .bool(false),
+            "selectionSHA256": .string(selectionSHA), "selectionOriginalPath": .string(originalSelection),
+            "qualificationLimits": limits, "cards": .array(cards), "sourceBindings": .array([
+                try binding(selectionURL, original: originalSelection),
+                try binding(configURL, original: directory.appendingPathComponent("Surround/config.json").path)])]), to: importURL)
+        let inspectionURL = directory.appendingPathComponent("inspection.json")
+        let reference = try catalog()
+        try FileIO.writeJSONValue(.object(["purpose": .string("duo-asset-library-readonly-inspection"),
+            "perAppAssetLibraryReadable": .bool(true), "remoteMutationsPerformed": .bool(false),
+            "bundleId": .string("com.example.App"), "requestedVersion": .string("3.0"),
+            "catalogResources": .array(reference), "routing": try DuoAssetLibraryRouting.resolve(catalog: reference),
+            "assetLibraryId": .string("library"), "targetVersion": .null, "localizations": .array([])]), to: inspectionURL)
+        return PlanFixture(directory: directory, importURL: importURL, inspection: inspectionURL,
+                           importSHA: FileIO.sha256(try Data(contentsOf: importURL)), selectionSHA: selectionSHA,
+                           inspectionSHA: FileIO.sha256(try Data(contentsOf: inspectionURL)))
+    }
+
+    private func group(platform: String = "IPHONE_APP_STORE") -> [String: Any] {
+        ["platform": platform, "displayClassId": "IPHONE_DUO", "placementProfileGroupId": "runtime-duo-group"]
+    }
+
+    private func catalog(groups: [[String: Any]]? = nil, alpha: Bool = false, includeInner: Bool = true, malformedSpec: Bool = false) throws -> [JSONValue] {
+        let sizes = [(1398, 2034), (2034, 1398)] + (includeInner ? [(2853, 2007), (2007, 2853)] : [])
+        let specs: [[String: Any]] = sizes.enumerated().map { index, size in
+            ["specId": "spec-\(index)", "alphaAllowed": alpha, "compatiblePlacementTypes": ["APP_SCREENSHOT"],
+             "mimeTypes": ["image/png"], "maxFileSize": 524288000,
+             "fileExtensions": [".png"], "dimensions": ["minWidth": size.0, "maxWidth": size.0,
+                                                          "minHeight": size.1, "maxHeight": size.1]]
+        }
+        return [try JSONValue(any: ["id": "catalog", "attributes": [
+            "placementProfileGroups": groups ?? [group(), group(platform: "IMESSAGE_APP_STORE")],
+            "placementTypes": [["placementTypeId": "APP_SCREENSHOT", "acceptsAssetCategories": ["APP_SCREENSHOTS_AND_PREVIEWS"],
+                                "specMappings": [["placementGroupId": "runtime-duo-group", "specs": specs.map { $0["specId"]! } + (malformedSpec ? [42] : [])]]]],
+            "features": [["featureId": "APP_STORE_VERSIONS", "placementPolicies": [["placementType": "APP_SCREENSHOT",
+                           "groupLimits": [["groupIds": ["runtime-duo-group", "other-phone"], "maxCount": 10]]]]]],
+            "imageSpecs": specs,
+        ]])]
+    }
+}
+
+private final class ReadOnlyDuoTransport: HTTPTransport, @unchecked Sendable {
+    let catalog: [JSONValue]
+    var methods: [String] = []
+    var lastQuery: [URLQueryItem]?
+    let appID: String
+    init(catalog: [JSONValue], appID: String = "app") { self.catalog = catalog; self.appID = appID }
+    func send(_ request: URLRequest) throws -> TransportResponse {
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertNil(request.httpBody)
+        methods.append(request.httpMethod!)
+        let value: JSONValue
+        switch request.url!.path {
+        case "/v1/appAssetLibraryRefData": value = .object(["data": .array(catalog)])
+        case "/v1/apps": value = .object(["data": .array([.object(["id": .string(appID)])])])
+        case "/v1/apps/app/assetLibrary": value = .object(["data": .object(["id": .string("library")])])
+        case "/v1/apps/app/appStoreVersions": value = .object(["data": .array([.object([
+            "id": .string("version"), "attributes": .object(["versionString": .string("3.0")])
+        ])])])
+        case "/v1/appStoreVersions/version/appStoreVersionLocalizations": value = .object(["data": .array([.object([
+            "id": .string("locale"), "attributes": .object(["locale": .string("en-US")])
+        ])])])
+        case "/v1/appStoreVersionLocalizations/locale/placements":
+            lastQuery = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+            value = .object(["data": .array([.object(["id": .string("placement")])])])
+        default: throw ReleaseToolError.api("Unexpected mocked GET")
+        }
+        return TransportResponse(data: try JSONEncoder().encode(value), statusCode: 200)
+    }
+}

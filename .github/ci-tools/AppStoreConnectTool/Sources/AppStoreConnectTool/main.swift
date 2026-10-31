@@ -46,6 +46,10 @@ private struct Arguments {
       init --version V --output DIR --locales-config FILE
       validate-release --release FILE --locales-config FILE --output FILE
       snapshot --release NORMALIZED_JSON --output FILE
+      inspect-duo-placement --bundle-id ID --version V --output FILE
+      build-duo-placement-plan --inspection FILE --selected-import FILE \\
+        --expected-inspection-sha256 SHA256 --expected-import-sha256 SHA256 \\
+        --expected-selection-sha256 SHA256 --output FILE
       validate-snapshot --release NORMALIZED_JSON --snapshot REMOTE_SNAPSHOT_JSON
       build-manifest --release NORMALIZED_JSON --locales-config FILE \\
         --screenshots-root DIR --capture-metadata FILE --remote-snapshot FILE \\
@@ -60,7 +64,8 @@ private struct Arguments {
         --expected-source-version V --confirm-version V \\
         --confirm-manifest-digest SHA256 --journal FILE
 
-    snapshot and both publish commands require ASC_KEY_ID, ASC_ISSUER_ID, and ASC_PRIVATE_KEY_PATH.
+    snapshot, inspect-duo-placement and both publish commands require ASC_KEY_ID,
+    ASC_ISSUER_ID, and ASC_PRIVATE_KEY_PATH. build-duo-placement-plan is offline.
     """
 }
 
@@ -104,12 +109,39 @@ do {
         let target = snapshot.targetVersion == nil ? "missing (will be created on publish)" : "existing"
         print("Captured App Store Connect snapshot for \(release.version): \(target)")
 
+    case "inspect-duo-placement":
+        let values = try arguments.require("--bundle-id", "--version", "--output")
+        let output = fileURL(values[2])
+        guard !FileManager.default.fileExists(atPath: output.path) else {
+            throw ReleaseToolError.validation("Inspection output already exists")
+        }
+        let credentials: ASCCredentials
+        do { credentials = try ASCCredentials.fromEnvironment() }
+        catch { throw ReleaseToolError.validation("Configured ASC credentials are unavailable; no request was made") }
+        let client = ASCAPIClient(credentials: credentials, maxRetries: 0)
+        let result = try DuoAssetLibraryInspector(client: client).capture(bundleId: values[0], version: values[1])
+        try FileIO.writeJSONValue(result, to: output)
+        print("Saved GET-only Duo placement discovery; upload acceptance and publication are not claimed")
+
     case "validate-snapshot":
         let values = try arguments.require("--release", "--snapshot")
         let release = try ManifestBuilder.decode(NormalizedRelease.self, at: fileURL(values[0]))
         let snapshot = try ManifestBuilder.decode(RemoteSnapshot.self, at: fileURL(values[1]))
         try SnapshotPreflight.validate(release: release, snapshot: snapshot)
         print("Validated App Store Connect metadata preflight for \(release.version)")
+
+    case "build-duo-placement-plan":
+        let values = try arguments.require("--inspection", "--selected-import", "--expected-inspection-sha256", "--expected-import-sha256", "--expected-selection-sha256", "--output")
+        let output = fileURL(values[5])
+        guard !FileManager.default.fileExists(atPath: output.path) else {
+            throw ReleaseToolError.validation("Offline plan output already exists")
+        }
+        let plan = try DuoAssetLibraryPlanBuilder.build(inspectionURL: fileURL(values[0]), expectedInspectionSHA256: values[2], importURL: fileURL(values[1]),
+            expectedImportSHA256: values[3], expectedSelectionSHA256: values[4])
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(plan).write(to: output, options: .withoutOverwriting)
+        print("Saved offline Duo request plan; no requests, uploads or qualification changes were performed")
 
     case "build-manifest":
         let values = try arguments.require(

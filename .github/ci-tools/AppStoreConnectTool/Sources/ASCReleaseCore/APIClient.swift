@@ -60,6 +60,15 @@ public enum ASCRetryPolicy: Equatable, Sendable {
     case singleAttempt
 }
 
+/// Opt-in structured status reporting for callers that journal mutation intent.
+/// The legacy request interface keeps its existing error behavior by default.
+public struct ASCHTTPResponseError: Error, LocalizedError {
+    public let statusCode: Int
+    public let method: String
+    public let path: String
+    public var errorDescription: String? { "\(method) \(path) returned HTTP \(statusCode)" }
+}
+
 public final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
 
@@ -120,7 +129,8 @@ public final class ASCAPIClient: @unchecked Sendable {
         query: [URLQueryItem] = [],
         body: JSONValue? = nil,
         expectedStatus: Range<Int> = 200..<300,
-        retryPolicy: ASCRetryPolicy = .automatic
+        retryPolicy: ASCRetryPolicy = .automatic,
+        reportHTTPStatus: Bool = false
     ) throws -> JSONValue? {
         let url = try makeURL(path: path, query: query)
         var request = URLRequest(url: url)
@@ -133,6 +143,9 @@ public final class ASCAPIClient: @unchecked Sendable {
         }
         let response = try sendWithRetry(request, retryPolicy: retryPolicy)
         guard expectedStatus.contains(response.statusCode) else {
+            if reportHTTPStatus {
+                throw ASCHTTPResponseError(statusCode: response.statusCode, method: method, path: url.path)
+            }
             throw apiError(method: method, url: url, response: response)
         }
         guard !response.data.isEmpty else { return nil }
@@ -176,7 +189,7 @@ public final class ASCAPIClient: @unchecked Sendable {
         return resources
     }
 
-    public func upload(operation: UploadOperation, fileData: Data) throws {
+    public func upload(operation: UploadOperation, fileData: Data, retryPolicy: ASCRetryPolicy = .automatic) throws {
         guard operation.offset >= 0, operation.length >= 0,
               operation.offset + operation.length <= fileData.count else {
             throw ReleaseToolError.validation("Upload operation has an invalid byte range")
@@ -190,7 +203,7 @@ public final class ASCAPIClient: @unchecked Sendable {
         for header in operation.requestHeaders {
             request.setValue(header.value, forHTTPHeaderField: header.name)
         }
-        let response = try sendWithRetry(request)
+        let response = try sendWithRetry(request, retryPolicy: retryPolicy)
         guard (200..<300).contains(response.statusCode) else {
             throw apiError(method: operation.method, url: url, response: response)
         }

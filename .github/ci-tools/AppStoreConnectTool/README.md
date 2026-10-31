@@ -32,6 +32,89 @@ app-store-connect-tool validate-snapshot \
 Only `publish` and `publish-metadata-only` mutate App Store Connect. The former requires an exact
 `--confirm-version`; the latter also requires the reviewed source version and manifest digest.
 
+`inspect-duo-placement` is a separate GET-only diagnostic. Build the tool before
+loading credentials, then run the built executable in the documented local
+credential process:
+
+```sh
+app-store-connect-tool inspect-duo-placement \
+  --bundle-id com.honganhkhoa.Surround --version 3.0 \
+  --output /absolute/new/path/duo-placement-inspection.json
+```
+
+It discovers the ordinary iPhone Duo Asset Library group and image specifications
+from Apple's returned catalog, then reads the app's library and any existing
+version-localized placements in group order. Outer and inner displays share the
+returned per-localization group limit. `IPHONE_DUO` is a display class, not a
+legacy screenshot display-type enum. The command creates no remote resources,
+does not implement Asset Library publication, and explicitly leaves upload
+acceptance and storefront behavior unverified. Missing/ambiguous groups, malformed
+specifications and unsafe resource identifiers fail closed. Credentials and key
+contents are never included in diagnostic output.
+
+The separate `build-duo-placement-plan` command is offline:
+
+```sh
+app-store-connect-tool build-duo-placement-plan \
+  --inspection /reviewed/duo-inspection.json \
+  --expected-inspection-sha256 REVIEWED_INSPECTION_SHA256 \
+  --selected-import /reviewed/import/selected-import.json \
+  --expected-import-sha256 REVIEWED_IMPORT_SHA256 \
+  --expected-selection-sha256 REVIEWED_SELECTION_SHA256 \
+  --output /absolute/new/path/duo-plan.json
+```
+
+Run the full private selected-import verifier before planning. The builder also
+checks every retained source-binding hash, exact import/selection/inspection
+pins, app/locale identity and every framed Duo PNG against the returned opaque
+size, MIME and file-size specification. It retains all ten ordered cards per
+locale, their original origins and distinct locale/slot/hash reservation keys.
+Absent target versions cannot supply localization IDs. Future image/placement
+IDs stay unresolved until an authorized executor obtains them.
+
+`DuoAssetLibraryAdapter` only serializes image reservation, `uploaded:true`
+commit, processed-image placement and ten-ID ordering bodies. It has no client
+or network executor. Commit omits legacy MD5/sourceFileChecksum fields; specId
+is processing readback evidence, not a reservation field. Placement eligibility
+requires `PREPARE_FOR_SUBMISSION` and the intended specification. Ordering uses
+one `orderedPlacements` array for the entire group/localization, with no numeric
+position attribute. Upload operations must come from an actual reservation.
+Local plans remain unpublishable and do not change capture/widget qualification
+or prove Apple write acceptance. An existing placement's `ACTIVE` state does
+not prove its image processing metadata; that needs separate image readback.
+
+The separate `DuoPublishingExecutor` component implements per-localization
+execution and recovery for a future qualified handoff. It has no CLI entry point
+and cannot decode the unqualified offline plan as a `DuoPublishSet`. The caller
+must supply actual editable target/localization IDs, the reviewed target baseline
+and exact version/set-digest confirmations. Version creation and listing metadata
+remain in the parent publishing workflow.
+
+It seals full-size PNG backups and image identities, stages and processes all ten
+replacement images, then replaces and orders placements. Its recovery strategy
+is fixed in the journal: reupload verified backup PNG content, create new
+placements and restore the original whole-group order. Existing image assets are
+never deleted or archived. Original placement/image IDs are not claimed to survive
+restoration. An empty baseline is restored to verified emptiness; smaller
+baselines are ordered using their complete backed-up count.
+
+The journal requires an existing handoff directory, exclusive ownership, synced
+backup files/directories and synced intent writes before mutation. Response-known
+and readback-verified states are separate. Unknown reservations or uploads stop
+without blind replay; filename/size alone never establish ownership. Known image
+IDs can reconcile lost placement responses, and exact whole-order readback can
+reconcile lost forward or rollback ordering responses. Foreign IDs, image changes,
+external reordering or persistence failure stop further writes. Verified rollback
+creates a checkpoint for resuming the same reviewed set in a new epoch; completed
+groups are read back before reuse. Upload URLs, headers and credentials are not
+journaled. Mutation requests and upload operations use a single attempt.
+
+This component is tested with injected fixtures, including recovery and existing
+legacy retry/rollback compatibility. The current selected capture remains gated;
+local execution tests do not establish server write acceptance, storefront
+presentation or historical capture qualification. No publishing command invokes
+the new component yet.
+
 For a patch release that changes only localized What's New text, use the dedicated
 metadata-only manifest and publisher instead of capturing screenshots:
 
@@ -77,6 +160,7 @@ The preferred configuration shape is:
       "expectedCount": 10,
       "pixelWidth": 1320,
       "pixelHeight": 2868,
+      "allowsMixedOrientations": true,
       "additionalPixelSizes": [
         { "pixelWidth": 1260, "pixelHeight": 2736 },
         { "pixelWidth": 1290, "pixelHeight": 2796 }
@@ -96,6 +180,14 @@ The preferred configuration shape is:
   ]
 }
 ```
+
+`allowsMixedOrientations` is an optional Boolean, enabled only for the public
+iPhone family. The first image must match an approved family base size; later
+images may use that base or its exact transpose, without mixing hardware
+resolutions. Opted-in manifests record `pixelWidth` and `pixelHeight` on every
+image and retain a set-level base size. Verification fully decodes each PNG
+against its own recorded dimensions. Omitted optional fields preserve the
+encoded shape and digest of legacy uniform sets, including rollback manifests.
 
 ## Release package
 
@@ -133,16 +225,18 @@ policy must be an absolute HTTP(S) URL.
 Validation includes Apple field limits, including the 100-character keyword limit measured
 conservatively with Swift's UTF-16 view. This matches App Store Connect's treatment of combining
 marks in localized keywords. The capture metadata must list exactly the configured screenshot
-locales, devices, scenes, and expected total count. PNG count and portrait-iPhone/landscape-iPad
-orientation are independently
-checked before a manifest can be built. ImageIO must fully decode every single-frame PNG at one
-of the family's configured pixel sizes, with no alpha channel and neutral orientation metadata (`1`).
+locales, devices, scenes, and expected total count. PNG count and dimensions are independently
+checked before a manifest can be built. ImageIO must fully decode every single-frame PNG at
+the family's approved base size, or its exact transpose when that family explicitly opts in,
+with no alpha channel and neutral orientation metadata (`1`). Other hardware sizes cannot be
+mixed within a set.
 Manifest verification repeats these checks so a file or metadata-only rotation cannot change
 after review.
 
 ## Credentials and safety
 
-Only environment variable names are read; no credentials are written into an artifact:
+Credentials are read locally from the following environment references and the referenced
+private-key file; no credentials or private-key contents are written into an artifact:
 
 ```text
 ASC_KEY_ID
