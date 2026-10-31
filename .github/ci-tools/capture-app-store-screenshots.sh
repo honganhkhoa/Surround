@@ -30,6 +30,8 @@ readonly -a expected_locales=(
   "es-MX"
   "pt-BR"
   "pt-PT"
+  "ms-MY"
+  "id-ID"
 )
 
 readonly -a expected_iphone_scenes=(
@@ -97,7 +99,7 @@ Options:
                        Repeat to capture multiple locales. Supported values are
                        en-US, fr-FR, de-DE, ja-JP, vi-VN, th-TH,
                        zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES, es-MX, pt-BR,
-                       and pt-PT. Defaults to all thirteen.
+                       pt-PT, ms-MY, and id-ID. Defaults to all fifteen.
   --keep-simulators    Retain the task-created devices for reviewed cleanup.
                        Teardown still clears overrides and shuts them down.
                        Their UUIDs and names are recorded in simulators.tsv.
@@ -115,7 +117,7 @@ Environment overrides:
 
 The AppStoreScreenshots test plan must contain configurations named en-US,
 fr-FR, de-DE, ja-JP, vi-VN, th-TH, zh-Hans-CN, zh-Hant-TW, ko-KR, es-ES,
-es-MX, pt-BR, and pt-PT. For example, pass --locale en-US for an English-only
+es-MX, pt-BR, pt-PT, ms-MY, and id-ID. For example, pass --locale en-US for an English-only
 capture. The UI test must keep exactly ten named screenshot attachments for
 iPhone and exactly ten for iPad. The iPhone themes source is landscape; its
 other nine scenes are portrait. Every iPad source is landscape.

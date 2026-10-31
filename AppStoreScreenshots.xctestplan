@@ -103,6 +103,22 @@
         "language" : "pt-PT",
         "region" : "PT"
       }
+    },
+    {
+      "id" : "7A100005-4000-4000-8000-000000000005",
+      "name" : "ms-MY",
+      "options" : {
+        "language" : "ms",
+        "region" : "MY"
+      }
+    },
+    {
+      "id" : "7A100006-4000-4000-8000-000000000006",
+      "name" : "id-ID",
+      "options" : {
+        "language" : "id",
+        "region" : "ID"
+      }
     }
   ],
   "defaultOptions" : {

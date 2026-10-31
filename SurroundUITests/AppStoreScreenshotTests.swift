@@ -47,6 +47,93 @@ final class AppStoreScreenshotTests: SurroundUITestCase {
         appStoreWidgetProofToken = UUID().uuidString
     }
 
+    // Diagnostic only: observes the existing widget page and never lays out,
+    // isolates, or exports a marketing screenshot. Native-display ownership
+    // cannot be inferred from an accessibility element's frame or ancestry.
+    func testDuoWidgetQualification() throws {
+        guard ProcessInfo.processInfo.environment["SURROUND_DUO_WIDGET_QUALIFICATION"] == "1" else {
+            throw XCTSkip("Opt in to the focused Duo widget diagnostic.")
+        }
+        #if targetEnvironment(macCatalyst)
+        throw XCTSkip("This diagnostic requires the explicitly selected Duo Simulator.")
+        #else
+        let app = XCUIApplication()
+        app.launchArguments = [
+            SurroundUITestContract.launchArgument,
+            SurroundUITestContract.screenshotLaunchArgument,
+            SurroundUITestContract.appStoreScreenshotWidgetProofTokenLaunchArgument,
+            appStoreWidgetProofToken,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        ]
+        registerAppTermination(app)
+        app.launch()
+        element(SurroundUITestContract.AccessibilityID.screenHome, in: app)
+        // On Duo, a global Home press can leave the SDK screenshot on the
+        // inactive app display. Establish app termination separately, then let
+        // the host inspect the freshly enumerated physical outer display.
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        XCTAssertTrue(springboard.wait(for: .runningForeground, timeout: 10))
+        let allWidgetMarkers = springboard.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "surround.appstore.widget.")
+        )
+        func allIdentifiers() -> [String] { allWidgetMarkers.allElementsBoundByIndex.map(\.identifier).sorted() }
+        let prefix = "surround.appstore.widget.ready.medium.games-3.displaying-2.rendering-fullColor.token-"
+            + appStoreWidgetProofToken + ".locale-"
+        let matches = springboard.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", prefix)
+        )
+        func identifiers() -> [String] { matches.allElementsBoundByIndex.map(\.identifier).sorted() }
+        func attach(_ phase: String, _ values: [String]) throws {
+            let payload: [String: Any] = [
+                "phase": phase, "observedAt": ISO8601DateFormatter().string(from: Date()),
+                "fixtureRunToken": appStoreWidgetProofToken, "expectedLocale": "en_US",
+                "readyIdentifiers": values,
+                "allWidgetIdentifiers": allIdentifiers(),
+                "staleReadyIdentifiers": allIdentifiers().filter {
+                    $0.hasPrefix("surround.appstore.widget.ready.") && !$0.contains(".token-" + appStoreWidgetProofToken + ".")
+                },
+                "unreadyIdentifiers": allIdentifiers().filter { $0.hasPrefix("surround.appstore.widget.unready.") },
+                "appNotRunning": app.state == .notRunning,
+                "homeTransition": "terminate-and-wait-notRunning",
+                "sameRenderDisplayBindingEstablished": false,
+                "historicalSelectedScreenshotsQualified": false,
+            ]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "duo-widget-qualification-" + phase
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        try attach("home-transition", [])
+        print("SURROUND_DUO_WIDGET_HOME_TRANSITION_COMPLETED " + appStoreWidgetProofToken)
+        fflush(stdout)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 8))
+        let observed = matches.firstMatch.waitForExistence(timeout: 30)
+        let before = identifiers()
+        try attach("before", before)
+        keepSpringBoardDiagnostics(springboard, name: "Duo widget qualification hierarchy")
+        XCTAssertTrue(observed, "No current-run widget ready marker was observed; native display binding remains unresolved.")
+        let unique = Set(before)
+        XCTAssertEqual(unique.count, 1, "Expected one unambiguous ready identifier; duplicate AX nodes are retained in evidence.")
+        let identifier = try XCTUnwrap(unique.first)
+        let suffix = String(identifier.dropFirst(prefix.count))
+        let marker = try XCTUnwrap(suffix.range(of: ".expires-", options: .backwards))
+        XCTAssertEqual(String(suffix[..<marker.lowerBound]), "en_US")
+        let expiry = try XCTUnwrap(TimeInterval(suffix[marker.upperBound...]))
+        XCTAssertGreaterThan(expiry, Date().timeIntervalSince1970 + 5 * 60 * 60)
+        print("SURROUND_DUO_WIDGET_BOUNDARY_READY " + appStoreWidgetProofToken)
+        fflush(stdout)
+        // The host may retain a separate native-display PNG during this hold.
+        // That does not establish an AX-element-to-physical-display join.
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 20))
+        let after = identifiers()
+        try attach("after", after)
+        XCTAssertEqual(Set(after), unique, "Current-run widget readiness changed across the diagnostic boundary.")
+        #endif
+    }
+
     func testQuickMatchMarketingPilot() throws {
         guard ProcessInfo.processInfo.environment[
             "SURROUND_QUICK_MATCH_MARKETING_PILOT"

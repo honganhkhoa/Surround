@@ -715,7 +715,9 @@ public final class Publisher {
                 byteCount: entry.byteCount,
                 sha256: entry.sha256,
                 md5: entry.md5,
-                order: entry.order
+                order: entry.order,
+                pixelWidth: entry.pixelWidth,
+                pixelHeight: entry.pixelHeight
             )
             restoredIds.append(try uploadScreenshot(screenshot, setId: setId))
             restoredScreenshots.append(screenshot)

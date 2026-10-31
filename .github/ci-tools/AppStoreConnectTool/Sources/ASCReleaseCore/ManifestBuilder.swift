@@ -61,10 +61,25 @@ public enum ManifestBuilder {
                 }
                 let screenshots = try files.enumerated().map { index, url in
                         let data = try Data(contentsOf: url)
+                        let decoded = try ImageValidation.decodePNG(data, context: url.path)
+                        let size = ScreenshotPixelSize(
+                            pixelWidth: decoded.pixelWidth, pixelHeight: decoded.pixelHeight
+                        )
+                        let transposed = ScreenshotPixelSize(
+                            pixelWidth: capturedPixelSize.pixelHeight,
+                            pixelHeight: capturedPixelSize.pixelWidth
+                        )
+                        guard size == capturedPixelSize ||
+                                (family.allowsMixedOrientations == true && size == transposed) else {
+                            throw ReleaseToolError.validation(
+                                "Screenshot must use the set's base resolution"
+                                    + " or its explicitly allowed transpose: \(url.path)"
+                            )
+                        }
                         try ImageValidation.validateScreenshot(
                             data,
-                            pixelWidth: capturedPixelSize.pixelWidth,
-                            pixelHeight: capturedPixelSize.pixelHeight,
+                            pixelWidth: size.pixelWidth,
+                            pixelHeight: size.pixelHeight,
                             context: url.path
                         )
                         return ManifestScreenshot(
@@ -73,7 +88,9 @@ public enum ManifestBuilder {
                             byteCount: data.count,
                             sha256: FileIO.sha256(data),
                             md5: FileIO.md5(data),
-                            order: index + 1
+                            order: index + 1,
+                            pixelWidth: family.allowsMixedOrientations == true ? size.pixelWidth : nil,
+                            pixelHeight: family.allowsMixedOrientations == true ? size.pixelHeight : nil
                         )
                     }
                 sets.append(ManifestScreenshotSet(
@@ -81,7 +98,8 @@ public enum ManifestBuilder {
                     displayType: family.displayType,
                     pixelWidth: capturedPixelSize.pixelWidth,
                     pixelHeight: capturedPixelSize.pixelHeight,
-                    screenshots: screenshots
+                    screenshots: screenshots,
+                    allowsMixedOrientations: family.allowsMixedOrientations == true ? true : nil
                 ))
             }
             locales.append(ManifestLocale(
@@ -204,6 +222,9 @@ public enum ManifestBuilder {
                     throw ReleaseToolError.validation("Manifest screenshot order or dimensions are invalid")
                 }
                 screenshotCount += set.screenshots.count
+                for screenshot in set.screenshots {
+                    _ = try resolvedPixelSize(screenshot, in: set)
+                }
             }
         }
         guard manifest.captureMetadata["expectedScreenshotCount"]?.intValue == screenshotCount else {
@@ -239,13 +260,35 @@ public enum ManifestBuilder {
                     }
                     try ImageValidation.validateScreenshot(
                         data,
-                        pixelWidth: set.pixelWidth,
-                        pixelHeight: set.pixelHeight,
+                        pixelWidth: try resolvedPixelSize(screenshot, in: set).pixelWidth,
+                        pixelHeight: try resolvedPixelSize(screenshot, in: set).pixelHeight,
                         context: screenshot.path
                     )
                 }
             }
         }
+    }
+
+    private static func resolvedPixelSize(
+        _ screenshot: ManifestScreenshot, in set: ManifestScreenshotSet
+    ) throws -> ScreenshotPixelSize {
+        guard (screenshot.pixelWidth == nil) == (screenshot.pixelHeight == nil),
+              set.allowsMixedOrientations != true || screenshot.pixelWidth != nil else {
+            throw ReleaseToolError.validation(
+                "Mixed-orientation screenshots require complete per-image dimensions"
+            )
+        }
+        let width = screenshot.pixelWidth ?? set.pixelWidth
+        let height = screenshot.pixelHeight ?? set.pixelHeight
+        guard width > 0, height > 0,
+              (width == set.pixelWidth && height == set.pixelHeight) ||
+                (set.allowsMixedOrientations == true &&
+                 width == set.pixelHeight && height == set.pixelWidth) else {
+            throw ReleaseToolError.validation(
+                "Manifest image dimensions must match the base resolution or its allowed transpose"
+            )
+        }
+        return ScreenshotPixelSize(pixelWidth: width, pixelHeight: height)
     }
 
     public static func decode<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {

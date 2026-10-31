@@ -28,6 +28,7 @@ public struct ScreenshotFamily: Codable, Equatable, Sendable {
     public let pixelWidth: Int
     public let pixelHeight: Int
     public let additionalPixelSizes: [ScreenshotPixelSize]
+    public let allowsMixedOrientations: Bool?
 
     public var acceptedPixelSizes: [ScreenshotPixelSize] {
         [ScreenshotPixelSize(pixelWidth: pixelWidth, pixelHeight: pixelHeight)]
@@ -41,7 +42,8 @@ public struct ScreenshotFamily: Codable, Equatable, Sendable {
         expectedCount: Int = 10,
         pixelWidth: Int,
         pixelHeight: Int,
-        additionalPixelSizes: [ScreenshotPixelSize] = []
+        additionalPixelSizes: [ScreenshotPixelSize] = [],
+        allowsMixedOrientations: Bool? = nil
     ) {
         self.name = name
         self.directory = directory
@@ -50,6 +52,7 @@ public struct ScreenshotFamily: Codable, Equatable, Sendable {
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
         self.additionalPixelSizes = additionalPixelSizes
+        self.allowsMixedOrientations = allowsMixedOrientations
     }
 }
 
@@ -207,6 +210,17 @@ public struct LocaleConfiguration: Codable, Equatable, Sendable {
                         "Screenshot family pixel sizes must not contain duplicates"
                     )
                 }
+                let allowsMixedOrientations: Bool?
+                if let value = object["allowsMixedOrientations"] {
+                    guard case let .bool(enabled) = value else {
+                        throw ReleaseToolError.validation(
+                            "Screenshot family allowsMixedOrientations must be a Boolean"
+                        )
+                    }
+                    allowsMixedOrientations = enabled
+                } else {
+                    allowsMixedOrientations = nil
+                }
                 return ScreenshotFamily(
                     name: name,
                     directory: directory,
@@ -214,7 +228,8 @@ public struct LocaleConfiguration: Codable, Equatable, Sendable {
                     expectedCount: count,
                     pixelWidth: pixelWidth,
                     pixelHeight: pixelHeight,
-                    additionalPixelSizes: additionalPixelSizes
+                    additionalPixelSizes: additionalPixelSizes,
+                    allowsMixedOrientations: allowsMixedOrientations
                 )
             }
         }
@@ -415,6 +430,22 @@ public struct ManifestScreenshot: Codable, Equatable, Sendable {
     public let sha256: String
     public let md5: String
     public let order: Int
+    public let pixelWidth: Int?
+    public let pixelHeight: Int?
+
+    public init(
+        path: String, fileName: String, byteCount: Int, sha256: String,
+        md5: String, order: Int, pixelWidth: Int? = nil, pixelHeight: Int? = nil
+    ) {
+        self.path = path
+        self.fileName = fileName
+        self.byteCount = byteCount
+        self.sha256 = sha256
+        self.md5 = md5
+        self.order = order
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+    }
 }
 
 public struct ManifestScreenshotSet: Codable, Equatable, Sendable {
@@ -423,6 +454,19 @@ public struct ManifestScreenshotSet: Codable, Equatable, Sendable {
     public let pixelWidth: Int
     public let pixelHeight: Int
     public let screenshots: [ManifestScreenshot]
+    public let allowsMixedOrientations: Bool?
+
+    public init(
+        family: String, displayType: String, pixelWidth: Int, pixelHeight: Int,
+        screenshots: [ManifestScreenshot], allowsMixedOrientations: Bool? = nil
+    ) {
+        self.family = family
+        self.displayType = displayType
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+        self.screenshots = screenshots
+        self.allowsMixedOrientations = allowsMixedOrientations
+    }
 }
 
 public struct ScreenshotBackupEntry: Codable, Equatable, Sendable {

@@ -54,6 +54,14 @@
     {
       "appStoreLocale": "pt-PT",
       "screenshotConfiguration": "pt-PT"
+    },
+    {
+      "appStoreLocale": "ms",
+      "screenshotConfiguration": "ms-MY"
+    },
+    {
+      "appStoreLocale": "id",
+      "screenshotConfiguration": "id-ID"
     }
   ],
   "screenshotFamilies": [
@@ -64,6 +72,7 @@
       "expectedCount": 10,
       "pixelWidth": 1320,
       "pixelHeight": 2868,
+      "allowsMixedOrientations": true,
       "additionalPixelSizes": [
         {
           "pixelWidth": 1260,

@@ -225,6 +225,11 @@ validate_locale_configuration() {
       == (.localizations | length))
     and (([.localizations[].screenshotConfiguration] | sort)
       == ([$test_plan[0].configurations[].name] | sort))
+    and ([.screenshotFamilies[]
+      | (if has("allowsMixedOrientations") then
+           (.allowsMixedOrientations | type == "boolean")
+         else true end)
+        and (.allowsMixedOrientations != true or .name == "iphone-6.9")] | all)
     and ([.screenshotFamilies[] | {
       name, directory, displayType, expectedCount, pixelWidth, pixelHeight,
       additionalPixelSizes

@@ -198,7 +198,7 @@ CI runs these journeys on both iPadOS 26 and the latest installed iPadOS 18 runt
 
 For keyboard layout failures, match the device model as well as the runtime reported in the result bundle. An 11-inch iPad in landscape can exhaust chat space that remains available on a 13-inch iPad. The variation-sharing Zen round trip verifies that leaving Zen restores the automatically focused composer with its exact draft name, sharing status, and frozen 120-point preview, retaining a screenshot and accessibility hierarchy in that state. Keyboard dismissal remains covered by the separate preflight and composer interaction journeys.
 
-On iOS 27 a SwiftUI `Menu` item wrapped in a `Section` loses its accessibility identifier and value and keeps only its localized label. Separate the groups of such a menu with `Divider()` wherever a test has to resolve an item without knowing the running language: it draws the same separators in the same places and keeps the identifiers on every runtime. The Analyze actions menu does this because the App Store capture runs in thirteen languages and matches on identifiers alone. `SurroundUITests` pins itself to English and resolves a menu item by identifier or, failing that, by the title of an element that has none, which covers both Mac Catalyst's `NSMenuItem` titles and the still-sectioned game actions menu.
+On iOS 27 a SwiftUI `Menu` item wrapped in a `Section` loses its accessibility identifier and value and keeps only its localized label. Separate the groups of such a menu with `Divider()` wherever a test has to resolve an item without knowing the running language: it draws the same separators in the same places and keeps the identifiers on every runtime. The Analyze actions menu does this because the App Store capture runs in fifteen languages and matches on identifiers alone. `SurroundUITests` pins itself to English and resolves a menu item by identifier or, failing that, by the title of an element that has none, which covers both Mac Catalyst's `NSMenuItem` titles and the still-sectioned game actions menu.
 
 ### Opt-in animation-stall diagnostics
 
@@ -323,7 +323,7 @@ output_path=".build/AppStoreScreenshots-en-US-$(date +%Y%m%d-%H%M%S)"
   --keep-simulators
 ```
 
-`--locale` is repeatable. When it is omitted, the runner captures all thirteen supported localizations.
+`--locale` is repeatable. When it is omitted, the runner captures all fifteen supported localizations.
 
 The output path must not already exist. Reusable build products default to the gitignored `.build/AppStoreScreenshotDerivedData` directory; pass `--derived-data` only to put that cache elsewhere. The runner:
 
@@ -341,7 +341,21 @@ The output path must not already exist. Reusable build products default to the g
 - validates screenshot count, ordering, PNG format, dimensions, orientation metadata, and absence of an alpha channel; and
 - deletes the disposable simulators during teardown, including after a failed capture, without changing the template simulators, unless `--keep-simulators` retains them for separately reviewed cleanup. The retained devices are shut down, and `simulators.tsv` records their exact UUIDs and names even if capture fails.
 
-The complete thirteen-locale run produces 260 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Promotional framing may use a landscape canvas for the iPhone theme card. The public manifest and publisher require uniform dimensions within each screenshot family, so the mixed portrait/landscape set needs per-image size support before publication preparation. The unframed `prepare` path also does not accept this mixed-orientation source set.
+The complete fifteen-locale run produces 300 validated PNGs; an English-only run produces 20. Review `index.html` in the output directory before uploading. Final PNGs are in `screenshots/<locale>/iphone-6.9/` and `screenshots/<locale>/ipad-13/`; the result bundle, raw attachments, metadata, and `xcodebuild` log are retained beside them. Promotional framing may use a landscape canvas for the iPhone theme card. The public iPhone family explicitly allows its approved base size and exact transpose in one set; opted-in manifests record and verify dimensions for each image. Other families retain uniform dimensions. This size support does not add a Duo publishing route or qualify operator-observed captures. See the [tool contract](.github/ci-tools/AppStoreConnectTool/README.md) for the separate GET-only Duo placement inspection.
+
+For a prospective Duo widget diagnostic, explicitly select
+`AppStoreScreenshotTests/testDuoWidgetQualification` on the owned Closed outer
+portrait device and opt in with
+`TEST_RUNNER_SURROUND_DUO_WIDGET_QUALIFICATION=1`. It is separate from the standard
+capture plan. After seeding the offline fixture, it terminates the app and waits
+for `.notRunning` before querying SpringBoard; a global Home press can leave
+Duo's SDK screenshot on an inactive app display. It records all current/stale/
+unready widget identifiers, checks the current token/locale/expiry, and emits
+separate Home-transition and readiness signals for independently enumerated
+native-display diagnostics. These observations can establish prospective fixture
+readiness, but do not join an AX element to physical native pixels or qualify
+historical marketing captures. No widget layout or production preferences are
+changed by the diagnostic.
 
 To deliberately choose a different installed runtime or device templates, set `APP_STORE_IOS_RUNTIME` to the runtime's exact identifier, version, or name and set `APP_STORE_IPHONE_DEVICE` and `APP_STORE_IPAD_DEVICE` to exact simulator names. The runner does not fall back to the latest runtime when the default iOS 27.0 runtime is unavailable. When adding a language, keep the localization catalog, project regions, `AppStoreScreenshots.xctestplan`, `.github/ci-tools/capture-app-store-screenshots.sh`, `.github/ci-tools/app-store-release-locales.json`, and this guide in sync. When adding a scene, keep `AppStoreScreenshotTests.swift` and the runner's scene arrays in sync.
 
@@ -392,6 +406,8 @@ The public locale contract maps these App Store locales to screenshot test-plan 
 | `es-MX` | `es-MX` |
 | `pt-BR` | `pt-BR` |
 | `pt-PT` | `pt-PT` |
+| `ms` | `ms-MY` |
+| `id` | `id-ID` |
 
 Initialize a private package for a version from the public repository root:
 
@@ -401,7 +417,7 @@ Initialize a private package for a version from the public repository root:
   --output ../AppStoreReleases/2.1
 ```
 
-The generated `release.json` references one `localizations/<locale>/whats-new.txt` file for each locale. Fill all thirteen release-note files. A localization may also patch version-scoped `description`, `keywords`, `promotionalText`, `supportUrl`, and `marketingUrl`, or app-wide `name`, `subtitle`, and `privacyPolicyUrl`. Long descriptions and promotional text can use `descriptionFile` and `promotionalTextFile`. The top-level optional `copyright` patches the version-wide value. Omitted fields remain unchanged; an explicit `null` clears only fields whose schema permits clearing. For a locale absent from the released source version, `prepare` requires effective non-empty values for `description`, `keywords`, `supportUrl`, `name`, `subtitle`, and `privacyPolicyUrl`; explicit release-package values take precedence, while values already present in the reviewed target draft are accepted as fallback. The localized name must contain 2–30 characters, and the privacy policy URL must be an absolute HTTP(S) URL. Validation applies Apple's field limits, including the 100-character keyword limit measured conservatively with Swift's UTF-16 view so localized combining marks count the same way as App Store Connect.
+The generated `release.json` references one `localizations/<locale>/whats-new.txt` file for each locale. Fill all fifteen release-note files. A localization may also patch version-scoped `description`, `keywords`, `promotionalText`, `supportUrl`, and `marketingUrl`, or app-wide `name`, `subtitle`, and `privacyPolicyUrl`. Long descriptions and promotional text can use `descriptionFile` and `promotionalTextFile`. The top-level optional `copyright` patches the version-wide value. Omitted fields remain unchanged; an explicit `null` clears only fields whose schema permits clearing. For a locale absent from the released source version, `prepare` requires effective non-empty values for `description`, `keywords`, `supportUrl`, `name`, `subtitle`, and `privacyPolicyUrl`; explicit release-package values take precedence, while values already present in the reviewed target draft are accepted as fallback. The localized name must contain 2–30 characters, and the privacy policy URL must be an absolute HTTP(S) URL. Validation applies Apple's field limits, including the 100-character keyword limit measured conservatively with Swift's UTF-16 view so localized combining marks count the same way as App Store Connect.
 
 Run the offline validation before using API credentials:
 
